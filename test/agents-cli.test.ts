@@ -70,6 +70,7 @@ describe("agents cli", () => {
     ]);
     expect(existsSync(join(tempDir, "workspaces", "default", "BOOTSTRAP.md"))).toBe(true);
     expect(existsSync(join(tempDir, "workspaces", "default", "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(tempDir, "workspaces", "default", "MEMORY.md"))).toBe(true);
     expect(existsSync(join(tempDir, "workspaces", "default", "CLAUDE.md"))).toBe(false);
     expect(output.join("\n")).toContain("Added agent default with tool codex.");
   });

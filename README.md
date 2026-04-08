@@ -219,6 +219,15 @@ source ~/.zshrc
 - If you use custom env names, pass them explicitly with `--slack-app-token`, `--slack-bot-token`, or `--telegram-bot-token`.
 - If `muxbot status` shows `bootstrap=...:missing`, the workspace is missing the tool-specific bootstrap file or `IDENTITY.md`; run `muxbot agents bootstrap <agentId> --mode <mode>`.
 - If `muxbot status` shows `bootstrap=...:not-bootstrapped`, finish the workspace bootstrap by reviewing `BOOTSTRAP.md`, `SOUL.md`, `IDENTITY.md`, and the mode-specific files in that workspace.
+- If Codex shows `Do you trust the contents of this directory?`, keep `trustWorkspace: true` in muxbot config and also mark the workspace as trusted in `~/.codex/config.toml`, for example:
+
+```toml
+[projects."/home/node/.muxbot/workspaces/default"]
+trust_level = "trusted"
+```
+
+- If that trust screen is still blocking, attach directly and continue from tmux with `tmux -S ~/.muxbot/state/muxbot.sock attach -t agent-default-main`.
+- If Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment.
 - If the bot does not answer, check that your shell environment really contains the expected tokens and restart `muxbot` after changing them.
 - If runtime startup still fails, run `muxbot logs` and inspect the recent log tail that `muxbot` now prints automatically on startup failure.
 - If you need the full command list, run `muxbot --help`.

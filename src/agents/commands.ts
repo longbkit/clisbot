@@ -312,13 +312,13 @@ function parseWatchCommand(raw: string) {
   }
 
   const durationToken = match[2];
-  const durationMs = durationToken ? parseCommandDurationMs(durationToken) : undefined;
-  if (durationToken && !durationMs) {
+  const parsedDurationMs = durationToken ? parseCommandDurationMs(durationToken) : null;
+  if (durationToken && !parsedDurationMs) {
     return null;
   }
 
   return {
     intervalMs,
-    durationMs,
+    durationMs: parsedDurationMs ?? undefined,
   };
 }

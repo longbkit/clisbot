@@ -172,7 +172,7 @@ Bootstrap behavior:
 - bootstrap state is `missing` when the tool-specific file or `IDENTITY.md` is absent
 - bootstrap state is `not-bootstrapped` when the required files exist but `BOOTSTRAP.md` is still present
 - bootstrap state becomes `bootstrapped` after the required files exist and `BOOTSTRAP.md` is gone
-- seeded files typically include `BOOTSTRAP.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, and tool guidance files
+- seeded files include `BOOTSTRAP.md`, `SOUL.md`, `IDENTITY.md`, `USER.md`, `MEMORY.md`, and tool guidance files
 
 Operational note:
 
@@ -395,6 +395,10 @@ tmux -S ~/.muxbot/state/muxbot.sock list-sessions
 ```
 
 ```bash
+tmux -S ~/.muxbot/state/muxbot.sock attach -t agent-default-main
+```
+
+```bash
 cat ~/.muxbot/state/sessions.json
 ```
 
@@ -409,6 +413,26 @@ ls -la ~/.muxbot/state/pairing
 ```bash
 tail -f ~/.muxbot/state/muxbot.log
 ```
+
+Codex trust prompt troubleshooting:
+
+- muxbot already keeps `trustWorkspace: true` by default for Codex
+- if Codex still shows `Do you trust the contents of this directory?`, also mark the muxbot workspace as trusted in `~/.codex/config.toml`
+
+Example:
+
+```toml
+[projects."/home/node/.muxbot/workspaces/default"]
+trust_level = "trusted"
+```
+
+- if the trust screen is still visible, attach to the tmux session and continue from there:
+
+```bash
+tmux -S ~/.muxbot/state/muxbot.sock attach -t agent-default-main
+```
+
+- if Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment
 
 Inside each agent workspace, inbound channel files are stored under:
 

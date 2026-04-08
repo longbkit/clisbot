@@ -295,7 +295,7 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     lines.push("  Manual setup is still available with `muxbot agents add ...`.");
     lines.push(...renderOperatorHelpLines("  "));
     lines.push(
-      "  Bootstrap files will be seeded in the agent workspace. Review BOOTSTRAP.md, SOUL.md, USER.md, and IDENTITY.md.",
+      "  Bootstrap files will be seeded in the agent workspace. Review BOOTSTRAP.md, SOUL.md, USER.md, IDENTITY.md, and MEMORY.md.",
     );
     return lines.join("\n");
   }

@@ -15,6 +15,7 @@ type FakeSession = {
   snapshot: string;
   longRunning: boolean;
   longRunningStep: number;
+  trustPromptOnCapture?: number;
 };
 
 class FakeTmuxClient {
@@ -23,6 +24,8 @@ class FakeTmuxClient {
   private readonly invalidResumeSessionIds = new Set<string>();
   private readonly disappearingOnCaptureSessionIds = new Set<string>();
   private readonly duplicateOnNewSession = new Set<string>();
+  private serverRunning = true;
+  private nextTrustPromptCaptureCount: number | null = null;
 
   markInvalidResumeSessionId(sessionId: string) {
     this.invalidResumeSessionIds.add(sessionId);
@@ -36,7 +39,22 @@ class FakeTmuxClient {
     this.duplicateOnNewSession.add(sessionName);
   }
 
+  setServerRunning(value: boolean) {
+    this.serverRunning = value;
+  }
+
+  setTrustPromptOnNextSessionCapture(captureCount: number) {
+    this.nextTrustPromptCaptureCount = captureCount;
+  }
+
+  async isServerRunning() {
+    return this.serverRunning;
+  }
+
   async hasSession(sessionName: string) {
+    if (!this.serverRunning) {
+      return false;
+    }
     return this.sessions.has(sessionName);
   }
 
@@ -56,7 +74,9 @@ class FakeTmuxClient {
         snapshot: `READY ${sessionId}`,
         longRunning: false,
         longRunningStep: 0,
+        trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
       });
+      this.nextTrustPromptCaptureCount = null;
       throw new Error(`duplicate session: ${params.sessionName}`);
     }
     if (
@@ -72,7 +92,10 @@ class FakeTmuxClient {
       snapshot: `READY ${sessionId}`,
       longRunning: false,
       longRunningStep: 0,
+      trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
     });
+    this.nextTrustPromptCaptureCount = null;
+    this.serverRunning = true;
   }
 
   async sendLiteral(sessionName: string, text: string) {
@@ -85,6 +108,13 @@ class FakeTmuxClient {
       return;
     }
     const session = this.requireSession(sessionName);
+    if (
+      session.snapshot.includes("Do you trust the contents of this directory?") ||
+      session.snapshot.includes("Press enter to continue")
+    ) {
+      session.snapshot = `READY ${session.sessionId}`;
+      return;
+    }
     if (session.pendingInput === "/status") {
       session.snapshot = `${session.snapshot}\nSTATUS session id: ${session.sessionId}`;
     } else if (session.pendingInput === "crash") {
@@ -110,6 +140,15 @@ class FakeTmuxClient {
       this.sessions.delete(sessionName);
       throw new Error(`can't find session: ${sessionName}`);
     }
+    if (session.trustPromptOnCapture != null) {
+      if (session.trustPromptOnCapture <= 0) {
+        session.snapshot =
+          "Do you trust the contents of this directory?\nPress enter to continue";
+        session.trustPromptOnCapture = undefined;
+      } else {
+        session.trustPromptOnCapture -= 1;
+      }
+    }
     if (session.longRunning) {
       session.longRunningStep += 1;
       session.snapshot = `${session.snapshot}\nSTEP ${session.longRunningStep} ${session.sessionId}`;
@@ -119,6 +158,9 @@ class FakeTmuxClient {
 
   async killSession(sessionName: string) {
     this.sessions.delete(sessionName);
+    if (this.sessions.size === 0) {
+      this.serverRunning = false;
+    }
   }
 
   private extractSessionId(command: string) {
@@ -580,6 +622,128 @@ describe("AgentService session identity", () => {
       expect(secondRun.snapshot).toContain(`PONG ${nextSessionId ?? ""}`);
       expect(fakeTmux.sessionCommands[1]).toContain(`resume ${firstSessionId ?? ""}`);
       expect(fakeTmux.sessionCommands[2]).toContain(`--session-id ${nextSessionId ?? ""}`);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("waits for a delayed trust prompt on first startup", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "muxbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "muxbot.sock");
+      const configPath = join(tempDir, "muxbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:telegram:dm:42",
+      };
+
+      fakeTmux.setTrustPromptOnNextSessionCapture(1);
+
+      const result = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(result.snapshot).not.toContain("Do you trust the contents of this directory?");
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("recovers when the tmux socket exists but the server is not running", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "muxbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "muxbot.sock");
+      const configPath = join(tempDir, "muxbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.setServerRunning(false);
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:telegram:group:-1001",
+      };
+
+      const result = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(result.snapshot).toContain("PONG");
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

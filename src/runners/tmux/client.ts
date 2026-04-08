@@ -53,6 +53,16 @@ export class TmuxClient {
       .filter(Boolean);
   }
 
+  async isServerRunning() {
+    const result = await this.exec(["list-sessions", "-F", "#{session_name}"]);
+    if (result.exitCode === 0) {
+      return true;
+    }
+
+    const output = `${result.stderr}\n${result.stdout}`.trim();
+    return !output.includes("no server running");
+  }
+
   async newSession(params: {
     sessionName: string;
     cwd: string;

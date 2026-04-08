@@ -9,6 +9,7 @@ They are the workspace bootstrap files used for agent identity, behavior, local 
 - `AGENTS.md`
 - `BOOTSTRAP.md`
 - `IDENTITY.md`
+- `MEMORY.md`
 - `SOUL.md`
 - `TOOLS.md`
 - `USER.md`

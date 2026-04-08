@@ -60,6 +60,18 @@ type AgentExecutionResult = {
   note?: string;
 };
 
+type ActiveSessionRuntimeInfo = SessionRuntimeInfo & {
+  state: "running" | "detached";
+};
+
+function hasActiveRuntime(
+  entry: Awaited<ReturnType<SessionStore["list"]>>[number],
+): entry is Awaited<ReturnType<SessionStore["list"]>>[number] & {
+  runtime: StoredSessionRuntime & { state: "running" | "detached" };
+} {
+  return entry.runtime?.state === "running" || entry.runtime?.state === "detached";
+}
+
 type ShellCommandResult = {
   agentId: string;
   sessionKey: string;
@@ -73,6 +85,8 @@ type ShellCommandResult = {
 
 const BASH_WINDOW_NAME = "bash";
 const BASH_WINDOW_STARTUP_DELAY_MS = 150;
+const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
+const TRUST_PROMPT_MAX_WAIT_MS = 10_000;
 const TMUX_MISSING_SESSION_PATTERN = /can't find session:/i;
 const TMUX_DUPLICATE_SESSION_PATTERN = /duplicate session:/i;
 
@@ -536,17 +550,30 @@ export class AgentService {
 
   private async captureSessionIdentity(resolved: ReturnType<AgentService["resolveTarget"]>) {
     const capture = resolved.runner.sessionId.capture;
-    const startedAt = Date.now();
+    let deadline = Date.now() + capture.timeoutMs;
 
-    await this.tmux.sendLiteral(resolved.sessionName, capture.statusCommand);
-    await sleep(resolved.runner.promptSubmitDelayMs);
-    await this.tmux.sendKey(resolved.sessionName, "Enter");
+    await this.submitSessionInput(
+      resolved.sessionName,
+      capture.statusCommand,
+      resolved.runner.promptSubmitDelayMs,
+    );
 
-    while (Date.now() - startedAt < capture.timeoutMs) {
+    while (Date.now() < deadline) {
       await sleep(capture.pollIntervalMs);
       const snapshot = normalizePaneText(
         await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
       );
+      if (this.hasTrustPrompt(snapshot)) {
+        await this.tmux.sendKey(resolved.sessionName, "Enter");
+        await sleep(1500);
+        deadline = Date.now() + capture.timeoutMs;
+        await this.submitSessionInput(
+          resolved.sessionName,
+          capture.statusCommand,
+          resolved.runner.promptSubmitDelayMs,
+        );
+        continue;
+      }
       const sessionId = extractSessionId(snapshot, capture.pattern);
       if (sessionId) {
         return sessionId;
@@ -564,8 +591,9 @@ export class AgentService {
     await ensureDir(resolved.workspacePath);
     await ensureDir(dirname(this.loadedConfig.raw.tmux.socketPath));
     const existing = await this.sessionStore.get(resolved.sessionKey);
+    const serverRunning = await this.tmux.isServerRunning();
 
-    if (await this.tmux.hasSession(resolved.sessionName)) {
+    if (serverRunning && (await this.tmux.hasSession(resolved.sessionName))) {
       try {
         await this.syncSessionIdentity(resolved);
       } catch (error) {
@@ -621,11 +649,8 @@ export class AgentService {
     }
 
     if (resolved.runner.trustWorkspace) {
-      let snapshot = "";
       try {
-        snapshot = normalizePaneText(
-          await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-        );
+        await this.dismissTrustPromptIfPresent(resolved);
       } catch (error) {
         if (
           resumingExistingSession &&
@@ -644,13 +669,6 @@ export class AgentService {
           }
         }
         throw this.mapSessionError(error, resolved.sessionName, "during startup");
-      }
-      if (
-        snapshot.includes("Do you trust the contents of this directory?") ||
-        snapshot.includes("Press enter to continue")
-      ) {
-        await this.tmux.sendKey(resolved.sessionName, "Enter");
-        await sleep(1500);
       }
     }
 
@@ -767,17 +785,17 @@ export class AgentService {
     };
   }
 
-  async listActiveSessionRuntimes() {
+  async listActiveSessionRuntimes(): Promise<ActiveSessionRuntimeInfo[]> {
     const entries = await this.sessionStore.list();
     return entries
-      .filter((entry) => entry.runtime?.state === "running" || entry.runtime?.state === "detached")
+      .filter(hasActiveRuntime)
       .map((entry) => ({
-        state: entry.runtime?.state ?? "idle",
-        startedAt: entry.runtime?.startedAt,
-        detachedAt: entry.runtime?.detachedAt,
+        state: entry.runtime?.state,
+        startedAt: entry.runtime.startedAt,
+        detachedAt: entry.runtime.detachedAt,
         sessionKey: entry.sessionKey,
         agentId: entry.agentId,
-      })) satisfies SessionRuntimeInfo[];
+      }));
   }
 
   async setConversationFollowUpMode(target: AgentSessionTarget, mode: FollowUpMode) {
@@ -941,14 +959,14 @@ export class AgentService {
     return `This session has been running for over ${resolved.stream.maxRuntimeLabel}. muxbot will keep monitoring it and will post the final result here when it completes. Use \`/attach\` to resume live updates, \`/watch every 30s\` for interval updates, or \`/stop\` to interrupt it.`;
   }
 
-  private createRunUpdate(params: {
+  private createRunUpdate<TStatus extends PromptExecutionStatus>(params: {
     resolved: ReturnType<AgentService["resolveTarget"]>;
-    status: PromptExecutionStatus;
+    status: TStatus;
     snapshot: string;
     fullSnapshot: string;
     initialSnapshot: string;
     note?: string;
-  }): RunUpdate {
+  }): TStatus extends "running" ? RunUpdate : AgentExecutionResult {
     return {
       status: params.status,
       agentId: params.resolved.agentId,
@@ -959,7 +977,7 @@ export class AgentService {
       fullSnapshot: params.fullSnapshot,
       initialSnapshot: params.initialSnapshot,
       note: params.note,
-    };
+    } as TStatus extends "running" ? RunUpdate : AgentExecutionResult;
   }
 
   private async notifyRunObservers(run: ActiveRun, update: RunUpdate) {
@@ -1161,6 +1179,49 @@ export class AgentService {
         ));
       }
     })();
+  }
+
+  private async submitSessionInput(
+    sessionName: string,
+    text: string,
+    promptSubmitDelayMs: number,
+  ) {
+    await this.tmux.sendLiteral(sessionName, text);
+    await sleep(promptSubmitDelayMs);
+    await this.tmux.sendKey(sessionName, "Enter");
+  }
+
+  private hasTrustPrompt(snapshot: string) {
+    return (
+      snapshot.includes("Do you trust the contents of this directory?") ||
+      snapshot.includes("Press enter to continue")
+    );
+  }
+
+  private async dismissTrustPromptIfPresent(
+    resolved: ReturnType<AgentService["resolveTarget"]>,
+  ) {
+    const deadline = Date.now() + Math.max(
+      TRUST_PROMPT_MAX_WAIT_MS,
+      resolved.runner.startupDelayMs,
+    );
+
+    while (Date.now() <= deadline) {
+      const snapshot = normalizePaneText(
+        await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
+      );
+      if (!snapshot) {
+        await sleep(TRUST_PROMPT_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      if (!this.hasTrustPrompt(snapshot)) {
+        return;
+      }
+
+      await this.tmux.sendKey(resolved.sessionName, "Enter");
+      await sleep(1500);
+    }
   }
 
   private async executePrompt(
