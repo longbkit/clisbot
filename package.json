@@ -1,0 +1,52 @@
+{
+  "name": "muxbot",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Chat surfaces for durable AI coding agents running in tmux",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "bun@1.3.8",
+  "bin": {
+    "muxbot": "./bin/muxbot"
+  },
+  "files": [
+    "bin",
+    "src",
+    "config",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "bun --watch run src/main.ts serve-foreground",
+    "start": "bun run src/main.ts start",
+    "restart": "bun run src/main.ts restart",
+    "stop": "bun run src/main.ts stop",
+    "status": "bun run src/main.ts status",
+    "logs": "bun run src/main.ts logs",
+    "init": "bun run src/main.ts init",
+    "print-config-path": "bun run src/main.ts print-config-path",
+    "pairing": "bun run src/main.ts pairing",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "check": "bun run typecheck && bun test"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.6.0",
+    "proper-lockfile": "^4.1.2",
+    "zod": "^3.24.2"
+  },
+  "keywords": [
+    "ai",
+    "slack",
+    "telegram",
+    "tmux",
+    "codex",
+    "claude"
+  ],
+  "engines": {
+    "bun": ">=1.3.8"
+  },
+  "devDependencies": {
+    "bun-types": "^1.3.8",
+    "typescript": "^5.8.3"
+  }
+}

@@ -1,0 +1,853 @@
+import { describe, expect, test } from "bun:test";
+import {
+  cleanInteractionSnapshot,
+  deriveMeaningfulPaneSnapshot,
+  deriveInteractionText,
+  extractFinalAnswer,
+  extractSlackIncrement,
+  mergeSlackStreamBodies,
+  renderSlackInteraction,
+  renderSlackSnapshot,
+  selectSlackCompletionBody,
+  selectSlackSnapshotBody,
+  truncateHead,
+} from "../src/shared/transcript.ts";
+
+describe("snapshot shaping", () => {
+  test("returns a bounded tail excerpt for an initial snapshot while preserving the full snapshot", () => {
+    const snapshot = ["one", "two", "three", "four", "five"].join("\n");
+    const shaped = deriveMeaningfulPaneSnapshot({
+      snapshot,
+      maxLines: 3,
+    });
+
+    expect(shaped.hasMeaningfulChange).toBe(true);
+    expect(shaped.fullSnapshot).toBe(snapshot);
+    expect(shaped.displaySnapshot).toBe(["...", "three", "four", "five"].join("\n"));
+  });
+
+  test("focuses updates on the changed pane region instead of replaying the whole pane", () => {
+    const previousSnapshot = [
+      "header",
+      "task: scanning repo",
+      "step 1",
+      "step 2",
+      "ready",
+    ].join("\n");
+    const snapshot = [
+      "header",
+      "task: scanning repo",
+      "step 1",
+      "step 2",
+      "running command",
+      "ready",
+    ].join("\n");
+
+    const shaped = deriveMeaningfulPaneSnapshot({
+      previousSnapshot,
+      snapshot,
+      contextLines: 1,
+      maxLines: 4,
+    });
+
+    expect(shaped.hasMeaningfulChange).toBe(true);
+    expect(shaped.fullSnapshot).toBe(snapshot);
+    expect(shaped.displaySnapshot).toBe(["...", "step 2", "running command", "ready"].join("\n"));
+  });
+
+  test("keeps the remaining context when later pane lines disappear", () => {
+    const shaped = deriveMeaningfulPaneSnapshot({
+      previousSnapshot: ["line 1", "line 2", "line 3"].join("\n"),
+      snapshot: "line 1",
+    });
+
+    expect(shaped.hasMeaningfulChange).toBe(true);
+    expect(shaped.fullSnapshot).toBe("line 1");
+    expect(shaped.displaySnapshot).toBe("line 1");
+  });
+
+  test("strips codex chrome while keeping meaningful content", () => {
+    const cleaned = cleanInteractionSnapshot(`
+Welcome to Codex, OpenAI's command-line coding agent
+
+› list all files
+
+  in this workspace please
+
+  gpt-5.4 high · 97% left · ~/.muxbot/workspaces/default
+
+╭────────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.118.0)                 │
+│                                            │
+│ model:     gpt-5.4 high   /model to change │
+│ directory: ~/.muxbot/workspaces/default │
+╰────────────────────────────────────────────╯
+
+  Tip: New Build faster with the Codex App.
+
+• I'm listing the files in the current workspace.
+• No files are present in /Users/longluong/.muxbot/workspaces/default.
+    `);
+
+    expect(cleaned).not.toContain("OpenAI Codex");
+    expect(cleaned).not.toContain("Tip:");
+    expect(cleaned).not.toContain("› list all files");
+    expect(cleaned).not.toContain("in this workspace please");
+    expect(cleaned).toContain("I'm listing the files in the current workspace.");
+    expect(cleaned).toContain("No files are present");
+  });
+
+  test("derives only the current interaction text relative to the baseline pane", () => {
+    const baseline = `
+› hello
+
+• Fine.
+    `;
+    const current = `
+› hello
+
+• Fine.
+
+› list all files
+
+• I'm listing the files in the current workspace.
+• No files are present in /Users/longluong/.muxbot/workspaces/default.
+    `;
+
+    const derived = deriveInteractionText(baseline, current);
+    expect(derived).not.toContain("Fine.");
+    expect(derived).toContain("I'm listing the files in the current workspace.");
+    expect(derived).toContain("No files are present");
+  });
+
+  test("derives only newly appended content when the pane scrolls", () => {
+    const baseline = `
+What changed today vs. yesterday
+
+- Today: commentary.
+- Yesterday: launch summaries.
+
+If you want, I can turn this into a short table.
+    `;
+    const current = `
+- Today: commentary.
+- Yesterday: launch summaries.
+
+If you want, I can turn this into a short table.
+
+# Gemma 4 Coverage: April 4 vs April 3, 2026
+
+On April 4, 2026, coverage was mostly follow-on analysis.
+
+- Today focused on licensing.
+- Yesterday focused on launch facts.
+    `;
+
+    expect(deriveInteractionText(baseline, current)).toBe(
+      [
+        "# Gemma 4 Coverage: April 4 vs April 3, 2026",
+        "",
+        "On April 4, 2026, coverage was mostly follow-on analysis.",
+        "",
+        "- Today focused on licensing.",
+        "- Yesterday focused on launch facts.",
+      ].join("\n"),
+    );
+  });
+
+  test("derives newly appended content when the old snapshot appears later in the current pane", () => {
+    const baseline = `
+older context
+What changed today vs. yesterday
+
+- Today: commentary.
+- Yesterday: launch summaries.
+
+If you want, I can turn this into a short table.
+    `;
+    const current = `
+stale header line
+older context
+What changed today vs. yesterday
+
+- Today: commentary.
+- Yesterday: launch summaries.
+
+If you want, I can turn this into a short table.
+
+# Repo Overview
+
+This project maps channel messages into tmux-backed agents.
+    `;
+
+    expect(deriveInteractionText(baseline, current)).toBe(
+      ["# Repo Overview", "", "This project maps channel messages into tmux-backed agents."].join(
+        "\n",
+      ),
+    );
+  });
+
+  test("unwraps soft-wrapped tmux lines into cleaner Slack text", () => {
+    const cleaned = cleanInteractionSnapshot(`
+• As of April 4, 2026, I’m not seeing a new official Google update on Gemma 4
+  today. The main official launch was on April 2, 2026, and April 3 had broader
+  media pickup.
+    `);
+
+    expect(cleaned).toContain(
+      "• As of April 4, 2026, I’m not seeing a new official Google update on Gemma 4 today. The main official launch was on April 2, 2026, and April 3 had broader media pickup.",
+    );
+    expect(cleaned).not.toContain("\n  today.");
+  });
+
+  test("unwraps codex markdown blocks into direct markdown text", () => {
+    const cleaned = cleanInteractionSnapshot(`
+› compare Gemma 4 coverage
+
+• # Gemma 4 Coverage: April 4 vs April 3, 2026
+
+  On April 4, 2026, Gemma 4 coverage was mostly follow-on analysis.
+
+  - Today focused on licensing and local deployment.
+  - Yesterday focused on launch facts.
+
+  ## Sources
+
+  - Google blog
+
+  (https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/)
+    `);
+
+    expect(cleaned).toStartWith("# Gemma 4 Coverage: April 4 vs April 3, 2026");
+    expect(cleaned).toContain("## Sources");
+    expect(cleaned).toContain(
+      "- Google blog (https://blog.google/innovation-and-ai/technology/developers-tools/gemma-4/)",
+    );
+    expect(cleaned).not.toContain("• # Gemma");
+  });
+
+  test("drops codex footer timing lines", () => {
+    const cleaned = cleanInteractionSnapshot(`
+› search the web
+
+• Searching the web
+
+• Working (11s • esc to interrupt)
+
+4s esc to interrupt
+
+• Final answer.
+    `);
+
+    expect(cleaned).toContain("• Searching the web");
+    expect(cleaned).toContain("• Final answer.");
+    expect(cleaned).not.toContain("esc to interrupt");
+  });
+
+  test("drops wrapped interrupt status footer lines during running snapshots", () => {
+    const cleaned = cleanInteractionSnapshot(`
+› explain this codebase
+
+• Exploring the workspace
+
+◦ Working (3s • esc to interrupt)
+
+5s • esc to interrupt)
+
+8s • esc to interrupt)
+
+• The workspace contains a Bun service and tmux-backed runner integration.
+    `);
+
+    expect(cleaned).toContain("• Exploring the workspace");
+    expect(cleaned).toContain("• The workspace contains a Bun service and tmux-backed runner integration.");
+    expect(cleaned).not.toContain("Working (3s");
+    expect(cleaned).not.toContain("5s • esc to interrupt");
+    expect(cleaned).not.toContain("8s • esc to interrupt");
+  });
+
+  test("strips claude chrome and prompt echo while keeping the answer", () => {
+    const cleaned = cleanInteractionSnapshot(`
+╭─── Claude Code v2.1.92 ───────────────────────────────────────────────────────────────────╮
+│                                    │ Tips for getting started                             │
+│            Welcome back!           │ Ask Claude to create a new app or clone a repository │
+│                                    │ ──────────────────────────────────────────────────── │
+│               ▐▛███▜▌              │ Recent activity                                      │
+│              ▝▜█████▛▘             │ No recent activity                                   │
+│                ▘▘ ▝▝               │                                                      │
+│                                    │                                                      │
+│   Sonnet 4.6 · API Usage Billing   │                                                      │
+│   ~/.muxbot/workspaces/claude   │                                                      │
+╰───────────────────────────────────────────────────────────────────────────────────────────╯
+
+❯ reply with exactly PONG and nothing else.
+
+⏺ PONG
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+❯
+──────────────────────────────────────────────────────────────────────────────────────────────
+   Sonnet 4.6 | claude | 164 (23%) | $0.01 | 11s                          ◐ medium · /effort
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+    `);
+
+    expect(cleaned).toBe("PONG");
+  });
+
+  test("drops claude progress noise during running snapshots", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+❯ hi em
+
+Burrowing
+
+Read 7 files, recalled 1 memory (ctrl+o to expand)
+
+AGENTS.md
+
+⏺ chào em. anh đây.
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+❯
+──────────────────────────────────────────────────────────────────────────────────────────────
+   Sonnet 4.6 | claude | 78.0K (29%) | $0.27 | 24s                1 MCP server failed · /mcp
+  ⏵⏵ bypass permissions on (shift+tab to cycle)
+    `);
+
+    expect(cleaned).toBe("chào em. anh đây.");
+  });
+
+  test("drops claude worked-for footer lines from settled snapshots", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+⏺ item 089: abcdefghijklmnopqrstuvwxyz
+  item 090: abcdefghijklmnopqrstuvwxyz
+
+Worked for 36s
+    `);
+
+    expect(cleaned).toBe(
+      ["item 089: abcdefghijklmnopqrstuvwxyz", "item 090: abcdefghijklmnopqrstuvwxyz"].join("\n"),
+    );
+  });
+
+  test("drops claude cooked-for footer lines from settled snapshots", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+⏺ item 089: abcdefghijklmnopqrstuvwxyz
+  item 090: abcdefghijklmnopqrstuvwxyz
+
+✻ Cooked for 50s
+    `);
+
+    expect(cleaned).toBe(
+      ["item 089: abcdefghijklmnopqrstuvwxyz", "item 090: abcdefghijklmnopqrstuvwxyz"].join("\n"),
+    );
+  });
+
+  test("keeps claude tool progress detail but strips ui-only hints", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+❯ tìm tin tức việt nam
+
+⏺ web-explorer(gather Vietnam news)
+  ⎿  Initializing…
+     (ctrl+b ctrl+b (twice) to run in background)
+
+· Flummoxing… (30s · ↓ 476 tokens · thought for 4s)
+    `);
+
+    expect(cleaned).toBe(
+      [
+        "web-explorer(gather Vietnam news)",
+        "Initializing…",
+        "",
+        "• Flummoxing… (30s · ↓ 476 tokens · thought for 4s)",
+      ].join("\n"),
+    );
+  });
+
+  test("keeps claude tool lines after the prompt instead of stripping them as prompt continuation", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+❯ tìm tin tức việt nam
+
+  Read 7 files (ctrl+o to expand)
+
+  Web Search("tin tức Việt Nam hôm nay 2026")
+
+✽ Effecting… (thought for 3s)
+    `);
+
+    expect(cleaned).toBe(
+      ['Web Search("tin tức Việt Nam hôm nay 2026")', "", "✽ Effecting… (thought for 3s)"].join(
+        "\n",
+      ),
+    );
+  });
+
+  test("drops wrapped claude prompt continuation lines before the first blank separator", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+❯ Reply with exactly 120 lines. Each line must be in the format \`item NNN:
+abcdefghijklmnopqrstuvwxyz\` where NNN starts at 001 and increments by 1. No intro. No code
+fence. No extra text.
+
+⏺ item 001: abcdefghijklmnopqrstuvwxyz
+  item 002: abcdefghijklmnopqrstuvwxyz
+    `);
+
+    expect(cleaned).toBe(
+      ["item 001: abcdefghijklmnopqrstuvwxyz", "item 002: abcdefghijklmnopqrstuvwxyz"].join("\n"),
+    );
+  });
+
+  test("treats standalone claude gerund progress frames as non-meaningful output", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.muxbot/workspaces/claude
+
+❯ hi em
+
+Scampering
+
+:eight_spoked_asterisk: Tomfoolering
+
+Searched for 1 pattern, read 5 files (ctrl+o to expand)
+    `);
+
+    expect(cleaned).toBe("");
+  });
+
+  test("collapses duplicated progress redraw lines inside one cleaned snapshot", () => {
+    const cleaned = cleanInteractionSnapshot(`
+✽ Finagling
+
+Finagling
+
+Finagling
+
+Finagling
+    `);
+
+    expect(cleaned).toBe("✽ Finagling");
+  });
+
+  test("renders metadata and truncated snapshot", () => {
+    const rendered = renderSlackSnapshot({
+      agentId: "default",
+      sessionName: "default",
+      workspacePath: "/tmp/workspace",
+      status: "running",
+      snapshot: "a".repeat(5000),
+      maxChars: 100,
+    });
+
+    expect(rendered).toContain("agent: default");
+    expect(rendered).toContain("status: running");
+    expect(rendered).toContain("```");
+    expect(rendered.length).toBeLessThan(4300);
+  });
+
+  test("renders chat-first Slack interaction text without metadata", () => {
+    expect(
+      renderSlackInteraction({
+        status: "queued",
+        content: "",
+        maxChars: 200,
+        queuePosition: 2,
+      }),
+    ).toBe("_Queued: 2 ahead._");
+
+    expect(
+      renderSlackInteraction({
+        status: "running",
+        content: "Thinking...\nFound the issue.",
+        maxChars: 200,
+      }),
+    ).toBe("Thinking...\nFound the issue.");
+  });
+
+  test("extracts the final answer and drops leading progress blocks on completion", () => {
+    const extracted = extractFinalAnswer(`
+• I’m checking the latest web results for Gemma 4 and comparing coverage from April 4, 2026 versus April 3, 2026.
+
+• Searching the web
+
+• Searched Gemma 4 news April 4 2026
+
+• Searching the web
+
+• Searched Reuters Gemma 4 April 2026
+
+• As of April 4, 2026, I’m not seeing a new official Google update on Gemma 4 today.
+
+What changed today vs. yesterday
+
+- Today: mostly follow-on analysis.
+- Yesterday: broader launch coverage.
+    `);
+
+    expect(extracted).toStartWith("• As of April 4, 2026");
+    expect(extracted).not.toContain("Searching the web");
+    expect(extracted).not.toContain("I’m checking the latest web results");
+  });
+
+  test("extracts the final answer and drops standalone claude gerund progress blocks", () => {
+    const extracted = extractFinalAnswer(`
+Determining
+
+PONG
+    `);
+
+    expect(extracted).toBe("PONG");
+  });
+
+  test("extracts a codex single-line final answer without the assistant bullet prefix", () => {
+    const extracted = extractFinalAnswer(`
+› Reply with exactly PONG and nothing else.
+
+• PONG
+    `);
+
+    expect(extracted).toBe("PONG");
+  });
+
+  test("extracts the final answer and drops codex tool and file blocks on completion", () => {
+    const extracted = extractFinalAnswer(`
+Mình đang nạp context của workspace trước đã: đọc SOUL.md, USER.md, các memory gần đây, rồi
+sẽ trả lời trong đúng ngữ cảnh của phiên này.
+
+Ran pwd
+ /Users/longluong/.muxbot/workspace/default
+
+Explored List ls -1
+
+Ran for f in SOUL.md USER.md MEMORY.md memory/2026-04-05.md memory/2026-04-04.md
+ FILE:SOUL.md --- 125 lines
+
+_Good luck out there. Make it count._
+
+Hey. Anh vừa lên phiên này nên đang ở trạng thái fresh.
+
+Trong workspace này còn BOOTSTRAP.md, nghĩa là mình đang ở lần khởi động đầu. Nên câu đầu
+tiên đúng ra là: mình là ai, còn em là ai?
+
+Cho anh 2 mẩu là đủ để bắt đầu:
+
+1. Em muốn gọi anh là gì?
+2. Anh nên gọi em là gì?
+    `);
+
+    expect(extracted).toStartWith("Hey. Anh vừa lên phiên này");
+    expect(extracted).toContain("Cho anh 2 mẩu là đủ để bắt đầu:");
+    expect(extracted).not.toContain("Mình đang nạp context");
+    expect(extracted).not.toContain("Ran pwd");
+    expect(extracted).not.toContain("Explored List ls -1");
+    expect(extracted).not.toContain("FILE:SOUL.md");
+    expect(extracted).not.toContain("Good luck out there");
+  });
+
+  test("extracts the final answer after generic shell command and filesystem blocks", () => {
+    const extracted = extractFinalAnswer(`
+Preparing workspace.
+
+$ pwd
+/Users/longluong/.muxbot/workspace/default
+
+$ ls
+README.md
+src
+package.json
+
+The workspace is ready.
+
+Next, I can inspect the source tree or run tests.
+    `);
+
+    expect(extracted).toBe(
+      ["The workspace is ready.", "", "Next, I can inspect the source tree or run tests."].join(
+        "\n",
+      ),
+    );
+  });
+
+  test("extracts the final answer after generic path-list trace blocks", () => {
+    const extracted = extractFinalAnswer(`
+Scanning candidate files.
+
+src/index.ts
+src/shared/transcript.ts
+docs/features/runners/README.md
+
+The duplicate came from settlement merging rather than tmux capture.
+    `);
+
+    expect(extracted).toBe("The duplicate came from settlement merging rather than tmux capture.");
+  });
+
+  test("completed interaction truncation preserves the beginning of the final answer", () => {
+    const rendered = renderSlackInteraction({
+      status: "completed",
+      content: `
+• Searching the web
+
+• Searched Gemma 4 news April 4 2026
+
+• As of April 4, 2026, I’m not seeing a new official Google update on Gemma 4 today.
+
+What changed today vs. yesterday
+
+- Today: mostly follow-on analysis.
+- Yesterday: broader launch coverage.
+      `,
+      maxChars: 120,
+    });
+
+    expect(rendered).toStartWith("• As of April 4, 2026");
+    expect(rendered).not.toContain("Searching the web");
+    expect(rendered.endsWith("\n...")).toBe(true);
+  });
+
+  test("completed interaction can preserve streamed content when response policy is all", () => {
+    const rendered = renderSlackInteraction({
+      status: "completed",
+      content: [
+        "• Searching the web",
+        "",
+        "# Codebase Overview",
+        "",
+        "This workspace is currently empty.",
+      ].join("\n"),
+      maxChars: 200,
+      responsePolicy: "all",
+    });
+
+    expect(rendered).toContain("• Searching the web");
+    expect(rendered).toContain("# Codebase Overview");
+  });
+
+  test("completed interaction strips a codex single-line assistant bullet in final mode", () => {
+    const rendered = renderSlackInteraction({
+      status: "completed",
+      content: "• PONG",
+      maxChars: 200,
+      responsePolicy: "final",
+    });
+
+    expect(rendered).toBe("PONG");
+  });
+
+  test("truncateHead keeps the start of long content", () => {
+    const rendered = truncateHead("abcdefghij", 8);
+    expect(rendered).toBe("abcd\n...");
+  });
+
+  test("extracts only appended content when snapshots overlap", () => {
+    const previous = [
+      "Welcome to Codex",
+      "",
+      "› Reply with exactly PONG and nothing else.",
+      "",
+      "• thinking",
+    ].join("\n");
+    const current = [
+      "",
+      "› Reply with exactly PONG and nothing else.",
+      "",
+      "• thinking",
+      "",
+      "• PONG",
+    ].join("\n");
+
+    expect(extractSlackIncrement(previous, current)).toBe("• PONG");
+  });
+
+  test("returns only the final delta when response policy keeps streamed replies", () => {
+    const completion = selectSlackCompletionBody({
+      previousBody: [
+        "• Searching the web",
+        "",
+        "# Codebase Overview",
+        "",
+        "This workspace is currently empty.",
+      ].join("\n"),
+      finalBody: [
+        "• Searching the web",
+        "",
+        "# Codebase Overview",
+        "",
+        "This workspace is currently empty.",
+        "",
+        "- No source files are present.",
+      ].join("\n"),
+      response: "all",
+    });
+
+    expect(completion).toBe("- No source files are present.");
+  });
+
+  test("extracts normalized line deltas when progress markers change", () => {
+    const delta = extractSlackIncrement(
+      [
+        "* Recombobulating...",
+        "",
+        "web-explorer(gather Vietnam news)",
+      ].join("\n"),
+      [
+        ":eight_spoked_asterisk: Recombobulating...",
+        "",
+        "web-explorer(gather Vietnam news)",
+        "",
+        "Initializing…",
+      ].join("\n"),
+    );
+
+    expect(delta).toBe("Initializing…");
+  });
+
+  test("merges streamed bodies without duplicating the boundary line when indentation differs", () => {
+    const merged = mergeSlackStreamBodies(
+      [
+        "Searched https://vnexpress.net/doi-sim-sang-dien-thoai-moi-phai-xac-thuc-khuon-mat-5058317.html",
+        "",
+        " Tính đến trưa thứ bảy, 4/4/2026 giờ Việt Nam, vài tin Việt Nam đáng chú ý là:",
+      ].join("\n"),
+      [
+        "Tính đến trưa thứ bảy, 4/4/2026 giờ Việt Nam, vài tin Việt Nam đáng chú ý là:",
+        "",
+        "- Kinh tế quý I tăng mạnh",
+      ].join("\n"),
+    );
+
+    expect(merged).toBe(
+      [
+        "Searched https://vnexpress.net/doi-sim-sang-dien-thoai-moi-phai-xac-thuc-khuon-mat-5058317.html",
+        "",
+        "Tính đến trưa thứ bảy, 4/4/2026 giờ Việt Nam, vài tin Việt Nam đáng chú ý là:",
+        "",
+        "- Kinh tế quý I tăng mạnh",
+      ].join("\n"),
+    );
+  });
+
+  test("merges repeated progress updates without accumulating duplicate lines", () => {
+    const merged = mergeSlackStreamBodies(
+      [
+        "* Recombobulating...",
+        "",
+        "* Recombobulating...",
+      ].join("\n"),
+      [
+        ":eight_spoked_asterisk: Recombobulating...",
+        "",
+        "• Recombobulating...",
+      ].join("\n"),
+    );
+
+    expect(merged).toBe("* Recombobulating...");
+  });
+
+  test("dedupes repeated progress lines even when the first streamed delta is already noisy", () => {
+    const merged = mergeSlackStreamBodies(
+      "",
+      [
+        "Creating",
+        "",
+        ":eight_spoked_asterisk: Creating",
+        "",
+        "Creating",
+      ].join("\n"),
+    );
+
+    expect(merged).toBe("Creating");
+  });
+
+  test("dedupes claude progress markers that use the ✽ glyph", () => {
+    const merged = mergeSlackStreamBodies(
+      "Quantumizing",
+      [
+        "✽ Quantumizing",
+        "",
+        ":eight_spoked_asterisk: Quantumizing",
+      ].join("\n"),
+    );
+
+    expect(merged).toBe("✽ Quantumizing");
+  });
+
+  test("suppresses completion replay when the final body was already streamed", () => {
+    const completion = selectSlackCompletionBody({
+      previousBody: [
+        "# Codebase Overview",
+        "",
+        "This workspace is currently empty.",
+      ].join("\n"),
+      finalBody: [
+        "# Codebase Overview",
+        "",
+        "This workspace is currently empty.",
+      ].join("\n"),
+      response: "all",
+    });
+
+    expect(completion).toBe("");
+  });
+
+  test("keeps the full final body when response policy is final", () => {
+    const completion = selectSlackCompletionBody({
+      previousBody: "• Searching the web",
+      finalBody: [
+        "# Codebase Overview",
+        "",
+        "This workspace is currently empty.",
+      ].join("\n"),
+      response: "final",
+    });
+
+    expect(completion).toBe(
+      ["# Codebase Overview", "", "This workspace is currently empty."].join("\n"),
+    );
+  });
+
+  test("keeps only the newly appended body while running", () => {
+    const body = selectSlackSnapshotBody({
+      status: "running",
+      initialSnapshot: "line 1\nline 2",
+      snapshot: "line 1\nline 2\nline 3",
+      previousBody: "line 2",
+    });
+
+    expect(body).toBe("line 3");
+  });
+
+  test("reuses the last meaningful body when completion adds no new content", () => {
+    const body = selectSlackSnapshotBody({
+      status: "completed",
+      initialSnapshot: "line 1\nline 2\nline 3",
+      snapshot: "line 1\nline 2\nline 3",
+      previousBody: "line 3",
+    });
+
+    expect(body).toBe("line 3");
+  });
+});

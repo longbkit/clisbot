@@ -1,0 +1,173 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "lastTouchedAt": "2026-04-07T00:00:00.000Z"
+  },
+  "tmux": {
+    "socketPath": "~/.muxbot/state/muxbot.sock"
+  },
+  "session": {
+    "mainKey": "main",
+    "dmScope": "main",
+    "identityLinks": {},
+    "storePath": "~/.muxbot/state/sessions.json"
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "~/.muxbot/workspaces/{agentId}",
+      "runner": {
+        "command": "codex",
+        "args": [
+          "--dangerously-bypass-approvals-and-sandbox",
+          "--no-alt-screen",
+          "-C",
+          "{workspace}"
+        ],
+        "trustWorkspace": true,
+        "startupDelayMs": 3000,
+        "promptSubmitDelayMs": 150,
+        "sessionId": {
+          "create": {
+            "mode": "runner",
+            "args": []
+          },
+          "capture": {
+            "mode": "status-command",
+            "statusCommand": "/status",
+            "pattern": "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+            "timeoutMs": 5000,
+            "pollIntervalMs": 250
+          },
+          "resume": {
+            "mode": "command",
+            "args": [
+              "resume",
+              "{sessionId}",
+              "--dangerously-bypass-approvals-and-sandbox",
+              "--no-alt-screen",
+              "-C",
+              "{workspace}"
+            ]
+          }
+        }
+      },
+      "stream": {
+        "captureLines": 160,
+        "updateIntervalMs": 2000,
+        "idleTimeoutMs": 6000,
+        "noOutputTimeoutMs": 20000,
+        "maxRuntimeMin": 15,
+        "maxMessageChars": 3500
+      },
+      "session": {
+        "createIfMissing": true,
+        "staleAfterMinutes": 60,
+        "name": "{sessionKey}"
+      }
+    },
+    "list": []
+  },
+  "bindings": [],
+  "control": {
+    "configReload": {
+      "watch": true,
+      "watchDebounceMs": 250
+    }
+  },
+  "channels": {
+    "slack": {
+      "enabled": true,
+      "mode": "socket",
+      "appToken": "${SLACK_APP_TOKEN}",
+      "botToken": "${SLACK_BOT_TOKEN}",
+      "ackReaction": ":heavy_check_mark:",
+      "typingReaction": "",
+      "processingStatus": {
+        "enabled": true,
+        "status": "Working...",
+        "loadingMessages": []
+      },
+      "allowBots": false,
+      "replyToMode": "thread",
+      "channelPolicy": "allowlist",
+      "groupPolicy": "allowlist",
+      "defaultAgentId": "default",
+      "privilegeCommands": {
+        "enabled": false,
+        "allowUsers": []
+      },
+      "commandPrefixes": {
+        "slash": [
+          "::",
+          "\\"
+        ],
+        "bash": [
+          "!"
+        ]
+      },
+      "streaming": "all",
+      "response": "final",
+      "followUp": {
+        "mode": "auto",
+        "participationTtlMin": 5
+      },
+      "channels": {},
+      "groups": {},
+      "directMessages": {
+        "enabled": true,
+        "policy": "pairing",
+        "allowFrom": [],
+        "requireMention": false,
+        "agentId": "default",
+        "privilegeCommands": {
+          "enabled": false,
+          "allowUsers": []
+        }
+      }
+    },
+    "telegram": {
+      "enabled": true,
+      "mode": "polling",
+      "botToken": "${TELEGRAM_BOT_TOKEN}",
+      "allowBots": false,
+      "groupPolicy": "allowlist",
+      "defaultAgentId": "default",
+      "privilegeCommands": {
+        "enabled": false,
+        "allowUsers": []
+      },
+      "commandPrefixes": {
+        "slash": [
+          "::",
+          "\\"
+        ],
+        "bash": [
+          "!"
+        ]
+      },
+      "streaming": "all",
+      "response": "final",
+      "followUp": {
+        "mode": "auto",
+        "participationTtlMin": 5
+      },
+      "polling": {
+        "timeoutSeconds": 20,
+        "retryDelayMs": 1000
+      },
+      "groups": {},
+      "directMessages": {
+        "enabled": true,
+        "policy": "pairing",
+        "allowFrom": [],
+        "requireMention": false,
+        "allowBots": false,
+        "agentId": "default",
+        "privilegeCommands": {
+          "enabled": false,
+          "allowUsers": []
+        }
+      }
+    }
+  }
+}
