@@ -1,6 +1,7 @@
 import { sleep } from "../../shared/process.ts";
 import { deriveInteractionText, normalizePaneText } from "../../shared/transcript.ts";
 import type { TmuxClient } from "./client.ts";
+import { submitTmuxSessionInput } from "./session-handshake.ts";
 
 export type TmuxRunMonitorParams = {
   tmux: TmuxClient;
@@ -45,9 +46,12 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let detachedNotified = params.detachedAlready;
 
   if (params.prompt) {
-    await params.tmux.sendLiteral(params.sessionName, params.prompt);
-    await sleep(params.promptSubmitDelayMs);
-    await params.tmux.sendKey(params.sessionName, "Enter");
+    await submitTmuxSessionInput({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      text: params.prompt,
+      promptSubmitDelayMs: params.promptSubmitDelayMs,
+    });
   }
 
   while (true) {

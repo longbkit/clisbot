@@ -11,7 +11,7 @@ import {
   type RunUpdate,
   type StoredSessionRuntime,
 } from "./run-observation.ts";
-import { createSessionId, extractSessionId } from "./session-identity.ts";
+import { createSessionId } from "./session-identity.ts";
 import { SessionStore } from "./session-store.ts";
 import {
   getAgentEntry,
@@ -25,6 +25,10 @@ import { sleep } from "../shared/process.ts";
 import { deriveInteractionText, normalizePaneText } from "../shared/transcript.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { monitorTmuxRun } from "../runners/tmux/run-monitor.ts";
+import {
+  captureTmuxSessionIdentity,
+  dismissTmuxTrustPromptIfPresent,
+} from "../runners/tmux/session-handshake.ts";
 import { AgentJobQueue } from "./job-queue.ts";
 
 export type AgentSessionTarget = {
@@ -85,8 +89,6 @@ type ShellCommandResult = {
 
 const BASH_WINDOW_NAME = "bash";
 const BASH_WINDOW_STARTUP_DELAY_MS = 150;
-const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
-const TRUST_PROMPT_MAX_WAIT_MS = 10_000;
 const TMUX_MISSING_SESSION_PATTERN = /can't find session:/i;
 const TMUX_DUPLICATE_SESSION_PATTERN = /duplicate session:/i;
 
@@ -550,37 +552,16 @@ export class AgentService {
 
   private async captureSessionIdentity(resolved: ReturnType<AgentService["resolveTarget"]>) {
     const capture = resolved.runner.sessionId.capture;
-    let deadline = Date.now() + capture.timeoutMs;
-
-    await this.submitSessionInput(
-      resolved.sessionName,
-      capture.statusCommand,
-      resolved.runner.promptSubmitDelayMs,
-    );
-
-    while (Date.now() < deadline) {
-      await sleep(capture.pollIntervalMs);
-      const snapshot = normalizePaneText(
-        await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-      );
-      if (this.hasTrustPrompt(snapshot)) {
-        await this.tmux.sendKey(resolved.sessionName, "Enter");
-        await sleep(1500);
-        deadline = Date.now() + capture.timeoutMs;
-        await this.submitSessionInput(
-          resolved.sessionName,
-          capture.statusCommand,
-          resolved.runner.promptSubmitDelayMs,
-        );
-        continue;
-      }
-      const sessionId = extractSessionId(snapshot, capture.pattern);
-      if (sessionId) {
-        return sessionId;
-      }
-    }
-
-    return null;
+    return captureTmuxSessionIdentity({
+      tmux: this.tmux,
+      sessionName: resolved.sessionName,
+      promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
+      captureLines: resolved.stream.captureLines,
+      statusCommand: capture.statusCommand,
+      pattern: capture.pattern,
+      timeoutMs: capture.timeoutMs,
+      pollIntervalMs: capture.pollIntervalMs,
+    });
   }
 
   private async ensureSessionReady(
@@ -650,7 +631,12 @@ export class AgentService {
 
     if (resolved.runner.trustWorkspace) {
       try {
-        await this.dismissTrustPromptIfPresent(resolved);
+        await dismissTmuxTrustPromptIfPresent({
+          tmux: this.tmux,
+          sessionName: resolved.sessionName,
+          captureLines: resolved.stream.captureLines,
+          startupDelayMs: resolved.runner.startupDelayMs,
+        });
       } catch (error) {
         if (
           resumingExistingSession &&
@@ -1179,49 +1165,6 @@ export class AgentService {
         ));
       }
     })();
-  }
-
-  private async submitSessionInput(
-    sessionName: string,
-    text: string,
-    promptSubmitDelayMs: number,
-  ) {
-    await this.tmux.sendLiteral(sessionName, text);
-    await sleep(promptSubmitDelayMs);
-    await this.tmux.sendKey(sessionName, "Enter");
-  }
-
-  private hasTrustPrompt(snapshot: string) {
-    return (
-      snapshot.includes("Do you trust the contents of this directory?") ||
-      snapshot.includes("Press enter to continue")
-    );
-  }
-
-  private async dismissTrustPromptIfPresent(
-    resolved: ReturnType<AgentService["resolveTarget"]>,
-  ) {
-    const deadline = Date.now() + Math.max(
-      TRUST_PROMPT_MAX_WAIT_MS,
-      resolved.runner.startupDelayMs,
-    );
-
-    while (Date.now() <= deadline) {
-      const snapshot = normalizePaneText(
-        await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-      );
-      if (!snapshot) {
-        await sleep(TRUST_PROMPT_POLL_INTERVAL_MS);
-        continue;
-      }
-
-      if (!this.hasTrustPrompt(snapshot)) {
-        return;
-      }
-
-      await this.tmux.sendKey(resolved.sessionName, "Enter");
-      await sleep(1500);
-    }
   }
 
   private async executePrompt(
