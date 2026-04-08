@@ -125,8 +125,8 @@ describe("renderCliHelp", () => {
     expect(help).toContain("muxbot agents <subcommand>");
     expect(help).toContain("muxbot init [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>]");
     expect(help).not.toContain("print-config-path");
-    expect(help).toContain("npx muxbot start");
-    expect(help).toContain("npm install -g muxbot && muxbot start");
+    expect(help).toContain("npx @muxbot/muxbot start");
+    expect(help).toContain("npm install -g @muxbot/muxbot && muxbot start");
     expect(help).toContain("Docs: docs/user-guide/README.md");
     expect(help).toContain("clone https://github.com/longbkit/muxbot");
     expect(help).toContain("Codex or Claude Code");

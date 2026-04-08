@@ -46,7 +46,7 @@ Packaged CLI path:
 1. Install globally:
 
 ```bash
-npm install -g muxbot
+npm install -g @muxbot/muxbot
 ```
 
 2. Add the required environment variables to your shell startup file, then reload it.
@@ -72,7 +72,7 @@ muxbot start --cli codex --bootstrap personal-assistant
 If you do not want to install globally, you can also run it directly with `npx`:
 
 ```bash
-npx muxbot start --cli codex --bootstrap personal-assistant
+npx @muxbot/muxbot start --cli codex --bootstrap personal-assistant
 ```
 
 Local repo path:

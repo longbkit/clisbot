@@ -20,8 +20,6 @@ Related pages:
 
 If setup is unclear, clone this repo, open it in Codex or Claude Code, and ask it to help set up `muxbot`. The docs here are kept current enough for guided setup and troubleshooting.
 
-If you are still in doubt after reading this guide, clone `https://github.com/longbkit/muxbot`, open the repo in Codex or Claude Code, and ask for setup help directly in the repo context.
-
 ## Service
 
 Default config path:
@@ -55,7 +53,7 @@ bun run start
 Start the packaged CLI in the background:
 
 ```bash
-npx muxbot start
+npx @muxbot/muxbot start
 ```
 
 Restart the packaged CLI:
