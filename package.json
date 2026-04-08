@@ -13,6 +13,8 @@
     "bin",
     "src",
     "config",
+    "templates",
+    "LICENSE",
     "README.md"
   ],
   "scripts": {
