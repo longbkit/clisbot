@@ -1,7 +1,7 @@
 import type { FollowUpMode, StoredFollowUpState } from "./follow-up-policy.ts";
 import type { ResolvedAgentTarget } from "./resolved-target.ts";
-import type { SessionRuntimeInfo } from "./agent-service.ts";
 import type { StoredSessionRuntime } from "./run-observation.ts";
+import type { SessionRuntimeInfo } from "./session-runtime.ts";
 import { SessionStore } from "./session-store.ts";
 
 export type ActiveSessionRuntimeInfo = SessionRuntimeInfo & {
