@@ -321,9 +321,9 @@ describe("loadConfig", () => {
 
     expect(config.channels.slack.enabled).toBe(false);
     expect(config.channels.telegram.enabled).toBe(false);
-    expect(config.channels.slack.appToken).toBe("$${SLACK_APP_TOKEN}");
-    expect(config.channels.slack.botToken).toBe("$${SLACK_BOT_TOKEN}");
-    expect(config.channels.telegram.botToken).toBe("$${TELEGRAM_BOT_TOKEN}");
+    expect(config.channels.slack.appToken).toBe("${SLACK_APP_TOKEN}");
+    expect(config.channels.slack.botToken).toBe("${SLACK_BOT_TOKEN}");
+    expect(config.channels.telegram.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
     expect(config.channels.slack.channels).toEqual({});
     expect(config.channels.slack.groups).toEqual({});
     expect(config.channels.telegram.groups).toEqual({});
@@ -348,7 +348,7 @@ describe("loadConfig", () => {
     expect(config.channels.telegram.enabled).toBe(false);
     expect(config.channels.slack.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.channels.slack.botToken).toBe("${SLACK_BOT_TOKEN}");
-    expect(config.channels.telegram.botToken).toBe("$${TELEGRAM_BOT_TOKEN}");
+    expect(config.channels.telegram.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
   });
 
   test("default config template preserves custom token env placeholders as literals", () => {

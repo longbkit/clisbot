@@ -13,6 +13,7 @@ import {
   renderOperatorErrorWithHelpLines,
   renderRuntimeErrorLines,
 } from "./operator-errors.ts";
+import { RuntimeHealthStore } from "./runtime-health-store.ts";
 
 type ActiveRuntime = {
   agentService: AgentService;
@@ -29,6 +30,7 @@ export class RuntimeSupervisor {
   private reloadInFlight = false;
   private reloadRequested = false;
   private configWatchDebounceMs = 250;
+  private readonly runtimeHealthStore = new RuntimeHealthStore();
 
   constructor(private readonly configPath?: string) {}
 
@@ -40,6 +42,16 @@ export class RuntimeSupervisor {
     this.clearReloadTimer();
     this.stopWatchingConfig();
     await this.stopActiveRuntime();
+    await this.runtimeHealthStore.setChannel({
+      channel: "slack",
+      connection: "stopped",
+      summary: "Slack channel is stopped.",
+    });
+    await this.runtimeHealthStore.setChannel({
+      channel: "telegram",
+      connection: "stopped",
+      summary: "Telegram channel is stopped.",
+    });
   }
 
   private async reload(reason: "initial" | "watch") {
@@ -142,15 +154,45 @@ export class RuntimeSupervisor {
           activityStore,
         )
       : undefined;
+    let slackStarted = false;
+    let telegramStarted = false;
+    let startupPhase: "agent" | "slack" | "telegram" = "agent";
 
     try {
+      await this.writeConfiguredChannelHealth(loadedConfig, "starting");
       await withStartupTimeout("agent service", () => agentService.start());
 
       if (slackService) {
+        startupPhase = "slack";
         await withStartupTimeout("slack service", () => slackService.start());
+        slackStarted = true;
+        await this.runtimeHealthStore.setChannel({
+          channel: "slack",
+          connection: "active",
+          summary: `Slack Socket Mode connected as ${slackService.getBotUserLabel()}.`,
+        });
+      } else {
+        await this.runtimeHealthStore.setChannel({
+          channel: "slack",
+          connection: "disabled",
+          summary: "Slack channel is disabled in config.",
+        });
       }
       if (telegramService) {
+        startupPhase = "telegram";
         await withStartupTimeout("telegram service", () => telegramService.start());
+        telegramStarted = true;
+        await this.runtimeHealthStore.setChannel({
+          channel: "telegram",
+          connection: "active",
+          summary: `Telegram polling connected as ${telegramService.getBotLabel()}.`,
+        });
+      } else {
+        await this.runtimeHealthStore.setChannel({
+          channel: "telegram",
+          connection: "disabled",
+          summary: "Telegram channel is disabled in config.",
+        });
       }
 
       return {
@@ -159,6 +201,16 @@ export class RuntimeSupervisor {
         telegramService,
       };
     } catch (error) {
+      if (startupPhase === "slack" && loadedConfig.raw.channels.slack.enabled && !slackStarted) {
+        await this.runtimeHealthStore.markSlackFailure(error);
+      }
+      if (
+        startupPhase === "telegram" &&
+        loadedConfig.raw.channels.telegram.enabled &&
+        !telegramStarted
+      ) {
+        await this.runtimeHealthStore.markTelegramFailure(error);
+      }
       if (slackService) {
         await slackService.stop().catch(() => undefined);
       }
@@ -168,6 +220,26 @@ export class RuntimeSupervisor {
       await agentService.stop().catch(() => undefined);
       throw error;
     }
+  }
+
+  private async writeConfiguredChannelHealth(
+    loadedConfig: LoadedConfig,
+    connection: "starting",
+  ) {
+    await this.runtimeHealthStore.setChannel({
+      channel: "slack",
+      connection: loadedConfig.raw.channels.slack.enabled ? connection : "disabled",
+      summary: loadedConfig.raw.channels.slack.enabled
+        ? "Slack channel is starting."
+        : "Slack channel is disabled in config.",
+    });
+    await this.runtimeHealthStore.setChannel({
+      channel: "telegram",
+      connection: loadedConfig.raw.channels.telegram.enabled ? connection : "disabled",
+      summary: loadedConfig.raw.channels.telegram.enabled
+        ? "Telegram channel is starting."
+        : "Telegram channel is disabled in config.",
+    });
   }
 
   private async reconcileConfigWatcher(loadedConfig: LoadedConfig) {

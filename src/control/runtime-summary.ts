@@ -16,13 +16,14 @@ import {
 } from "../config/agent-tool-presets.ts";
 import { ActivityStore } from "./activity-store.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
-import { DEFAULT_ACTIVITY_STORE_PATH } from "../shared/paths.ts";
+import { DEFAULT_ACTIVITY_STORE_PATH, DEFAULT_RUNTIME_HEALTH_PATH } from "../shared/paths.ts";
 import {
   renderOperatorHelpLines,
   renderPairingSetupHelpLines,
   renderRepoHelpLines,
   renderTmuxDebugHelpLines,
 } from "./startup-bootstrap.ts";
+import { RuntimeHealthStore, type RuntimeChannelConnection } from "./runtime-health-store.ts";
 
 type AgentOperatorSummary = {
   id: string;
@@ -33,21 +34,23 @@ type AgentOperatorSummary = {
   bootstrapState: BootstrapWorkspaceState;
   bindings: string[];
   lastActivityAt?: string;
-  lastActivitySurface?: string;
 };
 
 type ChannelOperatorSummary = {
   channel: "slack" | "telegram";
   enabled: boolean;
-  connection: "disabled" | "stopped" | "active";
+  connection: RuntimeChannelConnection;
   defaultAgentId: string;
   configuredSurfaceCount: number;
   directMessagesEnabled: boolean;
   directMessagesPolicy: string;
   groupPolicy?: string;
   lastActivityAt?: string;
-  lastActivitySurface?: string;
   lastActivityAgentId?: string;
+  healthSummary?: string;
+  healthDetail?: string;
+  healthActions: string[];
+  healthUpdatedAt?: string;
 };
 
 type RuntimeOperatorSummary = {
@@ -116,11 +119,14 @@ export async function getRuntimeOperatorSummary(params: {
   configPath?: string;
   runtimeRunning: boolean;
   activityPath?: string;
+  healthPath?: string;
 }) {
   const loadedConfig = await loadOperatorSummaryConfig(params.configPath);
   const agentService = new AgentService(loadedConfig);
   const activityStore = new ActivityStore(params.activityPath ?? DEFAULT_ACTIVITY_STORE_PATH);
   const activities = await activityStore.read();
+  const runtimeHealthStore = new RuntimeHealthStore(params.healthPath ?? DEFAULT_RUNTIME_HEALTH_PATH);
+  const runtimeHealth = await runtimeHealthStore.read();
   const runningTmuxSessions = params.runtimeRunning ? await getRunningTmuxSessions(loadedConfig) : 0;
 
   const agentSummaries = loadedConfig.raw.agents.list.map((entry) => {
@@ -143,7 +149,6 @@ export async function getRuntimeOperatorSummary(params: {
         .filter((binding) => binding.agentId === entry.id)
         .map((binding) => formatBinding(binding.match)),
       lastActivityAt: activities.agents[entry.id]?.updatedAt,
-      lastActivitySurface: activities.agents[entry.id]?.surface,
     } satisfies AgentOperatorSummary;
   });
 
@@ -151,36 +156,42 @@ export async function getRuntimeOperatorSummary(params: {
     {
       channel: "slack" as const,
       enabled: loadedConfig.raw.channels.slack.enabled,
-      connection: !loadedConfig.raw.channels.slack.enabled
-        ? "disabled"
-        : params.runtimeRunning
-          ? "active"
-          : "stopped",
+      connection: deriveChannelConnection({
+        enabled: loadedConfig.raw.channels.slack.enabled,
+        runtimeRunning: params.runtimeRunning,
+        recordedConnection: runtimeHealth.channels.slack?.connection,
+      }),
       defaultAgentId: loadedConfig.raw.channels.slack.defaultAgentId,
       configuredSurfaceCount: countSlackSurfaces(loadedConfig),
       directMessagesEnabled: loadedConfig.raw.channels.slack.directMessages.enabled,
       directMessagesPolicy: loadedConfig.raw.channels.slack.directMessages.policy,
       groupPolicy: loadedConfig.raw.channels.slack.groupPolicy,
       lastActivityAt: activities.channels.slack?.updatedAt,
-      lastActivitySurface: activities.channels.slack?.surface,
       lastActivityAgentId: activities.channels.slack?.agentId,
+      healthSummary: runtimeHealth.channels.slack?.summary,
+      healthDetail: runtimeHealth.channels.slack?.detail,
+      healthActions: runtimeHealth.channels.slack?.actions ?? [],
+      healthUpdatedAt: runtimeHealth.channels.slack?.updatedAt,
     },
     {
       channel: "telegram" as const,
       enabled: loadedConfig.raw.channels.telegram.enabled,
-      connection: !loadedConfig.raw.channels.telegram.enabled
-        ? "disabled"
-        : params.runtimeRunning
-          ? "active"
-          : "stopped",
+      connection: deriveChannelConnection({
+        enabled: loadedConfig.raw.channels.telegram.enabled,
+        runtimeRunning: params.runtimeRunning,
+        recordedConnection: runtimeHealth.channels.telegram?.connection,
+      }),
       defaultAgentId: loadedConfig.raw.channels.telegram.defaultAgentId,
       configuredSurfaceCount: countTelegramSurfaces(loadedConfig),
       directMessagesEnabled: loadedConfig.raw.channels.telegram.directMessages.enabled,
       directMessagesPolicy: loadedConfig.raw.channels.telegram.directMessages.policy,
       groupPolicy: loadedConfig.raw.channels.telegram.groupPolicy,
       lastActivityAt: activities.channels.telegram?.updatedAt,
-      lastActivitySurface: activities.channels.telegram?.surface,
       lastActivityAgentId: activities.channels.telegram?.agentId,
+      healthSummary: runtimeHealth.channels.telegram?.summary,
+      healthDetail: runtimeHealth.channels.telegram?.detail,
+      healthActions: runtimeHealth.channels.telegram?.actions ?? [],
+      healthUpdatedAt: runtimeHealth.channels.telegram?.updatedAt,
     },
   ] satisfies ChannelOperatorSummary[];
 
@@ -197,6 +208,23 @@ export async function getRuntimeOperatorSummary(params: {
       .length,
     runningTmuxSessions,
   } satisfies RuntimeOperatorSummary;
+}
+
+function deriveChannelConnection(params: {
+  enabled: boolean;
+  runtimeRunning: boolean;
+  recordedConnection?: RuntimeChannelConnection;
+}) {
+  if (!params.enabled) {
+    return "disabled" as const;
+  }
+  if (params.recordedConnection === "failed") {
+    return "failed" as const;
+  }
+  if (!params.runtimeRunning) {
+    return "stopped" as const;
+  }
+  return params.recordedConnection ?? "active";
 }
 
 function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
@@ -275,6 +303,39 @@ function renderChannelSummaryLines(summary: RuntimeOperatorSummary) {
       return `  - ${channel.channel} enabled=${channel.enabled ? "yes" : "no"} connection=${channel.connection} defaultAgent=${channel.defaultAgentId}${dm}${group}${routeHint}${last}`;
     }),
   ];
+}
+
+function renderChannelDiagnosticLines(summary: RuntimeOperatorSummary) {
+  const channelsNeedingDiagnostics = summary.channelSummaries.filter((channel) =>
+    channel.connection === "failed" || channel.healthActions.length > 0
+  );
+  if (channelsNeedingDiagnostics.length === 0) {
+    return [];
+  }
+
+  return [
+    "",
+    "Channel diagnostics:",
+    ...channelsNeedingDiagnostics.flatMap((channel) => {
+      const lines = [
+        `  - ${channel.channel}: ${channel.healthSummary ?? "channel diagnostics available"}`,
+      ];
+      if (channel.healthUpdatedAt) {
+        lines.push(`    updated: ${formatTime(channel.healthUpdatedAt)}`);
+      }
+      if (channel.healthDetail) {
+        lines.push(`    detail: ${channel.healthDetail}`);
+      }
+      for (const action of channel.healthActions) {
+        lines.push(`    action: ${action}`);
+      }
+      return lines;
+    }),
+  ];
+}
+
+export function renderRuntimeDiagnosticsSummary(summary: RuntimeOperatorSummary) {
+  return renderChannelDiagnosticLines(summary).join("\n").trim();
 }
 
 export function renderStartSummary(summary: RuntimeOperatorSummary) {
@@ -427,6 +488,7 @@ export function renderStatusSummary(summary: RuntimeOperatorSummary) {
     `stats agents=${summary.configuredAgents} bootstrapped=${summary.bootstrappedAgents} pendingBootstrap=${summary.bootstrapPendingAgents} tmuxSessions=${summary.runningTmuxSessions}`,
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
+    ...renderChannelDiagnosticLines(summary),
     ...renderActiveRunSummaryLines(summary),
   ];
 

@@ -11,6 +11,7 @@ export const DEFAULT_PROCESSED_EVENTS_PATH = join(DEFAULT_STATE_DIR, "processed-
 export const DEFAULT_SESSION_STORE_PATH = join(DEFAULT_STATE_DIR, "sessions.json");
 export const DEFAULT_PAIRING_DIR = join(DEFAULT_STATE_DIR, "pairing");
 export const DEFAULT_ACTIVITY_STORE_PATH = join(DEFAULT_STATE_DIR, "activity.json");
+export const DEFAULT_RUNTIME_HEALTH_PATH = join(DEFAULT_STATE_DIR, "runtime-health.json");
 export const DEFAULT_RUNTIME_PID_PATH = join(DEFAULT_STATE_DIR, "muxbot.pid");
 export const DEFAULT_RUNTIME_LOG_PATH = join(DEFAULT_STATE_DIR, "muxbot.log");
 

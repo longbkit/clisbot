@@ -85,8 +85,8 @@ function createConfig(): MuxbotConfig {
       slack: {
         enabled: false,
         mode: "socket",
-        appToken: "$${SLACK_APP_TOKEN}",
-        botToken: "$${SLACK_BOT_TOKEN}",
+        appToken: "${SLACK_APP_TOKEN}",
+        botToken: "${SLACK_BOT_TOKEN}",
         ackReaction: ":heavy_check_mark:",
         typingReaction: "",
         processingStatus: {
@@ -126,7 +126,7 @@ function createConfig(): MuxbotConfig {
       telegram: {
         enabled: false,
         mode: "polling",
-        botToken: "$${TELEGRAM_BOT_TOKEN}",
+        botToken: "${TELEGRAM_BOT_TOKEN}",
         allowBots: false,
         groupPolicy: "allowlist",
         defaultAgentId: "default",

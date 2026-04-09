@@ -16,6 +16,7 @@ import {
 } from "./control/runtime-process.ts";
 import {
   getRuntimeOperatorSummary,
+  renderRuntimeDiagnosticsSummary,
   renderStartSummary,
   renderStatusSummary,
 } from "./control/runtime-summary.ts";
@@ -432,6 +433,21 @@ async function logs(lines: number) {
   }
 
   console.log(result.text);
+
+  try {
+    const runtimeStatus = await getRuntimeStatus();
+    const summary = await getRuntimeOperatorSummary({
+      configPath: runtimeStatus.configPath,
+      runtimeRunning: runtimeStatus.running,
+    });
+    const diagnostics = renderRuntimeDiagnosticsSummary(summary);
+    if (diagnostics) {
+      console.log("");
+      console.log(diagnostics);
+    }
+  } catch {
+    // Keep raw log access working even when summary rendering fails.
+  }
 }
 
 async function main() {

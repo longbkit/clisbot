@@ -1,6 +1,6 @@
 {
   "name": "@muxbot/muxbot",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": false,
   "description": "Chat surfaces for durable AI coding agents running in tmux",
   "license": "MIT",

@@ -10,7 +10,7 @@ type DefaultChannelBootstrapOptions = {
 
 function renderEnvReference(
   name: string,
-  enabled: boolean,
+  _enabled: boolean,
   override?: string,
 ) {
   const normalizedOverride = normalizeEnvReference(override);
@@ -18,7 +18,7 @@ function renderEnvReference(
     return normalizedOverride;
   }
 
-  return enabled ? "${" + name + "}" : "$${" + name + "}";
+  return "${" + name + "}";
 }
 
 export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOptions = {}) {

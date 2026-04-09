@@ -45,7 +45,6 @@ import {
   reconcileSlackText,
   type SlackPostedMessageChunk,
 } from "./transport.ts";
-import { sleep } from "../../shared/process.ts";
 
 type SlackAppType = InstanceType<typeof App>;
 type SlackThreadTsCacheEntry = {
@@ -530,14 +529,16 @@ export class SlackSocketService {
     });
     this.startPromise = this.app.start().catch((error) => {
       console.error("slack socket start failed", error);
+      throw error;
     });
-    await Promise.race([
-      this.startPromise,
-      sleep(1_000),
-    ]);
+    await this.startPromise;
   }
 
   async stop() {
     await this.app.stop();
+  }
+
+  getBotUserLabel() {
+    return this.botUserId || "unknown";
   }
 }

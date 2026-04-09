@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ActivityStore } from "../src/control/activity-store.ts";
+import { RuntimeHealthStore } from "../src/control/runtime-health-store.ts";
 import { getRuntimeOperatorSummary, renderStartSummary, renderStatusSummary } from "../src/control/runtime-summary.ts";
 import { writeEditableConfig } from "../src/config/config-file.ts";
 import { muxbotConfigSchema } from "../src/config/schema.ts";
@@ -264,5 +265,44 @@ describe("runtime summaries", () => {
     expect(text).toContain("agents=1");
     expect(text).toContain("slack enabled=yes");
     expect(text).toContain("telegram enabled=yes");
+  });
+
+  test("renders persisted channel diagnostics when Slack startup fails", async () => {
+    process.env.SLACK_APP_TOKEN = "app";
+    process.env.SLACK_BOT_TOKEN = "bot";
+    tempDir = mkdtempSync(join(tmpdir(), "muxbot-runtime-summary-"));
+    const configPath = join(tempDir, "muxbot.json");
+    const healthPath = join(tempDir, "runtime-health.json");
+    const config = muxbotConfigSchema.parse(
+      JSON.parse(
+        renderDefaultConfigTemplate({
+          slackEnabled: true,
+          telegramEnabled: false,
+        }),
+      ),
+    );
+    config.agents.list = [
+      {
+        id: "default",
+        cliTool: "codex",
+        bootstrap: { mode: "team-assistant" },
+      },
+    ];
+    await writeEditableConfig(configPath, config);
+
+    const healthStore = new RuntimeHealthStore(healthPath);
+    await healthStore.markSlackFailure(new Error("Socket Mode app token rejected: xapp token missing `connections:write`"));
+
+    const summary = await getRuntimeOperatorSummary({
+      configPath,
+      runtimeRunning: false,
+      healthPath,
+    });
+    const text = renderStatusSummary(summary);
+
+    expect(text).toContain("slack enabled=yes connection=failed");
+    expect(text).toContain("Channel diagnostics:");
+    expect(text).toContain("Socket Mode app token was rejected.");
+    expect(text).toContain("action: verify `channels.slack.appToken` resolves to an `xapp-` token");
   });
 });

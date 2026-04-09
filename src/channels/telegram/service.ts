@@ -239,6 +239,10 @@ export class TelegramPollingService {
     await Promise.allSettled([...this.inFlightUpdates]);
   }
 
+  getBotLabel() {
+    return this.botUsername ? `@${this.botUsername}` : `${this.botUserId || "unknown"}`;
+  }
+
   private async pollLoop() {
     const telegramConfig = this.loadedConfig.raw.channels.telegram;
     while (this.running) {
