@@ -160,7 +160,7 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 
 ### Expected Results
 
-- the default resolved Slack config exposes `ackReaction: ":heavy_check_mark:"`
+- the default resolved Slack config exposes `ackReaction: ""`
 - the default resolved Slack config exposes `typingReaction: ""`
 - the default resolved Slack config exposes `processingStatus.enabled: true`
 - the default resolved Slack config exposes `processingStatus.status: "Working..."`

@@ -1,5 +1,6 @@
 import type { ClisbotConfig } from "../config/schema.ts";
 import type { ChannelInteractionIdentity } from "./interaction-processing.ts";
+import { renderTelegramRouteChoiceMessage } from "./telegram/route-guidance.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
 export type AdditionalMessageMode = "queue" | "steer";
@@ -149,13 +150,13 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
 
   const group = config.channels.telegram.groups[chatId];
   if (!group) {
-    throw new Error(`Route not configured yet: telegram group ${chatId}. Add the route first.`);
+    throw new Error(renderTelegramRouteChoiceMessage({ chatId }));
   }
 
   if (topicId) {
     const topic = group.topics?.[topicId];
     if (!topic) {
-      throw new Error(`Route not configured yet: telegram group ${chatId} --topic ${topicId}. Add the topic route first.`);
+      throw new Error(renderTelegramRouteChoiceMessage({ chatId, topicId }));
     }
     return {
       get: () =>

@@ -46,6 +46,8 @@ import { sleep } from "../../shared/process.ts";
 import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
+import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
+import { runWithTelegramTypingHeartbeat } from "./typing.ts";
 
 type TelegramGetMeResult = {
   id: number;
@@ -106,7 +108,6 @@ export function renderTelegramUnroutedRouteMessage(params: {
   topicId?: number;
   isForum: boolean;
 }) {
-  const scopeLabel = params.topicId != null ? "topic" : "group";
   const lines = params.mode === "whoami"
     ? [
         "Who am I",
@@ -115,11 +116,7 @@ export function renderTelegramUnroutedRouteMessage(params: {
         `chatType: \`${params.chatType}\``,
         `chatId: \`${params.chatId}\``,
       ]
-    : [
-        `clisbot: this Telegram ${scopeLabel} is not configured yet.`,
-        "",
-        "Ask the bot owner to add this route with:",
-      ];
+    : [];
 
   if (params.mode === "whoami" && params.topicId != null) {
     lines.push(`topicId: \`${params.topicId}\``);
@@ -132,28 +129,20 @@ export function renderTelegramUnroutedRouteMessage(params: {
   if (params.mode === "whoami") {
     lines.push("routed: `no`");
     lines.push("");
-    lines.push("Ask the bot owner to add this route with:");
-  }
-
-  lines.push(
-    params.topicId != null
-      ? `\`clisbot channels add telegram-group ${params.chatId} --topic ${params.topicId}\``
-      : `\`clisbot channels add telegram-group ${params.chatId}\``,
-  );
-
-  if (params.mode === "start" || params.mode === "help" || params.mode === "status") {
-    lines.push("");
-    lines.push("After that, group commands such as `/transcript`, `/stop`, `/followup`, and `/bash` will work here.");
-  } else {
-    lines.push("");
     lines.push(
-      params.topicId != null
-        ? `Config path: \`channels.telegram.groups.\"${params.chatId}\".topics.\"${params.topicId}\"\``
-        : `Config path: \`channels.telegram.groups.\"${params.chatId}\"\``,
+      renderTelegramRouteChoiceMessage({
+        chatId: params.chatId,
+        topicId: params.topicId,
+        includeConfigPath: true,
+      }),
     );
+    return lines.join("\n");
   }
 
-  return lines.join("\n");
+  return renderTelegramRouteChoiceMessage({
+    chatId: params.chatId,
+    topicId: params.topicId,
+  });
 }
 
 export function buildTelegramCommandRegistrations(
@@ -489,14 +478,20 @@ export class TelegramPollingService {
             : `group:${message.chat.id}`,
     });
     try {
-      await this.sendTyping(message.chat.id, routeInfo.topicId);
       let responseChunks: TelegramPostedMessageChunk[] = [];
+      const senderName = [message.from?.first_name, message.from?.last_name]
+        .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .join(" ")
+        .trim();
       const identity = {
         platform: "telegram" as const,
         conversationKind: routeInfo.conversationKind,
         senderId:
           message.from?.id != null ? String(message.from.id).trim() : undefined,
+        senderName:
+          senderName || message.from?.username?.trim() || undefined,
         chatId: String(message.chat.id),
+        chatName: message.chat.title?.trim() || undefined,
         topicId:
           routeInfo.topicId != null ? String(routeInfo.topicId) : undefined,
       };
@@ -520,37 +515,45 @@ export class TelegramPollingService {
         responseMode: routeInfo.route.responseMode,
         accountId: this.accountId,
       });
-      await processChannelInteraction({
-        agentService: this.agentService,
-        sessionTarget: routeInfo.sessionTarget,
-        identity,
-        senderId:
-          message.from?.id != null ? String(message.from.id).trim() : undefined,
-        text,
-        agentPromptText,
-        route: routeInfo.route,
-        maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
-        timingContext,
-        postText: async (nextText) => {
-          responseChunks = await postTelegramText({
-            token: this.accountConfig.botToken,
-            chatId: message.chat.id,
-            text: nextText,
-            topicId: routeInfo.topicId,
-            omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
-          });
-          return responseChunks;
+      await runWithTelegramTypingHeartbeat({
+        sendTyping: () => this.sendTyping(message.chat.id, routeInfo.topicId),
+        onError: (error) => {
+          console.error("telegram typing failed", error);
         },
-        reconcileText: async (chunks, nextText) => {
-          responseChunks = await reconcileTelegramText({
-            token: this.accountConfig.botToken,
-            chatId: message.chat.id,
-            chunks,
-            text: nextText,
-            topicId: routeInfo.topicId,
-            omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+        run: async () => {
+          await processChannelInteraction({
+            agentService: this.agentService,
+            sessionTarget: routeInfo.sessionTarget,
+            identity,
+            senderId:
+              message.from?.id != null ? String(message.from.id).trim() : undefined,
+            text,
+            agentPromptText,
+            route: routeInfo.route,
+            maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
+            timingContext,
+            postText: async (nextText) => {
+              responseChunks = await postTelegramText({
+                token: this.accountConfig.botToken,
+                chatId: message.chat.id,
+                text: nextText,
+                topicId: routeInfo.topicId,
+                omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+              });
+              return responseChunks;
+            },
+            reconcileText: async (chunks, nextText) => {
+              responseChunks = await reconcileTelegramText({
+                token: this.accountConfig.botToken,
+                chatId: message.chat.id,
+                chunks,
+                text: nextText,
+                topicId: routeInfo.topicId,
+                omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+              });
+              return responseChunks;
+            },
           });
-          return responseChunks;
         },
       });
       await this.processedEventsStore.markCompleted(eventId);

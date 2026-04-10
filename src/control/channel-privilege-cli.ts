@@ -1,4 +1,5 @@
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
+import { renderTelegramRouteChoiceMessage } from "../channels/telegram/route-guidance.ts";
 
 type PrivilegeTarget =
   | "slack-dm"
@@ -149,13 +150,13 @@ export async function runChannelPrivilegeCli(args: string[]) {
   const topicId = parseOptionValue(rest, "--topic");
   const group = config.channels.telegram.groups[chatId];
   if (!group) {
-    throw new Error(`Route not configured yet: telegram-group ${chatId}. Add the route first with \`clisbot channels add telegram-group ${chatId}\`.`);
+    throw new Error(renderTelegramRouteChoiceMessage({ chatId }));
   }
 
   if (topicId) {
     const topic = group.topics?.[topicId];
     if (!topic) {
-      throw new Error(`Route not configured yet: telegram-group ${chatId} --topic ${topicId}. Add the topic route first.`);
+      throw new Error(renderTelegramRouteChoiceMessage({ chatId, topicId }));
     }
 
     const current = ensureAllowUsersList(topic.privilegeCommands);

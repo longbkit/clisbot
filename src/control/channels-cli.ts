@@ -257,6 +257,7 @@ async function addTelegramGroup(args: string[]) {
     await writeEditableConfig(configPath, config);
     console.log(`added telegram topic route ${chatId}/${topicId}`);
     console.log(`config: ${configPath}`);
+    renderSuccessBanner();
     renderRouteAddGuidance({
       channel: "telegram",
       kind: "topic",
@@ -274,6 +275,7 @@ async function addTelegramGroup(args: string[]) {
   await writeEditableConfig(configPath, config);
   console.log(`added telegram group route ${chatId}`);
   console.log(`config: ${configPath}`);
+  renderSuccessBanner();
   renderRouteAddGuidance({
     channel: "telegram",
     kind: "group",
@@ -342,6 +344,7 @@ async function addSlackRoute(kind: "channel" | "group", args: string[]) {
   await writeEditableConfig(configPath, config);
   console.log(`added slack ${kind} route ${routeId}`);
   console.log(`config: ${configPath}`);
+  renderSuccessBanner();
   renderRouteAddGuidance({
     channel: "slack",
     kind,
@@ -546,6 +549,14 @@ function renderPostChangeGuidance(action: ChannelAction, channel: ChannelId) {
   for (const line of renderChannelSetupHelpLines()) {
     console.log(line);
   }
+}
+
+function renderSuccessBanner() {
+  console.log("");
+  console.log("+---------+");
+  console.log("| SUCCESS |");
+  console.log("+---------+");
+  console.log("");
 }
 
 function renderRouteAddGuidance(params: {

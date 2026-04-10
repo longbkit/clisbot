@@ -39,7 +39,7 @@ They should be used for ad hoc validation and later automation across Slack firs
 - the final Slack reply settles to a result containing `PONG`
 - `/status` in that same routed conversation reports the current follow-up mode and route help
 
-## Test Case 1A: Default Slack Feedback Uses Ack Reaction And Live Reply
+## Test Case 1A: Default Slack Feedback Uses Live Reply Without Ack Reaction
 
 ### Preconditions
 
@@ -57,11 +57,11 @@ They should be used for ad hoc validation and later automation across Slack firs
 
 ### Expected Results
 
-- the inbound user message receives `:heavy_check_mark:`
+- the inbound user message does not receive an ack reaction by default
 - no extra typing reaction is added by default
 - the thread shows Slack assistant processing status such as `Working...`
 - the main processing feedback is still the live bot reply inside the thread
-- completion removes only temporary in-thread processing text, not the ack reaction on the user message
+- completion removes only temporary in-thread processing text
 
 If `reactions:write` or the accepted Slack status scope is missing, expected degraded behavior is:
 
@@ -200,6 +200,25 @@ Live proof on April 5, 2026:
 - the reply includes the exact `clisbot channels add telegram-group ...` command to run
 - `/whoami` exposes `chatId` and `topicId` when applicable
 - sensitive commands such as `/transcript`, `/stop`, `/followup`, and `/bash` are not advertised for the unrouted group yet
+
+## Test Case 2I: Telegram Topic Keeps Typing Visible During Active Work
+
+### Preconditions
+
+- Telegram routing is enabled for the configured test topic
+- the topic route points to a working agent
+
+### Steps
+
+1. Send a prompt in the routed Telegram topic that keeps the runner busy for several seconds
+2. Watch the topic before the first visible bot reply appears
+3. Keep watching while the run is still active
+
+### Expected Results
+
+- Telegram shows typing feedback in the same topic soon after the message is accepted
+- typing remains visible during active work instead of flashing only once
+- the eventual live reply and final reply still stay in the same topic
 
 ## Test Case 2G: Slack DM Allowlist Policy Blocks Unknown Senders Silently
 

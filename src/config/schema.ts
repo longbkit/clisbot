@@ -372,7 +372,7 @@ const slackSchema = z.object({
     maxProgressMessages: 3,
     requireFinalResponse: true,
   }),
-  ackReaction: z.string().default(":heavy_check_mark:"),
+  ackReaction: z.string().default(""),
   typingReaction: z.string().default(""),
   processingStatus: slackProcessingStatusSchema.default({
     enabled: true,

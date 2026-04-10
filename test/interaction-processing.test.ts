@@ -772,31 +772,29 @@ describe("processChannelInteraction agent prompt text", () => {
   test("still posts a fallback error when message-tool mode fails before the agent can reply", async () => {
     const posted: string[] = [];
 
-    await expect(
-      processChannelInteraction({
-        agentService: {
-          enqueuePrompt: () => ({
-            positionAhead: 0,
-            result: Promise.reject(new Error("runner crashed")),
-          }),
-          recordConversationReply: async () => undefined,
-        } as any,
-        sessionTarget: createTarget(),
-        identity: createIdentity(),
-        senderId: "U123",
-        text: "investigate this",
-        agentPromptText: "<system>\nuse wrapper\n</system>\n\n<user>\ninvestigate this\n</user>",
-        route: createRoute({
-          responseMode: "message-tool",
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.reject(new Error("runner crashed")),
         }),
-        maxChars: 4000,
-        postText: async (text) => {
-          posted.push(text);
-          return [text];
-        },
-        reconcileText: async (_chunks, text) => [text],
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      agentPromptText: "<system>\nuse wrapper\n</system>\n\n<user>\ninvestigate this\n</user>",
+      route: createRoute({
+        responseMode: "message-tool",
       }),
-    ).rejects.toThrow("runner crashed");
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("runner crashed");
@@ -805,6 +803,7 @@ describe("processChannelInteraction agent prompt text", () => {
   test("steers additional user messages into the active run by default", async () => {
     const posted: string[] = [];
     const submitted: string[] = [];
+    let replyCalls = 0;
 
     await processChannelInteraction({
       agentService: {
@@ -813,7 +812,9 @@ describe("processChannelInteraction agent prompt text", () => {
         submitSessionInput: async (_target: AgentSessionTarget, text: string) => {
           submitted.push(text);
         },
-        recordConversationReply: async () => undefined,
+        recordConversationReply: async () => {
+          replyCalls += 1;
+        },
       } as any,
       sessionTarget: createTarget(),
       identity: createIdentity(),
@@ -833,7 +834,8 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(submitted[0]).toContain("[clisbot steering message]");
     expect(submitted[0]).toContain("please focus on the regression first");
-    expect(posted[0]).toContain("Steered.");
+    expect(posted).toEqual([]);
+    expect(replyCalls).toBe(0);
   });
 
   test("queue command forces clisbot-managed delivery even in message-tool mode", async () => {

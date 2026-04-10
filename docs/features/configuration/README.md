@@ -87,6 +87,7 @@ Current policy meaning:
 ## Related Research
 
 - [OpenClaw agent and workspace config shape](../../research/configuration/2026-04-06-openclaw-agent-workspace-config-shape.md)
+- [OpenClaw template improvements](../../research/configuration/2026-04-10-openclaw-template-improvements.md)
 
 ## Dependencies
 
@@ -214,7 +215,7 @@ Current first-run startup bootstrap should stay explicit:
 
 Current Slack feedback defaults should stay explicit:
 
-- `ackReaction: ":heavy_check_mark:"`
+- `ackReaction: ""`
 - `typingReaction: ""`
 - `processingStatus.enabled: true`
 - `processingStatus.status: "Working..."`

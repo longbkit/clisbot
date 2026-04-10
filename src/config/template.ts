@@ -137,7 +137,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             maxProgressMessages: 3,
             requireFinalResponse: true,
           },
-          ackReaction: ":heavy_check_mark:",
+          ackReaction: "",
           typingReaction: "",
           processingStatus: {
             enabled: true,

@@ -87,7 +87,7 @@ function createConfig(): ClisbotConfig {
         mode: "socket",
         appToken: "${SLACK_APP_TOKEN}",
         botToken: "${SLACK_BOT_TOKEN}",
-        ackReaction: ":heavy_check_mark:",
+        ackReaction: "",
         typingReaction: "",
         processingStatus: {
           enabled: true,

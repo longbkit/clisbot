@@ -59,6 +59,14 @@ type PreparedBootstrapState = {
   firstRun: boolean;
 };
 
+function printCommandOutcomeBanner(outcome: "success" | "failure") {
+  console.log("");
+  console.log("+---------+");
+  console.log(outcome === "success" ? "| SUCCESS |" : "| FAILED  |");
+  console.log("+---------+");
+  console.log("");
+}
+
 function getPrimaryWorkspacePath(
   summary: Awaited<ReturnType<typeof getRuntimeOperatorSummary>>,
 ) {
@@ -73,6 +81,9 @@ function getPrimaryWorkspacePath(
 }
 
 function printMissingBootstrapOptions(commandName: "init" | "start") {
+  if (commandName === "start") {
+    printCommandOutcomeBanner("failure");
+  }
   console.log("");
   console.log(`warning!!! no default agent is configured yet, so clisbot did not ${commandName}.`);
   console.log("First run requires both `--cli` and `--bootstrap`.");
@@ -102,6 +113,7 @@ async function prepareBootstrapState(
     : getDefaultChannelAvailability();
 
   if (requireAvailableDefaultTokens && firstRun && !hasAnyDefaultChannelToken(channelAvailability)) {
+    printCommandOutcomeBanner("failure");
     for (const line of renderMissingTokenWarningLines(options)) {
       console.log(line);
     }
@@ -152,6 +164,7 @@ async function ensureDefaultAgentBootstrap(
   if (commandName === "start") {
     const installed = commandExists(options.cliTool);
     if (!installed) {
+      printCommandOutcomeBanner("failure");
       console.log(`warning ${options.cliTool} is not installed, so clisbot did not start.`);
       console.log(`Install \`${options.cliTool}\`, then run start again.`);
       for (const line of renderOperatorHelpLines()) {
@@ -254,6 +267,7 @@ async function start(options: StartCommandOptions = {}) {
     console.log(line);
   }
   if (tokenIssueLines.length > 0) {
+    printCommandOutcomeBanner("failure");
     return;
   }
 
@@ -272,6 +286,7 @@ async function start(options: StartCommandOptions = {}) {
         configPath: result.configPath,
         runtimeRunning: true,
       });
+      printCommandOutcomeBanner("success");
       console.log(`clisbot is already running with pid: ${result.pid}`);
       const workspacePath = getPrimaryWorkspacePath(summary);
       if (workspacePath) {
@@ -283,6 +298,7 @@ async function start(options: StartCommandOptions = {}) {
       console.log(`log: ${result.logPath}`);
       console.log(renderStartSummary(summary));
     } catch (error) {
+      printCommandOutcomeBanner("success");
       console.log(`clisbot is already running with pid: ${result.pid}`);
       console.log("Run `clisbot status` to inspect runtime state or `clisbot logs` to inspect recent activity.");
       for (const line of renderChannelSetupHelpLines()) {
@@ -304,6 +320,7 @@ async function start(options: StartCommandOptions = {}) {
       configPath: result.configPath,
       runtimeRunning: true,
     });
+    printCommandOutcomeBanner("success");
     console.log(`clisbot started with pid: ${result.pid}`);
     const workspacePath = getPrimaryWorkspacePath(summary);
     if (workspacePath) {
@@ -315,6 +332,7 @@ async function start(options: StartCommandOptions = {}) {
     console.log(`log: ${result.logPath}`);
     console.log(renderStartSummary(summary));
   } catch (error) {
+    printCommandOutcomeBanner("success");
     console.log(`clisbot started with pid: ${result.pid}`);
     console.log(`config: ${result.configPath}`);
     console.log(`log: ${result.logPath}`);
@@ -369,11 +387,13 @@ async function stop(hard = false) {
     hard,
   });
   if (!result.stopped && !hard) {
+    printCommandOutcomeBanner("failure");
     console.log("clisbot is not running");
     return;
   }
 
   if (hard) {
+    printCommandOutcomeBanner("success");
     console.log(
       result.stopped
         ? "clisbot stopped and tmux sessions cleaned up"
@@ -382,6 +402,7 @@ async function stop(hard = false) {
     return;
   }
 
+  printCommandOutcomeBanner("success");
   console.log("clisbot stopped");
 }
 
@@ -453,8 +474,7 @@ async function logs(lines: number) {
   }
 }
 
-async function main() {
-  const command = parseCliArgs(process.argv);
+async function main(command = parseCliArgs(process.argv)) {
 
   if (command.name === "help") {
     console.log(renderCliHelp());
@@ -522,9 +542,14 @@ async function main() {
   }
 }
 
+const command = parseCliArgs(process.argv);
+
 try {
-  await main();
+  await main(command);
 } catch (error) {
+  if (command.name === "start" || command.name === "stop" || command.name === "restart") {
+    printCommandOutcomeBanner("failure");
+  }
   await printCliError(error);
   process.exit(1);
 }

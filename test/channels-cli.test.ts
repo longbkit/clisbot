@@ -111,6 +111,9 @@ describe("channels cli", () => {
     ]);
 
     expect(logs.some((line) => line.includes("Telegram route next steps:"))).toBe(true);
+    expect(logs).toContain("");
+    expect(logs).toContain("+---------+");
+    expect(logs).toContain("| SUCCESS |");
     expect(logs.some((line) =>
       line.includes("direct messages still follow channels.telegram.directMessages.policy")
     )).toBe(true);

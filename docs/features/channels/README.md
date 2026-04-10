@@ -95,7 +95,7 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - shared surfaces keep the OpenClaw-style secure posture of `allowlist` plus `requireMention: true` by default
 - OpenClaw’s Slack-only sparse-config fallback to `groupPolicy: "open"` is documented as research nuance, not copied as a `clisbot` default
 - Slack should acknowledge accepted inbound messages immediately with a configurable reaction, Slack assistant thread status, and a live in-thread processing reply
-- default Slack feedback should keep `ackReaction: ":heavy_check_mark:"`, `typingReaction: ""`, and `processingStatus.enabled: true`
+- default Slack feedback should keep `ackReaction: ""`, `typingReaction: ""`, and `processingStatus.enabled: true`
 - active long-running sessions should support `/attach`, `/detach`, and `/watch every <duration>` so users can control how this thread follows the run without switching to raw transcript by default
 - current observer scope is per thread for a routed conversation, so running `/attach` or `/watch` again in the same thread replaces the earlier observer mode for that thread
 - current `/detach` behavior is passive-final rather than silent unsubscribe: live updates stop, but final settlement still returns to the same thread when the run completes
@@ -103,6 +103,7 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - expand the same channel model to the API surface next
 - Telegram now ships as a topic-aware channel surface, using OpenClaw-style group and topic config inheritance instead of reusing Slack follow-up mechanics for topic identity
 - Telegram transport should respect Telegram Bot API retry-after hints and pace live message edits so streaming does not fail on 429 rate limits
+- Telegram processing feedback should keep a topic-aware typing heartbeat alive while work is still running, following OpenClaw's documented rule that typing remains scoped to the active topic
 - Telegram polling should dispatch updates without global in-order blocking, so one busy topic or DM does not stall later updates for other topics or chats on the same bot
 - Slack and Telegram now share a first-class `ChannelPlugin` seam for runtime bootstrap, operator `message` commands, runtime health summaries, and shared route-policy composition
 - provider event loops, payload parsing, and transport semantics still stay provider-owned, so a future channel can plug into the same control seam without flattening provider behavior

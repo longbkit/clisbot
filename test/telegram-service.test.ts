@@ -151,7 +151,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
         isForum: true,
       }),
     ).toContain(
-      "`clisbot channels add telegram-group -1003455688247 --topic 3`",
+      "`clisbot channels add telegram-group -1003455688247 --topic 3 --agent <id>`",
     );
   });
 
@@ -165,8 +165,14 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     });
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
-    expect(text).toContain("Ask the bot owner to add this route with:");
-    expect(text).toContain("After that, group commands such as `/transcript`, `/stop`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("Ask the bot owner to choose one of these:");
+    expect(text).toContain("Add the whole group with the default agent:");
+    expect(text).toContain("`clisbot channels add telegram-group -1003455688247`");
+    expect(text).toContain("Add the whole group with a specific agent:");
+    expect(text).toContain("`clisbot channels add telegram-group -1003455688247 --agent <id>`");
+    expect(text).toContain("Add only this topic with a specific agent:");
+    expect(text).toContain("`clisbot channels add telegram-group -1003455688247 --topic 3 --agent <id>`");
+    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.");
   });
 
   test("renders onboarding guidance for unrouted help in groups", () => {
@@ -179,8 +185,8 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     });
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
-    expect(text).toContain("Ask the bot owner to add this route with:");
-    expect(text).toContain("After that, group commands such as `/transcript`, `/stop`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("Ask the bot owner to choose one of these:");
+    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.");
   });
 
   test("renders onboarding guidance for unrouted status in groups", () => {
@@ -193,7 +199,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     });
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
-    expect(text).toContain("After that, group commands such as `/transcript`, `/stop`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.");
   });
 });
 

@@ -284,7 +284,7 @@ describe("loadConfig", () => {
     });
     expect(loaded.raw.channels.slack.directMessages.policy).toBe("pairing");
     expect(loaded.raw.channels.slack.directMessages.allowFrom).toEqual([]);
-    expect(loaded.raw.channels.slack.ackReaction).toBe(":heavy_check_mark:");
+    expect(loaded.raw.channels.slack.ackReaction).toBe("");
     expect(loaded.raw.channels.slack.typingReaction).toBe("");
     expect(loaded.raw.channels.slack.processingStatus.enabled).toBe(true);
     expect(loaded.raw.channels.slack.processingStatus.status).toBe(

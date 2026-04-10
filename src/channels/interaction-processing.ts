@@ -54,10 +54,14 @@ export type ChannelInteractionIdentity = {
   platform: "slack" | "telegram";
   conversationKind: "dm" | "channel" | "group" | "topic";
   senderId?: string;
+  senderName?: string;
   channelId?: string;
+  channelName?: string;
   chatId?: string;
+  chatName?: string;
   threadTs?: string;
   topicId?: string;
+  topicName?: string;
 };
 
 type PostText<TChunk> = (text: string) => Promise<TChunk[]>;
@@ -683,8 +687,6 @@ export async function processChannelInteraction<TChunk>(params: {
         params.sessionTarget,
         buildSteeringMessage(params.text),
       );
-      await params.postText("Steered.");
-      await params.agentService.recordConversationReply(params.sessionTarget);
       return;
     }
   }
@@ -852,6 +854,6 @@ export async function processChannelInteraction<TChunk>(params: {
     } else {
       await params.postText(errorText);
     }
-    throw error;
+    return;
   }
 }

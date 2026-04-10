@@ -79,7 +79,7 @@ Current default Slack config is:
 
 - `channels.slack.followUp.mode: "auto"`
 - `channels.slack.followUp.participationTtlMin: 5`
-- `channels.slack.ackReaction: ":heavy_check_mark:"`
+- `channels.slack.ackReaction: ""`
 - `channels.slack.typingReaction: ""`
 - `channels.slack.processingStatus.enabled: true`
 - `channels.slack.processingStatus.status: "Working..."`

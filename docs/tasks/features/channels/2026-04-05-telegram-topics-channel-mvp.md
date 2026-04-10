@@ -51,13 +51,13 @@ Telegram topics are the closest Telegram equivalent to Slack threads, but they a
 - [ ] define General topic special-case send behavior
 - [ ] define topic inheritance from parent group config
 - [ ] define Telegram route matching against `groups.<chatId>.topics.<threadId>`
-- [ ] support topic-aware reply placement and typing indicators
+- [x] support topic-aware reply placement and typing indicators
 - [ ] support Telegram-native slash commands for current control commands
 - [ ] map `/followup` to Telegram semantics carefully instead of copying Slack behavior blindly
 - [ ] support the current chat-first `streaming` and `response` contract on Telegram
 - [x] honor Telegram `retry after` limits and pace live reply edits to avoid 429 edit failures during streaming
 - [x] dispatch Telegram updates without whole-bot polling serialization so one busy conversation does not block other chats or topics
-- [ ] define Telegram processing feedback policy: typing first, live reply second
+- [x] define Telegram processing feedback policy: typing first, live reply second
 - [ ] add Telegram test cases for DM, group, topic, and General topic routing
 
 ## Exit Criteria
