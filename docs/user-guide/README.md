@@ -145,6 +145,7 @@ Important rules:
 - supported tools are `codex` and `claude`
 - `--startup-option` may be repeated
 - when `--startup-option` is omitted, clisbot uses the built-in startup options for the selected CLI
+- public first-run `start` or `init` uses `--bot-type personal|team`; the `agents` CLI below is the lower-level workspace-template surface
 - if `--bootstrap` is present, it must be `personal-assistant` or `team-assistant`
 - `personal-assistant` fits one assistant for one human
 - `team-assistant` fits one shared assistant for a team, channel, or group workflow
@@ -158,11 +159,7 @@ Important rules:
 Examples:
 
 ```bash
-clisbot agents add default --cli codex --bootstrap personal-assistant
-```
-
-```bash
-clisbot agents add work --cli claude --startup-option --dangerously-skip-permissions --bootstrap team-assistant --bind telegram
+clisbot agents add work --cli claude --bind telegram
 ```
 
 ```bash
@@ -170,7 +167,11 @@ clisbot agents bind --agent work --bind slack:ops
 ```
 
 ```bash
-clisbot agents bootstrap work --mode team-assistant --force
+clisbot agents add ops --cli codex --startup-option --dangerously-skip-permissions --bootstrap team-assistant --bind telegram:ops
+```
+
+```bash
+clisbot agents bootstrap ops --mode team-assistant --force
 ```
 
 Binding behavior:
@@ -182,6 +183,7 @@ Binding behavior:
 Bootstrap behavior:
 
 - `personal-assistant` and `team-assistant` copy `templates/openclaw`, `templates/customized/default`, and the matching folder under `templates/customized/`
+- those internal template modes map to the public first-run choices `--bot-type personal` and `--bot-type team`
 - codex bootstrap requires `AGENTS.md` and `IDENTITY.md`
 - claude bootstrap requires `CLAUDE.md` and `IDENTITY.md`
 - bootstrap state is `missing` when the tool-specific file or `IDENTITY.md` is absent
@@ -370,7 +372,7 @@ Important behavior:
 - these values are written into `~/.clisbot/clisbot.json` as `${ENV_NAME}` placeholders
 - bare env names are normalized into `${ENV_NAME}` placeholders in config
 - `clisbot` does not resolve or print the secret value during config bootstrap
-- this is meant for custom env variable names, not raw secret literals
+- this is meant for env variable names you chose, not raw secret literals
 - if you still prefer manual setup, `clisbot init` accepts the same `--cli`, `--bot-type`, and token-reference flags as `clisbot start`, but it does not start the runtime
 
 `clisbot status` now prints:

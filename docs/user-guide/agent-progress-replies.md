@@ -19,7 +19,7 @@ That means the agent can be running inside another workspace and still send prog
 Start clisbot normally:
 
 ```bash
-bun run start --cli codex --bootstrap team-assistant
+bun run start --cli codex --bot-type team
 ```
 
 Then:

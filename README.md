@@ -4,6 +4,7 @@ The cheapest, simplest path to frontier LLMs and agentic CLI workflows for teams
 `clisbot` is not just another tmux bridge, as many GitHub projects already are. It exposes native agentic AI tool CLIs like Claude Code / Codex through multi-channel chat surfaces, with each agent running inside its own durable tmux session and ready to behave like a real bot, a real assistant - with SOUL, IDENTITY & MEMORY, just as OpenClaw, not just a coding tool.
 
 `clisbot` is meant to grow into a reusable agent runtime layer that can support many CLI tools, many channels, and many workflow shapes on top of the same durable agent session.
+Instead of splitting your workflow between something like OpenClaw for everyday tasks and then switching back to Claude or Codex for real coding work, you can just stick with whatever strong tool you already have, whether Claude or Codex, and add `clisbot` as a lightweight layer to turn it into an all-purpose AI agent: chatbot, daily-work assistant, and powerful coding companion in one.
 
 Agentic AI is powerful, but only with frontier models. OpenClaw took off because people found many ways to access strong frontier models cheaply through subscription-based OAuth. Recent Anthropic enforcement around third-party and proxy-style usage made that risk harder to ignore.
 
@@ -21,14 +22,12 @@ Strong vendor investment in security and safety does not make frontier agentic C
 
 ## Why clisbot
 
+- Optimized for single subscription-backed usage with tools like Codex CLI and Claude CLI, so one strong CLI can cover both agentic AI assistant work and agentic engineering or coding work without forcing you into separate products or extra model spend.
 - Reuses the native CLI tools you already know and subscribe to, such as Claude Code, Codex, and Gemini CLI, then extends them across coding, chatbot, and non-dev workflows without forcing you to switch tools.
-- Optimized for cheap subscription-backed usage with tools like Codex CLI and Claude CLI... A practical response to the reality that high-quality frontier models are expensive and vendor policies can tighten around third-party usage.
 - Compatible with OpenClaw-style configuration, commands and some concepts, agent personality for bot usecases, and workspace bootstrap templates, help Openclaw users to quickly get started.
-- Team-first by design, with agent bootstrap templates that fit shared team agents as well as personal ones.
-- Fits the emerging pattern of one personal assistant per employee and shared assistants per team.
+- Strong chat-first communication support in Slack and Telegram, with follow-up controls that keep conversations natural when useful and quiet when teams need the bot to stay out of the way.
+- Team-first by design, with `AGENTS` and `MEMORY` context guidance optimized for shared team reality: team members, projects, ongoing work, and timeline continuity, instead of defaulting to the more personal context shape common in OpenClaw.
 - Useful as a bot for coding, operations, teamwork, and general work in team environment, or on the go
-- Strong team support in Slack, with Telegram already supported as another first-class channel.
-- Configurable follow-up policy instead of a fixed TTL model, with a 5-minute default window and route-level controls so teams can tune behavior to how they actually work. Smart follow-up controls help avoid unwanted bot interruption in active threads: keep natural continuation when useful, or pause it when you want the bot to stay quiet until explicitly called again.
 - Fast operator shortcuts for shell execution: `!<command>` or `/bash <command>`, plus slash-prefix mappings such as `\bash` or `::bash` when Slack slash-command handling is incompatible. Turns Slack / Telegram into a terminal interface on the go.
 - The proof of concept already shows high potential beyond internal coding workflows, including customer chatbot use cases once messaging MCP or CLI-based skills let the agent send messages proactively in a cleaner way.
 
@@ -153,7 +152,7 @@ clisbot pairing approve telegram <CODE>
 
 Fresh config starts with no configured agents, so first-run `clisbot start` requires both `--cli` and `--bot-type` before it creates the first `default` agent.
 Fresh config also starts with no preconfigured Slack channels or Telegram groups or topics. Add those routes manually in `~/.clisbot/clisbot.json`.
-`clisbot start` requires explicit channel token input before it bootstraps anything. You can pass raw values, env names such as `TELEGRAM_BOT_TOKEN`, or placeholders such as `'${CUSTOM_TELEGRAM_BOT_TOKEN}'`.
+`clisbot start` requires explicit channel token input before it bootstraps anything. You can pass raw values, env names such as `MY_TELEGRAM_BOT_TOKEN`, or placeholders such as `'${MY_TELEGRAM_BOT_TOKEN}'`.
 Set `CLISBOT_HOME` if you want a fully separate local config, state, tmux socket, wrapper, and workspace root, for example when running a dev instance beside your main bot.
 
 ## Setup Guide
@@ -177,7 +176,7 @@ Separate dev home example:
 
 ```bash
 export CLISBOT_HOME=~/.clisbot-dev
-clisbot start --cli codex --bot-type team --telegram-bot-token TELEGRAM_BOT_TOKEN
+clisbot start --cli codex --bot-type team --telegram-bot-token DEV_TELEGRAM_BOT_TOKEN
 ```
 
 - `CLISBOT_HOME` changes the default config path, runtime state dir, tmux socket, local wrapper path, and default workspaces together
@@ -190,27 +189,12 @@ Channel route setup is manual by design:
 - add only the exact channel, group, topic, or DM routing you want to expose
 - default channel account setup lives in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md)
 
-Example agent setup:
+Advanced agent management:
 
-```bash
-clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>
-```
-
-```bash
-clisbot agents add claude --cli claude --bootstrap team-assistant --bind telegram
-clisbot agents bootstrap claude --mode team-assistant --force
-clisbot agents list --bindings
-```
-
-Agent setup rules:
-
-- `agents add` requires `--cli` and currently supports `codex` and `claude`.
-- `--bootstrap` accepts `personal-assistant` or `team-assistant` and seeds the workspace from `templates/openclaw`, `templates/customized/default`, and the selected customized template.
-- `personal-assistant` fits one assistant for one human.
-- `team-assistant` fits one shared assistant for a team, channel, or group workflow.
-- `agents bootstrap <agentId> --mode <personal-assistant|team-assistant>` bootstraps an existing agent workspace using the agent's configured CLI tool.
-- bootstrap runs a dry check first; if any template markdown file already exists in the workspace, it stops and asks you to rerun with `--force`.
-- Fresh channel config still points at the `default` agent. If your first agent is not named `default`, update `defaultAgentId` and any route `agentId` values in config.
+- most users should stay on `clisbot start --cli ... --bot-type ...` and let first-run create the default agent
+- if you need more than one agent, custom bindings, or manual workspace bootstrap flows, use the `clisbot agents ...` commands described in [docs/user-guide/README.md](docs/user-guide/README.md)
+- README intentionally keeps that low-level surface out of the main onboarding path because the public first-run model is `--bot-type personal|team`, not internal template-mode naming.
+- Fresh channel config still points at the `default` agent. If your first agent uses another id, update `defaultAgentId` and any route `agentId` values in config.
 
 Env-backed setup is still supported when you want config to reference an env name instead of persisting a credential file:
 
@@ -224,7 +208,7 @@ clisbot start \
 
 - these flags are written into `~/.clisbot/clisbot.json` as `${ENV_NAME}` placeholders
 - you can pass either `CUSTOM_SLACK_APP_TOKEN` or `'${CUSTOM_SLACK_APP_TOKEN}'`
-- use this path when your environment variable names differ from `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN`, or `TELEGRAM_BOT_TOKEN`
+- use this path when you want config to point at env variable names you chose yourself
 - keep env export details in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md) instead of front-loading them into quick start
 
 ## Troubleshooting
@@ -236,8 +220,7 @@ clisbot start \
 - If you want later runs to work with plain `clisbot start`, rerun your successful first-run command with `--persist`.
 - If `clisbot start` prints token refs as `missing`, either pass the token explicitly on the command line or switch to env-backed setup described in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md).
 - If you use custom env names, pass them explicitly with `--slack-app-token`, `--slack-bot-token`, or `--telegram-bot-token`.
-- If `clisbot status` shows `bootstrap=...:missing`, the workspace is missing the tool-specific bootstrap file or `IDENTITY.md`; run `clisbot agents bootstrap <agentId> --mode <mode>`.
-- If `clisbot status` shows `bootstrap=...:not-bootstrapped`, finish the workspace bootstrap by reviewing `BOOTSTRAP.md`, `SOUL.md`, `IDENTITY.md`, and the mode-specific files in that workspace.
+- If `clisbot status` shows `bootstrap=...:missing` or `bootstrap=...:not-bootstrapped`, follow the advanced agent bootstrap steps in [docs/user-guide/README.md](docs/user-guide/README.md).
 - If Codex shows `Do you trust the contents of this directory?`, keep `trustWorkspace: true` in clisbot config and also mark the workspace as trusted in `~/.codex/config.toml`, for example:
 
 ```toml
@@ -278,7 +261,6 @@ trust_level = "trusted"
 - `clisbot channels privilege remove-user <target> <userId>`
 - `clisbot agents list --bindings`
 - `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist`
-- `clisbot agents bootstrap default --mode personal-assistant`
 - `clisbot agents bind --agent default --bind telegram`
 - `clisbot agents bindings`
 - `clisbot --help`
