@@ -75,7 +75,7 @@ Telegram topics are the closest Telegram equivalent to Slack threads, but they a
 ## Dependencies
 
 - current Slack channel contract remains the reference user experience
-- Agent-OS session identity stays stable
+- agent session identity stays stable
 - runner output normalization remains channel-agnostic
 
 ## Related Docs

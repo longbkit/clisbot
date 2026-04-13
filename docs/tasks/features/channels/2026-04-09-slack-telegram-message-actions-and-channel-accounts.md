@@ -26,7 +26,7 @@ At the same time, `clisbot` has no operator-facing `message` CLI surface for dir
 ## Non-Goals
 
 - adding new product channels beyond Slack and Telegram
-- changing Agent-OS session ownership rules
+- changing agent session ownership rules
 - moving route tables out of provider-owned config
 
 ## Research

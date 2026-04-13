@@ -1,4 +1,4 @@
-# Agent-OS Tests
+# Agents Tests
 
 ## Purpose
 
@@ -8,7 +8,7 @@ They cover durable concepts that must stay coherent even if the concrete runner 
 
 ## Current Coverage Truth
 
-- Agent-OS persists session continuity metadata by `sessionKey`
+- the agents layer persists session continuity metadata by `sessionKey`
 - a later prompt can recreate a killed tmux runner and resume the same stored `sessionId` when the backend supports it
 - stale tmux cleanup is implemented without forcing conversation reset
 - reset policy is not implemented yet
@@ -168,7 +168,7 @@ Implemented
 - the runner resumes the previous active AI CLI `sessionId`
 - the conversation continues without requiring a manual `/new`
 
-## Test Case 7A: Agent-OS Persists Session Continuity Metadata By Session Key
+## Test Case 7A: The Agents Layer Persists Session Continuity Metadata By Session Key
 
 ### Status
 

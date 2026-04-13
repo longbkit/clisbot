@@ -433,11 +433,11 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     lines.push("");
     lines.push("Guidance:");
     lines.push("  No agents are configured yet.");
-    lines.push("  First run requires both `--cli` and `--bootstrap`.");
-    lines.push("  personal-assistant = one assistant for one human.");
-    lines.push("  team-assistant = one shared assistant for a team or channel.");
-    lines.push("  Example: clisbot start --cli codex --bootstrap personal-assistant");
-    lines.push("  Example: clisbot start --cli codex --bootstrap team-assistant");
+    lines.push("  First run requires both `--cli` and `--bot-type`.");
+    lines.push("  personal = one assistant for one human.");
+    lines.push("  team = one shared assistant for a team or channel.");
+    lines.push("  Example: clisbot start --cli codex --bot-type personal");
+    lines.push("  Example: clisbot start --cli codex --bot-type team");
     lines.push("  Manual setup is still available with `clisbot agents add ...`.");
     lines.push(...renderOperatorHelpLines("  "));
     lines.push(

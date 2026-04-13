@@ -93,16 +93,16 @@ function printMissingBootstrapOptions(commandName: "init" | "start") {
   }
   console.log("");
   console.log(`warning!!! no default agent is configured yet, so clisbot did not ${commandName}.`);
-  console.log("First run requires both `--cli` and `--bootstrap`.");
+  console.log("First run requires both `--cli` and `--bot-type`.");
   console.log("");
-  console.log("Choose one bootstrap style:");
-  console.log("  personal-assistant = one assistant for one human");
-  console.log("  team-assistant     = one shared assistant for a team or channel");
-  console.log(`Prepare with one of these commands:`);
-  console.log(`  clisbot ${commandName} --cli codex --bootstrap personal-assistant`);
-  console.log(`  clisbot ${commandName} --cli codex --bootstrap team-assistant`);
-  console.log(`  clisbot ${commandName} --cli claude --bootstrap personal-assistant`);
-  console.log(`  clisbot ${commandName} --cli claude --bootstrap team-assistant`);
+  console.log("Choose one bot type:");
+  console.log("  personal = one assistant for one human");
+  console.log("  team     = one shared assistant for a team or channel");
+  console.log("Prepare with one of these commands:");
+  console.log(`  clisbot ${commandName} --cli codex --bot-type personal`);
+  console.log(`  clisbot ${commandName} --cli codex --bot-type team`);
+  console.log(`  clisbot ${commandName} --cli claude --bot-type personal`);
+  console.log(`  clisbot ${commandName} --cli claude --bot-type team`);
   console.log("Manual setup is still available with `clisbot agents add ...`.");
   for (const line of renderOperatorHelpLines()) {
     console.log(line);
@@ -261,7 +261,7 @@ async function initConfig(args: string[] = []) {
 
   const bootstrapped = await ensureDefaultAgentBootstrap(state, state.bootstrapFlags, "init");
   if (state.config.agents.list.length === 0 && !bootstrapped) {
-    console.log("No default agent was added. Use `--cli` with `--bootstrap`, or manage agents manually.");
+    console.log("No default agent was added. Use `--cli` with `--bot-type`, or manage agents manually.");
   }
 
   for (const line of state.persistenceLines) {

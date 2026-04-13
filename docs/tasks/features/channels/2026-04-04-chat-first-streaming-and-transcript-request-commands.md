@@ -32,7 +32,7 @@ Users may still need full session visibility, but that should be an explicit req
 ## Non-Goals
 
 - backend-specific output capture mechanics inside channel code
-- runner or Agent-OS ownership changes
+- runner or Agents ownership changes
 - making whole-session dumps the default interaction model
 
 ## Immediate Execution Slice

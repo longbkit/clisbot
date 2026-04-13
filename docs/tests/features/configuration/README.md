@@ -4,7 +4,7 @@
 
 These test cases define the expected behavior of configuration as the local control plane for `clisbot`.
 
-They cover config bootstrap, env substitution, and how the system wiring is resolved across channels, Agent-OS, runners, and control.
+They cover config bootstrap, env substitution, and how the system wiring is resolved across channels, the agents layer, runners, and control.
 
 ## Test Case 1: Default Config Bootstrap Works
 

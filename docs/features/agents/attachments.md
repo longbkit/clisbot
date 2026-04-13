@@ -2,13 +2,13 @@
 
 ## Summary
 
-Agent-OS owns inbound attachment placement inside the agent workspace.
+The agents layer owns inbound attachment placement inside the agent workspace.
 
 Current contract:
 
 - channels detect inbound files from Slack or Telegram
 - channels download those files
-- Agent-OS owns where they live in the workspace
+- the agents layer owns where they live in the workspace
 - runners receive only local file paths through the prompt text
 
 ## State
@@ -23,7 +23,7 @@ That means inbound channel files should become workspace-local files instead of 
 
 ## Ownership Rule
 
-Agent-OS owns:
+The agents layer owns:
 
 - the workspace-local attachment directory
 - per-session attachment placement
@@ -74,7 +74,7 @@ No extra metadata block is required in the current MVP slice.
 
 ## Related Task Docs
 
-- [2026-04-06-agent-workspace-attachments.md](../../tasks/features/agent-os/2026-04-06-agent-workspace-attachments.md)
+- [2026-04-06-agent-workspace-attachments.md](../../tasks/features/agents/2026-04-06-agent-workspace-attachments.md)
 
 ## Related Dependencies
 

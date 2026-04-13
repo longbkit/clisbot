@@ -147,4 +147,4 @@ Future extension if needed:
 - [Launch MVP Path](../../../overview/launch-mvp-path.md)
 - [Configuration Feature](../../../features/configuration/README.md)
 - [User Guide](../../../user-guide/README.md)
-- [Native Slash Command Compatibility And Overrides](../agent-os/2026-04-13-native-slash-command-compatibility-and-overrides.md)
+- [Native Slash Command Compatibility And Overrides](../agents/2026-04-13-native-slash-command-compatibility-and-overrides.md)

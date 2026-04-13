@@ -23,7 +23,7 @@ Keep the system split into five explicit product systems:
 - channels
 - control
 - configuration
-- agent-os
+- agents
 - runners
 
 That boundary is the main architecture rule for the repository.
@@ -43,11 +43,12 @@ That boundary is the main architecture rule for the repository.
 | Telegram             |              | status / logs        |
 | future API / Discord |              | channels / agents    |
 |                      |              | pairing / debug      |
+|                      |              | permissions          |
 | owns:                |              | owns:                |
 | - inbound messages   |              | - inspect            |
 | - thread / reply UX  |              | - intervene          |
 | - chat-first render  |              | - operator views     |
-| - transcript command |              |                      |
+| - transcript command |              | - operator permissions |
 +----------+-----------+              +----------+-----------+
            |                                     |
            +------------------+------------------+
@@ -66,7 +67,7 @@ That boundary is the main architecture rule for the repository.
                                |
                                v
                     +----------------------+
-                    |       AGENT-OS       |
+                    |        AGENTS        |
                     |----------------------|
                     | backend-agnostic     |
                     |                      |
@@ -122,7 +123,7 @@ That boundary is the main architecture rule for the repository.
 user message
   -> channel
   -> configuration resolves route + policy
-  -> agent-os resolves agent + session key
+  -> agents resolves agent + session key
   -> runner executes native CLI
   -> channel renders clean chat-first output
   -> control can inspect or intervene separately
@@ -147,14 +148,14 @@ Current session continuity metadata is intentionally small:
 - `runnerCommand`
 - `updatedAt`
 
-Do not treat tmux pane ids, tmux window ids, or other transient runner artifacts as canonical Agent-OS state.
+Do not treat tmux pane ids, tmux window ids, or other transient runner artifacts as canonical state in the agents layer.
 
 ## Ownership Rules
 
 - Channels own user-facing interaction and presentation.
-- Control owns operator-facing inspection and intervention.
-- Configuration is the local control plane that wires the system together.
-- Agent-OS owns backend-agnostic agent, session, and workspace behavior.
+- Control owns operator-facing inspection, intervention, and permission handling.
+- Configuration is the local control plane that wires the system together and stores the relevant policy config.
+- The agents layer owns backend-agnostic agent, session, and workspace behavior.
 - Runners own backend-specific execution behavior and normalize quirks behind one contract.
 
 ## Why This Split Matters
@@ -170,5 +171,5 @@ If these systems blur together:
 ## Detail Docs
 
 - Use [surface-architecture.md](surface-architecture.md) for user-facing and operator-facing surface rules.
-- Use [runtime-architecture.md](runtime-architecture.md) for Agent-OS, runner, persistence, and runtime contract rules.
+- Use [runtime-architecture.md](runtime-architecture.md) for agents, runner, persistence, and runtime contract rules.
 - Use [model-taxonomy-and-boundaries.md](model-taxonomy-and-boundaries.md) for model ownership, lifecycle, and naming boundaries.

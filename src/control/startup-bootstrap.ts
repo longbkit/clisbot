@@ -135,7 +135,7 @@ export function renderMissingTokenWarningLines(
     `Telegram token ref: ${telegramBot.envName} (${telegramBot.hasValue ? "set" : "missing"})`,
     "Pass the channels you want explicitly, for example with --telegram-bot-token or --slack-app-token plus --slack-bot-token.",
     "Use ENV_NAME or ${ENV_NAME} for env-backed setup, or pass a literal token to cold-start with credentialType=mem.",
-    "Example: clisbot start --cli codex --bootstrap personal-assistant --telegram-bot-token TELEGRAM_BOT_TOKEN",
+    "Example: clisbot start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN",
     `Repo docs path (local or GitHub): ${CHANNEL_ACCOUNT_DOC_PATH}`,
     `Slack docs: ${SLACK_TOKEN_DOC_URL}`,
     `Telegram docs: ${TELEGRAM_TOKEN_DOC_URL}`,

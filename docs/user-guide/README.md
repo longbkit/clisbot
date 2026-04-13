@@ -36,13 +36,19 @@ bun run init
 Fastest path:
 
 ```bash
-bun run start --cli codex --bootstrap personal-assistant
+bun run start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>
+```
+
+Persist the token for later plain `clisbot start` runs:
+
+```bash
+clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist
 ```
 
 If you use the packaged CLI:
 
 ```bash
-clisbot start --cli codex --bootstrap personal-assistant
+clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist
 ```
 
 Packaged CLI runtime expects Node 20+.
@@ -93,18 +99,18 @@ Important distinction:
 
 - `clisbot start` seeds `~/.clisbot/clisbot.json` automatically if it does not exist
 - `clisbot start` requires Slack or Telegram token references before it bootstraps anything
-- when no agents exist yet, `start` requires both `--cli` and `--bootstrap` to create the first `default` agent
+- when no agents exist yet, `start` requires both `--cli` and `--bot-type` to create the first `default` agent
 - `--slack-app-token`, `--slack-bot-token`, and `--telegram-bot-token` accept either bare env names like `CUSTOM_SLACK_APP_TOKEN` or placeholder form like `${CUSTOM_SLACK_APP_TOKEN}`
-- `clisbot start` prints which token env names it checks and whether each one is set or missing
+- `clisbot start` prints which token refs or credential sources it is using for the channels you requested
 - existing enabled channel token refs are validated before the detached runtime is spawned
-- the generated default config enables only the channels that have default tokens available
-- if default Slack or Telegram tokens exist later but the existing config still keeps that channel disabled, `clisbot start` prints the exact env names and a quick enable command
+- fresh bootstrap enables only the channels and accounts you named explicitly with flags
+- `--persist` writes canonical credential files for any literal channel tokens from that invocation, so later plain `clisbot start` can reuse them
 - the generated default config does not preseed Slack channel routes, Slack groups, Telegram groups, or Telegram topics
 - you must add channel routes manually in `~/.clisbot/clisbot.json`
 - `clisbot start` prints a brief agents and channels summary after launch
 - `clisbot start` and `clisbot status` print the primary agent workspace before the config path
 - that workspace is the default working directory for the agent and contains runtime state, sessions, personality files, and setup guidance
-- when no agents exist yet, `clisbot start` prints first-run guidance for direct `start --cli ... --bootstrap ...` usage and bootstrap completion
+- when no agents exist yet, `clisbot start` prints first-run guidance for direct `start --cli ... --bot-type ...` usage and bootstrap completion
 - `clisbot start` runs as a background service and writes runtime pid and log files under `~/.clisbot/state`
 - `bun run dev` watches source files in this repo
 - `control.configReload.watch` watches the runtime config file
@@ -345,7 +351,7 @@ If your shell uses different environment variable names, pass them directly on f
 ```bash
 clisbot start \
   --cli codex \
-  --bootstrap personal-assistant \
+  --bot-type personal \
   --slack-app-token CUSTOM_SLACK_APP_TOKEN \
   --slack-bot-token CUSTOM_SLACK_BOT_TOKEN
 ```
@@ -355,17 +361,17 @@ Or for Telegram:
 ```bash
 clisbot start \
   --cli claude \
-  --bootstrap team-assistant \
+  --bot-type team \
   --telegram-bot-token CUSTOM_TELEGRAM_BOT_TOKEN
 ```
 
 Important behavior:
 
-- these values are written into `~/.clisbot/clisbot.json` exactly as provided
+- these values are written into `~/.clisbot/clisbot.json` as `${ENV_NAME}` placeholders
 - bare env names are normalized into `${ENV_NAME}` placeholders in config
 - `clisbot` does not resolve or print the secret value during config bootstrap
 - this is meant for custom env variable names, not raw secret literals
-- if you still prefer manual setup, `clisbot init` accepts the same `--cli`, `--bootstrap`, and token-reference flags as `clisbot start`, but it does not start the runtime
+- if you still prefer manual setup, `clisbot init` accepts the same `--cli`, `--bot-type`, and token-reference flags as `clisbot start`, but it does not start the runtime
 
 `clisbot status` now prints:
 
@@ -373,6 +379,7 @@ Important behavior:
 - aggregate stats for agents, bootstrapped agents, pending bootstrap agents, and running tmux sessions
 - per-agent last activity
 - per-channel last activity and effective connection state
+- active runtime channel identity when available, such as account id, bot label, app id, and a short token fingerprint
 
 Connection state meaning:
 

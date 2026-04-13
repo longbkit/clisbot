@@ -134,13 +134,13 @@ Implemented
 
 ### Steps
 
-1. Inspect the runner interface used by Agent-OS and channels
+1. Inspect the runner interface used by the agents layer and channels
 2. Compare the required fields for input, lifecycle, snapshots, and streaming
 
 ### Expected Results
 
 - the contract does not require tmux-specific concepts outside the runner boundary
-- future ACP or SDK runners can implement the same contract without changing channel or Agent-OS semantics
+- future ACP or SDK runners can implement the same contract without changing channel or Agents semantics
 - backend-specific quirks stay inside the runner implementation
 
 ## Test Case 7: tmux Runner Can Resume A Tool Session After Runner Recreation

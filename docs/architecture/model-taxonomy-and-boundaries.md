@@ -10,7 +10,7 @@ This document defines how repository models should be named, separated, and evol
 
 Its goal is to stop a common early-stage architecture failure:
 
-- mixing agent-os state, runner contracts, channel payloads, control payloads, persistence records, and transient runtime state into the same object shape
+- mixing agent-layer state, runner contracts, channel payloads, control payloads, persistence records, and transient runtime state into the same object shape
 
 When that happens, the codebase becomes ambiguous in ways that are expensive later:
 
@@ -34,9 +34,9 @@ Every significant model must be defined by all of the following:
 
 ## Taxonomy
 
-### 1. Agent-OS Entities
+### 1. Agent Entities
 
-Agent-OS entities describe the canonical operating truth of the system.
+Agent entities describe the canonical operating truth of the system.
 
 They should answer:
 
@@ -44,7 +44,7 @@ They should answer:
 - how agents, sessions, workspaces, tools, skills, memory, and subagents relate
 - which mutations are meaningful
 
-Agent-OS entities are not automatically the same as channel DTOs, persistence rows, or operator views.
+Agent entities are not automatically the same as channel DTOs, persistence rows, or operator views.
 
 ### 2. Persistence Model
 
@@ -96,7 +96,7 @@ Runner runtime state must stay separate from:
 
 - persistence shape
 - channel DTOs
-- Agent-OS entities unless there is an explicit adapter layer
+- agent entities unless there is an explicit adapter layer
 
 ### 6. Surface View Models
 
@@ -104,7 +104,7 @@ Surface view models are render-oriented shapes prepared for a channel or control
 
 They are acceptable when they reduce UI complexity, but they must stay clearly local to rendering concerns.
 
-Do not let surface view models leak back into Agent-OS contracts or persistence logic.
+Do not let surface view models leak back into agent-layer contracts or persistence logic.
 
 ## Naming Rules
 

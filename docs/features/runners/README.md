@@ -2,7 +2,7 @@
 
 ## Summary
 
-Runners are the execution backends behind Agent-OS.
+Runners are the execution backends behind the agents layer.
 
 They standardize how the system talks to a concrete backend and how backend output becomes one consistent internal contract.
 
@@ -53,7 +53,7 @@ That only stays coherent if backend-specific behavior is isolated behind a stand
 
 ## Dependencies
 
-- [Agent-OS](../agent-os/README.md)
+- [Agents](../agents/README.md)
 - [Configuration](../configuration/README.md)
 
 ## Current Focus

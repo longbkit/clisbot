@@ -9,14 +9,14 @@ Target operator experiences:
 ```bash
 clisbot start \
   --telegram-bot-token 123456:telegram-bot-token \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 ```bash
 clisbot start \
   --slack-app-token SLACK_APP_TOKEN \
   --slack-bot-token SLACK_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 ```bash
@@ -24,7 +24,7 @@ clisbot start \
   --slack-app-token SLACK_APP_TOKEN_WORK \
   --slack-bot-token SLACK_BOT_TOKEN_WORK \
   --telegram-bot-token TELEGRAM_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 ```bash
@@ -36,7 +36,7 @@ clisbot start \
   --slack-account default \
   --slack-app-token SLACK_APP_TOKEN \
   --slack-bot-token SLACK_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 Those commands should be enough to try the requested channels immediately when the CLI choice is already unambiguous.
@@ -96,11 +96,11 @@ That means:
 
 Examples:
 
-- `clisbot start --telegram-bot-token TELEGRAM_BOT_TOKEN --bootstrap personal-assistant`
+- `clisbot start --telegram-bot-token TELEGRAM_BOT_TOKEN --bot-type personal`
   - bootstrap Telegram only
-- `clisbot start --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN --bootstrap personal-assistant`
+- `clisbot start --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN --bot-type personal`
   - bootstrap Slack only
-- `clisbot start --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN --telegram-bot-token TELEGRAM_BOT_TOKEN --bootstrap personal-assistant`
+- `clisbot start --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN --telegram-bot-token TELEGRAM_BOT_TOKEN --bot-type personal`
   - bootstrap Slack and Telegram
 
 This intentionally changes the current direction from "auto-use any default tokens found in env" to "only bootstrap what the operator asked for".
@@ -118,14 +118,14 @@ Examples:
 ```bash
 clisbot start \
   --telegram-bot-token TELEGRAM_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 ```bash
 clisbot start \
   --slack-app-token SLACK_APP_TOKEN \
   --slack-bot-token SLACK_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 ### Explicit account blocks
@@ -138,7 +138,7 @@ clisbot start \
   --telegram-bot-token TELEGRAM_ALERTS_BOT_TOKEN \
   --telegram-account personal \
   --telegram-bot-token TELEGRAM_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 ```bash
@@ -149,7 +149,7 @@ clisbot start \
   --slack-account default \
   --slack-app-token SLACK_APP_TOKEN \
   --slack-bot-token SLACK_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 Parser rule:
@@ -620,7 +620,7 @@ Command:
 ```bash
 clisbot start \
   --telegram-bot-token TELEGRAM_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 Result:
@@ -636,7 +636,7 @@ Command:
 clisbot start \
   --slack-app-token SLACK_APP_TOKEN \
   --slack-bot-token SLACK_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 Result:
@@ -653,7 +653,7 @@ clisbot start \
   --slack-app-token SLACK_APP_TOKEN \
   --slack-bot-token SLACK_BOT_TOKEN \
   --telegram-bot-token TELEGRAM_BOT_TOKEN \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 Result:
@@ -736,7 +736,7 @@ Example:
 ```bash
 clisbot start \
   --telegram-bot-token "$TELEGRAM_BOT_TOKEN" \
-  --bootstrap personal-assistant \
+  --bot-type personal \
   --persist
 ```
 

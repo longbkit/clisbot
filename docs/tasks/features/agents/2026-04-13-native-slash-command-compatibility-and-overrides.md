@@ -39,4 +39,4 @@ That is a good baseline, but it may not be enough for public launch across multi
 ## Related Docs
 
 - [Launch MVP Path](../../../overview/launch-mvp-path.md)
-- [Agent Commands](../../../features/agent-os/commands.md)
+- [Agent Commands](../../../features/agents/commands.md)

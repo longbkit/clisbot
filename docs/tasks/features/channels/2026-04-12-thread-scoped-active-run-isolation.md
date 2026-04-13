@@ -60,5 +60,5 @@ If a live run in thread A can unexpectedly block thread B, the product becomes c
 
 - [Channels Feature](../../../features/channels/README.md)
 - [Telegram Topics Channel MVP](2026-04-05-telegram-topics-channel-mvp.md)
-- [Conversation Follow-Up Policy And Runtime Control API](../agent-os/2026-04-05-conversation-follow-up-policy-and-runtime-control-api.md)
+- [Conversation Follow-Up Policy And Runtime Control API](../agents/2026-04-05-conversation-follow-up-policy-and-runtime-control-api.md)
 - [Observer-Based Session Attach, Detach, And Watch](../../2026-04-08-observer-based-session-attach-detach-and-watch.md)

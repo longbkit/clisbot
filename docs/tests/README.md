@@ -27,7 +27,7 @@ docs/tests/
     README.md
     channels/
       README.md
-    agent-os/
+    agents/
       README.md
     runners/
       README.md

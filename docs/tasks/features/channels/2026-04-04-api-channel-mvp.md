@@ -36,7 +36,7 @@ Treating it as a channel keeps the system model honest.
 
 ## Dependencies Or Blockers
 
-- stable Agent-OS lifecycle
+- stable Agents lifecycle
 - stable runner contract
 - stable configuration model
 

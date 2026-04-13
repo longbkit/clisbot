@@ -34,8 +34,8 @@ docs/tasks/
     README.md
     channels/
       yyyy-MM-dd-channel-task.md
-    agent-os/
-      yyyy-MM-dd-agent-os-task.md
+    agents/
+      yyyy-MM-dd-agents-task.md
 ```
 
 ## Core Rules

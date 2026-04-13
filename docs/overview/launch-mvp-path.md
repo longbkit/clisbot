@@ -109,4 +109,4 @@ The open question is whether broader public launch should also include:
 - [Vietnam Channel Launch Package](../tasks/features/channels/2026-04-13-vietnam-channel-launch-package.md)
 - [Secondary CLI Expansion Prioritization](../tasks/features/runners/2026-04-13-secondary-cli-expansion-prioritization.md)
 - [Post-MVP Channel Expansion Wave](../tasks/features/channels/2026-04-13-post-mvp-channel-expansion-wave.md)
-- [Native Slash Command Compatibility And Overrides](../tasks/features/agent-os/2026-04-13-native-slash-command-compatibility-and-overrides.md)
+- [Native Slash Command Compatibility And Overrides](../tasks/features/agents/2026-04-13-native-slash-command-compatibility-and-overrides.md)

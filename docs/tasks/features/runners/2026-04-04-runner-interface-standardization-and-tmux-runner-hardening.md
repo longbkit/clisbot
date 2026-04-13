@@ -74,7 +74,7 @@ That means the tmux runner must expose a normalized view of session progress tha
 
 ## Dependencies Or Blockers
 
-- stable Agent-OS ownership boundaries
+- stable Agents ownership boundaries
 
 ## Related Docs
 

@@ -500,14 +500,16 @@ export class ActiveRunManager {
               return;
             }
 
+            const keepDetached = currentRun.latestUpdate.status === "detached";
             await this.notifyRunObservers(
               currentRun,
               this.createRunUpdate({
                 resolved: currentRun.resolved,
-                status: "running",
+                status: keepDetached ? "detached" : "running",
                 snapshot: update.snapshot,
                 fullSnapshot: update.fullSnapshot,
                 initialSnapshot: update.initialSnapshot,
+                note: keepDetached ? this.buildDetachedNote(currentRun.resolved) : undefined,
               }),
             );
           },

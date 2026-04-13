@@ -1,8 +1,8 @@
-# Agent-OS
+# Agents
 
 ## Summary
 
-Agent-OS is the backend-agnostic operating layer for agents in `clisbot`.
+The agents layer is the backend-agnostic operating layer for agents in `clisbot`.
 
 It owns the durable mental model of an agent and its session state.
 
@@ -48,11 +48,11 @@ That operating model must continue to make sense even if tmux is replaced or sup
 
 ## Related Task Folder
 
-- [docs/tasks/features/agent-os](../../tasks/features/agent-os)
+- [docs/tasks/features/agents](../../tasks/features/agents)
 
 ## Related Test Docs
 
-- [docs/tests/features/agent-os](../../tests/features/agent-os/README.md)
+- [docs/tests/features/agents](../../tests/features/agents/README.md)
 - [Agent Commands](commands.md)
 - [Session Identity](sessions.md)
 - [Agent Workspace Attachments](attachments.md)

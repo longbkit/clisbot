@@ -52,7 +52,7 @@ Examples:
 ## Dependencies
 
 - [Channels](../../channels/README.md)
-- [Agent-OS](../../agent-os/README.md)
+- [Agents](../../agents/README.md)
 - [Runners](../../runners/README.md)
 - [Control](../../control/README.md)
 - [Configuration](../../configuration/README.md)

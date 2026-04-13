@@ -10,13 +10,13 @@
 
 This document covers:
 
-- agent-os
+- agents
 - runners
 - configuration as the runtime control plane
 
-## Agent-OS Rule
+## Agents Rule
 
-Agent-OS is backend-agnostic.
+The agents layer is backend-agnostic.
 
 It owns:
 
@@ -31,7 +31,7 @@ It owns:
 - subagents
 - lifecycle and health state
 
-Agent-OS must not depend on tmux-specific terms such as panes, send-keys, or socket-level commands.
+The agents layer must not depend on tmux-specific terms such as panes, send-keys, or socket-level commands.
 
 ## Runner Rule
 
@@ -43,7 +43,7 @@ They own:
 - future ACP integrations
 - future SDK integrations
 
-Every runner must normalize its behavior into one internal contract for Agent-OS.
+Every runner must normalize its behavior into one internal contract for the agents layer.
 
 Runners also own backend-specific session-id mechanics:
 
@@ -63,7 +63,7 @@ At minimum, a runner should provide:
 - surface lifecycle state
 - surface backend errors
 
-Backend quirks belong inside runner implementations, not Agent-OS.
+Backend quirks belong inside runner implementations, not Agents.
 
 ## Run Supervision Rule
 
@@ -90,7 +90,7 @@ It decides:
 - which session policy shapes the runtime identity for that route
 - which workspace and policy defaults apply
 
-Configuration should be expressive enough to support future runners without changing Agent-OS semantics.
+Configuration should be expressive enough to support future runners without changing the semantics of the agents layer.
 
 ## Persistence Rule
 
@@ -112,18 +112,18 @@ Current persisted session continuity metadata is intentionally small:
 - `runnerCommand`
 - `updatedAt`
 
-Do not persist transient runner artifacts as canonical Agent-OS state without a documented reason.
+Do not persist transient runner artifacts as canonical state in the agents layer without a documented reason.
 
 For AI CLI-backed runners, this implies one important split:
 
 - persist session continuity metadata such as `sessionKey`, active `sessionId`, and last-known resume metadata
-- do not treat tmux pane ids, tmux window ids, or ephemeral process state as canonical Agent-OS truth
+- do not treat tmux pane ids, tmux window ids, or ephemeral process state as canonical truth in the agents layer
 
 ## Testing Standard
 
 Runtime tests should verify:
 
-- Agent-OS lifecycle and ownership rules
+- agents lifecycle and ownership rules
 - OpenClaw-compatible session-key behavior for routed conversations
 - runner contract behavior
 - backend-specific quirks staying inside runners

@@ -39,7 +39,7 @@ Current tmux naming rule:
 
 ## Current Store
 
-Agent-OS persists one session entry per `sessionKey` in `session.storePath`.
+The agents layer persists one session entry per `sessionKey` in `session.storePath`.
 
 Current default path:
 
@@ -72,8 +72,8 @@ This is the current continuity bridge between routing and runner restart.
 For one routed conversation:
 
 1. channels resolve one `agentId` and one `sessionKey`
-2. Agent-OS resolves workspace and runner config
-3. Agent-OS checks whether that `sessionKey` already has a stored `sessionId`
+2. the agents layer resolves workspace and runner config
+3. the agents layer checks whether that `sessionKey` already has a stored `sessionId`
 4. runner bootstrap decides whether to start fresh or resume
 5. tmux hosts the live runner process for that session
 
@@ -91,7 +91,7 @@ Runner residency is now separate from logical conversation continuity.
 
 Current cleanup contract:
 
-- Agent-OS keeps one stored session entry per `sessionKey`
+- the agents layer keeps one stored session entry per `sessionKey`
 - a background cleanup loop checks stored sessions against the configured stale threshold
 - if the backing tmux session is idle past that threshold, clisbot kills only the tmux session
 - the stored `sessionId` remains in `session.storePath`
@@ -122,7 +122,7 @@ Current idle rule:
 
 ## Runner-Owned Session Id Behavior
 
-Agent-OS does not hardcode how a tool session id is obtained.
+The agents layer does not hardcode how a tool session id is obtained.
 
 That is a runner concern expressed in config.
 

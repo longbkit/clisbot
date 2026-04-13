@@ -1,7 +1,7 @@
 ---
 title: Packaged Runtime Must Not Assume Repo Layout
 date: 2026-04-08
-area: packaging, runtime, agent-os
+area: packaging, runtime, agents
 summary: Code that works from the repo tree can still fail after npm packaging if it assumes src-relative file layout. Bundled runtime paths must be resolved against both dev and packaged layouts, then tested explicitly.
 related:
   - src/agents/bootstrap.ts

@@ -14,7 +14,7 @@ This document covers:
 - control
 - how session output becomes visible at a surface
 
-It does not define runner mechanics or Agent-OS internals.
+It does not define runner mechanics or Agents internals.
 
 ## Surface Rule
 
@@ -82,6 +82,7 @@ Control responsibilities:
 - attach to sessions
 - restart or stop sessions
 - surface health and debug information
+- handle operator-facing permission and access-control flows
 
 Control must not behave like a user-facing conversation channel.
 

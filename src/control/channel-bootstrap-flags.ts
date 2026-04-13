@@ -27,6 +27,17 @@ export type ParsedBootstrapFlags = {
   literalWarnings: string[];
 };
 
+function parseBotType(rawValue: string) {
+  const value = rawValue.trim().toLowerCase();
+  if (value === "personal" || value === "personal-assistant") {
+    return "personal-assistant" satisfies AgentBootstrapMode;
+  }
+  if (value === "team" || value === "team-assistant") {
+    return "team-assistant" satisfies AgentBootstrapMode;
+  }
+  throw new Error(`Invalid bot type: ${rawValue}`);
+}
+
 function parseOptionValue(args: string[], name: string, index: number) {
   const value = args[index + 1]?.trim();
   if (!value) {
@@ -103,7 +114,12 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
       continue;
     }
     if (arg === "--bootstrap") {
-      bootstrap = parseOptionValue(args, arg, index) as AgentBootstrapMode;
+      bootstrap = parseBotType(parseOptionValue(args, arg, index));
+      index += 1;
+      continue;
+    }
+    if (arg === "--bot-type") {
+      bootstrap = parseBotType(parseOptionValue(args, arg, index));
       index += 1;
       continue;
     }

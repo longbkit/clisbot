@@ -86,8 +86,8 @@ describe("parseCliArgs", () => {
         "init",
         "--cli",
         "claude",
-        "--bootstrap",
-        "team-assistant",
+        "--bot-type",
+        "team",
         "--slack-app-token",
         "${CUSTOM_SLACK_APP_TOKEN}",
         "--slack-bot-token",
@@ -100,8 +100,8 @@ describe("parseCliArgs", () => {
       args: [
         "--cli",
         "claude",
-        "--bootstrap",
-        "team-assistant",
+        "--bot-type",
+        "team",
         "--slack-app-token",
         "${CUSTOM_SLACK_APP_TOKEN}",
         "--slack-bot-token",
@@ -120,8 +120,8 @@ describe("parseCliArgs", () => {
         "start",
         "--cli",
         "codex",
-        "--bootstrap",
-        "personal-assistant",
+        "--bot-type",
+        "personal",
         "--slack-app-token",
         "${CUSTOM_SLACK_APP_TOKEN}",
         "--slack-bot-token",
@@ -134,8 +134,8 @@ describe("parseCliArgs", () => {
       args: [
         "--cli",
         "codex",
-        "--bootstrap",
-        "personal-assistant",
+        "--bot-type",
+        "personal",
         "--slack-app-token",
         "${CUSTOM_SLACK_APP_TOKEN}",
         "--slack-bot-token",
@@ -153,15 +153,16 @@ describe("renderCliHelp", () => {
 
     expect(help).toContain(`clisbot v${getClisbotVersion()}`);
     expect(help).toContain("clisbot start");
-    expect(help).toContain("personal-assistant");
-    expect(help).toContain("team-assistant");
+    expect(help).toContain("Bot types:");
+    expect(help).toContain("personal  One human gets one dedicated long-lived assistant workspace and session path");
+    expect(help).toContain("team      One shared channel or group routes into one shared assistant workspace and session path");
     expect(help).toContain("SLACK_APP_TOKEN");
     expect(help).toContain("SLACK_BOT_TOKEN");
     expect(help).toContain("TELEGRAM_BOT_TOKEN");
     expect(help).toContain("Fresh bootstrap only enables channels named by flags");
     expect(help).toContain("One human gets one dedicated long-lived assistant workspace and session path");
     expect(help).toContain("One shared channel or group routes into one shared assistant workspace and session path");
-    expect(help).toContain("clisbot start --cli codex --bootstrap personal-assistant --telegram-bot-token TELEGRAM_BOT_TOKEN");
+    expect(help).toContain("clisbot start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN");
     expect(help).toContain("clisbot restart");
     expect(help).toContain("clisbot stop [--hard]");
     expect(help).toContain("clisbot status");
@@ -172,7 +173,7 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot loops <subcommand>");
     expect(help).toContain("clisbot message <subcommand>");
     expect(help).toContain("clisbot agents <subcommand>");
-    expect(help).toContain("clisbot init [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>] [--persist]");
+    expect(help).toContain("clisbot init [--cli <codex|claude>] [--bot-type <personal|team>] [--persist]");
     expect(help).not.toContain("print-config-path");
     expect(help).toContain("npx clisbot start");
     expect(help).toContain("npm install -g clisbot && clisbot start");

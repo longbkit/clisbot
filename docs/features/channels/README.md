@@ -72,7 +72,7 @@ Channels is where those surfaces live.
 
 ## Dependencies
 
-- [Agent-OS](../agent-os/README.md)
+- [Agents](../agents/README.md)
 - [Runners](../runners/README.md)
 - [Configuration](../configuration/README.md)
 - [Transcript Presentation And Streaming](../../architecture/transcript-presentation-and-streaming.md)

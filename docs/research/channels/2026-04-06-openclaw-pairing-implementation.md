@@ -364,6 +364,6 @@ The clean OpenClaw insight is:
 
 - pairing is a shared access-control subsystem with channel adapters
 - not a channel-specific hack
-- not an Agent-OS session feature
+- not an agent session feature
 
 That is the part worth bringing into `clisbot` if pairing work starts later.

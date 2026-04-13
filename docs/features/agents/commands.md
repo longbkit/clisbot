@@ -8,7 +8,7 @@ It covers slash-prefixed commands and configurable shorthand command forms that 
 
 ## Boundary Rule
 
-Agent command dispatch belongs to `agent-os`.
+Agent command dispatch belongs to `agents`.
 
 Why:
 

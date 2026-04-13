@@ -80,56 +80,69 @@ Telegram
 
 ## Quick Start
 
-Choose one setup path.
-
-Fastest first-run path when you already have one channel token:
+Fastest first-run path for the first Telegram bot:
 
 ```bash
 clisbot start \
   --cli codex \
-  --bootstrap personal-assistant \
+  --bot-type personal \
   --telegram-bot-token <your-telegram-bot-token>
 ```
 
-This keeps the literal token in memory for the current launch only. After the bot works, use `--persist` or the canonical credential-file path described in [docs/features/configuration/start-bootstrap-and-credential-persistence.md](docs/features/configuration/start-bootstrap-and-credential-persistence.md).
+If you want later runs to work with plain `clisbot start`, persist that token immediately:
+
+```bash
+clisbot start \
+  --cli codex \
+  --bot-type personal \
+  --telegram-bot-token <your-telegram-bot-token> \
+  --persist
+```
+
+What this does:
+
+- `--bot-type personal` creates one assistant for one human
+- `--bot-type team` creates one shared assistant for a team, channel, or group workflow
+- literal token input stays in memory unless you also pass `--persist`
+- `--persist` promotes the token into the canonical credential file so the next `clisbot start` can reuse it without retyping
+- fresh bootstrap only enables the channels you name explicitly
+- after the persisted first run, later restarts can use plain `clisbot start`
 
 Packaged CLI path:
 
-Requires Node 20+ in the shell where you run `clisbot`.
-
-Primary command: `clisbot`
-Short alias: `clis`
-
-1. Install globally:
-
 ```bash
 npm install -g clisbot
+clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist
 ```
 
-2. Add the required environment variables to your shell startup file, then reload it.
+Short alias:
 
 ```bash
-# ~/.zshrc or ~/.bashrc
-export SLACK_APP_TOKEN=...
-export SLACK_BOT_TOKEN=...
-export TELEGRAM_BOT_TOKEN=...
+clis start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>
 ```
+
+Local repo path:
 
 ```bash
-source ~/.zshrc
-# or: source ~/.bashrc
+bun install
+bun run start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist
 ```
 
-3. Start the service directly.
+If you prefer Slack first:
 
 ```bash
-clisbot start --cli codex --bootstrap personal-assistant
-clis start --cli codex --bootstrap personal-assistant
+clisbot start \
+  --cli codex \
+  --bot-type team \
+  --slack-app-token SLACK_APP_TOKEN \
+  --slack-bot-token SLACK_BOT_TOKEN
 ```
 
-4. Fastest first conversation path: send a direct message to the bot in Slack or Telegram.
+First conversation path:
 
-`clisbot` defaults direct messages to pairing mode. The bot will reply with a pairing code and approval command.
+- send a DM to the bot in Slack or Telegram
+- `clisbot` defaults DMs to pairing mode
+- the bot replies with a pairing code and approval command
 
 Approve it with:
 
@@ -138,61 +151,9 @@ clisbot pairing approve slack <CODE>
 clisbot pairing approve telegram <CODE>
 ```
 
-After approval, keep chatting with the bot in that DM or add shared channel or topic routes later.
-
-If you do not want to install globally, you can also run it directly with `npx`:
-
-```bash
-npx clisbot start --cli codex --bootstrap personal-assistant
-```
-
-Local repo path:
-
-Requires Bun for development commands in this repo.
-
-1. Install dependencies.
-
-```bash
-bun install
-```
-
-2. Add the required environment variables to your shell startup file, then reload it.
-
-```bash
-# ~/.zshrc or ~/.bashrc
-export SLACK_APP_TOKEN=...
-export SLACK_BOT_TOKEN=...
-export TELEGRAM_BOT_TOKEN=...
-```
-
-```bash
-source ~/.zshrc
-# or: source ~/.bashrc
-```
-
-3. Start the service directly.
-
-```bash
-bun run start --cli codex --bootstrap personal-assistant
-```
-
-4. Fastest first conversation path: send a direct message to the bot in Slack or Telegram.
-
-`clisbot` defaults direct messages to pairing mode. The bot will reply with a pairing code and approval command.
-
-Approve it with:
-
-```bash
-bun run pairing -- approve slack <CODE>
-bun run pairing -- approve telegram <CODE>
-```
-
-After approval, keep chatting with the bot in that DM or add shared channel or topic routes later.
-
-Fresh config now starts with no configured agents, and first-run `clisbot start` requires both `--cli` and `--bootstrap` before it creates the first `default` agent.
-Fresh config also starts with no preconfigured Slack channels or Telegram groups/topics. Add those routes manually in `~/.clisbot/clisbot.json`.
-`clisbot start` now also requires Slack or Telegram token references before it bootstraps anything. By default it looks for `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN`, and `TELEGRAM_BOT_TOKEN`, but you can pass custom placeholders such as `--slack-app-token '${CUSTOM_SLACK_APP_TOKEN}'`.
-On startup, `clisbot` now prints which token env names it is checking and whether each one is set or missing.
+Fresh config starts with no configured agents, so first-run `clisbot start` requires both `--cli` and `--bot-type` before it creates the first `default` agent.
+Fresh config also starts with no preconfigured Slack channels or Telegram groups or topics. Add those routes manually in `~/.clisbot/clisbot.json`.
+`clisbot start` requires explicit channel token input before it bootstraps anything. You can pass raw values, env names such as `TELEGRAM_BOT_TOKEN`, or placeholders such as `'${CUSTOM_TELEGRAM_BOT_TOKEN}'`.
 Set `CLISBOT_HOME` if you want a fully separate local config, state, tmux socket, wrapper, and workspace root, for example when running a dev instance beside your main bot.
 
 ## Setup Guide
@@ -210,14 +171,13 @@ If you prefer to configure things yourself:
 1. Read the full config template in [config/clisbot.json.template](config/clisbot.json.template).
 2. Copy it to `~/.clisbot/clisbot.json` and adjust channels, bindings, workspaces, and policies for your environment.
 3. Add agents through the CLI so tool defaults, startup options, and bootstrap templates stay consistent.
-4. Set the required environment variables in your shell startup file so `clisbot` can read them consistently.
+4. Optionally move stable channel secrets into env vars or canonical credential files after your first successful run.
 
 Separate dev home example:
 
 ```bash
 export CLISBOT_HOME=~/.clisbot-dev
-export TELEGRAM_BOT_TOKEN=...
-clisbot start --cli codex --bootstrap team-assistant
+clisbot start --cli codex --bot-type team --telegram-bot-token TELEGRAM_BOT_TOKEN
 ```
 
 - `CLISBOT_HOME` changes the default config path, runtime state dir, tmux socket, local wrapper path, and default workspaces together
@@ -233,7 +193,7 @@ Channel route setup is manual by design:
 Example agent setup:
 
 ```bash
-clisbot start --cli codex --bootstrap personal-assistant
+clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>
 ```
 
 ```bash
@@ -252,63 +212,29 @@ Agent setup rules:
 - bootstrap runs a dry check first; if any template markdown file already exists in the workspace, it stops and asks you to rerun with `--force`.
 - Fresh channel config still points at the `default` agent. If your first agent is not named `default`, update `defaultAgentId` and any route `agentId` values in config.
 
-Custom token placeholder setup:
+Env-backed setup is still supported when you want config to reference an env name instead of persisting a credential file:
 
 ```bash
 clisbot start \
   --cli codex \
-  --bootstrap personal-assistant \
+  --bot-type personal \
   --slack-app-token CUSTOM_SLACK_APP_TOKEN \
   --slack-bot-token CUSTOM_SLACK_BOT_TOKEN
 ```
 
-- these flags are written into `~/.clisbot/clisbot.json` exactly as provided
+- these flags are written into `~/.clisbot/clisbot.json` as `${ENV_NAME}` placeholders
 - you can pass either `CUSTOM_SLACK_APP_TOKEN` or `'${CUSTOM_SLACK_APP_TOKEN}'`
-- `clisbot` does not expand or print the token values during config generation
-- use them when your environment variable names differ from `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN`, or `TELEGRAM_BOT_TOKEN`
-- the env var itself still needs a real value in your shell before `clisbot start` can launch
-
-Examples:
-
-```bash
-# ~/.bashrc
-export SLACK_APP_TOKEN=...
-export SLACK_BOT_TOKEN=...
-export TELEGRAM_BOT_TOKEN=...
-```
-
-```bash
-# ~/.zshrc
-export SLACK_APP_TOKEN=...
-export SLACK_BOT_TOKEN=...
-export TELEGRAM_BOT_TOKEN=...
-```
-
-```bash
-# custom names are also valid
-export CUSTOM_SLACK_APP_TOKEN=...
-export CUSTOM_SLACK_BOT_TOKEN=...
-export CUSTOM_TELEGRAM_BOT_TOKEN=...
-```
-
-Then reload your shell:
-
-```bash
-source ~/.bashrc
-```
-
-```bash
-source ~/.zshrc
-```
+- use this path when your environment variable names differ from `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN`, or `TELEGRAM_BOT_TOKEN`
+- keep env export details in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md) instead of front-loading them into quick start
 
 ## Troubleshooting
 
 - If setup feels unclear, open Claude Code or Codex in this repo and ask it to help using the local docs.
-- If you are still in doubt, clone `https://github.com/longbkit/clisbot`, open the repo in Codex or Claude Code, and ask questions about setup or the bootstrap mode choice.
+- If you are still in doubt, clone `https://github.com/longbkit/clisbot`, open the repo in Codex or Claude Code, and ask questions about setup or the bot type choice.
 - If config behavior is confusing, inspect [config/clisbot.json.template](config/clisbot.json.template) first, then compare it with [docs/user-guide/README.md](docs/user-guide/README.md).
-- If `clisbot start` says no agents are configured, prefer `clisbot start --cli codex --bootstrap personal-assistant`.
-- If `clisbot start` says no default tokens were found, set Slack or Telegram tokens first using [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md).
-- If `clisbot start` prints token refs as `missing`, set those exact env vars in `~/.bashrc` or `~/.zshrc`, reload the shell, then start again.
+- If `clisbot start` says no agents are configured, prefer `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>`.
+- If you want later runs to work with plain `clisbot start`, rerun your successful first-run command with `--persist`.
+- If `clisbot start` prints token refs as `missing`, either pass the token explicitly on the command line or switch to env-backed setup described in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md).
 - If you use custom env names, pass them explicitly with `--slack-app-token`, `--slack-bot-token`, or `--telegram-bot-token`.
 - If `clisbot status` shows `bootstrap=...:missing`, the workspace is missing the tool-specific bootstrap file or `IDENTITY.md`; run `clisbot agents bootstrap <agentId> --mode <mode>`.
 - If `clisbot status` shows `bootstrap=...:not-bootstrapped`, finish the workspace bootstrap by reviewing `BOOTSTRAP.md`, `SOUL.md`, `IDENTITY.md`, and the mode-specific files in that workspace.
@@ -351,7 +277,7 @@ trust_level = "trusted"
 - `clisbot channels privilege allow-user <target> <userId>`
 - `clisbot channels privilege remove-user <target> <userId>`
 - `clisbot agents list --bindings`
-- `clisbot start --cli codex --bootstrap personal-assistant`
+- `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist`
 - `clisbot agents bootstrap default --mode personal-assistant`
 - `clisbot agents bind --agent default --bind telegram`
 - `clisbot agents bindings`

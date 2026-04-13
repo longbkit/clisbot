@@ -12,7 +12,7 @@ tmux is the current backend, but it is not the whole system model.
 
 This document keeps tmux-specific mechanics inside `runners` so that:
 
-- `agent-os` stays backend-agnostic
+- `agents` stays backend-agnostic
 - `channels` do not depend on tmux internals
 - future ACP or SDK runners can follow the same top-level contract
 
@@ -52,8 +52,8 @@ For AI CLI-backed runners, tmux is the host process boundary, not the canonical 
 
 Current continuity split:
 
-- Agent-OS owns `sessionKey`
-- Agent-OS persists the current `sessionId`
+- the agents layer owns `sessionKey`
+- the agents layer persists the current `sessionId`
 - the tmux runner owns how that `sessionId` is created, captured, and reused for a concrete backend
 
 ## tmux Mechanics
@@ -151,7 +151,7 @@ The tmux runner should capture the current visible state of the session and expo
 
 The runner should not expose raw tmux capture as the only contract.
 
-It should normalize pane-derived output into one backend-neutral runner format that channels and `agent-os` can consume.
+It should normalize pane-derived output into one backend-neutral runner format that channels and `agents` can consume.
 
 ## tmux-Specific Quirks
 
@@ -223,7 +223,7 @@ This avoids both bad extremes:
 
 Current implementation:
 
-- the cleanup loop is scheduled by Agent-OS
+- the cleanup loop is scheduled by Agents
 - each session resolves the stale threshold from:
   - `agents.defaults.session.staleAfterMinutes`
   - or `agents.list[].session.staleAfterMinutes`

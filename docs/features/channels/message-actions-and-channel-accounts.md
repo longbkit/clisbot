@@ -8,7 +8,7 @@ The goal is OpenClaw-shaped operator behavior without breaking the existing `cli
 
 - channels own provider-facing transport behavior
 - configuration owns account and route selection
-- agent-os stays backend-agnostic
+- agents stays backend-agnostic
 
 ## Scope
 
@@ -37,7 +37,7 @@ The goal is OpenClaw-shaped operator behavior without breaking the existing `cli
 - account config remains provider-owned under `channels.slack` and `channels.telegram`
 - route tables remain provider-owned
 - bindings remain the top-level cross-feature routing map
-- provider message actions stay in channel adapters, not in agent-os
+- provider message actions stay in channel adapters, not in agents
 
 ## Dependencies
 

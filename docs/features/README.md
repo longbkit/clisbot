@@ -32,7 +32,7 @@ docs/features/
   feature-tables.md
   channels/
     README.md
-  agent-os/
+  agents/
     README.md
   runners/
     README.md

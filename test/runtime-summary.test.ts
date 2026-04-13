@@ -48,10 +48,10 @@ describe("runtime summaries", () => {
     const text = renderStartSummary(summary);
 
     expect(text).toContain("No agents are configured yet.");
-    expect(text).toContain("First run requires both `--cli` and `--bootstrap`.");
-    expect(text).toContain("personal-assistant = one assistant for one human.");
-    expect(text).toContain("team-assistant = one shared assistant for a team or channel.");
-    expect(text).toContain("clisbot start --cli codex --bootstrap personal-assistant");
+    expect(text).toContain("First run requires both `--cli` and `--bot-type`.");
+    expect(text).toContain("personal = one assistant for one human.");
+    expect(text).toContain("team = one shared assistant for a team or channel.");
+    expect(text).toContain("clisbot start --cli codex --bot-type personal");
     expect(text).toContain("Help: clisbot --help");
   });
 

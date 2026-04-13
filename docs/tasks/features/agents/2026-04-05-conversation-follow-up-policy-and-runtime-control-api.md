@@ -50,13 +50,12 @@ This is especially important for the project goal of exposing Codex and Claude t
 ## Dependencies Or Blockers
 
 - settled channel follow-up behavior target
-- clear boundary between Agent-OS session state and channel delivery logic
+- clear boundary between agents session state and channel delivery logic
 
 ## Related Docs
 
-- [Agent-OS Feature](../../../features/agent-os/README.md)
-- [Agent Commands](../../../features/agent-os/commands.md)
+- [Agents Feature](../../../features/agents/README.md)
+- [Agent Commands](../../../features/agents/commands.md)
 - [Channels Feature](../../../features/channels/README.md)
 - [Configuration Feature](../../../features/configuration/README.md)
 - [Slack Thread Follow-Up Behavior Research](../../../research/channels/2026-04-05-slack-thread-follow-up-behavior.md)
-

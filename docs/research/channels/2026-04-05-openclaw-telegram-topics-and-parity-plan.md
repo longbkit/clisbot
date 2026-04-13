@@ -323,7 +323,7 @@ This matters for `clisbot` because it should choose one model explicitly instead
 Recommended `clisbot` choice:
 
 - do not introduce Telegram DM thread session splitting in the first Telegram MVP
-- keep DM continuity rules aligned with existing Agent-OS session policy unless a strong use case appears
+- keep DM continuity rules aligned with existing agent session policy unless a strong use case appears
 
 ## What Telegram Topics Mean For `clisbot`
 
@@ -368,7 +368,7 @@ Outbound delivery must know:
 - whether the target is the General topic
 - whether typing and reply threading should use `message_thread_id`
 
-This belongs in the Telegram channel adapter, not in Agent-OS.
+This belongs in the Telegram channel adapter, not in the agents layer.
 
 ## Slack-Parity Plan For `clisbot`
 
@@ -479,7 +479,7 @@ Guidance:
 
 - keep `streaming` and `response` aligned with the existing `clisbot` cross-channel rendering contract
 - keep Telegram-specific transport knobs under `channels.telegram`
-- keep topic overrides inside the Telegram channel subtree, not in Agent-OS
+- keep topic overrides inside the Telegram channel subtree, not in the agents layer
 
 ## Recommended Architectural Mapping In `clisbot`
 
@@ -493,9 +493,9 @@ Channels should own:
 - topic-aware live message editing
 - typing indicator behavior
 
-### Agent-OS
+### Agents
 
-Agent-OS should own:
+The agents layer should own:
 
 - `agentId`
 - `sessionKey`
@@ -519,4 +519,3 @@ The clean product rule is:
 - Telegram topics need topic identity and topic-safe delivery
 
 That keeps the system simple and truthful.
-

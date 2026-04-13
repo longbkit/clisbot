@@ -57,5 +57,5 @@ Those capabilities are useful, but they are not safe to leave open by default on
 ## Related Docs
 
 - [Configuration Feature](../../../features/configuration/README.md)
-- [Agent Commands](../../../features/agent-os/commands.md)
+- [Agent Commands](../../../features/agents/commands.md)
 - [Channel Tests](../../../tests/features/channels/README.md)

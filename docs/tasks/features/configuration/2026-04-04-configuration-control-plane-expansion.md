@@ -2,7 +2,7 @@
 
 ## Summary
 
-Expand the clisbot config so it can truthfully express channels, Agent-OS, runners, control, and policy.
+Expand the clisbot config so it can truthfully express channels, Agents, runners, control, and policy.
 
 ## Status
 

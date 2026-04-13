@@ -2,7 +2,7 @@
 
 ## Summary
 
-Control is the operator-facing system for inspecting and intervening in `clisbot`.
+Control is the operator-facing system for inspecting, intervening, and handling operator permissions in `clisbot`.
 
 ## State
 
@@ -16,7 +16,7 @@ Attaching to tmux, checking health, restarting sessions, or clearing broken stat
 
 Session-scoped follow-up behavior changes requested by end users do not belong here.
 
-Those belong to Agent-OS runtime policy, because they are part of the conversation contract rather than operator intervention.
+Those belong to agents runtime policy, because they are part of the conversation contract rather than operator intervention.
 
 ## Scope
 
@@ -25,6 +25,7 @@ Those belong to Agent-OS runtime policy, because they are part of the conversati
 - restart and stop flows
 - health and debug views
 - inspect and cancel persisted managed loops
+- permission and access-control flows for operator actions
 - operator-safe intervention points
 - config reload watch behavior
 
@@ -48,7 +49,7 @@ Those belong to Agent-OS runtime policy, because they are part of the conversati
 
 ## Dependencies
 
-- [Agent-OS](../agent-os/README.md)
+- [Agents](../agents/README.md)
 - [Runners](../runners/README.md)
 
 ## Current Focus
@@ -59,3 +60,4 @@ Current control-owned config is:
 
 - `control.configReload.watch`
 - `control.configReload.watchDebounceMs`
+- privilege or permission policy that gates operator actions

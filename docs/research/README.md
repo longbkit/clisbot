@@ -4,8 +4,8 @@ Use `docs/research/` for investigation output, source-driven analysis, experimen
 
 Organize research under feature-oriented folders such as:
 
-- `docs/research/agent-os/memory/`
-- `docs/research/agent-os/session/`
+- `docs/research/agents/memory/`
+- `docs/research/agents/session/`
 - `docs/research/channels/`
 - `docs/research/security/`
 

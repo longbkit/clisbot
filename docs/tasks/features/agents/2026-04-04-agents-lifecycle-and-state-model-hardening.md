@@ -1,8 +1,8 @@
-# Agent-OS Lifecycle And State Model Hardening
+# Agents Lifecycle And State Model Hardening
 
 ## Summary
 
-Make the Agent-OS lifecycle and state model reliable without leaking runner-specific mechanics into it.
+Make the lifecycle and state model in the agents layer reliable without leaking runner-specific mechanics into it.
 
 ## Status
 
@@ -26,7 +26,7 @@ That operating model must remain valid even if tmux is replaced by another runne
 ## Current Truth
 
 - `sessionKey` remains the logical conversation identity
-- Agent-OS persists AI CLI `sessionId` continuity metadata by `sessionKey`
+- the agents layer persists AI CLI `sessionId` continuity metadata by `sessionKey`
 - the system can recreate a killed tmux runner on a later prompt and resume the same logical conversation when the backend supports resume
 - stale tmux cleanup is implemented without forcing logical conversation reset
 - reset policy is not implemented yet
@@ -41,12 +41,12 @@ That operating model must remain valid even if tmux is replaced by another runne
 - [ ] define the canonical agent and session state model
 - [x] define the split between `sessionKey`, active AI CLI `sessionId`, and runner instance identity
 - [x] define the minimum persistent session store needed for runner restart and resume
-- [ ] define restart and health transitions at the Agent-OS level
+- [ ] define restart and health transitions in the agents layer
 - [x] define runner-loss recovery rules for resumable versus non-resumable backends
 - [x] define tmux runner sunsetting versus session reset as separate lifecycle events
 - [ ] define workspace ownership and lifecycle rules
 - [ ] define truthful extension seams for memory, tools, skills, and subagents
-- [ ] add Agent-OS ground-truth tests
+- [ ] add agents ground-truth tests
 
 ## Dependencies Or Blockers
 
@@ -54,5 +54,5 @@ That operating model must remain valid even if tmux is replaced by another runne
 
 ## Related Docs
 
-- [Agent-OS Feature](../../../features/agent-os/README.md)
-- [Agent-OS Tests](../../../tests/features/agent-os/README.md)
+- [Agents Feature](../../../features/agents/README.md)
+- [Agents Tests](../../../tests/features/agents/README.md)

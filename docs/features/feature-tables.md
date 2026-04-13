@@ -29,10 +29,10 @@ Execution detail belongs in `docs/tasks/`.
 | State | Area | Feature | Main Doc | Tasks Folder | Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | Active | surface | channels | [channels](channels/README.md) | [channels tasks](../tasks/features/channels) | 2026-04-11 | Channels now share a first-class plugin seam plus an explicit observer-failure boundary so Slack and Telegram delivery faults degrade one thread observer instead of killing runner supervision. |
-| Active | core | agent-os | [agent-os](agent-os/README.md) | [agent-os tasks](../tasks/features/agent-os) | 2026-04-04 | Agent-OS owns agents, sessions, workspaces, memory, tools, skills, queueing, and subagents without depending on tmux-specific mechanics. |
+| Active | core | agents | [agents](agents/README.md) | [agents tasks](../tasks/features/agents) | 2026-04-04 | The agents layer owns agents, sessions, workspaces, memory, tools, skills, queueing, and subagents without depending on tmux-specific mechanics. |
 | Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-08 | Runners now need to keep monitoring long-running sessions after request-level detachment so channels can re-attach and still receive final settlement. |
 | Planned | ops | control | [control](control/README.md) | [control tasks](../tasks/features/control) | 2026-04-04 | Operator inspect, attach, restart, stop, and health flows belong to control rather than user-facing channels. |
-| Active | platform | configuration | [configuration](configuration/README.md) | [configuration tasks](../tasks/features/configuration) | 2026-04-04 | Configuration is the local control plane for channels, agent-os, runners, and policy. |
+| Active | platform | configuration | [configuration](configuration/README.md) | [configuration tasks](../tasks/features/configuration) | 2026-04-04 | Configuration is the local control plane for channels, agents, runners, and policy. |
 
 ## Non-Functional Areas
 

@@ -127,7 +127,7 @@ The system should behave in this order:
 
 For already-running sessions, the same pipeline should also support observer changes without restarting the run:
 
-1. runner or Agent-OS keeps monitoring the active session
+1. runner or the agents layer keeps monitoring the active session
 2. channel command changes observer mode for the current thread
 3. channel receives live, passive-final, or interval updates from the same normalized run state
 

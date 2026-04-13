@@ -52,7 +52,7 @@ The goal is to improve OpenClaw familiarity without breaking the current clisbot
 ## Related Docs
 
 - [Configuration Feature](../../../features/configuration/README.md)
-- [Agent-OS Feature](../../../features/agent-os/README.md)
+- [Agents Feature](../../../features/agents/README.md)
 - [User Guide](../../../user-guide/README.md)
 - [OpenClaw Agent, Binding, Account, And Channel CLI Research](../../../research/channels/2026-04-07-openclaw-agent-binding-account-channel-cli.md)
 - [OpenClaw Agent And Workspace Config Shape](../../../research/configuration/2026-04-06-openclaw-agent-workspace-config-shape.md)

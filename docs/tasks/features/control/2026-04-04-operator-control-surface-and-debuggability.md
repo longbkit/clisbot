@@ -29,7 +29,7 @@ They should not stay as hidden implementation knowledge or be conflated with use
 - runner-specific protocol design
 - session-scoped follow-up policy requested by end users inside a conversation
 
-That policy belongs to Agent-OS runtime control, not operator control.
+That policy belongs to agents runtime control, not operator control.
 
 ## Subtasks
 
@@ -41,7 +41,7 @@ That policy belongs to Agent-OS runtime control, not operator control.
 
 ## Dependencies Or Blockers
 
-- stable Agent-OS and runner boundaries
+- stable Agents and runner boundaries
 
 ## Related Docs
 

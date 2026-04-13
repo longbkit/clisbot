@@ -4,7 +4,7 @@
 
 Configuration is the local control plane for `clisbot`.
 
-It defines how channels, Agent-OS, runners, and control are wired together.
+It defines how channels, Agents, runners, and control are wired together.
 
 It also defines how runner-owned AI CLI session ids are created, captured, resumed, and persisted.
 
@@ -96,7 +96,7 @@ Current policy meaning:
 ## Dependencies
 
 - [Channels](../channels/README.md)
-- [Agent-OS](../agent-os/README.md)
+- [Agents](../agents/README.md)
 - [Runners](../runners/README.md)
 - [Control](../control/README.md)
 
@@ -149,7 +149,7 @@ Current turn execution defaults should stay explicit:
 
 Current session-id ownership rule should stay explicit:
 
-- Agent-OS owns the persisted `sessionKey -> sessionId` mapping
+- the agents layer owns the persisted `sessionKey -> sessionId` mapping
 - runners own how a concrete backend session id is created, discovered, and resumed
 
 Current tmux naming tradeoff should stay explicit:

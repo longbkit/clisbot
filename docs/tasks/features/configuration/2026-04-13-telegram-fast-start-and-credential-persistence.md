@@ -7,7 +7,7 @@ Let operators try `clisbot` immediately with:
 ```bash
 clisbot start \
   --telegram-bot-token 123456:telegram-bot-token \
-  --bootstrap personal-assistant
+  --bot-type personal
 ```
 
 while keeping any literal token input in memory only for the current launch.

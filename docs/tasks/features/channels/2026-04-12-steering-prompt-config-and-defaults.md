@@ -64,5 +64,5 @@ This narrower steering-only task is now folded into the broader prompt-template 
 
 - [Agent Progress Reply Wrapper And Prompt](2026-04-09-agent-progress-reply-wrapper-and-prompt.md)
 - [Prompt Templates](../../../features/channels/prompt-templates.md)
-- [Conversation Follow-Up Policy And Runtime Control API](../agent-os/2026-04-05-conversation-follow-up-policy-and-runtime-control-api.md)
+- [Conversation Follow-Up Policy And Runtime Control API](../agents/2026-04-05-conversation-follow-up-policy-and-runtime-control-api.md)
 - [Channels Feature](../../../features/channels/README.md)

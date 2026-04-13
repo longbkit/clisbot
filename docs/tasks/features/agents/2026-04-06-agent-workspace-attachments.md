@@ -38,7 +38,7 @@ Out of scope for this slice:
 ## Architecture Notes
 
 - channels own provider-specific download logic
-- Agent-OS owns workspace placement
+- the agents layer owns workspace placement
 - runners stay provider-agnostic and only receive local file paths
 
 ## Planned Checks
@@ -51,4 +51,4 @@ Out of scope for this slice:
 
 ## Related Docs
 
-- [Agent Workspace Attachments](../../../features/agent-os/attachments.md)
+- [Agent Workspace Attachments](../../../features/agents/attachments.md)

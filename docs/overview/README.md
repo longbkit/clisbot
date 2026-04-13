@@ -43,7 +43,7 @@ The first slice is:
 The repository is organized around these systems:
 
 - `channels`: Slack today, API and other messaging channels later
-- `agent-os`: agents, sessions, workspaces, queueing, memory, tools, skills, and subagents
+- `agents`: agents, sessions, workspaces, queueing, memory, tools, skills, and subagents
 - `runners`: backend-specific execution layers such as tmux today and ACP or SDK integrations later
 - `control`: operator-facing inspect, attach, restart, stop, and health flows
 - `configuration`: local control-plane wiring for routes, agents, runners, and policy

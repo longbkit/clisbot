@@ -222,7 +222,7 @@ Then point `clisbot` at them on first run:
 ```bash
 clisbot start \
   --cli codex \
-  --bootstrap personal-assistant \
+  --bot-type personal \
   --slack-app-token CUSTOM_SLACK_APP_TOKEN \
   --slack-bot-token CUSTOM_SLACK_BOT_TOKEN
 ```
@@ -247,6 +247,6 @@ When `~/.clisbot/clisbot.json` already exists:
 
 When no agents exist yet:
 
-- `start` requires both `--cli` and `--bootstrap` to create the first `default` agent
-- choose `personal-assistant` for one assistant serving one human
-- choose `team-assistant` for one assistant serving a shared team surface
+- `start` requires both `--cli` and `--bot-type` to create the first `default` agent
+- choose `personal` for one assistant serving one human
+- choose `team` for one assistant serving a shared team surface
