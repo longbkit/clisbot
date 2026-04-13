@@ -10,17 +10,32 @@ export type RuntimeChannelConnection =
   | "active"
   | "failed";
 
+export type ChannelHealthInstance = {
+  accountId: string;
+  label?: string;
+  appLabel?: string;
+  tokenHint?: string;
+};
+
 export type ChannelHealthRecord = {
   channel: RuntimeChannel;
   connection: RuntimeChannelConnection;
   summary: string;
   detail?: string;
   actions: string[];
+  instances: ChannelHealthInstance[];
   updatedAt: string;
 };
 
 type RuntimeHealthDocument = {
   channels: Partial<Record<RuntimeChannel, ChannelHealthRecord>>;
+  reload?: {
+    status: "success" | "failed";
+    reason: "initial" | "watch";
+    configMtimeMs?: number;
+    detail?: string;
+    updatedAt: string;
+  };
 };
 
 function normalizeErrorMessage(error: unknown) {
@@ -106,20 +121,31 @@ export class RuntimeHealthStore {
     if (!(await fileExists(this.filePath))) {
       return {
         channels: {},
-      } satisfies RuntimeHealthDocument;
+      } as RuntimeHealthDocument;
     }
 
     const text = await readTextFile(this.filePath);
     if (!text.trim()) {
       return {
         channels: {},
-      } satisfies RuntimeHealthDocument;
+      } as RuntimeHealthDocument;
     }
 
     const parsed = JSON.parse(text) as Partial<RuntimeHealthDocument>;
+    const channels = Object.fromEntries(
+      Object.entries(parsed.channels ?? {}).map(([channel, record]) => [
+        channel,
+        {
+          ...record,
+          instances: record?.instances ?? [],
+        },
+      ]),
+    ) as RuntimeHealthDocument["channels"];
+
     return {
-      channels: parsed.channels ?? {},
-    } satisfies RuntimeHealthDocument;
+      channels,
+      reload: parsed.reload,
+    } as RuntimeHealthDocument;
   }
 
   async setChannel(params: {
@@ -128,6 +154,7 @@ export class RuntimeHealthStore {
     summary: string;
     detail?: string;
     actions?: string[];
+    instances?: ChannelHealthInstance[];
   }) {
     const document = await this.read();
     document.channels[params.channel] = {
@@ -136,6 +163,7 @@ export class RuntimeHealthStore {
       summary: params.summary,
       detail: params.detail,
       actions: params.actions ?? [],
+      instances: params.instances ?? [],
       updatedAt: new Date().toISOString(),
     };
     await this.write(document);
@@ -161,6 +189,23 @@ export class RuntimeHealthStore {
       detail: diagnostic.detail,
       actions: diagnostic.actions,
     });
+  }
+
+  async setReload(params: {
+    status: "success" | "failed";
+    reason: "initial" | "watch";
+    configMtimeMs?: number;
+    detail?: string;
+  }) {
+    const document = await this.read();
+    document.reload = {
+      status: params.status,
+      reason: params.reason,
+      configMtimeMs: params.configMtimeMs,
+      detail: params.detail,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.write(document);
   }
 
   private async write(document: RuntimeHealthDocument) {

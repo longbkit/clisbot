@@ -43,6 +43,27 @@ Strong vendor investment in security and safety does not make frontier agentic C
 
 tmux is still the current stability boundary. One agent maps to one durable runner session in one workspace, and every CLI, channel, or workflow layer should route onto that durable runtime instead of recreating the agent from scratch.
 
+## Launch MVP Path
+
+See [docs/overview/launch-mvp-path.md](docs/overview/launch-mvp-path.md) for the full current launch order.
+
+Short snapshot:
+
+1. Foundations first:
+   - frictionless start and credential persistence
+   - runtime stability and truthful status or debug UX
+   - `/loop` as the current differentiating workflow feature
+2. International launch gate:
+   - Claude, Codex, and Gemini as the well-tested core CLI trio
+   - current shared channel package remains Slack plus Telegram
+3. Vietnam launch package:
+   - add Zalo Official Account and Zalo Personal on top of the same core trio
+4. Next expansion wave:
+   - more CLIs such as Cursor, Amp, OpenCode, Qwen, Kilo, and Minimax, prioritized by real userbase demand
+   - more channels such as Discord, WhatsApp, Google Workspace, and Microsoft Teams
+5. Open launch decision:
+   - whether native CLI slash-command compatibility, override, and customization should ship before broader push
+
 ## Showcase
 
 Slack
@@ -60,6 +81,17 @@ Telegram
 ## Quick Start
 
 Choose one setup path.
+
+Fastest first-run path when you already have one channel token:
+
+```bash
+clisbot start \
+  --cli codex \
+  --bootstrap personal-assistant \
+  --telegram-bot-token <your-telegram-bot-token>
+```
+
+This keeps the literal token in memory for the current launch only. After the bot works, use `--persist` or the canonical credential-file path described in [docs/features/configuration/start-bootstrap-and-credential-persistence.md](docs/features/configuration/start-bootstrap-and-credential-persistence.md).
 
 Packaged CLI path:
 

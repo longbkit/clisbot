@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LoadedConfig } from "../src/config/load-config.ts";
@@ -166,6 +166,14 @@ function createLoadedConfig(): LoadedConfig {
   };
 }
 
+function createLoadedConfigAt(configPath: string): LoadedConfig {
+  const loaded = createLoadedConfig();
+  return {
+    ...loaded,
+    configPath,
+  };
+}
+
 describe("RuntimeSupervisor", () => {
   let tempDir = "";
 
@@ -249,5 +257,67 @@ describe("RuntimeSupervisor", () => {
     expect(document.channels.telegram?.connection).toBe("failed");
     expect(document.channels.telegram?.summary).toBe("Telegram channel failed to start.");
     expect(stopCalls).toEqual(["slack", "telegram"]);
+  });
+
+  test("records runtime account identity for active channel services", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
+    const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));
+
+    const plugins: ChannelPlugin[] = [
+      {
+        id: "slack",
+        isEnabled: () => true,
+        listAccounts: () => [{ accountId: "default", config: {} }],
+        createRuntimeService: () => ({
+          start: async () => undefined,
+          stop: async () => undefined,
+          getRuntimeIdentity: () => ({
+            accountId: "default",
+            label: "bot=@longluong2bot",
+            appLabel: "app=A123",
+            tokenHint: "deadbeef",
+          }),
+        }),
+        renderHealthSummary: (state) =>
+          state === "starting"
+            ? "Slack channel is starting."
+            : state === "disabled"
+              ? "Slack channel is disabled in config."
+              : "Slack channel is stopped.",
+        renderActiveHealthSummary: () => "Slack Socket Mode connected for 1 account(s).",
+        markStartupFailure: (store, error) => store.markSlackFailure(error),
+        runMessageCommand: async () => ({ accountId: "default", result: { ok: true } }),
+        resolveMessageReplyTarget: () => null,
+      },
+    ];
+
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(configPath, "{}\n");
+
+    const supervisor = new RuntimeSupervisor(undefined, {
+      loadConfig: async () => createLoadedConfigAt(configPath),
+      listChannelPlugins: () => plugins,
+      runtimeHealthStore,
+      createAgentService: () =>
+        ({
+          start: async () => undefined,
+          stop: async () => undefined,
+        }) as any,
+      createProcessedEventsStore: () => ({}) as any,
+      createActivityStore: () => ({}) as any,
+    });
+
+    await supervisor.start();
+
+    const document = await runtimeHealthStore.read();
+    expect(document.channels.slack?.connection).toBe("active");
+    expect(document.channels.slack?.instances).toEqual([
+      {
+        accountId: "default",
+        label: "bot=@longluong2bot",
+        appLabel: "app=A123",
+        tokenHint: "deadbeef",
+      },
+    ]);
   });
 });

@@ -6,7 +6,7 @@ Make the auto-injected steering prompt configurable, simplify its format, and re
 
 ## Status
 
-Planned
+Dropped
 
 ## Why
 
@@ -54,8 +54,15 @@ This should become an explicit configuration surface instead of a fixed runtime 
 - the wrapper format is shorter and cleaner when enabled
 - the shipped default no longer adds steering prompt noise unless explicitly configured
 
+## Replacement
+
+This narrower steering-only task is now folded into the broader prompt-template task:
+
+- [Prompt Templates And Overrides](2026-04-13-prompt-templates-and-overrides.md)
+
 ## Related Docs
 
 - [Agent Progress Reply Wrapper And Prompt](2026-04-09-agent-progress-reply-wrapper-and-prompt.md)
+- [Prompt Templates](../../../features/channels/prompt-templates.md)
 - [Conversation Follow-Up Policy And Runtime Control API](../agent-os/2026-04-05-conversation-follow-up-policy-and-runtime-control-api.md)
 - [Channels Feature](../../../features/channels/README.md)

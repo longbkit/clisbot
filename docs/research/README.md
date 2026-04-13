@@ -7,5 +7,6 @@ Organize research under feature-oriented folders such as:
 - `docs/research/agent-os/memory/`
 - `docs/research/agent-os/session/`
 - `docs/research/channels/`
+- `docs/research/security/`
 
 Tasks should stay brief and link to the relevant research output instead of duplicating the full analysis.

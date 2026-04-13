@@ -45,6 +45,10 @@ export function getDefaultWorkspaceRoot(env: NodeJS.ProcessEnv = process.env) {
   return join(resolveAppHomeDir(env), "workspaces");
 }
 
+export function getDefaultCredentialsDir(env: NodeJS.ProcessEnv = process.env) {
+  return join(resolveAppHomeDir(env), "credentials");
+}
+
 export function getDefaultTmuxSocketPath(env: NodeJS.ProcessEnv = process.env) {
   return join(getDefaultStateDir(env), "clisbot.sock");
 }
@@ -77,6 +81,10 @@ export function getDefaultRuntimeLogPath(env: NodeJS.ProcessEnv = process.env) {
   return join(getDefaultStateDir(env), "clisbot.log");
 }
 
+export function getDefaultRuntimeCredentialsPath(env: NodeJS.ProcessEnv = process.env) {
+  return join(getDefaultStateDir(env), "runtime-credentials.json");
+}
+
 export function getDefaultWorkspaceTemplate(env: NodeJS.ProcessEnv = process.env) {
   return join(getDefaultWorkspaceRoot(env), "{agentId}");
 }
@@ -85,6 +93,7 @@ export const APP_HOME_DIR = resolveAppHomeDir();
 export const DEFAULT_CONFIG_PATH = getDefaultConfigPath();
 export const DEFAULT_STATE_DIR = getDefaultStateDir();
 export const DEFAULT_WORKSPACE_ROOT = getDefaultWorkspaceRoot();
+export const DEFAULT_CREDENTIALS_DIR = getDefaultCredentialsDir();
 export const DEFAULT_TMUX_SOCKET_PATH = getDefaultTmuxSocketPath();
 export const DEFAULT_PROCESSED_EVENTS_PATH = getDefaultProcessedEventsPath();
 export const DEFAULT_SESSION_STORE_PATH = getDefaultSessionStorePath();
@@ -93,6 +102,7 @@ export const DEFAULT_ACTIVITY_STORE_PATH = getDefaultActivityStorePath();
 export const DEFAULT_RUNTIME_HEALTH_PATH = getDefaultRuntimeHealthPath();
 export const DEFAULT_RUNTIME_PID_PATH = getDefaultRuntimePidPath();
 export const DEFAULT_RUNTIME_LOG_PATH = getDefaultRuntimeLogPath();
+export const DEFAULT_RUNTIME_CREDENTIALS_PATH = getDefaultRuntimeCredentialsPath();
 
 export function ensureParentDir(pathname: string) {
   return writeTextFile(pathname, "").catch(async () => {

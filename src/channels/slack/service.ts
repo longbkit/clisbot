@@ -51,6 +51,7 @@ import {
 } from "./transport.ts";
 import type { SlackAccountConfig } from "../../config/channel-accounts.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
+import { buildTokenHint } from "../runtime-identity.ts";
 
 type SlackAppType = InstanceType<typeof App>;
 type SlackThreadTsCacheEntry = {
@@ -78,6 +79,7 @@ function waitForBackgroundSlackTask(task: Promise<unknown>) {
 export class SlackSocketService {
   private readonly app: SlackAppType;
   private botUserId = "";
+  private botLabel = "";
   private teamId = "";
   private apiAppId = "";
   private startPromise?: Promise<unknown>;
@@ -589,9 +591,10 @@ export class SlackSocketService {
       token: this.accountConfig.botToken,
     });
     this.botUserId = auth.user_id ?? "";
+    this.botLabel = (auth as { user?: string }).user?.trim() ?? "";
     this.teamId = auth.team_id ?? "";
     this.apiAppId = (auth as { api_app_id?: string }).api_app_id ?? "";
-    console.log(`slack bot user ${this.botUserId} (${this.accountId})`);
+    console.log(`slack bot user ${this.botLabel || this.botUserId} (${this.accountId})`);
     this.app.error(async (error) => {
       console.error("slack app error", error);
     });
@@ -607,6 +610,15 @@ export class SlackSocketService {
   }
 
   getBotUserLabel() {
-    return this.botUserId || "unknown";
+    return this.botLabel || this.botUserId || "unknown";
+  }
+
+  getRuntimeIdentity() {
+    return {
+      accountId: this.accountId,
+      label: this.botLabel ? `bot=${this.botLabel}` : `botUser=${this.botUserId || "unknown"}`,
+      appLabel: this.apiAppId ? `app=${this.apiAppId}` : undefined,
+      tokenHint: buildTokenHint(this.accountConfig.botToken),
+    };
   }
 }

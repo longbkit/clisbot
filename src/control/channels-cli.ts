@@ -383,6 +383,7 @@ async function setToken(target: TokenTarget, value: string) {
     const defaultAccountId = config.channels.slack.defaultAccount || "default";
     const existing = config.channels.slack.accounts[defaultAccountId];
     config.channels.slack.accounts[defaultAccountId] = {
+      enabled: existing?.enabled ?? true,
       appToken: value,
       botToken: existing?.botToken ?? config.channels.slack.botToken,
     };
@@ -391,6 +392,7 @@ async function setToken(target: TokenTarget, value: string) {
     const defaultAccountId = config.channels.slack.defaultAccount || "default";
     const existing = config.channels.slack.accounts[defaultAccountId];
     config.channels.slack.accounts[defaultAccountId] = {
+      enabled: existing?.enabled ?? true,
       appToken: existing?.appToken ?? config.channels.slack.appToken,
       botToken: value,
     };
@@ -398,6 +400,7 @@ async function setToken(target: TokenTarget, value: string) {
     config.channels.telegram.botToken = value;
     const defaultAccountId = config.channels.telegram.defaultAccount || "default";
     config.channels.telegram.accounts[defaultAccountId] = {
+      enabled: config.channels.telegram.accounts[defaultAccountId]?.enabled ?? true,
       botToken: value,
     };
   }
@@ -416,6 +419,7 @@ async function clearToken(target: TokenTarget) {
     const existing = config.channels.slack.accounts[defaultAccountId];
     if (existing) {
       config.channels.slack.accounts[defaultAccountId] = {
+        enabled: existing.enabled ?? true,
         appToken: "",
         botToken: existing.botToken,
       };
@@ -426,6 +430,7 @@ async function clearToken(target: TokenTarget) {
     const existing = config.channels.slack.accounts[defaultAccountId];
     if (existing) {
       config.channels.slack.accounts[defaultAccountId] = {
+        enabled: existing.enabled ?? true,
         appToken: existing.appToken,
         botToken: "",
       };
@@ -435,6 +440,7 @@ async function clearToken(target: TokenTarget) {
     const defaultAccountId = config.channels.telegram.defaultAccount || "default";
     if (config.channels.telegram.accounts[defaultAccountId]) {
       config.channels.telegram.accounts[defaultAccountId] = {
+        enabled: config.channels.telegram.accounts[defaultAccountId].enabled ?? true,
         botToken: "",
       };
     }

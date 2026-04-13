@@ -48,6 +48,7 @@ import { buildAgentPromptText } from "../agent-prompt.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
 import { runWithTelegramTypingHeartbeat } from "./typing.ts";
+import { buildTokenHint } from "../runtime-identity.ts";
 
 type TelegramGetMeResult = {
   id: number;
@@ -238,6 +239,14 @@ export class TelegramPollingService {
 
   getBotLabel() {
     return this.botUsername ? `@${this.botUsername}` : `${this.botUserId || "unknown"}`;
+  }
+
+  getRuntimeIdentity() {
+    return {
+      accountId: this.accountId,
+      label: `bot=${this.getBotLabel()}`,
+      tokenHint: buildTokenHint(this.accountConfig.botToken),
+    };
   }
 
   private async pollLoop() {

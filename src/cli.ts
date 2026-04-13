@@ -1,7 +1,3 @@
-import type {
-  AgentBootstrapMode,
-  AgentCliToolId,
-} from "./config/agent-tool-presets.ts";
 import { REPO_HELP_HINT, USER_GUIDE_DOC_PATH } from "./control/startup-bootstrap.ts";
 import { collapseHomePath, getDefaultConfigPath } from "./shared/paths.ts";
 import { getClisbotVersion } from "./version.ts";
@@ -9,31 +5,18 @@ import { getClisbotVersion } from "./version.ts";
 export type ParsedCliCommand =
   | { name: "help" }
   | { name: "version" }
-  | {
-      name: "start";
-      cliTool?: AgentCliToolId;
-      bootstrap?: AgentBootstrapMode;
-      slackAppTokenRef?: string;
-      slackBotTokenRef?: string;
-      telegramBotTokenRef?: string;
-    }
+  | { name: "start"; args: string[] }
   | { name: "restart" }
   | { name: "stop"; hard: boolean }
   | { name: "status" }
   | { name: "logs"; lines: number }
   | { name: "channels"; args: string[] }
+  | { name: "accounts"; args: string[] }
   | { name: "loops"; args: string[] }
   | { name: "message"; args: string[] }
   | { name: "agents"; args: string[] }
   | { name: "pairing"; args: string[] }
-  | {
-      name: "init";
-      cliTool?: AgentCliToolId;
-      bootstrap?: AgentBootstrapMode;
-      slackAppTokenRef?: string;
-      slackBotTokenRef?: string;
-      telegramBotTokenRef?: string;
-    }
+  | { name: "init"; args: string[] }
   | { name: "serve-foreground" };
 
 export function parseCliArgs(argv: string[]): ParsedCliCommand {
@@ -49,10 +32,9 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
   }
 
   if (command === "start") {
-    const options = parseBootstrapOptions(args.slice(1));
     return {
       name: "start",
-      ...options,
+      args: args.slice(1),
     };
   }
 
@@ -81,6 +63,13 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
   if (command === "channels") {
     return {
       name: "channels",
+      args: args.slice(1),
+    };
+  }
+
+  if (command === "accounts") {
+    return {
+      name: "accounts",
       args: args.slice(1),
     };
   }
@@ -114,10 +103,9 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
   }
 
   if (command === "init") {
-    const options = parseBootstrapOptions(args.slice(1));
     return {
       name: "init",
-      ...options,
+      args: args.slice(1),
     };
   }
 
@@ -134,48 +122,46 @@ export function renderCliHelp() {
     `clisbot v${getClisbotVersion()}`,
     "",
     "Fastest start:",
-    "  1. Export default token env vars in your shell.",
-    "     Slack: SLACK_APP_TOKEN and SLACK_BOT_TOKEN",
-    "     Telegram: TELEGRAM_BOT_TOKEN",
+    "  1. Choose the channels you want to bootstrap explicitly.",
     "  2. Run one of these commands:",
-    "     clisbot start --cli codex --bootstrap personal-assistant",
-    "     clisbot start --cli codex --bootstrap team-assistant",
-    "     clisbot start --cli claude --bootstrap personal-assistant",
-    "     clisbot start --cli claude --bootstrap team-assistant",
+    "     clisbot start --cli codex --bootstrap personal-assistant --telegram-bot-token TELEGRAM_BOT_TOKEN",
+    "     clisbot start --cli codex --bootstrap team-assistant --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN",
+    "     clisbot start --cli claude --bootstrap personal-assistant --telegram-bot-token \"$TELEGRAM_BOT_TOKEN\"",
     "  3. Use `clisbot status` to see the config path, log path, tmux socket, and runtime state.",
     "",
     "Bootstrap modes:",
     "  personal-assistant  One human gets one dedicated long-lived assistant workspace and session path.",
     "  team-assistant      One shared channel or group routes into one shared assistant workspace and session path.",
     "",
-    "Default token env vars:",
-    "  clisbot start uses standard env names automatically on first run.",
-    "  Slack requires both SLACK_APP_TOKEN and SLACK_BOT_TOKEN.",
-    "  Telegram requires TELEGRAM_BOT_TOKEN.",
-    "  Only use --slack-app-token, --slack-bot-token, or --telegram-bot-token when your shell uses different env var names.",
+    "Credential input rules:",
+    "  Pass ENV_NAME or ${ENV_NAME} to keep the account env-backed.",
+    "  Pass a raw or shell-expanded token value to use credentialType=mem for the current runtime only.",
+    "  Raw token input on `start` is only for cold start unless you also pass --persist.",
+    "  Fresh bootstrap only enables channels named by flags; ambient env vars alone do not auto-enable extra channels.",
     "",
     "Usage:",
-    "  clisbot start [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>]",
-    "               [--slack-app-token <ENV_NAME|${ENV_NAME}>] [--slack-bot-token <ENV_NAME|${ENV_NAME}>]",
-    "               [--telegram-bot-token <ENV_NAME|${ENV_NAME}>]",
+    "  clisbot start [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>] [--persist]",
+    "               [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
+    "               [--telegram-account <id> --telegram-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
     "  clisbot restart",
     "  clisbot stop [--hard]",
     "  clisbot status",
     "  clisbot version",
     "  clisbot logs [--lines N]",
     "  clisbot channels <subcommand>",
+    "  clisbot accounts <subcommand>",
     "  clisbot loops <subcommand>",
     "  clisbot message <subcommand>",
     "  clisbot agents <subcommand>",
     "  clisbot pairing <subcommand>",
-    "  clisbot init [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>]",
-    "              [--slack-app-token <ENV_NAME|${ENV_NAME}>] [--slack-bot-token <ENV_NAME|${ENV_NAME}>]",
-    "              [--telegram-bot-token <ENV_NAME|${ENV_NAME}>]",
+    "  clisbot init [--cli <codex|claude>] [--bootstrap <personal-assistant|team-assistant>] [--persist]",
+    "              [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
+    "              [--telegram-account <id> --telegram-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
     "  clis <same-command>",
     "  clisbot --help",
     "",
     "Commands:",
-    `  start              Seed ${configPath} if missing, optionally create the first agent, and start clisbot in the background.`,
+    `  start              Seed ${configPath} if missing, apply explicit channel-account bootstrap intent, and start clisbot in the background.`,
     "  restart            Stop the running clisbot process, then start it again.",
     "  stop               Stop the running clisbot process.",
     "  stop --hard        Stop clisbot and kill all tmux sessions on the configured clisbot socket.",
@@ -192,6 +178,11 @@ export function renderCliHelp() {
     "                     remove slack-group <groupId>",
     "                     set-token <slack-app|slack-bot|telegram-bot> <value>",
     "                     clear-token <slack-app|slack-bot|telegram-bot>",
+    "  accounts           Manage Slack and Telegram provider accounts plus persistence state.",
+    "                     add telegram --account <id> --token <ENV_NAME|${ENV_NAME}|literal> [--persist]",
+    "                     add slack --account <id> --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]",
+    "                     persist --channel <slack|telegram> --account <id>",
+    "                     persist --all",
     "  loops              Inspect or cancel managed recurring loops persisted by `/loop`.",
     "                     list|status",
     "                     cancel <id>",
@@ -212,36 +203,6 @@ export function renderCliHelp() {
     `  Docs: ${USER_GUIDE_DOC_PATH}`,
     `  ${REPO_HELP_HINT}`,
   ].join("\n");
-}
-
-function parseTokenReferenceOptions(args: string[]) {
-  return {
-    slackAppTokenRef: parseOptionValue(args, "--slack-app-token"),
-    slackBotTokenRef: parseOptionValue(args, "--slack-bot-token"),
-    telegramBotTokenRef: parseOptionValue(args, "--telegram-bot-token"),
-  };
-}
-
-function parseBootstrapOptions(args: string[]) {
-  return {
-    cliTool: parseOptionValue(args, "--cli") as AgentCliToolId | undefined,
-    bootstrap: parseOptionValue(args, "--bootstrap") as AgentBootstrapMode | undefined,
-    ...parseTokenReferenceOptions(args),
-  };
-}
-
-function parseOptionValue(args: string[], name: string) {
-  const index = args.findIndex((arg) => arg === name);
-  if (index === -1) {
-    return undefined;
-  }
-
-  const value = args[index + 1]?.trim();
-  if (!value) {
-    throw new Error(`Missing value for ${name}`);
-  }
-
-  return value;
 }
 
 function parseLineCount(args: string[]) {

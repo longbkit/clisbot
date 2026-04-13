@@ -89,6 +89,10 @@ Current policy meaning:
 - [OpenClaw agent and workspace config shape](../../research/configuration/2026-04-06-openclaw-agent-workspace-config-shape.md)
 - [OpenClaw template improvements](../../research/configuration/2026-04-10-openclaw-template-improvements.md)
 
+## Supporting Docs
+
+- [Start Bootstrap And Credential Persistence](start-bootstrap-and-credential-persistence.md)
+
 ## Dependencies
 
 - [Channels](../channels/README.md)
@@ -212,6 +216,13 @@ Current first-run startup bootstrap should stay explicit:
 - fresh config should not auto-add sample Slack channels, Slack groups, Telegram groups, or Telegram topics
 - when no agents exist yet and only one supported CLI is installed, `start` should create `default` automatically
 - when both `codex` and `claude` are installed, `start` should stop and require an explicit `--cli` choice for the first agent
+
+Current credential-persistence direction should stay explicit:
+
+- fast first-run may accept a literal Telegram token on `start`, but only as an in-memory bootstrap secret
+- generated config should prefer account scaffolding plus external secret sources over raw secret persistence
+- the preferred durable Telegram path is a canonical credential file under `~/.clisbot/credentials/telegram/<accountId>/bot-token`
+- startup and status should explain which credential source is active so canonical path discovery never feels hidden
 
 Current Slack feedback defaults should stay explicit:
 

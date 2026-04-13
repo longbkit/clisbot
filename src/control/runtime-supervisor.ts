@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from "node:fs";
+import { statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname } from "node:path";
 import { AgentService } from "../agents/agent-service.ts";
 import { ProcessedEventsStore } from "../channels/processed-events-store.ts";
@@ -87,6 +87,11 @@ export class RuntimeSupervisor {
       nextRuntime = await this.createRuntime(loadedConfig);
 
       await this.reconcileConfigWatcher(loadedConfig);
+      await this.dependencies.runtimeHealthStore.setReload({
+        status: "success",
+        reason,
+        configMtimeMs: statSync(loadedConfig.configPath).mtimeMs,
+      });
       this.activeRuntime = nextRuntime;
 
       if (previousRuntime) {
@@ -103,6 +108,11 @@ export class RuntimeSupervisor {
         console.log(`clisbot reloaded config ${loadedConfig.configPath}`);
       }
     } catch (error) {
+      await this.dependencies.runtimeHealthStore.setReload({
+        status: "failed",
+        reason,
+        detail: error instanceof Error ? error.message : String(error),
+      });
       const isFatalInitialFailure =
         reason === "initial" && !previousRuntime && !this.activeRuntime;
       if (error instanceof MissingEnvVarError) {
@@ -198,10 +208,14 @@ export class RuntimeSupervisor {
           await withStartupTimeout(`${plugin.id} service`, () => entry.service.start());
         }
         startedChannels.add(plugin.id);
+        const instances = pluginServices
+          .map((entry) => entry.service.getRuntimeIdentity?.())
+          .filter((identity) => identity != null);
         await this.dependencies.runtimeHealthStore.setChannel({
           channel: plugin.id,
           connection: "active",
           summary: plugin.renderActiveHealthSummary(pluginServices.length),
+          instances,
         });
       }
 

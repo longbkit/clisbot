@@ -119,8 +119,8 @@ export function listSlackAccounts(
 ): Array<{ accountId: string; config: SlackAccountConfig }> {
   const accounts = Object.entries(getAccountsRecord(config.accounts)).map(([accountId, accountConfig]) => ({
     accountId,
-    config: accountConfig as SlackAccountConfig,
-  })).filter(({ config }) => config.appToken.trim() && config.botToken.trim());
+    config: accountConfig as SlackAccountConfig & { enabled?: boolean },
+  })).filter(({ config }) => config.enabled !== false && config.appToken.trim() && config.botToken.trim());
   if (accounts.length > 0) {
     return accounts;
   }
@@ -145,8 +145,8 @@ export function listTelegramAccounts(
 ): Array<{ accountId: string; config: TelegramAccountConfig }> {
   const accounts = Object.entries(getAccountsRecord(config.accounts)).map(([accountId, accountConfig]) => ({
     accountId,
-    config: accountConfig as TelegramAccountConfig,
-  })).filter(({ config }) => config.botToken.trim());
+    config: accountConfig as TelegramAccountConfig & { enabled?: boolean },
+  })).filter(({ config }) => config.enabled !== false && config.botToken.trim());
   if (accounts.length > 0) {
     return accounts;
   }

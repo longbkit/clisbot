@@ -1,4 +1,8 @@
 import {
+  getCredentialSkipPaths,
+  materializeRuntimeChannelCredentials,
+} from "./channel-credentials.ts";
+import {
   collapseHomePath,
   expandHomePath,
   getDefaultConfigPath,
@@ -47,13 +51,16 @@ export async function loadConfig(configPath = getDefaultConfigPath()): Promise<L
   const expandedConfigPath = expandHomePath(configPath);
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
-  const withDynamicDefaults = applyDynamicPathDefaults(parsed);
+  const withDynamicDefaults = clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed));
   const substituted = resolveConfigEnvVars(withDynamicDefaults, process.env, {
-    skipPaths: getDisabledChannelTokenPaths(withDynamicDefaults),
+    skipPaths: getCredentialSkipPaths(withDynamicDefaults),
   }) as unknown;
   const validated = clisbotConfigSchema.parse(substituted);
+  const materialized = materializeRuntimeChannelCredentials(validated, {
+    env: process.env,
+  });
 
-  return materializeLoadedConfig(expandedConfigPath, validated);
+  return materializeLoadedConfig(expandedConfigPath, materialized);
 }
 
 export async function loadConfigWithoutEnvResolution(
@@ -63,7 +70,6 @@ export async function loadConfigWithoutEnvResolution(
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
   const validated = clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed));
-
   return materializeLoadedConfig(expandedConfigPath, validated);
 }
 
@@ -139,40 +145,6 @@ export function applyDynamicPathDefaults(
       },
     },
   };
-}
-
-function getDisabledChannelTokenPaths(parsed: unknown) {
-  const skipPaths: string[] = [];
-  const channels = isRecord(parsed) ? parsed.channels : undefined;
-
-  if (isRecord(channels)) {
-    const slack = isRecord(channels.slack) ? channels.slack : undefined;
-    if (slack?.enabled === false) {
-      skipPaths.push("channels.slack.appToken", "channels.slack.botToken");
-      const accounts = isRecord(slack.accounts) ? slack.accounts : undefined;
-      if (accounts) {
-        for (const accountId of Object.keys(accounts)) {
-          skipPaths.push(
-            `channels.slack.accounts.${accountId}.appToken`,
-            `channels.slack.accounts.${accountId}.botToken`,
-          );
-        }
-      }
-    }
-
-    const telegram = isRecord(channels.telegram) ? channels.telegram : undefined;
-    if (telegram?.enabled === false) {
-      skipPaths.push("channels.telegram.botToken");
-      const accounts = isRecord(telegram.accounts) ? telegram.accounts : undefined;
-      if (accounts) {
-        for (const accountId of Object.keys(accounts)) {
-          skipPaths.push(`channels.telegram.accounts.${accountId}.botToken`);
-        }
-      }
-    }
-  }
-
-  return skipPaths;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

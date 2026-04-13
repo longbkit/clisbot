@@ -10,16 +10,15 @@ Use this page when you need to configure Slack or Telegram accounts for:
 
 Current startup rule:
 
-- `clisbot start` requires either:
-  - `SLACK_APP_TOKEN` and `SLACK_BOT_TOKEN`
-  - or `TELEGRAM_BOT_TOKEN`
-- on first run, you can also pass custom token env names with:
-  - `--slack-app-token CUSTOM_SLACK_APP_TOKEN`
-  - `--slack-bot-token CUSTOM_SLACK_BOT_TOKEN`
-  - `--telegram-bot-token CUSTOM_TELEGRAM_BOT_TOKEN`
-- the CLI also accepts placeholder form such as `'${CUSTOM_SLACK_APP_TOKEN}'`
-- `clisbot start` prints the token env names it checks and whether each one is `set` or `missing`
-- when no default channel token is available, `clisbot` does not create runtime state or start the background service
+- fresh `clisbot start` only bootstraps channels that the operator names with flags
+- ambient env vars alone do not auto-enable Slack or Telegram on first run
+- `--slack-app-token`, `--slack-bot-token`, and `--telegram-bot-token` accept:
+  - env var names such as `TELEGRAM_BOT_TOKEN`
+  - placeholders such as `'${TELEGRAM_BOT_TOKEN}'`
+  - literal or shell-expanded token values such as `"$TELEGRAM_BOT_TOKEN"`
+- literal input becomes `credentialType: "mem"` and never gets written into `clisbot.json`
+- `clisbot start --persist` promotes those mem credentials into canonical credential files immediately
+- `clisbot accounts add` and `clisbot accounts persist` manage the same provider-account model after bootstrap
 
 ## Config Shape
 
@@ -128,6 +127,62 @@ Official docs:
 - Telegram bots overview: <https://core.telegram.org/bots>
 - BotFather setup: <https://core.telegram.org/bots#6-botfather>
 
+## Credential Direction
+
+Current direction:
+
+- raw Slack or Telegram token literals are not supported in `~/.clisbot/clisbot.json`
+- canonical credential files are preferred at:
+  - `~/.clisbot/credentials/telegram/<accountId>/bot-token`
+  - `~/.clisbot/credentials/slack/<accountId>/app-token`
+  - `~/.clisbot/credentials/slack/<accountId>/bot-token`
+- explicit `tokenFile` overrides remain supported for non-standard paths
+- env-backed setup still works through `${ENV_NAME}` placeholders
+- config makes mem and token-file state explicit through `credentialType`
+- `start` supports shorthand `default` input and repeated account blocks
+- `accounts add`, `accounts persist`, and `start --persist` are the supported persistence-management surfaces
+
+Why:
+
+- `clisbot.json` is easier to share, diff, or accidentally commit than a separate secret file
+- a dedicated credential file gives nearly the same convenience as raw config secrets with less operator footgun risk
+
+The credentials directory should also carry a default ignore file:
+
+Path:
+
+```text
+~/.clisbot/credentials/.gitignore
+```
+
+Suggested content:
+
+```gitignore
+*
+!*/
+!.gitignore
+```
+
+## CLI Input Semantics
+
+These inputs mean different things:
+
+- `--telegram-bot-token \"$TELEGRAM_BOT_TOKEN\"`
+  - shell expands first
+  - actual meaning: pass the token value itself, so `clisbot` treats it as in-memory `mem`
+- `--telegram-bot-token TELEGRAM_BOT_TOKEN`
+  - actual meaning: treat as env var name
+- `--telegram-bot-token '${TELEGRAM_BOT_TOKEN}'`
+  - actual meaning: treat as env placeholder
+
+Guardrail:
+
+- raw token input on `clisbot accounts add` without `--persist` currently requires the runtime to already be running
+- this keeps mem credentials tied to the active runtime instead of silently leaving long-lived secrets outside config without a running process to consume them
+- raw token input on `clisbot start` is cold-start friendly: when the runtime is stopped, the secret is injected into the spawned runtime process instead of being written into `clisbot.json`
+- if the runtime is already running, `clisbot start` with raw token input now requires `--persist`; otherwise stop first, then run `start` again with the literal token
+- those mem accounts are ephemeral: `clisbot stop` and the next cold `clisbot start` will disable expired `credentialType: "mem"` accounts automatically
+
 ## Shell Setup
 
 Examples:
@@ -176,19 +231,19 @@ clisbot start \
 
 When `~/.clisbot/clisbot.json` does not exist yet:
 
-- if Slack tokens are present, the generated config enables Slack
-- if Telegram token is present, the generated config enables Telegram
-- if both are present, both channels are enabled
-- if neither is present, `clisbot` prints a warning and returns
-- custom token-reference flags are written into config exactly as provided
+- only the explicitly requested channels are enabled
+- repeated account blocks create or update the requested provider accounts
+- env-backed input is stored as `${ENV_NAME}`
+- literal input is stored as `credentialType: "mem"`
+- `--persist` writes canonical credential files and flips the affected accounts to `credentialType: "tokenFile"`
 - no Slack channels, Slack groups, Telegram groups, or Telegram topics are auto-added
 
 When `~/.clisbot/clisbot.json` already exists:
 
-- `start` does not change channel enablement in the existing config
-- `start` validates the env vars referenced by the enabled channel token fields for the provider default account before it launches the background runtime
-- if an enabled channel points at a missing env var, `start` prints the exact missing env name and exits cleanly
-- if default tokens are present but `channels.slack.enabled` or `channels.telegram.enabled` is still `false`, `start` prints a warning and continues using the existing config as written
+- `start` preserves existing channels and accounts unless the operator explicitly adds or updates them
+- passing token flags can enable a second channel later or add a named account to an existing provider
+- if the runtime is already running, config reload reconciles the updated provider state immediately
+- status output reports whether the active source is `env`, `credential-file`, or `cli-ephemeral`
 
 When no agents exist yet:
 

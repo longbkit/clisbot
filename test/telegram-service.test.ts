@@ -172,7 +172,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     expect(text).toContain("`clisbot channels add telegram-group -1003455688247 --agent <id>`");
     expect(text).toContain("Add only this topic with a specific agent:");
     expect(text).toContain("`clisbot channels add telegram-group -1003455688247 --topic 3 --agent <id>`");
-    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 
   test("renders onboarding guidance for unrouted help in groups", () => {
@@ -186,7 +186,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
     expect(text).toContain("Ask the bot owner to choose one of these:");
-    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 
   test("renders onboarding guidance for unrouted status in groups", () => {
@@ -199,7 +199,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     });
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
-    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 });
 
@@ -228,6 +228,7 @@ describe("buildTelegramCommandRegistrations", () => {
       "detach",
       "watch",
       "stop",
+      "nudge",
       "followup",
       "responsemode",
       "queue",

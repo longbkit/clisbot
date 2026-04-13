@@ -303,7 +303,10 @@ const telegramPollingSchema = z.object({
 });
 
 const telegramAccountSchema = z.object({
+  enabled: z.boolean().optional(),
+  credentialType: z.enum(["mem", "tokenFile"]).optional(),
   botToken: z.string().default(""),
+  tokenFile: z.string().optional(),
 });
 
 const telegramSchema = z.object({
@@ -374,8 +377,12 @@ const slackSchema = z.object({
   botToken: z.string().default(""),
   defaultAccount: z.string().min(1).default("default"),
   accounts: z.record(z.string(), z.object({
+    enabled: z.boolean().optional(),
+    credentialType: z.enum(["mem", "tokenFile"]).optional(),
     appToken: z.string().default(""),
     botToken: z.string().default(""),
+    appTokenFile: z.string().optional(),
+    botTokenFile: z.string().optional(),
   })).default({}),
   agentPrompt: channelAgentPromptSchema.default({
     enabled: true,

@@ -28,7 +28,11 @@ import {
   renderRepoHelpLines,
   renderTmuxDebugHelpLines,
 } from "./startup-bootstrap.ts";
-import { RuntimeHealthStore, type RuntimeChannelConnection } from "./runtime-health-store.ts";
+import {
+  RuntimeHealthStore,
+  type ChannelHealthInstance,
+  type RuntimeChannelConnection,
+} from "./runtime-health-store.ts";
 
 type AgentOperatorSummary = {
   id: string;
@@ -61,6 +65,7 @@ type ChannelOperatorSummary = {
   healthSummary?: string;
   healthDetail?: string;
   healthActions: string[];
+  healthInstances: ChannelHealthInstance[];
   healthUpdatedAt?: string;
 };
 
@@ -201,6 +206,7 @@ export async function getRuntimeOperatorSummary(params: {
       }),
       healthDetail: runtimeHealth.channels.slack?.detail,
       healthActions: runtimeHealth.channels.slack?.actions ?? [],
+      healthInstances: runtimeHealth.channels.slack?.instances ?? [],
       healthUpdatedAt: runtimeHealth.channels.slack?.updatedAt,
     },
     {
@@ -225,6 +231,7 @@ export async function getRuntimeOperatorSummary(params: {
       }),
       healthDetail: runtimeHealth.channels.telegram?.detail,
       healthActions: runtimeHealth.channels.telegram?.actions ?? [],
+      healthInstances: runtimeHealth.channels.telegram?.instances ?? [],
       healthUpdatedAt: runtimeHealth.channels.telegram?.updatedAt,
     },
   ] satisfies ChannelOperatorSummary[];
@@ -306,15 +313,7 @@ function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
 }
 
 async function loadOperatorSummaryConfig(configPath?: string) {
-  try {
-    return await loadConfig(configPath);
-  } catch (error) {
-    if (!(error instanceof MissingEnvVarError)) {
-      throw error;
-    }
-
-    return await loadConfigWithoutEnvResolution(configPath);
-  }
+  return await loadConfigWithoutEnvResolution(configPath);
 }
 
 function formatTime(value?: string) {
@@ -370,7 +369,10 @@ function renderChannelSummaryLines(summary: RuntimeOperatorSummary) {
 
 function renderChannelDiagnosticLines(summary: RuntimeOperatorSummary) {
   const channelsNeedingDiagnostics = summary.channelSummaries.filter((channel) =>
-    Boolean(channel.healthSummary) || channel.healthActions.length > 0 || Boolean(channel.healthDetail)
+    Boolean(channel.healthSummary) ||
+    channel.healthActions.length > 0 ||
+    Boolean(channel.healthDetail) ||
+    channel.healthInstances.length > 0
   );
   if (channelsNeedingDiagnostics.length === 0) {
     return [];
@@ -389,12 +391,31 @@ function renderChannelDiagnosticLines(summary: RuntimeOperatorSummary) {
       if (channel.healthDetail) {
         lines.push(`    detail: ${channel.healthDetail}`);
       }
+      if (channel.healthInstances.length > 0) {
+        lines.push(
+          `    instances: ${channel.healthInstances.map((instance) => formatHealthInstance(instance)).join("; ")}`,
+        );
+      }
       for (const action of channel.healthActions) {
         lines.push(`    action: ${action}`);
       }
       return lines;
     }),
   ];
+}
+
+function formatHealthInstance(instance: ChannelHealthInstance) {
+  const parts = [instance.accountId];
+  if (instance.label) {
+    parts.push(instance.label);
+  }
+  if (instance.appLabel) {
+    parts.push(instance.appLabel);
+  }
+  if (instance.tokenHint) {
+    parts.push(`token#${instance.tokenHint}`);
+  }
+  return parts.join(" ");
 }
 
 export function renderRuntimeDiagnosticsSummary(summary: RuntimeOperatorSummary) {

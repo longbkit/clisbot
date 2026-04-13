@@ -13,6 +13,7 @@ This folder should answer:
 ## Files
 
 - [human-requirements.md](human-requirements.md): raw human-provided requirements and notes
+- [launch-mvp-path.md](launch-mvp-path.md): current launch order, market packaging, and expansion sequence
 
 ## Project Goal
 

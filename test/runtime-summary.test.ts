@@ -342,4 +342,54 @@ describe("runtime summaries", () => {
     expect(text).toContain("Socket Mode app token was rejected.");
     expect(text).toContain("action: verify `channels.slack.appToken` resolves to an `xapp-` token");
   });
+
+  test("renders active runtime channel identities from health metadata", async () => {
+    process.env.SLACK_APP_TOKEN = "app";
+    process.env.SLACK_BOT_TOKEN = "bot";
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const healthPath = join(tempDir, "runtime-health.json");
+    const config = clisbotConfigSchema.parse(
+      JSON.parse(
+        renderDefaultConfigTemplate({
+          slackEnabled: true,
+          telegramEnabled: false,
+        }),
+      ),
+    );
+    config.agents.list = [
+      {
+        id: "default",
+        cliTool: "codex",
+        bootstrap: { mode: "team-assistant" },
+      },
+    ];
+    await writeEditableConfig(configPath, config);
+
+    const healthStore = new RuntimeHealthStore(healthPath);
+    await healthStore.setChannel({
+      channel: "slack",
+      connection: "active",
+      summary: "Slack Socket Mode connected for 1 account(s).",
+      instances: [
+        {
+          accountId: "default",
+          label: "bot=@longluong2bot",
+          appLabel: "app=A123",
+          tokenHint: "deadbeef",
+        },
+      ],
+    });
+
+    const summary = await getRuntimeOperatorSummary({
+      configPath,
+      runtimeRunning: true,
+      healthPath,
+    });
+    const text = renderStatusSummary(summary);
+
+    expect(text).toContain("Channel health:");
+    expect(text).toContain("Slack Socket Mode connected for 1 account(s).");
+    expect(text).toContain("instances: default bot=@longluong2bot app=A123 token#deadbeef");
+  });
 });

@@ -5,19 +5,11 @@ import {
   getDefaultConfigPath,
   getDefaultTmuxSocketPath,
 } from "../shared/paths.ts";
+import { describeEnvReference } from "../shared/env-references.ts";
 import {
-  describeEnvReference,
-  extractEnvReferenceName,
-  hasEnvReferenceValue,
-} from "../shared/env-references.ts";
-import {
-  resolveSlackAccountConfig,
-  resolveTelegramAccountConfig,
-} from "../config/channel-accounts.ts";
-import type {
-  AgentBootstrapMode,
-  AgentCliToolId,
-} from "../config/agent-tool-presets.ts";
+  describeSlackCredentialSource,
+  describeTelegramCredentialSource,
+} from "../config/channel-credentials.ts";
 import { renderGenericPrivilegeCommandHelpLines } from "../channels/privilege-help.ts";
 
 export const CHANNEL_ACCOUNT_DOC_PATH = "docs/user-guide/channel-accounts.md";
@@ -38,11 +30,6 @@ export type StartTokenArgs = {
   telegramBotTokenRef?: string;
 };
 
-export type StartCommandOptions = StartTokenArgs & {
-  cliTool?: AgentCliToolId;
-  bootstrap?: AgentBootstrapMode;
-};
-
 export function getDefaultChannelAvailability(
   env: NodeJS.ProcessEnv = process.env,
 ): DefaultChannelAvailability {
@@ -56,15 +43,16 @@ export function getChannelAvailabilityForBootstrap(
   tokenArgs: StartTokenArgs,
   env: NodeJS.ProcessEnv = process.env,
 ): DefaultChannelAvailability {
+  const slackApp = describeEnvReference(tokenArgs.slackAppTokenRef, "SLACK_APP_TOKEN", env);
+  const slackBot = describeEnvReference(tokenArgs.slackBotTokenRef, "SLACK_BOT_TOKEN", env);
+  const telegramBot = describeEnvReference(
+    tokenArgs.telegramBotTokenRef,
+    "TELEGRAM_BOT_TOKEN",
+    env,
+  );
   return {
-    slack:
-      Boolean(
-        hasEnvReferenceValue(tokenArgs.slackAppTokenRef, env) &&
-          hasEnvReferenceValue(tokenArgs.slackBotTokenRef, env),
-      ) ||
-      Boolean(env.SLACK_APP_TOKEN?.trim() && env.SLACK_BOT_TOKEN?.trim()),
-    telegram: Boolean(hasEnvReferenceValue(tokenArgs.telegramBotTokenRef, env)) ||
-      Boolean(env.TELEGRAM_BOT_TOKEN?.trim()),
+    slack: Boolean(slackApp.hasValue && slackBot.hasValue),
+    telegram: Boolean(telegramBot.hasValue),
   };
 }
 
@@ -77,12 +65,8 @@ export function hasAnyDefaultChannelToken(
 export function renderDisabledConfiguredChannelWarningLines(
   config: {
     channels: {
-      slack: {
-        enabled: boolean;
-      };
-      telegram: {
-        enabled: boolean;
-      };
+      slack: { enabled: boolean };
+      telegram: { enabled: boolean };
     };
   },
   availability: DefaultChannelAvailability,
@@ -111,32 +95,6 @@ export function renderDisabledConfiguredChannelWarningLines(
   return lines;
 }
 
-export function renderMissingTokenWarningLines(
-  tokenArgs: StartTokenArgs = {},
-  env: NodeJS.ProcessEnv = process.env,
-) {
-  const slackApp = describeEnvReference(tokenArgs.slackAppTokenRef, "SLACK_APP_TOKEN", env);
-  const slackBot = describeEnvReference(tokenArgs.slackBotTokenRef, "SLACK_BOT_TOKEN", env);
-  const telegramBot = describeEnvReference(
-    tokenArgs.telegramBotTokenRef,
-    "TELEGRAM_BOT_TOKEN",
-    env,
-  );
-
-  return [
-    "warning no default Slack or Telegram tokens were found, so clisbot did not start.",
-    `Slack token refs: app=${slackApp.envName} (${slackApp.hasValue ? "set" : "missing"}), bot=${slackBot.envName} (${slackBot.hasValue ? "set" : "missing"})`,
-    `Telegram token ref: ${telegramBot.envName} (${telegramBot.hasValue ? "set" : "missing"})`,
-    "Set either Slack app+bot tokens or a Telegram bot token in your shell, then run start again.",
-    "If you use different env var names, pass them explicitly with --slack-app-token, --slack-bot-token, and --telegram-bot-token.",
-    "Example: clisbot start --cli codex --bootstrap personal-assistant --slack-app-token CUSTOM_SLACK_APP_TOKEN --slack-bot-token CUSTOM_SLACK_BOT_TOKEN",
-    `Repo docs path (local or GitHub): ${CHANNEL_ACCOUNT_DOC_PATH}`,
-    `Slack docs: ${SLACK_TOKEN_DOC_URL}`,
-    `Telegram docs: ${TELEGRAM_TOKEN_DOC_URL}`,
-    REPO_HELP_HINT,
-  ];
-}
-
 export function renderBootstrapTokenUsageLines(
   tokenArgs: StartTokenArgs,
   env: NodeJS.ProcessEnv = process.env,
@@ -151,23 +109,38 @@ export function renderBootstrapTokenUsageLines(
   );
 
   if (!(slackApp.hasValue && slackBot.hasValue)) {
-    lines.push(...renderEnvPresenceLines({
-      channel: "Slack",
-      found: false,
-      detail: `app=${slackApp.envName}, bot=${slackBot.envName}`,
-      flagHint: "--slack-app-token / --slack-bot-token",
-    }));
+    lines.push(
+      `Slack channel: token not found (app=${slackApp.envName}, bot=${slackBot.envName}), pass explicit flags for Slack bootstrap.`,
+    );
   }
   if (!telegramBot.hasValue) {
-    lines.push(...renderEnvPresenceLines({
-      channel: "Telegram",
-      found: false,
-      detail: telegramBot.envName,
-      flagHint: "--telegram-bot-token",
-    }));
+    lines.push(
+      `Telegram channel: token not found (${telegramBot.envName}), pass --telegram-bot-token explicitly for Telegram bootstrap.`,
+    );
   }
 
   return lines;
+}
+
+export function renderMissingTokenWarningLines(
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  const slackApp = describeEnvReference("SLACK_APP_TOKEN", "SLACK_APP_TOKEN", env);
+  const slackBot = describeEnvReference("SLACK_BOT_TOKEN", "SLACK_BOT_TOKEN", env);
+  const telegramBot = describeEnvReference("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN", env);
+
+  return [
+    "warning first-run bootstrap needs explicit channel flags, so clisbot did not start.",
+    `Slack token refs: app=${slackApp.envName} (${slackApp.hasValue ? "set" : "missing"}), bot=${slackBot.envName} (${slackBot.hasValue ? "set" : "missing"})`,
+    `Telegram token ref: ${telegramBot.envName} (${telegramBot.hasValue ? "set" : "missing"})`,
+    "Pass the channels you want explicitly, for example with --telegram-bot-token or --slack-app-token plus --slack-bot-token.",
+    "Use ENV_NAME or ${ENV_NAME} for env-backed setup, or pass a literal token to cold-start with credentialType=mem.",
+    "Example: clisbot start --cli codex --bootstrap personal-assistant --telegram-bot-token TELEGRAM_BOT_TOKEN",
+    `Repo docs path (local or GitHub): ${CHANNEL_ACCOUNT_DOC_PATH}`,
+    `Slack docs: ${SLACK_TOKEN_DOC_URL}`,
+    `Telegram docs: ${TELEGRAM_TOKEN_DOC_URL}`,
+    REPO_HELP_HINT,
+  ];
 }
 
 export function renderConfiguredChannelTokenIssueLines(
@@ -180,61 +153,36 @@ export function renderConfiguredChannelTokenIssueLines(
   env: NodeJS.ProcessEnv = process.env,
 ) {
   const lines: string[] = [];
-  const hardErrorLines: string[] = [];
-
-  if (config.channels.slack.enabled) {
-    const slackAccount = resolveSlackAccountConfig(config.channels.slack);
-    const slackAppEnv = extractEnvReferenceName(slackAccount.config.appToken);
-    const slackBotEnv = extractEnvReferenceName(slackAccount.config.botToken);
-
-    if (!slackAccount.config.appToken.trim()) {
-      hardErrorLines.push("Configured Slack app token is empty.");
-    } else if (slackAppEnv && !env[slackAppEnv]?.trim()) {
-      lines.push(`Configured Slack app token env var is missing: ${slackAppEnv}`);
+  try {
+    if (config.channels.slack.enabled) {
+      describeSlackCredentialSource({
+        config: config.channels.slack,
+        env,
+      });
     }
-
-    if (!slackAccount.config.botToken.trim()) {
-      hardErrorLines.push("Configured Slack bot token is empty.");
-    } else if (slackBotEnv && !env[slackBotEnv]?.trim()) {
-      lines.push(`Configured Slack bot token env var is missing: ${slackBotEnv}`);
-    }
+  } catch (error) {
+    lines.push(error instanceof Error ? error.message : String(error));
   }
 
-  if (config.channels.telegram.enabled) {
-    const telegramAccount = resolveTelegramAccountConfig(config.channels.telegram);
-    const telegramBotEnv = extractEnvReferenceName(telegramAccount.config.botToken);
-
-    if (!telegramAccount.config.botToken.trim()) {
-      hardErrorLines.push("Configured Telegram bot token is empty.");
-    } else if (telegramBotEnv && !env[telegramBotEnv]?.trim()) {
-      lines.push(`Configured Telegram bot token env var is missing: ${telegramBotEnv}`);
+  try {
+    if (config.channels.telegram.enabled) {
+      describeTelegramCredentialSource({
+        config: config.channels.telegram,
+        env,
+      });
     }
-  }
-
-  if (hardErrorLines.length > 0) {
-    return [
-      "warning configured channel tokens are invalid, so clisbot did not start.",
-      ...hardErrorLines,
-      "Set the missing token value in config or switch the channel token field back to an env placeholder.",
-      `Docs: ${CHANNEL_ACCOUNT_DOC_PATH}`,
-      REPO_HELP_HINT,
-    ];
+  } catch (error) {
+    lines.push(error instanceof Error ? error.message : String(error));
   }
 
   if (lines.length === 0) {
     return [];
   }
 
-  const shellHint = [
-    "Set the missing env vars in your shell, for example in ~/.bashrc or ~/.zshrc, then reload your shell with `source ~/.bashrc` or `source ~/.zshrc`.",
-    "If you want different env var names on first run, pass them explicitly with --slack-app-token, --slack-bot-token, or --telegram-bot-token.",
-    `Docs: ${CHANNEL_ACCOUNT_DOC_PATH}`,
-  ];
-
   return [
-    "warning!!! configured channel token references are missing, so clisbot did not start.",
+    "warning!!! configured channel credentials are invalid or unavailable, so clisbot did not start.",
     ...lines,
-    ...shellHint,
+    `Docs: ${CHANNEL_ACCOUNT_DOC_PATH}`,
     REPO_HELP_HINT,
   ];
 }
@@ -251,27 +199,33 @@ export function renderConfiguredChannelTokenStatusLines(
   const lines: string[] = [];
 
   if (config.channels.slack.enabled) {
-    const slackAccount = resolveSlackAccountConfig(config.channels.slack);
-    const slackApp = describeConfiguredTokenSource(slackAccount.config.appToken, env);
-    const slackBot = describeConfiguredTokenSource(slackAccount.config.botToken, env);
-    lines.push(...renderConfiguredTokenSourceLines({
-      channel: "Slack",
-      sources: [
-        { label: "app", source: slackApp },
-        { label: "bot", source: slackBot },
-      ],
-      flagHint: "--slack-app-token / --slack-bot-token",
-    }));
+    const accountId = config.channels.slack.defaultAccount || "default";
+    try {
+      const source = describeSlackCredentialSource({
+        config: config.channels.slack,
+        env,
+      });
+      lines.push(`Slack account ${accountId}: ${source.detail}`);
+    } catch (error) {
+      lines.push(
+        `Slack account ${accountId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
   }
 
   if (config.channels.telegram.enabled) {
-    const telegramAccount = resolveTelegramAccountConfig(config.channels.telegram);
-    const telegramBot = describeConfiguredTokenSource(telegramAccount.config.botToken, env);
-    lines.push(...renderConfiguredTokenSourceLines({
-      channel: "Telegram",
-      sources: [{ label: "bot", source: telegramBot }],
-      flagHint: "--telegram-bot-token",
-    }));
+    const accountId = config.channels.telegram.defaultAccount || "default";
+    try {
+      const source = describeTelegramCredentialSource({
+        config: config.channels.telegram,
+        env,
+      });
+      lines.push(`Telegram account ${accountId}: ${source.detail}`);
+    } catch (error) {
+      lines.push(
+        `Telegram account ${accountId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
   }
 
   if (lines.length === 0) {
@@ -369,75 +323,4 @@ export function renderChannelSetupHelpLines(
 
 export function shouldBootstrapFirstRunConfig(configPath = getDefaultConfigPath()) {
   return !existsSync(expandHomePath(configPath));
-}
-
-function describeConfiguredTokenSource(
-  configuredValue: string,
-  env: NodeJS.ProcessEnv,
-) {
-  const trimmed = configuredValue.trim();
-  if (!trimmed) {
-    return {
-      kind: "empty" as const,
-      hasValue: false,
-      label: "empty",
-    };
-  }
-
-  const envName = extractEnvReferenceName(trimmed);
-  if (envName) {
-    return {
-      kind: "env" as const,
-      hasValue: Boolean(env[envName]?.trim()),
-      label: `env ${envName}`,
-    };
-  }
-
-  return {
-    kind: "literal" as const,
-    hasValue: true,
-    label: "literal configured",
-  };
-}
-
-function renderEnvPresenceLines(params: {
-  channel: string;
-  found: boolean;
-  detail: string;
-  flagHint: string;
-}) {
-  if (params.found) {
-    return [`${params.channel} channel: found token, using ${params.detail}`];
-  }
-
-  return [
-    `${params.channel} channel: token not found (${params.detail}), set it or use ${params.flagHint} for custom env name. Follow ${CHANNEL_ACCOUNT_DOC_PATH} to set up ${params.channel}.`,
-  ];
-}
-
-function renderConfiguredTokenSourceLines(params: {
-  channel: string;
-  sources: Array<{
-    label: string;
-    source: ReturnType<typeof describeConfiguredTokenSource>;
-  }>;
-  flagHint: string;
-}) {
-  const details = params.sources.map(({ label, source }) => `${label}=${source.label}`).join(", ");
-  const missingEnvSources = params.sources.filter(
-    ({ source }) => source.kind === "env" && !source.hasValue,
-  );
-
-  if (missingEnvSources.length > 0) {
-    return [
-      `${params.channel} channel: token not found (${details}), set it or use ${params.flagHint} for custom env name. Follow ${CHANNEL_ACCOUNT_DOC_PATH} to set up ${params.channel}.`,
-    ];
-  }
-
-  const literalSources = params.sources.filter(({ source }) => source.kind === "literal");
-  if (literalSources.length > 0) {
-    return [`${params.channel} channel: configured literal token (${details})`];
-  }
-
-  return [`${params.channel} channel: found token, using ${details}`];
 }

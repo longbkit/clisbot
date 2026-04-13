@@ -4,6 +4,8 @@ import { dirname } from "node:path";
 import { kill } from "node:process";
 import { loadConfig } from "../config/load-config.ts";
 import { renderDefaultConfigTemplate } from "../config/template.ts";
+import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
+import { deactivateExpiredMemAccounts } from "../config/channel-account-management.ts";
 import { ensureClisbotWrapper } from "./clisbot-wrapper.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { readTextFile, readTextFileSlice, writeTextFile } from "../shared/fs.ts";
@@ -12,11 +14,13 @@ import {
   expandHomePath,
   getDefaultConfigPath,
   getDefaultRuntimeLogPath,
+  getDefaultRuntimeCredentialsPath,
   getDefaultRuntimePidPath,
   getDefaultTmuxSocketPath,
 } from "../shared/paths.ts";
 import { sleep } from "../shared/process.ts";
 import type { ConfigBootstrapOptions } from "../config/config-file.ts";
+import { removeRuntimeCredentials } from "../config/channel-credentials.ts";
 
 const START_WAIT_TIMEOUT_MS = 10_000;
 const STOP_WAIT_TIMEOUT_MS = 10_000;
@@ -32,6 +36,14 @@ function resolvePidPath(pidPath?: string) {
 
 function resolveLogPath(logPath?: string) {
   return expandHomePath(logPath ?? process.env.CLISBOT_LOG_PATH ?? getDefaultRuntimeLogPath());
+}
+
+function resolveRuntimeCredentialsPath(runtimeCredentialsPath?: string) {
+  return expandHomePath(
+    runtimeCredentialsPath ??
+      process.env.CLISBOT_RUNTIME_CREDENTIALS_PATH ??
+      getDefaultRuntimeCredentialsPath(),
+  );
 }
 
 export type RuntimeStartResult = {
@@ -131,9 +143,12 @@ export async function startDetachedRuntime(params: {
   configPath?: string;
   pidPath?: string;
   logPath?: string;
+  extraEnv?: NodeJS.ProcessEnv;
+  runtimeCredentialsPath?: string;
 }) {
   const pidPath = resolvePidPath(params.pidPath);
   const logPath = resolveLogPath(params.logPath);
+  const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath);
   const existingPid = await readRuntimePid(pidPath);
   if (existingPid && isProcessRunning(existingPid)) {
     return {
@@ -160,9 +175,11 @@ export async function startDetachedRuntime(params: {
     detached: true,
     env: {
       ...process.env,
+      ...params.extraEnv,
       CLISBOT_CONFIG_PATH: configResult.configPath,
       CLISBOT_PID_PATH: pidPath,
       CLISBOT_LOG_PATH: logPath,
+      CLISBOT_RUNTIME_CREDENTIALS_PATH: runtimeCredentialsPath,
     },
   });
   closeSync(logFd);
@@ -202,8 +219,10 @@ export async function stopDetachedRuntime(params: {
   pidPath?: string;
   hard?: boolean;
   configPath?: string;
+  runtimeCredentialsPath?: string;
 }) {
   const pidPath = resolvePidPath(params.pidPath);
+  const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath);
   const existingPid = await readRuntimePid(pidPath);
   let stopped = false;
 
@@ -217,6 +236,8 @@ export async function stopDetachedRuntime(params: {
   }
 
   rmSync(pidPath, { force: true });
+  removeRuntimeCredentials(runtimeCredentialsPath);
+  await disableExpiredMemAccountsInConfig(params.configPath);
 
   if (params.hard) {
     const socketPath = await resolveTmuxSocketPath(params.configPath);
@@ -231,6 +252,21 @@ export async function stopDetachedRuntime(params: {
   return {
     stopped,
   };
+}
+
+async function disableExpiredMemAccountsInConfig(configPath?: string) {
+  const resolvedConfigPath = resolveConfigPath(configPath);
+  if (!existsSync(resolvedConfigPath)) {
+    return;
+  }
+
+  const { config } = await readEditableConfig(resolvedConfigPath);
+  const lifecycleLines = deactivateExpiredMemAccounts(config);
+  if (lifecycleLines.length === 0) {
+    return;
+  }
+
+  await writeEditableConfig(resolvedConfigPath, config);
 }
 
 export async function writeRuntimePid(pidPath?: string, pid = process.pid) {

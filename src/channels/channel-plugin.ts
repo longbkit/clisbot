@@ -9,6 +9,14 @@ import type { RuntimeHealthStore } from "../control/runtime-health-store.ts";
 export type ChannelRuntimeService = {
   start(): Promise<void>;
   stop(): Promise<void>;
+  getRuntimeIdentity?(): ChannelRuntimeIdentity | null;
+};
+
+export type ChannelRuntimeIdentity = {
+  accountId: string;
+  label?: string;
+  appLabel?: string;
+  tokenHint?: string;
 };
 
 export type ChannelRuntimeContext = {

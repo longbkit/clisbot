@@ -67,6 +67,7 @@ Channels is where those surfaces live.
 
 - [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
 - [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)
+- [Prompt Templates](prompt-templates.md)
 - [Loop Slash Command](loop-slash-command.md)
 
 ## Dependencies
