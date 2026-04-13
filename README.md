@@ -30,38 +30,6 @@ Strong vendor investment in security and safety does not make frontier agentic C
 - Fast operator shortcuts for shell execution: `!<command>` or `/bash <command>`, plus slash-prefix mappings such as `\bash` or `::bash` when Slack slash-command handling is incompatible. Turns Slack / Telegram into a terminal interface on the go.
 - The proof of concept already shows high potential beyond internal coding workflows, including customer chatbot use cases once messaging MCP or CLI-based skills let the agent send messages proactively in a cleaner way.
 
-## Current Focus
-
-`clisbot` is growing toward a broader agent runtime layer:
-
-- more CLI tool support beyond Claude Code and Codex, including Gemini CLI, OpenCode, Qwen, Kilo, and other agentic CLIs
-- more communication channels beyond Slack and Telegram, including Zalo, WhatsApp, Facebook, Discord, and future API-compatible surfaces
-- simple workflow building blocks such as cronjobs, heartbeat jobs, lightweight Ralph-style loops, and prompt combinations that just work
-- durable agent sessions, workspaces, follow-up policy, commands, attachments, and operator controls that stay reusable across all those surfaces
-
-tmux is still the current stability boundary. One agent maps to one durable runner session in one workspace, and every CLI, channel, or workflow layer should route onto that durable runtime instead of recreating the agent from scratch.
-
-## Launch MVP Path
-
-See [docs/overview/launch-mvp-path.md](docs/overview/launch-mvp-path.md) for the full current launch order.
-
-Short snapshot:
-
-1. Foundations first:
-   - frictionless start and credential persistence
-   - runtime stability and truthful status or debug UX
-   - `/loop` as the current differentiating workflow feature
-2. International launch gate:
-   - Claude, Codex, and Gemini as the well-tested core CLI trio
-   - current shared channel package remains Slack plus Telegram
-3. Vietnam launch package:
-   - add Zalo Official Account and Zalo Personal on top of the same core trio
-4. Next expansion wave:
-   - more CLIs such as Cursor, Amp, OpenCode, Qwen, Kilo, and Minimax, prioritized by real userbase demand
-   - more channels such as Discord, WhatsApp, Google Workspace, and Microsoft Teams
-5. Open launch decision:
-   - whether native CLI slash-command compatibility, override, and customization should ship before broader push
-
 ## Showcase
 
 Slack
@@ -334,6 +302,38 @@ Follow-up behavior matters in team threads:
 - Experiment with json output mode from codex / claude code, Agent Client Protocol and native Codex SDK integration.
 - Experiment with native messaging tools so the bot can send Slack or Telegram messages through MCP or CLI-based skills instead of tmux pane capture, for more stable and natural public-facing behavior over time.
 - Add more channels on demand.
+
+## Current Focus
+
+`clisbot` is growing toward a broader agent runtime layer:
+
+- more CLI tool support beyond Claude Code and Codex, including Gemini CLI, OpenCode, Qwen, Kilo, and other agentic CLIs
+- more communication channels beyond Slack and Telegram, including Zalo, WhatsApp, Facebook, Discord, and future API-compatible surfaces
+- simple workflow building blocks such as cronjobs, heartbeat jobs, lightweight Ralph-style loops, and prompt combinations that just work
+- durable agent sessions, workspaces, follow-up policy, commands, attachments, and operator controls that stay reusable across all those surfaces
+
+tmux is still the current stability boundary. One agent maps to one durable runner session in one workspace, and every CLI, channel, or workflow layer should route onto that durable runtime instead of recreating the agent from scratch.
+
+## Launch MVP Path
+
+See [docs/overview/launch-mvp-path.md](docs/overview/launch-mvp-path.md) for the full current launch order.
+
+Short snapshot:
+
+1. Foundations first:
+   - frictionless start and credential persistence
+   - runtime stability and truthful status or debug UX
+   - `/loop` as the current differentiating workflow feature
+2. International launch gate:
+   - Claude, Codex, and Gemini as the well-tested core CLI trio
+   - current shared channel package remains Slack plus Telegram
+3. Vietnam launch package:
+   - add Zalo Official Account and Zalo Personal on top of the same core trio
+4. Next expansion wave:
+   - more CLIs such as Cursor, Amp, OpenCode, Qwen, Kilo, and Minimax, prioritized by real userbase demand
+   - more channels such as Discord, WhatsApp, Google Workspace, and Microsoft Teams
+5. Open launch decision:
+   - whether native CLI slash-command compatibility, override, and customization should ship before broader push
 
 ## Completed
 
