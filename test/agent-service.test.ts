@@ -13,9 +13,13 @@ type FakeSession = {
   pendingInput: string;
   sessionId: string;
   snapshot: string;
+  cursorX: number;
+  cursorY: number;
+  historySize: number;
   longRunning: boolean;
   longRunningStep: number;
   trustPromptOnCapture?: number;
+  ignoreNextEnter?: boolean;
 };
 
 class FakeTmuxClient {
@@ -27,6 +31,7 @@ class FakeTmuxClient {
   private readonly duplicateOnNewSession = new Set<string>();
   private serverRunning = true;
   private nextTrustPromptCaptureCount: number | null = null;
+  private ignoreNextEnterSessionNames = new Set<string>();
 
   markInvalidResumeSessionId(sessionId: string) {
     this.invalidResumeSessionIds.add(sessionId);
@@ -50,6 +55,10 @@ class FakeTmuxClient {
 
   setTrustPromptOnNextSessionCapture(captureCount: number) {
     this.nextTrustPromptCaptureCount = captureCount;
+  }
+
+  ignoreNextEnter(sessionName: string) {
+    this.ignoreNextEnterSessionNames.add(sessionName);
   }
 
   async isServerRunning() {
@@ -77,9 +86,13 @@ class FakeTmuxClient {
         pendingInput: "",
         sessionId,
         snapshot: `READY ${sessionId}`,
+        cursorX: `READY ${sessionId}`.length,
+        cursorY: 0,
+        historySize: 0,
         longRunning: false,
         longRunningStep: 0,
         trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
+        ignoreNextEnter: this.ignoreNextEnterSessionNames.delete(params.sessionName),
       });
       this.nextTrustPromptCaptureCount = null;
       throw new Error(`duplicate session: ${params.sessionName}`);
@@ -95,9 +108,13 @@ class FakeTmuxClient {
       pendingInput: "",
       sessionId,
       snapshot: `READY ${sessionId}`,
+      cursorX: `READY ${sessionId}`.length,
+      cursorY: 0,
+      historySize: 0,
       longRunning: false,
       longRunningStep: 0,
       trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
+      ignoreNextEnter: this.ignoreNextEnterSessionNames.delete(params.sessionName),
     });
     this.nextTrustPromptCaptureCount = null;
     this.serverRunning = true;
@@ -106,6 +123,7 @@ class FakeTmuxClient {
   async sendLiteral(sessionName: string, text: string) {
     const session = this.requireSession(sessionName);
     session.pendingInput = text;
+    session.cursorX += text.length;
   }
 
   async sendKey(sessionName: string, key: string) {
@@ -118,6 +136,12 @@ class FakeTmuxClient {
       session.snapshot.includes("Press enter to continue")
     ) {
       session.snapshot = `READY ${session.sessionId}`;
+      session.cursorX = session.snapshot.length;
+      session.cursorY = 0;
+      return;
+    }
+    if (session.ignoreNextEnter) {
+      session.ignoreNextEnter = false;
       return;
     }
     if (session.pendingInput === "/status") {
@@ -136,6 +160,9 @@ class FakeTmuxClient {
       session.snapshot = `${session.snapshot}\nECHO ${session.pendingInput}`;
     }
     session.pendingInput = "";
+    session.cursorX = 0;
+    session.cursorY += 1;
+    session.historySize += 1;
   }
 
   async capturePane(sessionName: string, _lines: number) {
@@ -165,6 +192,15 @@ class FakeTmuxClient {
       session.snapshot = `${session.snapshot}\nSTEP ${session.longRunningStep} ${session.sessionId}`;
     }
     return session.snapshot;
+  }
+
+  async getPaneState(sessionName: string) {
+    const session = this.requireSession(sessionName);
+    return {
+      cursorX: session.cursorX,
+      cursorY: session.cursorY,
+      historySize: session.historySize,
+    };
   }
 
   async killSession(sessionName: string) {

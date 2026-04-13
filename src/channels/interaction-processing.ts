@@ -947,6 +947,17 @@ export async function processChannelInteraction<TChunk>(params: {
       return;
     }
 
+    if (slashCommand.name === "nudge") {
+      const nudged = await params.agentService.nudgeSession(params.sessionTarget);
+      await params.postText(
+        nudged.nudged
+          ? `Sent one extra Enter to agent \`${nudged.agentId}\` session \`${nudged.sessionName}\`.`
+          : `No active or resumable session to nudge for agent \`${nudged.agentId}\`.`,
+      );
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return;
+    }
+
     if (slashCommand.name === "followup") {
       if (slashCommand.action === "status") {
         const latestState =

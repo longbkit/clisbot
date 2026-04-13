@@ -8,7 +8,7 @@ The reported symptom is that the human sends a message, nothing gets processed, 
 
 ## Status
 
-Planned
+In Progress
 
 ## Why
 
@@ -42,6 +42,9 @@ The fix must respect the project requirement that stability and speed are both f
 - tmux submit latency is already measured in the Slack latency audit, but Telegram-specific submit reliability has not been audited the same way
 - there is now a real user report that first-turn submit sometimes does not take effect until one or two extra follow-up messages are sent
 - the issue appears more common on Telegram than on Slack, which suggests either different timing pressure, different follow-up behavior, or different visibility of a shared runner weakness
+- current implementation work in this slice now uses tmux bracketed paste for literal prompt injection instead of raw `send-keys -l`
+- current implementation work now treats submit as tentatively incomplete until pane state changes after `Enter`
+- current implementation work retries only `Enter` once when pane state stays unchanged inside a short confirmation budget, instead of re-sending the whole prompt
 
 ## Non-Goals
 
@@ -53,11 +56,26 @@ The fix must respect the project requirement that stability and speed are both f
 
 - [ ] capture a reproducible Telegram case with timing notes and runtime logs
 - [ ] compare Telegram and Slack timing around `tmux-submit-start`, `tmux-submit-complete`, and first meaningful output
-- [ ] verify whether tmux key injection and final Enter submission are actually reaching the pane in the failure case
-- [ ] define a truthful post-submit observation rule that distinguishes "submitted and running" from "keystrokes attempted"
-- [ ] fix the reliability gap without increasing duplicate-submit risk
-- [ ] add automated coverage for the failing path and for no-duplicate guarantees
-- [ ] document any new latency or reliability instrumentation needed for future audits
+- [x] verify whether tmux key injection and final Enter submission are actually reaching the pane in the failure case
+- [x] define a truthful post-submit observation rule that distinguishes "submitted and running" from "keystrokes attempted"
+- [x] fix the reliability gap without increasing duplicate-submit risk
+- [x] add automated coverage for the failing path and for no-duplicate guarantees
+- [x] document any new latency or reliability instrumentation needed for future audits
+
+## Implementation Notes
+
+- prompt text injection now uses tmux buffer paste with bracketed paste mode so multiline and long prompt delivery is less fragile than raw literal key injection
+- after paste settles for the configured `promptSubmitDelayMs`, clisbot captures a lightweight tmux pane state based on cursor position and history size
+- clisbot then sends `Enter` and waits only a short confirmation window for pane state to change
+- if pane state still does not change, clisbot retries only `Enter` once
+- if pane state remains unchanged after that second `Enter`, clisbot throws an explicit submit-unconfirmed error instead of pretending the prompt was submitted
+- latency instrumentation now emits:
+  - `tmux-submit-enter-retry`
+  - `tmux-submit-unconfirmed`
+- this keeps the retry truthful and narrow:
+  - no duplicate prompt body resend
+  - no open-ended polling
+  - only one extra `Enter`
 
 ## Exit Criteria
 
@@ -72,3 +90,4 @@ The fix must respect the project requirement that stability and speed are both f
 - [Runner Interface Standardization And tmux Runner Hardening](../runners/2026-04-04-runner-interface-standardization-and-tmux-runner-hardening.md)
 - [Slack Latency And Stability Audit](../../../research/channels/2026-04-10-slack-latency-and-stability-audit.md)
 - [Telegram Topics Channel MVP](../channels/2026-04-05-telegram-topics-channel-mvp.md)
+- [tmux Submit State Model And Input Path Separation](2026-04-13-tmux-submit-state-model-and-input-path-separation.md)

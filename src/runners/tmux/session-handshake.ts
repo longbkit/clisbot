@@ -1,22 +1,58 @@
 import { extractSessionId } from "../../agents/session-identity.ts";
+import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 import { sleep } from "../../shared/process.ts";
 import { normalizePaneText } from "../../shared/transcript.ts";
-import type { TmuxClient } from "./client.ts";
+import type { TmuxClient, TmuxPaneState } from "./client.ts";
 
 const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
 const TRUST_PROMPT_MAX_WAIT_MS = 10_000;
 const TRUST_PROMPT_SETTLE_DELAY_MS = 1500;
 const SESSION_BOOTSTRAP_POLL_INTERVAL_MS = 100;
+const SUBMIT_CONFIRM_POLL_INTERVAL_MS = 40;
+const SUBMIT_CONFIRM_MAX_WAIT_MS = 160;
 
 export async function submitTmuxSessionInput(params: {
   tmux: TmuxClient;
   sessionName: string;
   text: string;
   promptSubmitDelayMs: number;
+  timingContext?: LatencyDebugContext;
 }) {
   await params.tmux.sendLiteral(params.sessionName, params.text);
   await sleep(params.promptSubmitDelayMs);
+  const preSubmitState = await params.tmux.getPaneState(params.sessionName);
+
   await params.tmux.sendKey(params.sessionName, "Enter");
+  if (
+    await waitForPaneSubmitConfirmation({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baseline: preSubmitState,
+    })
+  ) {
+    return;
+  }
+
+  logLatencyDebug("tmux-submit-enter-retry", params.timingContext, {
+    sessionName: params.sessionName,
+  });
+  await params.tmux.sendKey(params.sessionName, "Enter");
+  if (
+    await waitForPaneSubmitConfirmation({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baseline: preSubmitState,
+    })
+  ) {
+    return;
+  }
+
+  logLatencyDebug("tmux-submit-unconfirmed", params.timingContext, {
+    sessionName: params.sessionName,
+  });
+  throw new Error(
+    "tmux submit was not confirmed after Enter. The pane state did not change, so clisbot did not treat the prompt as truthfully submitted.",
+  );
 }
 
 export async function captureTmuxSessionIdentity(params: {
@@ -36,6 +72,7 @@ export async function captureTmuxSessionIdentity(params: {
     sessionName: params.sessionName,
     text: params.statusCommand,
     promptSubmitDelayMs: params.promptSubmitDelayMs,
+    timingContext: undefined,
   });
 
   while (Date.now() < deadline) {
@@ -51,6 +88,7 @@ export async function captureTmuxSessionIdentity(params: {
         sessionName: params.sessionName,
         text: params.statusCommand,
         promptSubmitDelayMs: params.promptSubmitDelayMs,
+        timingContext: undefined,
       });
       continue;
     }
@@ -130,4 +168,32 @@ function hasTrustPrompt(snapshot: string) {
 async function dismissTrustPrompt(tmux: TmuxClient, sessionName: string) {
   await tmux.sendKey(sessionName, "Enter");
   await sleep(TRUST_PROMPT_SETTLE_DELAY_MS);
+}
+
+async function waitForPaneSubmitConfirmation(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  baseline: TmuxPaneState;
+}) {
+  const deadline = Date.now() + SUBMIT_CONFIRM_MAX_WAIT_MS;
+  while (true) {
+    const state = await params.tmux.getPaneState(params.sessionName);
+    if (hasPaneStateChanged(params.baseline, state)) {
+      return true;
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return false;
+    }
+    await sleep(Math.min(SUBMIT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
+  }
+}
+
+function hasPaneStateChanged(left: TmuxPaneState, right: TmuxPaneState) {
+  return (
+    left.cursorX !== right.cursorX ||
+    left.cursorY !== right.cursorY ||
+    left.historySize !== right.historySize
+  );
 }

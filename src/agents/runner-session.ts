@@ -519,6 +519,23 @@ export class RunnerSessionService {
     };
   }
 
+  async nudgeSession(target: AgentSessionTarget) {
+    const resolved = this.resolveTarget(target);
+    const existed = await this.tmux.hasSession(resolved.sessionName);
+    if (existed) {
+      await this.tmux.sendKey(resolved.sessionName, "Enter");
+      await this.sessionState.touchSessionEntry(resolved);
+    }
+
+    return {
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+      sessionName: resolved.sessionName,
+      workspacePath: resolved.workspacePath,
+      nudged: existed,
+    };
+  }
+
   private async ensureShellPane(target: AgentSessionTarget) {
     const resolved = await this.ensureSessionReady(target);
     const paneId = await ensureTmuxShellPane({
@@ -552,6 +569,7 @@ export class RunnerSessionService {
       sessionName: resolved.sessionName,
       text,
       promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
+      timingContext: undefined,
     });
     await this.sessionState.touchSessionEntry(resolved);
     return {

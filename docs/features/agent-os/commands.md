@@ -44,6 +44,7 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/whoami`: return the current platform sender and route identity for the active conversation
 - `/transcript`: return the current full conversation session transcript
 - `/stop`: send `Escape` to interrupt current processing in the current conversation session
+- `/nudge`: send one extra `Enter` to the current tmux session without resending the prompt body
 - `/followup status`
 - `/followup auto`
 - `/followup mention-only`

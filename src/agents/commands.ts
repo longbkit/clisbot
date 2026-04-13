@@ -25,6 +25,7 @@ export type AgentControlSlashCommandName =
   | "detach"
   | "watch"
   | "stop"
+  | "nudge"
   | "followup"
   | "responsemode"
   | "additionalmessagemode"
@@ -73,6 +74,10 @@ export type AgentControlSlashCommand =
   | {
       type: "control";
       name: "stop";
+    }
+  | {
+      type: "control";
+      name: "nudge";
     }
   | {
       type: "control";
@@ -248,6 +253,13 @@ export function parseAgentCommand(
     return {
       type: "control",
       name: "stop",
+    };
+  }
+
+  if (lowered === "nudge") {
+    return {
+      type: "control",
+      name: "nudge",
     };
   }
 
@@ -483,6 +495,7 @@ export function renderAgentControlSlashHelp() {
     "- `/detach`: stop live updates for this thread while still allowing final settlement here",
     "- `/watch every 30s [for 10m]`: post the latest state on an interval until the run settles or the watch window ends",
     "- `/stop`: send Escape to interrupt the current conversation session",
+    "- `/nudge`: send one extra Enter to the current tmux session without resending the prompt text",
     "- `/followup status`: show the current conversation follow-up policy",
     "- `/followup auto`: allow natural follow-up after the bot has replied in-thread",
     "- `/followup mention-only`: require explicit mention for each later turn",

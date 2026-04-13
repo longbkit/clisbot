@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
-import { waitForTmuxSessionBootstrap } from "../src/runners/tmux/session-handshake.ts";
+import {
+  submitTmuxSessionInput,
+  waitForTmuxSessionBootstrap,
+} from "../src/runners/tmux/session-handshake.ts";
 import { monitorTmuxRun } from "../src/runners/tmux/run-monitor.ts";
 
 describe("tmux runner latency behavior", () => {
@@ -40,6 +43,19 @@ describe("tmux runner latency behavior", () => {
           snapshot = "READY\nFIRST";
         }
       },
+      async getPaneState() {
+        return submitted
+          ? {
+              cursorX: 0,
+              cursorY: snapshot ? 1 : 0,
+              historySize: snapshot ? 1 : 0,
+            }
+          : {
+              cursorX: 0,
+              cursorY: 0,
+              historySize: 0,
+            };
+      },
       async capturePane() {
         return snapshot;
       },
@@ -74,5 +90,75 @@ describe("tmux runner latency behavior", () => {
     });
 
     expect(seenRunningAt).toBeLessThan(700);
+  });
+
+  test("submitTmuxSessionInput retries Enter once when pane state stays unchanged", async () => {
+    let enterCount = 0;
+    let state = {
+      cursorX: 4,
+      cursorY: 0,
+      historySize: 0,
+    };
+
+    const fakeTmux = {
+      async sendLiteral() {
+        state = {
+          cursorX: 8,
+          cursorY: 0,
+          historySize: 0,
+        };
+      },
+      async sendKey() {
+        enterCount += 1;
+        if (enterCount >= 2) {
+          state = {
+            cursorX: 0,
+            cursorY: 1,
+            historySize: 1,
+          };
+        }
+      },
+      async getPaneState() {
+        return state;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      submitTmuxSessionInput({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        text: "ping",
+        promptSubmitDelayMs: 1,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(enterCount).toBe(2);
+  });
+
+  test("submitTmuxSessionInput fails when pane state never confirms submit", async () => {
+    const fakeTmux = {
+      async sendLiteral() {
+        return;
+      },
+      async sendKey() {
+        return;
+      },
+      async getPaneState() {
+        return {
+          cursorX: 8,
+          cursorY: 0,
+          historySize: 0,
+        };
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      submitTmuxSessionInput({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        text: "ping",
+        promptSubmitDelayMs: 1,
+      }),
+    ).rejects.toThrow("tmux submit was not confirmed after Enter");
   });
 });

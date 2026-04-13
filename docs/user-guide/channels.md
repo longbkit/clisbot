@@ -13,6 +13,7 @@ Useful slash commands on routed Slack and Telegram conversations:
 - `/status`
 - `/whoami`
 - `/stop`
+- `/nudge`
 
 `clisbot` also supports session-scoped Slack and Telegram follow-up policy.
 

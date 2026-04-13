@@ -134,6 +134,11 @@ describe("parseAgentCommand", () => {
       type: "control",
       name: "queue-clear",
     });
+
+    expect(parseAgentCommand("/nudge")).toEqual({
+      type: "control",
+      name: "nudge",
+    });
   });
 
   test("parses loop slash commands for times and intervals", () => {

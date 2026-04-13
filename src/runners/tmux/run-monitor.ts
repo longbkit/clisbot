@@ -60,6 +60,7 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       sessionName: params.sessionName,
       text: params.prompt,
       promptSubmitDelayMs: params.promptSubmitDelayMs,
+      timingContext: params.timingContext,
     });
     logLatencyDebug("tmux-submit-complete", params.timingContext, {
       sessionName: params.sessionName,

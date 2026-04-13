@@ -163,6 +163,10 @@ export class AgentService {
     return this.runnerSessions.interruptSession(target);
   }
 
+  async nudgeSession(target: AgentSessionTarget) {
+    return this.runnerSessions.nudgeSession(target);
+  }
+
   async getConversationFollowUpState(target: AgentSessionTarget) {
     return this.sessionState.getConversationFollowUpState(target);
   }

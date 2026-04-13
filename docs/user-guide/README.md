@@ -237,6 +237,7 @@ Important behavior:
   - `/steer <message>` or `\s <message>`
   - `/queue-list`
   - `/queue-clear`
+  - `/nudge`
   - `/loop 5m check CI`
   - `/loop 5m`
   - `/loop 1m --force check deploy`
@@ -261,6 +262,7 @@ Important behavior:
 - managed loops use `skip-if-busy`, so a tick is dropped instead of stacking more queued work when the session is already busy
 - managed loops persist in session state and are restored after restart
 - `/stop` interrupts the current run only; use `/loop cancel` to cancel loops
+- `/nudge` sends one extra `Enter` to the current tmux session without resending the prompt body; use it only as a manual recovery tool when a session seems stuck after input delivery
 
 Timezone config examples:
 

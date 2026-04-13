@@ -1085,6 +1085,75 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toBe("Cleared 2 queued messages.");
   });
 
+  test("nudge sends one extra Enter to an existing session", async () => {
+    const posted: string[] = [];
+    let nudgedTarget = "";
+
+    await processChannelInteraction({
+      agentService: {
+        nudgeSession: async (target: AgentSessionTarget) => {
+          nudgedTarget = target.sessionKey;
+          return {
+            agentId: target.agentId,
+            sessionKey: target.sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            nudged: true,
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/nudge",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(nudgedTarget).toBe(createTarget().sessionKey);
+    expect(posted[0]).toBe("Sent one extra Enter to agent `default` session `session`.");
+  });
+
+  test("nudge reports when no session is available", async () => {
+    const posted: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        nudgeSession: async (target: AgentSessionTarget) => ({
+          agentId: target.agentId,
+          sessionKey: target.sessionKey,
+          sessionName: "session",
+          workspacePath: "/tmp/workspace",
+          nudged: false,
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/nudge",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted[0]).toBe("No active or resumable session to nudge for agent `default`.");
+  });
+
   test("loop times mode queues all iterations immediately and wraps prompts", async () => {
     const posted: string[] = [];
     const enqueued: string[] = [];

@@ -37,7 +37,7 @@ export function renderTelegramRouteChoiceMessage(params: {
   } else {
     lines.push(
       "",
-      "After that, routed commands such as `/status`, `/stop`, `/followup`, and `/bash` will work here.",
+      "After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.",
     );
   }
 

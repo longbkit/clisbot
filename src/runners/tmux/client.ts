@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { runCommand } from "../../shared/process.ts";
 
 const MAIN_WINDOW_NAME = "main";
@@ -7,6 +8,12 @@ type TmuxExecResult = {
   stdout: string;
   stderr: string;
   exitCode: number;
+};
+
+export type TmuxPaneState = {
+  cursorX: number;
+  cursorY: number;
+  historySize: number;
 };
 
 export class TmuxClient {
@@ -152,11 +159,11 @@ export class TmuxClient {
   }
 
   async sendLiteral(sessionName: string, text: string) {
-    await this.execOrThrow(["send-keys", "-t", this.target(sessionName), "-l", "--", text]);
+    await this.pasteLiteralTarget(this.target(sessionName), text);
   }
 
   async sendLiteralTarget(target: string, text: string) {
-    await this.execOrThrow(["send-keys", "-t", this.rawTarget(target), "-l", "--", text]);
+    await this.pasteLiteralTarget(this.rawTarget(target), text);
   }
 
   async sendKey(sessionName: string, key: string) {
@@ -191,6 +198,36 @@ export class TmuxClient {
     ]);
   }
 
+  async getPaneState(sessionName: string): Promise<TmuxPaneState> {
+    return this.getPaneStateTarget(this.target(sessionName));
+  }
+
+  async getPaneStateTarget(target: string): Promise<TmuxPaneState> {
+    const output = await this.execOrThrow([
+      "display-message",
+      "-p",
+      "-t",
+      this.rawTarget(target),
+      "#{cursor_x}\t#{cursor_y}\t#{history_size}",
+    ]);
+    const [cursorXRaw, cursorYRaw, historySizeRaw] = output.trim().split("\t");
+    const cursorX = Number.parseInt(cursorXRaw ?? "", 10);
+    const cursorY = Number.parseInt(cursorYRaw ?? "", 10);
+    const historySize = Number.parseInt(historySizeRaw ?? "", 10);
+    if (
+      !Number.isFinite(cursorX) ||
+      !Number.isFinite(cursorY) ||
+      !Number.isFinite(historySize)
+    ) {
+      throw new Error(`tmux pane state parse failed for ${target}: ${output.trim()}`);
+    }
+    return {
+      cursorX,
+      cursorY,
+      historySize,
+    };
+  }
+
   async killSession(sessionName: string) {
     await this.exec(["kill-session", "-t", sessionName]);
   }
@@ -201,5 +238,24 @@ export class TmuxClient {
 
   async killServer() {
     await this.exec(["kill-server"]);
+  }
+
+  private async pasteLiteralTarget(target: string, text: string) {
+    const bufferName = `clisbot-submit-${randomUUID()}`;
+    await this.execOrThrow([
+      "set-buffer",
+      "-b",
+      bufferName,
+      "--",
+      text,
+      ";",
+      "paste-buffer",
+      "-b",
+      bufferName,
+      "-d",
+      "-p",
+      "-t",
+      this.rawTarget(target),
+    ]);
   }
 }
