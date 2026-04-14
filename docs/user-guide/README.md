@@ -12,6 +12,7 @@ This folder should explain:
 - where channel-specific operating notes live
 - how config reload works in practice
 - how stale tmux cleanup and sensitive commands work in practice
+- how app ownership, roles, and privileged actions are expected to work for operators
 
 Related pages:
 
@@ -20,6 +21,7 @@ Related pages:
 - [Telegram Bot Setup](telegram-setup.md)
 - [Slack App Setup](slack-setup.md)
 - [Agent Progress Replies](agent-progress-replies.md)
+- [Authorization And Roles](auth-and-roles.md)
 
 If setup is unclear, clone this repo, open it in Codex or Claude Code, and ask it to help set up `clisbot`. The docs here are kept current enough for guided setup and troubleshooting.
 

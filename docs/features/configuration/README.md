@@ -16,6 +16,8 @@ It also defines whether sensitive chat-surface commands such as transcript inspe
 
 It also defines first-run startup bootstrap behavior for default channel accounts and the first default agent.
 
+It also defines app-level ownership claim and app-or-agent authorization policy for operator and routed actions.
+
 ## State
 
 Active
@@ -94,6 +96,7 @@ Current policy meaning:
 ## Supporting Docs
 
 - [Start Bootstrap And Credential Persistence](start-bootstrap-and-credential-persistence.md)
+- [App And Agent Authorization And Owner Claim](app-and-agent-authorization-and-owner-claim.md)
 
 ## Dependencies
 
@@ -104,7 +107,7 @@ Current policy meaning:
 
 ## Current Focus
 
-Keep the current local JSON model, but expand it so the system can truthfully express routes, policies, runner choice, default chat rendering, and explicit transcript request commands.
+Keep the current local JSON model, but expand it so the system can truthfully express routes, policies, runner choice, default chat rendering, explicit transcript request commands, and the new app-or-agent authorization model.
 
 Current Slack defaults should favor visibility:
 
@@ -174,6 +177,13 @@ Current Slack route defaults should stay explicit:
 - `commandPrefixes.bash: ["!"]`
 - channel and group routes default to `requireMention: true` unless a route overrides it
 - Telegram groups and topics added through the CLI also default to `requireMention: true`
+
+Planned auth-model transition:
+
+- the current runtime still uses `privilegeCommands.enabled` plus `privilegeCommands.allowUsers`
+- the planned app-or-agent auth slice will migrate that route-local shape to `privilegeCommands.mode` plus `privilegeCommands.users`
+- the planned slice should reject the legacy keys with a clear rewrite error instead of keeping a compatibility layer
+- until that slice lands, this README section describes current behavior and the auth feature doc describes the target behavior
 
 Current sensitive-command rule should stay explicit:
 

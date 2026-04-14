@@ -32,7 +32,7 @@ Execution detail belongs in `docs/tasks/`.
 | Active | core | agents | [agents](agents/README.md) | [agents tasks](../tasks/features/agents) | 2026-04-04 | The agents layer owns agents, sessions, workspaces, memory, tools, skills, queueing, and subagents without depending on tmux-specific mechanics. |
 | Active | core | runners | [runners](runners/README.md) | [runner tasks](../tasks/features/runners) | 2026-04-08 | Runners now need to keep monitoring long-running sessions after request-level detachment so channels can re-attach and still receive final settlement. |
 | Planned | ops | control | [control](control/README.md) | [control tasks](../tasks/features/control) | 2026-04-04 | Operator inspect, attach, restart, stop, and health flows belong to control rather than user-facing channels. |
-| Active | platform | configuration | [configuration](configuration/README.md) | [configuration tasks](../tasks/features/configuration) | 2026-04-14 | Configuration remains the local control plane for channels, agents, runners, and policy, with current follow-up focused on startup credential guidance and restart UX. |
+| Active | platform | configuration | [configuration](configuration/README.md) | [configuration tasks](../tasks/features/configuration) | 2026-04-14 | Configuration remains the local control plane for channels, agents, runners, and policy, with current follow-up focused on app or agent authorization, owner claim, and explicit route privilege semantics. |
 
 ## Non-Functional Areas
 
