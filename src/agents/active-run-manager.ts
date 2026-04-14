@@ -578,7 +578,11 @@ export class ActiveRunManager {
       } catch (error) {
         await this.failActiveRun(
           sessionKey,
-          this.runnerSessions.mapRunError(error, run.resolved.sessionName),
+          await this.runnerSessions.mapRunError(
+            error,
+            run.resolved.sessionName,
+            run.latestUpdate.fullSnapshot,
+          ),
         );
       }
     })();

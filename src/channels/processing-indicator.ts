@@ -2,6 +2,27 @@ import type { AgentService, AgentSessionTarget } from "../agents/agent-service.t
 import { isTerminalRunStatus, type RunUpdate } from "../agents/run-observation.ts";
 
 export type ProcessingIndicatorLifecycle = "handler" | "active-run";
+type IndicatorCleanup = (() => Promise<void> | void) | void;
+
+type ProcessingIndicatorEntry = {
+  activeRunHold: boolean;
+  activeRunWait?: Promise<void>;
+  cleanup?: () => Promise<void> | void;
+  indicatorActive: boolean;
+  key: string;
+  operationChain: Promise<void>;
+  refCount: number;
+};
+
+export type ProcessingIndicatorLease = {
+  setLifecycle: (params: {
+    agentService: Pick<AgentService, "observeRun" | "detachRunObserver" | "hasActiveRun">;
+    sessionTarget: AgentSessionTarget;
+    observerId: string;
+    lifecycle: ProcessingIndicatorLifecycle;
+  }) => Promise<void>;
+  release: () => Promise<void>;
+};
 
 function shouldResolveIndicatorWait(update: RunUpdate) {
   return isTerminalRunStatus(update.status) || update.status === "detached";
@@ -66,5 +87,109 @@ export async function waitForProcessingIndicatorLifecycle(params: {
       params.sessionTarget,
       params.observerId,
     ).catch(() => undefined);
+  }
+}
+
+export class ConversationProcessingIndicatorCoordinator {
+  private readonly entries = new Map<string, ProcessingIndicatorEntry>();
+
+  async acquire(params: {
+    key: string;
+    activate: () => Promise<IndicatorCleanup> | IndicatorCleanup;
+    onError?: (phase: "activate" | "deactivate" | "active-run", error: unknown) => void;
+  }): Promise<ProcessingIndicatorLease> {
+    let entry = this.entries.get(params.key);
+    if (!entry) {
+      entry = {
+        activeRunHold: false,
+        indicatorActive: false,
+        key: params.key,
+        operationChain: Promise.resolve(),
+        refCount: 0,
+      };
+      this.entries.set(params.key, entry);
+    }
+
+    entry.refCount += 1;
+    await this.ensureIndicatorActive(entry, params.activate, params.onError);
+
+    let released = false;
+    return {
+      setLifecycle: async (lifecycleParams) => {
+        if (released || lifecycleParams.lifecycle !== "active-run" || entry.activeRunHold) {
+          return;
+        }
+
+        entry.activeRunHold = true;
+        entry.activeRunWait = waitForProcessingIndicatorLifecycle(lifecycleParams)
+          .catch((error) => {
+            params.onError?.("active-run", error);
+          })
+          .finally(() => {
+            entry.activeRunHold = false;
+            entry.activeRunWait = undefined;
+            void this.maybeDeactivate(entry, params.onError);
+          });
+      },
+      release: async () => {
+        if (released) {
+          return;
+        }
+        released = true;
+        entry.refCount = Math.max(0, entry.refCount - 1);
+        await this.maybeDeactivate(entry, params.onError);
+      },
+    };
+  }
+
+  private async ensureIndicatorActive(
+    entry: ProcessingIndicatorEntry,
+    activate: () => Promise<IndicatorCleanup> | IndicatorCleanup,
+    onError?: (phase: "activate" | "deactivate" | "active-run", error: unknown) => void,
+  ) {
+    entry.operationChain = entry.operationChain.then(async () => {
+      if (entry.indicatorActive) {
+        return;
+      }
+
+      try {
+        const cleanup = await activate();
+        entry.cleanup = typeof cleanup === "function" ? cleanup : undefined;
+        entry.indicatorActive = true;
+      } catch (error) {
+        onError?.("activate", error);
+      }
+    });
+
+    await entry.operationChain;
+  }
+
+  private async maybeDeactivate(
+    entry: ProcessingIndicatorEntry,
+    onError?: (phase: "activate" | "deactivate" | "active-run", error: unknown) => void,
+  ) {
+    if (entry.refCount > 0 || entry.activeRunHold) {
+      return;
+    }
+
+    entry.operationChain = entry.operationChain.then(async () => {
+      if (entry.refCount > 0 || entry.activeRunHold || !entry.indicatorActive) {
+        return;
+      }
+
+      try {
+        await entry.cleanup?.();
+      } catch (error) {
+        onError?.("deactivate", error);
+      } finally {
+        entry.cleanup = undefined;
+        entry.indicatorActive = false;
+        if (entry.refCount === 0 && !entry.activeRunHold) {
+          this.entries.delete(entry.key);
+        }
+      }
+    });
+
+    await entry.operationChain;
   }
 }

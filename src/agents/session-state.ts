@@ -10,6 +10,7 @@ export type ActiveSessionRuntimeInfo = SessionRuntimeInfo & {
 };
 
 export type ConversationReplyKind = "reply" | "progress" | "final";
+export type ConversationReplySource = "channel" | "message-tool";
 
 type SessionEntryUpdate = (existing: {
   sessionId?: string;
@@ -96,6 +97,8 @@ export class AgentSessionState {
       startedAt: entry?.runtime?.startedAt,
       detachedAt: entry?.runtime?.detachedAt,
       finalReplyAt: entry?.runtime?.finalReplyAt,
+      lastMessageToolReplyAt: entry?.runtime?.lastMessageToolReplyAt,
+      messageToolFinalReplyAt: entry?.runtime?.messageToolFinalReplyAt,
       sessionKey: target.sessionKey,
       agentId: target.agentId,
     };
@@ -110,6 +113,8 @@ export class AgentSessionState {
         startedAt: entry.runtime.startedAt,
         detachedAt: entry.runtime.detachedAt,
         finalReplyAt: entry.runtime.finalReplyAt,
+        lastMessageToolReplyAt: entry.runtime.lastMessageToolReplyAt,
+        messageToolFinalReplyAt: entry.runtime.messageToolFinalReplyAt,
         sessionKey: entry.sessionKey,
         agentId: entry.agentId,
       }));
@@ -285,6 +290,7 @@ export class AgentSessionState {
   async recordConversationReply(
     resolved: ResolvedAgentTarget,
     kind: ConversationReplyKind = "reply",
+    source: ConversationReplySource = "channel",
   ) {
     const repliedAt = Date.now();
     return this.upsertSessionEntry(resolved, (existing) => ({
@@ -295,10 +301,24 @@ export class AgentSessionState {
       },
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime:
-        kind === "final" && existing?.runtime && existing.runtime.state !== "idle"
+        existing?.runtime && existing.runtime.state !== "idle"
           ? {
               ...existing.runtime,
-              finalReplyAt: repliedAt,
+              ...(kind === "final"
+                ? {
+                    finalReplyAt: repliedAt,
+                  }
+                : {}),
+              ...(source === "message-tool"
+                ? {
+                    lastMessageToolReplyAt: repliedAt,
+                    ...(kind === "final"
+                      ? {
+                          messageToolFinalReplyAt: repliedAt,
+                        }
+                      : {}),
+                  }
+                : {}),
             }
           : existing?.runtime,
       intervalLoops: existing?.intervalLoops,

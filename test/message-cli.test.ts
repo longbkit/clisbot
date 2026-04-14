@@ -11,7 +11,12 @@ import type { LoadedConfig } from "../src/config/load-config.ts";
 function createDependencies() {
   const logs: string[] = [];
   const calls: Array<{ provider: string; action: string; params: unknown }> = [];
-  const replyTargets: Array<{ loadedConfig: LoadedConfig; target: unknown; kind?: string }> = [];
+  const replyTargets: Array<{
+    loadedConfig: LoadedConfig;
+    target: unknown;
+    kind?: string;
+    source?: string;
+  }> = [];
   const loadedConfig: LoadedConfig = {
     configPath: "/tmp/clisbot.json",
     processedEventsPath: "/tmp/processed-events.json",
@@ -354,6 +359,7 @@ function createDependencies() {
       loadedConfig: LoadedConfig;
       target: unknown;
       kind?: string;
+      source?: string;
     }) => {
       replyTargets.push(params);
     },
@@ -503,6 +509,25 @@ describe("message cli", () => {
 
     expect(replyTargets).toHaveLength(1);
     expect(replyTargets[0]?.kind).toBe("final");
+  });
+
+  test("marks routed message sends as message-tool replies", async () => {
+    const { deps, replyTargets } = createDependencies();
+
+    await runMessageCli([
+      "send",
+      "--channel",
+      "telegram",
+      "--target",
+      "-1001234567890",
+      "--message",
+      "working on it",
+      "--progress",
+    ], deps);
+
+    expect(replyTargets).toHaveLength(1);
+    expect(replyTargets[0]?.kind).toBe("progress");
+    expect(replyTargets[0]?.source).toBe("message-tool");
   });
 
   test("rejects conflicting progress and final flags", async () => {

@@ -18,9 +18,13 @@ import {
   runTmuxShellCommand,
 } from "../runners/tmux/shell-command.ts";
 import {
+  buildRunnerLaunchCommand,
+  clearRunnerExitRecord,
   ensureClisbotWrapper,
+  ensureRunnerExitRecordDir,
   getClisbotWrapperDir,
   getClisbotWrapperPath,
+  readRunnerExitRecord,
 } from "../control/clisbot-wrapper.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../control/latency-debug.ts";
 
@@ -42,27 +46,6 @@ type SessionErrorAction =
   | "during startup"
   | "before prompt submission"
   | "while the prompt was running";
-
-function shellQuote(value: string) {
-  if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) {
-    return value;
-  }
-  return `'${value.replaceAll("'", `'\"'\"'`)}'`;
-}
-
-function buildCommandString(command: string, args: string[]) {
-  return [command, ...args].map(shellQuote).join(" ");
-}
-
-function buildRunnerLaunchCommand(command: string, args: string[]) {
-  const wrapperDir = getClisbotWrapperDir();
-  const wrapperPath = getClisbotWrapperPath();
-  const exports = [
-    `export PATH=${shellQuote(wrapperDir)}:"$PATH"`,
-    `export CLISBOT_BIN=${shellQuote(wrapperPath)}`,
-  ];
-  return `${exports.join("; ")}; exec ${buildCommandString(command, args)}`;
-}
 
 function summarizeSnapshot(snapshot: string) {
   const compact = snapshot
@@ -93,12 +76,22 @@ export class RunnerSessionService {
     private readonly resolveTarget: (target: AgentSessionTarget) => ResolvedAgentTarget,
   ) {}
 
-  private mapSessionError(
+  private async mapSessionError(
     error: unknown,
     sessionName: string,
     action: SessionErrorAction,
+    lastSnapshot = "",
   ) {
     if (isMissingTmuxSessionError(error)) {
+      const exitRecord = await readRunnerExitRecord(this.loadedConfig.stateDir, sessionName);
+      console.error("runner session disappeared", {
+        sessionName,
+        action,
+        exitCode: exitRecord?.exitCode,
+        exitedAt: exitRecord?.exitedAt,
+        runnerCommand: exitRecord?.command,
+        lastVisiblePane: lastSnapshot ? summarizeSnapshot(lastSnapshot).trim() : undefined,
+      });
       return new Error(`Runner session "${sessionName}" disappeared ${action}.`);
     }
 
@@ -254,6 +247,7 @@ export class RunnerSessionService {
     logLatencyDebug("ensure-session-ready-start", timingContext);
     await ensureDir(resolved.workspacePath);
     await ensureDir(dirname(this.loadedConfig.raw.tmux.socketPath));
+    await ensureRunnerExitRecordDir(this.loadedConfig.stateDir, resolved.sessionName);
     const existing = await this.sessionState.getEntry(resolved.sessionKey);
     const serverRunning = await this.tmux.isServerRunning();
 
@@ -262,9 +256,10 @@ export class RunnerSessionService {
         hasStoredSessionId: Boolean(existing?.sessionId),
       });
       try {
+        await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
         await this.syncSessionIdentity(resolved);
       } catch (error) {
-        throw this.mapSessionError(error, resolved.sessionName, "during startup");
+        throw await this.mapSessionError(error, resolved.sessionName, "during startup");
       }
       logLatencyDebug("ensure-session-ready-complete", timingContext, {
         startupDelayMs: 0,
@@ -284,7 +279,15 @@ export class RunnerSessionService {
       sessionId: startupSessionId || undefined,
       resume: resumingExistingSession,
     });
-    const command = buildRunnerLaunchCommand(runnerLaunch.command, runnerLaunch.args);
+    await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
+    const command = buildRunnerLaunchCommand({
+      command: runnerLaunch.command,
+      args: runnerLaunch.args,
+      wrapperDir: getClisbotWrapperDir(),
+      wrapperPath: getClisbotWrapperPath(),
+      sessionName: resolved.sessionName,
+      stateDir: this.loadedConfig.stateDir,
+    });
 
     try {
       await this.tmux.newSession({
@@ -351,7 +354,7 @@ export class RunnerSessionService {
         allowFreshRetry: options.allowFreshRetry,
       });
     } catch (error) {
-      throw this.mapSessionError(error, resolved.sessionName, "during startup");
+      throw await this.mapSessionError(error, resolved.sessionName, "during startup");
     }
 
     logLatencyDebug("ensure-session-ready-complete", timingContext, {
@@ -473,7 +476,12 @@ export class RunnerSessionService {
         !existing?.sessionId ||
         !isMissingTmuxSessionError(error)
       ) {
-        throw this.mapSessionError(error, resolved.sessionName, "before prompt submission");
+        throw await this.mapSessionError(
+          error,
+          resolved.sessionName,
+          "before prompt submission",
+          resolved.sessionName ? await this.captureSessionSnapshot(resolved).catch(() => "") : "",
+        );
       }
 
       const retried = await this.retryFreshStartWithClearedSessionId(target, resolved, {
@@ -481,7 +489,12 @@ export class RunnerSessionService {
         nextAllowFreshRetry: false,
       });
       if (!retried) {
-        throw this.mapSessionError(error, resolved.sessionName, "before prompt submission");
+        throw await this.mapSessionError(
+          error,
+          resolved.sessionName,
+          "before prompt submission",
+          resolved.sessionName ? await this.captureSessionSnapshot(resolved).catch(() => "") : "",
+        );
       }
 
       resolved = retried;
@@ -618,7 +631,12 @@ export class RunnerSessionService {
     };
   }
 
-  mapRunError(error: unknown, sessionName: string) {
-    return this.mapSessionError(error, sessionName, "while the prompt was running");
+  async mapRunError(error: unknown, sessionName: string, lastSnapshot = "") {
+    return await this.mapSessionError(
+      error,
+      sessionName,
+      "while the prompt was running",
+      lastSnapshot,
+    );
   }
 }

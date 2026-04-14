@@ -472,6 +472,119 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("config.responseMode: `message-tool`");
   });
 
+  test("shows persisted streaming mode for the current route", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "clisbot-interaction-config-"));
+    const configPath = join(configDir, "clisbot.json");
+    const template = JSON.parse(renderDefaultConfigTemplate());
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...template,
+          channels: {
+            ...template.channels,
+            slack: {
+              ...template.channels.slack,
+              channels: {
+                C123: {
+                  requireMention: true,
+                  streaming: "all",
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.CLISBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTarget(),
+        identity: createIdentity(),
+        senderId: "U123",
+        text: "/streaming status",
+        route: createRoute({
+          streaming: "latest",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+    } finally {
+      process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("clisbot streaming mode: `latest`");
+    expect(posted[0]).toContain("config.target: `slack channel C123`");
+    expect(posted[0]).not.toContain("activeRoute.streaming:");
+    expect(posted[0]).not.toContain("config.streaming:");
+  });
+
+  test("updates persisted streaming mode for the current route", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "clisbot-interaction-config-"));
+    const configPath = join(configDir, "clisbot.json");
+    const template = JSON.parse(renderDefaultConfigTemplate());
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...template,
+          channels: {
+            ...template.channels,
+            slack: {
+              ...template.channels.slack,
+              channels: {
+                C123: {
+                  requireMention: true,
+                  streaming: "off",
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.CLISBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: createTarget(),
+        identity: createIdentity(),
+        senderId: "U123",
+        text: "/streaming on",
+        route: createRoute({
+          streaming: "off",
+        }),
+        maxChars: 4000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+    } finally {
+      process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("Updated streaming mode");
+    expect(posted[0]).toContain("config.streaming: `all`");
+    expect(posted[0]).toContain("persists as `all`");
+  });
+
   test("updates persisted response mode for the current route", async () => {
     const posted: string[] = [];
     const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -771,7 +884,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(observedPrompt).toContain("<user>");
   });
 
-  test("suppresses normal channel delivery when message-tool mode is enabled", async () => {
+  test("does not post a pane final settlement when message-tool mode has streaming off and no tool final arrives", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -799,6 +912,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentPromptText: "<system>\nuse wrapper\n</system>\n\n<user>\ninvestigate this\n</user>",
       route: createRoute({
         responseMode: "message-tool",
+        streaming: "off",
       }),
       maxChars: 4000,
       postText: async (text) => {
@@ -811,12 +925,268 @@ describe("processChannelInteraction agent prompt text", () => {
       },
     });
 
-    expect(posted).toEqual([]);
+    expect(posted).toHaveLength(0);
     expect(reconciled).toEqual([]);
+  });
+
+  test("streams one live preview and leaves it unchanged when no tool final arrives", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "working draft",
+              fullSnapshot: "working draft",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "final pane output",
+              fullSnapshot: "final pane output",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Working");
+    expect(reconciled).toContain("working draft");
+    expect(reconciled.at(-1)).toContain("working draft");
+  });
+
+  test("rotates the live draft after a message-tool reply boundary", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft one",
+              fullSnapshot: "draft one",
+              initialSnapshot: "",
+            });
+            runtime.lastMessageToolReplyAt = Date.now();
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft two",
+              fullSnapshot: "draft two",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "final pane output",
+              fullSnapshot: "final pane output",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(2);
+    expect(posted[1]).toContain("draft two");
+    expect(reconciled).toContain("draft one");
+    expect(posted.join("\n")).not.toContain("final pane output");
+    expect(reconciled.join("\n")).not.toContain("final pane output");
+  });
+
+  test("cleans up the live draft after a message-tool final reply when response is final", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft before final",
+              fullSnapshot: "draft before final",
+              initialSnapshot: "",
+            });
+            runtime.lastMessageToolReplyAt = Date.now();
+            runtime.messageToolFinalReplyAt = runtime.lastMessageToolReplyAt;
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "final pane output",
+              fullSnapshot: "final pane output",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+        response: "final",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(reconciled).toContain("draft before final");
+    expect(reconciled.at(-1)).toBe("");
+  });
+
+  test("does not post fallback settlement when a delayed message-tool final arrives with streaming off", async () => {
+    const posted: string[] = [];
+    let runtimeReads = 0;
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "completed",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "final pane output",
+            fullSnapshot: "final pane output",
+            initialSnapshot: "",
+          }),
+        }),
+        getSessionRuntime: async () => {
+          runtimeReads += 1;
+          return {
+            state: "running" as const,
+            startedAt: Date.now(),
+            messageToolFinalReplyAt: runtimeReads >= 2 ? Date.now() : undefined,
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "off",
+        response: "final",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(posted).toHaveLength(0);
   });
 
   test("still posts a fallback error when message-tool mode fails before the agent can reply", async () => {
     const posted: string[] = [];
+    const reconciled: string[] = [];
 
     await processChannelInteraction({
       agentService: {
@@ -839,11 +1209,15 @@ describe("processChannelInteraction agent prompt text", () => {
         posted.push(text);
         return [text];
       },
-      reconcileText: async (_chunks, text) => [text],
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
     });
 
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain("runner crashed");
+    expect(posted[0]).toContain("Working");
+    expect(reconciled.at(-1)).toContain("runner crashed");
   });
 
   test("steers additional user messages into the active run by default", async () => {
@@ -982,8 +1356,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(posted.at(-1)).toContain("queued mode final");
-    expect(reconciled).toEqual([]);
+    expect(reconciled.at(-1)).toContain("queued mode final");
   });
 
   test("explicit steer command injects a steering message into the active run", async () => {
@@ -1068,7 +1441,7 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(observedPrompt).toBe("1+1");
     expect(posted).not.toContain("Steered.");
-    expect(posted).toEqual([]);
+    expect(posted[0]).toContain("Working");
   });
 
   test("queue list shows pending queued messages for the current session", async () => {

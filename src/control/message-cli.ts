@@ -12,20 +12,21 @@ type MessageCliDependencies = {
   loadConfig: (configPath?: string) => Promise<LoadedConfig>;
   plugins: ChannelPlugin[];
   print: (text: string) => void;
-  recordConversationReply: (params: {
-    loadedConfig: LoadedConfig;
-    target: AgentSessionTarget;
-    kind?: "reply" | "progress" | "final";
-  }) => Promise<void>;
+    recordConversationReply: (params: {
+      loadedConfig: LoadedConfig;
+      target: AgentSessionTarget;
+      kind?: "reply" | "progress" | "final";
+      source?: "channel" | "message-tool";
+    }) => Promise<void>;
 };
 
 const defaultMessageCliDependencies: MessageCliDependencies = {
   loadConfig,
   plugins: listChannelPlugins(),
   print: (text) => console.log(text),
-  recordConversationReply: async ({ loadedConfig, target, kind }) => {
+  recordConversationReply: async ({ loadedConfig, target, kind, source }) => {
     const agentService = new AgentService(loadedConfig);
-    await agentService.recordConversationReply(target, kind);
+    await agentService.recordConversationReply(target, kind, source);
   },
 };
 
@@ -170,6 +171,7 @@ export async function runMessageCli(
       loadedConfig,
       target: replyTarget,
       kind: resolveReplyKind(command),
+      source: "message-tool",
     });
   }
 

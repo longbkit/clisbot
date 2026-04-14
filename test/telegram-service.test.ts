@@ -231,6 +231,7 @@ describe("buildTelegramCommandRegistrations", () => {
       "stop",
       "nudge",
       "followup",
+      "streaming",
       "responsemode",
       "queue",
       "steer",

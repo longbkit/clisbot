@@ -4,8 +4,9 @@ import { renderTelegramRouteChoiceMessage } from "./telegram/route-guidance.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
 export type AdditionalMessageMode = "queue" | "steer";
+export type StreamingMode = "off" | "latest" | "all";
 export type SurfaceModeChannel = "slack" | "telegram";
-export type SurfaceModeField = "responseMode" | "additionalMessageMode";
+export type SurfaceModeField = "responseMode" | "additionalMessageMode" | "streaming";
 
 export type ConfiguredSurfaceModeTarget = {
   channel: SurfaceModeChannel;
@@ -16,7 +17,12 @@ export type ConfiguredSurfaceModeTarget = {
 type SurfaceModeValueMap = {
   responseMode: ResponseMode;
   additionalMessageMode: AdditionalMessageMode;
+  streaming: StreamingMode;
 };
+
+type SurfaceModeSource = Partial<{
+  [K in SurfaceModeField]: SurfaceModeValueMap[K];
+}>;
 
 type SurfaceModeTargetBinding<TField extends SurfaceModeField> = {
   get: () => SurfaceModeValueMap[TField] | undefined;
@@ -25,14 +31,14 @@ type SurfaceModeTargetBinding<TField extends SurfaceModeField> = {
 };
 
 function getModeValue<TField extends SurfaceModeField>(
-  source: Partial<Record<SurfaceModeField, ResponseMode | AdditionalMessageMode>>,
+  source: SurfaceModeSource,
   field: TField,
 ) {
   return source[field] as SurfaceModeValueMap[TField] | undefined;
 }
 
 function setModeValue<TField extends SurfaceModeField>(
-  source: Partial<Record<SurfaceModeField, ResponseMode | AdditionalMessageMode>>,
+  source: SurfaceModeSource,
   field: TField,
   value: SurfaceModeValueMap[TField],
 ) {
@@ -217,5 +223,11 @@ export function buildConfiguredTargetFromIdentity(identity: ChannelInteractionId
 }
 
 function renderFieldLabel(field: SurfaceModeField) {
-  return field === "responseMode" ? "response-mode" : "additional-message-mode";
+  if (field === "responseMode") {
+    return "response-mode";
+  }
+  if (field === "additionalMessageMode") {
+    return "additional-message-mode";
+  }
+  return "streaming";
 }

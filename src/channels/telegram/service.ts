@@ -47,9 +47,9 @@ import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
-import { runWithTelegramTypingHeartbeat } from "./typing.ts";
+import { beginTelegramTypingHeartbeat } from "./typing.ts";
 import { buildTokenHint } from "../runtime-identity.ts";
-import { waitForProcessingIndicatorLifecycle } from "../processing-indicator.ts";
+import { ConversationProcessingIndicatorCoordinator } from "../processing-indicator.ts";
 
 type TelegramGetMeResult = {
   id: number;
@@ -96,6 +96,7 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
   { command: "stop", description: "Interrupt current run" },
   { command: "nudge", description: "Send one extra Enter to the session" },
   { command: "followup", description: "Show or change follow-up mode" },
+  { command: "streaming", description: "Show or change streaming mode" },
   { command: "responsemode", description: "Show or change response mode" },
   { command: "queue", description: "Queue a later message behind the active run" },
   { command: "steer", description: "Steer the active run immediately" },
@@ -206,6 +207,7 @@ export class TelegramPollingService {
   private loopPromise?: Promise<void>;
   private activePollController?: AbortController;
   private readonly inFlightUpdates = new Set<Promise<void>>();
+  private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
 
   constructor(
     private readonly loadedConfig: LoadedConfig,
@@ -528,61 +530,70 @@ export class TelegramPollingService {
         responseMode: routeInfo.route.responseMode,
         accountId: this.accountId,
       });
-      await runWithTelegramTypingHeartbeat({
-        sendTyping: () => this.sendTyping(message.chat.id, routeInfo.topicId),
-        onError: (error) => {
-          console.error("telegram typing failed", error);
-        },
-        run: async () => {
-          const interaction = await processChannelInteraction({
-            agentService: this.agentService,
-            sessionTarget: routeInfo.sessionTarget,
-            identity,
-            senderId:
-              message.from?.id != null ? String(message.from.id).trim() : undefined,
-            text,
-            agentPromptText,
-            agentPromptBuilder: (nextText) =>
-              buildAgentPromptText({
-                text: nextText,
-                identity,
-                config: this.loadedConfig.raw.channels.telegram.agentPrompt,
-                cliTool,
-                responseMode: routeInfo.route.responseMode,
-              }),
-            route: routeInfo.route,
-            maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
-            timingContext,
-            postText: async (nextText) => {
-              responseChunks = await postTelegramText({
-                token: this.accountConfig.botToken,
-                chatId: message.chat.id,
-                text: nextText,
-                topicId: routeInfo.topicId,
-                omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
-              });
-              return responseChunks;
+      const processingLease = await this.processingIndicators.acquire({
+        key: `telegram:${this.accountId}:${message.chat.id}:${routeInfo.topicId ?? "root"}`,
+        activate: async () =>
+          beginTelegramTypingHeartbeat({
+            sendTyping: () => this.sendTyping(message.chat.id, routeInfo.topicId),
+            onError: (error) => {
+              console.error("telegram typing failed", error);
             },
-            reconcileText: async (chunks, nextText) => {
-              responseChunks = await reconcileTelegramText({
-                token: this.accountConfig.botToken,
-                chatId: message.chat.id,
-                chunks,
-                text: nextText,
-                topicId: routeInfo.topicId,
-                omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
-              });
-              return responseChunks;
-            },
-          });
-          await waitForProcessingIndicatorLifecycle({
-            agentService: this.agentService,
-            sessionTarget: routeInfo.sessionTarget,
-            observerId: `telegram-processing:${eventId}`,
-            lifecycle: interaction.processingIndicatorLifecycle,
-          });
+          }),
+        onError: (_phase, error) => {
+          console.error("telegram processing indicator failed", error);
         },
       });
+      try {
+        const interaction = await processChannelInteraction({
+          agentService: this.agentService,
+          sessionTarget: routeInfo.sessionTarget,
+          identity,
+          senderId:
+            message.from?.id != null ? String(message.from.id).trim() : undefined,
+          text,
+          agentPromptText,
+          agentPromptBuilder: (nextText) =>
+            buildAgentPromptText({
+              text: nextText,
+              identity,
+              config: this.loadedConfig.raw.channels.telegram.agentPrompt,
+              cliTool,
+              responseMode: routeInfo.route.responseMode,
+            }),
+          route: routeInfo.route,
+          maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
+          timingContext,
+          postText: async (nextText) => {
+            responseChunks = await postTelegramText({
+              token: this.accountConfig.botToken,
+              chatId: message.chat.id,
+              text: nextText,
+              topicId: routeInfo.topicId,
+              omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+            });
+            return responseChunks;
+          },
+          reconcileText: async (chunks, nextText) => {
+            responseChunks = await reconcileTelegramText({
+              token: this.accountConfig.botToken,
+              chatId: message.chat.id,
+              chunks,
+              text: nextText,
+              topicId: routeInfo.topicId,
+              omitThreadId: shouldOmitTelegramThreadId(routeInfo.topicId),
+            });
+            return responseChunks;
+          },
+        });
+        await processingLease.setLifecycle({
+          agentService: this.agentService,
+          sessionTarget: routeInfo.sessionTarget,
+          observerId: `telegram-processing:${message.chat.id}:${routeInfo.topicId ?? "root"}`,
+          lifecycle: interaction.processingIndicatorLifecycle,
+        });
+      } finally {
+        await processingLease.release();
+      }
       await this.processedEventsStore.markCompleted(eventId);
     } catch (error) {
       console.error("telegram handler error", error);

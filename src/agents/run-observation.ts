@@ -7,6 +7,8 @@ export type StoredSessionRuntime = {
   startedAt?: number;
   detachedAt?: number;
   finalReplyAt?: number;
+  lastMessageToolReplyAt?: number;
+  messageToolFinalReplyAt?: number;
 };
 
 export type PromptExecutionStatus =

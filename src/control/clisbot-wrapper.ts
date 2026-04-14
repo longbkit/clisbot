@@ -73,3 +73,10 @@ export async function ensureClisbotWrapper() {
   await chmod(wrapperPath, 0o755);
   return wrapperPath;
 }
+
+export {
+  buildRunnerLaunchCommand,
+  clearRunnerExitRecord,
+  ensureRunnerExitRecordDir,
+  readRunnerExitRecord,
+} from "./runner-exit-diagnostics.ts";

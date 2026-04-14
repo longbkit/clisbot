@@ -28,7 +28,8 @@ import {
   clearSlackAssistantThreadStatus,
   setSlackAssistantThreadStatus,
 } from "./assistant-status.ts";
-import { waitForProcessingIndicatorLifecycle } from "../processing-indicator.ts";
+import { ConversationProcessingIndicatorCoordinator } from "../processing-indicator.ts";
+import { activateSlackProcessingDecoration } from "./processing-decoration.ts";
 import { App } from "./bolt-compat.ts";
 import {
   canUseImplicitSlackFollowUp,
@@ -79,6 +80,7 @@ function waitForBackgroundSlackTask(task: Promise<unknown>) {
 
 export class SlackSocketService {
   private readonly app: SlackAppType;
+  private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
   private botUserId = "";
   private botLabel = "";
   private teamId = "";
@@ -435,23 +437,44 @@ export class SlackSocketService {
         reactionTarget,
       ),
     );
-    const processingDecorationTask = waitForBackgroundSlackTask(
-      Promise.all([
-        addConfiguredReaction(
-          this.app.client,
-          this.loadedConfig.raw.channels.slack.typingReaction,
-          reactionTarget,
-        ),
-        setSlackAssistantThreadStatus(
-          this.app.client,
-          this.loadedConfig.raw.channels.slack.processingStatus,
-          {
-            channel: channelId,
-            threadTs,
+    const processingLease = await this.processingIndicators.acquire({
+      key: `slack:${this.accountId}:${channelId}:${threadTs}`,
+      activate: async () =>
+        activateSlackProcessingDecoration({
+          addReaction: () =>
+            addConfiguredReaction(
+              this.app.client,
+              this.loadedConfig.raw.channels.slack.typingReaction,
+              reactionTarget,
+            ),
+          removeReaction: () =>
+            removeConfiguredReaction(
+              this.app.client,
+              this.loadedConfig.raw.channels.slack.typingReaction,
+              reactionTarget,
+            ),
+          setStatus: () =>
+            setSlackAssistantThreadStatus(
+              this.app.client,
+              this.loadedConfig.raw.channels.slack.processingStatus,
+              {
+                channel: channelId,
+                threadTs,
+              },
+            ),
+          clearStatus: () =>
+            clearSlackAssistantThreadStatus(this.app.client, {
+              channel: channelId,
+              threadTs,
+            }),
+          onUnexpectedError: (phase, error) => {
+            console.error(`slack processing indicator ${phase} failed`, error);
           },
-        ),
-      ]),
-    );
+        }),
+      onError: (phase, error) => {
+        console.error(`slack processing indicator ${phase} failed`, error);
+      },
+    });
     try {
       const interaction = await processChannelInteraction({
         agentService: this.agentService,
@@ -504,10 +527,10 @@ export class SlackSocketService {
           return responseChunks;
         },
       });
-      await waitForProcessingIndicatorLifecycle({
+      await processingLease.setLifecycle({
         agentService: this.agentService,
         sessionTarget,
-        observerId: `slack-processing:${eventId}`,
+        observerId: `slack-processing:${channelId}:${threadTs}`,
         lifecycle: interaction.processingIndicatorLifecycle,
       });
       await this.processedEventsStore.markCompleted(eventId);
@@ -517,16 +540,7 @@ export class SlackSocketService {
       return;
     } finally {
       await ackReactionTask;
-      await processingDecorationTask;
-      await removeConfiguredReaction(
-        this.app.client,
-        this.loadedConfig.raw.channels.slack.typingReaction,
-        reactionTarget,
-      );
-      await clearSlackAssistantThreadStatus(this.app.client, {
-        channel: channelId,
-        threadTs,
-      });
+      await processingLease.release();
     }
   }
 

@@ -308,6 +308,31 @@ Live proof on April 5, 2026:
 - the system does not require a fresh explicit mention only because the previous reply came from `clisbot message send ...`
 - no duplicate pane-settlement reply appears when `responseMode` stays on `message-tool`
 
+## Test Case 2IA: Message-Tool Streaming Preview Stays Single-Draft And Cleans Up On Tool Final
+
+### Preconditions
+
+- the routed Slack or Telegram surface uses `responseMode: "message-tool"`
+- the route keeps `streaming: "all"` or `streaming: "latest"`
+- the agent can send at least one `--progress` reply and one `--final` reply through `clisbot message send ...`
+
+### Steps
+
+1. Start a routed conversation that takes long enough to produce visible preview updates
+2. Let clisbot show the initial live draft preview
+3. Have the agent send one `clisbot message send --progress ...` reply into the same thread
+4. Continue the run so more preview-worthy output appears
+5. Finish the run with `clisbot message send --final ...`
+6. Compare the final thread state
+
+### Expected Results
+
+- at any moment only one live draft preview is still being edited
+- once the tool-owned progress reply lands, the old draft stops changing
+- if more preview-worthy output appears later, a new draft appears below that boundary instead of mutating the older draft
+- clisbot never posts an extra pane-final reply in addition to the tool-final reply
+- when the run completes with `response: "final"`, the disposable draft preview is removed
+
 ## Test Case 2J: Message-Tool Heredoc Reply Survives Tricky Multi-Line Content
 
 ### Preconditions
@@ -513,6 +538,7 @@ not:
 - `latest` keeps one in-progress reply updated to the latest visible state
 - `all` keeps one in-progress reply updated in place while preserving all streamed content in that live reply
 - all three modes still preserve the chat-first text shaping rules for content quality
+- current runtime note: `latest` and `all` are both accepted and persisted, but the visible preview behavior is still intentionally the same until a later slice refines the distinction
 
 ## Test Case 5A: Channels With Edit Support Update The Live Reply Instead Of Posting New Progress Replies
 

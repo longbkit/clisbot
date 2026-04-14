@@ -40,9 +40,8 @@ function startTelegramTypingHeartbeat(params: {
   };
 }
 
-export async function runWithTelegramTypingHeartbeat<T>(params: {
+export async function beginTelegramTypingHeartbeat(params: {
   sendTyping: () => Promise<void>;
-  run: () => Promise<T>;
   intervalMs?: number;
   onError?: (error: unknown) => void;
 }) {
@@ -52,9 +51,22 @@ export async function runWithTelegramTypingHeartbeat<T>(params: {
     logTelegramTypingError(params.onError, error);
   }
 
-  const stopHeartbeat = startTelegramTypingHeartbeat({
+  return startTelegramTypingHeartbeat({
     sendTyping: params.sendTyping,
     intervalMs: params.intervalMs ?? TELEGRAM_TYPING_HEARTBEAT_MS,
+    onError: params.onError,
+  });
+}
+
+export async function runWithTelegramTypingHeartbeat<T>(params: {
+  sendTyping: () => Promise<void>;
+  run: () => Promise<T>;
+  intervalMs?: number;
+  onError?: (error: unknown) => void;
+}) {
+  const stopHeartbeat = await beginTelegramTypingHeartbeat({
+    sendTyping: params.sendTyping,
+    intervalMs: params.intervalMs,
     onError: params.onError,
   });
 

@@ -47,8 +47,13 @@ import {
   getConversationAdditionalMessageMode,
   setConversationAdditionalMessageMode,
 } from "./additional-message-mode-config.ts";
+import {
+  getConversationStreaming,
+  setConversationStreaming,
+} from "./streaming-config.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../control/latency-debug.ts";
 import { fileExists, readTextFile } from "../shared/fs.ts";
+import { sleep } from "../shared/process.ts";
 import { join } from "node:path";
 import type { ProcessingIndicatorLifecycle } from "./processing-indicator.ts";
 
@@ -85,6 +90,9 @@ type ReconcileText<TChunk> = (chunks: TChunk[], text: string) => Promise<TChunk[
 export type ProcessChannelInteractionResult = {
   processingIndicatorLifecycle: ProcessingIndicatorLifecycle;
 };
+
+const MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS = 3_000;
+const MESSAGE_TOOL_FINAL_GRACE_POLL_MS = 100;
 
 function renderSensitiveCommandDisabledMessage(identity: ChannelInteractionIdentity) {
   return [
@@ -236,6 +244,7 @@ function renderRouteStatusMessage(params: {
     "- `/status`",
     "- `/attach`, `/detach`, `/watch every 30s`",
     "- `/followup status`",
+    "- `/streaming status`",
     "- `/responsemode status`",
     "- `/additionalmessagemode status`",
     "- `/loop status`, `/loop cancel`, `/loop cancel <id>`",
@@ -278,6 +287,34 @@ function renderResponseModeStatusMessage(params: {
     "Available values:",
     "- `capture-pane`: clisbot posts pane-derived progress and final settlement",
     "- `message-tool`: clisbot still monitors the pane, but the agent should reply with `clisbot message send`",
+  );
+
+  return lines.join("\n");
+}
+
+function renderStreamingStatusMessage(params: {
+  route: ChannelInteractionRoute;
+  persisted?: {
+    label: string;
+    streaming?: "off" | "latest" | "all";
+  };
+}) {
+  const lines = [
+    `clisbot streaming mode: \`${params.route.streaming}\``,
+  ];
+
+  if (params.persisted) {
+    lines.push("");
+    lines.push(`config.target: \`${params.persisted.label}\``);
+  }
+
+  lines.push(
+    "",
+    "Available values:",
+    "- `off`: do not show live surface preview updates",
+    "- `on`: slash-command shorthand that persists as `all`",
+    "- `all`: keep streaming enabled with the current full preview behavior",
+    "- `latest`: keep streaming enabled; current runtime behavior still matches `all` until preview shaping is refined",
   );
 
   return lines.join("\n");
@@ -565,29 +602,103 @@ async function executePromptDelivery<TChunk>(params: {
   let renderedState: ChannelRenderedMessageState | undefined;
   let renderChain = Promise.resolve();
   let replyRecorded = false;
+  let finalReplyRecorded = false;
   let loggedFirstRunningUpdate = false;
-  const channelManagedDelivery =
+  let activePreviewStartedAt: number | undefined;
+  let lastFrozenPreviewText: string | undefined;
+  const paneManagedDelivery =
     params.route.responseMode === "capture-pane" || params.forceQueuedDelivery === true;
+  const messageToolPreview =
+    params.route.responseMode === "message-tool" &&
+    params.forceQueuedDelivery !== true &&
+    params.route.streaming !== "off";
+  const previewEnabled =
+    params.route.streaming !== "off" && (paneManagedDelivery || messageToolPreview);
 
-  async function recordReplyIfNeeded() {
+  async function recordVisibleReply(
+    kind: "reply" | "final" = "reply",
+    source: "channel" | "message-tool" = "channel",
+  ) {
+    if (kind === "final") {
+      if (finalReplyRecorded) {
+        return;
+      }
+
+      await params.agentService.recordConversationReply(params.sessionTarget, "final", source);
+      finalReplyRecorded = true;
+      replyRecorded = true;
+      return;
+    }
+
     if (replyRecorded) {
       return;
     }
 
-    await params.agentService.recordConversationReply(params.sessionTarget);
+    await params.agentService.recordConversationReply(params.sessionTarget, "reply", source);
     replyRecorded = true;
   }
 
   async function renderResponseText(nextText: string) {
     if (!responseChunks.length) {
       responseChunks = await params.postText(nextText);
-      if (responseChunks.length > 0) {
-        await recordReplyIfNeeded();
-      }
-      return;
+      return responseChunks.length > 0;
     }
 
     responseChunks = await params.reconcileText(responseChunks, nextText);
+    return false;
+  }
+
+  async function clearResponseText() {
+    if (!responseChunks.length) {
+      return;
+    }
+
+    responseChunks = await params.reconcileText(responseChunks, "");
+    renderedState = undefined;
+    activePreviewStartedAt = undefined;
+  }
+
+  function resetPreviewBoundary() {
+    lastFrozenPreviewText = renderedState?.text ?? lastFrozenPreviewText;
+    responseChunks = [];
+    renderedState = undefined;
+    activePreviewStartedAt = undefined;
+  }
+
+  async function getMessageToolRuntimeSignals() {
+    if (params.route.responseMode !== "message-tool" || params.forceQueuedDelivery === true) {
+      return {
+        lastMessageToolReplyAt: undefined,
+        messageToolFinalReplyAt: undefined,
+      };
+    }
+
+    const runtime = await params.agentService.getSessionRuntime?.(params.sessionTarget);
+    return {
+      lastMessageToolReplyAt: runtime?.lastMessageToolReplyAt,
+      messageToolFinalReplyAt: runtime?.messageToolFinalReplyAt,
+    };
+  }
+
+  async function waitForMessageToolFinalReply() {
+    const deadline = Date.now() + MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS;
+
+    while (true) {
+      const signals = await getMessageToolRuntimeSignals();
+      const toolFinalSeen =
+        typeof signals.messageToolFinalReplyAt === "number" &&
+        Number.isFinite(signals.messageToolFinalReplyAt);
+      if (toolFinalSeen) {
+        return true;
+      }
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) {
+        return false;
+      }
+
+      await sleep(Math.min(MESSAGE_TOOL_FINAL_GRACE_POLL_MS, remainingMs));
+    }
   }
 
   logLatencyDebug("channel-enqueue-start", params.timingContext, {
@@ -603,7 +714,7 @@ async function executePromptDelivery<TChunk>(params: {
         observerId: params.observerId,
         timingContext: params.timingContext,
         onUpdate: async (update) => {
-          if (!channelManagedDelivery) {
+          if (!paneManagedDelivery && !messageToolPreview) {
             return;
           }
           if (params.route.streaming === "off" && update.status === "running") {
@@ -618,6 +729,27 @@ async function executePromptDelivery<TChunk>(params: {
           }
 
           await (renderChain = renderChain.then(async () => {
+            const signals = await getMessageToolRuntimeSignals();
+            if (
+              messageToolPreview &&
+              typeof activePreviewStartedAt === "number" &&
+              typeof signals.messageToolFinalReplyAt === "number" &&
+              signals.messageToolFinalReplyAt >= activePreviewStartedAt
+            ) {
+              lastFrozenPreviewText = renderedState?.text ?? lastFrozenPreviewText;
+              activePreviewStartedAt = undefined;
+              return;
+            }
+
+            if (
+              messageToolPreview &&
+              typeof activePreviewStartedAt === "number" &&
+              typeof signals.lastMessageToolReplyAt === "number" &&
+              signals.lastMessageToolReplyAt >= activePreviewStartedAt
+            ) {
+              resetPreviewBoundary();
+            }
+
             const nextState = buildRenderedMessageState({
               platform: params.identity.platform,
               status: update.status,
@@ -633,18 +765,22 @@ async function executePromptDelivery<TChunk>(params: {
               return;
             }
 
-            if (!responseChunks.length) {
+            if (!renderedState && lastFrozenPreviewText === nextState.text) {
               return;
             }
 
-            await renderResponseText(nextState.text);
+            const postedNew = await renderResponseText(nextState.text);
+            if (postedNew) {
+              await recordVisibleReply("reply", "channel");
+              activePreviewStartedAt = Date.now();
+            }
             renderedState = nextState;
           }));
         },
       },
     );
 
-    if (channelManagedDelivery && params.route.streaming !== "off") {
+    if (previewEnabled) {
       const placeholderText = renderPlatformInteraction({
         platform: params.identity.platform,
         status: positionAhead > 0 ? "queued" : "running",
@@ -656,13 +792,16 @@ async function executePromptDelivery<TChunk>(params: {
             ? "Waiting for the agent queue to clear."
             : "Working...",
       });
-      responseChunks = await params.postText(placeholderText);
-      await recordReplyIfNeeded();
+      const postedNew = await renderResponseText(placeholderText);
+      if (postedNew) {
+        await recordVisibleReply("reply", "channel");
+        activePreviewStartedAt = Date.now();
+      }
       renderedState = {
         text: placeholderText,
         body: "",
       };
-    } else if (channelManagedDelivery && positionAhead > 0) {
+    } else if (paneManagedDelivery && positionAhead > 0) {
       const queuedText = renderPlatformInteraction({
         platform: params.identity.platform,
         status: "queued",
@@ -671,8 +810,10 @@ async function executePromptDelivery<TChunk>(params: {
         maxChars: Number.POSITIVE_INFINITY,
         note: "Waiting for the agent queue to clear.",
       });
-      responseChunks = await params.postText(queuedText);
-      await recordReplyIfNeeded();
+      const postedNew = await renderResponseText(queuedText);
+      if (postedNew) {
+        await recordVisibleReply("reply", "channel");
+      }
       renderedState = {
         text: queuedText,
         body: "",
@@ -681,26 +822,6 @@ async function executePromptDelivery<TChunk>(params: {
 
     const finalResult = await result;
     await renderChain;
-
-    if (!channelManagedDelivery) {
-      if (finalResult.status !== "error") {
-        return;
-      }
-
-      await params.postText(
-        renderPlatformInteraction({
-          platform: params.identity.platform,
-          status: finalResult.status,
-          content: finalResult.note ?? finalResult.snapshot,
-          maxChars: Number.POSITIVE_INFINITY,
-          note: finalResult.note,
-          allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
-          responsePolicy: "final",
-        }),
-      );
-      await recordReplyIfNeeded();
-      return;
-    }
 
     const nextState = buildRenderedMessageState({
       platform: params.identity.platform,
@@ -713,8 +834,60 @@ async function executePromptDelivery<TChunk>(params: {
       responsePolicy: params.route.response,
     });
 
-    if (params.route.streaming === "off") {
-      await params.postText(
+    if (paneManagedDelivery) {
+      if (params.route.streaming === "off") {
+        const postedNew = await renderResponseText(
+          renderPlatformInteraction({
+            platform: params.identity.platform,
+            status: finalResult.status,
+            content: nextState.body,
+            maxChars: Number.POSITIVE_INFINITY,
+            note: finalResult.note,
+            allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
+            responsePolicy: params.route.response,
+          }),
+        );
+        if (postedNew || finalResult.status === "completed") {
+          await recordVisibleReply(
+            finalResult.status === "completed" ? "final" : "reply",
+            "channel",
+          );
+        }
+        return;
+      }
+
+      const postedNew = await renderResponseText(nextState.text);
+      if (postedNew) {
+        await recordVisibleReply("reply", "channel");
+      }
+      if (finalResult.status === "completed") {
+        await recordVisibleReply("final", "channel");
+      }
+      return;
+    }
+
+    const toolFinalSeen =
+      finalResult.status === "completed"
+        ? await waitForMessageToolFinalReply()
+        : false;
+
+    if (finalResult.status === "completed" && toolFinalSeen) {
+      if (params.route.response === "final") {
+        await clearResponseText();
+      }
+      return;
+    }
+
+    if (finalResult.status === "completed") {
+      // Deliberately do not fall back to pane-derived final settlement in message-tool mode.
+      // The tool path is the only source of truth for canonical replies here, and re-enabling
+      // pane fallback tends to reintroduce duplicate or out-of-order terminal messages because
+      // tool-final state is asynchronous and subtle to coordinate across channel/runtime boundaries.
+      return;
+    }
+
+    if (params.route.streaming === "off" || responseChunks.length === 0) {
+      const postedNew = await renderResponseText(
         renderPlatformInteraction({
           platform: params.identity.platform,
           status: finalResult.status,
@@ -722,14 +895,19 @@ async function executePromptDelivery<TChunk>(params: {
           maxChars: Number.POSITIVE_INFINITY,
           note: finalResult.note,
           allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
-          responsePolicy: "final",
+          responsePolicy: params.route.response,
         }),
       );
-      await recordReplyIfNeeded();
+      if (postedNew) {
+        await recordVisibleReply("reply", "channel");
+      }
       return;
     }
 
-    await renderResponseText(nextState.text);
+    const postedNew = await renderResponseText(nextState.text);
+    if (postedNew) {
+      await recordVisibleReply("reply", "channel");
+    }
   } catch (error) {
     if (error instanceof ClearedQueuedTaskError) {
       return;
@@ -749,7 +927,7 @@ async function executePromptDelivery<TChunk>(params: {
       } else {
         await params.postText(activeText);
       }
-      await params.agentService.recordConversationReply(params.sessionTarget);
+      await recordVisibleReply("reply", "channel");
       return;
     }
 
@@ -764,6 +942,7 @@ async function executePromptDelivery<TChunk>(params: {
     } else {
       await params.postText(errorText);
     }
+    await recordVisibleReply("reply", "channel");
   }
 }
 
@@ -1028,6 +1207,37 @@ export async function processChannelInteraction<TChunk>(params: {
           slashCommand.mode === "paused"
             ? "Follow-up paused for this conversation until the next explicit mention."
             : `Follow-up mode set to \`${slashCommand.mode}\` for this conversation.`,
+        );
+      }
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return interactionResult;
+    }
+
+    if (slashCommand.name === "streaming") {
+      if (slashCommand.action === "status") {
+        const persisted = await getConversationStreaming({
+          identity: params.identity,
+        });
+        await params.postText(
+          renderStreamingStatusMessage({
+            route: params.route,
+            persisted,
+          }),
+        );
+      } else if (slashCommand.streaming) {
+        const persisted = await setConversationStreaming({
+          identity: params.identity,
+          streaming: slashCommand.streaming,
+        });
+        await params.postText(
+          [
+            `Updated streaming mode for \`${persisted.label}\`.`,
+            `config.streaming: \`${persisted.streaming}\``,
+            `config: \`${persisted.configPath}\``,
+            slashCommand.action === "on"
+              ? "`/streaming on` persists as `all` until `latest` and `all` diverge in runtime behavior."
+              : "If config reload is enabled, the new mode should apply automatically shortly.",
+          ].join("\n"),
         );
       }
       await params.agentService.recordConversationReply(params.sessionTarget);

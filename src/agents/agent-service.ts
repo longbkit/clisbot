@@ -14,6 +14,7 @@ import {
 import { SessionStore } from "./session-store.ts";
 import {
   AgentSessionState,
+  type ConversationReplySource,
   type ActiveSessionRuntimeInfo,
   type ConversationReplyKind,
 } from "./session-state.ts";
@@ -204,8 +205,9 @@ export class AgentService {
   async recordConversationReply(
     target: AgentSessionTarget,
     kind: ConversationReplyKind = "reply",
+    source: ConversationReplySource = "channel",
   ) {
-    return this.sessionState.recordConversationReply(this.resolveTarget(target), kind);
+    return this.sessionState.recordConversationReply(this.resolveTarget(target), kind, source);
   }
 
   async runShellCommand(target: AgentSessionTarget, command: string): Promise<ShellCommandResult> {

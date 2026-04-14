@@ -10,6 +10,7 @@ The feature combines three pieces:
 - agent runner launch behavior that exposes that wrapper consistently
 - a channel-owned prompt envelope that tells the agent exactly how to send progress updates back to the current Slack or Telegram surface
 - a response-mode policy layer that can disable normal channel auto-settlement while keeping runner observation active
+- a streaming policy layer that can still show one live draft preview even when canonical final replies come from `clisbot message send ...`
 - an additional-message policy layer that decides whether busy-session follow-up should steer the active run or queue behind it
 
 ## Scope
@@ -18,6 +19,7 @@ The feature combines three pieces:
 - expose the wrapper to agent runner sessions
 - inject a short channel context and reply command into the agent-bound prompt
 - support `responseMode: "message-tool"` so progress and final replies come from `clisbot message send`, not from pane settlement
+- support `streaming` for both response modes, with `message-tool` preview modeled as one disposable draft message
 - resolve reply delivery in this order: surface override, agent override, provider default
 - resolve busy-session follow-up in this order: surface override, agent override, provider default
 - support explicit `/queue <message>` to force ordered queued delivery for one extra message
@@ -29,6 +31,7 @@ The feature combines three pieces:
 
 - channels own the prompt-envelope text because the envelope is surface context
 - channels still observe runner state even when `responseMode` is `message-tool`
+- channels may render one disposable live draft preview while `message-tool` owns canonical replies
 - channels still monitor pane state even when additional human messages are handled as steering input
 - runners own wrapper availability inside agent processes
 - the prompt envelope only affects agent-bound prompts, not channel control commands

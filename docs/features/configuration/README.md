@@ -52,7 +52,9 @@ Without that, the implementation will drift into hidden defaults and hand-wired 
 Current policy meaning:
 
 - `streaming` controls how much in-progress content is retained in the live rendered reply
+- `streaming` now governs live preview visibility for both `capture-pane` and `message-tool`
 - `response` controls whether completion keeps the accumulated streamed content or settles to the clean final answer only
+- in `message-tool`, `response` mainly controls what happens to the disposable draft preview after tool-final delivery or fallback settlement
 - channel edit capability is not chosen by `streaming`; channels that support edits should prefer editing one live reply during streaming
 - follow-up policy controls whether a thread continues naturally after the bot has replied, requires explicit mention every time, or is temporarily paused
 

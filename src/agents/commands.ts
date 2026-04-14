@@ -27,12 +27,14 @@ export type AgentControlSlashCommandName =
   | "stop"
   | "nudge"
   | "followup"
+  | "streaming"
   | "responsemode"
   | "additionalmessagemode"
   | "queue-list"
   | "queue-clear"
   | "loop";
 export type AgentFollowUpSlashAction = "status" | "auto" | "mention-only" | "pause" | "resume";
+export type AgentStreamingSlashAction = "status" | "on" | "off" | "latest" | "all";
 export type AgentResponseModeSlashAction = "status" | "capture-pane" | "message-tool";
 export type AgentAdditionalMessageModeSlashAction = "status" | "queue" | "steer";
 
@@ -84,6 +86,12 @@ export type AgentControlSlashCommand =
       name: "followup";
       action: AgentFollowUpSlashAction;
       mode?: FollowUpMode;
+    }
+  | {
+      type: "control";
+      name: "streaming";
+      action: AgentStreamingSlashAction;
+      streaming?: "off" | "latest" | "all";
     }
   | {
       type: "control";
@@ -341,6 +349,41 @@ export function parseAgentCommand(
     };
   }
 
+  if (lowered === "streaming") {
+    const action = withoutSlash.slice(command.length).trim().toLowerCase();
+    if (!action || action === "status") {
+      return {
+        type: "control",
+        name: "streaming",
+        action: "status",
+      };
+    }
+
+    if (action === "on") {
+      return {
+        type: "control",
+        name: "streaming",
+        action: "on",
+        streaming: "all",
+      };
+    }
+
+    if (action === "off" || action === "latest" || action === "all") {
+      return {
+        type: "control",
+        name: "streaming",
+        action,
+        streaming: action,
+      };
+    }
+
+    return {
+      type: "control",
+      name: "streaming",
+      action: "status",
+    };
+  }
+
   if (lowered === "additionalmessagemode") {
     const action = withoutSlash.slice(command.length).trim().toLowerCase();
     if (!action || action === "status") {
@@ -501,6 +544,11 @@ export function renderAgentControlSlashHelp() {
     "- `/followup mention-only`: require explicit mention for each later turn",
     "- `/followup pause`: stop passive follow-up until the next explicit mention",
     "- `/followup resume`: clear the runtime override and restore config defaults",
+    "- `/streaming status`: show the configured streaming mode for this surface",
+    "- `/streaming on`: enable streaming for this surface using the current `all` preview behavior",
+    "- `/streaming off`: disable surface streaming previews for this surface",
+    "- `/streaming latest`: prefer the latest preview shape for this surface",
+    "- `/streaming all`: retain the full current preview shape for this surface",
     "- `/responsemode status`: show the configured response mode for this surface",
     "- `/responsemode capture-pane`: settle replies from captured pane output for this surface",
     "- `/responsemode message-tool`: expect the agent to reply through `clisbot message send` for this surface",

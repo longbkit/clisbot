@@ -99,17 +99,33 @@ User-visible reply delivery is configured beside `streaming` and `response`:
 ```
 
 - `capture-pane`: existing clisbot behavior. The channel posts progress or final settlement from normalized runner output.
-- `message-tool`: clisbot still captures and observes the runner pane for state, but normal progress and final reply delivery are expected to happen through `clisbot message send ...` from the agent prompt flow.
+- `message-tool`: clisbot still captures and observes the runner pane for state, but canonical progress and final replies are expected to happen through `clisbot message send ...` from the agent prompt flow.
+- `streaming` now affects both response modes. In `message-tool`, enabled streaming means clisbot may keep one disposable live draft preview visible while the run is active.
 - `steer`: when a session is already active, later human messages are sent straight into that live session as steering input.
 - `queue`: when a session is already active, later human messages wait behind the current run and clisbot settles them one by one.
 
 Use `message-tool` when you want to avoid duplicate replies or raw pane-derived final settlement while still keeping tmux observation available for status, attach, watch, and internal runtime logic.
+
+When `message-tool` and streaming are both enabled, the user-visible rules are:
+
+- clisbot keeps at most one active live draft preview message
+- if a tool-owned reply lands in the thread, that draft freezes
+- if later preview-worthy output appears, clisbot opens one new draft below that boundary
+- once a tool final is seen, the draft stops updating
+- on successful completion with `response: "final"`, the disposable draft is removed
+- if the tool path never sends a final reply, clisbot does not auto-settle from pane output; the tool path remains the only canonical reply source
 
 Use `additionalMessageMode: "steer"` when you want natural chatbot follow-ups to influence the current active run immediately.
 
 Use `additionalMessageMode: "queue"` when you want each later human message to become its own queued turn instead.
 
 If the route keeps `streaming: "off"`, queued turns still settle through clisbot, but you should only expect the final queued answer on the surface, not an interim queued placeholder.
+
+Current runtime note:
+
+- `streaming: "latest"` and `streaming: "all"` are both accepted and persisted today
+- the current live preview behavior is still the same for both values until a later preview-shaping slice differentiates them
+- `/streaming on` is shorthand that persists as `all`
 
 ## Debug Reply Delay
 
@@ -313,8 +329,11 @@ Status surfaces:
 
 - `clisbot status` shows provider-level `responseMode` and `additionalMessageMode` for Slack and Telegram plus any per-agent overrides in the agent summary.
 - `/status` shows the active route `responseMode` and `additionalMessageMode` for the current conversation.
+- `/streaming status` shows the active route value plus the current persisted surface target value.
 - `/responsemode status` shows the active route value plus the current persisted surface target value.
 - `/additionalmessagemode status` shows the active route busy-session behavior plus the current persisted surface target value.
+- `/streaming off|latest|all` updates the current routed surface target in config.
+- `/streaming on` updates the current routed surface target to `all`.
 - `/queue <message>` always queues that one extra message, even when the surface default is `steer`.
 - `\q <message>` is a shortcut alias for `/queue <message>`.
 - `/steer <message>` and `\s <message>` inject a steering message into the active run immediately.
