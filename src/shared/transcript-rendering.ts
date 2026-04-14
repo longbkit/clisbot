@@ -186,6 +186,7 @@ export function renderSlackInteraction(params: {
   maxChars: number;
   queuePosition?: number;
   note?: string;
+  allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
   const body = renderInteractionBody(params);
@@ -207,7 +208,11 @@ export function renderSlackInteraction(params: {
   }
 
   if (params.status === "detached") {
-    const note = params.note ?? "This session is still running. Use `/transcript` anytime to check it.";
+    const note = resolveDetachedInteractionNote({
+      baseNote: params.note,
+      allowTranscriptInspection: params.allowTranscriptInspection,
+      transcriptCommand: "`/transcript`",
+    });
     return body ? `${body}\n\n_${note}_` : `_${note}_`;
   }
 
@@ -224,6 +229,7 @@ export function renderTelegramInteraction(params: {
   maxChars: number;
   queuePosition?: number;
   note?: string;
+  allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
   const body = renderInteractionBody(params);
@@ -245,7 +251,11 @@ export function renderTelegramInteraction(params: {
   }
 
   if (params.status === "detached") {
-    const note = params.note ?? "This session is still running. Use /transcript anytime to check it.";
+    const note = resolveDetachedInteractionNote({
+      baseNote: params.note,
+      allowTranscriptInspection: params.allowTranscriptInspection,
+      transcriptCommand: "/transcript",
+    });
     return body ? `${body}\n\n${note}` : note;
   }
 
@@ -290,3 +300,22 @@ export const renderSlackSnapshot = renderSlackTranscript;
 export const renderChannelInteraction = renderSlackInteraction;
 export const renderChannelTranscript = renderSlackTranscript;
 export const renderChannelSnapshot = renderSlackSnapshot;
+
+export function resolveDetachedInteractionNote(params: {
+  baseNote?: string;
+  allowTranscriptInspection?: boolean;
+  transcriptCommand: string;
+}) {
+  const note =
+    params.baseNote ??
+    "This session is still running. Use `/attach`, `/watch every 30s`, or `/stop` to manage it.";
+  if (!params.allowTranscriptInspection) {
+    return note;
+  }
+
+  if (note.includes("/transcript")) {
+    return note;
+  }
+
+  return `${note} You can also use ${params.transcriptCommand} to inspect the current session snapshot.`;
+}

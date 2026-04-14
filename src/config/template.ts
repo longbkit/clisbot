@@ -181,6 +181,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -237,6 +238,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,

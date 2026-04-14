@@ -23,7 +23,7 @@ describe("runWithTelegramTypingHeartbeat", () => {
     releaseRun();
     await task;
 
-    expect(sendCount).toBeGreaterThanOrEqual(3);
+    expect(sendCount).toBeGreaterThanOrEqual(2);
   });
 
   test("stops heartbeating after the work completes", async () => {

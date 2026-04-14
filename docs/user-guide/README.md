@@ -246,6 +246,7 @@ Important behavior:
   - Telegram topics: negative chat id plus `--topic <topicId>`
 - channel and topic response-mode overrides require the route to exist first
 - `privilege` commands update route-level `privilegeCommands.enabled` and `privilegeCommands.allowUsers`
+- transcript visibility is controlled separately by route-level `verbose`
 - direct-message privilege targets are literal command targets: `slack-dm` and `telegram-dm`
 - conversation-level busy-session tools are available on routed Slack and Telegram conversations:
   - `/queue <message>` or `\q <message>`
@@ -416,7 +417,7 @@ Current meaning:
   - if a turn produces no visible output for 20 seconds from the start, clisbot returns a timeout
 - `maxRuntimeMin: 15`
   - default observation window of 15 minutes for one turn
-  - if the session is still active after that window, clisbot stops waiting, leaves the session running, and tells you to use `/transcript` to inspect it later
+  - if the session is still active after that window, clisbot stops waiting, leaves the session running, and tells you to use `/attach` or `/watch every 30s` to inspect it later
 - `maxRuntimeSec`
   - optional second-based observation window when you need tighter tests or shorter limits
 

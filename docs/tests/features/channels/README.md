@@ -703,11 +703,12 @@ Expected:
 - the returned output is the command result, not a forwarded natural-language prompt
 - control slash commands still keep higher priority than bash execution commands
 
-## Test Case 9C: Sensitive Commands Stay Disabled Unless The Route Opts In
+## Test Case 9C: Transcript Visibility And Privilege Gating Stay Separate
 
 ### Preconditions
 
-- one channel, group, topic, or DM route exists without `privilegeCommands.enabled: true`
+- one routed conversation exists with `verbose: "off"`
+- the same route also keeps `privilegeCommands.enabled: false`
 
 ### Steps
 
@@ -718,10 +719,12 @@ Expected:
 
 ### Expected Results
 
-- clisbot denies each request with a clear route-policy message
-- transcript inspection is not executed
+- clisbot denies transcript requests with a clear `verbose` policy message
+- transcript inspection is not executed while `verbose: "off"` is active
+- clisbot denies bash requests with a clear privilege-policy message
 - bash execution is not executed
-- enabling `privilegeCommands.enabled: true` on that route allows the same commands on the next turn
+- changing only `verbose` to `minimal` allows transcript requests on the next turn
+- changing only `privilegeCommands.enabled` to `true` allows bash requests on the next turn
 
 ## Test Case 10: Follow-Up Slack Interaction Does Not Repeat Previous Static Chrome
 

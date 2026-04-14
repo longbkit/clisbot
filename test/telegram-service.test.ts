@@ -55,6 +55,7 @@ function createTelegramConfig(): LoadedConfig["raw"]["channels"]["telegram"] {
     response: "final",
     responseMode: "message-tool",
     additionalMessageMode: "steer",
+    verbose: "minimal",
     followUp: {
       mode: "auto",
       participationTtlMin: 5,

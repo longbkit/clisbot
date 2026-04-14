@@ -27,6 +27,7 @@ function createRoute(
     response: "final",
     responseMode: "capture-pane",
     additionalMessageMode: "steer",
+    verbose: "minimal",
     followUp: {
       mode: "auto",
       participationTtlMs: 24 * 60 * 60 * 1000,
@@ -56,7 +57,7 @@ function createIdentity(
 }
 
 describe("processChannelInteraction sensitive command gating", () => {
-  test("blocks transcript requests when sensitive commands are disabled", async () => {
+  test("blocks transcript requests when route verbose is off", async () => {
     const posted: string[] = [];
     let transcriptCalls = 0;
     let replyCalls = 0;
@@ -81,7 +82,9 @@ describe("processChannelInteraction sensitive command gating", () => {
       identity: createIdentity(),
       senderId: "U123",
       text: "/transcript",
-      route: createRoute(),
+      route: createRoute({
+        verbose: "off",
+      }),
       maxChars: 4000,
       postText: async (text) => {
         posted.push(text);
@@ -93,9 +96,8 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(transcriptCalls).toBe(0);
     expect(replyCalls).toBe(1);
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain("Privilege commands are not allowed");
-    expect(posted[0]).toContain("clisbot channels privilege enable slack-channel C123");
-    expect(posted[0]).toContain("clisbot channels privilege allow-user slack-channel C123 U123");
+    expect(posted[0]).toContain("Transcript inspection is disabled");
+    expect(posted[0]).toContain('verbose: "minimal"');
   });
 
   test("blocks bash commands when sensitive commands are disabled", async () => {
@@ -139,7 +141,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("clisbot channels privilege allow-user slack-channel C123 U123");
   });
 
-  test("allows transcript requests when privilege commands are enabled", async () => {
+  test("allows transcript requests when route verbose is minimal", async () => {
     const posted: string[] = [];
     let transcriptCalls = 0;
 
@@ -161,12 +163,7 @@ describe("processChannelInteraction sensitive command gating", () => {
       identity: createIdentity(),
       senderId: "U123",
       text: "::transcript",
-      route: createRoute({
-        privilegeCommands: {
-          enabled: true,
-          allowUsers: [],
-        },
-      }),
+      route: createRoute(),
       maxChars: 4000,
       postText: async (text) => {
         posted.push(text);
@@ -202,12 +199,7 @@ describe("processChannelInteraction sensitive command gating", () => {
       identity: createIdentity(),
       senderId: "U123",
       text: "\\transcript",
-      route: createRoute({
-        privilegeCommands: {
-          enabled: true,
-          allowUsers: [],
-        },
-      }),
+      route: createRoute(),
       maxChars: 4000,
       postText: async (text) => {
         posted.push(text);
@@ -269,18 +261,21 @@ describe("processChannelInteraction sensitive command gating", () => {
 
   test("blocks privilege commands when allowUsers excludes the sender", async () => {
     const posted: string[] = [];
-    let transcriptCalls = 0;
+    let bashCalls = 0;
 
     await processChannelInteraction({
       agentService: {
-        captureTranscript: async () => {
-          transcriptCalls += 1;
+        runShellCommand: async () => {
+          bashCalls += 1;
           return {
             agentId: "default",
             sessionKey: createTarget().sessionKey,
             sessionName: "session",
             workspacePath: "/tmp/workspace",
-            snapshot: "runner output",
+            command: "pwd",
+            output: "/tmp/workspace",
+            exitCode: 0,
+            timedOut: false,
           };
         },
         recordConversationReply: async () => undefined,
@@ -288,7 +283,7 @@ describe("processChannelInteraction sensitive command gating", () => {
       sessionTarget: createTarget(),
       identity: createIdentity(),
       senderId: "U999",
-      text: "/transcript",
+      text: "!pwd",
       route: createRoute({
         privilegeCommands: {
           enabled: true,
@@ -303,7 +298,7 @@ describe("processChannelInteraction sensitive command gating", () => {
       reconcileText: async (_chunks, text) => [text],
     });
 
-    expect(transcriptCalls).toBe(0);
+    expect(bashCalls).toBe(0);
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Privilege commands are not allowed");
   });
@@ -337,6 +332,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("senderId: `U123`");
     expect(posted[0]).toContain("channelId: `C123`");
     expect(posted[0]).toContain("threadTs: `1.2`");
+    expect(posted[0]).toContain("verbose: `minimal`");
   });
 
   test("renders whoami for Telegram routes", async () => {
@@ -373,6 +369,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("conversationKind: `topic`");
     expect(posted[0]).toContain("chatId: `-1001`");
     expect(posted[0]).toContain("topicId: `4`");
+    expect(posted[0]).toContain("verbose: `minimal`");
   });
 
   test("renders status with operator privilege commands for routed conversations", async () => {
@@ -409,10 +406,12 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("clisbot status");
     expect(posted[0]).toContain("responseMode: `capture-pane`");
     expect(posted[0]).toContain("additionalMessageMode: `steer`");
+    expect(posted[0]).toContain("verbose: `minimal`");
     expect(posted[0]).toContain("run.state: `detached`");
     expect(posted[0]).toContain(`run.startedAt: \`${new Date(startedAt).toISOString()}\``);
     expect(posted[0]).toContain(`run.detachedAt: \`${new Date(detachedAt).toISOString()}\``);
     expect(posted[0]).toContain("/attach`, `/detach`, `/watch every 30s`");
+    expect(posted[0]).toContain("/transcript` enabled on this route (`verbose: minimal`)");
     expect(posted[0]).toContain("Operator commands:");
     expect(posted[0]).toContain("clisbot channels privilege enable slack-channel C123");
     expect(posted[0]).toContain("clisbot channels privilege allow-user slack-channel C123 U123");
@@ -658,7 +657,7 @@ describe("processChannelInteraction detached long-running settlement", () => {
             fullSnapshot: "Still working through the repository.",
             initialSnapshot: "",
             note:
-              "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/transcript` anytime to check it.",
+              "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it.",
           }),
         }),
         recordConversationReply: async () => undefined,
@@ -681,7 +680,54 @@ describe("processChannelInteraction detached long-running settlement", () => {
 
     expect(posted[0]).toContain("Working...");
     expect(reconciled.at(-1)).toContain("Still working through the repository.");
-    expect(reconciled.at(-1)).toContain("Use `/transcript` anytime to check it.");
+    expect(reconciled.at(-1)).toContain("You can also use `/transcript` to inspect the current session snapshot.");
+    expect(reconciled.at(-1)).not.toContain("Timed out waiting");
+  });
+
+  test("keeps detached guidance transcript-free when route verbose is off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "detached",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "Still working through the repository.",
+            fullSnapshot: "Still working through the repository.",
+            initialSnapshot: "",
+            note:
+              "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it.",
+          }),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "keep going",
+      route: createRoute({
+        verbose: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted[0]).toContain("Working...");
+    expect(reconciled.at(-1)).toContain("Still working through the repository.");
+    expect(reconciled.at(-1)).not.toContain("/transcript");
     expect(reconciled.at(-1)).not.toContain("Timed out waiting");
   });
 });

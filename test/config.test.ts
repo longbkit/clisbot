@@ -132,6 +132,7 @@ describe("loadConfig", () => {
             response: "final",
             responseMode: "message-tool",
             additionalMessageMode: "queue",
+            verbose: "minimal",
             followUp: {
               mode: "auto",
               participationTtlSec: 13,
@@ -190,6 +191,7 @@ describe("loadConfig", () => {
     });
     expect(loaded.raw.channels.slack.responseMode).toBe("message-tool");
     expect(loaded.raw.channels.slack.additionalMessageMode).toBe("queue");
+    expect(loaded.raw.channels.slack.verbose).toBe("minimal");
     expect(loaded.raw.channels.slack.streaming).toBe("all");
     expect(loaded.raw.channels.slack.response).toBe("final");
     expect(loaded.raw.channels.slack.followUp.mode).toBe("auto");
@@ -324,6 +326,7 @@ describe("loadConfig", () => {
           enabled: boolean;
           appToken: string;
           botToken: string;
+          verbose: string;
           channels: Record<string, unknown>;
           groups: Record<string, unknown>;
           directMessages: {
@@ -335,6 +338,7 @@ describe("loadConfig", () => {
         telegram: {
           enabled: boolean;
           botToken: string;
+          verbose: string;
           groups: Record<string, unknown>;
           directMessages: {
             privilegeCommands: {
@@ -347,6 +351,8 @@ describe("loadConfig", () => {
 
     expect(config.channels.slack.enabled).toBe(false);
     expect(config.channels.telegram.enabled).toBe(false);
+    expect(config.channels.slack.verbose).toBe("minimal");
+    expect(config.channels.telegram.verbose).toBe("minimal");
     expect(config.channels.slack.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.channels.slack.botToken).toBe("${SLACK_BOT_TOKEN}");
     expect(config.channels.telegram.botToken).toBe("${TELEGRAM_BOT_TOKEN}");

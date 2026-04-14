@@ -105,6 +105,7 @@ function createLoadedConfig(): LoadedConfig {
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -144,6 +145,7 @@ function createLoadedConfig(): LoadedConfig {
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,

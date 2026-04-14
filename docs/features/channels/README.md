@@ -69,6 +69,7 @@ Channels is where those surfaces live.
 - [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
 - [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)
 - [Prompt Templates](prompt-templates.md)
+- [Transcript Visibility And Verbose Levels](transcript-visibility-and-verbose-levels.md)
 - [Structured Channel Rendering And Native Surface Capabilities](structured-channel-rendering-and-native-surface-capabilities.md)
 - [Loop Slash Command](loop-slash-command.md)
 

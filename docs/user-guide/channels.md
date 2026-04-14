@@ -98,18 +98,35 @@ Assistant status notes:
 - this is the UI line that looks like `<bot name> Working...` or rotates configured loading messages
 - if Slack status writes are unavailable, `clisbot` should keep replying normally and fall back to reactions plus the live in-thread processing reply
 
-## Sensitive Commands
+## Transcript Visibility And Privilege Commands
 
-Transcript inspection and bash execution are disabled by default on chat routes.
+Transcript inspection and bash execution no longer use the same gate.
 
-This affects:
+Current rule:
 
-- `/transcript`
-- configured slash-style prefixes such as `::transcript` or `\transcript`
-- `/bash <command>`
-- configured bash shortcuts such as `!<command>`
+- `verbose: "minimal"` allows `/transcript`
+- `verbose: "off"` blocks `/transcript`
+- `/bash <command>` and bash shortcuts such as `!<command>` still require `privilegeCommands.enabled: true`
 
-To enable them, set `privilegeCommands.enabled: true` on the specific route you want to trust.
+`verbose` defaults to `minimal` on top-level Slack and Telegram channel config so routed users can inspect transcript state without extra privilege setup.
+
+Important rollout note:
+
+- if an existing config does not set `verbose` yet, the current release resolves it as `minimal`
+- set `verbose: "off"` explicitly on any route where transcript inspection should stay hidden
+
+Route examples for `verbose`:
+
+- `channels.slack.verbose`
+- `channels.slack.channels.<channelId>.verbose`
+- `channels.slack.groups.<groupId>.verbose`
+- `channels.slack.directMessages.verbose`
+- `channels.telegram.verbose`
+- `channels.telegram.groups.<chatId>.verbose`
+- `channels.telegram.groups.<chatId>.topics.<topicId>.verbose`
+- `channels.telegram.directMessages.verbose`
+
+Privilege examples for bash:
 
 Examples:
 
@@ -136,6 +153,7 @@ Example:
         "allowFrom": [],
         "requireMention": false,
         "agentId": "default",
+        "verbose": "minimal",
         "privilegeCommands": {
           "enabled": true,
           "allowUsers": []
@@ -145,6 +163,7 @@ Example:
         "C07U0LDK6ER": {
           "requireMention": true,
           "agentId": "default",
+          "verbose": "off",
           "privilegeCommands": {
             "enabled": true,
             "allowUsers": ["U123"]
@@ -158,12 +177,14 @@ Example:
 
 Important rule:
 
+- leaving top-level `verbose` at `minimal` is the low-friction default for internal use
+- set `verbose: "off"` only on routes where transcript monitoring should stay hidden
 - leaving `privilegeCommands.enabled` disabled at the root is recommended
 - use `privilegeCommands.allowUsers` when a route should trust only specific user ids
-- enable sensitive commands only on the specific DM, channel, group, or topic routes that should have them
+- enable privilege commands only on the specific DM, channel, group, or topic routes that should have bash access
 - shortcut prefixes are configured through `channels.<platform>.commandPrefixes`
 - defaults are `slash: ["::", "\\"]` and `bash: ["!"]`
-- the `privilege` CLI is the fastest way to enable or restrict `/transcript` and `/bash` without editing JSON by hand
+- the `privilege` CLI is the fastest way to enable or restrict `/bash` without editing JSON by hand
 - DM targets are literal: use `clisbot channels privilege enable slack-dm` or `clisbot channels privilege enable telegram-dm`
 
 ## Slack Event Subscriptions
@@ -364,7 +385,7 @@ When the group or topic is not routed yet:
 
 - Telegram still exposes a minimal command menu with `/start`, `/status`, `/help`, and `/whoami`
 - the reply includes the exact `clisbot channels add telegram-group ...` command to run
-- more sensitive commands such as `/transcript`, `/stop`, `/followup`, and `/bash` only appear after the route is added and allowed
+- route-only commands such as `/transcript`, `/stop`, `/followup`, and `/bash` only make sense after the route is added; `/transcript` then follows `verbose`, while `/bash` still follows privilege gating
 
 Practical notes:
 

@@ -75,15 +75,17 @@ Transcript inspection and bash execution are sensitive chat-surface capabilities
 
 Current rule:
 
-- they are disabled by default
-- they run only when the resolved chat route enables `privilegeCommands.enabled`
-- this gate applies to:
+- transcript inspection follows route `verbose`
+- `verbose: "minimal"` allows:
   - `/transcript`
   - configured slash-style transcript shortcuts such as `::transcript` or `\transcript`
+- `verbose: "off"` blocks transcript inspection
+- bash execution still follows `privilegeCommands.enabled`
+- privilege gating applies to:
   - `/bash <command>`
   - configured bash shortcuts such as `!<command>`
 
-When the route does not enable them, clisbot must deny the command instead of forwarding or executing it.
+When the route does not allow them, clisbot must deny the command instead of forwarding or executing it.
 
 ## Bash Execution Model
 

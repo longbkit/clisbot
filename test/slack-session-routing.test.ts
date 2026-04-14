@@ -122,6 +122,7 @@ function createLoadedConfig(): LoadedConfig {
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -167,6 +168,7 @@ function createLoadedConfig(): LoadedConfig {
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -220,6 +222,29 @@ describe("Slack conversation target routing", () => {
     );
 
     expect(resolved.route?.timezone).toBe("Asia/Ho_Chi_Minh");
+  });
+
+  test("inherits route verbose from channel defaults and supports overrides", () => {
+    const inheritedConfig = createLoadedConfig();
+    inheritedConfig.raw.channels.slack.channelPolicy = "open";
+    const config = createLoadedConfig();
+    config.raw.channels.slack.channels.C123 = {
+      requireMention: true,
+      allowBots: false,
+      verbose: "off",
+    };
+
+    const inherited = resolveSlackConversationRoute(
+      inheritedConfig,
+      { channel_type: "channel", channel: "C999" },
+    );
+    const overridden = resolveSlackConversationRoute(
+      config,
+      { channel_type: "channel", channel: "C123" },
+    );
+
+    expect(inherited.route?.verbose).toBe("minimal");
+    expect(overridden.route?.verbose).toBe("off");
   });
 
   test("isolates Slack channel conversations by root thread id", () => {

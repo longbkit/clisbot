@@ -242,6 +242,7 @@ const channelAgentPromptSchema = z.object({
 
 const channelResponseModeSchema = z.enum(["capture-pane", "message-tool"]);
 const channelAdditionalMessageModeSchema = z.enum(["queue", "steer"]);
+const channelVerboseSchema = z.enum(["off", "minimal"]);
 const timezoneSchema = z.string().refine(isValidLoopTimezone, {
   message: "Expected a valid IANA timezone such as Asia/Ho_Chi_Minh",
 });
@@ -256,6 +257,7 @@ const slackRouteSchema = z.object({
   response: slackResponseSchema.optional(),
   responseMode: channelResponseModeSchema.optional(),
   additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
+  verbose: channelVerboseSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
   timezone: timezoneSchema.optional(),
 });
@@ -270,6 +272,7 @@ const telegramTopicRouteSchema = z.object({
   response: slackResponseSchema.optional(),
   responseMode: channelResponseModeSchema.optional(),
   additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
+  verbose: channelVerboseSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
   timezone: timezoneSchema.optional(),
 });
@@ -284,6 +287,7 @@ const telegramGroupRouteSchema = z.object({
   response: slackResponseSchema.optional(),
   responseMode: channelResponseModeSchema.optional(),
   additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
+  verbose: channelVerboseSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
   timezone: timezoneSchema.optional(),
   topics: z.record(z.string(), telegramTopicRouteSchema).default({}),
@@ -302,6 +306,7 @@ const telegramDirectMessagesSchema = z.object({
   response: slackResponseSchema.optional(),
   responseMode: channelResponseModeSchema.optional(),
   additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
+  verbose: channelVerboseSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
   timezone: timezoneSchema.optional(),
 });
@@ -344,6 +349,7 @@ const telegramSchema = z.object({
   response: slackResponseSchema.default("final"),
   responseMode: channelResponseModeSchema.default("message-tool"),
   additionalMessageMode: channelAdditionalMessageModeSchema.default("steer"),
+  verbose: channelVerboseSchema.default("minimal"),
   followUp: slackFollowUpSchema.default({
     mode: "auto",
     participationTtlMin: 5,
@@ -375,6 +381,7 @@ const directMessagesSchema = z.object({
   response: slackResponseSchema.optional(),
   responseMode: channelResponseModeSchema.optional(),
   additionalMessageMode: channelAdditionalMessageModeSchema.optional(),
+  verbose: channelVerboseSchema.optional(),
   followUp: slackFollowUpOverrideSchema.optional(),
   timezone: timezoneSchema.optional(),
 });
@@ -422,6 +429,7 @@ const slackSchema = z.object({
   response: slackResponseSchema.default("final"),
   responseMode: channelResponseModeSchema.default("message-tool"),
   additionalMessageMode: channelAdditionalMessageModeSchema.default("steer"),
+  verbose: channelVerboseSchema.default("minimal"),
   followUp: slackFollowUpSchema.default({
     mode: "auto",
     participationTtlMin: 5,
@@ -544,6 +552,7 @@ export const clisbotConfigSchema = z.object({
       response: "final",
       responseMode: "message-tool",
       additionalMessageMode: "steer",
+      verbose: "minimal",
       followUp: {
         mode: "auto",
         participationTtlMin: 5,

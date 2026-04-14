@@ -19,6 +19,7 @@ export type SharedChannelRoute = {
   response: "all" | "final";
   responseMode: "capture-pane" | "message-tool";
   additionalMessageMode: "queue" | "steer";
+  verbose: "off" | "minimal";
   followUp: FollowUpConfig;
   timezone?: string;
 };
@@ -33,6 +34,7 @@ export type SharedChannelRouteOverride = {
   response?: "all" | "final";
   responseMode?: "capture-pane" | "message-tool";
   additionalMessageMode?: "queue" | "steer";
+  verbose?: "off" | "minimal";
   followUp?: {
     mode?: FollowUpConfig["mode"];
     participationTtlSec?: number;
@@ -50,6 +52,7 @@ type SharedChannelConfig = {
   response: "all" | "final";
   responseMode: "capture-pane" | "message-tool";
   additionalMessageMode: "queue" | "steer";
+  verbose: "off" | "minimal";
   followUp: {
     mode: FollowUpConfig["mode"];
     participationTtlSec?: number;
@@ -104,6 +107,7 @@ export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): 
       params.route?.additionalMessageMode ??
       agentEntry?.additionalMessageMode ??
       params.channelConfig.additionalMessageMode,
+    verbose: params.route?.verbose ?? params.channelConfig.verbose,
     followUp: {
       mode: params.route?.followUp?.mode ?? params.channelConfig.followUp.mode,
       participationTtlMs: resolveConfigDurationMs({

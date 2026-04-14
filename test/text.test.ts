@@ -560,10 +560,26 @@ Finagling
         content: "Still working through the repository.",
         maxChars: 200,
         note:
-          "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/transcript` anytime to check it.",
+          "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it.",
+        allowTranscriptInspection: true,
       }),
     ).toBe(
-      "Still working through the repository.\n\n_This session has been running for over 15 minutes. clisbot left it running as-is. Use `/transcript` anytime to check it._",
+      "Still working through the repository.\n\n_This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it. You can also use `/transcript` to inspect the current session snapshot._",
+    );
+  });
+
+  test("keeps detached note transcript-free when transcript inspection is disabled", () => {
+    expect(
+      renderSlackInteraction({
+        status: "detached",
+        content: "Still working through the repository.",
+        maxChars: 200,
+        note:
+          "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it.",
+        allowTranscriptInspection: false,
+      }),
+    ).toBe(
+      "Still working through the repository.\n\n_This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it._",
     );
   });
 

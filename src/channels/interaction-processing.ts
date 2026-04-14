@@ -25,6 +25,7 @@ import {
 import {
   renderChannelSnapshot,
   escapeCodeFence,
+  resolveDetachedInteractionNote,
 } from "../shared/transcript.ts";
 import {
   buildRenderedMessageState,
@@ -59,6 +60,7 @@ export type ChannelInteractionRoute = {
   response: "all" | "final";
   responseMode: "capture-pane" | "message-tool";
   additionalMessageMode: "queue" | "steer";
+  verbose: "off" | "minimal";
   followUp: FollowUpConfig;
   timezone?: string;
 };
@@ -87,9 +89,16 @@ export type ProcessChannelInteractionResult = {
 function renderSensitiveCommandDisabledMessage(identity: ChannelInteractionIdentity) {
   return [
     "Privilege commands are not allowed for this route or user.",
-    "Enable `privilegeCommands.enabled` on the route to allow transcript and bash commands. Use `privilegeCommands.allowUsers` to restrict access to specific user ids.",
+    "Enable `privilegeCommands.enabled` on the route to allow bash commands. Use `privilegeCommands.allowUsers` to restrict access to specific user ids.",
     "",
     ...renderPrivilegeCommandHelpLines(identity),
+  ].join("\n");
+}
+
+function renderTranscriptDisabledMessage() {
+  return [
+    "Transcript inspection is disabled for this route.",
+    'Set `verbose: "minimal"` on the route or channel to allow `/transcript`.',
   ].join("\n");
 }
 
@@ -132,6 +141,7 @@ function renderWhoAmIMessage(params: {
     `privilegeCommands.allowUsers: \`${
       params.route.privilegeCommands.allowUsers.join(", ") || "(all users on route)"
     }\``,
+    `verbose: \`${params.route.verbose}\``,
   );
 
   return lines.join("\n");
@@ -185,6 +195,7 @@ function renderRouteStatusMessage(params: {
     `response: \`${params.route.response}\``,
     `responseMode: \`${params.route.responseMode}\``,
     `additionalMessageMode: \`${params.route.additionalMessageMode}\``,
+    `verbose: \`${params.route.verbose}\``,
     `timezone: \`${params.route.timezone ?? "(inherit host/app)"}\``,
     `followUp.mode: \`${params.followUpState.overrideMode ?? params.route.followUp.mode}\``,
     `followUp.windowMinutes: \`${formatFollowUpTtlMinutes(params.route.followUp.participationTtlMs)}\``,
@@ -230,11 +241,18 @@ function renderRouteStatusMessage(params: {
     "- `/loop status`, `/loop cancel`, `/loop cancel <id>`",
     "- `/queue <message>`, `/steer <message>`",
     "- `/queue-list`, `/queue-clear`",
-    "- `/transcript` and `/bash` require privilege commands",
+    params.route.verbose === "off"
+      ? "- `/transcript` disabled on this route (`verbose: off`)"
+      : "- `/transcript` enabled on this route (`verbose: minimal`)",
+    "- `/bash` requires privilege commands",
   );
 
   lines.push("", ...renderPrivilegeCommandHelpLines(params.identity));
   return lines.join("\n");
+}
+
+function allowTranscriptInspectionForRoute(route: ChannelInteractionRoute) {
+  return route.verbose === "minimal";
 }
 
 function renderResponseModeStatusMessage(params: {
@@ -607,6 +625,7 @@ async function executePromptDelivery<TChunk>(params: {
               queuePosition: positionAhead,
               maxChars: Number.POSITIVE_INFINITY,
               note: update.note,
+              allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
               previousState: renderedState,
               responsePolicy: params.route.response,
             });
@@ -675,6 +694,7 @@ async function executePromptDelivery<TChunk>(params: {
           content: finalResult.note ?? finalResult.snapshot,
           maxChars: Number.POSITIVE_INFINITY,
           note: finalResult.note,
+          allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
           responsePolicy: "final",
         }),
       );
@@ -688,6 +708,7 @@ async function executePromptDelivery<TChunk>(params: {
       snapshot: finalResult.snapshot,
       maxChars: Number.POSITIVE_INFINITY,
       note: finalResult.note,
+      allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
       previousState: renderedState,
       responsePolicy: params.route.response,
     });
@@ -700,6 +721,7 @@ async function executePromptDelivery<TChunk>(params: {
           content: nextState.body,
           maxChars: Number.POSITIVE_INFINITY,
           note: finalResult.note,
+          allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
           responsePolicy: "final",
         }),
       );
@@ -713,7 +735,15 @@ async function executePromptDelivery<TChunk>(params: {
       return;
     }
     if (error instanceof ActiveRunInProgressError) {
-      const activeText = error.update.note ?? String(error);
+      const activeText =
+        error.update.status === "detached"
+          ? resolveDetachedInteractionNote({
+              baseNote: error.update.note ?? String(error),
+              allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
+              transcriptCommand:
+                params.identity.platform === "telegram" ? "/transcript" : "`/transcript`",
+            })
+          : (error.update.note ?? String(error));
       if (params.route.streaming !== "off" && responseChunks.length > 0) {
         await params.reconcileText(responseChunks, activeText);
       } else {
@@ -833,9 +863,7 @@ export async function processChannelInteraction<TChunk>(params: {
   );
   const queueByMode = !explicitQueueMessage && params.route.additionalMessageMode === "queue" && sessionBusy;
   const forceQueuedDelivery = typeof explicitQueueMessage === "string" || queueByMode;
-  const isSensitiveCommand =
-    slashCommand?.type === "bash" ||
-    (slashCommand?.type === "control" && slashCommand.name === "transcript");
+  const isSensitiveCommand = slashCommand?.type === "bash";
 
   if (
     isSensitiveCommand &&
@@ -893,6 +921,12 @@ export async function processChannelInteraction<TChunk>(params: {
     }
 
     if (slashCommand.name === "transcript") {
+      if (params.route.verbose === "off") {
+        await params.postText(renderTranscriptDisabledMessage());
+        await params.agentService.recordConversationReply(params.sessionTarget);
+        return interactionResult;
+      }
+
       const transcript = await params.agentService.captureTranscript(params.sessionTarget);
       await params.postText(
         renderChannelSnapshot({

@@ -19,6 +19,7 @@ export function buildRenderedMessageState(params: {
   queuePosition?: number;
   maxChars: number;
   note?: string;
+  allowTranscriptInspection?: boolean;
   previousState?: ChannelRenderedMessageState;
   responsePolicy?: "all" | "final";
 }): ChannelRenderedMessageState {
@@ -36,6 +37,7 @@ export function buildRenderedMessageState(params: {
       queuePosition: params.queuePosition,
       maxChars: params.maxChars,
       note: params.note,
+      allowTranscriptInspection: params.allowTranscriptInspection,
       responsePolicy: params.responsePolicy,
     }),
     body,
@@ -49,6 +51,7 @@ export function renderPlatformInteraction(params: {
   maxChars: number;
   queuePosition?: number;
   note?: string;
+  allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
   return params.platform === "telegram"

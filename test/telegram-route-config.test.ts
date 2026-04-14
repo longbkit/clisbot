@@ -122,6 +122,7 @@ function createLoadedConfig(): LoadedConfig {
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -165,6 +166,7 @@ function createLoadedConfig(): LoadedConfig {
           response: "final",
           responseMode: "message-tool",
           additionalMessageMode: "steer",
+          verbose: "minimal",
           followUp: {
             mode: "auto",
             participationTtlMin: 5,
@@ -183,6 +185,7 @@ function createLoadedConfig(): LoadedConfig {
                 "4": {
                   requireMention: false,
                   agentId: "claude",
+                  verbose: "off",
                   timezone: "Asia/Ho_Chi_Minh",
                   privilegeCommands: {
                     enabled: true,
@@ -219,6 +222,7 @@ describe("Telegram route resolution", () => {
     expect(resolved.conversationKind).toBe("topic");
     expect(resolved.route?.agentId).toBe("claude");
     expect(resolved.route?.requireMention).toBe(false);
+    expect(resolved.route?.verbose).toBe("off");
     expect(resolved.route?.timezone).toBe("Asia/Ho_Chi_Minh");
     expect(resolved.route?.privilegeCommands).toEqual({
       enabled: true,
@@ -244,6 +248,16 @@ describe("Telegram route resolution", () => {
     });
 
     expect(resolved.route?.additionalMessageMode).toBe("queue");
+  });
+
+  test("inherits telegram route verbose from channel defaults", () => {
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig: createLoadedConfig(),
+      chatType: "private",
+      chatId: 123,
+    });
+
+    expect(resolved.route?.verbose).toBe("minimal");
   });
 
   test("isolates forum topics by topic id", () => {

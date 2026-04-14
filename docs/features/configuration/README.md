@@ -165,6 +165,7 @@ Current Slack route defaults should stay explicit:
 - `directMessages.policy: "pairing"`
 - `directMessages.allowFrom: []`
 - `directMessages.requireMention: false`
+- `verbose: "minimal"`
 - `privilegeCommands.enabled: false`
 - `privilegeCommands.allowUsers: []`
 - `commandPrefixes.slash: ["::", "\\"]`
@@ -174,14 +175,23 @@ Current Slack route defaults should stay explicit:
 
 Current sensitive-command rule should stay explicit:
 
-- transcript inspection and bash execution are disabled by default on chat routes
-- enable them only where they are intentionally allowed
-- current sensitive commands are:
-  - `/transcript`
-  - configured slash-style transcript shortcuts such as `::transcript` or `\transcript`
+- transcript inspection is controlled by route `verbose`
+- `verbose: "minimal"` allows `/transcript`
+- `verbose: "off"` blocks `/transcript`
+- bash execution is controlled separately by `privilegeCommands`
+- current privilege-gated commands are:
   - `/bash <command>`
   - configured bash shortcuts such as `!<command>`
 - observer commands such as `/attach`, `/detach`, and `/watch every <duration>` use the normal channel route and do not require `privilegeCommands.enabled`
+- transcript visibility is configured under:
+  - `channels.slack.verbose`
+  - `channels.slack.channels.<id>.verbose`
+  - `channels.slack.groups.<id>.verbose`
+  - `channels.slack.directMessages.verbose`
+  - `channels.telegram.verbose`
+  - `channels.telegram.groups.<id>.verbose`
+  - `channels.telegram.groups.<id>.topics.<topicId>.verbose`
+  - `channels.telegram.directMessages.verbose`
 - route-level enablement is supported under:
   - `channels.slack.channels.<id>.privilegeCommands`
   - `channels.slack.groups.<id>.privilegeCommands`
