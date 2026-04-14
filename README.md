@@ -1,4 +1,4 @@
-# clisbot - Agentic Coding CLI & chat bot
+# clisbot - Turn your favorite coding CLI into an agentic assistant and code on the go
 Want to use OpenClaw but are struggling because:
 
 - API cost is too high, so you end up looking for LLM proxy workarounds
