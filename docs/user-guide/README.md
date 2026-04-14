@@ -17,6 +17,8 @@ Related pages:
 
 - [Channel Operations](channels.md)
 - [Channel Accounts](channel-accounts.md)
+- [Telegram Bot Setup](telegram-setup.md)
+- [Slack App Setup](slack-setup.md)
 - [Agent Progress Replies](agent-progress-replies.md)
 
 If setup is unclear, clone this repo, open it in Codex or Claude Code, and ask it to help set up `clisbot`. The docs here are kept current enough for guided setup and troubleshooting.

@@ -7,7 +7,7 @@ Want to use OpenClaw but are struggling because:
 
 `clisbot` is the right solution for you.
 
-`clisbot` turns native frontier agent CLIs like Claude Code, Codex, and Gemini CLI into durable Slack and Telegram bots. Each agent runs inside its own tmux session, keeps a real workspace, and can behave like a coding bot, a daily-work assistant, or a team assistant with SOUL, IDENTITY, and MEMORY.
+`clisbot` turns native frontier agent CLIs like Claude Code, Codex, and Gemini CLI into durable Slack and Telegram bots. Each agent runs inside its own tmux session, keeps a real workspace, and can behave like a coding bot, a daily-work assistant, or a team assistant with SOUL, IDENTITY, and MEMORY. It is not just a tmux bridge with chat glued on top. `clisbot` adds channel-aware routing, durable conversation state, pairing and access control, follow-up behavior, and support for sending and receiving files through Slack and Telegram.
 
 It is a cheaper, simpler path to frontier agent workflows for teams and individuals because it reuses the CLI subscriptions you already have instead of forcing a separate API-heavy stack. If you already trust Claude Code, Codex, or Gemini CLI for real work, `clisbot` lets you keep those tools as the core runtime and add chat surfaces, follow-up control, team workflows, and on-the-go access around them.
 
@@ -19,6 +19,8 @@ It is a cheaper, simpler path to frontier agent workflows for teams and individu
 - Learns from and integrates the two biggest strengths that made OpenClaw popular: memory and native channel integration with deep, channel-specific conversation and presentation capabilities.
 - Reuses native CLI subscriptions you already pay for, such as Claude Code, Codex, and Gemini CLI, instead of pushing you toward a separate API-cost-heavy stack.
 - Strong chat-first support in Slack and Telegram, with durable tmux-backed sessions behind the bot, so you can work from your laptop or on the go without giving up a real coding workspace.
+- Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough.
+- Files and images can move through the chat surfaces too, not just text prompts: inbound Slack or Telegram attachments can land in the workspace, and outbound channel delivery is designed around real message and media actions rather than terminal-only output.
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
 - Useful for coding, operations, teamwork, and general assistant work, with fast shell shortcuts such as `!<command>` and `/bash <command>` when you need terminal-like control from chat.
 
@@ -28,6 +30,7 @@ It is a cheaper, simpler path to frontier agent workflows for teams and individu
 - The first-run path creates one default agent and only enables the channels you explicitly name.
 - DMs start with pairing so access stays explicit.
 - `--persist` lets later restarts use plain `clisbot start`.
+- Slack and Telegram are not treated as plain-text sinks: routed conversations can carry thread or topic identity, pairing, and file-aware workflows.
 - Advanced multi-agent setup is available later, but it is not required for day one.
 
 ## Quick Start
@@ -44,6 +47,13 @@ clisbot start \
 ```
 
 If you want to try first without persisting the token yet, just remove `--persist`.
+
+Need the step-by-step setup docs instead of the shortest path?
+
+- Telegram: [Telegram Bot Setup](docs/user-guide/telegram-setup.md)
+- Slack: [Slack App Setup](docs/user-guide/slack-setup.md)
+- Slack app manifest template: [app-manifest.json](templates/slack/default/app-manifest.json)
+- Slack app manifest guide: [app-manifest-guide.md](templates/slack/default/app-manifest-guide.md)
 
 What happens next:
 
@@ -96,6 +106,8 @@ Fresh config also starts with no preconfigured Slack channels or Telegram groups
 If you want a separate dev instance beside your main bot, see the [Development Guide](docs/development/README.md).
 
 ## Showcase
+
+The goal is a real chat-native agent surface, not a terminal transcript mirror: threads, topics, follow-up behavior, and file-aware workflows should feel native to Slack and Telegram.
 
 Slack
 
