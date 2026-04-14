@@ -28,6 +28,7 @@ import {
   clearSlackAssistantThreadStatus,
   setSlackAssistantThreadStatus,
 } from "./assistant-status.ts";
+import { waitForProcessingIndicatorLifecycle } from "../processing-indicator.ts";
 import { App } from "./bolt-compat.ts";
 import {
   canUseImplicitSlackFollowUp,
@@ -452,7 +453,7 @@ export class SlackSocketService {
       ]),
     );
     try {
-      await processChannelInteraction({
+      const interaction = await processChannelInteraction({
         agentService: this.agentService,
         sessionTarget,
         identity: {
@@ -502,6 +503,12 @@ export class SlackSocketService {
           });
           return responseChunks;
         },
+      });
+      await waitForProcessingIndicatorLifecycle({
+        agentService: this.agentService,
+        sessionTarget,
+        observerId: `slack-processing:${eventId}`,
+        lifecycle: interaction.processingIndicatorLifecycle,
       });
       await this.processedEventsStore.markCompleted(eventId);
     } catch (error) {

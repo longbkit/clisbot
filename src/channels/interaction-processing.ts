@@ -49,6 +49,7 @@ import {
 import { logLatencyDebug, type LatencyDebugContext } from "../control/latency-debug.ts";
 import { fileExists, readTextFile } from "../shared/fs.ts";
 import { join } from "node:path";
+import type { ProcessingIndicatorLifecycle } from "./processing-indicator.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -78,6 +79,10 @@ export type ChannelInteractionIdentity = {
 
 type PostText<TChunk> = (text: string) => Promise<TChunk[]>;
 type ReconcileText<TChunk> = (chunks: TChunk[], text: string) => Promise<TChunk[]>;
+
+export type ProcessChannelInteractionResult = {
+  processingIndicatorLifecycle: ProcessingIndicatorLifecycle;
+};
 
 function renderSensitiveCommandDisabledMessage(identity: ChannelInteractionIdentity) {
   return [
@@ -745,7 +750,10 @@ export async function processChannelInteraction<TChunk>(params: {
   postText: PostText<TChunk>;
   reconcileText: ReconcileText<TChunk>;
   timingContext?: LatencyDebugContext;
-}) {
+}): Promise<ProcessChannelInteractionResult> {
+  const interactionResult: ProcessChannelInteractionResult = {
+    processingIndicatorLifecycle: "handler",
+  };
   let responseChunks: TChunk[] = [];
   let renderedState: ChannelRenderedMessageState | undefined;
   const observerId = buildChannelObserverId(params.identity);
@@ -838,7 +846,7 @@ export async function processChannelInteraction<TChunk>(params: {
   ) {
     await params.postText(renderSensitiveCommandDisabledMessage(params.identity));
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (slashCommand?.type === "control") {
@@ -863,13 +871,13 @@ export async function processChannelInteraction<TChunk>(params: {
         }),
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "help") {
       await params.postText(renderAgentControlSlashHelp());
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "whoami") {
@@ -881,7 +889,7 @@ export async function processChannelInteraction<TChunk>(params: {
         }),
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "transcript") {
@@ -897,7 +905,7 @@ export async function processChannelInteraction<TChunk>(params: {
           note: "transcript command",
         }),
       );
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "attach") {
@@ -908,7 +916,7 @@ export async function processChannelInteraction<TChunk>(params: {
         }),
       );
       await applyRunUpdate(observation.update);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "detach") {
@@ -922,7 +930,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : "This thread was not attached to an active run.",
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "watch") {
@@ -935,7 +943,7 @@ export async function processChannelInteraction<TChunk>(params: {
         }),
       );
       await applyRunUpdate(observation.update);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "stop") {
@@ -946,7 +954,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : `Agent \`${stopped.agentId}\` session \`${stopped.sessionName}\` was not running.`,
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "nudge") {
@@ -957,7 +965,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : `No active or resumable session to nudge for agent \`${nudged.agentId}\`.`,
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "followup") {
@@ -989,7 +997,7 @@ export async function processChannelInteraction<TChunk>(params: {
         );
       }
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "responsemode") {
@@ -1018,7 +1026,7 @@ export async function processChannelInteraction<TChunk>(params: {
         );
       }
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "additionalmessagemode") {
@@ -1047,14 +1055,14 @@ export async function processChannelInteraction<TChunk>(params: {
         );
       }
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "queue-list") {
       const queuedItems = params.agentService.listQueuedPrompts?.(params.sessionTarget) ?? [];
       await params.postText(renderQueuedMessagesList(queuedItems));
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.name === "queue-clear") {
@@ -1065,7 +1073,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : "Queue was already empty.",
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
   }
 
@@ -1080,7 +1088,7 @@ export async function processChannelInteraction<TChunk>(params: {
         }),
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     const sessionLoops = params.agentService.listIntervalLoops?.({
@@ -1095,7 +1103,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : "No active loops to cancel across the whole app.",
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.all) {
@@ -1106,7 +1114,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : "No active loops to cancel for this session.",
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     const targetLoopId =
@@ -1119,7 +1127,7 @@ export async function processChannelInteraction<TChunk>(params: {
           : "Multiple active loops exist for this session. Use `/loop cancel <id>` or `/loop cancel --all`.",
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     const cancelled = await params.agentService.cancelIntervalLoop(targetLoopId);
@@ -1129,13 +1137,13 @@ export async function processChannelInteraction<TChunk>(params: {
         : `No active loop found with id \`${targetLoopId}\`.`,
     );
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (slashCommand?.type === "loop-error") {
     await params.postText(`${slashCommand.message}\n\n${renderLoopUsage()}`);
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (slashCommand?.type === "loop") {
@@ -1152,7 +1160,7 @@ export async function processChannelInteraction<TChunk>(params: {
         `Loop count exceeds the configured max of \`${maxRunsPerLoop}\`.\n\n${renderLoopUsage()}`,
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.params.mode === "interval") {
@@ -1163,7 +1171,7 @@ export async function processChannelInteraction<TChunk>(params: {
       if (intervalValidation.error) {
         await params.postText(`${intervalValidation.error}\n\n${renderLoopUsage()}`);
         await params.agentService.recordConversationReply(params.sessionTarget);
-        return;
+        return interactionResult;
       }
     }
 
@@ -1177,7 +1185,7 @@ export async function processChannelInteraction<TChunk>(params: {
     } catch (error) {
       await params.postText(String(error));
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
     const buildLoopPromptText = (text: string) =>
       params.agentPromptBuilder ? params.agentPromptBuilder(text) : text;
@@ -1204,7 +1212,7 @@ export async function processChannelInteraction<TChunk>(params: {
           observerId: `${observerId}:loop:${index + 1}`,
         });
       }
-      return;
+      return interactionResult;
     }
 
     if (slashCommand.params.mode === "calendar") {
@@ -1249,7 +1257,7 @@ export async function processChannelInteraction<TChunk>(params: {
         }),
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     const createdLoop = await params.agentService.createIntervalLoop({
@@ -1283,42 +1291,42 @@ export async function processChannelInteraction<TChunk>(params: {
       }),
     );
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (slashCommand?.type === "bash") {
     if (!slashCommand.command.trim()) {
       await params.postText("Usage: `/bash <command>` or a configured bash shortcut such as `!<command>`");
-      return;
+      return interactionResult;
     }
 
-    const result = await params.agentService.runShellCommand(
+    const shellResult = await params.agentService.runShellCommand(
       params.sessionTarget,
       slashCommand.command,
     );
     const header = [
-      `Bash in \`${result.workspacePath}\``,
-      `command: \`${result.command}\``,
-      result.timedOut ? "exit: `124` timed out" : `exit: \`${result.exitCode}\``,
+      `Bash in \`${shellResult.workspacePath}\``,
+      `command: \`${shellResult.command}\``,
+      shellResult.timedOut ? "exit: `124` timed out" : `exit: \`${shellResult.exitCode}\``,
     ].join("\n");
-    const body = result.output
-      ? `\n\n\`\`\`text\n${escapeCodeFence(result.output)}\n\`\`\``
+    const body = shellResult.output
+      ? `\n\n\`\`\`text\n${escapeCodeFence(shellResult.output)}\n\`\`\``
       : "\n\n`(no output)`";
     await params.postText(`${header}${body}`);
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (slashCommand?.type === "queue" && !explicitQueueMessage) {
     await params.postText("Usage: `/queue <message>` or `\\q <message>`");
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (slashCommand?.type === "steer" && !explicitSteerMessage) {
     await params.postText("Usage: `/steer <message>` or `\\s <message>`");
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return interactionResult;
   }
 
   if (explicitSteerMessage) {
@@ -1326,7 +1334,7 @@ export async function processChannelInteraction<TChunk>(params: {
     if (!hasActiveRun) {
       await params.postText("No active run to steer.");
       await params.agentService.recordConversationReply(params.sessionTarget);
-      return;
+      return interactionResult;
     }
 
     await params.agentService.submitSessionInput(
@@ -1335,7 +1343,9 @@ export async function processChannelInteraction<TChunk>(params: {
     );
     await params.postText("Steered.");
     await params.agentService.recordConversationReply(params.sessionTarget);
-    return;
+    return {
+      processingIndicatorLifecycle: "active-run",
+    };
   }
 
   if (!forceQueuedDelivery && params.route.additionalMessageMode === "steer") {
@@ -1344,7 +1354,9 @@ export async function processChannelInteraction<TChunk>(params: {
         params.sessionTarget,
         buildSteeringMessage(params.text),
       );
-      return;
+      return {
+        processingIndicatorLifecycle: "active-run",
+      };
     }
   }
 
@@ -1361,4 +1373,5 @@ export async function processChannelInteraction<TChunk>(params: {
     timingContext: params.timingContext,
     forceQueuedDelivery,
   });
+  return interactionResult;
 }

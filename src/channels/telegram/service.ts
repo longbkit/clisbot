@@ -49,6 +49,7 @@ import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
 import { runWithTelegramTypingHeartbeat } from "./typing.ts";
 import { buildTokenHint } from "../runtime-identity.ts";
+import { waitForProcessingIndicatorLifecycle } from "../processing-indicator.ts";
 
 type TelegramGetMeResult = {
   id: number;
@@ -533,7 +534,7 @@ export class TelegramPollingService {
           console.error("telegram typing failed", error);
         },
         run: async () => {
-          await processChannelInteraction({
+          const interaction = await processChannelInteraction({
             agentService: this.agentService,
             sessionTarget: routeInfo.sessionTarget,
             identity,
@@ -573,6 +574,12 @@ export class TelegramPollingService {
               });
               return responseChunks;
             },
+          });
+          await waitForProcessingIndicatorLifecycle({
+            agentService: this.agentService,
+            sessionTarget: routeInfo.sessionTarget,
+            observerId: `telegram-processing:${eventId}`,
+            lifecycle: interaction.processingIndicatorLifecycle,
           });
         },
       });

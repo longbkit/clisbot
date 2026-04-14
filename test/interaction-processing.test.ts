@@ -805,7 +805,7 @@ describe("processChannelInteraction agent prompt text", () => {
     const submitted: string[] = [];
     let replyCalls = 0;
 
-    await processChannelInteraction({
+    const result = await processChannelInteraction({
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         hasActiveRun: () => true,
@@ -840,6 +840,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(submitted[0]).toContain("</user>");
     expect(posted).toEqual([]);
     expect(replyCalls).toBe(0);
+    expect(result.processingIndicatorLifecycle).toBe("active-run");
   });
 
   test("queue command forces clisbot-managed delivery even in message-tool mode", async () => {
@@ -943,7 +944,7 @@ describe("processChannelInteraction agent prompt text", () => {
     const posted: string[] = [];
     const submitted: string[] = [];
 
-    await processChannelInteraction({
+    const result = await processChannelInteraction({
       agentService: {
         hasActiveRun: () => true,
         submitSessionInput: async (_target: AgentSessionTarget, text: string) => {
@@ -974,6 +975,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(submitted[0]).toContain("focus on the failing test first");
     expect(submitted[0]).toContain("</user>");
     expect(posted[0]).toBe("Steered.");
+    expect(result.processingIndicatorLifecycle).toBe("active-run");
   });
 
   test("does not auto-steer after a final reply was already delivered", async () => {

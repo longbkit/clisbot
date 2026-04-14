@@ -303,6 +303,9 @@ function buildConfig(params: {
   runnerCommand: string;
   runnerArgs: string[];
   sessionId: object;
+  trustWorkspace?: boolean;
+  startupDelayMs?: number;
+  startupReadyPattern?: string;
   staleAfterMinutes?: number;
   cleanupEnabled?: boolean;
   cleanupIntervalMinutes?: number;
@@ -331,9 +334,12 @@ function buildConfig(params: {
         runner: {
           command: params.runnerCommand,
           args: params.runnerArgs,
-          trustWorkspace: false,
-          startupDelayMs: 1,
+          trustWorkspace: params.trustWorkspace ?? false,
+          startupDelayMs: params.startupDelayMs ?? 1,
           promptSubmitDelayMs: 1,
+          ...(params.startupReadyPattern
+            ? { startupReadyPattern: params.startupReadyPattern }
+            : {}),
           sessionId: params.sessionId,
         },
         stream: {
