@@ -46,7 +46,7 @@ export type SharedChannelRouteOverride = {
 type SharedChannelConfig = {
   defaultAgentId: string;
   allowBots: boolean;
-  privilegeCommands: PrivilegeCommandsConfig;
+  privilegeCommands?: PrivilegeCommandsConfig;
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
@@ -73,7 +73,10 @@ type BuildSharedChannelRouteParams = {
 
 export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): SharedChannelRoute {
   const privilegeCommands = resolvePrivilegeCommands(
-    params.channelConfig.privilegeCommands,
+    params.channelConfig.privilegeCommands ?? {
+      enabled: false,
+      allowUsers: [],
+    },
     params.route?.privilegeCommands,
   );
   const agentId =

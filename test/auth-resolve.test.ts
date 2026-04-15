@@ -127,6 +127,7 @@ function createConfig(): ClisbotConfig {
           policy: "pairing",
           allowFrom: [],
           requireMention: false,
+          allowBots: false,
           agentId: "default",
         },
       },

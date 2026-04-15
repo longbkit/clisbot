@@ -394,10 +394,7 @@ const telegramSchema = z.object({
   allowBots: z.boolean().default(false),
   groupPolicy: slackConversationPolicySchema.default("allowlist"),
   defaultAgentId: z.string().default("default"),
-  privilegeCommands: privilegeCommandsSchema.default({
-    enabled: false,
-    allowUsers: [],
-  }),
+  privilegeCommands: privilegeCommandsSchema.optional(),
   commandPrefixes: commandPrefixesSchema.default({
     slash: ["::", "\\"],
     bash: ["!"],
@@ -474,10 +471,7 @@ const slackSchema = z.object({
   channelPolicy: slackConversationPolicySchema.default("allowlist"),
   groupPolicy: slackConversationPolicySchema.default("allowlist"),
   defaultAgentId: z.string().default("default"),
-  privilegeCommands: privilegeCommandsSchema.default({
-    enabled: false,
-    allowUsers: [],
-  }),
+  privilegeCommands: privilegeCommandsSchema.optional(),
   commandPrefixes: commandPrefixesSchema.default({
     slash: ["::", "\\"],
     bash: ["!"],

@@ -41,27 +41,12 @@ export async function readEditableConfig(configPath = getDefaultConfigPath()): P
 export async function writeEditableConfig(configPath: string, config: ClisbotConfig) {
   const expandedConfigPath = expandHomePath(configPath);
   await ensureDir(dirname(expandedConfigPath));
-  const nextConfig = stripLegacyPrivilegeCommands({
+  const nextConfig = {
     ...config,
     meta: {
       ...config.meta,
       lastTouchedAt: new Date().toISOString(),
     },
-  });
+  };
   await writeTextFile(expandedConfigPath, `${JSON.stringify(nextConfig, null, 2)}\n`);
-}
-
-function stripLegacyPrivilegeCommands(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => stripLegacyPrivilegeCommands(entry));
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const nextEntries = Object.entries(value)
-    .filter(([key]) => key !== "privilegeCommands")
-    .map(([key, entry]) => [key, stripLegacyPrivilegeCommands(entry)]);
-  return Object.fromEntries(nextEntries);
 }
