@@ -1080,11 +1080,10 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Working");
-    expect(reconciled).toContain("working draft");
-    expect(reconciled.at(-1)).toContain("working draft");
+    expect(reconciled).toEqual([]);
   });
 
-  test("rotates the live draft after a message-tool reply boundary", async () => {
+  test("hands off the live draft after a message-tool reply boundary", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     const runtime = {
@@ -1153,9 +1152,10 @@ describe("processChannelInteraction agent prompt text", () => {
       },
     });
 
-    expect(posted).toHaveLength(2);
-    expect(posted[1]).toContain("draft two");
-    expect(reconciled).toContain("draft one");
+    expect(posted).toHaveLength(1);
+    expect(reconciled.at(-1)).toBe("");
+    expect(posted.join("\n")).not.toContain("draft two");
+    expect(reconciled.join("\n")).not.toContain("draft two");
     expect(posted.join("\n")).not.toContain("final pane output");
     expect(reconciled.join("\n")).not.toContain("final pane output");
   });
@@ -1223,7 +1223,6 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft before final");
     expect(reconciled.at(-1)).toBe("");
   });
 
@@ -1618,7 +1617,7 @@ describe("processChannelInteraction agent prompt text", () => {
       sessionTarget: createTarget(),
       identity: createIdentity(),
       senderId: "U123",
-      text: "/queue-list",
+      text: "/queue list",
       route: createRoute({
         responseMode: "message-tool",
       }),
@@ -1650,7 +1649,7 @@ describe("processChannelInteraction agent prompt text", () => {
       sessionTarget: createTarget(),
       identity: createIdentity(),
       senderId: "U123",
-      text: "/queue-clear",
+      text: "/queue clear",
       route: createRoute({
         responseMode: "message-tool",
       }),

@@ -252,8 +252,8 @@ Important behavior:
 - conversation-level busy-session tools are available on routed Slack and Telegram conversations:
   - `/queue <message>` or `\q <message>`
   - `/steer <message>` or `\s <message>`
-  - `/queue-list`
-  - `/queue-clear`
+  - `/queue list`
+  - `/queue clear`
   - `/nudge`
   - `/loop 5m check CI`
   - `/loop 5m`

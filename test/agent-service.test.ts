@@ -29,6 +29,7 @@ type FakeSession = {
 
 class FakeTmuxClient {
   readonly sessionCommands: string[] = [];
+  serverDefaultsEnsured = 0;
   private sessions = new Map<string, FakeSession>();
   private readonly invalidResumeSessionIds = new Set<string>();
   private readonly disappearingOnCaptureSessionIds = new Set<string>();
@@ -73,6 +74,12 @@ class FakeTmuxClient {
 
   async isServerRunning() {
     return this.serverRunning;
+  }
+
+  async ensureServerDefaults() {
+    if (this.serverRunning) {
+      this.serverDefaultsEnsured += 1;
+    }
   }
 
   async hasSession(sessionName: string) {
@@ -574,6 +581,73 @@ describe("AgentService session identity", () => {
         `--session-id ${storedSessionId}`,
       );
       expect(fakeTmux.sessionCommands[1]).not.toContain("resume");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("applies tmux server defaults before reusing an existing session", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "off",
+                statusCommand: "/status",
+                pattern: "[0-9a-fA-F-]{36}",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "off",
+                args: [],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c3:thread:500.600",
+      };
+      const resolved = resolveAgentTarget(loaded, target);
+      await fakeTmux.newSession({
+        sessionName: resolved.sessionName,
+        cwd: resolved.workspacePath,
+        command: "fake-cli -C /tmp",
+      });
+
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+
+      expect(run.snapshot).toContain("PONG");
+      expect(fakeTmux.serverDefaultsEnsured).toBeGreaterThan(0);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -1340,10 +1414,10 @@ describe("AgentService session identity", () => {
     const transcript = await service.captureTranscript(target);
 
     expect(transcript.snapshot).toContain("check deploy");
-    expect(transcript.snapshot).toContain("To send the final user-visible reply, use the following CLI command:");
-    expect(transcript.snapshot).toContain("do not send user-facing progress updates for this conversation");
+    expect(transcript.snapshot).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(transcript.snapshot).toContain("use that command to send progress updates and the final reply back to the conversation");
     expect(transcript.snapshot).not.toContain("legacy wrapped prompt with progress instructions");
-    expect(transcript.snapshot).not.toContain("send at most 3 progress updates");
+    expect(transcript.snapshot).toContain("send at most 3 progress updates");
 
     await service.stop();
   });

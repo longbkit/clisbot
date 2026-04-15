@@ -337,5 +337,5 @@ Status surfaces:
 - `/queue <message>` always queues that one extra message, even when the surface default is `steer`.
 - `\q <message>` is a shortcut alias for `/queue <message>`.
 - `/steer <message>` and `\s <message>` inject a steering message into the active run immediately.
-- `/queue-list` shows queued messages for the current conversation that have not started yet.
-- `/queue-clear` clears queued messages for the current conversation that have not started yet.
+- `/queue list` shows queued messages for the current conversation that have not started yet.
+- `/queue clear` clears queued messages for the current conversation that have not started yet.

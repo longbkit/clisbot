@@ -115,7 +115,7 @@ function createConfig(): ClisbotConfig {
           slash: ["::", "\\"],
           bash: ["!"],
         },
-        streaming: "all",
+        streaming: "off",
         response: "final",
         responseMode: "message-tool",
         followUp: {
@@ -153,7 +153,7 @@ function createConfig(): ClisbotConfig {
           slash: ["::", "\\"],
           bash: ["!"],
         },
-        streaming: "all",
+        streaming: "off",
         response: "final",
         responseMode: "message-tool",
         followUp: {

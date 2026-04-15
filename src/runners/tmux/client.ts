@@ -3,6 +3,10 @@ import { commandExists, runCommand } from "../../shared/process.ts";
 
 const MAIN_WINDOW_NAME = "main";
 const TMUX_NOT_FOUND_CODE = "ENOENT";
+const TMUX_SERVER_DEFAULTS = [
+  ["exit-empty", "off"],
+  ["destroy-unattached", "off"],
+] as const;
 
 type TmuxExecResult = {
   stdout: string;
@@ -94,6 +98,16 @@ export class TmuxClient {
     return !output.includes("no server running");
   }
 
+  async ensureServerDefaults() {
+    if (!(await this.isServerRunning())) {
+      return;
+    }
+
+    for (const [name, value] of TMUX_SERVER_DEFAULTS) {
+      await this.execOrThrow(["set-option", "-g", name, value]);
+    }
+  }
+
   async newSession(params: {
     sessionName: string;
     cwd: string;
@@ -110,6 +124,7 @@ export class TmuxClient {
       params.cwd,
       params.command,
     ]);
+    await this.ensureServerDefaults();
     await this.freezeWindowName(`${params.sessionName}:${MAIN_WINDOW_NAME}`);
   }
 

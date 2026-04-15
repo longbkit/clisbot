@@ -86,10 +86,54 @@ export function extractScrolledAppend(previous: string, current: string) {
   return "";
 }
 
+export function deriveRunningInteractionText(previousSnapshot: string, currentSnapshot: string) {
+  const previous = cleanInteractionSnapshot(previousSnapshot);
+  const current = cleanInteractionSnapshot(currentSnapshot);
+
+  if (!current || current === previous) {
+    return "";
+  }
+
+  if (!previous) {
+    return current;
+  }
+
+  return extractScrolledAppend(previous, current);
+}
+
 export function deriveInteractionText(initialSnapshot: string, currentSnapshot: string) {
   const previous = cleanInteractionSnapshot(initialSnapshot);
   const current = cleanInteractionSnapshot(currentSnapshot);
   return extractScrolledAppend(previous, current) || diffText(previous, current);
+}
+
+export function appendInteractionText(currentBody: string, nextDelta: string) {
+  const trimmedCurrent = currentBody.trim();
+  const trimmedDelta = nextDelta.trim();
+
+  if (!trimmedDelta) {
+    return trimmedCurrent;
+  }
+
+  if (!trimmedCurrent) {
+    return trimmedDelta;
+  }
+
+  const currentLines = trimmedCurrent.split("\n");
+  const deltaLines = trimmedDelta.split("\n");
+  const maxOverlap = Math.min(currentLines.length, deltaLines.length, 8);
+  let overlap = 0;
+
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    const currentSuffix = currentLines.slice(currentLines.length - size).join("\n");
+    const deltaPrefix = deltaLines.slice(0, size).join("\n");
+    if (currentSuffix === deltaPrefix) {
+      overlap = size;
+      break;
+    }
+  }
+
+  return [...currentLines, ...deltaLines.slice(overlap)].join("\n").trim();
 }
 
 function joinExcerpt(lines: string[], params: { trimmedHead: boolean; trimmedTail: boolean }) {

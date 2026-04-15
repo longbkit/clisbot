@@ -100,8 +100,10 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
   { command: "followup", description: "Show or change follow-up mode" },
   { command: "streaming", description: "Show or change streaming mode" },
   { command: "responsemode", description: "Show or change response mode" },
+  { command: "additionalmessagemode", description: "Show or change later-message mode" },
   { command: "queue", description: "Queue a later message behind the active run" },
   { command: "steer", description: "Steer the active run immediately" },
+  { command: "loop", description: "Show or manage loops for this route" },
   { command: "bash", description: "Run bash in the agent workspace" },
 ];
 

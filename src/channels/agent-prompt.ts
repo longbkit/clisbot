@@ -33,7 +33,7 @@ function renderAgentPromptInstruction(params: {
   protectedControlMutationRule?: string;
 }) {
   const messageToolMode = (params.responseMode ?? "message-tool") === "message-tool";
-  const progressAllowed = messageToolMode && (params.streaming ?? "all") !== "off";
+  const progressAllowed = messageToolMode && (params.streaming ?? "off") === "off";
   const lines = [
     `[${renderPromptTimestamp()}] ${renderIdentitySummary(params.identity)}`,
     "",
@@ -174,7 +174,7 @@ function buildReplyCommand(params: {
     }
     lines.push("  --final \\");
     lines.push('  --message "$(cat <<\\__CLISBOT_MESSAGE__');
-    lines.push("<short progress update>");
+    lines.push("<user-facing reply>");
     lines.push("__CLISBOT_MESSAGE__");
     lines.push(')" \\');
     lines.push("  [--media /absolute/path/to/file]");
@@ -188,7 +188,7 @@ function buildReplyCommand(params: {
   }
   lines.push("  --final \\");
   lines.push('  --message "$(cat <<\\__CLISBOT_MESSAGE__');
-  lines.push("<short progress update>");
+  lines.push("<user-facing reply>");
   lines.push("__CLISBOT_MESSAGE__");
   lines.push(')" \\');
   lines.push("  [--media /absolute/path/to/file]");

@@ -11,7 +11,7 @@ describe("agent prompt envelope", () => {
     process.env.CLISBOT_PROMPT_COMMAND = previousPromptCommand;
   });
 
-  test("renders a Slack reply command for the current thread", () => {
+  test("renders final-only reply instructions when streaming is enabled for the current thread", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
     process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
@@ -37,7 +37,7 @@ describe("agent prompt envelope", () => {
     });
 
     expect(prompt).toContain("<system>");
-    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(prompt).toContain("To send the final user-visible reply, use the following CLI command:");
     expect(prompt).toContain("/tmp/clis message send \\");
     expect(prompt).toContain("  --channel slack \\");
     expect(prompt).toContain("  --target channel:C123 \\");
@@ -48,9 +48,10 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  [--media /absolute/path/to/file]");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
-    expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
-    expect(prompt).toContain("- send at most 3 progress updates");
+    expect(prompt).toContain("- use that command only for the final user-facing reply");
+    expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
+    expect(prompt).not.toContain("- send at most 3 progress updates");
     expect(prompt).toContain("<user>\nplease investigate\n</user>");
   });
 
@@ -141,7 +142,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).not.toContain("- send exactly 1 final user-facing response");
   });
 
-  test("uses the same shared reply instructions for Gemini in message-tool mode", () => {
+  test("uses the same final-only reply instructions for Gemini when streaming is enabled", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
     process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
@@ -165,13 +166,15 @@ describe("agent prompt envelope", () => {
       streaming: "all",
     });
 
-    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(prompt).toContain("To send the final user-visible reply, use the following CLI command:");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
+    expect(prompt).toContain("- use that command only for the final user-facing reply");
+    expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
     expect(prompt).not.toContain("Gemini-specific rule:");
   });
 
-  test("suppresses progress instructions when streaming is off in message-tool mode", () => {
+  test("allows progress instructions when streaming is off in message-tool mode", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
     process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
@@ -194,12 +197,11 @@ describe("agent prompt envelope", () => {
       streaming: "off",
     });
 
-    expect(prompt).toContain("To send the final user-visible reply, use the following CLI command:");
-    expect(prompt).toContain("- use that command only for the final user-facing reply");
-    expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
+    expect(prompt).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
+    expect(prompt).toContain("- use that command to send progress updates and the final reply back to the conversation");
+    expect(prompt).toContain("- send at most 3 progress updates");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
-    expect(prompt).not.toContain("- send at most 3 progress updates");
-    expect(prompt).not.toContain("- keep progress updates short and meaningful");
+    expect(prompt).toContain("- keep progress updates short and meaningful");
   });
 
   test("appends the protected control rule when provided", () => {

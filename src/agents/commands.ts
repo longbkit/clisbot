@@ -418,20 +418,6 @@ export function parseAgentCommand(
     };
   }
 
-  if (lowered === "queue-list" || lowered === "queuelist") {
-    return {
-      type: "control",
-      name: "queue-list",
-    };
-  }
-
-  if (lowered === "queue-clear" || lowered === "queueclear") {
-    return {
-      type: "control",
-      name: "queue-clear",
-    };
-  }
-
   if (lowered === "loop") {
     const loopText = withoutSlash.slice(command.length).trim();
     const loweredLoopText = loopText.toLowerCase();
@@ -485,9 +471,41 @@ export function parseAgentCommand(
   }
 
   if (lowered === "queue" || lowered === "q") {
+    const queueText = withoutSlash.slice(command.length).trim();
+    const normalizedQueueText = queueText.toLowerCase();
+    if (lowered === "queue") {
+      if (normalizedQueueText === "list") {
+        return {
+          type: "control",
+          name: "queue-list",
+        };
+      }
+
+      if (normalizedQueueText === "clear") {
+        return {
+          type: "control",
+          name: "queue-clear",
+        };
+      }
+    }
+
     return {
       type: "queue",
-      text: withoutSlash.slice(command.length).trim(),
+      text: queueText,
+    };
+  }
+
+  if (lowered === "queue-list" || lowered === "queuelist") {
+    return {
+      type: "control",
+      name: "queue-list",
+    };
+  }
+
+  if (lowered === "queue-clear" || lowered === "queueclear") {
+    return {
+      type: "control",
+      name: "queue-clear",
     };
   }
 
@@ -544,11 +562,7 @@ export function renderAgentControlSlashHelp() {
     "- `/followup mention-only`: require explicit mention for each later turn",
     "- `/followup pause`: stop passive follow-up until the next explicit mention",
     "- `/followup resume`: clear the runtime override and restore config defaults",
-    "- `/streaming status`: show the configured streaming mode for this surface",
-    "- `/streaming on`: enable streaming for this surface using the current `all` preview behavior",
-    "- `/streaming off`: disable surface streaming previews for this surface",
-    "- `/streaming latest`: prefer the latest preview shape for this surface",
-    "- `/streaming all`: retain the full current preview shape for this surface",
+    "- `/streaming status|on|off|latest|all`: show or change streaming mode for this surface",
     "- `/responsemode status`: show the configured response mode for this surface",
     "- `/responsemode capture-pane`: settle replies from captured pane output for this surface",
     "- `/responsemode message-tool`: expect the agent to reply through `clisbot message send` for this surface",
@@ -557,8 +571,8 @@ export function renderAgentControlSlashHelp() {
     "- `/additionalmessagemode queue`: queue later user messages behind the active run for this surface",
     "- `/queue <message>` or `\\q <message>`: enqueue a later message behind the active run and let clisbot deliver it in order",
     "- `/steer <message>` or `\\s <message>`: inject a steering message into the active run immediately",
-    "- `/queue-list`: show queued messages that have not started yet",
-    "- `/queue-clear`: clear queued messages that have not started yet",
+    "- `/queue list`: show queued messages that have not started yet",
+    "- `/queue clear`: clear queued messages that have not started yet",
     ...renderLoopHelpLines(),
     "- `/bash` followed by a shell command: requires `shellExecute` on the resolved agent role",
     "- shortcut prefixes such as `!` run bash only when the resolved agent role allows `shellExecute`",

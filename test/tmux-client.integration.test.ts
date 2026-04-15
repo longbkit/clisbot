@@ -68,6 +68,24 @@ describe("TmuxClient", () => {
     await client.killSession(sessionName);
   }, 10000);
 
+  test("keeps the tmux server running after the last session exits", async () => {
+    socketDir = mkdtempSync(join(tmpdir(), "clisbot-socket-"));
+    const socketPath = join(socketDir, "clisbot.sock");
+    const client = new TmuxClient(socketPath);
+    const sessionName = "server-defaults-test";
+
+    await client.newSession({
+      sessionName,
+      cwd: socketDir,
+      command: "sleep 3600",
+    });
+
+    await client.killSession(sessionName);
+
+    expect(await client.isServerRunning()).toBe(true);
+    expect(await client.listSessions()).toEqual([]);
+  }, 10000);
+
   test("finds and reuses a named window target", async () => {
     socketDir = mkdtempSync(join(tmpdir(), "clisbot-socket-"));
     const socketPath = join(socketDir, "clisbot.sock");

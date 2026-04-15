@@ -233,12 +233,12 @@ function renderRouteStatusMessage(params: {
     "- `/status`",
     "- `/attach`, `/detach`, `/watch every 30s`",
     "- `/followup status`",
-    "- `/streaming status`",
+    "- `/streaming status|on|off|latest|all`",
     "- `/responsemode status`",
     "- `/additionalmessagemode status`",
     "- `/loop status`, `/loop cancel`, `/loop cancel <id>`",
     "- `/queue <message>`, `/steer <message>`",
-    "- `/queue-list`, `/queue-clear`",
+    "- `/queue list`, `/queue clear`",
     params.route.verbose === "off"
       ? "- `/transcript` disabled on this route (`verbose: off`)"
       : "- `/transcript` enabled on this route (`verbose: minimal`)",
@@ -611,7 +611,7 @@ async function executePromptDelivery<TChunk>(params: {
   let finalReplyRecorded = false;
   let loggedFirstRunningUpdate = false;
   let activePreviewStartedAt: number | undefined;
-  let lastFrozenPreviewText: string | undefined;
+  let messageToolPreviewHandedOff = false;
   const paneManagedDelivery =
     params.route.responseMode === "capture-pane" || params.forceQueuedDelivery === true;
   const messageToolPreview =
@@ -664,11 +664,13 @@ async function executePromptDelivery<TChunk>(params: {
     activePreviewStartedAt = undefined;
   }
 
-  function resetPreviewBoundary() {
-    lastFrozenPreviewText = renderedState?.text ?? lastFrozenPreviewText;
-    responseChunks = [];
-    renderedState = undefined;
-    activePreviewStartedAt = undefined;
+  async function handoffMessageToolPreview() {
+    if (messageToolPreviewHandedOff) {
+      return;
+    }
+
+    messageToolPreviewHandedOff = true;
+    await clearResponseText();
   }
 
   async function getMessageToolRuntimeSignals() {
@@ -739,21 +741,17 @@ async function executePromptDelivery<TChunk>(params: {
             if (
               messageToolPreview &&
               typeof activePreviewStartedAt === "number" &&
-              typeof signals.messageToolFinalReplyAt === "number" &&
-              signals.messageToolFinalReplyAt >= activePreviewStartedAt
+              ((typeof signals.messageToolFinalReplyAt === "number" &&
+                signals.messageToolFinalReplyAt >= activePreviewStartedAt) ||
+                (typeof signals.lastMessageToolReplyAt === "number" &&
+                  signals.lastMessageToolReplyAt >= activePreviewStartedAt))
             ) {
-              lastFrozenPreviewText = renderedState?.text ?? lastFrozenPreviewText;
-              activePreviewStartedAt = undefined;
+              await handoffMessageToolPreview();
               return;
             }
 
-            if (
-              messageToolPreview &&
-              typeof activePreviewStartedAt === "number" &&
-              typeof signals.lastMessageToolReplyAt === "number" &&
-              signals.lastMessageToolReplyAt >= activePreviewStartedAt
-            ) {
-              resetPreviewBoundary();
+            if (messageToolPreview) {
+              return;
             }
 
             const nextState = buildRenderedMessageState({
@@ -768,10 +766,6 @@ async function executePromptDelivery<TChunk>(params: {
               responsePolicy: params.route.response,
             });
             if (renderedState?.text === nextState.text) {
-              return;
-            }
-
-            if (!renderedState && lastFrozenPreviewText === nextState.text) {
               return;
             }
 
@@ -828,6 +822,10 @@ async function executePromptDelivery<TChunk>(params: {
 
     const finalResult = await result;
     await renderChain;
+
+    if (!paneManagedDelivery && messageToolPreviewHandedOff) {
+      return;
+    }
 
     const nextState = buildRenderedMessageState({
       platform: params.identity.platform,
@@ -889,6 +887,24 @@ async function executePromptDelivery<TChunk>(params: {
       // The tool path is the only source of truth for canonical replies here, and re-enabling
       // pane fallback tends to reintroduce duplicate or out-of-order terminal messages because
       // tool-final state is asynchronous and subtle to coordinate across channel/runtime boundaries.
+      return;
+    }
+
+    if (messageToolPreview && responseChunks.length > 0) {
+      const postedNew = await renderResponseText(
+        renderPlatformInteraction({
+          platform: params.identity.platform,
+          status: finalResult.status,
+          content: "",
+          maxChars: Number.POSITIVE_INFINITY,
+          note: finalResult.note,
+          allowTranscriptInspection: allowTranscriptInspectionForRoute(params.route),
+          responsePolicy: params.route.response,
+        }),
+      );
+      if (postedNew) {
+        await recordVisibleReply("reply", "channel");
+      }
       return;
     }
 

@@ -360,6 +360,7 @@ describe("loadConfig", () => {
           enabled: boolean;
           appToken: string;
           botToken: string;
+          streaming: string;
           verbose: string;
           channels: Record<string, unknown>;
           groups: Record<string, unknown>;
@@ -367,6 +368,7 @@ describe("loadConfig", () => {
         telegram: {
           enabled: boolean;
           botToken: string;
+          streaming: string;
           verbose: string;
           groups: Record<string, unknown>;
         };
@@ -375,6 +377,8 @@ describe("loadConfig", () => {
 
     expect(config.channels.slack.enabled).toBe(false);
     expect(config.channels.telegram.enabled).toBe(false);
+    expect(config.channels.slack.streaming).toBe("off");
+    expect(config.channels.telegram.streaming).toBe("off");
     expect(config.channels.slack.verbose).toBe("minimal");
     expect(config.channels.telegram.verbose).toBe("minimal");
     expect(config.channels.slack.appToken).toBe("${SLACK_APP_TOKEN}");
@@ -396,13 +400,15 @@ describe("loadConfig", () => {
       }),
     ) as {
       channels: {
-        slack: { enabled: boolean; appToken: string; botToken: string };
-        telegram: { enabled: boolean; botToken: string };
+        slack: { enabled: boolean; appToken: string; botToken: string; streaming: string };
+        telegram: { enabled: boolean; botToken: string; streaming: string };
       };
     };
 
     expect(config.channels.slack.enabled).toBe(true);
     expect(config.channels.telegram.enabled).toBe(false);
+    expect(config.channels.slack.streaming).toBe("off");
+    expect(config.channels.telegram.streaming).toBe("off");
     expect(config.channels.slack.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.channels.slack.botToken).toBe("${SLACK_BOT_TOKEN}");
     expect(config.channels.telegram.botToken).toBe("${TELEGRAM_BOT_TOKEN}");

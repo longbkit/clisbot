@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  appendInteractionText,
   cleanInteractionSnapshot,
   deriveMeaningfulPaneSnapshot,
   deriveInteractionText,
+  deriveRunningInteractionText,
   extractFinalAnswer,
   extractSlackIncrement,
   mergeSlackStreamBodies,
@@ -185,6 +187,36 @@ This project maps channel messages into tmux-backed agents.
         "\n",
       ),
     );
+  });
+
+  test("deriveRunningInteractionText ignores pane redraw content that is not a real append", () => {
+    const previous = [
+      "Em đã thêm regression test cho cả 2 case trên. Verify đã pass:",
+      "- `bun test test/text.test.ts test/interaction-processing.test.ts`",
+      "- `bun x tsc --noEmit`",
+    ].join("\n");
+    const current = [
+      "732 + }); 733 + 734 test(\"completed interaction truncation preserves the beginning of the final answer\", () => {",
+      "- `bun x tsc --noEmit`",
+    ].join("\n");
+
+    expect(deriveRunningInteractionText(previous, current)).toBe("");
+  });
+
+  test("deriveRunningInteractionText keeps only appended text when the pane window shifts", () => {
+    const previous = ["line 1", "line 2", "line 3"].join("\n");
+    const current = ["older line", "line 1", "line 2", "line 3", "line 4"].join("\n");
+
+    expect(deriveRunningInteractionText(previous, current)).toBe("line 4");
+  });
+
+  test("appendInteractionText keeps cumulative output without duplicating the overlap", () => {
+    expect(
+      appendInteractionText(
+        ["line 1", "line 2"].join("\n"),
+        ["line 2", "line 3"].join("\n"),
+      ),
+    ).toBe(["line 1", "line 2", "line 3"].join("\n"));
   });
 
   test("unwraps soft-wrapped tmux lines into cleaner Slack text", () => {

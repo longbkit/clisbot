@@ -250,6 +250,9 @@ export class RunnerSessionService {
     await ensureRunnerExitRecordDir(this.loadedConfig.stateDir, resolved.sessionName);
     const existing = await this.sessionState.getEntry(resolved.sessionKey);
     const serverRunning = await this.tmux.isServerRunning();
+    if (serverRunning) {
+      await this.tmux.ensureServerDefaults();
+    }
 
     if (serverRunning && (await this.tmux.hasSession(resolved.sessionName))) {
       logLatencyDebug("ensure-session-ready-existing-session", timingContext, {

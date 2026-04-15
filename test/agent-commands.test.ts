@@ -125,6 +125,21 @@ describe("parseAgentCommand", () => {
       text: "focus on the regression",
     });
 
+    expect(parseAgentCommand("/queue list")).toEqual({
+      type: "control",
+      name: "queue-list",
+    });
+
+    expect(parseAgentCommand("/queue clear")).toEqual({
+      type: "control",
+      name: "queue-clear",
+    });
+
+    expect(parseAgentCommand("/queue clear now")).toEqual({
+      type: "queue",
+      text: "clear now",
+    });
+
     expect(parseAgentCommand("/queue-list")).toEqual({
       type: "control",
       name: "queue-list",

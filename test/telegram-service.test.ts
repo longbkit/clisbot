@@ -233,8 +233,10 @@ describe("buildTelegramCommandRegistrations", () => {
       "followup",
       "streaming",
       "responsemode",
+      "additionalmessagemode",
       "queue",
       "steer",
+      "loop",
       "bash",
     ]);
     expect(registrations[2]?.scope).toEqual({

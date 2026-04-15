@@ -59,8 +59,8 @@ If this page and runtime ever disagree, runtime wins.
 
 - `/queue <message>` or `\q <message>`: enqueue a later message behind the active run
 - `/steer <message>` or `\s <message>`: inject a steering message into the active run immediately
-- `/queue-list`: show queued messages that have not started yet
-- `/queue-clear`: clear queued messages that have not started yet
+- `/queue list`: show queued messages that have not started yet
+- `/queue clear`: clear queued messages that have not started yet
 
 ## Loops
 
