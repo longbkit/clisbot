@@ -9,16 +9,13 @@ import {
 } from "../src/channels/interaction-processing.ts";
 import type { AgentSessionTarget } from "../src/agents/agent-service.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { sleep } from "../src/shared/process.ts";
 
 function createRoute(
   overrides: Partial<ChannelInteractionRoute> = {},
 ): ChannelInteractionRoute {
   return {
     agentId: "default",
-    privilegeCommands: {
-      enabled: false,
-      allowUsers: [],
-    },
     commandPrefixes: {
       slash: ["::", "\\"],
       bash: ["!"],
@@ -285,7 +282,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("command: `pwd`");
   });
 
-  test("still blocks bash when legacy route privilege settings would have allowed it", async () => {
+  test("still blocks bash when shellExecute is missing even if the sender differs", async () => {
     const posted: string[] = [];
     let bashCalls = 0;
 
@@ -310,12 +307,7 @@ describe("processChannelInteraction sensitive command gating", () => {
       identity: createIdentity(),
       senderId: "U999",
       text: "!pwd",
-      route: createRoute({
-        privilegeCommands: {
-          enabled: true,
-          allowUsers: ["U123"],
-        },
-      }),
+      route: createRoute(),
       maxChars: 4000,
       postText: async (text) => {
         posted.push(text);
@@ -1341,6 +1333,96 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(reconciled.join("\n")).not.toContain("final pane output");
   });
 
+  test("does not resume the live draft after a message-tool boundary was already handed off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft one",
+              fullSnapshot: "draft one",
+              initialSnapshot: "",
+            });
+            runtime.lastMessageToolReplyAt = Date.now();
+            runtime.messageToolFinalReplyAt = runtime.lastMessageToolReplyAt;
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft two",
+              fullSnapshot: "draft two",
+              initialSnapshot: "",
+            });
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft three",
+              fullSnapshot: "draft three",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "final pane output",
+              fullSnapshot: "final pane output",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(reconciled).toContain("draft one");
+    expect(reconciled.filter((text) => text === "")).toHaveLength(1);
+    expect(posted.join("\n")).not.toContain("draft two");
+    expect(posted.join("\n")).not.toContain("draft three");
+    expect(reconciled.join("\n")).not.toContain("draft two");
+    expect(reconciled.join("\n")).not.toContain("draft three");
+  });
+
   test("cleans up the live draft after a message-tool final reply when response is final", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
@@ -1408,6 +1490,88 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(reconciled.at(-1)).toBe("");
   });
 
+  test("clears the live draft as soon as a delayed message-tool final arrives even without another pane update", async () => {
+    const posted: string[] = [];
+    const reconciled: Array<{ text: string; resultResolved: boolean }> = [];
+    let resolveResult!: (value: any) => void;
+    let resultResolved = false;
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    const interaction = processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: new Promise((resolve) => {
+            resolveResult = (value) => {
+              resultResolved = true;
+              resolve(value);
+            };
+            void callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft before delayed final",
+              fullSnapshot: "draft before delayed final",
+              initialSnapshot: "",
+            });
+          }),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+        response: "final",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push({
+          text,
+          resultResolved,
+        });
+        return text ? [text] : [];
+      },
+    });
+
+    await sleep(20);
+    runtime.lastMessageToolReplyAt = Date.now();
+    runtime.messageToolFinalReplyAt = runtime.lastMessageToolReplyAt;
+    await sleep(160);
+    resolveResult({
+      status: "completed",
+      agentId: "default",
+      sessionKey: createTarget().sessionKey,
+      sessionName: "session",
+      workspacePath: "/tmp/workspace",
+      snapshot: "final pane output",
+      fullSnapshot: "final pane output",
+      initialSnapshot: "",
+    });
+    await interaction;
+
+    expect(posted).toHaveLength(1);
+    expect(reconciled.some((entry) => entry.text === "" && entry.resultResolved === false)).toBe(
+      true,
+    );
+    expect(reconciled.map((entry) => entry.text).join("\n")).not.toContain("final pane output");
+  });
+
   test("does not post fallback settlement when a delayed message-tool final arrives with streaming off", async () => {
     const posted: string[] = [];
     let runtimeReads = 0;
@@ -1455,6 +1619,50 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(0);
+  });
+
+  test("does not post pane timeout settlement when message-tool mode has streaming off and no tool final arrives", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "timeout",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "timeout pane output",
+            fullSnapshot: "timeout pane output",
+            initialSnapshot: "",
+          }),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted).toHaveLength(0);
+    expect(reconciled).toEqual([]);
   });
 
   test("still posts a fallback error when message-tool mode fails before the agent can reply", async () => {
@@ -2232,6 +2440,130 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toContain("Started loop for 3 iterations.");
     expect(posted.some((text) => text.includes("Queued:"))).toBe(false);
     expect(posted.some((text) => text.includes("Working"))).toBe(false);
+    expect(enqueued).toHaveLength(3);
+  });
+
+  test("loop times mode does not leak pane timeout settlements in message-tool mode when streaming is off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const enqueued: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getLoopConfig: () => ({
+          maxRunsPerLoop: 20,
+          maxActiveLoops: 10,
+        }),
+        getWorkspacePath: () => "/tmp/workspace",
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          enqueued.push(prompt);
+          return {
+            positionAhead: enqueued.length - 1,
+            result: Promise.resolve({
+              status: "timeout",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: `timed out pane ${enqueued.length}`,
+              fullSnapshot: `timed out pane ${enqueued.length}`,
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/loop 3 /codereview",
+      agentPromptBuilder: (text) => `wrapped:${text}`,
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "off",
+        surfaceNotifications: {
+          queueStart: "none",
+          loopStart: "brief",
+        },
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Started loop for 3 iterations.");
+    expect(posted.some((text) => text.includes("Timed out waiting for more output"))).toBe(false);
+    expect(posted.some((text) => text.includes("timed out pane"))).toBe(false);
+    expect(reconciled).toEqual([]);
+    expect(enqueued).toHaveLength(3);
+  });
+
+  test("loop times mode suppresses repeated detached settlements", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const enqueued: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        getLoopConfig: () => ({
+          maxRunsPerLoop: 20,
+          maxActiveLoops: 10,
+        }),
+        getWorkspacePath: () => "/tmp/workspace",
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          enqueued.push(prompt);
+          return {
+            positionAhead: enqueued.length - 1,
+            result: Promise.resolve({
+              status: "detached",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: `still running ${enqueued.length}`,
+              fullSnapshot: `still running ${enqueued.length}`,
+              initialSnapshot: "",
+              note:
+                "This session has been running for over 15 minutes. clisbot left it running as-is. Use `/attach`, `/watch every 30s`, or `/stop` to manage it.",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/loop 3 /codereview",
+      agentPromptBuilder: (text) => `wrapped:${text}`,
+      route: createRoute({
+        responseMode: "capture-pane",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(posted[0]).toContain("Started loop for 3 iterations.");
+    expect(posted.some((text) => text.includes("This session has been running for over 15 minutes"))).toBe(false);
+    expect(reconciled).toEqual([]);
     expect(enqueued).toHaveLength(3);
   });
 

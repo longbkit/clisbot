@@ -301,7 +301,7 @@ export class AgentSessionState {
       },
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime:
-        existing?.runtime && existing.runtime.state !== "idle"
+        existing?.runtime
           ? {
               ...existing.runtime,
               ...(kind === "final"

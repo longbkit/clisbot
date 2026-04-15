@@ -40,7 +40,6 @@ import {
   type SurfaceNotificationMode,
   type SurfaceNotificationsConfig,
 } from "./surface-notifications.ts";
-import { type PrivilegeCommandsConfig } from "./privilege-commands.ts";
 import type { RunObserverMode, RunUpdate } from "../agents/run-observation.ts";
 import {
   getConversationResponseMode,
@@ -63,7 +62,6 @@ import type { ChannelIdentity } from "./channel-identity.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
-  privilegeCommands: PrivilegeCommandsConfig;
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
@@ -86,6 +84,7 @@ export type ProcessChannelInteractionResult = {
 
 const MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS = 3_000;
 const MESSAGE_TOOL_FINAL_GRACE_POLL_MS = 100;
+const MESSAGE_TOOL_PREVIEW_SIGNAL_POLL_MS = 100;
 
 function renderSensitiveCommandDisabledMessage() {
   return [
@@ -645,6 +644,7 @@ async function executePromptDelivery<TChunk>(params: {
   forceQueuedDelivery?: boolean;
   queueStartMode?: SurfaceNotificationMode;
   notificationPromptSummary?: string;
+  suppressDetachedSettlement?: boolean;
 }) {
   let responseChunks: TChunk[] = [];
   let renderedState: ChannelRenderedMessageState | undefined;
@@ -654,6 +654,9 @@ async function executePromptDelivery<TChunk>(params: {
   let loggedFirstRunningUpdate = false;
   let activePreviewStartedAt: number | undefined;
   let messageToolPreviewHandedOff = false;
+  let messageToolPreviewMonitorStarted = false;
+  let stopMessageToolPreviewMonitor = false;
+  let messageToolPreviewMonitor: Promise<void> | undefined;
   let queueStartPending = false;
   let deferredQueueStartPreview = false;
   const paneManagedDelivery =
@@ -717,6 +720,22 @@ async function executePromptDelivery<TChunk>(params: {
     await clearResponseText();
   }
 
+  function hasMessageToolReplyBoundary(params: {
+    lastMessageToolReplyAt?: number;
+    messageToolFinalReplyAt?: number;
+  }) {
+    if (typeof activePreviewStartedAt !== "number") {
+      return false;
+    }
+
+    return (
+      (typeof params.messageToolFinalReplyAt === "number" &&
+        params.messageToolFinalReplyAt >= activePreviewStartedAt) ||
+      (typeof params.lastMessageToolReplyAt === "number" &&
+        params.lastMessageToolReplyAt >= activePreviewStartedAt)
+    );
+  }
+
   async function getMessageToolRuntimeSignals() {
     if (params.route.responseMode !== "message-tool" || params.forceQueuedDelivery === true) {
       return {
@@ -730,6 +749,36 @@ async function executePromptDelivery<TChunk>(params: {
       lastMessageToolReplyAt: runtime?.lastMessageToolReplyAt,
       messageToolFinalReplyAt: runtime?.messageToolFinalReplyAt,
     };
+  }
+
+  function ensureMessageToolPreviewMonitor() {
+    if (
+      !messageToolPreview ||
+      messageToolPreviewMonitorStarted ||
+      typeof activePreviewStartedAt !== "number"
+    ) {
+      return;
+    }
+
+    messageToolPreviewMonitorStarted = true;
+    messageToolPreviewMonitor = (async () => {
+      while (!stopMessageToolPreviewMonitor && !messageToolPreviewHandedOff) {
+        const signals = await getMessageToolRuntimeSignals();
+        if (hasMessageToolReplyBoundary(signals)) {
+          await (renderChain = renderChain.then(async () => {
+            const latestSignals = await getMessageToolRuntimeSignals();
+            if (hasMessageToolReplyBoundary(latestSignals)) {
+              await handoffMessageToolPreview();
+            }
+          }));
+          return;
+        }
+
+        await sleep(MESSAGE_TOOL_PREVIEW_SIGNAL_POLL_MS);
+      }
+    })().catch((error) => {
+      console.error("message-tool preview monitor failed", error);
+    });
   }
 
   async function waitForMessageToolFinalReply() {
@@ -855,6 +904,9 @@ async function executePromptDelivery<TChunk>(params: {
           }
 
           await (renderChain = renderChain.then(async () => {
+            if (messageToolPreviewHandedOff && !paneManagedDelivery) {
+              return;
+            }
             let renderedQueueStart = false;
             if (update.status === "running") {
               renderedQueueStart = await maybeRenderQueueStartNotification();
@@ -866,14 +918,7 @@ async function executePromptDelivery<TChunk>(params: {
               return;
             }
             const signals = await getMessageToolRuntimeSignals();
-            if (
-              messageToolPreview &&
-              typeof activePreviewStartedAt === "number" &&
-              ((typeof signals.messageToolFinalReplyAt === "number" &&
-                signals.messageToolFinalReplyAt >= activePreviewStartedAt) ||
-                (typeof signals.lastMessageToolReplyAt === "number" &&
-                  signals.lastMessageToolReplyAt >= activePreviewStartedAt))
-            ) {
+            if (messageToolPreview && hasMessageToolReplyBoundary(signals)) {
               await handoffMessageToolPreview();
               return;
             }
@@ -897,6 +942,7 @@ async function executePromptDelivery<TChunk>(params: {
             if (postedNew) {
               await recordVisibleReply("reply", "channel");
               activePreviewStartedAt = Date.now();
+              ensureMessageToolPreviewMonitor();
             }
             renderedState = nextState;
           }));
@@ -913,6 +959,7 @@ async function executePromptDelivery<TChunk>(params: {
       if (postedNew) {
         await recordVisibleReply("reply", "channel");
         activePreviewStartedAt = Date.now();
+        ensureMessageToolPreviewMonitor();
       }
       renderedState = {
         text: placeholderText,
@@ -940,6 +987,10 @@ async function executePromptDelivery<TChunk>(params: {
     const finalResult = await result;
     await renderChain;
     await maybeRenderQueueStartNotification();
+
+    if (params.suppressDetachedSettlement && finalResult.status === "detached") {
+      return;
+    }
 
     if (!paneManagedDelivery && messageToolPreviewHandedOff) {
       return;
@@ -1005,6 +1056,16 @@ async function executePromptDelivery<TChunk>(params: {
       // The tool path is the only source of truth for canonical replies here, and re-enabling
       // pane fallback tends to reintroduce duplicate or out-of-order terminal messages because
       // tool-final state is asynchronous and subtle to coordinate across channel/runtime boundaries.
+      return;
+    }
+
+    if (
+      params.route.responseMode === "message-tool" &&
+      params.forceQueuedDelivery !== true &&
+      params.route.streaming === "off" &&
+      responseChunks.length === 0 &&
+      finalResult.status !== "error"
+    ) {
       return;
     }
 
@@ -1083,6 +1144,11 @@ async function executePromptDelivery<TChunk>(params: {
       await params.postText(errorText);
     }
     await recordVisibleReply("reply", "channel");
+  } finally {
+    stopMessageToolPreviewMonitor = true;
+    if (messageToolPreviewMonitor) {
+      await messageToolPreviewMonitor;
+    }
   }
 }
 
@@ -1611,6 +1677,7 @@ export async function processChannelInteraction<TChunk>(params: {
             resolvedLoopPrompt.text,
             resolvedLoopPrompt.maintenancePrompt,
           ),
+          suppressDetachedSettlement: true,
           postText: params.postText,
           reconcileText: params.reconcileText,
           observerId: `${observerId}:loop:${index + 1}`,
