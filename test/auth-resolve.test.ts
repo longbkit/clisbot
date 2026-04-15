@@ -170,4 +170,34 @@ describe("resolveChannelAuth", () => {
     expect(auth.mayManageProtectedResources).toBe(false);
     expect(auth.canUseShell).toBe(true);
   });
+
+  test("keeps inherited permissions when an agent role override only changes users", () => {
+    const config = createConfig();
+    config.agents.list = [
+      {
+        id: "default",
+        auth: {
+          defaultRole: "member",
+          roles: {
+            member: {
+              users: ["slack:U123"],
+            },
+          },
+        },
+      },
+    ];
+
+    const auth = resolveChannelAuth({
+      config,
+      agentId: "default",
+      identity: {
+        platform: "slack",
+        conversationKind: "channel",
+        senderId: "U123",
+      },
+    });
+
+    expect(auth.agentRole).toBe("member");
+    expect(auth.canUseShell).toBe(false);
+  });
 });

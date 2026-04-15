@@ -272,23 +272,37 @@ export function renderPairingSetupHelpLines(
 
   lines.push(`${prefix}Pairing notes:`);
 
-  if (shouldRenderTelegram) {
+  if (shouldRenderSlack && shouldRenderTelegram) {
     lines.push(
-      `${prefix}  - Telegram DMs use \`pairing\`. Send \`/start\` or \`hi\` to the Telegram bot to get a pairing code.`,
+      `${prefix}  - Send a direct message (DM) to the Telegram or Slack bot. Send \`/start\` or \`hi\` to receive a pairing code.`,
     );
+  }
+
+  if (shouldRenderTelegram) {
+    if (!shouldRenderSlack) {
+      lines.push(
+        `${prefix}  - Send a direct message (DM) to the Telegram bot. Send \`/start\` or \`hi\` to receive a pairing code.`,
+      );
+    }
     lines.push(
       `${prefix}  - Approve the returned Telegram code with: \`clisbot pairing approve telegram <code>\``,
     );
   }
 
   if (shouldRenderSlack) {
-    lines.push(
-      `${prefix}  - Slack DMs use \`pairing\`. Say \`hi\` to the Slack bot to get a pairing code.`,
-    );
+    if (!shouldRenderTelegram) {
+      lines.push(
+        `${prefix}  - Send a direct message (DM) to the Slack bot. Say \`hi\` to receive a pairing code.`,
+      );
+    }
     lines.push(
       `${prefix}  - Approve the returned Slack code with: \`clisbot pairing approve slack <code>\``,
     );
   }
+
+  lines.push(
+    `${prefix}  - Configured app owner/admin principals bypass pairing in DMs.`,
+  );
 
   return lines;
 }

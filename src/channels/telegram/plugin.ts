@@ -70,6 +70,7 @@ export const telegramChannelPlugin: ChannelPlugin = {
       context.activityStore,
       account.accountId,
       account.config as TelegramAccountConfig,
+      context.reportLifecycle,
     ),
   renderHealthSummary: (state) => {
     switch (state) {

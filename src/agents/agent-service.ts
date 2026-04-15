@@ -135,7 +135,9 @@ export class AgentService {
 
     await this.runnerSessions.runSessionCleanup();
     this.cleanupTimer = setInterval(() => {
-      void this.runnerSessions.runSessionCleanup();
+      void this.runnerSessions.runSessionCleanup().catch((error) => {
+        console.error("session cleanup failed", error);
+      });
     }, cleanup.intervalMinutes * 60_000);
   }
 

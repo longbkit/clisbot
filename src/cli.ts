@@ -15,6 +15,7 @@ export type ParsedCliCommand =
   | { name: "loops"; args: string[] }
   | { name: "message"; args: string[] }
   | { name: "agents"; args: string[] }
+  | { name: "auth"; args: string[] }
   | { name: "pairing"; args: string[] }
   | { name: "init"; args: string[] }
   | { name: "serve-foreground" };
@@ -95,6 +96,13 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
     };
   }
 
+  if (command === "auth") {
+    return {
+      name: "auth",
+      args: args.slice(1),
+    };
+  }
+
   if (command === "pairing") {
     return {
       name: "pairing",
@@ -153,6 +161,7 @@ export function renderCliHelp() {
     "  clisbot loops <subcommand>",
     "  clisbot message <subcommand>",
     "  clisbot agents <subcommand>",
+    "  clisbot auth <subcommand>",
     "  clisbot pairing <subcommand>",
     "  clisbot init [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]",
     "              [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
@@ -189,6 +198,7 @@ export function renderCliHelp() {
     "                     cancel --all",
     "  message            Run provider message actions such as send, react, read, edit, delete, and pins.",
     "  agents             Manage configured agents and top-level bindings.",
+    "  auth               Manage app and agent auth roles, principals, and permissions in config. See `clisbot auth --help`.",
     "  pairing            Run the pairing control CLI.",
     `  init               Seed ${configPath} and optionally create the first agent without starting clisbot.`,
     "  --version, -v      Show the installed clisbot version.",

@@ -15,6 +15,33 @@ type AuthRoleDefinition = {
   users?: string[];
 };
 
+function mergeRoleDefinitions(
+  inherited: AuthRoleDefinition | undefined,
+  override: AuthRoleDefinition | undefined,
+): AuthRoleDefinition {
+  return {
+    allow: override?.allow ?? inherited?.allow ?? [],
+    users: override?.users ?? inherited?.users ?? [],
+  };
+}
+
+function mergeRoleRecord(
+  defaults: Record<string, AuthRoleDefinition> | undefined,
+  overrides: Record<string, AuthRoleDefinition> | undefined,
+) {
+  const merged: Record<string, AuthRoleDefinition> = {};
+  const roleNames = new Set([
+    ...Object.keys(defaults ?? {}),
+    ...Object.keys(overrides ?? {}),
+  ]);
+
+  for (const roleName of roleNames) {
+    merged[roleName] = mergeRoleDefinitions(defaults?.[roleName], overrides?.[roleName]);
+  }
+
+  return merged;
+}
+
 function normalizePrincipal(principal: string) {
   const trimmed = principal.trim();
   if (!trimmed) {
@@ -78,10 +105,7 @@ function getAgentAuth(config: ClisbotConfig, agentId: string) {
 
   return {
     defaultRole: override?.defaultRole ?? defaults.defaultRole,
-    roles: {
-      ...defaults.roles,
-      ...(override?.roles ?? {}),
-    },
+    roles: mergeRoleRecord(defaults.roles, override?.roles),
   };
 }
 

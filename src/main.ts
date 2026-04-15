@@ -3,6 +3,7 @@ import { parseCliArgs, renderCliHelp } from "./cli.ts";
 import { runPairingCli } from "./channels/pairing/cli.ts";
 import { addAgentToEditableConfig, runAgentsCli } from "./control/agents-cli.ts";
 import { runAccountsCli } from "./control/accounts-cli.ts";
+import { runAuthCli } from "./control/auth-cli.ts";
 import { runChannelsCli } from "./control/channels-cli.ts";
 import {
   hasLiteralBootstrapCredentials,
@@ -296,19 +297,52 @@ async function serveForeground() {
   const runtimeCredentialsPath = getDefaultRuntimeCredentialsPath();
   const runtimeSupervisor = new RuntimeSupervisor(configPath);
   let shuttingDown = false;
+  let fatalHandling = false;
 
-  const shutdown = async (exitCode = 0) => {
+  const shutdown = async (
+    exitCode = 0,
+    options: { markChannelsStopped?: boolean } = {},
+  ) => {
     if (shuttingDown) {
       return;
     }
 
     shuttingDown = true;
     try {
-      await runtimeSupervisor.stop();
+      await runtimeSupervisor.stop({
+        markChannelsStopped: options.markChannelsStopped,
+      });
     } finally {
       removeRuntimeCredentials(runtimeCredentialsPath);
       removeRuntimePid(pidPath);
       process.exit(exitCode);
+    }
+  };
+
+  const handleFatal = async (source: "uncaughtException" | "unhandledRejection", error: unknown) => {
+    if (fatalHandling || shuttingDown) {
+      return;
+    }
+
+    fatalHandling = true;
+    const detail = error instanceof Error ? error.message : String(error);
+    const fatalError = new Error(`fatal ${source}: ${detail}`);
+    console.error(`clisbot fatal ${source}`, error);
+    const forceExitTimer = setTimeout(() => {
+      process.exit(1);
+    }, 5_000);
+    forceExitTimer.unref?.();
+
+    try {
+      await runtimeSupervisor.markFatalFailure(fatalError);
+    } catch (markError) {
+      console.error("failed to record fatal runtime health", markError);
+    }
+
+    try {
+      await shutdown(1, { markChannelsStopped: false });
+    } finally {
+      clearTimeout(forceExitTimer);
     }
   };
 
@@ -317,6 +351,12 @@ async function serveForeground() {
   });
   process.once("SIGTERM", () => {
     void shutdown(0);
+  });
+  process.once("uncaughtException", (error) => {
+    void handleFatal("uncaughtException", error);
+  });
+  process.once("unhandledRejection", (error) => {
+    void handleFatal("unhandledRejection", error);
   });
 
   try {
@@ -411,9 +451,7 @@ async function start(args: string[] = []) {
       console.log(`clisbot is already running with pid: ${result.pid}`);
       const workspacePath = getPrimaryWorkspacePath(summary);
       if (workspacePath) {
-        console.log(
-          `workspace: ${workspacePath} (agent workspace: default work dir; contains state, sessions, personality, and guidance files)`,
-        );
+        console.log(`workspace: ${workspacePath}`);
       }
       console.log(`config: ${result.configPath}`);
       console.log(`log: ${result.logPath}`);
@@ -447,9 +485,7 @@ async function start(args: string[] = []) {
     console.log(`clisbot started with pid: ${result.pid}`);
     const workspacePath = getPrimaryWorkspacePath(summary);
     if (workspacePath) {
-      console.log(
-        `workspace: ${workspacePath} (agent workspace: default work dir; contains state, sessions, personality, and guidance files)`,
-      );
+      console.log(`workspace: ${workspacePath}`);
     }
     console.log(`config: ${result.configPath}`);
     console.log(`log: ${result.logPath}`);
@@ -555,9 +591,7 @@ async function status() {
     });
     const workspacePath = getPrimaryWorkspacePath(summary);
     if (workspacePath) {
-      console.log(
-        `workspace: ${workspacePath} (agent workspace: default work dir; contains state, sessions, personality, and guidance files)`,
-      );
+      console.log(`workspace: ${workspacePath}`);
     }
     console.log(`config: ${runtimeStatus.configPath}`);
     console.log(`pid file: ${runtimeStatus.pidPath}`);
@@ -674,6 +708,11 @@ async function main(command = parseCliArgs(process.argv)) {
 
   if (command.name === "agents") {
     await runAgentsCli(command.args);
+    return;
+  }
+
+  if (command.name === "auth") {
+    await runAuthCli(command.args);
     return;
   }
 

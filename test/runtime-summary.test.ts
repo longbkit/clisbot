@@ -82,7 +82,8 @@ describe("runtime summaries", () => {
     });
     const text = renderStartSummary(summary);
 
-    expect(text).toContain("configure Slack channels or Telegram groups/topics in ~/.clisbot-dev/clisbot.json");
+    expect(text).toContain("clisbot channels enable <slack|telegram>");
+    expect(text).toContain("clisbot channels add telegram-group <chatId> --agent <id>");
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock list-sessions");
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock attach -t <session-name>");
   });
@@ -138,6 +139,9 @@ describe("runtime summaries", () => {
     const startText = renderStartSummary(summary);
 
     expect(text).toContain("agents=1");
+    expect(text).toContain("Owner:");
+    expect(text).toContain("configured=no principals=none claimWindow=30m");
+    expect(text).toContain("implicit admin across all agents/channels");
     expect(text).toContain("work tool=codex");
     expect(text).toContain("slack enabled=yes");
     expect(text).toContain("responseMode=message-tool");
@@ -147,12 +151,28 @@ describe("runtime summaries", () => {
     expect(text).toContain("routes=none");
     expect(text).toContain("telegram: no explicit group or topic routes are configured yet");
     expect(startText).toContain("telegram: no explicit group or topic routes are configured yet");
-    expect(startText).toContain("Telegram DMs use `pairing`.");
-    expect(startText).toContain("Send `/start` or `hi` to the Telegram bot to get a pairing code.");
+    expect(startText).toContain("DM the Telegram or Slack bot first to confirm it responds normally");
+    expect(startText).toContain("after DM works, add the bot to the target Slack channel or Telegram group/topic");
+    expect(startText).toContain(
+      "route that surface with `clisbot channels add slack-channel <channelId> --agent <id>` or `clisbot channels add telegram-group <chatId> --agent <id>`",
+    );
+    expect(startText).toContain(
+      "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",
+    );
+    expect(startText).toContain(
+      "Slack: mention `@<botname> \\start` in the target channel to verify mention flow",
+    );
+    expect(startText).toContain(
+      "Send a direct message (DM) to the Telegram or Slack bot. Send `/start` or `hi` to receive a pairing code.",
+    );
+    expect(startText).toContain("Auth onboarding:");
+    expect(startText).toContain("Telegram groups or topics can use `/whoami` before routing, while DMs with pairing must pair first");
+    expect(startText).toContain("clisbot auth add-user app --role owner --user <principal>");
+    expect(startText).toContain("clisbot auth add-permission ...");
+    expect(startText).toContain("clisbot auth --help");
     expect(startText).toContain("clisbot pairing approve telegram <code>");
-    expect(startText).toContain("Slack DMs use `pairing`.");
-    expect(startText).toContain("Say `hi` to the Slack bot to get a pairing code.");
     expect(startText).toContain("clisbot pairing approve slack <code>");
+    expect(startText).toContain("Configured app owner/admin principals bypass pairing in DMs.");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
   });
@@ -206,6 +226,8 @@ describe("runtime summaries", () => {
     const text = renderStatusSummary(summary);
 
     expect(text).toContain("Active runs:");
+    expect(text).toContain("telegram enabled=no");
+    expect(text).not.toContain("telegram enabled=no connection=");
     expect(text).toContain("agent=work");
     expect(text).toContain("state=detached");
     expect(text).toContain("sessionKey=agent:work:slack:channel:C123:thread:1.2");
@@ -276,6 +298,9 @@ describe("runtime summaries", () => {
     expect(startText).toContain("next: chat with the bot or open the workspace");
     expect(startText).toContain("follow: BOOTSTRAP.md and the team-assistant personality files");
     expect(startText).toContain("Next steps after bootstrap:");
+    expect(startText).toContain(
+      "run `clisbot channels enable <slack|telegram>` for the first channel you want to expose",
+    );
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
   });

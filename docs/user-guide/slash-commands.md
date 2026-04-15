@@ -81,4 +81,5 @@ If this page and runtime ever disagree, runtime wins.
 ## Notes
 
 - This page is intentionally short and inventory-first
+- Native coding-CLI command or skill pass-through is documented in `docs/user-guide/native-cli-commands.md`
 - Detailed output wording review lives in `docs/research/channels/2026-04-14-slash-command-output-audit.md`

@@ -52,6 +52,7 @@ import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
 import { beginTelegramTypingHeartbeat } from "./typing.ts";
 import { buildTokenHint } from "../runtime-identity.ts";
 import { ConversationProcessingIndicatorCoordinator } from "../processing-indicator.ts";
+import type { ChannelRuntimeLifecycleEvent } from "../channel-plugin.ts";
 
 type TelegramGetMeResult = {
   id: number;
@@ -220,6 +221,7 @@ export class TelegramPollingService {
     private readonly activityStore: ActivityStore,
     private readonly accountId = "default",
     private readonly accountConfig: TelegramAccountConfig,
+    private readonly reportLifecycle?: (event: ChannelRuntimeLifecycleEvent) => Promise<void>,
   ) {}
 
   async start() {
@@ -297,6 +299,16 @@ export class TelegramPollingService {
         }
         if (isTelegramPollingConflict(error)) {
           this.running = false;
+          await this.reportLifecycle?.({
+            connection: "failed",
+            summary: "Telegram polling stopped because another instance is already using this bot token.",
+            detail:
+              error instanceof Error ? error.message : String(error),
+            actions: [
+              "stop the other Telegram poller that is using the same bot token",
+              "run `clisbot start` again after the token is no longer in use elsewhere",
+            ],
+          });
           console.error(
             "telegram polling stopped: another bot instance is already calling getUpdates for this token",
           );

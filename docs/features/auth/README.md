@@ -8,7 +8,7 @@ It owns the permission model across app-level control, agent-level runtime actio
 
 ## State
 
-Planned
+Active
 
 ## Why It Exists
 
@@ -69,9 +69,10 @@ Without that, the repository keeps blurring:
 
 ## Current Focus
 
-Introduce one explicit auth model that can:
+Keep the auth feature area truthful as active work:
 
-- express `app.auth` and `agents.<id>.auth`
-- define owner claim cleanly
-- explain which checks are advisory versus enforced
-- give channels and control one canonical permission source without turning configuration into the behavioral owner
+- `app.auth` and `agents.<id>.auth` are now live in config and runtime resolution
+- `clisbot auth ...` exists for operator auth inspection and mutation
+- channels already consume resolved auth for pairing bypass, `/whoami`, `/status`, and `/bash`
+- automatic first-owner claim is still pending and remains the main unfinished auth slice
+- advisory versus enforced boundaries still need to stay explicit across channels, control, and prompt rules

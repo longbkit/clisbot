@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this page as the operator quickstart for the planned auth model.
+Use this page as the operator quickstart for the current auth model and the near-term target design.
 
 It explains:
 
@@ -18,7 +18,56 @@ For the product and implementation contract, see:
 
 ## Status
 
-Planned
+Partially implemented
+
+## Current Runtime Reality
+
+This page mixes current operator reality with the target auth contract.
+
+Today:
+
+- `app.auth` and `agents.<id>.auth` exist in config shape
+- explicit app `owner` and app `admin` principals do bypass pairing
+- operators can add and remove users and permissions through `clisbot auth ...`
+- automatic first-owner claim from the first DM is not implemented yet
+- config remains the source of truth, and `clisbot auth ...` is the mutation surface for it
+
+Use this page to understand what is live now, what remains planned, and how operators should manage auth safely.
+
+## Current CLI Support
+
+Current operator commands:
+
+- `clisbot auth list`
+- `clisbot auth show <app|agent-defaults|agent> [--agent <id>]`
+- `clisbot auth add-user <scope> --role <role> --user <principal>`
+- `clisbot auth remove-user <scope> --role <role> --user <principal>`
+- `clisbot auth add-permission <scope> --role <role> --permission <permission>`
+- `clisbot auth remove-permission <scope> --role <role> --permission <permission>`
+
+Scope meaning:
+
+- `app` edits `app.auth`
+- `agent-defaults` edits `agents.defaults.auth`
+- `agent --agent <id>` edits a single agent override under `agents.list[].auth`
+
+Mutation rule:
+
+- user changes write `roles.<role>.users`
+- permission changes write `roles.<role>.allow`
+- the first agent-specific write clones the inherited default role into that agent override before mutating it
+
+## After `clisbot start`
+
+Recommended operator flow right after bootstrap:
+
+1. Get your principal from a surface the bot can already see.
+   Telegram groups or topics can use `/whoami` even before routing, while DMs under `pairing` policy must pair first.
+2. Copy the returned principal such as `telegram:1276408333` or `slack:U123`.
+3. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`.
+4. Inspect current auth with `clisbot auth show app` and `clisbot auth show agent-defaults`.
+5. Tune role permissions with `clisbot auth add-permission ...` or `clisbot auth remove-permission ...`.
+6. Continue route setup and test `/status`, `/whoami`, and `/bash` from the granted account.
 
 ## Target Model
 
@@ -91,7 +140,7 @@ That bypass does not auto-extend to another platform principal unless that princ
 
 ## First Owner Claim
 
-Rule:
+Target rule for the planned model:
 
 - if `app.auth.roles.owner.users` is empty when the runtime starts, owner claim opens for `ownerClaimWindowMinutes`
 - the first successful DM user during that window becomes the first owner
@@ -99,6 +148,11 @@ Rule:
 - restarting the runtime does not reopen claim while an owner still exists
 - if every owner is removed later, the next runtime start opens claim again
 - once any owner exists, claim is closed app-wide; a later DM from another platform principal does not auto-claim owner
+
+Current runtime fallback:
+
+- add the first owner manually in `app.auth.roles.owner.users`
+- restart or reload the runtime after changing config so the new principal is resolved
 
 ## Phase-1 Default Agent Permissions
 
@@ -127,6 +181,38 @@ Admin should additionally own the remaining advanced controls such as:
 - `followupManage`
 - `responseModeManage`
 - `additionalMessageModeManage`
+
+## Permission Inventory
+
+### App Permissions
+
+| Permission | What it controls | Long-term importance |
+| --- | --- | --- |
+| `configManage` | edit protected app-level config and operational control surfaces | critical |
+| `appAuthManage` | manage app roles and principals such as `owner` and `admin` | critical |
+| `agentAuthManage` | manage auth policy on agents and agent defaults | critical |
+| `promptGovernanceManage` | manage protected prompt and governance-level controls | high |
+
+### Agent Permissions
+
+| Permission | What it controls | Long-term importance |
+| --- | --- | --- |
+| `sendMessage` | send normal requests to the agent | critical |
+| `helpView` | use in-chat help surfaces | medium |
+| `statusView` | inspect current route or session status | critical |
+| `identityView` | inspect sender and route identity with `/whoami` | high |
+| `transcriptView` | inspect transcript output where route policy allows it | high |
+| `runObserve` | watch or attach to active runs | high |
+| `runInterrupt` | stop the active run | critical |
+| `streamingManage` | change streaming delivery mode | medium |
+| `queueManage` | enqueue follow-up work behind the active run | high |
+| `steerManage` | inject steering while a run is active | high |
+| `loopManage` | create, inspect, and cancel loops | high |
+| `shellExecute` | run `/bash` and other shell execution surfaces | critical, sensitive |
+| `runNudge` | manually send an extra Enter to a stuck tmux session | medium |
+| `followupManage` | change follow-up policy for the conversation | medium |
+| `responseModeManage` | switch between `capture-pane` and `message-tool` | medium |
+| `additionalMessageModeManage` | switch between `queue` and `steer` for busy sessions | medium |
 
 ## Minimal Config Example
 
@@ -211,9 +297,9 @@ Admin should additionally own the remaining advanced controls such as:
 }
 ```
 
-## Planned CLI Workflow
+## CLI Workflow
 
-The planned auth CLI should stay easy to read and hard to misuse.
+The auth CLI should stay easy to read and hard to misuse.
 
 Examples:
 
@@ -222,9 +308,39 @@ clisbot auth add-user app --role owner --user telegram:1276408333
 clisbot auth remove-user app --role admin --user telegram:1276408333
 clisbot auth add-user agent --agent default --role admin --user slack:U123
 clisbot auth remove-user agent --agent default --role admin --user slack:U123
+clisbot auth add-permission agent-defaults --role member --permission shellExecute
+clisbot auth remove-permission agent --agent default --role member --permission shellExecute
+clisbot auth show app
+clisbot auth list
 ```
 
-This CLI does not exist yet.
+## Managing Role Permissions
+
+Typical patterns:
+
+- grant a sensitive permission to one default agent role:
+
+```bash
+clisbot auth add-permission agent-defaults --role member --permission shellExecute
+```
+
+- remove a permission from a default agent role again:
+
+```bash
+clisbot auth remove-permission agent-defaults --role member --permission shellExecute
+```
+
+- create a one-agent override instead of changing every agent:
+
+```bash
+clisbot auth add-permission agent --agent default --role member --permission shellExecute
+```
+
+Practical rule:
+
+- use `agent-defaults` when the permission policy should affect most agents
+- use `agent --agent <id>` when only one agent needs a stricter or broader role definition
+- use `app` only for app-level permissions such as config or auth management
 
 ## Denied Access Contract
 
@@ -304,16 +420,18 @@ Operator rule:
 
 ## Operator Checklist
 
-When this slice ships, a clean rollout should look like this:
+Current rollout checklist:
 
-1. Start the runtime with no existing owner.
-2. Claim the first owner from a DM during the claim window.
-3. Add any extra app admins.
-4. Confirm owner/admin principals bypass pairing.
-5. Confirm unlisted routed users still fall back to agent `member`.
-6. Confirm `member` has the intended default controls.
-7. Confirm `/bash` is denied until `shellExecute` is granted.
-8. Confirm the protected prompt rule applies to normal, queue, steer, and loop delivery.
+1. Start the runtime.
+2. Send `/whoami` from the account that should become the first operator.
+3. Run `clisbot auth add-user app --role owner --user <principal>`.
+4. Add any extra app admins or agent admins.
+5. Confirm owner/admin principals bypass pairing.
+6. Confirm unlisted routed users still fall back to agent `member`.
+7. Confirm `member` has the intended default controls.
+8. Confirm `/bash` is denied until `shellExecute` is granted.
+9. Confirm permission changes through `add-permission` and `remove-permission` change the expected routed behavior.
+10. Confirm the protected prompt rule applies to normal, queue, steer, and loop delivery.
 
 ## Related Pages
 

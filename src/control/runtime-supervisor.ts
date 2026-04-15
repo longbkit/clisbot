@@ -13,7 +13,12 @@ import {
 } from "./operator-errors.ts";
 import { RuntimeHealthStore } from "./runtime-health-store.ts";
 import { listChannelPlugins } from "../channels/registry.ts";
-import type { ChannelRuntimeEntry, ChannelPlugin } from "../channels/channel-plugin.ts";
+import type {
+  ChannelRuntimeEntry,
+  ChannelPlugin,
+  ChannelRuntimeIdentity,
+  ChannelRuntimeLifecycleEvent,
+} from "../channels/channel-plugin.ts";
 
 type ActiveRuntime = {
   agentService: AgentService;
@@ -33,6 +38,7 @@ type RuntimeSupervisorDependencies = {
 
 export class RuntimeSupervisor {
   private activeRuntime?: ActiveRuntime;
+  private latestLoadedConfig?: LoadedConfig;
   private configWatcher?: FSWatcher;
   private reloadTimer?: ReturnType<typeof setTimeout>;
   private reloadInFlight = false;
@@ -59,15 +65,54 @@ export class RuntimeSupervisor {
     await this.reload("initial");
   }
 
-  async stop() {
+  async stop(options: { markChannelsStopped?: boolean } = {}) {
     this.clearReloadTimer();
     this.stopWatchingConfig();
     await this.stopActiveRuntime();
+    if (options.markChannelsStopped !== false) {
+      for (const plugin of this.dependencies.listChannelPlugins()) {
+        await this.dependencies.runtimeHealthStore.setChannel({
+          channel: plugin.id,
+          connection: "stopped",
+          summary: plugin.renderHealthSummary("stopped"),
+        });
+      }
+    }
+  }
+
+  async markFatalFailure(error: unknown) {
+    const loadedConfig = this.latestLoadedConfig;
+    if (!loadedConfig) {
+      return;
+    }
+
+    const detail = error instanceof Error ? error.message : String(error);
+    const instancesByChannel = new Map<string, ChannelRuntimeIdentity[]>();
+    for (const entry of this.activeRuntime?.channelServices ?? []) {
+      const identity = entry.service.getRuntimeIdentity?.();
+      if (!identity) {
+        continue;
+      }
+      const existing = instancesByChannel.get(entry.channel) ?? [];
+      existing.push(identity);
+      instancesByChannel.set(entry.channel, existing);
+    }
+
     for (const plugin of this.dependencies.listChannelPlugins()) {
+      if (!plugin.isEnabled(loadedConfig)) {
+        continue;
+      }
+
       await this.dependencies.runtimeHealthStore.setChannel({
         channel: plugin.id,
-        connection: "stopped",
-        summary: plugin.renderHealthSummary("stopped"),
+        connection: "failed",
+        summary: "Runtime crashed due to a fatal error.",
+        detail,
+        actions: [
+          "run `clisbot logs` and inspect the fatal error",
+          "fix the underlying runtime fault, then restart with `clisbot start`",
+        ],
+        instances: instancesByChannel.get(plugin.id) ?? [],
       });
     }
   }
@@ -84,6 +129,7 @@ export class RuntimeSupervisor {
 
     try {
       const loadedConfig = await this.dependencies.loadConfig(this.configPath);
+      this.latestLoadedConfig = loadedConfig;
       nextRuntime = await this.createRuntime(loadedConfig);
 
       await this.reconcileConfigWatcher(loadedConfig);
@@ -182,6 +228,13 @@ export class RuntimeSupervisor {
               agentService,
               processedEventsStore,
               activityStore,
+              reportLifecycle: (event) =>
+                this.reportChannelLifecycle({
+                  plugin,
+                  channelServices,
+                  accountId: account.accountId,
+                  event,
+                }),
             },
             account,
           ),
@@ -260,6 +313,49 @@ export class RuntimeSupervisor {
         summary: plugin.renderHealthSummary(enabled ? "starting" : "disabled"),
       });
     }
+  }
+
+  private getChannelInstances(
+    channelServices: ChannelRuntimeEntry[],
+    channel: ChannelPlugin["id"],
+  ) {
+    return channelServices
+      .filter((entry) => entry.channel === channel)
+      .map((entry) => entry.service.getRuntimeIdentity?.())
+      .filter((identity): identity is ChannelRuntimeIdentity => identity != null);
+  }
+
+  private async reportChannelLifecycle(params: {
+    plugin: ChannelPlugin;
+    channelServices: ChannelRuntimeEntry[];
+    accountId: string;
+    event: ChannelRuntimeLifecycleEvent;
+  }) {
+    const instances = this.getChannelInstances(params.channelServices, params.plugin.id);
+    if (params.event.connection === "active") {
+      await this.dependencies.runtimeHealthStore.setChannel({
+        channel: params.plugin.id,
+        connection: "active",
+        summary: params.event.summary ?? params.plugin.renderActiveHealthSummary(instances.length),
+        detail: params.event.detail,
+        actions: params.event.actions,
+        instances,
+      });
+      return;
+    }
+
+    const detailPrefix = `account=${params.accountId}`;
+    await this.dependencies.runtimeHealthStore.setChannel({
+      channel: params.plugin.id,
+      connection: "failed",
+      summary: params.event.summary ?? `${params.plugin.id} channel failed after startup.`,
+      detail: params.event.detail ? `${detailPrefix}; ${params.event.detail}` : detailPrefix,
+      actions: params.event.actions ?? [
+        "run `clisbot logs` and inspect the latest channel error",
+        "restart `clisbot` after fixing the channel-level issue",
+      ],
+      instances,
+    });
   }
 
   private async reconcileConfigWatcher(loadedConfig: LoadedConfig) {

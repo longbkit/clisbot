@@ -71,6 +71,11 @@ type ChannelOperatorSummary = {
 
 type RuntimeOperatorSummary = {
   loadedConfig: LoadedConfig;
+  ownerSummary: {
+    ownerPrincipals: string[];
+    adminPrincipals: string[];
+    ownerClaimWindowMinutes: number;
+  };
   agentSummaries: AgentOperatorSummary[];
   channelSummaries: ChannelOperatorSummary[];
   activeRuns: Array<{
@@ -240,6 +245,11 @@ export async function getRuntimeOperatorSummary(params: {
 
   return {
     loadedConfig,
+    ownerSummary: {
+      ownerPrincipals: loadedConfig.raw.app.auth.roles.owner?.users ?? [],
+      adminPrincipals: loadedConfig.raw.app.auth.roles.admin?.users ?? [],
+      ownerClaimWindowMinutes: loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
+    },
     agentSummaries,
     channelSummaries,
     activeRuns: await agentService.listActiveSessionRuntimes(),
@@ -348,11 +358,139 @@ function renderAgentSummaryLines(summary: RuntimeOperatorSummary) {
   ];
 }
 
+function renderOwnerSummaryLines(summary: RuntimeOperatorSummary) {
+  const ownerPrincipals = summary.ownerSummary.ownerPrincipals;
+  const adminPrincipals = summary.ownerSummary.adminPrincipals;
+  const configuredOwners = ownerPrincipals.length > 0 ? ownerPrincipals.join(",") : "none";
+  const claimWindow = `${summary.ownerSummary.ownerClaimWindowMinutes}m`;
+  const lines = [
+    "Owner:",
+    `  - configured=${ownerPrincipals.length > 0 ? "yes" : "no"} principals=${configuredOwners} claimWindow=${claimWindow}`,
+    "  - access=full app control, DM pairing bypass, implicit admin across all agents/channels",
+  ];
+
+  if (adminPrincipals.length > 0) {
+    lines.push(`  - appAdmins=${adminPrincipals.join(",")}`);
+  }
+
+  return lines;
+}
+
+function hasConfiguredPrivilegedPrincipal(summary: RuntimeOperatorSummary) {
+  return (
+    summary.ownerSummary.ownerPrincipals.length > 0 ||
+    summary.ownerSummary.adminPrincipals.length > 0
+  );
+}
+
+function renderPrivilegedChatHint(summary: RuntimeOperatorSummary, action: string) {
+  if (hasConfiguredPrivilegedPrincipal(summary)) {
+    return `chat with the bot from that owner/admin account to ${action}`;
+  }
+  return `after you configure an owner/admin principal, use that account to ${action}`;
+}
+
+function appendChannelNextStepLines(
+  lines: string[],
+  summary: RuntimeOperatorSummary,
+  prefix = "",
+) {
+  const slackEnabled = summary.channelSummaries.some((channel) =>
+    channel.channel === "slack" && channel.enabled
+  );
+  const telegramEnabled = summary.channelSummaries.some((channel) =>
+    channel.channel === "telegram" && channel.enabled
+  );
+  const hasEnabledChannel = slackEnabled || telegramEnabled;
+  const hasDisabledChannel = summary.channelSummaries.some((channel) => !channel.enabled);
+
+  if (!hasEnabledChannel) {
+    lines.push(
+      `${prefix}- run \`clisbot channels enable <slack|telegram>\` for the first channel you want to expose`,
+    );
+    return;
+  }
+
+  if (telegramEnabled && slackEnabled) {
+    lines.push(
+      `${prefix}- DM the Telegram or Slack bot first to confirm it responds normally`,
+    );
+  } else if (telegramEnabled) {
+    lines.push(
+      `${prefix}- DM the Telegram bot first to confirm it responds normally`,
+    );
+  } else {
+    lines.push(
+      `${prefix}- DM the Slack bot first to confirm it responds normally`,
+    );
+  }
+
+  if (hasDisabledChannel) {
+    lines.push(
+      `${prefix}- run \`clisbot channels enable <slack|telegram>\` for any other disabled channel you want to expose`,
+    );
+  }
+
+  lines.push(
+    `${prefix}- after DM works, add the bot to the target Slack channel or Telegram group/topic`,
+  );
+  lines.push(
+    `${prefix}- route that surface with \`clisbot channels add slack-channel <channelId> --agent <id>\` or \`clisbot channels add telegram-group <chatId> --agent <id>\``,
+  );
+
+  if (telegramEnabled) {
+    lines.push(
+      `${prefix}- Telegram: send \`/start\` in the target DM, group, or topic to get onboarding or pairing guidance`,
+    );
+  }
+
+  if (slackEnabled) {
+    lines.push(
+      `${prefix}- Slack: mention \`@<botname> \\start\` in the target channel to verify mention flow`,
+    );
+  }
+}
+
+function appendAuthOnboardingLines(
+  lines: string[],
+  summary: RuntimeOperatorSummary,
+  prefix = "",
+) {
+  lines.push(`${prefix}Auth onboarding:`);
+
+  if (!hasConfiguredPrivilegedPrincipal(summary)) {
+    lines.push(
+      `${prefix}  - get the principal from a surface the bot can already see; Telegram groups or topics can use \`/whoami\` before routing, while DMs with pairing must pair first`,
+    );
+    lines.push(
+      `${prefix}  - set the first owner with: \`clisbot auth add-user app --role owner --user <principal>\``,
+    );
+  } else {
+    lines.push(`${prefix}  - inspect current app roles with: \`clisbot auth show app\``);
+  }
+
+  lines.push(
+    `${prefix}  - inspect default agent roles with: \`clisbot auth show agent-defaults\``,
+  );
+  lines.push(
+    `${prefix}  - add or remove principals with: \`clisbot auth add-user ...\` and \`clisbot auth remove-user ...\``,
+  );
+  lines.push(
+    `${prefix}  - tune role permissions with: \`clisbot auth add-permission ...\` and \`clisbot auth remove-permission ...\``,
+  );
+  lines.push(
+    `${prefix}  - run \`clisbot auth --help\` or read docs/user-guide/auth-and-roles.md for scopes and permission names`,
+  );
+}
+
 function renderChannelSummaryLines(summary: RuntimeOperatorSummary) {
   return [
     "",
     "Channels:",
     ...summary.channelSummaries.map((channel) => {
+      if (!channel.enabled) {
+        return `  - ${channel.channel} enabled=no`;
+      }
       const last = channel.lastActivityAt
         ? ` last=${formatTime(channel.lastActivityAt)} via ${channel.lastActivityAgentId ?? "unknown"}`
         : " last=never";
@@ -425,8 +563,9 @@ export function renderRuntimeDiagnosticsSummary(summary: RuntimeOperatorSummary)
 }
 
 export function renderStartSummary(summary: RuntimeOperatorSummary) {
-  const configPath = collapseHomePath(getDefaultConfigPath());
   const lines = [
+    ...renderOwnerSummaryLines(summary),
+    "",
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
   ];
@@ -473,7 +612,12 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     lines.push("");
     lines.push("  Next steps after bootstrap:");
     lines.push("  - chat with the bot or open the workspace, then follow BOOTSTRAP.md");
-    lines.push(`  - configure Slack channels or Telegram groups/topics in ${configPath}`);
+    appendChannelNextStepLines(lines, summary, "  ");
+    lines.push(
+      `  - ${renderPrivilegedChatHint(summary, "verify DM access and adjust in-chat settings")}`,
+    );
+    lines.push("");
+    appendAuthOnboardingLines(lines, summary, "  ");
     lines.push("  - run `clisbot status` to recheck runtime and bootstrap state");
     lines.push("  - run `clisbot logs` if the bot does not answer as expected");
     lines.push(
@@ -497,9 +641,13 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
 
   lines.push("");
   lines.push("Next steps:");
-  lines.push(`  - configure Slack channels or Telegram groups/topics in ${configPath}`);
-  lines.push("  - verify routing and defaultAgentId values match the agent you want to expose");
-  lines.push("  - send a test message from Slack or Telegram");
+  appendChannelNextStepLines(lines, summary, "  ");
+  lines.push("  - verify routes and defaultAgentId values match the agent you want to expose");
+  lines.push(
+    `  - ${renderPrivilegedChatHint(summary, "adjust in-chat surface settings")}`,
+  );
+  lines.push("");
+  appendAuthOnboardingLines(lines, summary);
   lines.push("  - run `clisbot status` to inspect agents, channels, and tmux session state");
   lines.push("  - run `clisbot logs` if anything looks wrong");
   lines.push(
@@ -544,13 +692,13 @@ function appendChannelSetupNotes(
         `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
       );
       lines.push(
-        `${prefix}    route: add channels.telegram.groups.<chatId> in ${collapseHomePath(getDefaultConfigPath())}`,
+        `${prefix}    add group: \`clisbot channels add telegram-group <chatId> --agent <id>\``,
       );
       lines.push(
-        `${prefix}    example: channels.telegram.groups."-1001234567890".agentId = "default"`,
+        `${prefix}    add topic: \`clisbot channels add telegram-group <chatId> --topic <topicId> --agent <id>\``,
       );
       lines.push(
-        `${prefix}    forum topics: use channels.telegram.groups.<chatId>.topics.<topicId>`,
+        `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
       );
       continue;
     }
@@ -565,7 +713,13 @@ function appendChannelSetupNotes(
       `${prefix}    groups: ${channel.groupPolicy ?? "n/a"}`,
     );
     lines.push(
-      `${prefix}    route: configure channels.slack.channels.<channelId> or channels.slack.groups.<groupId>`,
+      `${prefix}    add channel: \`clisbot channels add slack-channel <channelId> --agent <id>\``,
+    );
+    lines.push(
+      `${prefix}    add group: \`clisbot channels add slack-group <groupId> --agent <id>\``,
+    );
+    lines.push(
+      `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
     );
   }
 }
@@ -573,6 +727,8 @@ function appendChannelSetupNotes(
 export function renderStatusSummary(summary: RuntimeOperatorSummary) {
   const lines = [
     `stats agents=${summary.configuredAgents} bootstrapped=${summary.bootstrappedAgents} pendingBootstrap=${summary.bootstrapPendingAgents} tmuxSessions=${summary.runningTmuxSessions}`,
+    ...renderOwnerSummaryLines(summary),
+    "",
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
     ...renderChannelDiagnosticLines(summary),

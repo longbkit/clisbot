@@ -155,7 +155,8 @@ describe("channels cli", () => {
     expect(output).toContain("clisbot channels");
     expect(output).toContain("Policy guide:");
     expect(output).toContain("Telegram DMs still follow channels.telegram.directMessages.policy");
-    expect(output).toContain("Telegram DMs use `pairing`.");
+    expect(output).toContain("Pairing notes:");
+    expect(output).toContain("Approve the returned Telegram code with: `clisbot pairing approve telegram <code>`");
     expect(output).toContain("clisbot pairing approve telegram <code>");
     expect(output).toContain("additional-message-mode");
     expect(output).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");

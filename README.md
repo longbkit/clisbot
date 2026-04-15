@@ -7,29 +7,36 @@ Want to use OpenClaw but are struggling because:
 
 `clisbot` is the right solution for you.
 
-`clisbot` turns native frontier agent CLIs like Claude Code, Codex, and Gemini CLI into durable Slack and Telegram bots. Each agent runs inside its own tmux session, keeps a real workspace, and can behave like a coding bot, a daily-work assistant, or a team assistant with SOUL, IDENTITY, and MEMORY. It is not just a tmux bridge with chat glued on top. `clisbot` adds channel-aware routing, durable conversation state, pairing and access control, follow-up behavior, and support for sending and receiving files through Slack and Telegram.
+`clisbot` turns native frontier agent CLIs like Claude Code, Codex, and Gemini CLI into durable Slack and Telegram bots. Each agent runs inside its own tmux session, keeps a real workspace, and can behave like a coding bot, a daily-work assistant, or a team assistant with SOUL, IDENTITY, and MEMORY.
 
-It is a cheaper, simpler path to frontier agent workflows for teams and individuals because it reuses the CLI subscriptions you already have instead of forcing a separate API-heavy stack. If you already trust Claude Code, Codex, or Gemini CLI for real work, `clisbot` lets you keep those tools as the core runtime and add chat surfaces, follow-up control, team workflows, and on-the-go access around them.
+It is not just a tmux bridge with chat glued on top. `clisbot` treats Slack and Telegram as real channel surfaces with routing, durable conversation state, pairing, follow-up control, file sending and receiving, and the ability to keep frontier coding agents inside the tools and communication surfaces where teams already work.
 
 `clisbot` is also meant to grow into a reusable agent runtime layer that can support many CLI tools, many channels, and many workflow shapes on top of the same durable agent session.
+
+## Why I Built This
+
+I’m Long Luong (Long), Co-founder & CTO of Vexere, Vietnam’s #1 transportation booking platform, where we also build SaaS and inventory distribution infrastructure for transportation operators. As we scale a 300-person company with a 100-member Engineering, Product, and Design team, I’ve been searching for the most practical way to roll out AI-native workflows across the organization.
+
+The challenge is not whether AI is useful. It is how to make it work at enterprise scale without creating a fragmented, expensive, or ungovernable stack. In practice, that means solving several hard problems at once: cost control, workflow truthfulness, team accessibility, governance, and the ability to bring frontier AI into the real tools and communication surfaces where work already happens.
+
+`clisbot` is the approach I landed on. Instead of building yet another isolated AI layer, it turns the coding CLIs we already trust into durable, chat-native agents that can work across Slack, Telegram, and real team workflows.
 
 ## Why clisbot
 
 - One frontier-agent stack for both daily work and real coding. You do not need one product for assistant work and another for actual engineering work.
-- Learns from and integrates the two biggest strengths that made OpenClaw popular: memory and native channel integration with deep, channel-specific conversation and presentation capabilities.
 - Reuses native CLI subscriptions you already pay for, such as Claude Code, Codex, and Gemini CLI, instead of pushing you toward a separate API-cost-heavy stack.
-- Strong chat-first support in Slack and Telegram, with durable tmux-backed sessions behind the bot, so you can work from your laptop or on the go without giving up a real coding workspace.
-- Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough.
-- Files and images can move through the chat surfaces too, not just text prompts: inbound Slack or Telegram attachments can land in the workspace, and outbound channel delivery is designed around real message and media actions rather than terminal-only output.
+- Learns from and integrates the two biggest strengths that made OpenClaw popular: memory and native channel integration with deep, channel-specific conversation and presentation capabilities.
+- Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough so you can work from your laptop or on the go without giving up a real coding workspace.
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
-- Useful for coding, operations, teamwork, and general assistant work, with fast shell shortcuts such as `!<command>` and `/bash <command>` when you need terminal-like control from chat.
+- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, and `/streaming on` to view real-time processing progress for coding tasks.
 
 ## What to expect
 
-- You can get the first Telegram bot running in one command.
+- You can get the first Telegram bot or Slack bot running in one command.
 - The first-run path creates one default agent and only enables the channels you explicitly name.
 - DMs start with pairing so access stays explicit.
 - `--persist` lets later restarts use plain `clisbot start`.
+- Streaming is disabled by default. If you want real-time coding progress in chat, turn it on from the chat surface with `/streaming on`, and turn it off any time with `/streaming off`.
 - Slack and Telegram are not treated as plain-text sinks: routed conversations can carry thread or topic identity, pairing, and file-aware workflows.
 - Advanced multi-agent setup is available later, but it is not required for day one.
 
@@ -47,6 +54,14 @@ clisbot start \
 ```
 
 If you want to try first without persisting the token yet, just remove `--persist`.
+
+Current auth note:
+
+- DMs currently start in pairing mode by default.
+- The config shape already includes `ownerClaimWindowMinutes`, but automatic first-owner claim from the first DM is not implemented in the runtime yet.
+- Today, if you want an owner or app admin, grant that principal explicitly with `clisbot auth add-user app --role owner --user <principal>` or `clisbot auth add-user app --role admin --user <principal>`.
+- `clisbot auth --help` now covers role scopes, permission sets, and add/remove flows for users and permissions.
+- App-level auth and owner-claim semantics in [Authorization And Roles](docs/user-guide/auth-and-roles.md) describe both the current runtime reality and the remaining target-model gaps.
 
 Need the step-by-step setup docs instead of the shortest path?
 
@@ -244,6 +259,12 @@ If you are running from the repo instead of the global package:
 ## In Chat
 
 `clisbot` supports a small set of chat-native commands for thread control, transcript access, and quick shell execution.
+
+Native coding-CLI command compatibility:
+
+- `clisbot` only intercepts its own reserved chat commands
+- any other native Claude, Codex, or Gemini command text is forwarded to the underlying CLI unchanged
+- operator guide: [Native CLI Commands](docs/user-guide/native-cli-commands.md)
 
 Slack note:
 

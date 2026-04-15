@@ -21,6 +21,7 @@ Related pages:
 - [Telegram Bot Setup](telegram-setup.md)
 - [Slack App Setup](slack-setup.md)
 - [Slash Commands](slash-commands.md)
+- [Native CLI Commands](native-cli-commands.md)
 - [CLI Commands](cli-commands.md)
 - [Agent Progress Replies](agent-progress-replies.md)
 - [Authorization And Roles](auth-and-roles.md)
@@ -44,6 +45,14 @@ Fastest path:
 ```bash
 bun run start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>
 ```
+
+After your first successful `clisbot start`:
+
+1. Get your principal from a surface the bot can already see:
+   Telegram groups or topics can use `/whoami` even before routing, while DMs with `pairing` policy need pairing first.
+2. Grant the first app owner with `clisbot auth add-user app --role owner --user <principal>`.
+3. Inspect and tune role permissions with `clisbot auth --help`.
+4. Continue with route setup in [Channel Operations](channels.md) and auth details in [Authorization And Roles](auth-and-roles.md).
 
 Persist the token for later plain `clisbot start` runs:
 

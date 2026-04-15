@@ -3,7 +3,10 @@ import type { LoadedConfig } from "../config/load-config.ts";
 import type { ProcessedEventsStore } from "./processed-events-store.ts";
 import type { ActivityStore } from "../control/activity-store.ts";
 import type { ParsedMessageCommand } from "./message-command.ts";
-import type { RuntimeChannel } from "../control/runtime-health-store.ts";
+import type {
+  RuntimeChannel,
+  RuntimeChannelConnection,
+} from "../control/runtime-health-store.ts";
 import type { RuntimeHealthStore } from "../control/runtime-health-store.ts";
 
 export type ChannelRuntimeService = {
@@ -24,6 +27,14 @@ export type ChannelRuntimeContext = {
   agentService: AgentService;
   processedEventsStore: ProcessedEventsStore;
   activityStore: ActivityStore;
+  reportLifecycle: (event: ChannelRuntimeLifecycleEvent) => Promise<void>;
+};
+
+export type ChannelRuntimeLifecycleEvent = {
+  connection: Extract<RuntimeChannelConnection, "active" | "failed">;
+  summary?: string;
+  detail?: string;
+  actions?: string[];
 };
 
 export type ChannelRuntimeAccount = {

@@ -15,7 +15,20 @@ Owner claim stays in this slice because it is the cleanest bootstrap path for th
 
 ## Status
 
-Planned
+Partially implemented
+
+## Current Runtime Reality
+
+Today:
+
+- `app.auth` and `agents.<id>.auth` are in the config schema and runtime
+- resolved app `owner` and app `admin` principals bypass pairing
+- `/bash` is gated by resolved agent auth through `shellExecute`
+- the protected prompt rule is injected for routed prompts, including queued, steering, and loop-triggered delivery
+- `clisbot auth ...` exists for `list`, `show`, `add-user`, `remove-user`, `add-permission`, and `remove-permission`
+- automatic first-owner claim from the first DM is not implemented yet
+
+Use this page as the feature contract for both what is already live and what remains unfinished.
 
 ## Why
 
@@ -228,6 +241,11 @@ Behavior:
 - if operators remove every owner later, the next start opens claim again
 - once any owner exists on one platform principal, claim is closed app-wide; a later Slack or Telegram DM from another principal does not claim owner automatically
 
+Current gap:
+
+- the runtime does not yet auto-claim the first owner
+- operators currently need to grant the first owner explicitly through `clisbot auth add-user app --role owner --user <principal>`
+
 ## Resolution Order
 
 Phase 1 should resolve in this order:
@@ -303,13 +321,14 @@ It is not yet the full long-term command-authorization system.
 ## Exit Criteria
 
 - config supports `app.auth` and `agents.<id>.auth`
-- owner claim opens only while no owner exists
+- `clisbot auth ...` exists for listing, showing, and mutating app or agent auth policy
 - `privilegeCommands` is removed and rejected everywhere
 - routed users not explicitly listed resolve to `member`
 - docs say clearly that `/bash` depends on `shellExecute`
 - docs say clearly that default `member` includes `sendMessage`, `helpView`, `statusView`, `identityView`, `transcriptView`, `runObserve`, `runInterrupt`, `streamingManage`, `queueManage`, `steerManage`, and `loopManage`
 - prompt injection uses the protected clisbot control-resource rule
 - prompt injection applies that rule to normal, queue, steer, and loop delivery
+- docs say clearly that automatic first-owner claim is still pending
 - docs say clearly that broader enforcement can be refined later
 
 ## Related Docs

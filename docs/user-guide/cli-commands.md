@@ -16,6 +16,7 @@ This page is the canonical overview for operator CLI surfaces and a quick refere
   - `src/control/loops-cli.ts`
   - `src/control/message-cli.ts`
   - `src/control/agents-cli.ts`
+  - `src/control/auth-cli.ts`
   - `src/channels/pairing/cli.ts`
 
 If this page and runtime ever disagree, runtime wins.
@@ -33,6 +34,7 @@ If this page and runtime ever disagree, runtime wins.
 - `clisbot loops ...`
 - `clisbot message ...`
 - `clisbot agents ...`
+- `clisbot auth ...`
 - `clisbot pairing ...`
 - `clisbot init`
 
@@ -106,6 +108,28 @@ If this page and runtime ever disagree, runtime wins.
 - `clisbot agents additional-message-mode status --agent <id>`
 - `clisbot agents additional-message-mode set <queue|steer> --agent <id>`
 - `clisbot agents additional-message-mode clear --agent <id>`
+
+## Auth
+
+- `clisbot auth list [--json]`
+- `clisbot auth show <app|agent-defaults|agent> [--agent <id>] [--json]`
+- `clisbot auth add-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
+- `clisbot auth remove-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
+- `clisbot auth add-permission <app|agent-defaults|agent> --role <role> --permission <permission> [--agent <id>]`
+- `clisbot auth remove-permission <app|agent-defaults|agent> --role <role> --permission <permission> [--agent <id>]`
+
+Important behavior:
+
+- `app` edits `app.auth`
+- `agent-defaults` edits `agents.defaults.auth`
+- `agent --agent <id>` edits one agent override under `agents.list[].auth`
+- `add-user` and `remove-user` mutate `roles.<role>.users`
+- `add-permission` and `remove-permission` mutate `roles.<role>.allow`
+- agent-specific writes clone the inherited role from `agents.defaults.auth.roles.<role>` into the target agent override on first mutation
+- app permissions are limited to the app permission set: `configManage`, `appAuthManage`, `agentAuthManage`, `promptGovernanceManage`
+- agent permissions are limited to the agent permission set shown by `clisbot auth --help`
+- this CLI writes config; config remains the source of truth for routed auth
+- `clisbot auth --help` is the detailed operator help surface for scopes, examples, and permission names
 
 ## Pairing
 

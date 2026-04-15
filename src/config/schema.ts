@@ -160,6 +160,11 @@ const authRoleSchema = z.object({
   users: z.array(z.string().min(1)).default([]),
 });
 
+const authRoleOverrideSchema = z.object({
+  allow: z.array(z.string().min(1)).optional(),
+  users: z.array(z.string().min(1)).optional(),
+});
+
 const appAuthSchema = z.object({
   ownerClaimWindowMinutes: z.number().int().positive().default(30),
   defaultRole: z.string().min(1).default("member"),
@@ -193,11 +198,16 @@ const agentAuthSchema = z.object({
   }),
 });
 
+const agentAuthOverrideSchema = z.object({
+  defaultRole: z.string().min(1).optional(),
+  roles: z.record(z.string(), authRoleOverrideSchema).default({}),
+});
+
 const agentOverrideSchema = z.object({
   workspace: z.string().optional(),
   responseMode: z.enum(["capture-pane", "message-tool"]).optional(),
   additionalMessageMode: z.enum(["queue", "steer"]).optional(),
-  auth: agentAuthSchema.optional(),
+  auth: agentAuthOverrideSchema.optional(),
   runner: runnerOverrideSchema.optional(),
   stream: streamSchema.partial().optional(),
   session: sessionSchema.partial().optional(),
