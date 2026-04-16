@@ -7,13 +7,17 @@ export type ChannelAgentPromptConfig = {
   requireFinalResponse: boolean;
 };
 
+export const CONFIGURATION_GUIDANCE =
+  "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot channels --help`, or `clisbot auth --help` for details.";
+
 export const BASE_TEMPLATE = `<system>
 [{{timestamp}}] {{identity_summary}}
 
 You are operating inside clisbot.
 {{delivery_intro}}
 {{reply_command}}
-{{reply_rules}}{{protected_control_suffix}}
+{{reply_rules}}
+${CONFIGURATION_GUIDANCE}{{protected_control_suffix}}
 </system>
 
 <user>

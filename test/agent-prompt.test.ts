@@ -51,6 +51,9 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- use that command only for the final user-facing reply");
     expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
+    expect(prompt).toContain(
+      "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot channels --help`, or `clisbot auth --help` for details.",
+    );
     expect(prompt).not.toContain("- send at most 3 progress updates");
     expect(prompt).toContain("<user>\nplease investigate\n</user>");
   });
@@ -203,6 +206,9 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- send at most 3 progress updates");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
     expect(prompt).toContain("- keep progress updates short and meaningful");
+    expect(prompt).toContain(
+      "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot channels --help`, or `clisbot auth --help` for details.",
+    );
   });
 
   test("appends the protected control rule when provided", () => {
