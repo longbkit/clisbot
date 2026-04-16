@@ -8,6 +8,7 @@ import { loadConfig, resolveSessionStorePath } from "../src/config/load-config.t
 import { AgentSessionState } from "../src/agents/session-state.ts";
 import { SessionStore } from "../src/agents/session-store.ts";
 import { RunnerService } from "../src/agents/runner-service.ts";
+import { MID_RUN_RECOVERY_CONTINUE_PROMPT } from "../src/agents/run-recovery.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 
 const RUNNER_GENERATED_ID = "11111111-1111-1111-1111-111111111111";
@@ -28,6 +29,7 @@ type FakeSession = {
   noServerAfterTrustDismiss?: boolean;
   failWithNoServerOnNextCapture?: boolean;
   scriptedCaptureOutputs?: string[];
+  waitForRecoveryContinue?: boolean;
 };
 
 class FakeTmuxClient {
@@ -134,6 +136,7 @@ class FakeTmuxClient {
         noServerAfterTrustDismiss: this.nextNoServerAfterTrustDismiss,
         failWithNoServerOnNextCapture: false,
         scriptedCaptureOutputs,
+        waitForRecoveryContinue: resumedWithScript,
       });
       this.nextTrustPromptCaptureCount = null;
       this.nextTrustPromptVariant = "codex";
@@ -162,6 +165,7 @@ class FakeTmuxClient {
       noServerAfterTrustDismiss: this.nextNoServerAfterTrustDismiss,
       failWithNoServerOnNextCapture: false,
       scriptedCaptureOutputs,
+      waitForRecoveryContinue: resumedWithScript,
     });
     this.nextTrustPromptCaptureCount = null;
     this.nextTrustPromptVariant = "codex";
@@ -215,6 +219,9 @@ class FakeTmuxClient {
     } else if (session.pendingInput === "recover-mid-run") {
       this.disappearingOnCaptureSessionIds.add(session.sessionId);
       session.snapshot = `${session.snapshot}\nRECOVER ${session.sessionId}`;
+    } else if (session.pendingInput === MID_RUN_RECOVERY_CONTINUE_PROMPT) {
+      session.waitForRecoveryContinue = false;
+      session.snapshot = `${session.snapshot}\nCONTINUE ${session.sessionId}`;
     } else if (session.pendingInput) {
       session.snapshot = `${session.snapshot}\nECHO ${session.pendingInput}`;
     }
@@ -275,7 +282,7 @@ class FakeTmuxClient {
       session.longRunningStep += 1;
       session.snapshot = `${session.snapshot}\nSTEP ${session.longRunningStep} ${session.sessionId}`;
     }
-    if ((session.scriptedCaptureOutputs?.length ?? 0) > 0) {
+    if (!session.waitForRecoveryContinue && (session.scriptedCaptureOutputs?.length ?? 0) > 0) {
       session.snapshot = `${session.snapshot}\n${session.scriptedCaptureOutputs?.shift()}`;
     }
     return session.snapshot;
@@ -2451,7 +2458,12 @@ describe("AgentService session identity", () => {
       expect(result.snapshot).toContain(`RESUMED ANSWER 1 ${RUNNER_GENERATED_ID}`);
       expect(fakeTmux.sessionCommands[1]).toContain(`resume ${RUNNER_GENERATED_ID}`);
       expect(updates.some((update) => update.note?.includes("Attempting recovery 1/2"))).toBe(true);
-      expect(updates.some((update) => update.note?.includes("Recovery succeeded"))).toBe(true);
+      expect(
+        updates.some((update) =>
+          update.note?.includes("continue exactly where it left off"),
+        ),
+      ).toBe(true);
+      expect(result.snapshot).toContain(`CONTINUE ${RUNNER_GENERATED_ID}`);
       expect(
         updates.some((update) =>
           update.snapshot.includes(`RESUMED ANSWER 1 ${RUNNER_GENERATED_ID}`),

@@ -7,7 +7,12 @@ import {
 import type { AgentSessionState } from "./session-state.ts";
 import type { AgentSessionTarget, ResolvedAgentTarget } from "./resolved-target.ts";
 import { deriveInteractionText, normalizePaneText } from "../shared/transcript.ts";
-import { buildRunRecoveryNote, mergeRunSnapshot } from "./run-recovery.ts";
+import {
+  buildRunRecoveryNote,
+  mergeRunSnapshot,
+  MID_RUN_RECOVERY_CONTINUE_PROMPT,
+  MID_RUN_RECOVERY_MAX_ATTEMPTS,
+} from "./run-recovery.ts";
 import { TmuxClient } from "../runners/tmux/client.ts";
 import { monitorTmuxRun } from "../runners/tmux/run-monitor.ts";
 import { RunnerService } from "./runner-service.ts";
@@ -506,9 +511,10 @@ export class SessionService {
     sessionKey: string,
     params: {
       timingContext?: RunObserver["timingContext"];
+      recoveryAttempt?: number;
     },
     error: unknown,
-  ) {
+  ): Promise<boolean> {
     if (!this.runnerSessions.canRecoverMidRun(error)) {
       return false;
     }
@@ -521,10 +527,16 @@ export class SessionService {
       agentId: run.resolved.agentId,
       sessionKey: run.resolved.sessionKey,
     };
+    const recoveryAttempt = params.recoveryAttempt ?? 1;
     const snapshotPrefix = run.latestUpdate.snapshot;
-    const previousFullSnapshot = run.latestUpdate.fullSnapshot;
     const detachedAlready = run.latestUpdate.status === "detached";
-    await this.notifyRecoveryStep(run, buildRunRecoveryNote("resume-attempt"));
+    await this.notifyRecoveryStep(
+      run,
+      buildRunRecoveryNote("resume-attempt", {
+        attempt: recoveryAttempt,
+        maxAttempts: MID_RUN_RECOVERY_MAX_ATTEMPTS,
+      }),
+    );
     try {
       const recovered = await this.runnerSessions.reopenRunContext(target, params.timingContext);
       const currentRun = this.activeRuns.get(sessionKey);
@@ -543,15 +555,29 @@ export class SessionService {
       });
       await this.notifyRunObservers(currentRun, currentRun.latestUpdate);
       this.startRunMonitor(sessionKey, {
-        prompt: undefined,
-        initialSnapshot: previousFullSnapshot,
+        prompt: MID_RUN_RECOVERY_CONTINUE_PROMPT,
+        initialSnapshot: recovered.initialSnapshot,
         startedAt: currentRun.startedAt,
         detachedAlready,
         timingContext: params.timingContext,
         snapshotPrefix,
+        recoveryAttempt,
       });
       return true;
-    } catch {
+    } catch (reopenError) {
+      if (
+        recoveryAttempt < MID_RUN_RECOVERY_MAX_ATTEMPTS &&
+        this.runnerSessions.canRecoverMidRun(reopenError)
+      ) {
+        return await this.recoverLostMidRun(
+          sessionKey,
+          {
+            timingContext: params.timingContext,
+            recoveryAttempt: recoveryAttempt + 1,
+          },
+          reopenError,
+        );
+      }
       const currentRun = this.activeRuns.get(sessionKey);
       if (!currentRun) {
         return true;
@@ -584,6 +610,7 @@ export class SessionService {
       detachedAlready: boolean;
       timingContext?: RunObserver["timingContext"];
       snapshotPrefix?: string;
+      recoveryAttempt?: number;
     },
   ) {
     const run = this.activeRuns.get(sessionKey);
@@ -682,7 +709,14 @@ export class SessionService {
         });
       } catch (error) {
         if (
-          await this.recoverLostMidRun(sessionKey, { timingContext: params.timingContext }, error)
+          await this.recoverLostMidRun(
+            sessionKey,
+            {
+              timingContext: params.timingContext,
+              recoveryAttempt: (params.recoveryAttempt ?? 0) + 1,
+            },
+            error,
+          )
         ) {
           return;
         }

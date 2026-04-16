@@ -130,6 +130,8 @@ The mid-prompt recovery gap is no longer the old asymmetric failure path.
 - startup and pre-prompt session loss still recover in `RunnerService`
 - mid-prompt tmux session loss now follows a bounded two-step flow:
   - first try reopening the same conversation context with the stored `sessionId`
+  - on a successful reopen, the same run now immediately sends `continue exactly where you left off` before any queued follow-up can run
+  - same-context reopen is now retried up to `2` times before falling through
   - if same-context recovery is unavailable or fails, open a fresh session without replaying the old prompt
   - fail the current run truthfully and tell the user to resend the full prompt or context
 - recovery notes are now forced visible in-channel even when route `streaming` is `off`
@@ -298,6 +300,8 @@ Ready-state verification:
 Mid-prompt recovery:
 
 - current recovery first tries reopening the same conversation context using the stored `sessionId`
+- if reopen succeeds, the active run immediately nudges the runner with `continue exactly where you left off`
+- same-context reopen is retried up to `2` times before the system gives up on continuity
 - if same-context reopen is unavailable or fails, it opens a fresh session without replaying the old prompt
 - this is bounded recovery, but it is not yet governed by a broader runtime-wide restart or backoff strategy
 
