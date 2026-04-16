@@ -122,7 +122,7 @@ Current Slack transport rule should favor UX:
 Current session defaults should favor OpenClaw compatibility:
 
 - `session.mainKey: "main"`
-- `session.dmScope: "main"`
+- `session.dmScope: "per-channel-peer"`
 - `session.storePath: "~/.clisbot/state/sessions.json"`
 - `agents.defaults.workspace: "~/.clisbot/workspaces/{agentId}"`
 - `agents.defaults.session.name: "{sessionKey}"`

@@ -51,7 +51,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
       },
       session: {
         mainKey: "main",
-        dmScope: "main",
+        dmScope: "per-channel-peer",
         identityLinks: {},
         storePath: sessionStorePath,
       },
@@ -162,6 +162,10 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
         },
         runtimeMonitor: {
           restartBackoff: {
+            fastRetry: {
+              delaySeconds: 10,
+              maxRestarts: 3,
+            },
             stages: [
               {
                 delayMinutes: 15,

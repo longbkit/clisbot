@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { kill } from "node:process";
 import { loadConfig } from "../config/load-config.ts";
 import { renderDefaultConfigTemplate } from "../config/template.ts";
@@ -36,28 +36,95 @@ function resolveConfigPath(configPath?: string) {
   return expandHomePath(configPath ?? process.env.CLISBOT_CONFIG_PATH ?? getDefaultConfigPath());
 }
 
-function resolvePidPath(pidPath?: string) {
-  return expandHomePath(pidPath ?? process.env.CLISBOT_PID_PATH ?? getDefaultRuntimePidPath());
+function deriveRuntimeSiblingPath(
+  configPath: string | undefined,
+  filename: string,
+) {
+  if (!configPath) {
+    return null;
+  }
+
+  return join(dirname(expandHomePath(configPath)), "state", filename);
 }
 
-function resolveLogPath(logPath?: string) {
-  return expandHomePath(logPath ?? process.env.CLISBOT_LOG_PATH ?? getDefaultRuntimeLogPath());
-}
+function resolvePidPath(pidPath?: string, configPath?: string) {
+  if (pidPath) {
+    return expandHomePath(pidPath);
+  }
 
-function resolveMonitorStatePath(monitorStatePath?: string) {
-  return expandHomePath(
-    monitorStatePath ??
-      process.env.CLISBOT_RUNTIME_MONITOR_STATE_PATH ??
-      getDefaultRuntimeMonitorStatePath(),
+  if (process.env.CLISBOT_PID_PATH) {
+    return expandHomePath(process.env.CLISBOT_PID_PATH);
+  }
+
+  const derivedFromConfig = deriveRuntimeSiblingPath(
+    configPath ?? process.env.CLISBOT_CONFIG_PATH,
+    "clisbot.pid",
   );
+  if (derivedFromConfig) {
+    return derivedFromConfig;
+  }
+
+  return expandHomePath(getDefaultRuntimePidPath());
 }
 
-function resolveRuntimeCredentialsPath(runtimeCredentialsPath?: string) {
-  return expandHomePath(
-    runtimeCredentialsPath ??
-      process.env.CLISBOT_RUNTIME_CREDENTIALS_PATH ??
-      getDefaultRuntimeCredentialsPath(),
+function resolveLogPath(logPath?: string, configPath?: string) {
+  if (logPath) {
+    return expandHomePath(logPath);
+  }
+
+  if (process.env.CLISBOT_LOG_PATH) {
+    return expandHomePath(process.env.CLISBOT_LOG_PATH);
+  }
+
+  const derivedFromConfig = deriveRuntimeSiblingPath(
+    configPath ?? process.env.CLISBOT_CONFIG_PATH,
+    "clisbot.log",
   );
+  if (derivedFromConfig) {
+    return derivedFromConfig;
+  }
+
+  return expandHomePath(getDefaultRuntimeLogPath());
+}
+
+function resolveMonitorStatePath(monitorStatePath?: string, configPath?: string) {
+  if (monitorStatePath) {
+    return expandHomePath(monitorStatePath);
+  }
+
+  if (process.env.CLISBOT_RUNTIME_MONITOR_STATE_PATH) {
+    return expandHomePath(process.env.CLISBOT_RUNTIME_MONITOR_STATE_PATH);
+  }
+
+  const derivedFromConfig = deriveRuntimeSiblingPath(
+    configPath ?? process.env.CLISBOT_CONFIG_PATH,
+    "clisbot-monitor.json",
+  );
+  if (derivedFromConfig) {
+    return derivedFromConfig;
+  }
+
+  return expandHomePath(getDefaultRuntimeMonitorStatePath());
+}
+
+function resolveRuntimeCredentialsPath(runtimeCredentialsPath?: string, configPath?: string) {
+  if (runtimeCredentialsPath) {
+    return expandHomePath(runtimeCredentialsPath);
+  }
+
+  if (process.env.CLISBOT_RUNTIME_CREDENTIALS_PATH) {
+    return expandHomePath(process.env.CLISBOT_RUNTIME_CREDENTIALS_PATH);
+  }
+
+  const derivedFromConfig = deriveRuntimeSiblingPath(
+    configPath ?? process.env.CLISBOT_CONFIG_PATH,
+    "runtime-credentials.json",
+  );
+  if (derivedFromConfig) {
+    return derivedFromConfig;
+  }
+
+  return expandHomePath(getDefaultRuntimeCredentialsPath());
 }
 
 export type RuntimeStartResult = {
@@ -81,6 +148,7 @@ export type RuntimeStatus = {
   runtimePid?: number;
   nextRestartAt?: string;
   restartNumber?: number;
+  restartMode?: NonNullable<RuntimeMonitorState["restart"]>["mode"];
   restartStageIndex?: number;
   stopReason?: RuntimeMonitorState["stopReason"];
 };
@@ -210,10 +278,11 @@ export async function startDetachedRuntime(params: {
   runtimeCredentialsPath?: string;
   monitorStatePath?: string;
 }) {
-  const pidPath = resolvePidPath(params.pidPath);
-  const logPath = resolveLogPath(params.logPath);
-  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath);
-  const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath);
+  const configPath = resolveConfigPath(params.configPath);
+  const pidPath = resolvePidPath(params.pidPath, configPath);
+  const logPath = resolveLogPath(params.logPath, configPath);
+  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath, configPath);
+  const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath, configPath);
   const existingPid = await readRuntimePid(pidPath);
   const existingMonitorState = await readRuntimeMonitorState(monitorStatePath);
   if (existingPid && isProcessRunning(existingPid)) {
@@ -221,7 +290,7 @@ export async function startDetachedRuntime(params: {
       alreadyRunning: true,
       createdConfig: false,
       pid: existingPid,
-      configPath: resolveConfigPath(params.configPath),
+      configPath,
       logPath,
     } satisfies RuntimeStartResult;
   }
@@ -310,9 +379,10 @@ export async function stopDetachedRuntime(params: {
   sendSignal?: typeof kill;
   sleep?: typeof sleep;
 } = {}) {
-  const pidPath = resolvePidPath(params.pidPath);
-  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath);
-  const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath);
+  const configPath = resolveConfigPath(params.configPath);
+  const pidPath = resolvePidPath(params.pidPath, configPath);
+  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath, configPath);
+  const runtimeCredentialsPath = resolveRuntimeCredentialsPath(params.runtimeCredentialsPath, configPath);
   const existingPid = await readRuntimePid(pidPath);
   const monitorState = await readRuntimeMonitorState(monitorStatePath);
   let stopped = false;
@@ -356,7 +426,7 @@ export async function stopDetachedRuntime(params: {
 
   rmSync(pidPath, { force: true });
   removeRuntimeCredentials(runtimeCredentialsPath);
-  await disableExpiredMemAccountsInConfig(params.configPath);
+  await disableExpiredMemAccountsInConfig(configPath);
   if (monitorState) {
     await writeRuntimeMonitorState(monitorStatePath, {
       ...monitorState,
@@ -368,7 +438,7 @@ export async function stopDetachedRuntime(params: {
   }
 
   if (params.hard) {
-    const socketPath = await resolveTmuxSocketPath(params.configPath);
+    const socketPath = await resolveTmuxSocketPath(configPath);
     const tmux = new TmuxClient(socketPath);
     try {
       await tmux.killServer();
@@ -414,9 +484,9 @@ export async function getRuntimeStatus(params: {
   monitorStatePath?: string;
 } = {}): Promise<RuntimeStatus> {
   const configPath = resolveConfigPath(params.configPath);
-  const pidPath = resolvePidPath(params.pidPath);
-  const logPath = resolveLogPath(params.logPath);
-  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath);
+  const pidPath = resolvePidPath(params.pidPath, configPath);
+  const logPath = resolveLogPath(params.logPath, configPath);
+  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath, configPath);
   const pid = await readRuntimePid(pidPath);
   const liveness = pid ? getProcessLiveness(pid) : "missing";
   const monitorState = await readRuntimeMonitorState(monitorStatePath);
@@ -437,6 +507,7 @@ export async function getRuntimeStatus(params: {
         : undefined,
     nextRestartAt: monitorState?.restart?.nextRestartAt,
     restartNumber: monitorState?.restart?.restartNumber,
+    restartMode: monitorState?.restart?.mode,
     restartStageIndex: monitorState?.restart?.stageIndex,
     stopReason: monitorState?.stopReason,
   };

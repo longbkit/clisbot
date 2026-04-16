@@ -156,6 +156,8 @@ Current behavior:
 
 Current config points:
 
+- `control.runtimeMonitor.restartBackoff.fastRetry.delaySeconds`
+- `control.runtimeMonitor.restartBackoff.fastRetry.maxRestarts`
 - `control.runtimeMonitor.restartBackoff.stages[].delayMinutes`
 - `control.runtimeMonitor.restartBackoff.stages[].maxRestarts`
 - `control.runtimeMonitor.ownerAlerts.enabled`
@@ -163,6 +165,7 @@ Current config points:
 
 Current default policy:
 
+- retry every 10 seconds for the first 3 unexpected exits
 - restart every 15 minutes for the first 4 retries
 - then every 30 minutes for the next 4 retries
 - then stop and require an operator restart after the root cause is fixed

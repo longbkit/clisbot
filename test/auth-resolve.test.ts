@@ -68,6 +68,7 @@ function createConfig(): ClisbotConfig {
       loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
       runtimeMonitor: {
         restartBackoff: {
+          fastRetry: { delaySeconds: 10, maxRestarts: 3 },
           stages: [
             { delayMinutes: 15, maxRestarts: 4 },
             { delayMinutes: 30, maxRestarts: 4 },

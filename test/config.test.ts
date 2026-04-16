@@ -464,6 +464,7 @@ describe("loadConfig", () => {
     expect(editable.config.agents.defaults.workspace).toBe(
       join(clisbotHome, "workspaces", "{agentId}"),
     );
+    expect(editable.config.session.dmScope).toBe("per-channel-peer");
   });
 
   test("readEditableConfig rejects legacy privilegeCommands keys too", async () => {

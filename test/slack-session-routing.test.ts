@@ -17,7 +17,7 @@ function createLoadedConfig(): LoadedConfig {
       },
       session: {
         mainKey: "main",
-        dmScope: "main",
+        dmScope: "per-channel-peer",
         identityLinks: {},
         storePath: "/tmp/sessions.json",
       },
@@ -99,6 +99,7 @@ function createLoadedConfig(): LoadedConfig {
         },
         runtimeMonitor: {
           restartBackoff: {
+            fastRetry: { delaySeconds: 10, maxRestarts: 3 },
             stages: [
               { delayMinutes: 15, maxRestarts: 4 },
               { delayMinutes: 30, maxRestarts: 4 },
@@ -211,7 +212,7 @@ function createLoadedConfig(): LoadedConfig {
 }
 
 describe("Slack conversation target routing", () => {
-  test("collapses direct messages to the main session by default", () => {
+  test("isolates direct messages by peer by default", () => {
     const target = resolveSlackConversationTarget({
       loadedConfig: createLoadedConfig(),
       agentId: "default",
@@ -223,7 +224,7 @@ describe("Slack conversation target routing", () => {
       replyToMode: "thread",
     });
 
-    expect(target.sessionKey).toBe("agent:default:main");
+    expect(target.sessionKey).toBe("agent:default:slack:dm:u123");
     expect(target.mainSessionKey).toBe("agent:default:main");
   });
 
@@ -299,9 +300,9 @@ describe("Slack conversation target routing", () => {
     );
   });
 
-  test("supports OpenClaw-style per-channel-peer dm scoping", () => {
+  test("supports explicit main-scope dm collapsing when requested", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.session.dmScope = "per-channel-peer";
+    loadedConfig.raw.session.dmScope = "main";
 
     const target = resolveSlackConversationTarget({
       loadedConfig,
@@ -314,7 +315,7 @@ describe("Slack conversation target routing", () => {
       replyToMode: "thread",
     });
 
-    expect(target.sessionKey).toBe("agent:default:slack:dm:u123");
+    expect(target.sessionKey).toBe("agent:default:main");
   });
 
   test("isolates Slack multi-person direct groups as group sessions", () => {

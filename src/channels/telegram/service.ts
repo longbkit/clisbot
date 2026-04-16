@@ -466,6 +466,9 @@ export class TelegramPollingService {
             "sendMessage",
             {
               chat_id: message.chat.id,
+              ...(message.message_id != null
+                ? { reply_to_message_id: message.message_id }
+                : {}),
               text: renderFirstOwnerClaimMessage({
                 principal: ownerPrincipal,
                 ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,

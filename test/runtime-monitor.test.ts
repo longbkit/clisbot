@@ -85,6 +85,10 @@ function createLoadedConfig(): LoadedConfig {
         loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
         runtimeMonitor: {
           restartBackoff: {
+            fastRetry: {
+              delaySeconds: 5,
+              maxRestarts: 1,
+            },
             stages: [{ delayMinutes: 1, maxRestarts: 1 }],
           },
           ownerAlerts: {
@@ -236,8 +240,10 @@ describe("serveMonitor", () => {
       },
     );
 
-    expect(spawnCount).toBe(2);
+    expect(spawnCount).toBe(3);
     expect(states.some((state) => state.phase === "backoff")).toBe(true);
+    expect(states.some((state) => state.restart?.mode === "fast-retry")).toBe(true);
+    expect(states.some((state) => state.restart?.mode === "backoff")).toBe(true);
     expect(states.at(-1)?.phase).toBe("stopped");
     expect(sentMessages).toHaveLength(2);
     expect(sentMessages[0]).toContain("entered restart backoff");

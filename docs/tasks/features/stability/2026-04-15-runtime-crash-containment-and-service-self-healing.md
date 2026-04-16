@@ -241,6 +241,7 @@ Current restart and retry behavior exists in multiple layers, but it is still fr
 - detached `clisbot start` now runs through an app-owned runtime monitor process
 - the monitor keeps one foreground runtime worker as its child and owns bounded restart backoff
 - default restart policy is:
+  - retry every 10 seconds for the first 3 unexpected exits
   - 15 minutes for the first 4 restart attempts
   - 30 minutes for the next 4 restart attempts
   - stop after that until an operator starts the service again

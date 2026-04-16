@@ -214,6 +214,8 @@ describe("renderDefaultConfigTemplate", () => {
   });
 
   test("matches config/clisbot.json.template after normalizing dynamic fields", () => {
+    delete process.env.CLISBOT_HOME;
+
     const generated = JSON.parse(
       renderDefaultConfigTemplate({
         slackEnabled: false,

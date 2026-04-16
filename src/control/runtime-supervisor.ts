@@ -14,6 +14,7 @@ import {
 } from "./operator-errors.ts";
 import { RuntimeHealthStore } from "./runtime-health-store.ts";
 import { listChannelPlugins } from "../channels/registry.ts";
+import { consumeSuppressedConfigReload } from "./config-reload-suppression.ts";
 import type {
   ChannelRuntimeEntry,
   ChannelPlugin,
@@ -132,13 +133,26 @@ export class RuntimeSupervisor {
 
     try {
       const loadedConfig = await this.dependencies.loadConfig(this.configPath);
+      const configMtimeMs = statSync(loadedConfig.configPath).mtimeMs;
+      if (
+        reason === "watch" &&
+        consumeSuppressedConfigReload(loadedConfig.configPath, configMtimeMs)
+      ) {
+        await this.reconcileConfigWatcher(loadedConfig);
+        await this.dependencies.runtimeHealthStore.setReload({
+          status: "success",
+          reason,
+          configMtimeMs,
+        });
+        return;
+      }
       nextRuntime = await this.createRuntime(loadedConfig);
 
       await this.reconcileConfigWatcher(loadedConfig);
       await this.dependencies.runtimeHealthStore.setReload({
         status: "success",
         reason,
-        configMtimeMs: statSync(loadedConfig.configPath).mtimeMs,
+        configMtimeMs,
       });
       this.activeRuntime = nextRuntime;
 

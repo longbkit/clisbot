@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import lockfile from "proper-lockfile";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
 import {
@@ -9,6 +10,7 @@ import type { ClisbotConfig } from "../config/schema.ts";
 import {
   resolveAuthPrincipal,
 } from "./resolve.ts";
+import { suppressConfigReload } from "../control/config-reload-suppression.ts";
 
 const OWNER_CLAIM_RUNTIME_STARTED_AT_MS = Date.now();
 const CONFIG_LOCK_OPTIONS = {
@@ -146,6 +148,7 @@ export async function claimFirstOwnerFromDirectMessage(params: {
 
     freshConfig.app.auth.roles.owner.users = [...currentOwners, principal];
     await writeEditableConfig(expandedPath, freshConfig);
+    suppressConfigReload(expandedPath, statSync(expandedPath).mtimeMs);
     syncOwnerUsers(params.config, freshConfig);
     ownerClaimRuntimeState.closed = true;
     console.log(`clisbot auto-claimed first owner ${principal}`);

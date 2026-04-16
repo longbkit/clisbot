@@ -22,6 +22,7 @@ export type RuntimeMonitorState = {
   startedAt: string;
   updatedAt: string;
   restart?: {
+    mode: "fast-retry" | "backoff";
     stageIndex: number;
     restartNumber: number;
     restartAttemptInStage: number;
@@ -128,8 +129,23 @@ function getRestartPlan(
   config: ClisbotConfig["control"]["runtimeMonitor"]["restartBackoff"],
   restartNumber: number,
 ) {
-  let completedRestarts = 0;
-  const totalRestarts = config.stages.reduce((sum, stage) => sum + stage.maxRestarts, 0);
+  const fastRetryMaxRestarts = config.fastRetry.maxRestarts;
+  const totalRestarts =
+    fastRetryMaxRestarts + config.stages.reduce((sum, stage) => sum + stage.maxRestarts, 0);
+
+  if (restartNumber >= 1 && restartNumber <= fastRetryMaxRestarts) {
+    return {
+      mode: "fast-retry" as const,
+      stageIndex: -1,
+      delayMs: config.fastRetry.delaySeconds * 1000,
+      restartAttemptInStage: restartNumber,
+      restartsRemaining: totalRestarts - restartNumber,
+      totalRestarts,
+      stageMaxRestarts: fastRetryMaxRestarts,
+    };
+  }
+
+  let completedRestarts = fastRetryMaxRestarts;
 
   for (let index = 0; index < config.stages.length; index += 1) {
     const stage = config.stages[index]!;
@@ -137,11 +153,13 @@ function getRestartPlan(
     const stageEnd = completedRestarts + stage.maxRestarts;
     if (restartNumber >= stageStart && restartNumber <= stageEnd) {
       return {
+        mode: "backoff" as const,
         stageIndex: index,
-        delayMinutes: stage.delayMinutes,
+        delayMs: stage.delayMinutes * 60_000,
         restartAttemptInStage: restartNumber - completedRestarts,
         restartsRemaining: totalRestarts - restartNumber,
         totalRestarts,
+        stageMaxRestarts: stage.maxRestarts,
       };
     }
     completedRestarts = stageEnd;
@@ -306,6 +324,7 @@ function renderBackoffAlertMessage(params: {
   restartNumber: number;
   stageIndex: number;
   restartAttemptInStage: number;
+  stageMaxRestarts: number;
   totalRestarts: number;
   nextRestartAt: string;
   exit: { code: number | null; signal: NodeJS.Signals | null; at: string };
@@ -318,7 +337,7 @@ function renderBackoffAlertMessage(params: {
     `next restart: ${params.nextRestartAt}`,
     `restart: ${params.restartNumber}/${params.totalRestarts}`,
     `stage: ${params.stageIndex + 1}/${params.config.restartBackoff.stages.length}`,
-    `stage attempt: ${params.restartAttemptInStage}/${params.config.restartBackoff.stages[params.stageIndex]?.maxRestarts ?? params.restartAttemptInStage}`,
+    `stage attempt: ${params.restartAttemptInStage}/${params.stageMaxRestarts}`,
   ].join("\n");
 }
 
@@ -432,25 +451,28 @@ class RuntimeMonitor {
         restartNumber = nextRestartNumber;
         totalRestarts = plan.totalRestarts;
         const nextRestartAt = new Date(
-          this.dependencies.now() + plan.delayMinutes * 60_000,
+          this.dependencies.now() + plan.delayMs,
         ).toISOString();
-        await this.maybeSendAlert(
-          "backoff",
-          monitorConfig,
-          renderBackoffAlertMessage({
-            config: monitorConfig,
-            restartNumber,
-            stageIndex: plan.stageIndex,
-            restartAttemptInStage: plan.restartAttemptInStage,
-            totalRestarts,
-            nextRestartAt,
-            exit: {
-              code: exit.code,
-              signal: exit.signal,
-              at: exitAt,
-            },
-          }),
-        );
+        if (plan.mode === "backoff") {
+          await this.maybeSendAlert(
+            "backoff",
+            monitorConfig,
+            renderBackoffAlertMessage({
+              config: monitorConfig,
+              restartNumber,
+              stageIndex: plan.stageIndex,
+              restartAttemptInStage: plan.restartAttemptInStage,
+              stageMaxRestarts: plan.stageMaxRestarts,
+              totalRestarts,
+              nextRestartAt,
+              exit: {
+                code: exit.code,
+                signal: exit.signal,
+                at: exitAt,
+              },
+            }),
+          );
+        }
         await this.writeState({
           phase: "backoff",
           runtimePid: undefined,
@@ -460,6 +482,7 @@ class RuntimeMonitor {
             at: exitAt,
           },
           restart: {
+            mode: plan.mode,
             stageIndex: plan.stageIndex,
             restartNumber,
             restartAttemptInStage: plan.restartAttemptInStage,
@@ -467,7 +490,7 @@ class RuntimeMonitor {
             nextRestartAt,
           },
         });
-        await this.sleepWithStop(plan.delayMinutes * 60_000);
+        await this.sleepWithStop(plan.delayMs);
       }
     } finally {
       await this.stopActiveChild();

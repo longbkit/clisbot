@@ -17,7 +17,7 @@ function createLoadedConfig(): LoadedConfig {
       },
       session: {
         mainKey: "main",
-        dmScope: "main",
+        dmScope: "per-channel-peer",
         identityLinks: {},
         storePath: "/tmp/sessions.json",
       },
@@ -99,6 +99,7 @@ function createLoadedConfig(): LoadedConfig {
         },
         runtimeMonitor: {
           restartBackoff: {
+            fastRetry: { delaySeconds: 10, maxRestarts: 3 },
             stages: [
               { delayMinutes: 15, maxRestarts: 4 },
               { delayMinutes: 30, maxRestarts: 4 },
@@ -285,7 +286,7 @@ describe("Telegram route resolution", () => {
     expect(target.sessionKey).toBe("agent:claude:telegram:group:-1001:topic:4");
   });
 
-  test("collapses direct messages to the main session by default", () => {
+  test("isolates direct messages by peer by default", () => {
     const target = resolveTelegramConversationTarget({
       loadedConfig: createLoadedConfig(),
       agentId: "default",
@@ -294,7 +295,7 @@ describe("Telegram route resolution", () => {
       conversationKind: "dm",
     });
 
-    expect(target.sessionKey).toBe("agent:default:main");
+    expect(target.sessionKey).toBe("agent:default:telegram:dm:12345");
   });
 
   test("does not expose route-local privilege commands anymore", () => {

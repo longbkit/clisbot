@@ -140,6 +140,9 @@ async function printStatusSummary() {
   if (runtimeStatus.restartNumber) {
     console.log(`restart attempt: ${runtimeStatus.restartNumber}`);
   }
+  if (runtimeStatus.restartMode) {
+    console.log(`restart mode: ${runtimeStatus.restartMode}`);
+  }
   if (runtimeStatus.restartStageIndex != null && runtimeStatus.restartStageIndex >= 0) {
     console.log(`restart stage: ${runtimeStatus.restartStageIndex + 1}`);
   }

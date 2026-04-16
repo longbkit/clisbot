@@ -132,7 +132,7 @@ const sessionDmScopeSchema = z.enum([
 
 const sessionConfigSchema = z.object({
   mainKey: z.string().min(1).default("main"),
-  dmScope: sessionDmScopeSchema.default("main"),
+  dmScope: sessionDmScopeSchema.default("per-channel-peer"),
   identityLinks: z.record(z.string(), z.array(z.string())).default({}),
   storePath: z.string().default("~/.clisbot/state/sessions.json"),
 });
@@ -479,7 +479,16 @@ const controlRuntimeMonitorRestartStageSchema = z.object({
   maxRestarts: z.number().int().positive().default(4),
 });
 
+const controlRuntimeMonitorFastRetrySchema = z.object({
+  delaySeconds: z.number().int().positive().default(10),
+  maxRestarts: z.number().int().min(0).default(3),
+});
+
 const controlRuntimeMonitorRestartBackoffSchema = z.object({
+  fastRetry: controlRuntimeMonitorFastRetrySchema.default({
+    delaySeconds: 10,
+    maxRestarts: 3,
+  }),
   stages: z.array(controlRuntimeMonitorRestartStageSchema).min(1).default([
     {
       delayMinutes: 15,
@@ -499,6 +508,10 @@ const controlRuntimeMonitorOwnerAlertsSchema = z.object({
 
 const controlRuntimeMonitorSchema = z.object({
   restartBackoff: controlRuntimeMonitorRestartBackoffSchema.default({
+    fastRetry: {
+      delaySeconds: 10,
+      maxRestarts: 3,
+    },
     stages: [
       {
         delayMinutes: 15,
@@ -563,7 +576,7 @@ export const clisbotConfigSchema = z.object({
   }),
   session: sessionConfigSchema.default({
     mainKey: "main",
-    dmScope: "main",
+    dmScope: "per-channel-peer",
     identityLinks: {},
     storePath: "~/.clisbot/state/sessions.json",
   }),
@@ -606,6 +619,10 @@ export const clisbotConfigSchema = z.object({
     },
     runtimeMonitor: {
       restartBackoff: {
+        fastRetry: {
+          delaySeconds: 10,
+          maxRestarts: 3,
+        },
         stages: [
           {
             delayMinutes: 15,

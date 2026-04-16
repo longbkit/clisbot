@@ -6,11 +6,21 @@ Use this guide for local development flows that should not distract from the pub
 
 ## Separate Dev Home
 
-If you want to run a dev instance beside your main bot, use a separate `CLISBOT_HOME`:
+Repo-local `bun run start`, `bun run stop`, `bun run restart`, `bun run status`, `bun run logs`, `bun run init`, and `bun run pairing` now read the repo `.env` and use `CLISBOT_HOME` as the single home selector.
+
+Default repo-local setup:
+
+```bash
+CLISBOT_HOME=~/.clisbot-dev
+```
+
+That means the convenience scripts stay pinned to `~/.clisbot-dev` even if your shell still has stale `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, or `CLISBOT_LOG_PATH` exported from another runtime.
+
+If you want to run a dev instance beside your main bot, keep using a separate `CLISBOT_HOME`:
 
 ```bash
 export CLISBOT_HOME=~/.clisbot-dev
-clisbot start --cli codex --bot-type team --telegram-bot-token DEV_TELEGRAM_BOT_TOKEN
+bun run start --cli codex --bot-type team --telegram-bot-token DEV_TELEGRAM_BOT_TOKEN
 ```
 
 What this changes:
@@ -21,7 +31,7 @@ What this changes:
 - `CLISBOT_HOME` changes the local wrapper path
 - `CLISBOT_HOME` changes the default workspace root
 
-If you only want to point at one exact config file manually, `CLISBOT_CONFIG_PATH` still works.
+Direct CLI overrides such as `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, and `CLISBOT_LOG_PATH` still work when you invoke `clisbot ...` or `bun run src/main.ts ...` manually. They are no longer part of the repo-local default flow because `CLISBOT_HOME` is the intended source of truth.
 
 ## npm Publish
 

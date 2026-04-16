@@ -111,6 +111,8 @@ bun install
 bun run start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist
 ```
 
+Repo-local `bun run start|stop|restart|status|logs|init|pairing` is pinned by `.env` to `CLISBOT_HOME=~/.clisbot-dev`, so local testing does not accidentally reuse your main `~/.clisbot` runtime.
+
 First conversation path:
 
 - send a DM to the bot in Slack or Telegram

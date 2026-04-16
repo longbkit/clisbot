@@ -8,7 +8,7 @@
   },
   "session": {
     "mainKey": "main",
-    "dmScope": "main",
+    "dmScope": "per-channel-peer",
     "identityLinks": {},
     "storePath": "~/.clisbot/state/sessions.json"
   },
@@ -154,11 +154,15 @@
       "maxActiveLoops": 10,
       "defaultTimezone": "UTC"
     },
-    "runtimeMonitor": {
-      "restartBackoff": {
-        "stages": [
-          {
-            "delayMinutes": 15,
+      "runtimeMonitor": {
+        "restartBackoff": {
+          "fastRetry": {
+            "delaySeconds": 10,
+            "maxRestarts": 3
+          },
+          "stages": [
+            {
+              "delayMinutes": 15,
             "maxRestarts": 4
           },
           {

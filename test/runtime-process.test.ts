@@ -41,7 +41,7 @@ function createConfig() {
     tmux: { socketPath: "~/.clisbot/state/clisbot.sock" },
     session: {
       mainKey: "main",
-      dmScope: "main",
+      dmScope: "per-channel-peer",
       identityLinks: {},
       storePath: "~/.clisbot/state/sessions.json",
     },
@@ -89,6 +89,10 @@ function createConfig() {
       loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
       runtimeMonitor: {
         restartBackoff: {
+          fastRetry: {
+            delaySeconds: 10,
+            maxRestarts: 3,
+          },
           stages: [
             { delayMinutes: 15, maxRestarts: 4 },
             { delayMinutes: 30, maxRestarts: 4 },
@@ -237,6 +241,7 @@ describe("runtime monitor state", () => {
         startedAt: "2026-04-15T00:00:00.000Z",
         updatedAt: "2026-04-15T00:01:00.000Z",
         restart: {
+          mode: "backoff",
           stageIndex: 1,
           restartNumber: 5,
           restartAttemptInStage: 1,
@@ -257,6 +262,7 @@ describe("runtime monitor state", () => {
     expect(status.running).toBe(false);
     expect(status.serviceState).toBe("backoff");
     expect(status.restartNumber).toBe(5);
+    expect(status.restartMode).toBe("backoff");
     expect(status.restartStageIndex).toBe(1);
     expect(status.nextRestartAt).toBe("2026-04-15T00:15:00.000Z");
     expect(status.stopReason).toBe("restart-budget-exhausted");

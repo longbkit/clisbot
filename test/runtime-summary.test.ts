@@ -27,6 +27,7 @@ describe("runtime summaries", () => {
   });
 
   test("renders first-run guidance when no agents exist", async () => {
+    delete process.env.CLISBOT_HOME;
     process.env.SLACK_APP_TOKEN = "app";
     process.env.SLACK_BOT_TOKEN = "bot";
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
@@ -89,6 +90,7 @@ describe("runtime summaries", () => {
   });
 
   test("renders agent and channel activity in status output", async () => {
+    delete process.env.CLISBOT_HOME;
     process.env.SLACK_APP_TOKEN = "app";
     process.env.SLACK_BOT_TOKEN = "bot";
     process.env.TELEGRAM_BOT_TOKEN = "telegram";
@@ -180,6 +182,7 @@ describe("runtime summaries", () => {
   });
 
   test("renders active runs in operator status output", async () => {
+    delete process.env.CLISBOT_HOME;
     process.env.SLACK_APP_TOKEN = "app";
     process.env.SLACK_BOT_TOKEN = "bot";
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
@@ -236,6 +239,7 @@ describe("runtime summaries", () => {
   });
 
   test("distinguishes missing, not-bootstrapped, and bootstrapped bootstrap states", async () => {
+    delete process.env.CLISBOT_HOME;
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
     const configPath = join(tempDir, "clisbot.json");
     const baseWorkspace = join(tempDir, "workspaces");
@@ -308,6 +312,7 @@ describe("runtime summaries", () => {
   });
 
   test("falls back to raw config when token env vars are missing in the operator shell", async () => {
+    delete process.env.CLISBOT_HOME;
     delete process.env.SLACK_APP_TOKEN;
     delete process.env.SLACK_BOT_TOKEN;
     delete process.env.TELEGRAM_BOT_TOKEN;
@@ -343,6 +348,7 @@ describe("runtime summaries", () => {
   });
 
   test("renders persisted channel diagnostics when Slack startup fails", async () => {
+    delete process.env.CLISBOT_HOME;
     process.env.SLACK_APP_TOKEN = "app";
     process.env.SLACK_BOT_TOKEN = "bot";
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));

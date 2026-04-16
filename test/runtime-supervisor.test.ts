@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { LoadedConfig } from "../src/config/load-config.ts";
 import { RuntimeSupervisor } from "../src/control/runtime-supervisor.ts";
 import { RuntimeHealthStore } from "../src/control/runtime-health-store.ts";
+import {
+  resetConfigReloadSuppressionForTests,
+  suppressConfigReload,
+} from "../src/control/config-reload-suppression.ts";
 import type { ChannelPlugin } from "../src/channels/channel-plugin.ts";
 
 function createLoadedConfig(): LoadedConfig {
@@ -18,7 +22,7 @@ function createLoadedConfig(): LoadedConfig {
       },
       session: {
         mainKey: "main",
-        dmScope: "main",
+        dmScope: "per-channel-peer",
         identityLinks: {},
         storePath: "/tmp/sessions.json",
       },
@@ -87,6 +91,7 @@ function createLoadedConfig(): LoadedConfig {
         loop: { maxRunsPerLoop: 20, maxActiveLoops: 10 },
         runtimeMonitor: {
           restartBackoff: {
+            fastRetry: { delaySeconds: 10, maxRestarts: 3 },
             stages: [
               { delayMinutes: 15, maxRestarts: 4 },
               { delayMinutes: 30, maxRestarts: 4 },
@@ -199,14 +204,52 @@ describe("RuntimeSupervisor", () => {
   let tempDir = "";
 
   afterEach(() => {
+    resetConfigReloadSuppressionForTests();
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
       tempDir = "";
     }
   });
 
+  test("ignores suppressed watch reloads triggered by internal owner-claim writes", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(configPath, "{}\n");
+    const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));
+    let createdAgentServices = 0;
+    let stoppedAgentServices = 0;
+
+    const supervisor = new RuntimeSupervisor(configPath, {
+      loadConfig: async () => createLoadedConfigAt(configPath),
+      listChannelPlugins: () => [],
+      runtimeHealthStore,
+      createAgentService: () => {
+        createdAgentServices += 1;
+        return {
+          start: async () => undefined,
+          stop: async () => {
+            stoppedAgentServices += 1;
+          },
+        } as any;
+      },
+      createProcessedEventsStore: () => ({}) as any,
+      createActivityStore: () => ({}) as any,
+    });
+
+    await supervisor.start();
+    suppressConfigReload(configPath, statSync(configPath).mtimeMs);
+
+    await (supervisor as any).reload("watch");
+
+    expect(createdAgentServices).toBe(1);
+    expect(stoppedAgentServices).toBe(0);
+    expect((await runtimeHealthStore.read()).reload?.status).toBe("success");
+  });
+
   test("marks already-started channels as stopped when a later plugin fails during startup", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(configPath, "{}\n");
     const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));
     const stopCalls: string[] = [];
 
@@ -257,8 +300,8 @@ describe("RuntimeSupervisor", () => {
       },
     ];
 
-    const supervisor = new RuntimeSupervisor(undefined, {
-      loadConfig: async () => createLoadedConfig(),
+    const supervisor = new RuntimeSupervisor(configPath, {
+      loadConfig: async () => createLoadedConfigAt(configPath),
       listChannelPlugins: () => plugins,
       runtimeHealthStore,
       createAgentService: () =>

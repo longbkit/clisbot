@@ -306,6 +306,7 @@ export class SlackSocketService {
         await this.processedEventsStore.markCompleted(eventId);
         return;
       }
+      const ownerClaimThreadTs = await this.resolveThreadTs(event);
 
       let ownerClaimed = false;
       let ownerPrincipal: string | undefined;
@@ -325,6 +326,7 @@ export class SlackSocketService {
         try {
           await postSlackText(this.app.client, {
             channel: channelId,
+            threadTs: ownerClaimThreadTs ?? messageTs,
             text: renderFirstOwnerClaimMessage({
               principal: ownerPrincipal,
               ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
