@@ -216,9 +216,9 @@ export class RunnerService {
   private async retryFreshStartWithClearedSessionId(
     target: AgentSessionTarget,
     resolved: ResolvedAgentTarget,
-    options: { allowRetry?: boolean; nextAllowFreshRetry?: boolean },
+    remainingFreshRetries: number,
   ) {
-    if (options.allowRetry === false) {
+    if (remainingFreshRetries <= 0) {
       return null;
     }
 
@@ -226,8 +226,11 @@ export class RunnerService {
     await this.sessionState.clearSessionIdEntry(resolved, {
       runnerCommand: resolved.runner.command,
     });
+    if (resolved.runner.startupRetryDelayMs > 0) {
+      await sleep(resolved.runner.startupRetryDelayMs);
+    }
     return this.ensureSessionReady(target, {
-      allowFreshRetry: options.nextAllowFreshRetry,
+      remainingFreshRetries: remainingFreshRetries - 1,
     });
   }
 
@@ -235,27 +238,45 @@ export class RunnerService {
     target: AgentSessionTarget,
     resolved: ResolvedAgentTarget,
     error: unknown,
-    allowFreshRetry?: boolean,
+    remainingFreshRetries: number,
   ) {
     if (!isRecoverableStartupSessionLoss(error)) {
       return null;
     }
 
-    return this.retryFreshStartWithClearedSessionId(target, resolved, {
-      allowRetry: allowFreshRetry,
-      nextAllowFreshRetry: false,
-    });
+    return this.retryFreshStartWithClearedSessionId(
+      target,
+      resolved,
+      remainingFreshRetries,
+    );
   }
 
   private async retryAfterStartupTimeout(
     target: AgentSessionTarget,
     resolved: ResolvedAgentTarget,
-    allowFreshRetry?: boolean,
+    remainingFreshRetries: number,
   ) {
-    return this.retryFreshStartWithClearedSessionId(target, resolved, {
-      allowRetry: allowFreshRetry,
-      nextAllowFreshRetry: false,
-    });
+    return this.retryFreshStartWithClearedSessionId(
+      target,
+      resolved,
+      remainingFreshRetries,
+    );
+  }
+
+  private resolveRemainingFreshRetries(
+    resolved: ResolvedAgentTarget,
+    options: {
+      allowFreshRetry?: boolean;
+      remainingFreshRetries?: number;
+    },
+  ) {
+    if (typeof options.remainingFreshRetries === "number") {
+      return options.remainingFreshRetries;
+    }
+    if (options.allowFreshRetry === false) {
+      return 0;
+    }
+    return resolved.runner.startupRetryCount;
   }
 
   private async abortUnreadySession(
@@ -353,7 +374,11 @@ export class RunnerService {
 
   async ensureSessionReady(
     target: AgentSessionTarget,
-    options: { allowFreshRetry?: boolean; timingContext?: LatencyDebugContext } = {},
+    options: {
+      allowFreshRetry?: boolean;
+      remainingFreshRetries?: number;
+      timingContext?: LatencyDebugContext;
+    } = {},
   ): Promise<ResolvedAgentTarget> {
     await ensureClisbotWrapper();
     const resolved = this.resolveTarget(target);
@@ -363,6 +388,7 @@ export class RunnerService {
       sessionKey: resolved.sessionKey,
       sessionName: resolved.sessionName,
     };
+    const remainingFreshRetries = this.resolveRemainingFreshRetries(resolved, options);
     logLatencyDebug("ensure-session-ready-start", timingContext);
     await ensureDir(resolved.workspacePath);
     await ensureDir(dirname(this.loadedConfig.raw.tmux.socketPath));
@@ -449,7 +475,7 @@ export class RunnerService {
         const retried = await this.retryAfterStartupTimeout(
           target,
           resolved,
-          options.allowFreshRetry,
+          remainingFreshRetries,
         );
         if (retried) {
           return retried;
@@ -470,7 +496,7 @@ export class RunnerService {
         target,
         resolved,
         error,
-        options.allowFreshRetry,
+        remainingFreshRetries,
       );
       if (retried) {
         return retried;
@@ -559,10 +585,11 @@ export class RunnerService {
         );
       }
 
-      const retried = await this.retryFreshStartWithClearedSessionId(target, resolved, {
-        allowRetry: true,
-        nextAllowFreshRetry: false,
-      });
+      const retried = await this.retryFreshStartWithClearedSessionId(
+        target,
+        resolved,
+        resolved.runner.startupRetryCount,
+      );
       if (!retried) {
         throw await this.mapSessionError(
           error,

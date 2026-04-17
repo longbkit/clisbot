@@ -9,6 +9,8 @@ export type AgentToolTemplate = {
   startupOptions: string[];
   trustWorkspace: boolean;
   startupDelayMs: number;
+  startupRetryCount: number;
+  startupRetryDelayMs: number;
   startupReadyPattern?: string;
   startupBlockers?: Array<{
     pattern: string;
@@ -47,6 +49,8 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
     ],
     trustWorkspace: true,
     startupDelayMs: 3000,
+    startupRetryCount: 2,
+    startupRetryDelayMs: 1000,
     promptSubmitDelayMs: 150,
     sessionId: {
       create: {
@@ -78,6 +82,8 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
     startupOptions: ["--dangerously-skip-permissions"],
     trustWorkspace: true,
     startupDelayMs: 3000,
+    startupRetryCount: 2,
+    startupRetryDelayMs: 1000,
     promptSubmitDelayMs: 150,
     sessionId: {
       create: {
@@ -106,6 +112,8 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
     startupOptions: ["--approval-mode=yolo", "--sandbox=false"],
     trustWorkspace: true,
     startupDelayMs: 15_000,
+    startupRetryCount: 2,
+    startupRetryDelayMs: 1000,
     startupReadyPattern: "Type your message or @path/to/file",
     startupBlockers: [
       {
@@ -147,6 +155,8 @@ export type ResolvedRunnerTemplate = {
   args: string[];
   trustWorkspace: boolean;
   startupDelayMs: number;
+  startupRetryCount: number;
+  startupRetryDelayMs: number;
   startupReadyPattern?: string;
   startupBlockers?: AgentToolTemplate["startupBlockers"];
   promptSubmitDelayMs: number;
@@ -166,6 +176,8 @@ export function buildRunnerFromToolTemplate(
       args: [...options, "-C", "{workspace}"],
       trustWorkspace: template.trustWorkspace,
       startupDelayMs: template.startupDelayMs,
+      startupRetryCount: template.startupRetryCount,
+      startupRetryDelayMs: template.startupRetryDelayMs,
       startupReadyPattern: template.startupReadyPattern,
       startupBlockers: template.startupBlockers?.map((entry) => ({ ...entry })),
       promptSubmitDelayMs: template.promptSubmitDelayMs,
@@ -191,6 +203,8 @@ export function buildRunnerFromToolTemplate(
     args: [...options],
     trustWorkspace: template.trustWorkspace,
     startupDelayMs: template.startupDelayMs,
+    startupRetryCount: template.startupRetryCount,
+    startupRetryDelayMs: template.startupRetryDelayMs,
     startupReadyPattern: template.startupReadyPattern,
     startupBlockers: template.startupBlockers?.map((entry) => ({ ...entry })),
     promptSubmitDelayMs: template.promptSubmitDelayMs,

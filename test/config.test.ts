@@ -41,6 +41,8 @@ describe("loadConfig", () => {
               args: ["-C", "{workspace}"],
               trustWorkspace: true,
               startupDelayMs: 1,
+              startupRetryCount: 3,
+              startupRetryDelayMs: 250,
               startupReadyPattern: "ready",
               startupBlockers: [
                 {
@@ -208,6 +210,8 @@ describe("loadConfig", () => {
       "status-command",
     );
     expect(loaded.raw.agents.defaults.runner.startupReadyPattern).toBe("ready");
+    expect(loaded.raw.agents.defaults.runner.startupRetryCount).toBe(3);
+    expect(loaded.raw.agents.defaults.runner.startupRetryDelayMs).toBe(250);
     expect(loaded.raw.agents.defaults.runner.startupBlockers).toEqual([
       {
         pattern: "blocked",

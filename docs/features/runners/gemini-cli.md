@@ -53,7 +53,8 @@ Gemini startup now follows two explicit rules:
 
 1. If the configured ready pattern appears, the session is considered ready.
 2. If a runner-managed trust prompt appears first and `trustWorkspace` is enabled, the runner dismisses it and continues waiting for readiness.
-3. If a configured startup blocker appears first, or the ready pattern never appears before the startup budget expires, the runner fails startup and kills the half-ready tmux session.
+3. If a configured startup blocker appears first, the runner fails startup immediately and kills the half-ready tmux session.
+4. If the ready pattern still does not appear before the startup budget expires, the runner uses its bounded fresh-start retry policy before finally failing startup.
 
 Current built-in blocker:
 

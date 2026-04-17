@@ -75,6 +75,10 @@ Current lifecycle rule:
 - that detached settlement must leave the tmux session running while monitoring continues until real completion
 - channels must be able to attach new observers to that still-running session and receive truthful final settlement later
 - new CLI onboarding must include explicit ready-state detection and startup-blocker truthfulness, especially for auth-gated CLIs such as Gemini
+- fresh runner startup now has bounded retry knobs:
+  - `runner.startupRetryCount`
+  - `runner.startupRetryDelayMs`
+- the goal is higher cold-start stability without forcing every healthy startup to wait longer up front
 
 ## Related CLI Doc
 

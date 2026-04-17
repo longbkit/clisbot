@@ -42,6 +42,8 @@ function createConfig(): ClisbotConfig {
           args: ["-C", "{workspace}"],
           trustWorkspace: true,
           startupDelayMs: 1,
+          startupRetryCount: 2,
+          startupRetryDelayMs: 0,
           promptSubmitDelayMs: 1,
           sessionId: {
             create: { mode: "runner", args: [] },

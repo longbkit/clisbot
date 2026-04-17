@@ -101,6 +101,8 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             ],
             trustWorkspace: true,
             startupDelayMs: 3000,
+            startupRetryCount: 2,
+            startupRetryDelayMs: 1000,
             startupReadyPattern: undefined,
             promptSubmitDelayMs: 150,
             sessionId: {

@@ -376,6 +376,8 @@ function buildConfig(params: {
   sessionId: object;
   trustWorkspace?: boolean;
   startupDelayMs?: number;
+  startupRetryCount?: number;
+  startupRetryDelayMs?: number;
   startupReadyPattern?: string;
   staleAfterMinutes?: number;
   cleanupEnabled?: boolean;
@@ -407,6 +409,8 @@ function buildConfig(params: {
           args: params.runnerArgs,
           trustWorkspace: params.trustWorkspace ?? false,
           startupDelayMs: params.startupDelayMs ?? 1,
+          startupRetryCount: params.startupRetryCount ?? 2,
+          startupRetryDelayMs: params.startupRetryDelayMs ?? 0,
           promptSubmitDelayMs: 1,
           ...(params.startupReadyPattern
             ? { startupReadyPattern: params.startupReadyPattern }
@@ -1345,8 +1349,80 @@ describe("AgentService session identity", () => {
       ).rejects.toThrow(
         "did not reach the configured ready state",
       );
-      expect(newSessionCount).toBe(2);
+      expect(newSessionCount).toBe(3);
       expect(await tmux.hasSession("default-main")).toBe(false);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("survives a slow ready banner after bounded startup retries", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: [],
+            startupDelayMs: 20,
+            startupRetryCount: 2,
+            startupRetryDelayMs: 1,
+            sessionId: {
+              create: { mode: "runner", args: [] },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern: "\\b[0-9a-fA-F-]{36}\\b",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: { mode: "off", args: [] },
+            },
+          }),
+        ),
+      );
+      const loaded = await loadConfig(configPath);
+      loaded.raw.agents.defaults.runner.startupReadyPattern = "Type your message or @path/to/file";
+      const tmux = new FakeTmuxClient();
+      let newSessionCount = 0;
+      const originalNewSession = tmux.newSession.bind(tmux);
+      tmux.newSession = async (params) => {
+        newSessionCount += 1;
+        await originalNewSession(params);
+        const session = (tmux as unknown as { sessions: Map<string, FakeSession> }).sessions.get(
+          params.sessionName,
+        );
+        if (!session) {
+          return;
+        }
+        session.snapshot =
+          newSessionCount >= 3 ? "Type your message or @path/to/file" : "Still booting...";
+        session.cursorX = session.snapshot.length;
+      };
+
+      const runnerSessions = new RunnerService(
+        loaded,
+        tmux as unknown as TmuxClient,
+        new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),
+        (target) => resolveAgentTarget(loaded, target),
+      );
+
+      const resolved = await runnerSessions.ensureSessionReady({
+        agentId: "default",
+        sessionKey: "main",
+      });
+
+      expect(resolved.sessionName).toBe("main");
+      expect(newSessionCount).toBe(3);
+      expect(await tmux.hasSession("main")).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
