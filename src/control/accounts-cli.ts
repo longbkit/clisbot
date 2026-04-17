@@ -41,6 +41,25 @@ function parseOptionValue(args: string[], name: string) {
   return value;
 }
 
+function parseAliasedOptionValue(args: string[], names: string[], label: string) {
+  const values = names.flatMap((name) => {
+    const value = parseOptionValue(args, name);
+    return value === undefined ? [] : [{ name, value }];
+  });
+
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  const distinctValues = Array.from(new Set(values.map((entry) => entry.value)));
+  if (distinctValues.length > 1) {
+    const seen = values.map((entry) => `${entry.name}=${entry.value}`).join(", ");
+    throw new Error(`Conflicting values for ${label}: ${seen}`);
+  }
+
+  return values[values.length - 1]?.value;
+}
+
 function hasFlag(args: string[], name: string) {
   return args.includes(name);
 }
@@ -84,13 +103,14 @@ function renderAccountsHelp() {
     "Usage:",
     "  clisbot accounts --help",
     "  clisbot accounts help",
-    "  clisbot accounts add telegram --account <id> --token <ENV_NAME|${ENV_NAME}|literal> [--persist]",
-    "  clisbot accounts add slack --account <id> --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]",
+    "  clisbot accounts add telegram --account <id> (--token | --telegram-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]",
+    "  clisbot accounts add slack --account <id> (--app-token | --slack-app-token) <ENV_NAME|${ENV_NAME}|literal> (--bot-token | --slack-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]",
     "  clisbot accounts persist --channel <slack|telegram> --account <id>",
     "  clisbot accounts persist --all",
     "",
     "Notes:",
     "  - env-style input such as `TELEGRAM_BOT_TOKEN` or `${TELEGRAM_BOT_TOKEN}` keeps the account env-backed in config",
+    "  - `accounts add` accepts both the short account-local flags and the bootstrap-style channel flags",
     "  - literal token input without `--persist` stays runtime-only and requires a running clisbot runtime",
     "  - `--persist` writes canonical token files so later plain `clisbot start` can reuse the account safely",
     "  - `persist --all` converts every configured `credentialType=mem` account into canonical token files",
@@ -102,7 +122,9 @@ async function addTelegramAccount(
   deps: AccountsCliDependencies,
 ) {
   const accountId = parseOptionValue(args, "--account") ?? "default";
-  const token = parseTokenInput(parseOptionValue(args, "--token") ?? "");
+  const token = parseTokenInput(
+    parseAliasedOptionValue(args, ["--token", "--telegram-bot-token"], "telegram bot token") ?? "",
+  );
   const persist = hasFlag(args, "--persist");
   const runtimeStatus = await deps.getRuntimeStatus();
 
@@ -155,8 +177,12 @@ async function addSlackAccount(
   deps: AccountsCliDependencies,
 ) {
   const accountId = parseOptionValue(args, "--account") ?? "default";
-  const appToken = parseTokenInput(parseOptionValue(args, "--app-token") ?? "");
-  const botToken = parseTokenInput(parseOptionValue(args, "--bot-token") ?? "");
+  const appToken = parseTokenInput(
+    parseAliasedOptionValue(args, ["--app-token", "--slack-app-token"], "slack app token") ?? "",
+  );
+  const botToken = parseTokenInput(
+    parseAliasedOptionValue(args, ["--bot-token", "--slack-bot-token"], "slack bot token") ?? "",
+  );
   const persist = hasFlag(args, "--persist");
   const runtimeStatus = await deps.getRuntimeStatus();
 

@@ -76,8 +76,8 @@ Important behavior:
 
 ## Accounts
 
-- `clisbot accounts add telegram --account <id> --token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
-- `clisbot accounts add slack --account <id> --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
+- `clisbot accounts add telegram --account <id> (--token | --telegram-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]`
+- `clisbot accounts add slack --account <id> (--app-token | --slack-app-token) <ENV_NAME|${ENV_NAME}|literal> (--bot-token | --slack-bot-token) <ENV_NAME|${ENV_NAME}|literal> [--persist]`
 - `clisbot accounts persist --channel <slack|telegram> --account <id>`
 - `clisbot accounts persist --all`
 
@@ -85,6 +85,7 @@ Important behavior:
 
 - `clisbot accounts help` and `clisbot accounts --help` both work
 - env-style values keep the account env-backed
+- `accounts add` accepts both the short account-local flags and the bootstrap-style token flags
 - literal token values without `--persist` stay runtime-only and require a running clisbot runtime
 - `--persist` writes canonical token files for later plain starts
 
