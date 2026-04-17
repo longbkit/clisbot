@@ -3,6 +3,7 @@ import {
   deriveInteractionText,
   deriveRunningInteractionText,
   deriveRunningInteractionSnapshot,
+  hasActiveTimerStatus,
   normalizePaneText,
 } from "../../shared/transcript.ts";
 import type { TmuxClient } from "./client.ts";
@@ -46,8 +47,10 @@ export type TmuxRunMonitorParams = {
 export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let previousSnapshot = params.initialSnapshot;
   let previousRunningSnapshot = "";
-  let lastActivityAt = params.startedAt;
+  let lastPaneChangeAt = params.startedAt;
   let sawActivity = false;
+  let sawPaneChange = false;
+  let sawPromptSubmission = Boolean(params.prompt);
   let detachedNotified = params.detachedAlready;
   let firstMeaningfulDeltaLogged = false;
   let noOutputThresholdLogged = false;
@@ -64,6 +67,8 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       promptSubmitDelayMs: params.promptSubmitDelayMs,
       timingContext: params.timingContext,
     });
+    sawPromptSubmission = true;
+    lastPaneChangeAt = Date.now();
     await params.onPromptSubmitted?.();
     logLatencyDebug("tmux-submit-complete", params.timingContext, {
       sessionName: params.sessionName,
@@ -82,6 +87,12 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       await params.tmux.capturePane(params.sessionName, params.captureLines),
     );
     const now = Date.now();
+    const paneChanged = snapshot !== previousSnapshot;
+    if (paneChanged) {
+      lastPaneChangeAt = now;
+      sawPaneChange = true;
+    }
+    const hasActiveTimer = hasActiveTimerStatus(snapshot);
     const runningSnapshot = params.initialSnapshot
       ? deriveRunningInteractionText(params.initialSnapshot, snapshot)
       : deriveRunningInteractionSnapshot(snapshot);
@@ -90,7 +101,6 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
 
     if (runningSnapshot && runningSnapshot !== previousRunningSnapshot) {
       previousRunningSnapshot = runningSnapshot;
-      lastActivityAt = now;
       sawActivity = true;
       if (!firstMeaningfulDeltaLogged) {
         firstMeaningfulDeltaLogged = true;
@@ -115,7 +125,11 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       });
     }
 
-    if (sawActivity && now - lastActivityAt >= params.idleTimeoutMs) {
+    if (
+      !hasActiveTimer &&
+      (sawActivity || sawPaneChange || sawPromptSubmission) &&
+      now - lastPaneChangeAt >= params.idleTimeoutMs
+    ) {
       await params.onCompleted({
         snapshot: deriveInteractionText(params.initialSnapshot, previousSnapshot),
         fullSnapshot: previousSnapshot,

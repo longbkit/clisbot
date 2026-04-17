@@ -245,6 +245,13 @@ Current disable rule:
 
 The tmux runner is the source of normalized transcript data for tmux-backed sessions.
 
+Current completion rule:
+
+- pane-state observation is the source of truth
+- if a live runner timer is still visible in the pane, the turn is still active
+- if the pane stays unchanged for `idleTimeoutMs` and no active timer remains, the turn is treated as completed
+- this includes very fast turns where no timer ever had time to appear before the pane became idle again
+
 It does not decide how normal interaction is rendered to users.
 
 Default interaction should be rendered as chat-first output by `channels`.

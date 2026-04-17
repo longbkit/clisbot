@@ -418,7 +418,8 @@ Current turn execution timeout config lives under:
 Current meaning:
 
 - `idleTimeoutMs`
-  - after a turn has already produced visible output, clisbot treats the turn as completed once the runner pane stops changing for this many milliseconds
+  - clisbot treats the turn as completed once the runner pane stays unchanged for this many milliseconds and no active runner timer is still visible
+  - this also covers very fast turns where the backend may finish before any live timer or progress line ever appears
 - `noOutputTimeoutMs`
   - internal diagnostic threshold for turns that have not produced visible activity yet
   - it can be logged or measured, but it does not settle the turn or render a timeout into chat

@@ -367,7 +367,7 @@ function isInterruptStatusLine(line: string) {
   );
 }
 
-function isTimerDrivenStatusLine(line: string) {
+export function isActiveTimerStatusLine(line: string) {
   const trimmed = line.trim();
   if (!trimmed) {
     return false;
@@ -376,9 +376,24 @@ function isTimerDrivenStatusLine(line: string) {
   return (
     isInterruptStatusLine(trimmed) ||
     GEMINI_THINKING_STATUS_PATTERN.test(trimmed) ||
-    CLAUDE_WORKED_STATUS_PATTERN.test(trimmed) ||
     CLAUDE_TIMER_FOOTER_PATTERN.test(trimmed)
   );
+}
+
+function isTimerDrivenStatusLine(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return (
+    isActiveTimerStatusLine(trimmed) ||
+    CLAUDE_WORKED_STATUS_PATTERN.test(trimmed)
+  );
+}
+
+export function hasActiveTimerStatus(snapshot: string) {
+  return splitNormalizedLines(snapshot).some((line) => isActiveTimerStatusLine(line));
 }
 
 function shouldDropCodexChromeLine(line: string) {

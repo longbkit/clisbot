@@ -370,6 +370,67 @@ describe("tmux runner latency behavior", () => {
     expect(completions).toEqual(["Done."]);
   });
 
+  test("monitorTmuxRun completes when the pane stays idle without any active timer", async () => {
+    const snapshots = [
+      "READY",
+      "READY",
+      "READY",
+      "READY",
+    ];
+    let captureIndex = 0;
+    const completions: string[] = [];
+    let entered = false;
+
+    const fakeTmux = {
+      async sendLiteral() {
+        return;
+      },
+      async sendKey() {
+        entered = true;
+      },
+      async getPaneState() {
+        return entered
+          ? {
+              cursorX: 0,
+              cursorY: 1,
+              historySize: 1,
+            }
+          : {
+              cursorX: 4,
+              cursorY: 0,
+              historySize: 0,
+            };
+      },
+      async capturePane() {
+        const snapshot = snapshots[Math.min(captureIndex, snapshots.length - 1)] ?? "";
+        captureIndex += 1;
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: "noop",
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1_000,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot: "READY",
+      detachedAlready: false,
+      onRunning: async () => undefined,
+      onDetached: async () => undefined,
+      onCompleted: async (update) => {
+        completions.push(update.snapshot);
+      },
+    });
+
+    expect(completions).toEqual([""]);
+  });
+
   test("monitorTmuxRun does not leak the previous settled transcript into the first running preview", async () => {
     const initialSnapshot = [
       "Previous answer",

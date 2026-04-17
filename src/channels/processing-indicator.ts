@@ -1,8 +1,10 @@
 import type { AgentService, AgentSessionTarget } from "../agents/agent-service.ts";
 import { isTerminalRunStatus, type RunUpdate } from "../agents/run-observation.ts";
+import { sleep } from "../shared/process.ts";
 
 export type ProcessingIndicatorLifecycle = "handler" | "active-run";
 type IndicatorCleanup = (() => Promise<void> | void) | void;
+const ACTIVE_RUN_WAIT_POLL_INTERVAL_MS = 250;
 
 type ProcessingIndicatorEntry = {
   activeRunHold: boolean;
@@ -59,6 +61,19 @@ export async function waitForProcessingIndicatorLifecycle(params: {
         settled = true;
         resolve();
       };
+
+      void (async () => {
+        while (!settled) {
+          await sleep(ACTIVE_RUN_WAIT_POLL_INTERVAL_MS);
+          if (settled) {
+            return;
+          }
+          if (!params.agentService.hasActiveRun(params.sessionTarget)) {
+            resolveOnce();
+            return;
+          }
+        }
+      })();
 
       try {
         const observation = await params.agentService.observeRun(

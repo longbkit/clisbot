@@ -125,6 +125,35 @@ describe("waitForProcessingIndicatorLifecycle", () => {
 
     expect(settled).toBe(true);
   });
+
+  test("resolves once the active run disappears even if no terminal update arrives", async () => {
+    let active = true;
+    let settled = false;
+
+    const task = waitForProcessingIndicatorLifecycle({
+      agentService: {
+        hasActiveRun: () => active,
+        observeRun: async () => ({
+          active: true,
+          update: createUpdate("running"),
+        }),
+        detachRunObserver: async () => ({ detached: true }),
+      } as any,
+      sessionTarget: createTarget(),
+      observerId: "obs-4",
+      lifecycle: "active-run",
+    }).then(() => {
+      settled = true;
+    });
+
+    await Bun.sleep(50);
+    expect(settled).toBe(false);
+
+    active = false;
+    await task;
+
+    expect(settled).toBe(true);
+  });
 });
 
 describe("ConversationProcessingIndicatorCoordinator", () => {
