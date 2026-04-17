@@ -361,6 +361,76 @@ describe("tmux runner latency behavior", () => {
     expect(completions).toEqual(["Done."]);
   });
 
+  test("monitorTmuxRun does not leak the previous settled transcript into the first running preview", async () => {
+    const initialSnapshot = [
+      "Previous answer",
+      "",
+      "Done.",
+    ].join("\n");
+    const snapshots = [
+      initialSnapshot,
+      [
+        "Previous answer",
+        "",
+        "Done.",
+        "",
+        "Working... (1s) esc to interrupt",
+      ].join("\n"),
+      [
+        "Previous answer",
+        "",
+        "Done.",
+        "",
+        "New draft line",
+      ].join("\n"),
+      [
+        "Previous answer",
+        "",
+        "Done.",
+        "",
+        "New draft line",
+      ].join("\n"),
+    ];
+    let captureIndex = 0;
+    const runningSnapshots: string[] = [];
+
+    const fakeTmux = {
+      async capturePane() {
+        const snapshot = snapshots[Math.min(captureIndex, snapshots.length - 1)] ?? "";
+        captureIndex += 1;
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: undefined,
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1_000,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot,
+      detachedAlready: false,
+      onRunning: async (update) => {
+        runningSnapshots.push(update.snapshot);
+      },
+      onDetached: async () => undefined,
+      onCompleted: async () => undefined,
+    });
+
+    expect(runningSnapshots[0]).not.toContain("Previous answer");
+    expect(runningSnapshots[0]).toContain("Working... (1s) esc to interrupt");
+    expect(runningSnapshots[runningSnapshots.length - 1]).toContain("New draft line");
+    expect(runningSnapshots).toEqual([
+      "Working... (1s) esc to interrupt",
+      "New draft line",
+    ]);
+  });
+
   test("submitTmuxSessionInput retries Enter once when pane state stays unchanged", async () => {
     let enterCount = 0;
     let state = {

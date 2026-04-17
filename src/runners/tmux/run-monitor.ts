@@ -1,6 +1,7 @@
 import { sleep } from "../../shared/process.ts";
 import {
   deriveInteractionText,
+  deriveRunningInteractionText,
   deriveRunningInteractionSnapshot,
   normalizePaneText,
 } from "../../shared/transcript.ts";
@@ -81,7 +82,9 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       await params.tmux.capturePane(params.sessionName, params.captureLines),
     );
     const now = Date.now();
-    const runningSnapshot = deriveRunningInteractionSnapshot(snapshot);
+    const runningSnapshot = params.initialSnapshot
+      ? deriveRunningInteractionText(params.initialSnapshot, snapshot)
+      : deriveRunningInteractionSnapshot(snapshot);
 
     previousSnapshot = snapshot;
 
