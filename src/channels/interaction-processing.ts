@@ -956,10 +956,12 @@ async function executePromptDelivery<TChunk>(params: {
         },
       },
     );
-    await params.onPromptAccepted?.();
     queueStartPending =
       positionAhead > 0 &&
       (params.queueStartMode ?? "none") !== "none";
+    if (params.onPromptAccepted) {
+      await params.onPromptAccepted();
+    }
 
     if (previewEnabled) {
       const placeholderText = buildInitialPlaceholderText(positionAhead);
@@ -1853,7 +1855,9 @@ export async function processChannelInteraction<TChunk>(params: {
         protectedControlMutationRule: params.protectedControlMutationRule,
       }),
     );
-    await params.onPromptAccepted?.();
+    if (params.onPromptAccepted) {
+      await params.onPromptAccepted();
+    }
     await params.postText("Steered.");
     await params.agentService.recordConversationReply(params.sessionTarget);
     return {
@@ -1870,7 +1874,9 @@ export async function processChannelInteraction<TChunk>(params: {
           protectedControlMutationRule: params.protectedControlMutationRule,
         }),
       );
-      await params.onPromptAccepted?.();
+      if (params.onPromptAccepted) {
+        await params.onPromptAccepted();
+      }
       return {
         processingIndicatorLifecycle: "active-run",
       };
