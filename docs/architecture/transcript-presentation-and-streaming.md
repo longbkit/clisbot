@@ -129,7 +129,7 @@ For already-running sessions, the same pipeline should also support observer cha
 
 1. runner or the agents layer keeps monitoring the active session
 2. channel command changes observer mode for the current thread
-3. channel receives live, passive-final, or interval updates from the same normalized run state
+3. channel receives live, sparse-detached, or interval updates from the same normalized run state
 
 The same normalized runner output may be rendered differently by different channels and by different command patterns on the same channel.
 
@@ -199,9 +199,9 @@ Rules:
 
 - observer commands do not expose raw tmux transcript by default
 - observer commands change how the current thread follows an already-running session
-- channels may support live attach, passive detach, and interval watch behavior on the same active run
+- channels may support live attach, sparse detach, and interval watch behavior on the same active run
 - current observer identity is thread-scoped per routed conversation surface, so a later observer command in the same thread replaces the previous observer mode for that thread
-- `detach` is a passive-final mode, not a full unsubscribe: it stops live updates for that thread but still allows final settlement there when the run completes
+- `detach` is a sparse-follow mode, not a full unsubscribe: it stops live updates for that thread, may continue low-frequency progress updates, and still allows final settlement there when the run completes
 - detaching a thread from live updates must not silently stop runner monitoring or final settlement
 
 ## tmux-Specific Implications

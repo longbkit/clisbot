@@ -25,7 +25,7 @@ export type ProcessingIndicatorLease = {
 };
 
 function shouldResolveIndicatorWait(update: RunUpdate) {
-  return isTerminalRunStatus(update.status) || update.status === "detached";
+  return isTerminalRunStatus(update.status);
 }
 
 export async function waitForProcessingIndicatorLifecycle(params: {

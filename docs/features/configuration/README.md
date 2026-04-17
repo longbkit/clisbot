@@ -151,7 +151,7 @@ Current turn execution defaults should stay explicit:
 
 - `stream.idleTimeoutMs: 6000`
 - `stream.noOutputTimeoutMs: 20000`
-- `stream.maxRuntimeMin: 15`
+- `stream.maxRuntimeMin: 30`
 
 Current session-id ownership rule should stay explicit:
 
@@ -420,10 +420,11 @@ Current meaning:
 - `idleTimeoutMs`
   - after a turn has already produced visible output, clisbot treats the turn as completed once the runner pane stops changing for this many milliseconds
 - `noOutputTimeoutMs`
-  - if the turn produces no visible output at all for this many milliseconds from start, clisbot returns a timeout result
+  - internal diagnostic threshold for turns that have not produced visible activity yet
+  - it can be logged or measured, but it does not settle the turn or render a timeout into chat
 - `maxRuntimeMin`
   - default minute-based observation window for one turn
-  - when that window is exceeded, clisbot stops waiting for settlement, leaves the session running, and tells the user to inspect later with `/transcript`
+  - when that window is exceeded, clisbot stops live follow, leaves the session running, shifts that thread to sparse progress updates, and still posts the final result when it completes
 - `maxRuntimeSec`
   - optional second-based observation window when you need a shorter value for tests or special routes
 

@@ -59,7 +59,7 @@ export function formatConfiguredRuntimeLimit(params: {
     return `${params.maxRuntimeMin} minute${params.maxRuntimeMin === 1 ? "" : "s"}`;
   }
 
-  return "15 minutes";
+  return "30 minutes";
 }
 
 export function parseCommandDurationMs(raw: string) {

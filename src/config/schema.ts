@@ -199,7 +199,7 @@ const agentDefaultsSchema = z.object({
     updateIntervalMs: 2000,
     idleTimeoutMs: 6000,
     noOutputTimeoutMs: 20000,
-    maxRuntimeMin: 15,
+    maxRuntimeMin: 30,
     maxMessageChars: 3500,
   }),
   session: sessionSchema.default({

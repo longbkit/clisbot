@@ -105,7 +105,7 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - active long-running sessions should support `/attach`, `/detach`, and `/watch every <duration>` so users can control how this thread follows the run without switching to raw transcript by default
 - routed conversations now also support `/loop` for bounded repeated prompts, managed interval loops, and wall-clock loops such as `every day at 07:00`, with `LOOP.md` as the maintenance fallback when no prompt is supplied and `/loop status` or `/loop cancel` for active loop control
 - current observer scope is per thread for a routed conversation, so running `/attach` or `/watch` again in the same thread replaces the earlier observer mode for that thread
-- current `/detach` behavior is passive-final rather than silent unsubscribe: live updates stop, but final settlement still returns to the same thread when the run completes
+- current `/detach` behavior is sparse-follow rather than silent unsubscribe: live updates stop, sparse progress can continue, and final settlement still returns to the same thread when the run completes
 - channel observer delivery is now explicitly best-effort: transient Slack or Telegram send or edit failures may miss intermediate updates, but they must not terminate runner supervision or require a process restart
 - `/status` on a routed thread should expose the current session run state so users can see active detached work without switching to transcript-first inspection
 - expand the same channel model to the API surface next

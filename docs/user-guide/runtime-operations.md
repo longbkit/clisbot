@@ -15,12 +15,13 @@ Current config points are:
 Current meaning:
 
 - `idleTimeoutMs: 6000`
-  - once a turn has already produced visible output, clisbot treats it as completed after 6 seconds with no pane changes
+  - once a turn has already produced visible output, clisbot treats it as completed after 6 seconds with no further meaningful runner activity
 - `noOutputTimeoutMs: 20000`
-  - if a turn produces no visible output for 20 seconds from the start, clisbot returns a timeout
-- `maxRuntimeMin: 15`
-  - default observation window of 15 minutes for one turn
-  - if the session is still active after that window, clisbot stops waiting, leaves the session running, and tells you to use `/attach` or `/watch every 30s` to inspect it later
+  - internal diagnostic threshold only
+  - it is logged for metrics or debugging, but it does not settle the turn or surface a timeout into chat
+- `maxRuntimeMin: 30`
+  - default observation window of 30 minutes for one turn
+  - if the session is still active after that window, clisbot stops live follow, leaves the session running, shifts this thread to sparse progress updates, and still posts the final result here later
 - `maxRuntimeSec`
   - optional second-based observation window when you need tighter tests or shorter limits
 
@@ -43,6 +44,7 @@ Current commands:
   - if the run is already settled, you get one latest settled state
 - `/detach`
   - stop live updates for this thread
+  - switch this thread to sparse progress updates while the run is still active
   - the underlying run keeps going
   - final settlement is still posted here when the run completes
 - `/watch every 30s`

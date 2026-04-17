@@ -553,7 +553,7 @@ export function renderAgentControlSlashHelp() {
     "- `/whoami`: show the current platform, route, and sender identity details",
     "- `/transcript`: show the current conversation session transcript when the route verbose policy allows it",
     "- `/attach`: attach this thread to the active run and resume live updates when it is still processing",
-    "- `/detach`: stop live updates for this thread while still allowing final settlement here",
+    "- `/detach`: stop live updates for this thread, switch to sparse progress updates, and still allow final settlement here",
     "- `/watch every 30s [for 10m]`: post the latest state on an interval until the run settles or the watch window ends",
     "- `/stop`: send Escape to interrupt the current conversation session",
     "- `/nudge`: send one extra Enter to the current tmux session without resending the prompt text",

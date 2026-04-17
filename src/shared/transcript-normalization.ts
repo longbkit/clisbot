@@ -38,6 +38,30 @@ export function collapseBlankLines(lines: string[]) {
   return collapsed;
 }
 
+const DURATION_STATUS_PATTERN = String.raw`(?:\d+(?:h|m|s))(?:\s+\d+(?:h|m|s)){0,2}`;
+const CODEX_WORKING_STATUS_PATTERN = new RegExp(
+  String.raw`^(?:[•◦·]\s*)?Working(?:\s*\()?${
+    DURATION_STATUS_PATTERN
+  }\b.*(?:esc to interrupt|interrupt)\)?$`,
+  "i",
+);
+const CODEX_INTERRUPT_FOOTER_PATTERN = new RegExp(
+  String.raw`^(?:[•◦·]\s*)?${DURATION_STATUS_PATTERN}\s*[•◦·]?\s*esc to interrupt\)?$`,
+  "i",
+);
+const GEMINI_THINKING_STATUS_PATTERN = new RegExp(
+  String.raw`^Thinking\.\.\. \(esc to cancel,\s*${DURATION_STATUS_PATTERN}\)$`,
+  "i",
+);
+const CLAUDE_WORKED_STATUS_PATTERN = new RegExp(
+  String.raw`^(?:[✻✽*]\s*)?(?:Worked|Cooked) for ${DURATION_STATUS_PATTERN}$`,
+  "i",
+);
+const CLAUDE_TIMER_FOOTER_PATTERN = new RegExp(
+  String.raw`\|\s*claude\s*\|.*\|\s*${DURATION_STATUS_PATTERN}\s*$`,
+  "i",
+);
+
 function looksLikeUrlContinuation(line: string) {
   const trimmed = line.trim();
   return trimmed.startsWith("(") || trimmed.startsWith("http://") || trimmed.startsWith("https://");
@@ -338,8 +362,22 @@ function isInterruptStatusLine(line: string) {
   }
 
   return (
-    /^(?:[•◦·]\s*)?Working(?:\s*\()?\d+s\b.*(?:esc to interrupt|interrupt)\)?$/i.test(trimmed) ||
-    /^(?:[•◦·]\s*)?\d+s\s*[•◦·]?\s*esc to interrupt\)?$/i.test(trimmed)
+    CODEX_WORKING_STATUS_PATTERN.test(trimmed) ||
+    CODEX_INTERRUPT_FOOTER_PATTERN.test(trimmed)
+  );
+}
+
+function isTimerDrivenStatusLine(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return (
+    isInterruptStatusLine(trimmed) ||
+    GEMINI_THINKING_STATUS_PATTERN.test(trimmed) ||
+    CLAUDE_WORKED_STATUS_PATTERN.test(trimmed) ||
+    CLAUDE_TIMER_FOOTER_PATTERN.test(trimmed)
   );
 }
 
@@ -387,7 +425,7 @@ function shouldDropClaudeChromeLine(line: string) {
     trimmed.includes("run in background") ||
     /^~\/\.clisbot\/(?:workspace\/)?[a-z0-9._/-]+$/i.test(trimmed) ||
     trimmed.includes("| claude |") ||
-    /^(?:[✻*]\s*)?(?:Worked|Cooked) for \d+s$/i.test(trimmed) ||
+    isTimerDrivenStatusLine(trimmed) ||
     trimmed.startsWith("⏵⏵") ||
     trimmed.startsWith("❯") ||
     isProgressLine(trimmed) ||
@@ -430,7 +468,7 @@ function shouldDropGeminiChromeLine(line: string) {
     trimmed.includes("Type your message or @path/to/file") ||
     trimmed.includes("workspace (/directory)") ||
     /^~\/.+\s+\S+\s+no sandbox\s+\S+/i.test(trimmed) ||
-    /^Thinking\.\.\. \(esc to cancel,\s*\d+s\)$/i.test(trimmed) ||
+    isTimerDrivenStatusLine(trimmed) ||
     /^[╭╰│]/.test(trimmed) ||
     /^[-▀▄]{10,}$/.test(trimmed) ||
     /^─+$/.test(trimmed)
@@ -481,7 +519,9 @@ export function collapseAdjacentDuplicateLines(raw: string) {
   return collapseBlankLines(collapsed).join("\n").trim();
 }
 
-export function cleanInteractionSnapshot(raw: string) {
+function cleanInteractionSnapshotInternal(raw: string, options?: {
+  preserveTimerStatusLines?: boolean;
+}) {
   const lines = splitNormalizedLines(raw);
   const isCodex = looksLikeCodexSnapshot(lines);
   const isClaude = looksLikeClaudeSnapshot(lines);
@@ -492,9 +532,15 @@ export function cleanInteractionSnapshot(raw: string) {
       ? dropClaudePromptBlocks(lines)
       : isGemini
         ? dropGeminiPromptBlocks(lines)
-      : lines;
+        : lines;
+  const timerStatusLines: string[] = [];
   const filtered = promptStripped.filter((line) => {
     if (shouldDropDeliveryReportLine(line)) {
+      return false;
+    }
+
+    if (options?.preserveTimerStatusLines && isTimerDrivenStatusLine(line)) {
+      timerStatusLines.push(line.trim());
       return false;
     }
 
@@ -518,7 +564,26 @@ export function cleanInteractionSnapshot(raw: string) {
       ? unwrapClaudeMessageBlocks(filtered)
       : isGemini
         ? filtered.map((line) => line.replace(/^\s*>\s*/, ""))
-      : filtered;
+        : filtered;
   const unwrapped = unwrapSoftWrappedLines(normalized);
-  return collapseAdjacentDuplicateLines(collapseBlankLines(trimBlankLines(unwrapped)).join("\n"));
+  const cleanedBody = collapseAdjacentDuplicateLines(
+    collapseBlankLines(trimBlankLines(unwrapped)).join("\n"),
+  );
+  const cleanedTimerStatus = options?.preserveTimerStatusLines
+    ? collapseAdjacentDuplicateLines(
+        collapseBlankLines(trimBlankLines(timerStatusLines)).join("\n"),
+      )
+    : "";
+
+  return [cleanedBody, cleanedTimerStatus].filter(Boolean).join("\n\n").trim();
+}
+
+export function cleanInteractionSnapshot(raw: string) {
+  return cleanInteractionSnapshotInternal(raw);
+}
+
+export function cleanRunningInteractionSnapshot(raw: string) {
+  return cleanInteractionSnapshotInternal(raw, {
+    preserveTimerStatusLines: true,
+  });
 }

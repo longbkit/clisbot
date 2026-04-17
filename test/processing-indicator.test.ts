@@ -90,7 +90,7 @@ describe("waitForProcessingIndicatorLifecycle", () => {
     expect(detachedIds).toEqual(["obs-2"]);
   });
 
-  test("stops waiting when the active run detaches", async () => {
+  test("keeps waiting when the active run detaches and only resolves on completion", async () => {
     let observer: Omit<RunObserver, "lastSentAt"> | undefined;
     let settled = false;
 
@@ -117,6 +117,10 @@ describe("waitForProcessingIndicatorLifecycle", () => {
     expect(settled).toBe(false);
 
     await observer?.onUpdate(createUpdate("detached"));
+    await Bun.sleep(0);
+    expect(settled).toBe(false);
+
+    await observer?.onUpdate(createUpdate("completed"));
     await task;
 
     expect(settled).toBe(true);

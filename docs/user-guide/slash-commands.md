@@ -31,7 +31,7 @@ If this page and runtime ever disagree, runtime wins.
 ## Run Control
 
 - `/attach`: attach this thread to the active run and resume live updates
-- `/detach`: stop live updates for this thread while still allowing final settlement here
+- `/detach`: stop live updates for this thread, switch to sparse progress updates, and still allow final settlement here
 - `/watch every 30s [for 10m]`: post latest run state on an interval until settle or timeout
 - `/stop`: send Escape to interrupt the current conversation session
 - `/nudge`: send one extra Enter to the current tmux session without resending prompt text

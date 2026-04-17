@@ -298,7 +298,6 @@ describe("tmux runner latency behavior", () => {
       },
       onDetached: async () => undefined,
       onCompleted: async () => undefined,
-      onTimeout: async () => undefined,
     }).catch((error) => {
       if (!(error instanceof Error) || !error.message.startsWith("seen-running:")) {
         throw error;
@@ -308,6 +307,58 @@ describe("tmux runner latency behavior", () => {
     });
 
     expect(seenRunningAt).toBeLessThan(700);
+  });
+
+  test("monitorTmuxRun treats no-output timeout as diagnostic only and waits for timer-driven activity", async () => {
+    const snapshots = [
+      "",
+      "",
+      "Thinking... (esc to cancel, 56s)",
+      "Thinking... (esc to cancel, 57s)",
+      "Done.",
+      "Done.",
+      "Done.",
+    ];
+    let captureIndex = 0;
+    const runningSnapshots: string[] = [];
+    const completions: string[] = [];
+
+    const fakeTmux = {
+      async capturePane() {
+        const snapshot = snapshots[Math.min(captureIndex, snapshots.length - 1)] ?? "";
+        captureIndex += 1;
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: undefined,
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot: "",
+      detachedAlready: false,
+      onRunning: async (update) => {
+        runningSnapshots.push(update.snapshot);
+      },
+      onDetached: async () => undefined,
+      onCompleted: async (update) => {
+        completions.push(update.snapshot);
+      },
+    });
+
+    expect(runningSnapshots).toEqual([
+      "Thinking... (esc to cancel, 56s)",
+      "Thinking... (esc to cancel, 57s)",
+      "Done.",
+    ]);
+    expect(completions).toEqual(["Done."]);
   });
 
   test("submitTmuxSessionInput retries Enter once when pane state stays unchanged", async () => {

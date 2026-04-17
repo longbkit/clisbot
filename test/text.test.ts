@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   appendInteractionText,
   cleanInteractionSnapshot,
+  cleanRunningInteractionSnapshot,
   deriveMeaningfulPaneSnapshot,
   deriveInteractionText,
   deriveRunningInteractionText,
@@ -312,6 +313,22 @@ This project maps channel messages into tmux-backed agents.
     expect(cleaned).not.toContain("8s • esc to interrupt");
   });
 
+  test("keeps codex timer lines in running snapshots", () => {
+    const cleaned = cleanRunningInteractionSnapshot(`
+› explain this codebase
+
+• Exploring the workspace
+
+◦ Working (3m 12s • esc to interrupt)
+
+• The workspace contains a Bun service and tmux-backed runner integration.
+    `);
+
+    expect(cleaned).toContain("• Exploring the workspace");
+    expect(cleaned).toContain("• The workspace contains a Bun service and tmux-backed runner integration.");
+    expect(cleaned).toContain("Working (3m 12s • esc to interrupt)");
+  });
+
   test("strips gemini chrome while keeping meaningful content", () => {
     const cleaned = cleanInteractionSnapshot(`
  ▝▜▄     Gemini CLI v0.37.1
@@ -338,6 +355,20 @@ This project maps channel messages into tmux-backed agents.
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
  workspace (/directory)      branch      sandbox                         /model
  ~/projects/clisbot          main        no sandbox      gemini-3-flash-preview
+
+Hi
+    `);
+
+    expect(cleaned).toBe("Hi");
+  });
+
+  test("drops gemini timer lines with minute precision from settled snapshots", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▝▜▄     Gemini CLI v0.37.1
+
+> say hi in one word
+
+Thinking... (esc to cancel, 3m 12s)
 
 Hi
     `);
@@ -438,6 +469,23 @@ Worked for 36s
     );
   });
 
+  test("drops claude worked-for footer lines with minute precision from settled snapshots", () => {
+    const cleaned = cleanInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.clisbot/workspaces/claude
+
+⏺ item 089: abcdefghijklmnopqrstuvwxyz
+  item 090: abcdefghijklmnopqrstuvwxyz
+
+Worked for 3m 12s
+    `);
+
+    expect(cleaned).toBe(
+      ["item 089: abcdefghijklmnopqrstuvwxyz", "item 090: abcdefghijklmnopqrstuvwxyz"].join("\n"),
+    );
+  });
+
   test("drops claude cooked-for footer lines from settled snapshots", () => {
     const cleaned = cleanInteractionSnapshot(`
  ▐▛███▜▌   Claude Code v2.1.92
@@ -453,6 +501,22 @@ Worked for 36s
     expect(cleaned).toBe(
       ["item 089: abcdefghijklmnopqrstuvwxyz", "item 090: abcdefghijklmnopqrstuvwxyz"].join("\n"),
     );
+  });
+
+  test("keeps claude worked-for footer lines in running snapshots", () => {
+    const cleaned = cleanRunningInteractionSnapshot(`
+ ▐▛███▜▌   Claude Code v2.1.92
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/.clisbot/workspaces/claude
+
+⏺ item 089: abcdefghijklmnopqrstuvwxyz
+  item 090: abcdefghijklmnopqrstuvwxyz
+
+Worked for 3m 12s
+    `);
+
+    expect(cleaned).toContain("item 089: abcdefghijklmnopqrstuvwxyz");
+    expect(cleaned).toContain("Worked for 3m 12s");
   });
 
   test("keeps claude tool progress detail but strips ui-only hints", () => {

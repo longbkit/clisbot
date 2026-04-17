@@ -1,5 +1,6 @@
 import {
   cleanInteractionSnapshot,
+  cleanRunningInteractionSnapshot,
   collapseBlankLines,
   normalizePaneText,
   splitNormalizedLines,
@@ -87,8 +88,8 @@ export function extractScrolledAppend(previous: string, current: string) {
 }
 
 export function deriveRunningInteractionText(previousSnapshot: string, currentSnapshot: string) {
-  const previous = cleanInteractionSnapshot(previousSnapshot);
-  const current = cleanInteractionSnapshot(currentSnapshot);
+  const previous = cleanRunningInteractionSnapshot(previousSnapshot);
+  const current = cleanRunningInteractionSnapshot(currentSnapshot);
 
   if (!current || current === previous) {
     return "";
@@ -99,6 +100,10 @@ export function deriveRunningInteractionText(previousSnapshot: string, currentSn
   }
 
   return extractScrolledAppend(previous, current);
+}
+
+export function deriveRunningInteractionSnapshot(currentSnapshot: string) {
+  return cleanRunningInteractionSnapshot(currentSnapshot);
 }
 
 export function deriveInteractionText(initialSnapshot: string, currentSnapshot: string) {

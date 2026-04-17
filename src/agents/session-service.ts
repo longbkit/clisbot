@@ -48,6 +48,7 @@ type ActiveRun = {
 };
 
 const OBSERVER_RETRYABLE_FAILURE_LIMIT = 3;
+const DETACHED_OBSERVER_INTERVAL_MS = 5 * 60_000;
 
 function formatObserverError(error: unknown) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
@@ -349,7 +350,10 @@ export class SessionService {
       };
     }
 
-    observer.mode = "passive-final";
+    observer.mode = "poll";
+    observer.intervalMs = DETACHED_OBSERVER_INTERVAL_MS;
+    observer.expiresAt = undefined;
+    observer.lastSentAt = Date.now();
     run.observerFailures.delete(observerId);
     return {
       detached: true,
@@ -376,7 +380,20 @@ export class SessionService {
   }
 
   private buildDetachedNote(resolved: ResolvedAgentTarget) {
-    return `This session has been running for over ${resolved.stream.maxRuntimeLabel}. clisbot will keep monitoring it and will post the final result here when it completes. Use \`/attach\` to resume live updates, \`/watch every 30s\` for interval updates, or \`/stop\` to interrupt it.`;
+    return `This session has been running for over ${resolved.stream.maxRuntimeLabel}. clisbot will keep monitoring it, switch this thread to sparse progress updates, and post the final result here when it completes. Use \`/attach\` to resume live updates, \`/watch every 30s\` for interval updates, or \`/stop\` to interrupt it.`;
+  }
+
+  private applyDetachedObserverPolicy(run: ActiveRun) {
+    const now = Date.now();
+    for (const observer of run.observers.values()) {
+      if (observer.mode !== "live") {
+        continue;
+      }
+      observer.mode = "poll";
+      observer.intervalMs = DETACHED_OBSERVER_INTERVAL_MS;
+      observer.expiresAt = undefined;
+      observer.lastSentAt = now;
+    }
   }
 
   private createRunUpdate<TStatus extends PromptExecutionStatus>(params: {
@@ -683,23 +700,14 @@ export class SessionService {
               startedAt: params.startedAt,
               detachedAt: Date.now(),
             });
-            currentRun.latestUpdate = detachedUpdate;
+            await this.notifyRunObservers(currentRun, detachedUpdate);
+            this.applyDetachedObserverPolicy(currentRun);
             currentRun.initialResult.resolve(detachedUpdate);
           },
           onCompleted: async (update) => {
             const runUpdate = this.createRunUpdate({
               resolved: run.resolved,
               status: "completed",
-              snapshot: mergeRunSnapshot(params.snapshotPrefix ?? "", update.snapshot),
-              fullSnapshot: update.fullSnapshot,
-              initialSnapshot: update.initialSnapshot,
-            });
-            await this.finishActiveRun(sessionKey, runUpdate);
-          },
-          onTimeout: async (update) => {
-            const runUpdate = this.createRunUpdate({
-              resolved: run.resolved,
-              status: "timeout",
               snapshot: mergeRunSnapshot(params.snapshotPrefix ?? "", update.snapshot),
               fullSnapshot: update.fullSnapshot,
               initialSnapshot: update.initialSnapshot,

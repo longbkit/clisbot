@@ -1,8 +1,7 @@
 import { sleep } from "../../shared/process.ts";
 import {
-  appendInteractionText,
   deriveInteractionText,
-  deriveRunningInteractionText,
+  deriveRunningInteractionSnapshot,
   normalizePaneText,
 } from "../../shared/transcript.ts";
 import type { TmuxClient } from "./client.ts";
@@ -41,20 +40,16 @@ export type TmuxRunMonitorParams = {
     fullSnapshot: string;
     initialSnapshot: string;
   }) => Promise<void>;
-  onTimeout: (params: {
-    snapshot: string;
-    fullSnapshot: string;
-    initialSnapshot: string;
-  }) => Promise<void>;
 };
 
 export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let previousSnapshot = params.initialSnapshot;
-  let lastChangeAt = Date.now();
-  let sawChange = false;
-  let cumulativeInteractionSnapshot = "";
+  let previousRunningSnapshot = "";
+  let lastActivityAt = params.startedAt;
+  let sawActivity = false;
   let detachedNotified = params.detachedAlready;
   let firstMeaningfulDeltaLogged = false;
+  let noOutputThresholdLogged = false;
 
   if (params.prompt) {
     logLatencyDebug("tmux-submit-start", params.timingContext, {
@@ -77,73 +72,61 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   }
 
   while (true) {
-    await sleep(sawChange ? params.updateIntervalMs : Math.min(params.updateIntervalMs, FIRST_OUTPUT_POLL_INTERVAL_MS));
+    await sleep(
+      sawActivity
+        ? params.updateIntervalMs
+        : Math.min(params.updateIntervalMs, FIRST_OUTPUT_POLL_INTERVAL_MS),
+    );
     const snapshot = normalizePaneText(
       await params.tmux.capturePane(params.sessionName, params.captureLines),
     );
     const now = Date.now();
+    const runningSnapshot = deriveRunningInteractionSnapshot(snapshot);
 
-    if (snapshot !== previousSnapshot) {
-      const priorSnapshot = previousSnapshot;
-      lastChangeAt = now;
-      previousSnapshot = snapshot;
-      const interactionDelta = deriveRunningInteractionText(priorSnapshot, snapshot);
-      const nextInteractionSnapshot = appendInteractionText(
-        cumulativeInteractionSnapshot,
-        interactionDelta,
-      );
-      if (
-        nextInteractionSnapshot &&
-        nextInteractionSnapshot !== cumulativeInteractionSnapshot
-      ) {
-        sawChange = true;
-        cumulativeInteractionSnapshot = nextInteractionSnapshot;
-        if (!firstMeaningfulDeltaLogged) {
-          firstMeaningfulDeltaLogged = true;
-          logLatencyDebug("tmux-first-meaningful-delta", params.timingContext, {
-            sessionName: params.sessionName,
-            elapsedMs: now - params.startedAt,
-          });
-        }
-        await params.onRunning({
-          snapshot: cumulativeInteractionSnapshot,
-          fullSnapshot: snapshot,
-          initialSnapshot: params.initialSnapshot,
+    previousSnapshot = snapshot;
+
+    if (runningSnapshot && runningSnapshot !== previousRunningSnapshot) {
+      previousRunningSnapshot = runningSnapshot;
+      lastActivityAt = now;
+      sawActivity = true;
+      if (!firstMeaningfulDeltaLogged) {
+        firstMeaningfulDeltaLogged = true;
+        logLatencyDebug("tmux-first-meaningful-delta", params.timingContext, {
+          sessionName: params.sessionName,
+          elapsedMs: now - params.startedAt,
         });
       }
+      await params.onRunning({
+        snapshot: runningSnapshot,
+        fullSnapshot: snapshot,
+        initialSnapshot: params.initialSnapshot,
+      });
     }
 
     if (!detachedNotified && now - params.startedAt >= params.maxRuntimeMs) {
       detachedNotified = true;
       await params.onDetached({
-        snapshot:
-          cumulativeInteractionSnapshot ||
-          deriveInteractionText(params.initialSnapshot, previousSnapshot),
+        snapshot: previousRunningSnapshot || deriveInteractionText(params.initialSnapshot, snapshot),
         fullSnapshot: previousSnapshot,
         initialSnapshot: params.initialSnapshot,
       });
     }
 
-    if (sawChange && now - lastChangeAt >= params.idleTimeoutMs) {
+    if (sawActivity && now - lastActivityAt >= params.idleTimeoutMs) {
       await params.onCompleted({
-        snapshot:
-          cumulativeInteractionSnapshot ||
-          deriveInteractionText(params.initialSnapshot, previousSnapshot),
+        snapshot: deriveInteractionText(params.initialSnapshot, previousSnapshot),
         fullSnapshot: previousSnapshot,
         initialSnapshot: params.initialSnapshot,
       });
       return;
     }
 
-    if (!sawChange && now - params.startedAt >= params.noOutputTimeoutMs) {
-      await params.onTimeout({
-        snapshot:
-          cumulativeInteractionSnapshot ||
-          deriveInteractionText(params.initialSnapshot, previousSnapshot),
-        fullSnapshot: previousSnapshot,
-        initialSnapshot: params.initialSnapshot,
+    if (!noOutputThresholdLogged && !sawActivity && now - params.startedAt >= params.noOutputTimeoutMs) {
+      noOutputThresholdLogged = true;
+      logLatencyDebug("tmux-no-output-threshold-crossed", params.timingContext, {
+        sessionName: params.sessionName,
+        elapsedMs: now - params.startedAt,
       });
-      return;
     }
   }
 }

@@ -7,7 +7,7 @@ import {
 import type { AgentSessionState } from "../src/agents/session-state.ts";
 import type { ResolvedAgentTarget } from "../src/agents/resolved-target.ts";
 import type { RunnerService } from "../src/agents/runner-service.ts";
-import type { RunUpdate } from "../src/agents/run-observation.ts";
+import type { RunObserver, RunUpdate } from "../src/agents/run-observation.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 
 function createResolvedTarget(): ResolvedAgentTarget {
@@ -204,6 +204,63 @@ describe("SessionService observer delivery", () => {
     expect(failingCalls).toBe(1);
     expect(run.observers.has("broken-observer")).toBe(false);
     expect(consoleSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("detachRunObserver downgrades the observer to sparse polling instead of passive-final", async () => {
+    const resolved = createResolvedTarget();
+    const manager = createManager(resolved) as any;
+    const observer: Omit<RunObserver, "lastSentAt"> & { lastSentAt?: number } = {
+      id: "thread-observer",
+      mode: "live",
+      onUpdate: async () => undefined,
+    };
+    const run = createRun(
+      resolved,
+      new Map([
+        ["thread-observer", observer],
+      ]),
+    );
+    manager.activeRuns.set(resolved.sessionKey, run);
+
+    const result = await manager.detachRunObserver(
+      { agentId: resolved.agentId, sessionKey: resolved.sessionKey },
+      "thread-observer",
+    );
+
+    expect(result).toEqual({ detached: true });
+    expect(observer.mode).toBe("poll");
+    expect(observer.intervalMs).toBe(5 * 60_000);
+    expect(observer.expiresAt).toBeUndefined();
+    expect(typeof observer.lastSentAt).toBe("number");
+  });
+
+  test("detached transition notifies live observers before downgrading them to sparse polling", async () => {
+    const resolved = createResolvedTarget();
+    const manager = createManager(resolved) as any;
+    const seenStatuses: string[] = [];
+    const observer: Omit<RunObserver, "lastSentAt"> & { lastSentAt?: number } = {
+      id: "thread-observer",
+      mode: "live",
+      onUpdate: async (update: RunUpdate) => {
+        seenStatuses.push(update.status);
+      },
+    };
+    const run = createRun(
+      resolved,
+      new Map([
+        ["thread-observer", observer],
+      ]),
+    );
+
+    await manager.notifyRunObservers(
+      run,
+      createUpdate(resolved, { status: "detached", snapshot: "still running" }),
+    );
+    manager.applyDetachedObserverPolicy(run);
+
+    expect(seenStatuses).toEqual(["detached"]);
+    expect(observer.mode).toBe("poll");
+    expect(observer.intervalMs).toBe(5 * 60_000);
   });
 
   test("mid-run recovery preserves the original startedAt and resumes from the reopened pane snapshot", async () => {
