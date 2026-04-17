@@ -40,6 +40,7 @@ Channels is where those surfaces live.
 - explicit transcript request command patterns for whole-session visibility when users ask for it
 - observer-style run control commands such as attach, detach, and interval watch on active long-running sessions
 - channel-ingestion concurrency so one long-running conversation does not block unrelated conversations on the same channel account
+- bounded recent-message replay so a later mention can recover the last few ignored routed messages without replaying whole-channel history
 
 ## Non-Goals
 
@@ -74,6 +75,7 @@ Channels is where those surfaces live.
 - [Transcript Visibility And Verbose Levels](transcript-visibility-and-verbose-levels.md)
 - [Structured Channel Rendering And Native Surface Capabilities](structured-channel-rendering-and-native-surface-capabilities.md)
 - [Loop Slash Command](loop-slash-command.md)
+- [Recent Conversation Replay](recent-conversation-replay.md)
 
 ## Dependencies
 
@@ -109,6 +111,7 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - current `/detach` behavior is sparse-follow rather than silent unsubscribe: live updates stop, sparse progress can continue, and final settlement still returns to the same thread when the run completes
 - channel observer delivery is now explicitly best-effort: transient Slack or Telegram send or edit failures may miss intermediate updates, but they must not terminate runner supervision or require a process restart
 - `/status` on a routed thread should expose the current session run state so users can see active detached work without switching to transcript-first inspection
+- Slack and Telegram now keep only the latest 5 routed inbound messages per conversation boundary plus a `lastProcessedMarker`, then replay only the unprocessed tail when a later invocation needs recent context
 - expand the same channel model to the API surface next
 - Telegram now ships as a topic-aware channel surface, using OpenClaw-style group and topic config inheritance instead of reusing Slack follow-up mechanics for topic identity
 - Telegram transport should respect Telegram Bot API retry-after hints and pace live message edits so streaming does not fail on 429 rate limits

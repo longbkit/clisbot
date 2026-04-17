@@ -47,6 +47,8 @@ import { resolveTelegramAttachmentPaths } from "./attachments.ts";
 import { sleep } from "../../shared/process.ts";
 import type { TelegramAccountConfig } from "../../config/channel-accounts.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
+import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
+import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
 import {
@@ -560,6 +562,22 @@ export class TelegramPollingService {
         lastBotReplyAt: followUpState.lastBotReplyAt,
         directReplyToBot: isReplyToTelegramBot(message, this.botUserId),
       });
+    const textBody = explicitMention
+      ? stripTelegramBotMention(rawText, this.botUsername)
+      : rawText;
+    const recentMessageMarker = String(message.message_id);
+    if (rawText || explicitMention || slashCommand) {
+      await this.agentService.appendRecentConversationMessage(routeInfo.sessionTarget, {
+        marker: recentMessageMarker,
+        text: slashCommand ? "" : textBody,
+        senderId:
+          message.from?.id != null ? String(message.from.id).trim() : undefined,
+        senderName: [message.from?.first_name, message.from?.last_name]
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+          .join(" ")
+          .trim() || message.from?.username?.trim() || undefined,
+      });
+    }
     if (routeInfo.route.requireMention && !wasMentioned) {
       await this.processedEventsStore.markCompleted(eventId);
       return;
@@ -568,10 +586,18 @@ export class TelegramPollingService {
     if (explicitMention && followUpState.overrideMode === "paused") {
       await this.agentService.reactivateConversationFollowUp(routeInfo.sessionTarget);
     }
-
-    const textBody = explicitMention
-      ? stripTelegramBotMention(rawText, this.botUsername)
-      : rawText;
+    const effectivePromptText =
+      textBody ||
+      (explicitMention
+        ? buildMentionOnlyFollowUpPrompt({
+            conversationKind:
+              routeInfo.conversationKind === "topic" ? "group" : routeInfo.conversationKind,
+            threaded:
+              routeInfo.topicId != null ||
+              (message.message_thread_id != null &&
+                Number.isFinite(message.message_thread_id)),
+          })
+        : "");
     const attachmentPaths = await resolveTelegramAttachmentPaths({
       message,
       botToken: this.accountConfig.botToken,
@@ -579,11 +605,22 @@ export class TelegramPollingService {
       sessionKey: routeInfo.sessionTarget.sessionKey,
       messageId: String(message.message_id),
     });
-    const text = prependAttachmentMentions(textBody, attachmentPaths);
+    const text = prependAttachmentMentions(effectivePromptText, attachmentPaths);
     if (!text) {
       await this.processedEventsStore.markCompleted(eventId);
       return;
     }
+    const recentConversationReplay = await this.agentService.getRecentConversationReplayMessages(
+      routeInfo.sessionTarget,
+      {
+        excludeMarker: recentMessageMarker,
+      },
+    );
+    const enrichPromptText = (nextText: string) =>
+      prependRecentConversationContext({
+        currentText: nextText,
+        recentMessages: recentConversationReplay,
+      });
 
     await this.processedEventsStore.markProcessing(eventId);
     await this.activityStore.record({
@@ -625,7 +662,7 @@ export class TelegramPollingService {
         ? undefined
         : DEFAULT_PROTECTED_CONTROL_RULE;
       const agentPromptText = buildAgentPromptText({
-        text,
+        text: enrichPromptText(text),
         identity,
         config: this.loadedConfig.raw.channels.telegram.agentPrompt,
         cliTool,
@@ -672,7 +709,7 @@ export class TelegramPollingService {
           agentPromptText,
           agentPromptBuilder: (nextText) =>
             buildAgentPromptText({
-              text: nextText,
+              text: enrichPromptText(nextText),
               identity,
               config: this.loadedConfig.raw.channels.telegram.agentPrompt,
               cliTool,
@@ -681,6 +718,13 @@ export class TelegramPollingService {
               protectedControlMutationRule,
             }),
           protectedControlMutationRule,
+          transformSessionInputText: enrichPromptText,
+          onPromptAccepted: async () => {
+            await this.agentService.markRecentConversationProcessed(
+              routeInfo.sessionTarget,
+              recentMessageMarker,
+            );
+          },
           route: routeInfo.route,
           maxChars: this.getTelegramMaxChars(routeInfo.route.agentId),
           timingContext,

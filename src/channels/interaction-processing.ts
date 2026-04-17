@@ -647,6 +647,7 @@ async function executePromptDelivery<TChunk>(params: {
   queueStartMode?: SurfaceNotificationMode;
   notificationPromptSummary?: string;
   suppressDetachedSettlement?: boolean;
+  onPromptAccepted?: () => Promise<void>;
 }) {
   let responseChunks: TChunk[] = [];
   let renderedState: ChannelRenderedMessageState | undefined;
@@ -955,6 +956,7 @@ async function executePromptDelivery<TChunk>(params: {
         },
       },
     );
+    await params.onPromptAccepted?.();
     queueStartPending =
       positionAhead > 0 &&
       (params.queueStartMode ?? "none") !== "none";
@@ -1173,6 +1175,8 @@ export async function processChannelInteraction<TChunk>(params: {
   postText: PostText<TChunk>;
   reconcileText: ReconcileText<TChunk>;
   timingContext?: LatencyDebugContext;
+  transformSessionInputText?: (text: string) => string;
+  onPromptAccepted?: () => Promise<void>;
 }): Promise<ProcessChannelInteractionResult> {
   const interactionResult: ProcessChannelInteractionResult = {
     processingIndicatorLifecycle: "handler",
@@ -1845,10 +1849,11 @@ export async function processChannelInteraction<TChunk>(params: {
     await params.agentService.submitSessionInput(
       params.sessionTarget,
       buildSteeringPromptText({
-        text: explicitSteerMessage,
+        text: params.transformSessionInputText?.(explicitSteerMessage) ?? explicitSteerMessage,
         protectedControlMutationRule: params.protectedControlMutationRule,
       }),
     );
+    await params.onPromptAccepted?.();
     await params.postText("Steered.");
     await params.agentService.recordConversationReply(params.sessionTarget);
     return {
@@ -1861,10 +1866,11 @@ export async function processChannelInteraction<TChunk>(params: {
       await params.agentService.submitSessionInput(
         params.sessionTarget,
         buildSteeringPromptText({
-          text: params.text,
+          text: params.transformSessionInputText?.(params.text) ?? params.text,
           protectedControlMutationRule: params.protectedControlMutationRule,
         }),
       );
+      await params.onPromptAccepted?.();
       return {
         processingIndicatorLifecycle: "active-run",
       };
@@ -1887,6 +1893,7 @@ export async function processChannelInteraction<TChunk>(params: {
     observerId,
     timingContext: params.timingContext,
     forceQueuedDelivery,
+    onPromptAccepted: params.onPromptAccepted,
   });
   return interactionResult;
 }

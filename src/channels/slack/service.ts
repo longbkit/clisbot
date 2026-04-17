@@ -4,6 +4,7 @@ import {
   resolveFollowUpMode,
 } from "../../agents/follow-up-policy.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
+import { parseAgentCommand } from "../../agents/commands.ts";
 import { processChannelInteraction } from "../interaction-processing.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
 import { isSlackSenderAllowed } from "../pairing/access.ts";
@@ -16,6 +17,8 @@ import { ProcessedEventsStore } from "../processed-events-store.ts";
 import { ActivityStore } from "../../control/activity-store.ts";
 import { renderChannelInteraction } from "../../shared/transcript.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
+import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
+import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
 import {
@@ -427,6 +430,22 @@ export class SlackSocketService {
           lastBotReplyAt: followUpState.lastBotReplyAt,
           directReplyToBot: isImplicitBotThreadReply(event, this.botUserId),
         }));
+    const rawText = explicitMention
+      ? stripBotMention(event.text ?? "", this.botUserId)
+      : `${event.text ?? ""}`.trim();
+    const recentMessageMarker = messageTs?.trim();
+    if (recentMessageMarker && (rawText || explicitMention)) {
+      await this.agentService.appendRecentConversationMessage(sessionTarget, {
+        marker: recentMessageMarker,
+        text: parseAgentCommand(rawText, {
+          commandPrefixes: params.route.commandPrefixes,
+        })
+          ? ""
+          : rawText,
+        senderId:
+          typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
+      });
+    }
     if (requiresMention && !wasMentioned) {
       const isCommandLike = isSlackCommandLikeMessage({
         text: event.text ?? "",
@@ -465,10 +484,14 @@ export class SlackSocketService {
     if (explicitMention && followUpState.overrideMode === "paused") {
       await this.agentService.reactivateConversationFollowUp(sessionTarget);
     }
-
-    const rawText = explicitMention
-      ? stripBotMention(event.text ?? "", this.botUserId)
-      : `${event.text ?? ""}`.trim();
+    const effectivePromptText =
+      rawText ||
+      (explicitMention
+        ? buildMentionOnlyFollowUpPrompt({
+            conversationKind: params.conversationKind,
+            threaded: Boolean(threadTs),
+          })
+        : "");
     const attachmentPaths = await resolveSlackAttachmentPaths({
       client: this.app.client as any,
       event,
@@ -480,12 +503,22 @@ export class SlackSocketService {
       sessionKey: sessionTarget.sessionKey,
       messageId: messageTs ?? threadTs ?? `${Date.now()}`,
     });
-    const text = prependAttachmentMentions(rawText, attachmentPaths);
+    const text = prependAttachmentMentions(effectivePromptText, attachmentPaths);
     if (!text) {
       debugSlackEvent("drop-empty-text", { eventId, channelId });
       await this.processedEventsStore.markCompleted(eventId);
       return;
     }
+    const recentConversationReplay = recentMessageMarker
+      ? await this.agentService.getRecentConversationReplayMessages(sessionTarget, {
+          excludeMarker: recentMessageMarker,
+        })
+      : [];
+    const enrichPromptText = (nextText: string) =>
+      prependRecentConversationContext({
+        currentText: nextText,
+        recentMessages: recentConversationReplay,
+      });
 
     debugSlackEvent("process-message", {
       eventId,
@@ -529,7 +562,7 @@ export class SlackSocketService {
       ? undefined
       : DEFAULT_PROTECTED_CONTROL_RULE;
     const agentPromptText = buildAgentPromptText({
-      text,
+      text: enrichPromptText(text),
       identity,
       config: this.loadedConfig.raw.channels.slack.agentPrompt,
       cliTool,
@@ -607,7 +640,7 @@ export class SlackSocketService {
         agentPromptText,
         agentPromptBuilder: (nextText) =>
           buildAgentPromptText({
-            text: nextText,
+            text: enrichPromptText(nextText),
             identity,
             config: this.loadedConfig.raw.channels.slack.agentPrompt,
             cliTool,
@@ -616,6 +649,15 @@ export class SlackSocketService {
             protectedControlMutationRule,
           }),
         protectedControlMutationRule,
+        transformSessionInputText: enrichPromptText,
+        onPromptAccepted: recentMessageMarker
+          ? async () => {
+            await this.agentService.markRecentConversationProcessed(
+              sessionTarget,
+              recentMessageMarker,
+            );
+          }
+          : undefined,
         route: params.route,
         maxChars: this.getSlackMaxChars(params.route.agentId),
         timingContext,

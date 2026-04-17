@@ -55,6 +55,7 @@ import type { LatencyDebugContext } from "../control/latency-debug.ts";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
 import type { StoredLoopSurfaceBinding } from "./loop-state.ts";
 import { applyTemplate } from "../shared/paths.ts";
+import type { StoredRecentConversationMessage } from "../shared/recent-message-context.ts";
 
 type StreamUpdate = RunUpdate;
 
@@ -289,6 +290,29 @@ export class AgentService {
     source: ConversationReplySource = "channel",
   ) {
     return this.sessionState.recordConversationReply(this.resolveTarget(target), kind, source);
+  }
+
+  async appendRecentConversationMessage(
+    target: AgentSessionTarget,
+    message: StoredRecentConversationMessage,
+  ) {
+    return this.sessionState.appendRecentConversationMessage(this.resolveTarget(target), message);
+  }
+
+  async getRecentConversationReplayMessages(
+    target: AgentSessionTarget,
+    params: {
+      excludeMarker?: string;
+    } = {},
+  ) {
+    return this.sessionState.getRecentConversationReplayMessages(target, params);
+  }
+
+  async markRecentConversationProcessed(
+    target: AgentSessionTarget,
+    marker: string,
+  ) {
+    return this.sessionState.markRecentConversationProcessed(this.resolveTarget(target), marker);
   }
 
   async runShellCommand(target: AgentSessionTarget, command: string): Promise<ShellCommandResult> {

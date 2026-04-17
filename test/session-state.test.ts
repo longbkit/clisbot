@@ -52,4 +52,54 @@ describe("session state runtime reply markers", () => {
     expect(typeof runtime.lastMessageToolReplyAt).toBe("number");
     expect(typeof runtime.messageToolFinalReplyAt).toBe("number");
   });
+
+  test("persists recent conversation replay state per session", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-session-state-"));
+    const store = new SessionStore(join(tempDir, "sessions.json"));
+    const state = new AgentSessionState(store);
+    const resolved = createResolvedTarget(tempDir);
+
+    await state.appendRecentConversationMessage(resolved, {
+      marker: "m1",
+      text: "first",
+    });
+    await state.appendRecentConversationMessage(resolved, {
+      marker: "m2",
+      text: "",
+    });
+    await state.appendRecentConversationMessage(resolved, {
+      marker: "m3",
+      text: "third",
+    });
+    await state.markRecentConversationProcessed(resolved, "m2");
+
+    const replay = await state.getRecentConversationReplayMessages(
+      {
+        sessionKey: resolved.sessionKey,
+      },
+      {
+        excludeMarker: "m3",
+      },
+    );
+
+    expect(replay).toEqual([]);
+
+    const entry = await state.getEntry(resolved.sessionKey);
+    expect(entry?.recentConversation).toEqual({
+      lastProcessedMarker: "m2",
+      messages: [
+        {
+          marker: "m1",
+          text: "first",
+        },
+        {
+          marker: "m2",
+        },
+        {
+          marker: "m3",
+          text: "third",
+        },
+      ],
+    });
+  });
 });

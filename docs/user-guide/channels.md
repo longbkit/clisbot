@@ -44,6 +44,53 @@ Operational notes:
 - `/status` is also the fastest way to see whether this routed thread is idle, actively running, or detached after a long autonomous turn
 - `/start` is useful both for routed conversations and for Telegram groups or topics that are not routed yet
 
+## Recent Context Replay
+
+Slack and Telegram now use the same KISS recent-context rule for routed conversations.
+
+What is stored per routed conversation:
+
+- the latest 5 inbound messages in that routed boundary
+- one `lastProcessedMarker`
+
+What counts as the routed boundary:
+
+- Slack thread route: one thread
+- Slack non-thread route: one channel route
+- Telegram DM: one chat
+- Telegram group: one group
+- Telegram topic: one topic
+
+What counts as the marker:
+
+- Slack: message `ts`
+- Telegram: `message_id`
+
+When `clisbot` updates the processed marker:
+
+- only when that message is actually accepted into agent execution
+- this includes normal prompt enqueue, queued prompt enqueue, and steer delivery
+
+What does not advance the marker:
+
+- message delivery by itself
+- follow-up eligibility by itself
+- control commands such as `/status`, `/help`, `/attach`, `/detach`, `/stop`
+
+How replay works on the next real prompt:
+
+1. `clisbot` scans backward through the saved 5-message tail
+2. it stops when it finds the last processed marker
+3. it keeps only the newer messages after that marker
+4. it strips the current message itself
+5. it prepends the remaining tail into the next agent prompt as recent context
+
+Practical effect:
+
+- if a Slack thread or Telegram topic had a few plain human messages that the bot ignored, and someone later mentions the bot, the bot can see that recent gap
+- this is intentionally bounded to 5 messages, so it stays predictable and cheap
+- if the processed marker has already fallen out of the saved window, the bot replays the full surviving 5-message tail
+
 ## Operator Commands
 
 Use the `clisbot channels ...` CLI to update route config without editing JSON by hand.
