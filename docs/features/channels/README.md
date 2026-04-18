@@ -67,7 +67,7 @@ Channels is where those surfaces live.
 
 ## Related Feature Docs
 
-- [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
+- [Message Actions And Bot Routing](message-actions-and-channel-accounts.md)
 - [Message Command Formatting And Render Modes](message-command-formatting-and-render-modes.md)
 - [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)
 - [Streaming Mode And Message-Tool Draft Preview Handoff](streaming-mode-and-message-tool-draft-preview-handoff.md)

@@ -274,5 +274,5 @@ Recommended defer list:
 
 - [Structured Channel Rendering And Native Surface Capabilities](../../features/channels/structured-channel-rendering-and-native-surface-capabilities.md)
 - [Structured Channel Rendering And Native Surface Capabilities Task](../../tasks/features/channels/2026-04-14-structured-channel-rendering-and-native-surface-capabilities.md)
-- [Message Actions And Channel Accounts](../../features/channels/message-actions-and-channel-accounts.md)
+- [Message Actions And Bot Routing](../../features/channels/message-actions-and-channel-accounts.md)
 - [Agent Progress Reply Wrapper And Prompt](../../features/channels/agent-progress-reply-wrapper-and-prompt.md)

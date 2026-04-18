@@ -47,7 +47,7 @@ That makes first-use trust worse and hides the actual next step.
 
 - [Channels](../../../features/channels/README.md)
 - [DM-First Pairing Onboarding](2026-04-10-dm-first-pairing-onboarding.md)
-- [slack telegram message actions and channel accounts](2026-04-09-slack-telegram-message-actions-and-channel-accounts.md)
+- [slack telegram message actions and bot routing](2026-04-09-slack-telegram-message-actions-and-channel-accounts.md)
 
 ## User-Reported Flow
 

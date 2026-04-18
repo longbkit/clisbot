@@ -13,7 +13,7 @@ The goal is to control how a reply is rendered, updated, replied-to, and interac
 `clisbot` already has:
 
 - channel routing
-- channel accounts
+- bot-aware routing
 - prompt templates
 - agent reply wrappers
 
@@ -98,7 +98,7 @@ Operators should be able to see:
 ## Dependencies
 
 - [Channels](README.md)
-- [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
+- [Message Actions And Bot Routing](message-actions-and-channel-accounts.md)
 - [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)
 - [Prompt Templates](prompt-templates.md)
 

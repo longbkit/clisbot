@@ -12,6 +12,14 @@ summary: Audit draft for current `clisbot` CLI command output, with emphasis on 
 
 This draft reviews current CLI output as a product surface.
 
+## Historical Note
+
+This audit was captured before the official operator model fully converged on `bots` and `routes`.
+
+Many examples below intentionally preserve then-current output, including removed `channels` and `accounts` surfaces.
+
+Read this document as UX audit history, not as current CLI guidance.
+
 The goal is not API completeness.
 
 The goal is to quickly spot places where command output can become:
@@ -204,7 +212,7 @@ Telegram token ref: TELEGRAM_BOT_TOKEN (set)
 Pass the channels you want explicitly, for example with --telegram-bot-token or --slack-app-token plus --slack-bot-token.
 Use ENV_NAME or ${ENV_NAME} for env-backed setup, or pass a literal token to cold-start with credentialType=mem.
 Example: clisbot start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN
-Repo docs path (local or GitHub): docs/user-guide/channel-accounts.md
+Repo docs path (local or GitHub): docs/user-guide/bots-and-credentials.md
 Slack docs: https://api.slack.com/apps
 Telegram docs: https://core.telegram.org/bots#6-botfather
 If you still need help: clone https://github.com/longbkit/clisbot, open it in Codex or Claude Code, and ask for setup help.
@@ -246,7 +254,7 @@ Token note:
   a literal token starts with a temporary runtime-only credential unless you also pass --persist
 
 Docs:
-  docs/user-guide/channel-accounts.md
+  docs/user-guide/bots-and-credentials.md
   https://api.slack.com/apps
   https://core.telegram.org/bots#6-botfather
 ```
@@ -275,7 +283,7 @@ Telegram token ref: TELEGRAM_BOT_TOKEN (set)
 Pass the channels you want explicitly, for example with --telegram-bot-token or --slack-app-token plus --slack-bot-token.
 Use ENV_NAME or ${ENV_NAME} for env-backed setup, or pass a literal token to cold-start with credentialType=mem.
 Example: clisbot start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN
-Repo docs path (local or GitHub): docs/user-guide/channel-accounts.md
+Repo docs path (local or GitHub): docs/user-guide/bots-and-credentials.md
 Slack docs: https://api.slack.com/apps
 Telegram docs: https://core.telegram.org/bots#6-botfather
 If you still need help: clone https://github.com/longbkit/clisbot, open it in Codex or Claude Code, and ask for setup help.
@@ -304,7 +312,7 @@ Token note:
   a literal token is temporary unless you later persist it
 
 Docs:
-  docs/user-guide/channel-accounts.md
+  docs/user-guide/bots-and-credentials.md
 ```
 
 Why this proposed version is better:

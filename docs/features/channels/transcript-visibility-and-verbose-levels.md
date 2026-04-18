@@ -13,6 +13,12 @@ Current levels:
 
 Done
 
+## Current Contract
+
+Official config ownership is bot-rooted now.
+
+This feature still describes the same `verbose` behavior, but the live config paths are under `bots`, not `channels`.
+
 ## Why
 
 `/transcript` is not the same class of action as `/bash`.
@@ -36,25 +42,29 @@ The cleaner split is:
 
 Supported on:
 
-- `channels.slack.verbose`
-- `channels.slack.channels.<channelId>.verbose`
-- `channels.slack.groups.<groupId>.verbose`
-- `channels.slack.directMessages.verbose`
-- `channels.telegram.verbose`
-- `channels.telegram.groups.<chatId>.verbose`
-- `channels.telegram.groups.<chatId>.topics.<topicId>.verbose`
-- `channels.telegram.directMessages.verbose`
+- `bots.slack.defaults.verbose`
+- `bots.slack.<botId>.groups."channel:<channelId>".verbose`
+- `bots.slack.<botId>.groups."group:<groupId>".verbose`
+- `bots.slack.<botId>.directMessages."*".verbose`
+- `bots.telegram.defaults.verbose`
+- `bots.telegram.<botId>.groups."<chatId>".verbose`
+- `bots.telegram.<botId>.groups."<chatId>".topics."<topicId>".verbose`
+- `bots.telegram.<botId>.directMessages."*".verbose`
 
 Example:
 
 ```json
 {
-  "channels": {
+  "bots": {
     "slack": {
-      "verbose": "minimal",
-      "channels": {
-        "C1234567890": {
-          "verbose": "off"
+      "defaults": {
+        "verbose": "minimal"
+      },
+      "default": {
+        "groups": {
+          "channel:C1234567890": {
+            "verbose": "off"
+          }
         }
       }
     }

@@ -1,21 +1,21 @@
-# Message Actions And Channel Accounts
+# Message Actions And Bot Routing
 
 ## Summary
 
-This feature slice adds an operator-facing `message` CLI plus first-class Slack and Telegram channel accounts.
+This feature slice adds an operator-facing `message` CLI plus bot-aware Slack and Telegram routing.
 
 The goal is OpenClaw-shaped operator behavior without breaking the existing `clisbot` system boundaries:
 
 - channels own provider-facing transport behavior
-- configuration owns account and route selection
+- configuration owns bot and route selection
 - agents stays backend-agnostic
 
 ## Scope
 
 - `clisbot message ...` operator CLI
-- Slack and Telegram account config under provider-owned account maps
-- `defaultAccount` selection
-- account-aware bindings in `channel[:accountId]` form
+- Slack and Telegram bot config under provider-owned bot maps
+- `defaultBotId` selection
+- bot-aware route selection
 - Slack and Telegram message actions routed through provider adapters
 
 ## In Scope Message Actions
@@ -34,9 +34,9 @@ The goal is OpenClaw-shaped operator behavior without breaking the existing `cli
 
 ## Architecture Notes
 
-- account config remains provider-owned under `channels.slack` and `channels.telegram`
-- route tables remain provider-owned
-- bindings remain the top-level cross-feature routing map
+- bot config remains provider-owned under `bots.slack` and `bots.telegram`
+- route tables remain bot-owned
+- route resolution stays separate from agent execution
 - provider message actions stay in channel adapters, not in agents
 
 ## Dependencies

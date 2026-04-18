@@ -198,6 +198,6 @@ Example summary:
 
 - [Start Bootstrap And Credential Persistence](start-bootstrap-and-credential-persistence.md)
 - [Configuration](README.md)
-- [Channel Accounts](../../user-guide/channel-accounts.md)
+- [Bots And Credentials](../../user-guide/bots-and-credentials.md)
 - [Start First-Run Bootstrap And Token Gating](../../tasks/features/configuration/2026-04-07-start-first-run-bootstrap-and-token-gating.md)
 - [Telegram credential security research](../../research/security/2026-04-12-openclaw-telegram-credential-security-and-setup.md)

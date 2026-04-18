@@ -188,7 +188,7 @@ clisbot message send \
 ## Related Docs
 
 - [Channels](README.md)
-- [Message Actions And Channel Accounts](message-actions-and-channel-accounts.md)
+- [Message Actions And Bot Routing](message-actions-and-channel-accounts.md)
 - [Structured Channel Rendering And Native Surface Capabilities](structured-channel-rendering-and-native-surface-capabilities.md)
 - [CLI Commands](../../user-guide/cli-commands.md)
 - [Agent Progress Replies](../../user-guide/agent-progress-replies.md)

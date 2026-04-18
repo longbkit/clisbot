@@ -11,7 +11,7 @@ import {
   describeTelegramCredentialSource,
 } from "../config/channel-credentials.ts";
 
-export const CHANNEL_ACCOUNT_DOC_PATH = "docs/user-guide/channel-accounts.md";
+export const BOTS_AND_CREDENTIALS_DOC_PATH = "docs/user-guide/bots-and-credentials.md";
 export const USER_GUIDE_DOC_PATH = "docs/user-guide/README.md";
 export const SLACK_TOKEN_DOC_URL = "https://api.slack.com/apps";
 export const TELEGRAM_TOKEN_DOC_URL = "https://core.telegram.org/bots#6-botfather";
@@ -135,7 +135,7 @@ export function renderMissingTokenWarningLines(
     "Pass the channels you want explicitly, for example with --telegram-bot-token or --slack-app-token plus --slack-bot-token.",
     "Use ENV_NAME or ${ENV_NAME} for env-backed setup, or pass a literal token to cold-start with credentialType=mem.",
     "Example: clisbot start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN",
-    `Repo docs path (local or GitHub): ${CHANNEL_ACCOUNT_DOC_PATH}`,
+    `Repo docs path (local or GitHub): ${BOTS_AND_CREDENTIALS_DOC_PATH}`,
     `Slack docs: ${SLACK_TOKEN_DOC_URL}`,
     `Telegram docs: ${TELEGRAM_TOKEN_DOC_URL}`,
     REPO_HELP_HINT,
@@ -181,7 +181,7 @@ export function renderConfiguredChannelTokenIssueLines(
   return [
     "warning!!! configured channel credentials are invalid or unavailable, so clisbot did not start.",
     ...lines,
-    `Docs: ${CHANNEL_ACCOUNT_DOC_PATH}`,
+    `Docs: ${BOTS_AND_CREDENTIALS_DOC_PATH}`,
     REPO_HELP_HINT,
   ];
 }
@@ -329,7 +329,7 @@ export function renderChannelSetupHelpLines(
   _options: { includePrivilegeHelp?: boolean } = {},
 ) {
   return [
-    `${prefix}Channel setup docs: ${CHANNEL_ACCOUNT_DOC_PATH}`,
+    `${prefix}Bot setup docs: ${BOTS_AND_CREDENTIALS_DOC_PATH}`,
     `${prefix}Operator guide: ${USER_GUIDE_DOC_PATH}`,
     `${prefix}If Slack or Telegram is not responding yet, configure tokens, routes, and defaultAgentId first.`,
     ...renderPairingSetupHelpLines(prefix, {

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this page when you need to manage Slack or Telegram bot identities, credentials, and bot-level defaults.
+Use this page when you need to manage Slack or Telegram bot identities, credentials, and provider-level bot defaults.
 
 Official operator surface:
 

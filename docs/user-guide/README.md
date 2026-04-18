@@ -17,7 +17,7 @@ This folder should explain:
 Related pages:
 
 - [Channel Operations](channels.md)
-- [Channel Accounts](channel-accounts.md)
+- [Bots And Credentials](bots-and-credentials.md)
 - [Telegram Bot Setup](telegram-setup.md)
 - [Slack App Setup](slack-setup.md)
 - [Slash Commands](slash-commands.md)

@@ -424,5 +424,5 @@ clisbot status
 ## Related Pages
 
 - [User Guide README](README.md)
-- [Channel Accounts](channel-accounts.md)
+- [Bots And Credentials](bots-and-credentials.md)
 - [Channel Operations](channels.md)

@@ -26,9 +26,9 @@
 
 ### Preconditions
 
-- `channels.slack.ackReaction` is left at the default value
-- `channels.slack.typingReaction` is left empty
-- `channels.slack.processingStatus.enabled` is left at the default value
+- `bots.slack.defaults.ackReaction` is left at the default value
+- `bots.slack.defaults.typingReaction` is left empty
+- `bots.slack.defaults.processingStatus.enabled` is left at the default value
 - the Slack app has bot scope `reactions:write`
 - the Slack app has bot scope `chat:write` or `assistant:write`
 
@@ -141,7 +141,7 @@ Live proof on April 5, 2026:
 ### Preconditions
 
 - one Slack DM route exists
-- `channels.slack.directMessages.policy: "pairing"`
+- `bots.slack.default.directMessages."*".policy: "pairing"`
 - the test sender is not already present in config `allowFrom`
 - the test sender is not already approved in `~/.clisbot/state/pairing`
 
@@ -169,7 +169,7 @@ Live proof on April 5, 2026:
 
 - Telegram channel support is enabled
 - the bot is present in the configured Telegram test group
-- the target group or topic is not yet present in `channels.telegram.groups`
+- the target group or topic is not yet present under `bots.telegram.default.groups`
 
 ### Steps
 
@@ -180,7 +180,7 @@ Live proof on April 5, 2026:
 ### Expected Results
 
 - the group receives a minimal setup reply instead of silence
-- the reply includes the exact `clisbot channels add telegram-group ...` command to run
+- the reply includes the exact `clisbot routes add --channel telegram ...` command to run
 - `/whoami` exposes `chatId` and `topicId` when applicable
 - sensitive commands such as `/transcript`, `/stop`, `/followup`, and `/bash` are not advertised for the unrouted group yet
 
@@ -208,7 +208,7 @@ Live proof on April 5, 2026:
 ### Preconditions
 
 - one Slack DM route exists
-- `channels.slack.directMessages.policy: "allowlist"`
+- `bots.slack.default.directMessages."*".policy: "allowlist"`
 - the test sender is not present in config `allowFrom`
 - the test sender is not present in the pairing allowlist store
 

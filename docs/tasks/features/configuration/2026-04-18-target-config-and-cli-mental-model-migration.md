@@ -56,6 +56,13 @@ Always judge follow-up work against the same north star:
 - the previously stale regression sweep is now migrated and green
 - current broad migration verification is green at `277 pass, 0 fail`
 - `bunx tsc --noEmit` is now green in this workspace
+- stale dead helpers that still carried `channels` / privilege-command guidance were removed
+- remaining targeted test-doc coverage was updated to use `bots.*` config paths and `routes ...` setup commands
+- the operator guide path now uses `bots-and-credentials.md` instead of the old `channel-accounts.md` wording
+- the older message-actions task and feature docs were updated to read as bot-aware historical artifacts instead of active `channel accounts` guidance
+- the main configuration feature docs now either use the bot-rooted contract directly or carry an explicit historical note when they still preserve pre-migration rollout detail
+- selected historical task and research docs now carry explicit notes so old `accounts`, `channels`, and `defaultAccount` references do not read like live guidance
+- the OpenClaw Telegram credential security research doc now also carries an explicit historical note
 
 ### Completed Checklist
 
@@ -66,6 +73,13 @@ Always judge follow-up work against the same north star:
 - [x] stale first-wave regression cluster moved onto the new shape
 - [x] broad migration verification rerun after the sweep
 - [x] typecheck rerun after the sweep
+- [x] dead compatibility-only helper files with legacy guidance removed
+- [x] targeted test-doc references updated away from old setup commands and config paths
+- [x] operator docs and startup help now point to `bots-and-credentials.md`
+- [x] the stale active task entry for old `channel accounts` wording was collapsed into a delivered bot-aware historical record
+- [x] older feature docs were either updated to bot-rooted paths or marked historical where a full rewrite is not worth the churn right now
+- [x] selected historical task and research docs now explicitly mark old `channels` and `accounts` language as research or rollout history
+- [x] the OpenClaw Telegram credential security research doc now marks old `channels` and `accounts` nouns as historical research input
 
 ### Remaining obvious sweep
 
@@ -74,16 +88,15 @@ Always judge follow-up work against the same north star:
 
 ### Follow-Up Items
 
-- [ ] sweep compatibility-only operator strings that still mention old `channels` commands so they are clearly marked as removed guidance, not living workflow
-- [ ] sweep older docs, task docs, and test-doc artifacts that still teach the old nouns without enough historical context
+- [ ] sweep older research and task docs that preserve migration history but still read too much like current guidance
 - [ ] decide whether the migration task can move from `In Progress` to `Done` after that convergence cleanup, or whether another adjacent slice should stay attached here
 
 ### Known Follow-Up Targets
 
-- `src/channels/privilege-help.ts`
-- `src/control/channels-cli-rendering.ts`
-- `docs/tests/features/channels/slack-routing-and-follow-up.md`
 - older task or research docs that intentionally preserve history but currently read too much like live guidance
+- `docs/research/channels/2026-04-09-openclaw-cli-command-surfaces-and-slack-telegram-send-syntax.md`
+- `docs/research/ux/2026-04-14-cli-output-audit.md`
+- `docs/tasks/features/configuration/2026-04-13-telegram-fast-start-and-credential-persistence.md`
 
 ## Next Steps
 

@@ -27,4 +27,4 @@ Reduce time to first successful routed conversation by onboarding new Slack and 
 
 - [Channels](../../../features/channels/README.md)
 - [Configuration](../../../features/configuration/README.md)
-- [slack telegram message actions and channel accounts](2026-04-09-slack-telegram-message-actions-and-channel-accounts.md)
+- [slack telegram message actions and bot routing](2026-04-09-slack-telegram-message-actions-and-channel-accounts.md)

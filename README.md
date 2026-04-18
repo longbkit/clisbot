@@ -185,7 +185,7 @@ Channel route setup is manual by design:
 - fresh config does not auto-add Slack channels
 - fresh config does not auto-add Telegram groups or topics
 - add only the exact channel, group, topic, or DM routing you want to expose
-- default channel account setup lives in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md)
+- default bot credential setup lives in [docs/user-guide/bots-and-credentials.md](docs/user-guide/bots-and-credentials.md)
 
 Advanced agent management:
 
@@ -207,7 +207,7 @@ clisbot start \
 - these flags are written into `~/.clisbot/clisbot.json` as `${ENV_NAME}` placeholders
 - you can pass either `CUSTOM_SLACK_APP_TOKEN` or `'${CUSTOM_SLACK_APP_TOKEN}'`
 - use this path when you want config to point at env variable names you chose yourself
-- keep env export details in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md) instead of front-loading them into quick start
+- keep env export details in [docs/user-guide/bots-and-credentials.md](docs/user-guide/bots-and-credentials.md) instead of front-loading them into quick start
 
 ## Troubleshooting
 
@@ -217,7 +217,7 @@ If the quick start does not work, check these in order:
 - If config behavior is confusing, inspect [config/clisbot.json.template](config/clisbot.json.template) first, then compare it with [docs/user-guide/README.md](docs/user-guide/README.md).
 - If `clisbot start` says no agents are configured, prefer `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>`.
 - If you want later runs to work with plain `clisbot start`, rerun your successful first-run command with `--persist`.
-- If `clisbot start` prints token refs as `missing`, either pass the token explicitly on the command line or switch to env-backed setup described in [docs/user-guide/channel-accounts.md](docs/user-guide/channel-accounts.md).
+- If `clisbot start` prints token refs as `missing`, either pass the token explicitly on the command line or switch to env-backed setup described in [docs/user-guide/bots-and-credentials.md](docs/user-guide/bots-and-credentials.md).
 - If you use custom env names, pass them explicitly with `--slack-app-token`, `--slack-bot-token`, or `--telegram-bot-token`.
 - If `clisbot status` shows `bootstrap=...:missing` or `bootstrap=...:not-bootstrapped`, follow the advanced agent bootstrap steps in [docs/user-guide/README.md](docs/user-guide/README.md).
 - If Codex shows `Do you trust the contents of this directory?`, keep `trustWorkspace: true` in clisbot config and also mark the workspace as trusted in `~/.codex/config.toml`, for example:

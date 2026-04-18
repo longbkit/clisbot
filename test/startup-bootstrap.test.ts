@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { collapseHomePath, getDefaultConfigPath } from "../src/shared/paths.ts";
 import {
-  CHANNEL_ACCOUNT_DOC_PATH,
+  BOTS_AND_CREDENTIALS_DOC_PATH,
   getChannelAvailabilityForBootstrap,
   getDefaultChannelAvailability,
   hasAnyDefaultChannelToken,
@@ -199,7 +199,7 @@ describe("startup bootstrap helpers", () => {
   test("renders missing token guidance with repo and official docs", () => {
     const lines = renderMissingTokenWarningLines({}).join("\n");
 
-    expect(lines).toContain(CHANNEL_ACCOUNT_DOC_PATH);
+    expect(lines).toContain(BOTS_AND_CREDENTIALS_DOC_PATH);
     expect(lines).toContain("--slack-app-token");
     expect(lines).toContain("SLACK_APP_TOKEN (missing)");
     expect(lines).toContain("TELEGRAM_BOT_TOKEN (missing)");
@@ -226,7 +226,7 @@ describe("startup bootstrap helpers", () => {
     expect(lines).toContain("warning!!! configured channel credentials are invalid or unavailable");
     expect(lines).toContain("Missing env var \"CUSTOM_SLACK_BOT_TOKEN\"");
     expect(lines).toContain("Missing env var \"CUSTOM_TELEGRAM_BOT_TOKEN\"");
-    expect(lines).toContain(CHANNEL_ACCOUNT_DOC_PATH);
+    expect(lines).toContain(BOTS_AND_CREDENTIALS_DOC_PATH);
   });
 
   test("blocks start when any enabled channel still has missing token env refs", () => {

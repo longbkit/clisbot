@@ -4,6 +4,21 @@
 
 This note captures how OpenClaw currently handles Telegram bot credentials, what setup paths it supports, and which of those patterns are worth copying into `clisbot`.
 
+## Historical Note
+
+This is research about OpenClaw, plus an early comparison point for `clisbot`.
+
+It intentionally preserves OpenClaw nouns such as `channels.telegram`, `accounts`, and `tokenFile`.
+
+It is not the current `clisbot` product contract.
+
+For current `clisbot`, use:
+
+- `app`
+- `bots`
+- `agents`
+- `bots` and `routes` as the operator setup flow
+
 Main conclusions:
 
 - OpenClaw supports three practical Telegram token paths today:
@@ -59,7 +74,7 @@ This note does not propose final implementation details for `clisbot` beyond res
 - `openclaw-private/deploy/docs/add-telegram-bot-guide.md`
 - `openclaw-private/appcast.xml`
 - `clisbot/config/clisbot.json.v0.1.0.template`
-- `clisbot/docs/user-guide/channel-accounts.md`
+- `clisbot/docs/user-guide/bots-and-credentials.md`
 - `clisbot/docs/user-guide/channels.md`
 
 ## How OpenClaw Resolves Telegram Tokens

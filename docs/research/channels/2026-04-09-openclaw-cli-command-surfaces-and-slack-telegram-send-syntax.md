@@ -4,6 +4,21 @@
 
 This note is a source-backed reference for OpenClaw operator CLI commands related to outbound messaging and channel routing.
 
+## Historical Note
+
+This note is research input from OpenClaw.
+
+It is useful for understanding why some early `clisbot` slices explored `channels`, `accounts`, and `defaultAccount`.
+
+It is not the current `clisbot` product contract.
+
+For current `clisbot`, use:
+
+- `app`
+- `bots`
+- `agents`
+- `bots` and `routes` as the operator setup flow
+
 Main conclusions:
 
 - `openclaw message send` is the main outbound CLI surface

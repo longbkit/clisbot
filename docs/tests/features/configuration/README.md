@@ -22,8 +22,8 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 - the file is created at `~/.clisbot/clisbot.json`
 - the tmux socket path is `~/.clisbot/state/clisbot.sock`
 - the default agent workspace is `~/.clisbot/workspaces/default`
-- the generated Slack `channels` map is empty
-- the generated Telegram `groups` map is empty
+- the generated Slack default bot route maps are empty
+- the generated Telegram default bot route maps are empty
 
 ## Test Case 2: Start Refuses First Run Without Default Channel Tokens
 
@@ -39,7 +39,7 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 ### Expected Results
 
 - `clisbot` prints a warning instead of starting
-- `clisbot` points the operator to `docs/user-guide/channel-accounts.md`
+- `clisbot` points the operator to `docs/user-guide/bots-and-credentials.md`
 - `clisbot` does not create the runtime config or pid state
 
 ## Test Case 3: Env Substitution Fails Loudly On Missing Vars
@@ -153,9 +153,9 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 
 ### Steps
 
-1. load the config without explicitly setting `channels.slack.ackReaction`
-2. load the config without explicitly setting `channels.slack.typingReaction`
-3. load the config without explicitly setting `channels.slack.processingStatus`
+1. load the config without explicitly setting `bots.slack.defaults.ackReaction`
+2. load the config without explicitly setting `bots.slack.defaults.typingReaction`
+3. load the config without explicitly setting `bots.slack.defaults.processingStatus`
 4. load the config again with all three values explicitly set
 
 ### Expected Results

@@ -18,6 +18,16 @@ After first-run success, steer the operator toward persistent credential storage
 
 Done
 
+## Historical Note
+
+This task captures the rollout slice that introduced fast bootstrap and durable credential persistence.
+
+Current live operator language has moved on:
+
+- use `bots` instead of `accounts`
+- use `docs/user-guide/bots-and-credentials.md` as the operator guide
+- treat any older `clisbot accounts add ...` references here as historical rollout context, not current CLI guidance
+
 ## Why
 
 Current startup is still too biased toward credential setup before product proof.
@@ -279,7 +289,7 @@ Suggested file content:
 
 - a first-run operator can bring up requested channels with one command using literal or env-backed token references
 - that token is not persisted into config, logs, or status output
-- config still clearly shows `mem` versus `tokenFile` state for channel accounts
+- config still clearly shows `mem` versus `tokenFile` state for configured bots
 - the preferred canonical credential-file path works for default and named accounts
 - startup and status truthfully explain where each active credential came from
 - raw channel token literals inside `clisbot.json` are unsupported and rejected
@@ -292,5 +302,5 @@ Suggested file content:
 
 - [Feature Doc](../../../features/configuration/start-bootstrap-and-credential-persistence.md)
 - [Configuration](../../../features/configuration/README.md)
-- [Channel Accounts](../../../user-guide/channel-accounts.md)
+- [Bots And Credentials](../../../user-guide/bots-and-credentials.md)
 - [Telegram credential security research](../../../research/security/2026-04-12-openclaw-telegram-credential-security-and-setup.md)

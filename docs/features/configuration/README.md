@@ -14,13 +14,26 @@ It also defines stale tmux cleanup policy so runner residency does not grow fore
 
 It also defines route transcript visibility policy and auth-relevant shell execution policy inputs.
 
-It also defines first-run startup bootstrap behavior for default channel accounts and the first default agent.
+It also defines first-run startup bootstrap behavior for default bots and the first default agent.
 
 It also defines persisted auth policy config used by the auth system for operator and routed actions.
 
 ## State
 
 Active
+
+## Current Contract
+
+Official operator and config truth is now:
+
+- `app`
+- `bots`
+- `agents`
+- `bots` and `routes` as the operator setup flow
+
+Some older sections in this feature doc still preserve pre-migration reasoning.
+
+When this page and the user guide differ, treat the user guide, current template, and current CLI help as the live product contract.
 
 ## Why It Exists
 
@@ -52,32 +65,18 @@ The system needs one explicit place to define:
 
 Without that, the implementation will drift into hidden defaults and hand-wired behavior.
 
-## Current Runtime Vs Target Shape
+## Current Runtime Shape
 
-Two truths need to stay visible at the same time:
+The current runtime and operator contract is already centered on:
 
-1. current runtime config and CLI still use many legacy names such as `channels`, `accounts`, and top-level binding language
-2. the target operator mental model is now:
-   - `app`
-   - `bots`
-   - `agents`
-
-The docs for this feature should therefore do both:
-
-- describe the current runtime truthfully
-- describe the target shape truthfully
-- never blur the two into one ambiguous contract
-
-Current target direction for the template and migration work:
-
-- top-level ownership should read `app -> bots -> agents`
-- provider-specific bot config should live under `bots.slack.<botId>` and `bots.telegram.<botId>`
-- provider-local nodes should use provider-local ids where the provider is already obvious
+- top-level ownership `app -> bots -> agents`
+- provider-specific bot config under `bots.slack.<botId>` and `bots.telegram.<botId>`
+- provider-local ids where the provider is already obvious
   - Slack examples: `U_OWNER`, `channel:C_GENERAL`, `group:G_SUPPORT_PRIVATE`
   - Telegram examples: `1276408333`, `-1003455688247`
-- fully qualified prefixes such as `slack:U_OWNER` and `telegram:1276408333` should stay for cross-channel lists only, such as `app.auth.roles.<role>.users`
-- `directMessages` should move toward the same flat-map mental model as `groups`, with `"*"` as the fallback entry
-- DM-specific sender filters should live under `directMessages`, not as ambiguous bot-root keys
+- fully qualified prefixes such as `slack:U_OWNER` and `telegram:1276408333` only for cross-channel lists such as `app.auth.roles.<role>.users`
+- `directMessages` as the bot-local DM map, with `"*"` as the fallback entry
+- DM-specific sender filters under `directMessages`
 - Slack should keep `channelPolicy` and `groupPolicy` visibly separate because current code still distinguishes them
 
 Current policy meaning:
@@ -243,18 +242,18 @@ Current sensitive-command rule should stay explicit:
   - `/bash <command>`
   - configured bash shortcuts such as `!<command>`
 - observer commands such as `/attach`, `/detach`, and `/watch every <duration>` use the normal channel route and do not require `shellExecute`
-- transcript visibility is configured under:
-  - `channels.slack.verbose`
-  - `channels.slack.channels.<id>.verbose`
-  - `channels.slack.groups.<id>.verbose`
-  - `channels.slack.directMessages.verbose`
-  - `channels.telegram.verbose`
-  - `channels.telegram.groups.<id>.verbose`
-  - `channels.telegram.groups.<id>.topics.<topicId>.verbose`
-  - `channels.telegram.directMessages.verbose`
-- command shortcut configuration is owned by:
-  - `channels.slack.commandPrefixes`
-  - `channels.telegram.commandPrefixes`
+- transcript visibility is configured under bot and route nodes such as:
+  - `bots.slack.defaults.verbose`
+  - `bots.slack.<botId>.groups."channel:<id>".verbose`
+  - `bots.slack.<botId>.groups."group:<id>".verbose`
+  - `bots.slack.<botId>.directMessages."*".verbose`
+  - `bots.telegram.defaults.verbose`
+  - `bots.telegram.<botId>.groups."<chatId>".verbose`
+  - `bots.telegram.<botId>.groups."<chatId>".topics."<topicId>".verbose`
+  - `bots.telegram.<botId>.directMessages."*".verbose`
+- command shortcut configuration is owned by bot defaults or bot-local nodes such as:
+  - `bots.slack.defaults.commandPrefixes`
+  - `bots.telegram.defaults.commandPrefixes`
 
 Current DM access-policy meaning should stay explicit:
 
@@ -273,8 +272,8 @@ Current rollout tradeoff should stay explicit:
 Current first-run startup bootstrap should stay explicit:
 
 - `start` should not bootstrap or launch when neither default Slack nor default Telegram tokens are available
-- the default Slack account is defined by `SLACK_APP_TOKEN` plus `SLACK_BOT_TOKEN`
-- the default Telegram account is defined by `TELEGRAM_BOT_TOKEN`
+- the default Slack bot is defined by `SLACK_APP_TOKEN` plus `SLACK_BOT_TOKEN`
+- the default Telegram bot is defined by `TELEGRAM_BOT_TOKEN`
 - when fresh config is created through `start`, only the channels with available default tokens should be enabled
 - fresh config should not auto-add sample Slack channels, Slack groups, Telegram groups, or Telegram topics
 - when no agents exist yet and only one supported CLI is installed, `start` should create `default` automatically
@@ -283,8 +282,8 @@ Current first-run startup bootstrap should stay explicit:
 Current credential-persistence direction should stay explicit:
 
 - fast first-run may accept a literal Telegram token on `start`, but only as an in-memory bootstrap secret
-- generated config should prefer account scaffolding plus external secret sources over raw secret persistence
-- the preferred durable Telegram path is a canonical credential file under `~/.clisbot/credentials/telegram/<accountId>/bot-token`
+- generated config should prefer bot scaffolding plus external secret sources over raw secret persistence
+- the preferred durable Telegram path is a canonical credential file under `~/.clisbot/credentials/telegram/<botId>/bot-token`
 - startup and status should explain which credential source is active so canonical path discovery never feels hidden
 
 Current Slack feedback defaults should stay explicit:
@@ -304,22 +303,22 @@ Current Slack continuation target should stay explicit:
 - it should not depend on the bot having authored the thread root
 - the exact implementation mechanism can change, but the user-visible rule should stay compatible with latest OpenClaw `main`
 
-Current follow-up config is:
+Current follow-up config is bot-rooted, with route overrides when needed:
 
-- `channels.slack.followUp.mode: "auto" | "mention-only" | "paused"`
-- `channels.slack.followUp.participationTtlMin`
-- `channels.slack.followUp.participationTtlSec`
-- per-route overrides under `channels.slack.channels.<id>.followUp`
-- per-route overrides under `channels.slack.groups.<id>.followUp`
-- per-route overrides under `channels.slack.directMessages.followUp`
+- `bots.slack.defaults.followUp.mode: "auto" | "mention-only" | "paused"`
+- `bots.slack.defaults.followUp.participationTtlMin`
+- `bots.slack.defaults.followUp.participationTtlSec`
+- per-route overrides under `bots.slack.<botId>.groups."channel:<id>".followUp`
+- per-route overrides under `bots.slack.<botId>.groups."group:<id>".followUp`
+- per-route overrides under `bots.slack.<botId>.directMessages."*".followUp`
 
-Future Telegram config should stay OpenClaw-shaped:
+Current Telegram config should stay bot-rooted:
 
-- `channels.telegram.botToken`
-- `channels.telegram.dmPolicy`
-- `channels.telegram.replyToMode`
-- `channels.telegram.groups.<chatId>`
-- `channels.telegram.groups.<chatId>.topics.<threadId>`
+- `bots.telegram.<botId>.botToken` or credential-file equivalent
+- `bots.telegram.<botId>.directMessages`
+- `bots.telegram.<botId>.replyToMode`
+- `bots.telegram.<botId>.groups."<chatId>"`
+- `bots.telegram.<botId>.groups."<chatId>".topics."<threadId>"`
 - topic config should inherit parent group config unless the topic overrides it
 
 Current default should stay OpenClaw-compatible:
@@ -400,8 +399,8 @@ This file stores the current `sessionKey -> sessionId` mapping used for resume a
 
 Current DM access config lives under:
 
-- `channels.slack.directMessages`
-- `channels.telegram.directMessages`
+- `bots.slack.<botId>.directMessages`
+- `bots.telegram.<botId>.directMessages`
 
 Current fields are:
 

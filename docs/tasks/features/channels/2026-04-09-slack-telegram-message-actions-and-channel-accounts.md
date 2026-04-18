@@ -1,25 +1,24 @@
-# Slack Telegram Message Actions And Channel Accounts
+# Slack Telegram Message Actions And Bot Routing
 
 ## Summary
 
-Add OpenClaw-shaped operator message actions plus first-class Slack and Telegram channel accounts.
+Add operator message actions plus bot-aware Slack and Telegram routing and credential handling.
 
 ## Status
 
-In Progress
+Done
 
 ## Why
 
-Current `clisbot` bindings already carry `accountId`, but Slack and Telegram config and runtime still mostly behave like single-account channels.
+This task started before the official `bots` mental model settled.
 
-At the same time, `clisbot` has no operator-facing `message` CLI surface for direct provider actions such as `send`, `react`, `read`, or `delete`.
+The shipped result now lives under bot-aware routing and credentials, together with the `clisbot message ...` operator surface.
 
 ## Scope
 
 - add `clisbot message ...`
-- add Slack and Telegram account maps plus `defaultAccount`
-- route bindings through `channel[:accountId]`
-- make runtime startup account-aware for Slack and Telegram
+- add Slack and Telegram bot maps plus per-provider default bot selection
+- make runtime startup bot-aware for Slack and Telegram
 - implement provider message-action adapters with OpenClaw-shaped syntax where practical
 - add tests for config, routing, and message actions
 
@@ -37,7 +36,7 @@ At the same time, `clisbot` has no operator-facing `message` CLI surface for dir
 
 - [x] add feature doc and backlog entry
 - [x] add account-aware Slack and Telegram config helpers
-- [x] update config bootstrap and validation for account maps
+- [x] update config bootstrap and validation for bot maps
 - [x] start one Slack runtime service per configured account
 - [x] start one Telegram runtime service per configured account
 - [x] add `clisbot message` CLI parsing and help
@@ -70,7 +69,7 @@ At the same time, `clisbot` has no operator-facing `message` CLI surface for dir
 ## Exit Criteria
 
 - `clisbot message` exists as a documented operator CLI surface
-- Slack and Telegram can resolve configured accounts by `defaultAccount` or explicit `--account`
-- account-specific bindings affect route resolution and session identity
+- Slack and Telegram can resolve configured bots by provider defaults or explicit bot selection
+- bot-specific routing affects route resolution and session identity
 - Slack live validation covers the configured test channel and the configured allowed DM surface
 - tests cover config loading, account selection, route selection, and message-action execution paths

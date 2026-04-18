@@ -482,7 +482,7 @@ clisbot status
 ## Related Pages
 
 - [User Guide README](README.md)
-- [Channel Accounts](channel-accounts.md)
+- [Bots And Credentials](bots-and-credentials.md)
 - [Channel Operations](channels.md)
 - [Slack manifest template](../../templates/slack/default/app-manifest.json)
 - [Slack manifest guide](../../templates/slack/default/app-manifest-guide.md)

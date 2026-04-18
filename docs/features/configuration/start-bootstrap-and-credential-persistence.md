@@ -1,5 +1,13 @@
 # Start Bootstrap And Credential Persistence
 
+## Historical Note
+
+This feature doc captures the design and rollout slice that led to the current bootstrap behavior.
+
+The live product contract now uses `bots`, `routes`, and `bots-and-credentials.md`.
+
+When concrete command syntax in this document differs from current CLI help, follow the current CLI and user guide.
+
 ## Summary
 
 This feature direction makes first-run channel setup extremely fast without normalizing raw secrets inside config files.
@@ -57,7 +65,7 @@ Preferred persistence order:
 - one-line `clisbot start` for first-run Slack and Telegram bootstrap
 - literal token support on `--telegram-bot-token`, `--slack-app-token`, and `--slack-bot-token`
 - in-memory bootstrap credentials that are never written back to config
-- canonical credential file discovery for channel accounts
+- canonical credential file discovery for configured bots
 - explicit `tokenFile` override when the operator wants a non-standard path
 - explicit config state that tells the operator which credential source is active
 - status surfaces that explain which credential source is active
@@ -65,7 +73,7 @@ Preferred persistence order:
 - `clisbot bots add ... --persist`, `clisbot bots set-credentials ... --persist`, and `clisbot start --persist`
 - repeated account blocks inside one `start` command
 - `clisbot bots add` with the same token-input rules as `start`
-- config examples for one default account and multiple accounts
+- config examples for one default bot and multiple bots
 
 ## Why
 

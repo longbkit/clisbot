@@ -39,6 +39,20 @@ Current operator observation:
 - early signal looks promising
 - it still needs continued monitoring
 
+Additional observation after more use:
+
+- this prompt looks especially strong for larger tasks
+- for larger tasks, it may be worth running the same prompt in a loop up to `10` times
+- during execution, the bot appears able to:
+  - update progress directly
+  - add newly discovered unfinished work
+  - update memory so already-completed work is less likely to be repeated
+- this strengthens a possible `clisbot` differentiator versus using Codex or Claude directly:
+  - long-running loop control
+  - in-place progress updates
+  - memory updates that help preserve execution continuity across loops
+- early evidence also suggests the loop can drive meaningful follow-on doc updates and code updates without drifting away from the original task
+
 ## Future Additions
 
 Later, this page can grow into a small library of:

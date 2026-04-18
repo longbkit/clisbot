@@ -294,6 +294,10 @@ That means process restart is no longer entirely outside the app-owned resilienc
 
 Telegram currently has two distinct retry paths plus one request-level rate-limit retry path.
 
+The config key names mentioned in this section reflect the task's original audit context.
+
+Treat them as historical implementation notes, not as the current operator-facing config guide.
+
 Startup handoff conflict:
 
 - `retryTelegramPollingConflict(...)` retries Telegram `getUpdates` conflict `409` during startup handoff

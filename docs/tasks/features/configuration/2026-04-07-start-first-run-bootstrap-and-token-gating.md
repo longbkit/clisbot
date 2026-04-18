@@ -46,5 +46,5 @@ The old startup flow still had too much operator friction:
 
 - [Configuration Feature](../../../features/configuration/README.md)
 - [User Guide](../../../user-guide/README.md)
-- [Channel Accounts](../../../user-guide/channel-accounts.md)
+- [Bots And Credentials](../../../user-guide/bots-and-credentials.md)
 - [OpenClaw-Style Agent CLI And Bootstrap](2026-04-07-openclaw-style-agent-cli-and-bootstrap.md)

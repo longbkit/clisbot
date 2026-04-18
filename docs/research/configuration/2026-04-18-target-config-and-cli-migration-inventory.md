@@ -92,8 +92,9 @@ The official runtime and operator contract is now centered on:
 
 What still remains is convergence cleanup, not first-wave migration:
 
-- compatibility-only help strings and removed-surface guidance should stay clearly marked as non-official
-- older research, task, and test-doc artifacts still need a lighter historical sweep so they do not read like current product guidance
+- dead compatibility-only helper files with old guidance have been removed from the active codebase
+- current user guide, startup help, and main feature-doc entry points already point at the bot-rooted contract
+- older research and task artifacts still need a lighter historical sweep so they do not read like current product guidance
 
 # Target Mental Model
 
