@@ -39,6 +39,13 @@ That means:
 - `/streaming latest` is accepted and reported truthfully
 - a later slice can refine the visible difference between `latest` and `all` without renaming the config surface again
 
+Current running-preview shaping rule:
+
+- normal append-like pane growth is still accumulated into one live preview
+- if the pane rewrites hard enough that overlap cannot be trusted, clisbot replaces the running preview instead of freezing it
+- that replacement is intentionally bounded to only the latest changed lines plus a short `...[N more changed lines]` marker when the rewrite is large
+- the goal is stable chat readability, not full in-chat transcript reconstruction during a noisy rewrite
+
 ## Dependencies
 
 - [Channels](README.md)

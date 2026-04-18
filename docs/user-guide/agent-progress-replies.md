@@ -179,6 +179,9 @@ Current runtime note:
 - `streaming: "latest"` and `streaming: "all"` are both accepted and persisted today
 - the current live preview behavior is still the same for both values until a later preview-shaping slice differentiates them
 - `/streaming on` is shorthand that persists as `all`
+- when pane output grows normally, clisbot keeps accumulating the live running preview
+- when pane output rewrites hard and overlap is no longer trustworthy, clisbot replaces the preview with only the latest changed lines
+- large rewrites are intentionally bounded with a short `...[N more changed lines]` marker so chat stays readable instead of replaying a huge pane dump
 
 ## Debug Reply Delay
 
