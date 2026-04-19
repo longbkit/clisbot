@@ -30,6 +30,7 @@ import {
   type TelegramMessage,
   type TelegramUpdate,
 } from "./message.ts";
+import { resolveTelegramUnroutedGuidanceModeForEvent } from "./feedback.ts";
 import {
   resolveTelegramConversationTarget,
   type TelegramConversationKind,
@@ -112,6 +113,8 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
   { command: "stop", description: "Interrupt current run" },
   { command: "nudge", description: "Send one extra Enter to the session" },
   { command: "followup", description: "Show or change follow-up mode" },
+  { command: "pause", description: "Pause passive follow-up for this conversation" },
+  { command: "resume", description: "Restore route follow-up defaults for this conversation" },
   { command: "streaming", description: "Show or change streaming mode" },
   { command: "responsemode", description: "Show or change response mode" },
   { command: "additionalmessagemode", description: "Show or change later-message mode" },
@@ -406,25 +409,23 @@ export class TelegramPollingService {
       botUsername: this.botUsername,
       botId: this.botId,
     });
+    const unroutedGuidanceMode = resolveTelegramUnroutedGuidanceModeForEvent({
+      conversationKind: routeInfo.conversationKind,
+      rawText,
+      botUsername: this.botUsername,
+      slashCommand,
+      isBotOriginated: isTelegramBotOriginatedMessage(message),
+    });
     if (!routeInfo.route) {
-      if (
-        routeInfo.conversationKind !== "dm" &&
-        slashCommand?.type === "control" &&
-        (
-          slashCommand.name === "whoami" ||
-          slashCommand.name === "start" ||
-          slashCommand.name === "help" ||
-          slashCommand.name === "status"
-        )
-      ) {
-          try {
-            await callTelegramApi(
+      if (unroutedGuidanceMode) {
+        try {
+          await callTelegramApi(
             this.botCredentials.botToken,
-              "sendMessage",
+            "sendMessage",
             {
               chat_id: message.chat.id,
               text: renderTelegramUnroutedRouteMessage({
-                mode: slashCommand.name,
+                mode: unroutedGuidanceMode,
                 chatId: message.chat.id,
                 chatType: message.chat.type,
                 topicId: routeInfo.topicId ?? undefined,
@@ -436,7 +437,7 @@ export class TelegramPollingService {
             },
           );
         } catch (error) {
-          console.error("telegram unrouted whoami reply failed", error);
+          console.error("telegram unrouted guidance reply failed", error);
         }
       }
       await this.processedEventsStore.markCompleted(eventId);

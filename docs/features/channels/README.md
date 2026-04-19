@@ -109,6 +109,7 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
   - `disabled` ignores the DM surface
 - Slack and Telegram direct messages now default to `policy: "pairing"` to match OpenClaw
 - shared surfaces keep the OpenClaw-style secure posture of `allowlist` plus `requireMention: true` by default
+- unrouted shared-surface onboarding guidance now follows one shared policy layer: Slack explicit mentions still surface route guidance, and Telegram group or topic explicit mentions now do the same while keeping Telegram-native slash onboarding
 - OpenClaw’s Slack-only sparse-config fallback to `groupPolicy: "open"` is documented as research nuance, not copied as a `clisbot` default
 - Slack should acknowledge accepted inbound messages immediately with a configurable reaction, Slack assistant thread status, and a live in-thread processing reply
 - default Slack feedback should keep `ackReaction: ""`, `typingReaction: ""`, and `processingStatus.enabled: true`

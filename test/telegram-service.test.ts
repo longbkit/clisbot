@@ -1,14 +1,31 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   buildTelegramCommandRegistrations,
   dispatchTelegramUpdates,
   renderTelegramUnroutedRouteMessage,
+  TelegramPollingService,
 } from "../src/channels/telegram/service.ts";
 import { resolveTelegramBotConfig } from "../src/config/channel-bots.ts";
 import type { TelegramUpdate } from "../src/channels/telegram/message.ts";
+import { ProcessedEventsStore } from "../src/channels/processed-events-store.ts";
 import type { LoadedConfig } from "../src/config/load-config.ts";
+import { ActivityStore } from "../src/control/activity-store.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+
+let previousCliName: string | undefined;
+
+beforeEach(() => {
+  previousCliName = process.env.CLISBOT_CLI_NAME;
+  delete process.env.CLISBOT_CLI_NAME;
+});
+
+afterEach(() => {
+  process.env.CLISBOT_CLI_NAME = previousCliName;
+});
 
 function makeUpdate(updateId: number): TelegramUpdate {
   return {
@@ -65,6 +82,94 @@ function createTelegramConfig() {
     agentId: "default",
   };
   return resolveTelegramBotConfig(config.bots.telegram, "default");
+}
+
+function createLoadedConfig(): LoadedConfig {
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: false,
+        telegramEnabled: true,
+      }),
+    ),
+  );
+  config.bots.defaults.dmScope = "per-channel-peer";
+  config.bots.telegram.defaults.enabled = true;
+  config.bots.telegram.defaults.groupPolicy = "allowlist";
+  config.bots.telegram.default.enabled = true;
+  config.bots.telegram.default.botToken = "telegram-token";
+  config.bots.telegram.default.groups = {};
+  config.bots.telegram.default.directMessages["dm:*"] = {
+    enabled: true,
+    policy: "open",
+    allowUsers: [],
+    blockUsers: [],
+    requireMention: false,
+    allowBots: false,
+    agentId: "default",
+  };
+
+  return {
+    configPath: "/tmp/clisbot.json",
+    processedEventsPath: "/tmp/processed.json",
+    stateDir: "/tmp",
+    raw: {
+      ...config,
+      session: {
+        ...config.app.session,
+        dmScope: config.bots.defaults.dmScope,
+      },
+      control: config.app.control,
+      tmux: config.agents.defaults.runner.defaults.tmux,
+    },
+  };
+}
+
+async function runTelegramServiceUpdate(params: {
+  update: TelegramUpdate;
+  botUsername?: string;
+}) {
+  const tempDir = mkdtempSync(join(tmpdir(), "clisbot-telegram-service-"));
+  const previousFetch = globalThis.fetch;
+  const apiCalls: Array<{ method: string; payload: Record<string, unknown> }> = [];
+
+  globalThis.fetch = (async (input, init) => {
+    const method = String(input).split("/").pop() ?? "";
+    apiCalls.push({
+      method,
+      payload: JSON.parse(String(init?.body ?? "{}")),
+    });
+
+    return new Response(JSON.stringify({
+      ok: true,
+      result: {
+        message_id: 9001,
+      },
+    }));
+  }) as typeof fetch;
+
+  try {
+    const service = new TelegramPollingService(
+      createLoadedConfig(),
+      {
+        registerSurfaceNotificationHandler() {},
+        unregisterSurfaceNotificationHandler() {},
+      } as any,
+      new ProcessedEventsStore(join(tempDir, "processed-events.json")),
+      new ActivityStore(join(tempDir, "activity.json")),
+      "default",
+      { botToken: "telegram-token" },
+    );
+
+    (service as any).botUsername = params.botUsername ?? "mybot";
+
+    await (service as any).handleUpdate(params.update);
+
+    return apiCalls;
+  } finally {
+    globalThis.fetch = previousFetch;
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 describe("dispatchTelegramUpdates", () => {
@@ -220,6 +325,8 @@ describe("buildTelegramCommandRegistrations", () => {
       "stop",
       "nudge",
       "followup",
+      "pause",
+      "resume",
       "streaming",
       "responsemode",
       "additionalmessagemode",
@@ -232,5 +339,89 @@ describe("buildTelegramCommandRegistrations", () => {
       type: "chat",
       chat_id: -1003455688247,
     });
+  });
+});
+
+describe("TelegramPollingService", () => {
+  test("posts unrouted mention guidance for forum topics through the service handler", async () => {
+    const apiCalls = await runTelegramServiceUpdate({
+      update: {
+        update_id: 42,
+        message: {
+          message_id: 42,
+          message_thread_id: 7,
+          text: "@mybot hello",
+          from: {
+            id: 123,
+          },
+          chat: {
+            id: -1003455688248,
+            type: "supergroup",
+            is_forum: true,
+          },
+        },
+      } satisfies TelegramUpdate,
+    });
+
+    expect(apiCalls).toHaveLength(1);
+    expect(apiCalls[0]?.method).toBe("sendMessage");
+    expect(apiCalls[0]?.payload.chat_id).toBe(-1003455688248);
+    expect(apiCalls[0]?.payload.message_thread_id).toBe(7);
+    expect(String(apiCalls[0]?.payload.text ?? "")).toContain(
+      "clisbot: this Telegram topic is not configured yet.",
+    );
+    expect(String(apiCalls[0]?.payload.text ?? "")).toContain(
+      "`clisbot routes add --channel telegram group:-1003455688248 --bot default`",
+    );
+  });
+
+  test("posts unrouted mention guidance for non-forum groups through the service handler", async () => {
+    const apiCalls = await runTelegramServiceUpdate({
+      update: {
+        update_id: 43,
+        message: {
+          message_id: 43,
+          text: "@mybot hello",
+          from: {
+            id: 123,
+          },
+          chat: {
+            id: -1003455688249,
+            type: "supergroup",
+            is_forum: false,
+          },
+        },
+      } satisfies TelegramUpdate,
+    });
+
+    expect(apiCalls).toHaveLength(1);
+    expect(apiCalls[0]?.method).toBe("sendMessage");
+    expect(apiCalls[0]?.payload.chat_id).toBe(-1003455688249);
+    expect(apiCalls[0]?.payload.message_thread_id).toBeUndefined();
+    expect(String(apiCalls[0]?.payload.text ?? "")).toContain(
+      "clisbot: this Telegram group is not configured yet.",
+    );
+  });
+
+  test("keeps plain unrouted group messages silent", async () => {
+    const apiCalls = await runTelegramServiceUpdate({
+      update: {
+        update_id: 44,
+        message: {
+          message_id: 44,
+          text: "hello there",
+          from: {
+            id: 123,
+          },
+          chat: {
+            id: -1003455688250,
+            type: "supergroup",
+            is_forum: false,
+          },
+        },
+      } satisfies TelegramUpdate,
+    });
+
+    expect(apiCalls).toHaveLength(0);
   });
 });

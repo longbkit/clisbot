@@ -107,6 +107,21 @@ describe("parseAgentCommand", () => {
     });
   });
 
+  test("parses follow-up shortcut aliases", () => {
+    expect(parseAgentCommand("/pause")).toEqual({
+      type: "control",
+      name: "followup",
+      action: "pause",
+      mode: "paused",
+    });
+
+    expect(parseAgentCommand("/resume")).toEqual({
+      type: "control",
+      name: "followup",
+      action: "resume",
+    });
+  });
+
   test("parses queue slash commands", () => {
     expect(parseAgentCommand("/queue follow up after the current run")).toEqual({
       type: "queue",

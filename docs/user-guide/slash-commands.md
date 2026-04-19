@@ -43,6 +43,8 @@ If this page and runtime ever disagree, runtime wins.
 - `/followup mention-only`
 - `/followup pause`
 - `/followup resume`
+- `/pause`: shortcut for `/followup pause`
+- `/resume`: shortcut for `/followup resume`
 - `/streaming status`
 - `/streaming on`
 - `/streaming off`

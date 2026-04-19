@@ -282,55 +282,17 @@ export function parseAgentCommand(
   }
 
   if (lowered === "followup") {
-    const action = withoutSlash.slice(command.length).trim().toLowerCase();
-    if (!action || action === "status") {
-      return {
-        type: "control",
-        name: "followup",
-        action: "status",
-      };
-    }
+    return parseFollowUpSlashCommand(
+      withoutSlash.slice(command.length).trim().toLowerCase(),
+    );
+  }
 
-    if (action === "auto") {
-      return {
-        type: "control",
-        name: "followup",
-        action: "auto",
-        mode: "auto",
-      };
-    }
+  if (lowered === "pause") {
+    return parseFollowUpSlashCommand("pause");
+  }
 
-    if (action === "mention-only") {
-      return {
-        type: "control",
-        name: "followup",
-        action: "mention-only",
-        mode: "mention-only",
-      };
-    }
-
-    if (action === "pause") {
-      return {
-        type: "control",
-        name: "followup",
-        action: "pause",
-        mode: "paused",
-      };
-    }
-
-    if (action === "resume") {
-      return {
-        type: "control",
-        name: "followup",
-        action: "resume",
-      };
-    }
-
-    return {
-      type: "control",
-      name: "followup",
-      action: "status",
-    };
+  if (lowered === "resume") {
+    return parseFollowUpSlashCommand("resume");
   }
 
   if (lowered === "responsemode") {
@@ -586,6 +548,8 @@ export function renderAgentControlSlashHelp() {
     "- `/followup mention-only`: require explicit mention for each later turn",
     "- `/followup pause`: stop passive follow-up until the next explicit mention",
     "- `/followup resume`: clear the runtime override and restore config defaults",
+    "- `/pause`: shortcut for `/followup pause`",
+    "- `/resume`: shortcut for `/followup resume`",
     "- `/streaming status|on|off|latest|all`: show or change streaming mode for this surface",
     "- `/responsemode status`: show the configured response mode for this surface",
     "- `/responsemode capture-pane`: settle replies from captured pane output for this surface",
@@ -637,5 +601,56 @@ function parseWatchCommand(raw: string) {
   return {
     intervalMs,
     durationMs: parsedDurationMs ?? undefined,
+  };
+}
+
+function parseFollowUpSlashCommand(action: string): AgentControlSlashCommand {
+  if (!action || action === "status") {
+    return {
+      type: "control",
+      name: "followup",
+      action: "status",
+    };
+  }
+
+  if (action === "auto") {
+    return {
+      type: "control",
+      name: "followup",
+      action: "auto",
+      mode: "auto",
+    };
+  }
+
+  if (action === "mention-only") {
+    return {
+      type: "control",
+      name: "followup",
+      action: "mention-only",
+      mode: "mention-only",
+    };
+  }
+
+  if (action === "pause") {
+    return {
+      type: "control",
+      name: "followup",
+      action: "pause",
+      mode: "paused",
+    };
+  }
+
+  if (action === "resume") {
+    return {
+      type: "control",
+      name: "followup",
+      action: "resume",
+    };
+  }
+
+  return {
+    type: "control",
+    name: "followup",
+    action: "status",
   };
 }

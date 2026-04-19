@@ -50,6 +50,8 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/followup mention-only`
 - `/followup pause`
 - `/followup resume`
+- `/pause`
+- `/resume`
 
 Current meaning:
 
@@ -59,6 +61,8 @@ Current meaning:
 - `mention-only`: require explicit mention for every later turn in the thread
 - `pause`: stop passive follow-up until explicitly resumed or re-activated
 - `resume`: restore the default follow-up policy for that conversation
+- `/pause`: shortcut alias for `pause`
+- `/resume`: shortcut alias for `resume`
 
 These commands should stay agent-scoped.
 

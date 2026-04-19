@@ -1,5 +1,6 @@
 import { parseAgentCommand, type CommandPrefixes } from "../../agents/commands.ts";
 import type { ProcessedEventsStore } from "../processed-events-store.ts";
+import { shouldGuideUnroutedConversation } from "../unrouted-guidance-policy.ts";
 import { hasBotMention } from "./message.ts";
 
 export function isSlackCommandLikeMessage(params: {
@@ -67,19 +68,13 @@ export function shouldGuideUnroutedSlackEvent(params: {
   wasMentioned: boolean;
   isBotOriginated: boolean;
 }) {
-  if (params.isBotOriginated) {
-    return false;
-  }
-
-  if (!params.isCommandLike) {
-    return false;
-  }
-
-  if (params.conversationKind === "dm") {
-    return true;
-  }
-
-  return params.wasMentioned;
+  return shouldGuideUnroutedConversation({
+    conversationKind: params.conversationKind,
+    explicitlyAddressed: params.wasMentioned,
+    isGuidanceCommand: params.isCommandLike,
+    allowCommandOnlyGuidance: false,
+    isBotOriginated: params.isBotOriginated,
+  });
 }
 
 export async function sendSlackGuidanceOnce(params: {
