@@ -4,6 +4,7 @@ import {
   dismissTmuxTrustPromptIfPresent,
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
+  tmuxPaneHasTrustPrompt,
   waitForTmuxSessionBootstrap,
 } from "../src/runners/tmux/session-handshake.ts";
 import { monitorTmuxRun } from "../src/runners/tmux/run-monitor.ts";
@@ -246,6 +247,95 @@ describe("tmux runner latency behavior", () => {
         startupDelayMs: 500,
       }),
     ).rejects.toBeInstanceOf(TmuxBootstrapSessionLostError);
+  });
+
+  test("tmuxPaneHasTrustPrompt ignores stale trust text left above a later Codex prompt", () => {
+    const snapshot = [
+      "Do you trust the contents of this directory?",
+      "Press enter to continue",
+      "",
+      "╭────────────────────────────────────────────╮",
+      "│ >_ OpenAI Codex (v0.121.0)                 │",
+      "╰────────────────────────────────────────────╯",
+      "",
+      "› Explain this codebase",
+      "",
+      "  gpt-5.4 high · /tmp/workspaces/codex",
+    ].join("\n");
+
+    expect(tmuxPaneHasTrustPrompt(snapshot)).toBe(false);
+  });
+
+  test("waitForTmuxSessionBootstrap ignores stale trust text once a later prompt is visible", async () => {
+    let captureCount = 0;
+    const staleSnapshot = [
+      "Do you trust the contents of this directory?",
+      "Press enter to continue",
+      "",
+      "╭────────────────────────────────────────────╮",
+      "│ >_ OpenAI Codex (v0.121.0)                 │",
+      "╰────────────────────────────────────────────╯",
+      "",
+      "› Explain this codebase",
+      "",
+      "  gpt-5.4 high · /tmp/workspaces/codex",
+    ].join("\n");
+    const fakeTmux = {
+      async capturePane() {
+        captureCount += 1;
+        return captureCount === 1 ? staleSnapshot : "READY";
+      },
+      async sendKey() {
+        throw new Error("trust dismissal should not be attempted for stale trust text");
+      },
+    } as unknown as TmuxClient;
+
+    const result = await waitForTmuxSessionBootstrap({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      captureLines: 80,
+      startupDelayMs: 500,
+      trustWorkspace: true,
+    });
+
+    expect(result).toEqual({
+      status: "ready",
+      snapshot: staleSnapshot,
+    });
+  });
+
+  test("dismissTmuxTrustPromptIfPresent returns when trust text is stale history only", async () => {
+    let captureCount = 0;
+    const snapshot = [
+      "Do you trust the contents of this directory?",
+      "Press enter to continue",
+      "",
+      "╭────────────────────────────────────────────╮",
+      "│ >_ OpenAI Codex (v0.121.0)                 │",
+      "╰────────────────────────────────────────────╯",
+      "",
+      "› Explain this codebase",
+      "",
+      "  gpt-5.4 high · /tmp/workspaces/codex",
+    ].join("\n");
+    const fakeTmux = {
+      async capturePane() {
+        captureCount += 1;
+        return snapshot;
+      },
+      async sendKey() {
+        throw new Error("trust dismissal should not be attempted for stale trust text");
+      },
+    } as unknown as TmuxClient;
+
+    await dismissTmuxTrustPromptIfPresent({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      captureLines: 80,
+      startupDelayMs: 500,
+    });
+
+    expect(captureCount).toBe(1);
   });
 
   test("monitorTmuxRun polls quickly for the first visible output", async () => {

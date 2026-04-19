@@ -81,6 +81,10 @@ Use this to reproduce first-launch trust and setup flows without destroying the 
 
 This is the most important mode for the trust-prompt problem.
 
+For the standardized two-pass report that measures this path directly, use:
+
+- [Bootstrap Trust And Readiness Report](./bootstrap-trust-and-readiness-report.md)
+
 ### `fresh-empty`
 
 Launch the CLI in an empty temporary directory.
@@ -241,6 +245,10 @@ Every real CLI validation run should leave:
 - enough path information that the operator can attach or inspect quickly
 
 If the machine says `blocked:trust`, a human should be able to open one file or one live watch surface and see that truth immediately.
+
+The same rule applies to trust persistence:
+
+- if the report says trust persisted, the operator should be able to open the pass-2 artifact and see that the same workspace relaunched without the trust prompt returning
 
 ## Recommended Surfaces
 

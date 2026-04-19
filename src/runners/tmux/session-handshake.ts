@@ -1,7 +1,7 @@
 import { extractSessionId } from "../../agents/session-identity.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 import { sleep } from "../../shared/process.ts";
-import { normalizePaneText } from "../../shared/transcript.ts";
+import { normalizePaneText, splitNormalizedLines, trimBlankLines } from "../../shared/transcript.ts";
 import type { TmuxClient, TmuxPaneState } from "./client.ts";
 
 const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
@@ -525,12 +525,80 @@ function looksLikeGeminiTrustPrompt(snapshot: string) {
   );
 }
 
+const TRUST_PROMPT_ACTIVE_TAIL_LINES = 24;
+const TRUST_OPTION_LINE_PATTERN = /^[›❯]\s*\d+\.\s/i;
+const INTERACTIVE_PROMPT_LINE_PATTERN = /^[›❯]\s*(?!\d+\.\s).+/;
+
+function extractActiveTrustPromptRegion(snapshot: string) {
+  const lines = trimBlankLines(splitNormalizedLines(snapshot));
+  if (lines.length === 0) {
+    return "";
+  }
+
+  return lines.slice(-TRUST_PROMPT_ACTIVE_TAIL_LINES).join("\n");
+}
+
+function findLastTrustPromptLineIndex(lines: string[]) {
+  let lastIndex = -1;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]?.trim() ?? "";
+    if (
+      line.includes("Do you trust the contents of this directory?") ||
+      line.includes("Press enter to continue") ||
+      line.includes("Quick safety check:") ||
+      line.includes("Enter to confirm · Esc to cancel") ||
+      line.includes("Do you trust the files in this folder?") ||
+      line.includes("Trust folder (default)")
+    ) {
+      lastIndex = index;
+    }
+  }
+
+  return lastIndex;
+}
+
+function hasLaterInteractivePrompt(lines: string[], afterIndex: number) {
+  for (const rawLine of lines.slice(afterIndex + 1)) {
+    const line = rawLine.trim();
+    if (!line) {
+      continue;
+    }
+    if (TRUST_OPTION_LINE_PATTERN.test(line)) {
+      continue;
+    }
+    if (INTERACTIVE_PROMPT_LINE_PATTERN.test(line)) {
+      return true;
+    }
+    if (
+      /^gpt-[\w.-]+\b/i.test(line) ||
+      line.includes("Type your message or @path/to/file") ||
+      line.startsWith("Session:") ||
+      line.startsWith("Model:")
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function tmuxPaneHasTrustPrompt(snapshot: string) {
+  const activeRegion = extractActiveTrustPromptRegion(snapshot);
+  const activeLines = trimBlankLines(splitNormalizedLines(activeRegion));
+  const lastTrustPromptLineIndex = findLastTrustPromptLineIndex(activeLines);
+  if (lastTrustPromptLineIndex < 0) {
+    return false;
+  }
+
+  if (hasLaterInteractivePrompt(activeLines, lastTrustPromptLineIndex)) {
+    return false;
+  }
+
   return (
-    snapshot.includes("Do you trust the contents of this directory?") ||
-    snapshot.includes("Press enter to continue") ||
-    looksLikeClaudeTrustPrompt(snapshot) ||
-    looksLikeGeminiTrustPrompt(snapshot)
+    activeRegion.includes("Do you trust the contents of this directory?") ||
+    activeRegion.includes("Press enter to continue") ||
+    looksLikeClaudeTrustPrompt(activeRegion) ||
+    looksLikeGeminiTrustPrompt(activeRegion)
   );
 }
 

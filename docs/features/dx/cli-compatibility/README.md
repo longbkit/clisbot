@@ -60,6 +60,7 @@ Current exception:
 - [DX](../README.md)
 - [Human Checklist](./human-checklist.md)
 - [Operator Validation Map](./operator-validation-map.md)
+- [Bootstrap Trust And Readiness Report](./bootstrap-trust-and-readiness-report.md)
 - [Capability Contract](./capability-contract.md)
 - [CLI Profiles](./backend-profiles.md)
 - [Real-CLI Smoke Surface](./real-cli-smoke-surface.md)
@@ -74,6 +75,8 @@ The v0 contract and launch-trio CLI profiles are now in place.
 The human input checklist is now captured separately so operator painpoints stay visible even while machine-readable contracts are being normalized.
 
 The operator validation map now turns those painpoints into reproducible risk slices with explicit workspace modes, metrics, artifacts, and operator surfaces.
+
+The bootstrap trust and readiness report now standardizes one especially important validation unit for first-launch behavior and same-workspace reinvoke proof across Codex, Claude, Gemini, and future CLIs.
 
 The next batch should use that published contract to drive:
 

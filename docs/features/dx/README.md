@@ -44,6 +44,7 @@ Those concerns should not be scattered across `agents`, `runners`, `stability`, 
 - [CLI Compatibility](./cli-compatibility/README.md)
 - [CLI Compatibility Human Checklist](./cli-compatibility/human-checklist.md)
 - [CLI Compatibility Operator Validation Map](./cli-compatibility/operator-validation-map.md)
+- [Bootstrap Trust And Readiness Report](./cli-compatibility/bootstrap-trust-and-readiness-report.md)
 
 ## Dependencies
 
