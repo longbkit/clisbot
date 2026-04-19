@@ -1,6 +1,6 @@
 {
   "meta": {
-    "schemaVersion": "0.1.39",
+    "schemaVersion": "0.1.41",
     "lastTouchedAt": "2026-04-18T10:10:00Z"
   },
   "app": {
@@ -127,7 +127,7 @@
           "loadingMessages": []
         },
         "directMessages": {
-          "*": {
+          "dm:*": {
             "enabled": true,
             "requireMention": false,
             "policy": "pairing",
@@ -192,7 +192,7 @@
         },
         "timezone": "UTC",
         "directMessages": {
-          "*": {
+          "dm:*": {
             "enabled": true,
             "requireMention": false,
             "policy": "pairing",
@@ -224,14 +224,12 @@
             },
             "timezone": "America/Los_Angeles"
           },
-          "U_OWNER": {
-            "enabled": true,
-            "policy": "open",
+          "dm:U_OWNER": {
             "agentId": "default"
           }
         },
         "groups": {
-          "*": {
+          "dm:*": {
             "enabled": true,
             "requireMention": true,
             "policy": "disabled",
@@ -361,14 +359,12 @@
               "participationTtlMin": 10
             }
           },
-          "U_SUPPORT": {
-            "enabled": true,
-            "policy": "allowlist",
+          "dm:U_SUPPORT": {
             "agentId": "reviewer"
           }
         },
         "groups": {
-          "*": {
+          "dm:*": {
             "enabled": true,
             "requireMention": true,
             "policy": "disabled",
@@ -450,7 +446,7 @@
         },
         "timezone": "UTC",
         "directMessages": {
-          "*": {
+          "dm:*": {
             "enabled": true,
             "requireMention": false,
             "policy": "pairing",
@@ -525,14 +521,12 @@
               "participationTtlMin": 5
             }
           },
-          "1276408333": {
-            "enabled": true,
-            "policy": "open",
+          "dm:1276408333": {
             "agentId": "default"
           }
         },
         "groups": {
-          "*": {
+          "dm:*": {
             "enabled": true,
             "requireMention": true,
             "policy": "disabled",
@@ -664,14 +658,10 @@
               "participationTtlMin": 15
             }
           },
-          "1276408333": {
-            "enabled": true,
-            "policy": "open",
+          "dm:1276408333": {
             "agentId": "reviewer"
           },
-          "555000111": {
-            "enabled": true,
-            "policy": "open",
+          "dm:555000111": {
             "agentId": "reviewer"
           }
         },

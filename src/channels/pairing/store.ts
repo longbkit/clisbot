@@ -8,6 +8,7 @@ export type PairingChannel = "slack" | "telegram";
 
 export type PairingRequest = {
   id: string;
+  botId?: string;
   code: string;
   createdAt: string;
   lastSeenAt: string;
@@ -271,6 +272,7 @@ export async function addChannelAllowFromStoreEntry(params: {
 export async function upsertChannelPairingRequest(params: {
   channel: PairingChannel;
   id: string | number;
+  botId?: string;
   meta?: Record<string, string | undefined | null>;
   baseDir?: string;
 }) {
@@ -286,6 +288,7 @@ export async function upsertChannelPairingRequest(params: {
       const now = new Date().toISOString();
       const nowMs = Date.now();
       const id = normalizeId(params.id);
+      const botId = normalizeId(params.botId ?? "");
       const meta =
         params.meta && typeof params.meta === "object"
           ? Object.fromEntries(
@@ -298,7 +301,9 @@ export async function upsertChannelPairingRequest(params: {
       let requests = Array.isArray(value.requests) ? value.requests : [];
       const { requests: prunedExpired } = pruneExpiredRequests(requests, nowMs);
       requests = prunedExpired;
-      const existingIndex = requests.findIndex((request) => request.id === id);
+      const existingIndex = requests.findIndex(
+        (request) => request.id === id && normalizeId(request.botId ?? "") === botId,
+      );
       const existingCodes = new Set(
         requests.map((request) => String(request.code ?? "").trim().toUpperCase()),
       );
@@ -311,6 +316,7 @@ export async function upsertChannelPairingRequest(params: {
             : generateUniqueCode(existingCodes);
         requests[existingIndex] = {
           id,
+          ...(botId ? { botId } : {}),
           code,
           createdAt: existing?.createdAt ?? now,
           lastSeenAt: now,
@@ -341,6 +347,7 @@ export async function upsertChannelPairingRequest(params: {
           ...requests,
           {
             id,
+            ...(botId ? { botId } : {}),
             code,
             createdAt: now,
             lastSeenAt: now,
@@ -397,12 +404,7 @@ export async function approveChannelPairingCode(params: {
         version: 1,
         requests: pruned,
       } satisfies PairingStore);
-      await addChannelAllowFromStoreEntry({
-        channel: params.channel,
-        entry: entry.id,
-        baseDir: params.baseDir,
-      });
-      return { id: entry.id, entry };
+      return { id: entry.id, botId: entry.botId, entry };
     },
   );
 }

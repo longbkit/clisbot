@@ -20,6 +20,7 @@ import {
   type ClisbotConfig,
   clisbotConfigSchema,
 } from "./schema.ts";
+import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
 
 export type RuntimeConfig = ClisbotConfig & {
   session: ClisbotConfig["app"]["session"] & {
@@ -111,11 +112,15 @@ export async function loadConfig(
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
   assertNoLegacyPrivilegeCommands(parsed);
-  const withDynamicDefaults = clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed));
+  const withDynamicDefaults = normalizeConfigDirectMessageRoutes(
+    clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+  );
   const substituted = resolveConfigEnvVars(withDynamicDefaults, process.env, {
     skipPaths: getCredentialSkipPaths(withDynamicDefaults),
   }) as unknown;
-  const validated = clisbotConfigSchema.parse(substituted);
+  const validated = normalizeConfigDirectMessageRoutes(
+    clisbotConfigSchema.parse(substituted),
+  );
   const materialized = materializeRuntimeChannelCredentials(validated, {
     env: process.env,
     materializeChannels: options.materializeChannels,
@@ -131,7 +136,9 @@ export async function loadConfigWithoutEnvResolution(
   const text = await readTextFile(expandedConfigPath);
   const parsed = JSON.parse(text);
   assertNoLegacyPrivilegeCommands(parsed);
-  const validated = clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed));
+  const validated = normalizeConfigDirectMessageRoutes(
+    clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+  );
   return materializeLoadedConfig(expandedConfigPath, validated);
 }
 

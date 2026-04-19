@@ -2,6 +2,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
 import type { ClisbotConfig } from "../config/schema.ts";
+import { ensureBotDirectMessageWildcardRoute } from "../config/direct-message-routes.ts";
 import {
   describeSlackCredentialSource,
   describeTelegramCredentialSource,
@@ -18,6 +19,7 @@ import { RuntimeHealthStore } from "./runtime-health-store.ts";
 import { getRuntimeStatus } from "./runtime-process.ts";
 import { getDefaultRuntimeCredentialsPath } from "../shared/paths.ts";
 import { addAgentToEditableConfig } from "./agents-cli.ts";
+import { renderCliCommand } from "../shared/cli-name.ts";
 
 type Provider = "slack" | "telegram";
 
@@ -101,32 +103,32 @@ async function waitForReloadResult(
 
 function renderBotsHelp() {
   return [
-    "clisbot bots",
+    renderCliCommand("bots"),
     "",
     "Usage:",
-    "  clisbot bots --help",
-    "  clisbot bots help",
-    "  clisbot bots list [--channel <slack|telegram>] [--json]",
-    "  clisbot bots add --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]",
-    "  clisbot bots add --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]",
-    "  clisbot bots get --channel <slack|telegram> [--bot <id>] [--json]",
-    "  clisbot bots enable --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots disable --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots remove --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots get-default --channel <slack|telegram>",
-    "  clisbot bots set-default --channel <slack|telegram> --bot <id>",
-    "  clisbot bots get-agent --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots set-agent --channel <slack|telegram> [--bot <id>] --agent <id>",
-    "  clisbot bots clear-agent --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots get-credentials-source --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots set-credentials --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]",
-    "  clisbot bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]",
-    "  clisbot bots get-dm-policy --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots set-dm-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|pairing|allowlist|open>",
-    "  clisbot bots get-group-policy --channel <slack|telegram> [--bot <id>]",
-    "  clisbot bots set-group-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|allowlist|open>",
-    "  clisbot bots get-channel-policy --channel slack [--bot <id>]",
-    "  clisbot bots set-channel-policy --channel slack [--bot <id>] --policy <disabled|allowlist|open>",
+    `  ${renderCliCommand("bots --help")}`,
+    `  ${renderCliCommand("bots help")}`,
+    `  ${renderCliCommand("bots list [--channel <slack|telegram>] [--json]")}`,
+    `  ${renderCliCommand("bots add --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]")}`,
+    `  ${renderCliCommand("bots add --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]")}`,
+    `  ${renderCliCommand("bots get --channel <slack|telegram> [--bot <id>] [--json]")}`,
+    `  ${renderCliCommand("bots enable --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots disable --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots remove --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots get-default --channel <slack|telegram>")}`,
+    `  ${renderCliCommand("bots set-default --channel <slack|telegram> --bot <id>")}`,
+    `  ${renderCliCommand("bots get-agent --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-agent --channel <slack|telegram> [--bot <id>] --agent <id>")}`,
+    `  ${renderCliCommand("bots clear-agent --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots get-credentials-source --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-credentials --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]")}`,
+    `  ${renderCliCommand("bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]")}`,
+    `  ${renderCliCommand("bots get-dm-policy --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-dm-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|pairing|allowlist|open>")}`,
+    `  ${renderCliCommand("bots get-group-policy --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-group-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|allowlist|open>")}`,
+    `  ${renderCliCommand("bots get-channel-policy --channel slack [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-channel-policy --channel slack [--bot <id>] --policy <disabled|allowlist|open>")}`,
     "",
     "Notes:",
     "  - `add` creates only; if the bot already exists, use `set-agent`, `set-credentials`, or another `set-<key>` command",
@@ -331,7 +333,7 @@ async function addOrSetBotCredentials(
   const exists = provider === "slack" ? botId in getSlackBots(config) : botId in getTelegramBots(config);
   if (action === "add" && exists) {
     throw new Error(
-      `Bot already exists: ${provider}/${botId}. Use \`clisbot bots set-agent ...\`, \`clisbot bots set-credentials ...\`, or another \`set-<key>\` command.`,
+      `Bot already exists: ${provider}/${botId}. Use ${renderCliCommand("bots set-agent ...", { inline: true })}, ${renderCliCommand("bots set-credentials ...", { inline: true })}, or another \`set-<key>\` command.`,
     );
   }
   if (action === "set-credentials" && !exists) {
@@ -590,19 +592,7 @@ async function getOrSetBotAgent(args: string[], action: "get-agent" | "set-agent
 }
 
 function ensureDefaultDmRoute(config: ClisbotConfig, provider: Provider, botId: string) {
-  const bot = ensureProviderBot(config, provider, botId);
-  const key = "dm:*";
-  if (!bot.directMessages[key]) {
-    bot.directMessages[key] = {
-      enabled: true,
-      requireMention: false,
-      policy: "pairing",
-      allowUsers: [],
-      blockUsers: [],
-      allowBots: false,
-    };
-  }
-  return bot.directMessages[key]!;
+  return ensureBotDirectMessageWildcardRoute(config, provider, botId);
 }
 
 async function getOrSetBotPolicy(args: string[], action: string) {

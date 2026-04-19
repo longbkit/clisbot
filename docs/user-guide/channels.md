@@ -65,6 +65,8 @@ Behavior rules:
 - `add` is create-only
 - if the route already exists, use the matching `set-<key>` command
 - route-local overrides only work after the route exists
+- `dm:*` owns DM admission fields: `policy`, `allowUsers`, `blockUsers`, and effective enabled state
+- exact DM routes such as `dm:U1234567890` or `dm:1276408333` are behavior-only overrides and must not be used for DM auth mutation
 
 ## Route Policy
 
@@ -80,6 +82,13 @@ Common defaults:
 - Slack public or private shared surfaces usually start with `requireMention: true`
 - Telegram groups and topics usually start with `requireMention: true`
 - DM routes usually start with `requireMention: false`
+
+DM-specific rule:
+
+- pair or allow a DM sender on `dm:*`
+- block a DM sender on `dm:*` too
+- use exact DM routes only for per-user behavior overrides such as `agentId`, `streaming`, `responseMode`, `additionalMessageMode`, `followUp`, `verbose`, or `timezone`
+- pairing approval also lands on the requesting bot's `dm:*` allowUsers, so DM admission stays in one place
 
 ## Route Ownership
 

@@ -431,7 +431,7 @@ const slackBotsSchema = z.object({
       participationTtlMin: 5,
     },
     directMessages: {
-      "*": {
+      "dm:*": {
         enabled: true,
         requireMention: false,
         policy: "pairing",
@@ -469,7 +469,7 @@ const telegramBotsSchema = z.object({
       participationTtlMin: 5,
     },
     directMessages: {
-      "*": {
+      "dm:*": {
         enabled: true,
         requireMention: false,
         policy: "pairing",
@@ -718,10 +718,10 @@ const agentsDefaultsSchema = z.object({
 
 export const clisbotConfigSchema = z.object({
   meta: z.object({
-    schemaVersion: z.string().min(1).default("0.1.39"),
+    schemaVersion: z.string().min(1).default("0.1.41"),
     lastTouchedAt: z.string().optional(),
   }).default({
-    schemaVersion: "0.1.39",
+    schemaVersion: "0.1.41",
   }),
   app: z.object({
     session: appSessionSchema.default({
@@ -900,7 +900,7 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "*": {
+          "dm:*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
@@ -945,7 +945,7 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "*": {
+          "dm:*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
@@ -982,7 +982,7 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "*": {
+          "dm:*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
@@ -1022,7 +1022,7 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "*": {
+          "dm:*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",

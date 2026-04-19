@@ -234,11 +234,13 @@ Policy rules:
   - `disabled`
   - `allowlist`
   - `open`
-- for direct-message routes, route policy is one of:
+- for DM wildcard routes `dm:*`, route policy is one of:
   - `disabled`
   - `pairing`
   - `allowlist`
   - `open`
+- for exact DM routes such as `dm:U123456` or `dm:1276408333`, admission policy stays on `dm:*`
+- exact DM routes are behavior-only overrides for fields such as `agentId`, `streaming`, `responseMode`, `additionalMessageMode`, `followUp`, `verbose`, and `timezone`
 
 Important behavior:
 
@@ -250,17 +252,29 @@ Important behavior:
 - `routes set-agent` answers the operator question: which agent should handle this surface?
 - an explicit route agent always wins over the bot-specific fallback agent
 - `allowUsers` and `blockUsers` apply to who may talk to the bot on that route, not to which groups or channels exist
+- DM auth is owned by `dm:*`; `routes set-policy`, `add/remove-allow-user`, and `add/remove-block-user` reject exact DM routes
+- `pairing approve <channel> <code>` now writes the approved sender into the requesting bot's `directMessages."dm:*".allowUsers`
+
+How to add or block users:
+
+- Slack DM allow: `clisbot routes add-allow-user --channel slack dm:* --bot <bot-id> --user U123ABC456`
+- Slack DM block: `clisbot routes add-block-user --channel slack dm:* --bot <bot-id> --user U123ABC456`
+- Telegram DM allow: `clisbot routes add-allow-user --channel telegram dm:* --bot <bot-id> --user 1276408333`
+- Telegram DM block: `clisbot routes add-block-user --channel telegram dm:* --bot <bot-id> --user 1276408333`
+- Shared channel/group allow or block stays on that shared route itself, for example `channel:<id>`, `group:<id>`, or `topic:<chatId>:<topicId>`
+- If you want one DM peer to behave differently but not change admission, create or mutate `dm:<userId>` and only change behavior fields there
 
 Examples:
 
 - `clisbot routes add --channel slack channel:C_GENERAL`
 - `clisbot routes add --channel slack group:G_SUPPORT --bot support --require-mention false`
-- `clisbot routes add --channel slack dm:U_OWNER --policy allowlist`
+- `clisbot routes add --channel slack dm:* --bot support --policy allowlist`
+- `clisbot routes add --channel slack dm:U_OWNER --bot support`
 - `clisbot routes add --channel telegram group:-1001234567890`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot support --require-mention false`
 - `clisbot routes set-agent --channel slack channel:C_GENERAL --agent product`
 - `clisbot routes set-require-mention --channel telegram topic:-1001234567890:42 --value false`
-- `clisbot routes add-allow-user --channel slack dm:U_OWNER --user U_OWNER`
+- `clisbot routes add-allow-user --channel slack dm:* --bot support --user U_OWNER`
 - `clisbot routes add-block-user --channel telegram group:-1001234567890 --user 1276408333`
 
 ## Agents
@@ -438,13 +452,22 @@ Important behavior:
 
 - `clisbot loops list`
 - `clisbot loops status`
+- `clisbot loops status --channel slack --target channel:C1234567890 --thread-id 1712345678.123456`
+- `clisbot loops create --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 every day at 07:00 check CI`
+- `clisbot loops --channel telegram --target -1001234567890 --thread-id 42 5m check CI`
+- `clisbot loops --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 3 review backlog`
 - `clisbot loops cancel <id>`
+- `clisbot loops cancel --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 --all`
 - `clisbot loops cancel --all`
 
 Examples:
 
 - recurring loops are created from chat with `/loop 5m check CI` or `/loop every day at 07:00 check CI`
-- use `clisbot loops ...` to inspect or cancel persisted loops later from the operator CLI
+- use scoped `clisbot loops ... --channel ... --target ...` when you want the same session-specific create, status, or cancel behavior from the operator CLI
+- use app-wide `clisbot loops list`, `clisbot loops status`, or `clisbot loops cancel --all` when you want global inventory or emergency cleanup
+- CLI creation accepts the same expression families as `/loop`: interval, forced interval, times/count, and calendar schedules
+- omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
+- count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
 
 ## First-Run Flows
 

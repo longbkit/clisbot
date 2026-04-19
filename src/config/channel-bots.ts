@@ -9,6 +9,10 @@ import type {
   TelegramBotConfig,
   TelegramProviderDefaultsConfig,
 } from "./schema.ts";
+import {
+  resolveDirectMessageWildcardRoute,
+  resolveEffectiveDirectMessageRoute,
+} from "./direct-message-routes.ts";
 
 // Canonical bot-oriented config helpers live here.
 
@@ -40,23 +44,6 @@ export type ResolvedTelegramBotConfig = Omit<TelegramBotConfig, "directMessages"
     groups: Record<string, TelegramBotConfig["groups"][string]>;
     botToken: string;
   };
-
-function resolveDirectMessageRoute(
-  routes: Record<string, BotRouteConfig>,
-  subjectId?: string | number | null,
-) {
-  const normalizedSubjectId =
-    typeof subjectId === "number" ? String(subjectId) : subjectId?.trim();
-
-  if (normalizedSubjectId) {
-    const exactRoute = routes[`dm:${normalizedSubjectId}`];
-    if (exactRoute) {
-      return exactRoute;
-    }
-  }
-
-  return routes["dm:*"] ?? routes["*"];
-}
 
 function normalizeBotId(botId?: string | null) {
   const normalized = botId?.trim();
@@ -342,14 +329,26 @@ export function resolveSlackDirectMessageConfig(
   config: ResolvedSlackBotConfig,
   userId?: string | null,
 ) {
-  return resolveDirectMessageRoute(config.directMessages, userId);
+  return resolveEffectiveDirectMessageRoute(config.directMessages, userId);
 }
 
 export function resolveTelegramDirectMessageConfig(
   config: ResolvedTelegramBotConfig,
   senderId?: string | number | null,
 ) {
-  return resolveDirectMessageRoute(config.directMessages, senderId);
+  return resolveEffectiveDirectMessageRoute(config.directMessages, senderId);
+}
+
+export function resolveSlackDirectMessageAdmissionConfig(
+  config: ResolvedSlackBotConfig,
+) {
+  return resolveDirectMessageWildcardRoute(config.directMessages);
+}
+
+export function resolveTelegramDirectMessageAdmissionConfig(
+  config: ResolvedTelegramBotConfig,
+) {
+  return resolveDirectMessageWildcardRoute(config.directMessages);
 }
 
 export function resolveSlackBotCredentials(

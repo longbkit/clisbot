@@ -7,14 +7,17 @@ import { parseAgentCommand } from "../../agents/commands.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../interaction-processing.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
-import { isTelegramSenderAllowed } from "../pairing/access.ts";
+import {
+  isTelegramSenderAllowed,
+  isTelegramSenderBlocked,
+} from "../pairing/access.ts";
 import { buildPairingReplyFromRequest } from "../pairing/messages.ts";
 import {
-  readChannelAllowFromStore,
   upsertChannelPairingRequest,
 } from "../pairing/store.ts";
 import { ProcessedEventsStore } from "../processed-events-store.ts";
 import { ActivityStore } from "../../control/activity-store.ts";
+import { renderCliCommand } from "../../shared/cli-name.ts";
 import {
   callTelegramApi,
   isTelegramPollingConflict,
@@ -49,7 +52,7 @@ import { sleep } from "../../shared/process.ts";
 import type { TelegramBotCredentialConfig } from "../../config/channel-bots.ts";
 import {
   resolveTelegramBotConfig,
-  resolveTelegramDirectMessageConfig,
+  resolveTelegramDirectMessageAdmissionConfig,
 } from "../../config/channel-bots.ts";
 import type { ResolvedTelegramBotConfig } from "../../config/channel-bots.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
@@ -273,7 +276,7 @@ export class TelegramPollingService {
   }
 
   private getDirectMessageConfig(senderId?: string | number) {
-    return resolveTelegramDirectMessageConfig(this.getBotConfig(), senderId);
+    return resolveTelegramDirectMessageAdmissionConfig(this.getBotConfig());
   }
 
   async start() {
@@ -362,7 +365,7 @@ export class TelegramPollingService {
               error instanceof Error ? error.message : String(error),
             actions: [
               "stop the other Telegram poller that is using the same bot token",
-              "run `clisbot start` again after the token is no longer in use elsewhere",
+              `run ${renderCliCommand("start", { inline: true })} again after the token is no longer in use elsewhere`,
             ],
           });
           console.error(
@@ -510,10 +513,18 @@ export class TelegramPollingService {
         identity: dmIdentity,
       });
 
+      if (isTelegramSenderBlocked({
+        blockFrom: directMessages.blockUsers ?? [],
+        userId: senderId,
+        username: senderUsername,
+      })) {
+        await this.processedEventsStore.markCompleted(eventId);
+        return;
+      }
+
       if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
-        const storedAllowFrom = await readChannelAllowFromStore("telegram");
         const allowed = isTelegramSenderAllowed({
-          allowFrom: [...directMessages.allowUsers, ...storedAllowFrom],
+          allowFrom: directMessages.allowUsers ?? [],
           userId: senderId,
           username: senderUsername,
         });
@@ -522,6 +533,7 @@ export class TelegramPollingService {
             const pairingRequest = await upsertChannelPairingRequest({
               channel: "telegram",
               id: senderId,
+              botId: this.botId,
               meta: {
                 username: senderUsername,
                 firstName: message.from?.first_name,
@@ -531,6 +543,7 @@ export class TelegramPollingService {
             const pairingReply = buildPairingReplyFromRequest({
               channel: "telegram",
               idLine: `Your Telegram user id: ${senderId}`,
+              botId: this.botId,
               pairingRequest,
             });
             if (pairingReply) {

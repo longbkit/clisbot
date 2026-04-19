@@ -685,7 +685,7 @@
       "workspace": "~/.clisbot/workspaces/{agentId}",
       "cli": "codex",
       "bootstrap": {
-        "botType": "team"
+        "botType": "team-assistant"
       },
       "runner": {
         "defaults": {

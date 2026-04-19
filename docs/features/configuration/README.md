@@ -208,21 +208,22 @@ Current Slack route defaults should stay explicit:
 
 - `channelPolicy: "allowlist"`
 - `groupPolicy: "allowlist"`
-- `directMessages.policy: "pairing"`
-- `directMessages.allowFrom: []`
-- `directMessages.requireMention: false`
+- `directMessages."dm:*".policy: "pairing"`
+- `directMessages."dm:*".allowUsers: []`
+- `directMessages."dm:*".blockUsers: []`
+- `directMessages."dm:*".requireMention: false`
 - `verbose: "minimal"`
 - `commandPrefixes.slash: ["::", "\\"]`
 - `commandPrefixes.bash: ["!"]`
 - channel and group routes default to `requireMention: true` unless a route overrides it
 - Telegram groups and topics added through the CLI also default to `requireMention: true`
-- current runtime still uses legacy DM allowlist wording such as `allowFrom`
-- target shape work should move that meaning into the DM route map itself with `directMessages."*".allowUsers` and per-DM override entries when the migration lands
+- DM auth now lives on `directMessages."dm:*"` and pairing approval writes into that wildcard route's `allowUsers`
+- exact DM routes such as `directMessages."dm:<userId>"` are behavior-only overrides and must not carry `policy`, `allowUsers`, or `blockUsers`
 
 Target shape direction for route maps should stay explicit too:
 
 - `groups` and `directMessages` should read as sibling route maps, not as two unrelated concepts
-- `directMessages."*"` should be the DM fallback route entry
+- `directMessages."dm:*"` should be the DM fallback route entry
 - provider-local route maps should use local ids inside provider-rooted nodes
 - bot-root config should avoid ambiguous sender filters that can be misread as applying to every surface
 

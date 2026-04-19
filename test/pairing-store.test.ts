@@ -6,7 +6,6 @@ import {
   approveChannelPairingCode,
   clearChannelPairingRequests,
   listChannelPairingRequests,
-  readChannelAllowFromStore,
   rejectChannelPairingCode,
   upsertChannelPairingRequest,
 } from "../src/channels/pairing/store.ts";
@@ -35,12 +34,13 @@ describe("pairing store", () => {
     }
   });
 
-  test("approving a code removes the pending request and populates allowFrom", async () => {
+  test("approving a code removes the pending request and preserves the requesting bot id", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-pairing-"));
     try {
       const created = await upsertChannelPairingRequest({
         channel: "telegram",
         id: "123456",
+        botId: "alerts",
         baseDir: tempDir,
       });
       const approved = await approveChannelPairingCode({
@@ -50,8 +50,8 @@ describe("pairing store", () => {
       });
 
       expect(approved?.id).toBe("123456");
+      expect(approved?.botId).toBe("alerts");
       expect(await listChannelPairingRequests("telegram", tempDir)).toEqual([]);
-      expect(await readChannelAllowFromStore("telegram", tempDir)).toEqual(["123456"]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -110,7 +110,6 @@ describe("pairing store", () => {
 
       expect(rejected?.id).toBe("U123");
       expect(await listChannelPairingRequests("slack", tempDir)).toEqual([]);
-      expect(await readChannelAllowFromStore("slack", tempDir)).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

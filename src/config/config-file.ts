@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { ensureDir, expandHomePath, getDefaultConfigPath } from "../shared/paths.ts";
 import { readTextFile, writeTextFile } from "../shared/fs.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "./schema.ts";
+import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
 import { applyDynamicPathDefaults, assertNoLegacyPrivilegeCommands } from "./load-config.ts";
 import { renderDefaultConfigTemplate } from "./template.ts";
 
@@ -35,17 +36,20 @@ export async function readEditableConfig(configPath = getDefaultConfigPath()): P
   assertNoLegacyPrivilegeCommands(parsed);
   return {
     configPath: expandedConfigPath,
-    config: clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+    config: normalizeConfigDirectMessageRoutes(
+      clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+    ),
   };
 }
 
 export async function writeEditableConfig(configPath: string, config: ClisbotConfig) {
   const expandedConfigPath = expandHomePath(configPath);
   await ensureDir(dirname(expandedConfigPath));
+  const normalizedConfig = normalizeConfigDirectMessageRoutes(config);
   const nextConfig = {
-    ...config,
+    ...normalizedConfig,
     meta: {
-      ...config.meta,
+      ...normalizedConfig.meta,
       lastTouchedAt: new Date().toISOString(),
     },
   };

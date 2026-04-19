@@ -18,6 +18,34 @@ function createTelegramTopicTarget(chatId: string, topicId: string): ConfiguredS
 }
 
 describe("resolveConfiguredSurfaceModeTarget", () => {
+  test("exact DM mode targets inherit from dm:* and materialize behavior-only overrides on write", () => {
+    const config = createConfig();
+    config.bots.slack.default.directMessages["dm:*"] = {
+      enabled: true,
+      requireMention: false,
+      policy: "allowlist",
+      allowUsers: ["U123"],
+      blockUsers: ["U999"],
+      allowBots: false,
+      streaming: "latest",
+    };
+
+    const target: ConfiguredSurfaceModeTarget = {
+      channel: "slack",
+      botId: "default",
+      target: "dm:U123",
+    };
+    const binding = resolveConfiguredSurfaceModeTarget(config, "streaming", target);
+
+    expect(binding.get()).toBe("latest");
+    binding.set("off");
+
+    expect(config.bots.slack.default.directMessages["dm:U123"]?.streaming).toBe("off");
+    expect(config.bots.slack.default.directMessages["dm:U123"]?.policy).toBeUndefined();
+    expect(config.bots.slack.default.directMessages["dm:U123"]?.allowUsers).toEqual([]);
+    expect(config.bots.slack.default.directMessages["dm:U123"]?.blockUsers).toEqual([]);
+  });
+
   test("telegram topic inherits group mode values without requiring an explicit topic override", () => {
     const config = createConfig();
     config.bots.telegram.default.groups["-1001"] = {

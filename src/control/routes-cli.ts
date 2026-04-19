@@ -4,6 +4,13 @@ import type {
   ClisbotConfig,
   TelegramBotConfig,
 } from "../config/schema.ts";
+import {
+  createDirectMessageBehaviorOverride,
+  ensureBotDirectMessageWildcardRoute,
+  isDirectMessageWildcardRouteId,
+  isExactDirectMessageRouteId,
+} from "../config/direct-message-routes.ts";
+import { renderCliCommand } from "../shared/cli-name.ts";
 
 type Provider = "slack" | "telegram";
 type RouteNode = BotRouteConfig | TelegramBotConfig["groups"][string] | TelegramBotConfig["groups"][string]["topics"][string];
@@ -182,6 +189,20 @@ function parseCommandRoute(args: string[], provider: Provider) {
   return parseRouteId(provider, findRouteArgument(args));
 }
 
+function isExactDirectMessageRoute(parsed: ParsedRouteId) {
+  return parsed.storage === "directMessages" && isExactDirectMessageRouteId(parsed.routeId);
+}
+
+function rejectExactDirectMessageAdmissionChange(parsed: ParsedRouteId, action: string) {
+  if (!isExactDirectMessageRoute(parsed)) {
+    return;
+  }
+
+  throw new Error(
+    `Direct-message admission for ${parsed.routeId} is managed on dm:* only. ${action} is not allowed on exact DM routes.`,
+  );
+}
+
 function createBaseRoute(kind: ParsedRouteId["kind"], policy?: string): BotRouteConfig {
   const route: BotRouteConfig = {
     enabled: true,
@@ -196,6 +217,16 @@ function createBaseRoute(kind: ParsedRouteId["kind"], policy?: string): BotRoute
   return route;
 }
 
+function createRouteConfig(parsed: ParsedRouteId, policy?: string) {
+  if (isExactDirectMessageRoute(parsed)) {
+    if (policy) {
+      rejectExactDirectMessageAdmissionChange(parsed, "Setting policy");
+    }
+    return createDirectMessageBehaviorOverride();
+  }
+  return createBaseRoute(parsed.kind, policy);
+}
+
 function getOrCreateRoute(
   config: ClisbotConfig,
   provider: Provider,
@@ -207,7 +238,7 @@ function getOrCreateRoute(
     const bot = ensureSlackBot(config, botId);
     if (parsed.storage === "directMessages") {
       if (!bot.directMessages[parsed.key] && options.create) {
-        bot.directMessages[parsed.key] = createBaseRoute(parsed.kind, options.policy);
+        bot.directMessages[parsed.key] = createRouteConfig(parsed, options.policy);
       }
       return bot.directMessages[parsed.key];
     }
@@ -220,7 +251,7 @@ function getOrCreateRoute(
   const bot = ensureTelegramBot(config, botId);
   if (parsed.storage === "directMessages") {
     if (!bot.directMessages[parsed.key] && options.create) {
-      bot.directMessages[parsed.key] = createBaseRoute(parsed.kind, options.policy);
+      bot.directMessages[parsed.key] = createRouteConfig(parsed, options.policy);
     }
     return bot.directMessages[parsed.key];
   }
@@ -259,41 +290,53 @@ function ensureRoute(
 
 function renderRoutesHelp() {
   return [
-    "clisbot routes",
+    renderCliCommand("routes"),
     "",
     "Usage:",
-    "  clisbot routes --help",
-    "  clisbot routes help",
-    "  clisbot routes list [--channel <slack|telegram>] [--bot <id>] [--json]",
-    "  clisbot routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]",
-    "  clisbot routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]",
-    "  clisbot routes get --channel <slack|telegram> <route-id> [--bot <id>] [--json]",
-    "  clisbot routes enable --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes disable --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes remove --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes get-agent --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-agent --channel <slack|telegram> <route-id> [--bot <id>] --agent <id>",
-    "  clisbot routes clear-agent --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes get-policy --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-policy --channel <slack|telegram> <route-id> [--bot <id>] --policy <...>",
-    "  clisbot routes get-require-mention --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-require-mention --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>",
-    "  clisbot routes get-allow-bots --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-allow-bots --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>",
-    "  clisbot routes add-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>",
-    "  clisbot routes remove-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>",
-    "  clisbot routes add-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>",
-    "  clisbot routes remove-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>",
-    "  clisbot routes get-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <auto|mention-only|paused>",
-    "  clisbot routes get-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>] --minutes <n>",
-    "  clisbot routes get-response-mode --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-response-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <capture-pane|message-tool>",
-    "  clisbot routes clear-response-mode --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes get-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]",
-    "  clisbot routes set-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <queue|steer>",
-    "  clisbot routes clear-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]",
+    `  ${renderCliCommand("routes --help")}`,
+    `  ${renderCliCommand("routes help")}`,
+    `  ${renderCliCommand("routes list [--channel <slack|telegram>] [--bot <id>] [--json]")}`,
+    `  ${renderCliCommand("routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
+    `  ${renderCliCommand("routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
+    `  ${renderCliCommand("routes get --channel <slack|telegram> <route-id> [--bot <id>] [--json]")}`,
+    `  ${renderCliCommand("routes enable --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes disable --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes remove --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes get-agent --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-agent --channel <slack|telegram> <route-id> [--bot <id>] --agent <id>")}`,
+    `  ${renderCliCommand("routes clear-agent --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes get-policy --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-policy --channel <slack|telegram> <route-id> [--bot <id>] --policy <...>")}`,
+    `  ${renderCliCommand("routes get-require-mention --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-require-mention --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>")}`,
+    `  ${renderCliCommand("routes get-allow-bots --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-allow-bots --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>")}`,
+    `  ${renderCliCommand("routes add-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
+    `  ${renderCliCommand("routes remove-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
+    `  ${renderCliCommand("routes add-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
+    `  ${renderCliCommand("routes remove-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
+    `  ${renderCliCommand("routes get-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <auto|mention-only|paused>")}`,
+    `  ${renderCliCommand("routes get-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>] --minutes <n>")}`,
+    `  ${renderCliCommand("routes get-response-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-response-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <capture-pane|message-tool>")}`,
+    `  ${renderCliCommand("routes clear-response-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes get-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    `  ${renderCliCommand("routes set-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <queue|steer>")}`,
+    `  ${renderCliCommand("routes clear-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
+    "",
+    "Notes:",
+    "  - For DM auth, mutate `dm:*`, not `dm:<userId>`.",
+    "  - Exact DM routes are behavior-only overrides such as agent, streaming, responseMode, followUp, verbose, or timezone.",
+    "  - `set-policy`, `add/remove-allow-user`, and `add/remove-block-user` reject exact DM routes.",
+    "  - `pairing approve <channel> <code>` writes the approved sender into the requesting bot's `dm:*` allowUsers.",
+    "",
+    "Examples:",
+    `  ${renderCliCommand("routes add-allow-user --channel slack dm:* --bot support --user U123ABC456")}`,
+    `  ${renderCliCommand("routes add-block-user --channel telegram dm:* --bot alerts --user 1276408333")}`,
+    `  ${renderCliCommand("routes add-allow-user --channel slack channel:C1234567890 --bot default --user U_OWNER")}`,
+    `  ${renderCliCommand("routes add-block-user --channel telegram group:-1001234567890 --bot default --user 1276408333")}`,
   ].join("\n");
 }
 
@@ -408,6 +451,7 @@ async function setRouteEnabled(args: string[], enabled: boolean) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
   const parsed = parseCommandRoute(args, provider);
+  rejectExactDirectMessageAdmissionChange(parsed, enabled ? "Enabling" : "Disabling");
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const route = ensureRoute(config, provider, botId, parsed);
   route.enabled = enabled;
@@ -468,8 +512,10 @@ async function getSetClearRouteField(args: string[], action: string) {
     await writeEditableConfig(configPath, config);
     console.log(`cleared agent for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-policy") {
+    rejectExactDirectMessageAdmissionChange(parsed, "Reading policy");
     console.log(`${provider}/${botId}/${parsed.routeId} policy: ${route.policy ?? "(default)"}`);
   } else if (action === "set-policy") {
+    rejectExactDirectMessageAdmissionChange(parsed, "Setting policy");
     const policy = parseOptionValue(args, "--policy");
     if (!policy) {
       throw new Error(renderRoutesHelp());
@@ -552,12 +598,18 @@ async function mutateRouteUsers(args: string[], action: string) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
   const parsed = parseCommandRoute(args, provider);
+  rejectExactDirectMessageAdmissionChange(
+    parsed,
+    action.startsWith("add-") ? "Adding allow/block users" : "Removing allow/block users",
+  );
   const user = parseOptionValue(args, "--user");
   if (!user) {
     throw new Error(renderRoutesHelp());
   }
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
-  const route = ensureRoute(config, provider, botId, parsed);
+  const route = parsed.storage === "directMessages" && isDirectMessageWildcardRouteId(parsed.routeId)
+    ? ensureBotDirectMessageWildcardRoute(config, provider, botId)
+    : ensureRoute(config, provider, botId, parsed);
   const field = action.includes("allow") ? "allowUsers" : "blockUsers";
   const current = Array.from(new Set((route[field] ?? []).filter(Boolean)));
 

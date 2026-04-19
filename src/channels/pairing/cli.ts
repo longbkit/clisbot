@@ -1,3 +1,6 @@
+import { readEditableConfig, writeEditableConfig } from "../../config/config-file.ts";
+import { ensureBotDirectMessageWildcardRoute } from "../../config/direct-message-routes.ts";
+import { normalizeAllowEntry } from "./access.ts";
 import { renderPairingRequests } from "./messages.ts";
 import {
   approveChannelPairingCode,
@@ -6,6 +9,7 @@ import {
   rejectChannelPairingCode,
   type PairingChannel,
 } from "./store.ts";
+import { renderCliCommand } from "../../shared/cli-name.ts";
 
 type PairingCliWriter = {
   log: (line: string) => void;
@@ -21,6 +25,10 @@ function resolvePairingBaseDir(env: NodeJS.ProcessEnv = process.env) {
   return legacy || undefined;
 }
 
+function resolveConfigPath(env: NodeJS.ProcessEnv = process.env) {
+  return env.CLISBOT_CONFIG_PATH;
+}
+
 function parseChannel(raw: string | undefined): PairingChannel {
   const value = raw?.trim().toLowerCase();
   if (value === "slack" || value === "telegram") {
@@ -29,21 +37,38 @@ function parseChannel(raw: string | undefined): PairingChannel {
   throw new Error("Channel required: slack | telegram");
 }
 
+function resolveApprovedBotId(
+  channel: PairingChannel,
+  configuredBotIds: string[],
+  approvedBotId?: string,
+) {
+  const normalizedBotId = approvedBotId?.trim();
+  if (normalizedBotId) {
+    return normalizedBotId;
+  }
+  if (configuredBotIds.length === 1) {
+    return configuredBotIds[0];
+  }
+  throw new Error(
+    `Pending ${channel} pairing request is missing a bot id. Recreate the request after upgrading.`,
+  );
+}
+
 function renderPairingCliHelp() {
   return [
-    "clisbot pairing",
+    renderCliCommand("pairing"),
     "",
     "Usage:",
-    "  clisbot pairing --help",
-    "  clisbot pairing help",
-    "  clisbot pairing list <slack|telegram> [--json]",
-    "  clisbot pairing approve <slack|telegram> <code>",
-    "  clisbot pairing reject <slack|telegram> <code>",
-    "  clisbot pairing clear <slack|telegram>",
+    `  ${renderCliCommand("pairing --help")}`,
+    `  ${renderCliCommand("pairing help")}`,
+    `  ${renderCliCommand("pairing list <slack|telegram> [--json]")}`,
+    `  ${renderCliCommand("pairing approve <slack|telegram> <code>")}`,
+    `  ${renderCliCommand("pairing reject <slack|telegram> <code>")}`,
+    `  ${renderCliCommand("pairing clear <slack|telegram>")}`,
     "",
     "Notes:",
     "  - `list` shows pending pairing requests for one channel only",
-    "  - `approve` moves that sender into the channel allowlist",
+    "  - `approve` moves that sender into the requesting bot's DM allowUsers list",
     "  - `reject` removes one pending request without allowlisting the sender",
     "  - `clear` drops every pending request for that channel when the queue needs a reset",
   ].join("\n");
@@ -85,7 +110,21 @@ export async function runPairingCli(args: string[], writer: PairingCliWriter = c
     if (!approved) {
       throw new Error(`No pending pairing request found for code: ${code}`);
     }
-    writer.log(`Approved ${channel} sender ${approved.id}.`);
+    const { config, configPath } = await readEditableConfig(resolveConfigPath());
+    const configuredBotIds =
+      channel === "slack"
+        ? Object.keys(config.bots.slack).filter((botId) => botId !== "defaults")
+        : Object.keys(config.bots.telegram).filter((botId) => botId !== "defaults");
+    const botId = resolveApprovedBotId(channel, configuredBotIds, approved.botId);
+    const wildcardRoute = ensureBotDirectMessageWildcardRoute(config, channel, botId);
+    const normalizedUser = normalizeAllowEntry(channel, approved.id);
+    const currentUsers = new Set((wildcardRoute.allowUsers ?? []).map((entry) => String(entry).trim()).filter(Boolean));
+    if (normalizedUser) {
+      currentUsers.add(normalizedUser);
+    }
+    wildcardRoute.allowUsers = [...currentUsers];
+    await writeEditableConfig(configPath, config);
+    writer.log(`Approved ${channel} sender ${approved.id} for bot ${botId}.`);
     return;
   }
 

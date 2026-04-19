@@ -1,4 +1,9 @@
 import type { ClisbotConfig } from "../config/schema.ts";
+import {
+  createDirectMessageBehaviorOverride,
+  resolveDirectMessageExactRoute,
+  resolveDirectMessageWildcardRoute,
+} from "../config/direct-message-routes.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
 import { resolveChannelIdentityBotId } from "./channel-identity.ts";
 import {
@@ -101,6 +106,37 @@ function renderFieldLabel(field: SurfaceModeField) {
   return "streaming";
 }
 
+function resolveDirectMessageModeTarget<TField extends SurfaceModeField>(params: {
+  field: TField;
+  botLabel: string;
+  targetId: string;
+  routes: Record<string, SurfaceModeSource & Record<string, unknown>>;
+}) {
+  const normalizedTargetId = params.targetId.trim();
+  if (!normalizedTargetId) {
+    throw new Error(
+      `${params.botLabel} ${renderFieldLabel(params.field)} target must use dm:<id|*>.`,
+    );
+  }
+
+  const routeKey = `dm:${normalizedTargetId}`;
+  const exactRoute = resolveDirectMessageExactRoute(params.routes, normalizedTargetId);
+  const wildcardRoute = resolveDirectMessageWildcardRoute(params.routes);
+
+  return {
+    get: () =>
+      getModeValue(exactRoute, params.field) ??
+      getModeValue(wildcardRoute, params.field),
+    set: (value: SurfaceModeValueMap[TField]) => {
+      const route =
+        params.routes[routeKey] ??
+        (params.routes[routeKey] = createDirectMessageBehaviorOverride());
+      setModeValue(route, params.field, value);
+    },
+    label: `${params.botLabel} ${routeKey}`,
+  } satisfies SurfaceModeTargetBinding<TField>;
+}
+
 function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   config: ClisbotConfig,
   field: TField,
@@ -130,17 +166,15 @@ function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   }
 
   if (kind === "dm") {
-    const routeKey = `dm:${targetId.trim()}`;
-    const route = bot.directMessages[routeKey] ?? bot.directMessages[targetId.trim()];
-    if (!route) {
-      throw new Error(`Route not configured yet: slack ${routeKey}. Add the route first.`);
-    }
+    const binding = resolveDirectMessageModeTarget({
+      field,
+      botLabel: "slack",
+      targetId,
+      routes: bot.directMessages,
+    });
     return {
-      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
-      set: (value) => {
-        setModeValue(route, field, value);
-      },
-      label: `slack ${routeKey}`,
+      ...binding,
+      get: () => binding.get() ?? getModeValue(bot, field),
     };
   }
 
@@ -191,17 +225,15 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
     if (!targetId) {
       throw new Error(`Telegram ${renderFieldLabel(field)} target must use dm:<id|*>.`);
     }
-    const routeKey = `dm:${targetId}`;
-    const route = bot.directMessages[routeKey] ?? bot.directMessages[targetId];
-    if (!route) {
-      throw new Error(`Route not configured yet: telegram ${routeKey}. Add the route first.`);
-    }
+    const binding = resolveDirectMessageModeTarget({
+      field,
+      botLabel: "telegram",
+      targetId,
+      routes: bot.directMessages,
+    });
     return {
-      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
-      set: (value) => {
-        setModeValue(route, field, value);
-      },
-      label: `telegram ${routeKey}`,
+      ...binding,
+      get: () => binding.get() ?? getModeValue(bot, field),
     };
   }
 

@@ -7,10 +7,12 @@ import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { parseAgentCommand } from "../../agents/commands.ts";
 import { processChannelInteraction } from "../interaction-processing.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
-import { isSlackSenderAllowed } from "../pairing/access.ts";
+import {
+  isSlackSenderAllowed,
+  isSlackSenderBlocked,
+} from "../pairing/access.ts";
 import { buildPairingReplyFromRequest } from "../pairing/messages.ts";
 import {
-  readChannelAllowFromStore,
   upsertChannelPairingRequest,
 } from "../pairing/store.ts";
 import { ProcessedEventsStore } from "../processed-events-store.ts";
@@ -73,7 +75,7 @@ import {
 import type { SlackBotCredentialConfig } from "../../config/channel-bots.ts";
 import {
   resolveSlackBotConfig,
-  resolveSlackDirectMessageConfig,
+  resolveSlackDirectMessageAdmissionConfig,
 } from "../../config/channel-bots.ts";
 import { logLatencyDebug } from "../../control/latency-debug.ts";
 import { buildTokenHint } from "../runtime-identity.ts";
@@ -148,7 +150,7 @@ export class SlackSocketService {
   }
 
   private getDirectMessageConfig(userId?: string) {
-    return resolveSlackDirectMessageConfig(this.getBotConfig(), userId);
+    return resolveSlackDirectMessageAdmissionConfig(this.getBotConfig());
   }
 
   private getSlackMaxChars(agentId: string) {
@@ -365,10 +367,18 @@ export class SlackSocketService {
         identity: dmIdentity,
       });
 
+      if (isSlackSenderBlocked({
+        blockFrom: dmConfig.blockUsers ?? [],
+        userId: directUserId,
+      })) {
+        debugSlackEvent("drop-dm-blocked", { eventId, directUserId });
+        await this.processedEventsStore.markCompleted(eventId);
+        return;
+      }
+
       if (dmConfig.policy !== "open" && !auth.mayBypassPairing) {
-        const storedAllowFrom = await readChannelAllowFromStore("slack");
         const allowed = isSlackSenderAllowed({
-          allowFrom: [...dmConfig.allowUsers, ...storedAllowFrom],
+          allowFrom: dmConfig.allowUsers ?? [],
           userId: directUserId,
         });
         if (!allowed) {
@@ -376,10 +386,12 @@ export class SlackSocketService {
             const pairingRequest = await upsertChannelPairingRequest({
               channel: "slack",
               id: directUserId,
+              botId: this.botId,
             });
             const pairingReply = buildPairingReplyFromRequest({
               channel: "slack",
               idLine: `Your Slack user id: ${directUserId}`,
+              botId: this.botId,
               pairingRequest,
             });
             if (pairingReply) {

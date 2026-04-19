@@ -63,13 +63,15 @@ describe("loadConfig", () => {
       participationTtlMin: 13,
     };
     config.bots.slack.default.directMessages = {
-      "dm:U123": {
+      "*": {
         enabled: true,
         requireMention: false,
         policy: "allowlist",
-        allowUsers: ["U123"],
-        blockUsers: [],
+        allowUsers: ["U999"],
+        blockUsers: ["U555"],
         allowBots: false,
+      },
+      U123: {
         responseMode: "message-tool",
         additionalMessageMode: "queue",
       },
@@ -124,8 +126,11 @@ describe("loadConfig", () => {
     });
     expect(resolvedSlackBot.followUp.mode).toBe("auto");
     expect(resolvedSlackBot.followUp.participationTtlMin).toBe(13);
-    expect(resolvedSlackBot.directMessages["dm:U123"]?.policy).toBe("allowlist");
-    expect(resolvedSlackBot.directMessages["dm:U123"]?.allowUsers).toEqual(["U123"]);
+    expect(resolvedSlackBot.directMessages["dm:*"]?.policy).toBe("allowlist");
+    expect(resolvedSlackBot.directMessages["dm:*"]?.allowUsers).toEqual(["U999"]);
+    expect(resolvedSlackBot.directMessages["dm:*"]?.blockUsers).toEqual(["U555"]);
+    expect(resolvedSlackBot.directMessages["dm:U123"]?.policy).toBeUndefined();
+    expect(resolvedSlackBot.directMessages["dm:U123"]?.allowUsers).toEqual([]);
     expect(resolvedSlackBot.directMessages["dm:U123"]?.responseMode).toBe("message-tool");
     expect(resolvedSlackBot.directMessages["dm:U123"]?.additionalMessageMode).toBe("queue");
     expect(loaded.raw.agents.defaults.runner.codex.sessionId!.capture.mode).toBe(

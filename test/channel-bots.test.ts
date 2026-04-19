@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
   listSlackBots,
+  resolveSlackBotConfig,
   resolveSlackBotCredentials,
+  resolveSlackDirectMessageConfig,
   resolveTelegramBotCredentials,
 } from "../src/config/channel-bots.ts";
+import { normalizeConfigDirectMessageRoutes } from "../src/config/direct-message-routes.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 
@@ -67,5 +70,35 @@ describe("channel bots", () => {
     expect(listSlackBots(config.bots.slack).map((entry) => entry.botId)).toEqual([
       "work",
     ]);
+  });
+
+  test("treats exact DM routes as behavior-only overrides", () => {
+    const config = createConfig();
+    config.bots.slack.work.directMessages = {
+      "*": {
+        enabled: true,
+        policy: "allowlist",
+        allowUsers: ["U123"],
+        blockUsers: ["U999"],
+        allowBots: false,
+        responseMode: "capture-pane",
+      },
+      U123: {
+        responseMode: "message-tool",
+      } as any,
+    };
+
+    const normalized = normalizeConfigDirectMessageRoutes(
+      clisbotConfigSchema.parse(config),
+    );
+    const resolved = resolveSlackDirectMessageConfig(
+      resolveSlackBotConfig(normalized.bots.slack, "work"),
+      "U123",
+    );
+
+    expect(resolved?.policy).toBe("allowlist");
+    expect(resolved?.allowUsers).toEqual(["U123"]);
+    expect(resolved?.blockUsers).toEqual(["U999"]);
+    expect(resolved?.responseMode).toBe("message-tool");
   });
 });

@@ -34,7 +34,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
   return JSON.stringify(
     {
       meta: {
-        schemaVersion: "0.1.39",
+        schemaVersion: "0.1.41",
         lastTouchedAt: new Date().toISOString(),
       },
       app: {
@@ -146,7 +146,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
               loadingMessages: [],
             },
             directMessages: {
-              "*": {
+              "dm:*": {
                 enabled: true,
                 requireMention: false,
                 policy: "pairing",
@@ -196,7 +196,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
               requireFinalResponse: true,
             },
             directMessages: {
-              "*": {
+              "dm:*": {
                 enabled: true,
                 requireMention: false,
                 policy: "pairing",

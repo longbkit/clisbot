@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,11 +10,18 @@ import { runRoutesCli } from "../src/control/routes-cli.ts";
 describe("routes cli", () => {
   let tempDir = "";
   let previousConfigPath: string | undefined;
+  let previousCliName: string | undefined;
   const originalLog = console.log;
+
+  beforeEach(() => {
+    previousCliName = process.env.CLISBOT_CLI_NAME;
+    delete process.env.CLISBOT_CLI_NAME;
+  });
 
   afterEach(() => {
     console.log = originalLog;
     process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
+    process.env.CLISBOT_CLI_NAME = previousCliName;
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
       tempDir = "";
@@ -197,5 +204,101 @@ describe("routes cli", () => {
     await expect(runRoutesCli(["list", "--channel", "discord"])).rejects.toThrow(
       "clisbot routes",
     );
+  });
+
+  test("help explains DM wildcard auth ownership", async () => {
+    const lines: string[] = [];
+    console.log = ((line?: unknown) => {
+      lines.push(String(line ?? ""));
+    }) as typeof console.log;
+
+    await runRoutesCli(["help"]);
+
+    const text = lines.join("\n");
+    expect(text).toContain("For DM auth, mutate `dm:*`, not `dm:<userId>`.");
+    expect(text).toContain("pairing approve <channel> <code>");
+    expect(text).toContain("routes add-block-user --channel telegram dm:* --bot alerts --user 1276408333");
+  });
+
+  test("rejects DM admission policy changes on exact DM routes", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "slack",
+      "dm:U123",
+      "--bot",
+      "default",
+    ]);
+
+    await expect(
+      runRoutesCli([
+        "set-policy",
+        "--channel",
+        "slack",
+        "dm:U123",
+        "--bot",
+        "default",
+        "--policy",
+        "disabled",
+      ]),
+    ).rejects.toThrow("dm:* only");
+  });
+
+  test("rejects DM allowlist mutations on exact DM routes", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "slack",
+      "dm:U123",
+      "--bot",
+      "default",
+    ]);
+
+    await expect(
+      runRoutesCli([
+        "add-allow-user",
+        "--channel",
+        "slack",
+        "dm:U123",
+        "--bot",
+        "default",
+        "--user",
+        "U123",
+      ]),
+    ).rejects.toThrow("dm:* only");
+  });
+
+  test("materializes the DM wildcard route when mutating DM allow users", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add-allow-user",
+      "--channel",
+      "slack",
+      "dm:*",
+      "--bot",
+      "default",
+      "--user",
+      "U123",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.slack.default.directMessages["dm:*"].allowUsers).toEqual(["U123"]);
   });
 });

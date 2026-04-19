@@ -1,13 +1,28 @@
-import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPairingCli } from "../src/channels/pairing/cli.ts";
+import { writeEditableConfig } from "../src/config/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 import {
   listChannelPairingRequests,
-  readChannelAllowFromStore,
   upsertChannelPairingRequest,
 } from "../src/channels/pairing/store.ts";
+
+let previousCliName: string | undefined;
+let previousConfigPath: string | undefined;
+
+beforeEach(() => {
+  previousCliName = process.env.CLISBOT_CLI_NAME;
+  delete process.env.CLISBOT_CLI_NAME;
+});
+
+afterEach(() => {
+  process.env.CLISBOT_CLI_NAME = previousCliName;
+  process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
+});
 
 function withPairingDir(
   tempDir: string,
@@ -22,6 +37,19 @@ function withPairingDir(
       process.env.CLISBOT_PAIRING_DIR = previousDir;
     }
   });
+}
+
+async function seedConfig(configPath: string) {
+  const config = clisbotConfigSchema.parse(
+    JSON.parse(
+      renderDefaultConfigTemplate({
+        slackEnabled: true,
+        telegramEnabled: true,
+      }),
+    ),
+  );
+  config.agents.list = [{ id: "default" }];
+  await writeEditableConfig(configPath, config);
 }
 
 describe("pairing cli", () => {
@@ -63,9 +91,13 @@ describe("pairing cli", () => {
   test("approves a pending code", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-pairing-cli-"));
     try {
+      previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+      process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+      await seedConfig(process.env.CLISBOT_CONFIG_PATH);
       const created = await upsertChannelPairingRequest({
         channel: "telegram",
         id: "123456",
+        botId: "default",
         baseDir: tempDir,
       });
 
@@ -76,7 +108,46 @@ describe("pairing cli", () => {
         });
       });
 
-      expect(lines.join("\n")).toContain("Approved telegram sender 123456.");
+      expect(lines.join("\n")).toContain("Approved telegram sender 123456 for bot default.");
+      const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+      expect(rawConfig.bots.telegram.default.directMessages["dm:*"].allowUsers).toEqual(["123456"]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("approval is scoped to the requesting bot", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-pairing-cli-"));
+    try {
+      previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+      process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+      await seedConfig(process.env.CLISBOT_CONFIG_PATH);
+
+      const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+      rawConfig.bots.telegram.support = {
+        ...rawConfig.bots.telegram.default,
+        name: "support",
+        botToken: "${TELEGRAM_SUPPORT_BOT_TOKEN}",
+        directMessages: {},
+      };
+      await writeEditableConfig(process.env.CLISBOT_CONFIG_PATH!, rawConfig);
+
+      const created = await upsertChannelPairingRequest({
+        channel: "telegram",
+        id: "123456",
+        botId: "support",
+        baseDir: tempDir,
+      });
+
+      await withPairingDir(tempDir, async () => {
+        await runPairingCli(["approve", "telegram", created.code], {
+          log: () => {},
+        });
+      });
+
+      const updatedConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+      expect(updatedConfig.bots.telegram.support.directMessages["dm:*"].allowUsers).toEqual(["123456"]);
+      expect(updatedConfig.bots.telegram.default.directMessages["dm:*"]).toBeUndefined();
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -100,7 +171,6 @@ describe("pairing cli", () => {
 
       expect(lines.join("\n")).toContain("Rejected slack sender U123.");
       expect(await listChannelPairingRequests("slack", tempDir)).toEqual([]);
-      expect(await readChannelAllowFromStore("slack", tempDir)).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

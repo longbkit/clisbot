@@ -49,6 +49,16 @@ export function isSlackSenderAllowed(params: {
     .includes(normalizedUserId);
 }
 
+export function isSlackSenderBlocked(params: {
+  blockFrom: string[];
+  userId: string;
+}) {
+  return isSlackSenderAllowed({
+    allowFrom: params.blockFrom,
+    userId: params.userId,
+  });
+}
+
 export function isTelegramSenderAllowed(params: {
   allowFrom: string[];
   userId?: string;
@@ -69,4 +79,16 @@ export function isTelegramSenderAllowed(params: {
   }
 
   return false;
+}
+
+export function isTelegramSenderBlocked(params: {
+  blockFrom: string[];
+  userId?: string;
+  username?: string;
+}) {
+  return isTelegramSenderAllowed({
+    allowFrom: params.blockFrom,
+    userId: params.userId,
+    username: params.username,
+  });
 }
