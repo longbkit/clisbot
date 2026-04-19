@@ -785,10 +785,17 @@ async function executePromptDelivery<TChunk>(params: {
     });
   }
 
-  async function waitForMessageToolFinalReply() {
-    const deadline = Date.now() + MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS;
+  async function waitForMessageToolFinalReply(params: {
+    deadlineAt?: number;
+    stopWhen?: () => boolean;
+  } = {}) {
+    const deadline = params.deadlineAt ?? (Date.now() + MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS);
 
     while (true) {
+      if (params.stopWhen?.()) {
+        return false;
+      }
+
       const signals = await getMessageToolRuntimeSignals();
       const toolFinalSeen =
         typeof signals.messageToolFinalReplyAt === "number" &&
@@ -993,6 +1000,40 @@ async function executePromptDelivery<TChunk>(params: {
         text: queuedText,
         body: "",
       };
+    }
+
+    const returnOnToolFinal =
+      params.route.responseMode === "message-tool" &&
+      params.forceQueuedDelivery !== true;
+    let stopEarlyToolFinalWait = false;
+    const earlyToolFinalOutcome = returnOnToolFinal
+      ? await Promise.race([
+        result.then(
+          () => "result" as const,
+          () => "result" as const,
+        ),
+        waitForMessageToolFinalReply({
+          deadlineAt: Number.POSITIVE_INFINITY,
+          stopWhen: () => stopEarlyToolFinalWait,
+        }).then((seen) => (seen ? "tool-final" as const : "result" as const)),
+      ])
+      : "result";
+    stopEarlyToolFinalWait = true;
+
+    if (earlyToolFinalOutcome === "tool-final") {
+      await renderChain;
+      if (messageToolPreview && responseChunks.length > 0) {
+        await handoffMessageToolPreview();
+      } else if (params.route.response === "final") {
+        await clearResponseText();
+      }
+      void result.catch((error) => {
+        console.error(
+          "message-tool run settled after the channel already observed a final reply",
+          error,
+        );
+      });
+      return;
     }
 
     const finalResult = await result;
