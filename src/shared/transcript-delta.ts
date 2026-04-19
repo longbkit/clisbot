@@ -187,7 +187,7 @@ export function deriveBoundedRunningRewritePreview(params: {
 
   const changedLines = currentLines.slice(prefix, currentLines.length - suffix);
   if (changedLines.length === 0) {
-    return current;
+    return current === previous ? current : "";
   }
 
   if (changedLines.length <= maxLines) {

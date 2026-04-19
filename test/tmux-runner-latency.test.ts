@@ -621,6 +621,88 @@ describe("tmux runner latency behavior", () => {
     ]);
   });
 
+  test("monitorTmuxRun does not replay already-streamed lines after a bounded rewrite shrinks", async () => {
+    const initialSnapshot = "READY";
+    const snapshots = [
+      ["draft 1", "draft 2"].join("\n"),
+      [
+        "final 1",
+        "final 2",
+        "final 3",
+        "final 4",
+        "final 5",
+        "final 6",
+        "final 7",
+        "final 8",
+        "final 9",
+        "final 10",
+      ].join("\n"),
+      [
+        "final 1",
+        "final 2",
+        "final 3",
+        "final 4",
+        "final 5",
+        "final 6",
+        "final 7",
+      ].join("\n"),
+      [
+        "final 1",
+        "final 2",
+        "final 3",
+        "final 4",
+        "final 5",
+        "final 6",
+        "final 7",
+      ].join("\n"),
+    ];
+    let captureIndex = 0;
+    const runningSnapshots: string[] = [];
+
+    const fakeTmux = {
+      async capturePane() {
+        const snapshot = snapshots[Math.min(captureIndex, snapshots.length - 1)] ?? "";
+        captureIndex += 1;
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: undefined,
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1_000,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot,
+      detachedAlready: false,
+      onRunning: async (update) => {
+        runningSnapshots.push(update.snapshot);
+      },
+      onDetached: async () => undefined,
+      onCompleted: async () => undefined,
+    });
+
+    expect(runningSnapshots).toEqual([
+      ["draft 1", "draft 2"].join("\n"),
+      [
+        "...[2 more changed lines]",
+        "final 3",
+        "final 4",
+        "final 5",
+        "final 6",
+        "final 7",
+        "final 8",
+        "final 9",
+        "final 10",
+      ].join("\n"),
+    ]);
+  });
+
   test("submitTmuxSessionInput retries Enter once when pane state stays unchanged", async () => {
     let enterCount = 0;
     let state = {

@@ -49,7 +49,8 @@ export type TmuxRunMonitorParams = {
 
 export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let previousSnapshot = params.initialSnapshot;
-  let previousRunningSnapshot = "";
+  let previousRunningTruth = "";
+  let previousRenderedRunningSnapshot = "";
   let lastPaneChangeAt = params.startedAt;
   let sawActivity = false;
   let sawPaneChange = false;
@@ -107,23 +108,29 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       paneChanged &&
       !runningDelta &&
       Boolean(baselineRunningSnapshot) &&
-      baselineRunningSnapshot !== previousRunningSnapshot;
-    const runningSnapshot = runningDelta
-      ? previousRunningSnapshot
-        ? appendInteractionText(previousRunningSnapshot, runningDelta)
+      baselineRunningSnapshot !== previousRunningTruth;
+    const nextRunningTruth = runningDelta
+      ? previousRunningTruth
+        ? appendInteractionText(previousRunningTruth, runningDelta)
         : runningDelta
       : shouldReplaceRunningSnapshot
+        ? baselineRunningSnapshot
+        : previousRunningTruth;
+    const runningSnapshot = runningDelta
+      ? nextRunningTruth
+      : shouldReplaceRunningSnapshot
         ? deriveBoundedRunningRewritePreview({
-            previousSnapshot: previousRunningSnapshot,
-            snapshot: baselineRunningSnapshot,
+            previousSnapshot: previousRunningTruth,
+            snapshot: nextRunningTruth,
             maxLines: RUNNING_REWRITE_PREVIEW_MAX_LINES,
           })
         : "";
 
     previousSnapshot = snapshot;
+    previousRunningTruth = nextRunningTruth;
 
-    if (runningSnapshot && runningSnapshot !== previousRunningSnapshot) {
-      previousRunningSnapshot = runningSnapshot;
+    if (runningSnapshot && runningSnapshot !== previousRenderedRunningSnapshot) {
+      previousRenderedRunningSnapshot = runningSnapshot;
       sawActivity = true;
       if (!firstMeaningfulDeltaLogged) {
         firstMeaningfulDeltaLogged = true;
@@ -142,7 +149,10 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
     if (!detachedNotified && now - params.startedAt >= params.maxRuntimeMs) {
       detachedNotified = true;
       await params.onDetached({
-        snapshot: previousRunningSnapshot || deriveInteractionText(params.initialSnapshot, snapshot),
+        snapshot:
+          previousRenderedRunningSnapshot ||
+          previousRunningTruth ||
+          deriveInteractionText(params.initialSnapshot, snapshot),
         fullSnapshot: previousSnapshot,
         initialSnapshot: params.initialSnapshot,
       });

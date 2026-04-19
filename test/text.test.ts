@@ -245,6 +245,19 @@ This project maps channel messages into tmux-backed agents.
     ].join("\n"));
   });
 
+  test("deriveBoundedRunningRewritePreview suppresses delete-only rewrites", () => {
+    const previous = ["final 1", "final 2", "final 3", "final 4"].join("\n");
+    const current = ["final 1", "final 2", "final 3"].join("\n");
+
+    expect(
+      deriveBoundedRunningRewritePreview({
+        previousSnapshot: previous,
+        snapshot: current,
+        maxLines: 2,
+      }),
+    ).toBe("");
+  });
+
   test("unwraps soft-wrapped tmux lines into cleaner Slack text", () => {
     const cleaned = cleanInteractionSnapshot(`
 • As of April 4, 2026, I’m not seeing a new official Google update on Gemma 4
