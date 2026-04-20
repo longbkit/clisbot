@@ -40,16 +40,11 @@ If this page and runtime ever disagree, runtime wins.
 
 - `/followup status`
 - `/followup auto`
-- `/followup mention-only`
-- `/followup mention-only channel`
-- `/followup mention-only all`
-- `/mention`: shortcut for `/followup mention-only` in the current conversation
-- `/mention channel`: persist mention-only as the default for the current channel or group and apply it to this conversation now
-- `/mention all`: persist mention-only as the default for all routed conversations on the current bot and apply it to this conversation now
-- `/followup pause`
-- `/followup resume`
-- `/pause`: shortcut for `/followup pause`
-- `/resume`: shortcut for `/followup resume`
+- `/followup mention-only` or `/mention`: require explicit mention in the current conversation
+- `/followup mention-only channel` or `/mention channel`: persist mention-only as the default for the current channel or group and apply it now
+- `/followup mention-only all` or `/mention all`: persist mention-only as the default for all routed conversations on the current bot and apply it now
+- `/followup pause` or `/pause`
+- `/followup resume` or `/resume`
 - `/streaming status`
 - `/streaming on`
 - `/streaming off`

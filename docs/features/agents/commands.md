@@ -47,32 +47,22 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/nudge`: send one extra `Enter` to the current tmux session without resending the prompt body
 - `/followup status`
 - `/followup auto`
-- `/followup mention-only`
-- `/followup mention-only channel`
-- `/followup mention-only all`
-- `/mention`
-- `/mention channel`
-- `/mention all`
-- `/followup pause`
-- `/followup resume`
-- `/pause`
-- `/resume`
+- `/followup mention-only` or `/mention`
+- `/followup mention-only channel` or `/mention channel`
+- `/followup mention-only all` or `/mention all`
+- `/followup pause` or `/pause`
+- `/followup resume` or `/resume`
 
 Current meaning:
 
 - `start`: show the current route onboarding or setup guidance
 - `status`: show the current conversation follow-up policy and operator guidance for the route
 - `auto`: continue naturally after the bot has replied in the thread, subject to policy TTL
-- `mention-only`: require explicit mention for every later turn in the thread
-- `mention-only channel`: persist mention-only as the default for the current channel, group, or DM container
-- `mention-only all`: persist mention-only as the default for all routed conversations on the current bot
-- `pause`: stop passive follow-up until explicitly resumed or re-activated
-- `resume`: restore the default follow-up policy for that conversation
-- `/mention`: shortcut alias for `mention-only` in the current conversation
-- `/mention channel`: shortcut alias for `mention-only channel`
-- `/mention all`: shortcut alias for `mention-only all`
-- `/pause`: shortcut alias for `pause`
-- `/resume`: shortcut alias for `resume`
+- `mention-only`: require explicit mention for every later turn in the thread; shorthand: `/mention`
+- `mention-only channel`: persist mention-only as the default for the current channel, group, or DM container; shorthand: `/mention channel`
+- `mention-only all`: persist mention-only as the default for all routed conversations on the current bot; shorthand: `/mention all`
+- `pause`: stop passive follow-up until explicitly resumed or re-activated; shorthand: `/pause`
+- `resume`: restore the default follow-up policy for that conversation; shorthand: `/resume`
 
 These commands should stay agent-scoped.
 
