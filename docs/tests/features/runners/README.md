@@ -214,6 +214,33 @@ Implemented
 - the captured value is persisted under the current `sessionKey`
 - later restart can use that stored session id for resume
 
+## Test Case 7AA: tmux Runner Does Not Lose The First User Prompt Right After Status-Command Capture
+
+### Status
+
+Implemented
+
+### Preconditions
+
+- the backend creates its own session id
+- runner config enables `capture.mode: "status-command"`
+- the first routed prompt after `/status` is the highest-risk path under investigation
+
+### Steps
+
+1. launch a new tmux runner session through the routed path
+2. let the runner send the configured status command and capture the returned session id
+3. immediately send the first real user prompt
+4. simulate a case where that first prompt paste does not land in the current pane
+
+### Expected Results
+
+- the runner does not send `Enter` until prompt paste is truthfully confirmed
+- the runner retries paste delivery a bounded number of times in the same pane first
+- if paste still never lands, the runner kills only that tmux session, clears continuity safely, and retries once in one fresh session
+- the prompt is replayed only on that safe fresh retry path where no truthful `Enter` happened yet
+- if the fresh retry succeeds, the user sees one truthful successful run instead of a stuck idle session
+
 ## Test Case 7B: tmux Runner Can Reuse An Explicit Session Id
 
 ### Status

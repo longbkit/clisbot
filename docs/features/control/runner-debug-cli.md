@@ -67,7 +67,10 @@ It is intentionally separate from `updatedAt` because:
 ### `clisbot runner list`
 
 - prints current tmux runner sessions
+- prefixes each entry header with `sessionName:` for faster scanning
 - sorts sessions by newest `lastAdmittedPromptAt` when known
+- shows mapped `sessionId` when stored, otherwise `sessionId: none`
+- shows simple state from stored runtime when available, otherwise `state: unmanaged` for tmux-only sessions
 - still shows unnamed tmux-only sessions even if no persisted metadata row matches
 
 ### `clisbot runner inspect <session-name>`

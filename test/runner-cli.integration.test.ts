@@ -126,28 +126,47 @@ describe("runner cli integration", () => {
 
     await createSessionWithOutput(tmux, dir, "alpha", "alpha output");
     await createSessionWithOutput(tmux, dir, "beta", "beta output");
+    await createSessionWithOutput(tmux, dir, "gamma", "gamma output");
     await writeSessionStore(sessionStorePath, [
       {
         agentId: "default",
         sessionKey: "alpha",
+        sessionId: "",
         workspacePath: join(dir, "workspaces", "default"),
         runnerCommand: "codex",
         lastAdmittedPromptAt: now - 10_000,
+        runtime: {
+          state: "idle",
+        },
         updatedAt: now - 10_000,
       },
       {
         agentId: "default",
         sessionKey: "beta",
+        sessionId: "session-beta",
         workspacePath: join(dir, "workspaces", "default"),
         runnerCommand: "codex",
         lastAdmittedPromptAt: now - 1_000,
+        runtime: {
+          state: "running",
+        },
         updatedAt: now - 1_000,
       },
     ]);
 
     const result = await runRunnerCliCommand(configPath, ["list"]);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.indexOf("- beta")).toBeLessThan(result.stdout.indexOf("- alpha"));
+    expect(result.stdout.indexOf("- sessionName: beta")).toBeLessThan(
+      result.stdout.indexOf("- sessionName: alpha"),
+    );
+    expect(result.stdout.indexOf("- sessionName: alpha")).toBeLessThan(
+      result.stdout.indexOf("- sessionName: gamma"),
+    );
+    expect(result.stdout).toContain("sessionId: session-beta");
+    expect(result.stdout).toContain("sessionId: none");
+    expect(result.stdout).toContain("state: running");
+    expect(result.stdout).toContain("state: idle");
+    expect(result.stdout).toContain("- sessionName: gamma\n  sessionId: none\n  state: unmanaged");
     expect(result.stdout).toContain("lastAdmittedPromptAt");
   }, 15000);
 

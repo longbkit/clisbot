@@ -11,6 +11,7 @@ import {
   defaultAgentAuthConfig,
   defaultAppAuthConfig,
 } from "./auth-schema.ts";
+import { getDefaultRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
 
 const defaultSessionIdPattern =
   "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
@@ -503,6 +504,8 @@ const appControlLoopSchema = z.object({
   maxTimes: z.number().int().positive().optional(),
 });
 
+const defaultRuntimeMonitorRestartBackoff = getDefaultRuntimeMonitorRestartBackoff();
+
 const appControlRuntimeMonitorSchema = z.object({
   restartBackoff: z.object({
     fastRetry: z.object({
@@ -515,32 +518,8 @@ const appControlRuntimeMonitorSchema = z.object({
     stages: z.array(z.object({
       delayMinutes: z.number().int().positive().default(15),
       maxRestarts: z.number().int().positive().default(4),
-    })).min(1).default([
-      {
-        delayMinutes: 15,
-        maxRestarts: 4,
-      },
-      {
-        delayMinutes: 30,
-        maxRestarts: 4,
-      },
-    ]),
-  }).default({
-    fastRetry: {
-      delaySeconds: 10,
-      maxRestarts: 3,
-    },
-    stages: [
-      {
-        delayMinutes: 15,
-        maxRestarts: 4,
-      },
-      {
-        delayMinutes: 30,
-        maxRestarts: 4,
-      },
-    ],
-  }),
+    })).min(1).default(defaultRuntimeMonitorRestartBackoff.stages),
+  }).default(defaultRuntimeMonitorRestartBackoff),
   ownerAlerts: z.object({
     enabled: z.boolean().default(true),
     minIntervalMinutes: z.number().int().positive().default(30),
@@ -718,10 +697,10 @@ const agentsDefaultsSchema = z.object({
 
 export const clisbotConfigSchema = z.object({
   meta: z.object({
-    schemaVersion: z.string().min(1).default("0.1.41"),
+    schemaVersion: z.string().min(1).default("0.1.42"),
     lastTouchedAt: z.string().optional(),
   }).default({
-    schemaVersion: "0.1.41",
+    schemaVersion: "0.1.42",
   }),
   app: z.object({
     session: appSessionSchema.default({
@@ -744,22 +723,7 @@ export const clisbotConfigSchema = z.object({
         maxActiveLoops: 10,
       }),
       runtimeMonitor: appControlRuntimeMonitorSchema.default({
-        restartBackoff: {
-          fastRetry: {
-            delaySeconds: 10,
-            maxRestarts: 3,
-          },
-          stages: [
-            {
-              delayMinutes: 15,
-              maxRestarts: 4,
-            },
-            {
-              delayMinutes: 30,
-              maxRestarts: 4,
-            },
-          ],
-        },
+        restartBackoff: defaultRuntimeMonitorRestartBackoff,
         ownerAlerts: {
           enabled: true,
           minIntervalMinutes: 30,
@@ -779,22 +743,7 @@ export const clisbotConfigSchema = z.object({
         maxActiveLoops: 10,
       },
       runtimeMonitor: {
-        restartBackoff: {
-          fastRetry: {
-            delaySeconds: 10,
-            maxRestarts: 3,
-          },
-          stages: [
-            {
-              delayMinutes: 15,
-              maxRestarts: 4,
-            },
-            {
-              delayMinutes: 30,
-              maxRestarts: 4,
-            },
-          ],
-        },
+        restartBackoff: defaultRuntimeMonitorRestartBackoff,
         ownerAlerts: {
           enabled: true,
           minIntervalMinutes: 30,
@@ -822,22 +771,7 @@ export const clisbotConfigSchema = z.object({
         maxActiveLoops: 10,
       },
       runtimeMonitor: {
-        restartBackoff: {
-          fastRetry: {
-            delaySeconds: 10,
-            maxRestarts: 3,
-          },
-          stages: [
-            {
-              delayMinutes: 15,
-              maxRestarts: 4,
-            },
-            {
-              delayMinutes: 30,
-              maxRestarts: 4,
-            },
-          ],
-        },
+        restartBackoff: defaultRuntimeMonitorRestartBackoff,
         ownerAlerts: {
           enabled: true,
           minIntervalMinutes: 30,

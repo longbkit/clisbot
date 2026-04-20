@@ -19,8 +19,11 @@ describe("renderDefaultConfigTemplate", () => {
     expect("channels" in config).toBe(false);
     expect(config.app.auth.defaultRole).toBe("member");
     expect(config.app.control.configReload.watch).toBe(true);
+    expect(config.bots.defaults.allowBots).toBe(false);
     expect(config.bots.slack.defaults.enabled).toBe(false);
+    expect(config.bots.slack.defaults.allowBots).toBe(false);
     expect(config.bots.telegram.defaults.enabled).toBe(false);
+    expect(config.bots.telegram.defaults.allowBots).toBe(false);
     expect(config.bots.slack.default.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.bots.slack.default.botToken).toBe("${SLACK_BOT_TOKEN}");
     expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
@@ -90,7 +93,7 @@ describe("renderDefaultConfigTemplate", () => {
     const parsed = JSON.parse(text);
     const config = clisbotConfigSchema.parse(parsed);
 
-    expect(config.meta.schemaVersion).toBe("0.1.41");
+    expect(config.meta.schemaVersion).toBe("0.1.42");
     expect(Object.keys(config)).toEqual(["meta", "app", "bots", "agents"]);
     expect(config.bots.slack.defaults.defaultBotId).toBe("default");
     expect(config.bots.telegram.defaults.defaultBotId).toBe("default");
@@ -98,6 +101,6 @@ describe("renderDefaultConfigTemplate", () => {
     const editable = await readEditableConfig(
       new URL("../config/clisbot.json.template", import.meta.url).pathname,
     );
-    expect(editable.config.meta.schemaVersion).toBe("0.1.41");
+    expect(editable.config.meta.schemaVersion).toBe("0.1.42");
   });
 });

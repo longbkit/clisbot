@@ -52,6 +52,10 @@ Why this exact form:
 - keep `__CLISBOT_MESSAGE__` alone on its own line when closing the heredoc
 - this pattern is now regression-tested against multi-line text, mixed quotes, shell-like text, steering-style blocks, and markdown code fences
 - `--input md --render native` is the shipped default, so the flags are optional; they are shown here because they make the reply contract explicit and easier to review
+- when attaching something generic, prefer `--file` in agent-facing prompts; `--media` still works as a compatibility alias
+- keep the prompt guidance short by channel:
+  - Telegram reply prompts currently use `--render native`, so raw Markdown should stay comfortably below `4096` after HTML-safe rendering
+  - Slack reply prompts currently use `--render blocks`, so guidance should focus on the content that actually risks overflowing: keep each paragraph, list, or code block comfortably below the `section` limit instead of warning about headings that are already short by default
 
 Common render choices:
 

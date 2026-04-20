@@ -147,10 +147,12 @@ Useful commands inside routed Slack and Telegram conversations:
 - `/stop`
 - `/nudge`
 - `/followup status`
+- `/followup mention-only` or `/mention`
+- `/followup mention-only channel` or `/mention channel`
+- `/followup mention-only all` or `/mention all`
 - `/followup auto`
-- `/followup mention-only`
-- `/followup pause`
-- `/followup resume`
+- `/followup pause` or `/pause`
+- `/followup resume` or `/resume`
 
 Useful rule of thumb:
 

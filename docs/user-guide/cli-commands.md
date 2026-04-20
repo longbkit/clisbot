@@ -394,9 +394,15 @@ Important behavior:
   - `--render <native|none|html|mrkdwn|blocks>`
   - `--body-file <path>` as an alternative to `--message`
   - `--message-file <path>` as a compatibility alias for `--body-file`
+  - `--file <path-or-url>` as the preferred attachment flag
+  - `--media <path-or-url>` as a compatibility alias for `--file`
 - default behavior is intentionally short and stable:
   - `--input md`
   - `--render native`
+- keep agent reply prompts short by channel:
+  - Telegram `native` or `html`: the final payload must stay under `4096` characters, so Markdown-to-HTML paths should leave headroom
+  - Slack text or `mrkdwn`: prefer text under `4000` characters; Slack truncates very long text after `40000`
+  - Slack `blocks`: keep header text under `150`, section text under `3000`, and total blocks under `50`
 - `native` means channel-owned rendering:
   - Telegram currently resolves to Telegram-safe HTML
   - Slack currently resolves to Slack `mrkdwn`
@@ -426,6 +432,7 @@ Important behavior:
 Important behavior:
 
 - main help promotes `clisbot runner list` and `clisbot runner watch --latest` as the fastest tmux debug entry points
+- `runner list` shows mapped `sessionId` plus a simple persisted state when available; tmux-only sessions are labeled `unmanaged`
 - `clisbot status` includes the newest five runner sessions by default; if there are more, it prints `(n) sessions more`
 - `watch --latest` means the session with the newest admitted prompt, not the newest tmux spawn
 - `watch --next` waits for the first newly admitted prompt after the command starts, then sticks to that session

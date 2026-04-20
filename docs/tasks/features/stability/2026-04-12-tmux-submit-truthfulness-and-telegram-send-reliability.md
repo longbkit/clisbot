@@ -9,8 +9,9 @@ The reported symptom is that the human sends a message, nothing gets processed, 
 Bounded retry rule for this flow:
 
 - startup: one fresh-start retry if the runner times out before ready state
-- paste: one confirmation revalidation if prompt delivery is not yet visibly confirmed
+- paste: up to three prompt-delivery attempts before `Enter`
 - submit: one retry if `Enter` still does not confirm execution
+- post-paste failure before any truthful `Enter`: one fresh-session retry of the whole first-prompt flow
 
 ## Status
 
@@ -52,16 +53,23 @@ The fix must respect the project requirement that stability and speed are both f
 - current implementation work now treats prompt delivery and post-`Enter` submit confirmation as separate phases
 - current implementation work now applies one bounded retry at each relevant phase:
   - one fresh-start retry if startup times out before ready state
-  - one paste confirmation revalidation if prompt delivery is still not visible
+  - one post-`/status` settle window before the first user prompt
+  - up to three paste attempts before `Enter`
   - one `Enter` retry if submit confirmation still does not arrive
+  - one full fresh-session retry only when paste never landed truthfully and `Enter` was never sent
 - live Claude tracing on April 13, 2026 confirmed two concrete runner-side gaps:
   - Claude trust prompt startup text had drifted away from the older Codex-style trust prompt detection, so a fresh Claude workspace could still be blocked even when higher layers thought startup had finished
   - multiline prompt paste could become visibly settled only after the fixed `promptSubmitDelayMs`, so the first `Enter` could be sent too early and get ignored
-- after the latest fix, a new real-world failure was still observed at least once, so the current strategy is improved but not yet stable enough to be treated as closed
+- the key remaining real-world failure is the first user prompt right after `/status` session-id capture:
+  - session id becomes visible
+  - the runner leaves handshake immediately
+  - the pane can still be in a transient post-`/status` state where the first prompt paste does not land
+- the implementation in this batch now targets that post-`/status` first-prompt gap directly
 - the next validation pass needs to cover cases that may stress the current confirmation heuristic more than the traced Slack Claude slice did:
   - prompts with embedded newlines
   - longer prompt bodies
-  - broader pane-state inspection to understand what changed, or failed to change, when submit confirmation still misses reality
+  - delayed redraw after `/status`
+  - broader pane-state inspection to understand what changed, or failed to change, when prompt delivery or submit confirmation still misses reality
 
 ## Non-Goals
 
@@ -74,7 +82,7 @@ The fix must respect the project requirement that stability and speed are both f
 - [ ] capture a reproducible Telegram case with timing notes and runtime logs
 - [ ] compare Telegram and Slack timing around `tmux-submit-start`, `tmux-submit-complete`, and first meaningful output
 - [ ] add explicit validation cases for prompts with embedded newlines and longer prompt bodies
-- [ ] widen submit-confirmation inspection enough to explain which pane signals make the current heuristic fail in the new reported case
+- [x] widen submit-confirmation inspection enough to explain which pane signals make the current heuristic fail in the new reported case
 - [x] verify whether tmux key injection and final Enter submission are actually reaching the pane in the failure case
 - [x] define a truthful post-submit observation rule that distinguishes "submitted and running" from "keystrokes attempted"
 - [x] fix the reliability gap without increasing duplicate-submit risk
@@ -84,11 +92,14 @@ The fix must respect the project requirement that stability and speed are both f
 ## Implementation Notes
 
 - prompt text injection now uses tmux buffer paste with bracketed paste mode so multiline and long prompt delivery is less fragile than raw literal key injection
+- after `capture.mode: "status-command"` finds a session id, the runner now gives the pane one short settle window before the first user prompt flow continues
 - after the configured minimum `promptSubmitDelayMs`, clisbot now waits for visible paste settlement before locking the pre-submit pane baseline
-- if that visible paste confirmation never arrives from pane-state polling, clisbot revalidates once via `capture-pane` before failing with an explicit paste-unconfirmed error
-- clisbot then sends `Enter` and waits only a short confirmation window for pane state to change
+- if paste confirmation never arrives, the runner retries prompt delivery up to three times before any `Enter` is sent
+- clisbot sends `Enter` only after paste truth is confirmed, then waits only a short confirmation window for pane state to change
 - if pane state still does not change, clisbot retries only `Enter` once
-- if pane state remains unchanged after that second `Enter`, clisbot throws an explicit submit-unconfirmed error instead of pretending the prompt was submitted
+- if paste never lands truthfully, clisbot throws an explicit paste-unconfirmed error without sending `Enter`
+- if that paste-unconfirmed failure happens on the first routed prompt, clisbot kills the tmux session, clears session-id continuity, and retries once in one fresh runner session
+- if pane state remains unchanged after the second `Enter`, clisbot throws an explicit submit-unconfirmed error instead of pretending the prompt was submitted
 - if startup times out under a configured ready-pattern gate, clisbot does one fresh-start retry before surfacing the startup failure
 - latency instrumentation now emits:
   - `tmux-paste-retry`
@@ -96,7 +107,9 @@ The fix must respect the project requirement that stability and speed are both f
   - `tmux-submit-enter-retry`
   - `tmux-submit-unconfirmed`
 - this keeps the retry truthful and narrow:
-  - no duplicate prompt body resend during paste confirmation
+  - no `Enter` before paste truth
+  - at most three paste attempts in the same pane
+  - one fresh retry only when no truthful `Enter` has happened yet
   - no open-ended polling
   - only one extra `Enter`
 - this strategy is still provisional:

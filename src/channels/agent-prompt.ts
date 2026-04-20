@@ -42,7 +42,7 @@ export const REPLY_COMMAND = `{{reply_command_base}}
 <user-facing reply>
 __CLISBOT_MESSAGE__
 )" \\
-  [--media /absolute/path/to/file]`;
+  [--file /absolute/path/to/file]`;
 
 export const REPLY_RULES = `When replying to the user:
 - put the user-facing message inside the --message body of that command
@@ -86,10 +86,10 @@ export const TELEGRAM_REPLY_COMMAND_BASE = `{{command}} message send \\
 `;
 
 export const SLACK_REPLY_STYLE_HINT =
-  "Put readable hierarchical Markdown in the --message body.";
+  "Put readable hierarchical Markdown in the --message body.\nKeep each paragraph, list, or code block under 2500 chars.";
 
 export const TELEGRAM_REPLY_STYLE_HINT =
-  "Put readable hierarchical Markdown in the --message body.";
+  "Put readable hierarchical Markdown in the --message body.\nKeep the Markdown body under 3000 chars.";
 
 export const ACCOUNT_CLAUSE = "  --account {{account_id}} \\\n";
 export const EMPTY_ACCOUNT_CLAUSE = "";

@@ -58,10 +58,13 @@ This means the default mental model is:
 - `--message <text>`: inline body
 - `--body-file <path>`: read the body from a file
 - `--message-file <path>`: compatibility alias for `--body-file`
+- `--file <path-or-url>`: preferred attachment flag for files or remote URLs
+- `--media <path-or-url>`: compatibility alias for `--file`
 
 Current product stance:
 
 - operator-facing workflows may use `--body-file` for large payloads
+- agent-facing prompt guidance should prefer `--file` over `--media` so the attachment intent stays generic instead of sounding image-only
 - bot-facing and injected reply guidance should continue to prefer `--message` with inline text or heredoc bodies
 
 ## Input Formats

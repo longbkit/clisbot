@@ -195,15 +195,21 @@ Current config points:
 Current default policy:
 
 - retry every 10 seconds for the first 3 unexpected exits
-- restart every 15 minutes for the first 4 retries
-- then every 30 minutes for the next 4 retries
-- then stop and require an operator restart after the root cause is fixed
+- then back off through a smoother stage ladder: 1 minute, 3 minutes, 5 minutes, 10 minutes, 15 minutes, and finally 30 minutes
+- when the configured ladder reaches the final stage, clisbot keeps retrying at that final-stage delay instead of stopping permanently
+- if an older config still uses the legacy `15m x4` then `30m x4` default ladder, the runtime now normalizes that legacy default into the smoother ladder in memory without rewriting the operator's config file
 
 Current owner alert rule:
 
 - if `app.auth.roles.owner.users` contains reachable principals, the monitor sends a direct alert when the service first enters restart backoff
-- it sends another direct alert when the configured restart budget is exhausted
+- if a configuration truly has no usable final retry stage, it can still send a later direct alert when the configured restart budget is exhausted
 - same-kind alerts are rate-limited by `control.runtimeMonitor.ownerAlerts.minIntervalMinutes`
+
+Telegram polling conflict behavior:
+
+- if another process is temporarily using the same bot token for `getUpdates`, the Telegram channel now stays inside the runtime and retries automatically with backoff instead of stopping permanently
+- channel health should flip to `failed` while the conflict is active, then return to `active` automatically after polling recovers
+- if the polling conflict is unintended, stop the other poller; otherwise clisbot can keep waiting and recover on its own
 
 Codex trust prompt troubleshooting:
 

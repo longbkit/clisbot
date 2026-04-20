@@ -41,7 +41,7 @@ export function renderSlackRouteChoiceMessage(params: {
     `- ${renderCliCommand(`routes add --channel slack channel:${params.channelId} --bot default`, { inline: true })}`,
     `- ${renderCliCommand(`routes set-agent --channel slack channel:${params.channelId} --bot default --agent <id>`, { inline: true })}`,
     "",
-    `After that, ${botReference} and send \`\\start\` or \`\\status\` here.`,
+    `After that, ${botReference} and send \`\\start\`, \`\\status\`, or \`\\mention\` here.`,
   ].join("\n");
 }
 
@@ -51,7 +51,7 @@ export function renderSlackMentionRequiredMessage(botLabel?: string) {
     : "mention this bot";
   return [
     "clisbot: this Slack channel requires a bot mention for new commands.",
-    `Try ${botReference} and send \`\\start\` or \`\\status\` here.`,
+    `Try ${botReference} and send \`\\status\` or \`\\mention\` here.`,
     "After the bot replies in a thread, normal follow-up messages there can continue according to the follow-up policy.",
   ].join("\n");
 }

@@ -47,22 +47,22 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/nudge`: send one extra `Enter` to the current tmux session without resending the prompt body
 - `/followup status`
 - `/followup auto`
-- `/followup mention-only`
-- `/followup pause`
-- `/followup resume`
-- `/pause`
-- `/resume`
+- `/followup mention-only` or `/mention`
+- `/followup mention-only channel` or `/mention channel`
+- `/followup mention-only all` or `/mention all`
+- `/followup pause` or `/pause`
+- `/followup resume` or `/resume`
 
 Current meaning:
 
 - `start`: show the current route onboarding or setup guidance
 - `status`: show the current conversation follow-up policy and operator guidance for the route
 - `auto`: continue naturally after the bot has replied in the thread, subject to policy TTL
-- `mention-only`: require explicit mention for every later turn in the thread
-- `pause`: stop passive follow-up until explicitly resumed or re-activated
-- `resume`: restore the default follow-up policy for that conversation
-- `/pause`: shortcut alias for `pause`
-- `/resume`: shortcut alias for `resume`
+- `mention-only`: require explicit mention for every later turn in the thread; shorthand: `/mention`
+- `mention-only channel`: persist mention-only as the default for the current channel, group, or DM container; shorthand: `/mention channel`
+- `mention-only all`: persist mention-only as the default for all routed conversations on the current bot; shorthand: `/mention all`
+- `pause`: stop passive follow-up until explicitly resumed or re-activated; shorthand: `/pause`
+- `resume`: restore the default follow-up policy for that conversation; shorthand: `/resume`
 
 These commands should stay agent-scoped.
 
@@ -123,6 +123,7 @@ Examples:
 
 - current reserved commands are intentionally small
 - control slash commands are agent-scoped, not workspace-global
+- follow-up can now change at conversation scope or persist to the current channel or bot defaults when the command explicitly asks for it
 - `/bash` and configured bash shortcuts are agent execution commands, not operator control commands
 - current bash routing uses one default reusable shell surface per conversation session
 - future addressing such as `!1:` or `!bash:` belongs to later command-surface expansion, not the current default

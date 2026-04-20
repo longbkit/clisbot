@@ -4,6 +4,11 @@ import type { ChildProcess } from "node:child_process";
 import type { LoadedConfig } from "../src/config/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import {
+  getConfiguredRuntimeMonitorRestartBudget,
+  getRuntimeMonitorRestartPlan,
+  normalizeRuntimeMonitorRestartBackoff,
+} from "../src/config/runtime-monitor-backoff.ts";
 import { serveMonitor, type RuntimeMonitorState } from "../src/control/runtime-monitor.ts";
 import type { ChannelPlugin } from "../src/channels/channel-plugin.ts";
 
@@ -77,7 +82,58 @@ function createLoadedConfig(): LoadedConfig {
 }
 
 describe("serveMonitor", () => {
-  test("restarts with backoff and alerts owners before exhausting the configured budget", async () => {
+  test("normalizes the legacy default restart backoff into the smoother ladder", () => {
+    const normalized = normalizeRuntimeMonitorRestartBackoff({
+      fastRetry: {
+        delaySeconds: 10,
+        maxRestarts: 3,
+      },
+      stages: [
+        {
+          delayMinutes: 15,
+          maxRestarts: 4,
+        },
+        {
+          delayMinutes: 30,
+          maxRestarts: 4,
+        },
+      ],
+    });
+
+    expect(normalized.stages).toEqual([
+      { delayMinutes: 1, maxRestarts: 2 },
+      { delayMinutes: 3, maxRestarts: 2 },
+      { delayMinutes: 5, maxRestarts: 2 },
+      { delayMinutes: 10, maxRestarts: 3 },
+      { delayMinutes: 15, maxRestarts: 4 },
+      { delayMinutes: 30, maxRestarts: 4 },
+    ]);
+  });
+
+  test("repeats the final stage instead of exhausting the configured restart budget", () => {
+    const restartBackoff = {
+      fastRetry: {
+        delaySeconds: 5,
+        maxRestarts: 1,
+      },
+      stages: [
+        {
+          delayMinutes: 1,
+          maxRestarts: 1,
+        },
+      ],
+    };
+
+    const configuredBudget = getConfiguredRuntimeMonitorRestartBudget(restartBackoff);
+    const repeatingPlan = getRuntimeMonitorRestartPlan(restartBackoff, configuredBudget + 1);
+
+    expect(repeatingPlan).not.toBeNull();
+    expect(repeatingPlan?.repeatingFinalStage).toBe(true);
+    expect(repeatingPlan?.delayMs).toBe(60_000);
+    expect(repeatingPlan?.restartsRemaining).toBe(0);
+  });
+
+  test("keeps restarting on the final stage instead of stopping after the configured ladder", async () => {
     const states: RuntimeMonitorState[] = [];
     const sentMessages: string[] = [];
     let now = Date.parse("2026-04-15T00:00:00.000Z");
@@ -134,23 +190,29 @@ describe("serveMonitor", () => {
           spawnCount += 1;
           const child = new EventEmitter() as unknown as ChildProcess;
           (child as { pid?: number }).pid = 999000 + spawnCount;
-          queueMicrotask(() => {
-            (child as unknown as EventEmitter).emit("exit", 1, null);
-          });
+          if (spawnCount >= 4) {
+            queueMicrotask(() => {
+              process.emit("SIGTERM");
+              (child as unknown as EventEmitter).emit("exit", 0, "SIGTERM");
+            });
+          } else {
+            queueMicrotask(() => {
+              (child as unknown as EventEmitter).emit("exit", 1, null);
+            });
+          }
           return child;
         },
         sendSignal: (() => true) as typeof process.kill,
       },
     );
 
-    expect(spawnCount).toBe(3);
+    expect(spawnCount).toBe(4);
     expect(states.some((state) => state.phase === "backoff")).toBe(true);
     expect(states.some((state) => state.restart?.mode === "fast-retry")).toBe(true);
     expect(states.some((state) => state.restart?.mode === "backoff")).toBe(true);
     expect(states.at(-1)?.phase).toBe("stopped");
-    expect(sentMessages).toHaveLength(2);
+    expect(sentMessages).toHaveLength(1);
     expect(sentMessages[0]).toContain("entered restart backoff");
-    expect(sentMessages[1]).toContain("stopped after exhausting the configured restart budget");
     expect(removed.pid).toBe(true);
     expect(removed.runtimeCredentials).toBe(true);
   });

@@ -13,6 +13,7 @@ import {
   dismissTmuxTrustPromptIfPresent,
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
+  TmuxPasteUnconfirmedError,
   tmuxPaneHasTrustPrompt,
   waitForTmuxSessionBootstrap,
 } from "../runners/tmux/session-handshake.ts";
@@ -92,6 +93,10 @@ function isRecoverableStartupSessionLoss(error: unknown) {
     isTmuxServerUnavailableError(error) ||
     isBootstrapSessionLostError(error)
   );
+}
+
+function isFreshStartRetryablePromptDeliveryError(error: unknown) {
+  return error instanceof TmuxPasteUnconfirmedError;
 }
 
 export class RunnerService {
@@ -241,7 +246,10 @@ export class RunnerService {
     error: unknown,
     remainingFreshRetries: number,
   ) {
-    if (!isRecoverableStartupSessionLoss(error)) {
+    if (
+      !isRecoverableStartupSessionLoss(error) &&
+      !isFreshStartRetryablePromptDeliveryError(error)
+    ) {
       return null;
     }
 
@@ -612,6 +620,10 @@ export class RunnerService {
     return isRecoverableStartupSessionLoss(error);
   }
 
+  canRetryPromptAfterFreshStart(error: unknown) {
+    return isFreshStartRetryablePromptDeliveryError(error);
+  }
+
   async reopenRunContext(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
     const resolved = this.resolveTarget(target);
     const existing = await this.sessionState.getEntry(resolved.sessionKey);
@@ -625,7 +637,10 @@ export class RunnerService {
     const resolved = this.resolveTarget(target);
     await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
     await this.sessionState.clearSessionIdEntry(resolved, { runnerCommand: resolved.runner.command });
-    return this.ensureSessionReady(target, { allowFreshRetry: false, timingContext });
+    return this.ensureRunnerReady(target, {
+      allowFreshRetryBeforePrompt: false,
+      timingContext,
+    });
   }
 
   async captureTranscript(target: AgentSessionTarget) {

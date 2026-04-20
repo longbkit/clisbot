@@ -54,13 +54,16 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --final \\");
     expect(prompt).toContain("--message \"$(cat <<\\__CLISBOT_MESSAGE__");
     expect(prompt).toContain("__CLISBOT_MESSAGE__");
-    expect(prompt).toContain("  [--media /absolute/path/to/file]");
+    expect(prompt).toContain("  [--file /absolute/path/to/file]");
     expect(prompt).toContain("When replying to the user:");
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
     expect(prompt).toContain("- use that command only for the final user-facing reply");
     expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
-    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
+    expect(prompt).toContain(
+      "Put readable hierarchical Markdown in the --message body.",
+    );
+    expect(prompt).toContain("Keep each paragraph, list, or code block under 2500 chars.");
     expect(prompt).toContain(
       "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot bots --help`, `clisbot routes --help`, or `clisbot auth --help` for details.",
     );
@@ -103,7 +106,10 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("  --input md \\");
     expect(prompt).toContain("  --render native \\");
     expect(prompt).toContain("  --final \\");
-    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
+    expect(prompt).toContain(
+      "Put readable hierarchical Markdown in the --message body.",
+    );
+    expect(prompt).toContain("Keep the Markdown body under 3000 chars.");
     expect(prompt).toContain("topic Launch (4) in group Release Ops (-1001) | sender Alice Smith (123)");
   });
 
@@ -154,7 +160,7 @@ describe("agent prompt envelope", () => {
     expect(prompt).not.toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(prompt).not.toContain("/tmp/clis message send \\");
     expect(prompt).not.toContain("When replying to the user:");
-    expect(prompt).not.toContain("Put readable hierarchical Markdown in the --message body.");
+    expect(prompt).not.toContain("Write normal Markdown only in the --message body");
     expect(prompt).not.toContain("- send at most 3 progress updates");
     expect(prompt).not.toContain("- send exactly 1 final user-facing response");
   });
@@ -188,7 +194,10 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- put the user-facing message inside the --message body of that command");
     expect(prompt).toContain("- use that command only for the final user-facing reply");
     expect(prompt).toContain("- do not send user-facing progress updates for this conversation");
-    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
+    expect(prompt).toContain(
+      "Put readable hierarchical Markdown in the --message body.",
+    );
+    expect(prompt).toContain("Keep each paragraph, list, or code block under 2500 chars.");
     expect(prompt).not.toContain("Gemini-specific rule:");
   });
 
@@ -223,7 +232,10 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("- send at most 3 progress updates");
     expect(prompt).toContain("- send exactly 1 final user-facing response");
     expect(prompt).toContain("- keep progress updates short and meaningful");
-    expect(prompt).toContain("Put readable hierarchical Markdown in the --message body.");
+    expect(prompt).toContain(
+      "Put readable hierarchical Markdown in the --message body.",
+    );
+    expect(prompt).toContain("Keep the Markdown body under 3000 chars.");
     expect(prompt).toContain(
       "When the user asks to change clisbot configuration, use clisbot CLI commands; see `clisbot --help`, `clisbot bots --help`, `clisbot routes --help`, or `clisbot auth --help` for details.",
     );

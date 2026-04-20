@@ -553,6 +553,85 @@ export class SessionService {
     }
     this.activeRuns.delete(run.resolved.sessionKey);
   }
+
+  private async recoverPromptDeliveryFailure(
+    sessionKey: string,
+    params: {
+      runId: string;
+      prompt?: string;
+      startedAt: number;
+      detachedAlready: boolean;
+      timingContext?: RunObserver["timingContext"];
+      promptRetryAttempt?: number;
+    },
+    error: unknown,
+  ) {
+    if (
+      !params.prompt ||
+      params.promptRetryAttempt ||
+      !this.runnerSessions.canRetryPromptAfterFreshStart(error)
+    ) {
+      return false;
+    }
+
+    const run = this.getRun(sessionKey, params.runId);
+    if (!run) {
+      return true;
+    }
+    const target = {
+      agentId: run.resolved.agentId,
+      sessionKey: run.resolved.sessionKey,
+    };
+
+    await this.notifyRecoveryStep(
+      run,
+      "Prompt delivery did not settle truthfully in the current runner session. clisbot is opening one fresh runner session and retrying the prompt once.",
+    );
+    try {
+      const fresh = await this.runnerSessions.startFreshSession(target, params.timingContext);
+      const currentRun = this.getRun(sessionKey, params.runId);
+      if (!currentRun) {
+        return true;
+      }
+      const restartedAt = Date.now();
+      currentRun.resolved = fresh.resolved;
+      currentRun.steeringReady = false;
+      currentRun.startedAt = restartedAt;
+      currentRun.latestUpdate = this.createRunUpdate({
+        resolved: currentRun.resolved,
+        status: currentRun.latestUpdate.status === "detached" ? "detached" : "running",
+        snapshot: "",
+        fullSnapshot: fresh.initialSnapshot,
+        initialSnapshot: fresh.initialSnapshot,
+        note: "Retrying the prompt in one fresh runner session.",
+        forceVisible: true,
+      });
+      await this.sessionState.setSessionRuntime(currentRun.resolved, {
+        state: "running",
+        startedAt: restartedAt,
+      });
+      await this.notifyRunObservers(currentRun, currentRun.latestUpdate);
+      this.startRunMonitor(sessionKey, {
+        ...params,
+        promptRetryAttempt: 1,
+        initialSnapshot: fresh.initialSnapshot,
+        startedAt: restartedAt,
+      });
+      return true;
+    } catch (freshError) {
+      await this.failActiveRun(
+        sessionKey,
+        run.runId,
+        await this.runnerSessions.mapRunError(
+          freshError,
+          run.resolved.sessionName,
+          run.latestUpdate.fullSnapshot,
+        ),
+      );
+      return true;
+    }
+  }
+
   private async recoverLostMidRun(
     sessionKey: string,
     params: {
@@ -666,6 +745,7 @@ export class SessionService {
       timingContext?: RunObserver["timingContext"];
       snapshotPrefix?: string;
       recoveryAttempt?: number;
+      promptRetryAttempt?: number;
     },
   ) {
     const run = this.getRun(sessionKey, params.runId);
@@ -758,6 +838,22 @@ export class SessionService {
           },
         });
       } catch (error) {
+        if (
+          await this.recoverPromptDeliveryFailure(
+            sessionKey,
+            {
+              runId: params.runId,
+              prompt: params.prompt,
+              startedAt: params.startedAt,
+              detachedAlready: params.detachedAlready,
+              timingContext: params.timingContext,
+              promptRetryAttempt: params.promptRetryAttempt,
+            },
+            error,
+          )
+        ) {
+          return;
+        }
         if (
           await this.recoverLostMidRun(
             sessionKey,

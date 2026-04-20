@@ -141,6 +141,14 @@ Examples of tmux-specific mechanics include:
 
 Those mechanics must stay inside the runner boundary.
 
+Current tmux submit rule in `clisbot` is intentionally narrow and truthful:
+
+- after an internal status-command handshake such as `/status`, the runner gives the pane one short settle window before the first user prompt path continues
+- the runner must confirm prompt paste truth before it sends `Enter`
+- if the prompt is still not visible, the runner may retry paste delivery a bounded number of times in the same pane
+- if paste never lands truthfully and no `Enter` was sent, the runner may reset that tmux session and retry once in one fresh session
+- if `Enter` has already been sent, the runner must not blindly full-reset immediately because that could cut off a real run that started late
+
 ## Snapshot And Streaming Capture
 
 The tmux runner should capture the current visible state of the session and expose it as:
@@ -205,6 +213,7 @@ Current clisbot behavior is narrower than the full ideal:
 - if `create.mode` is `explicit`, the runner relaunches with the same explicit session id
 - if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot clears that continuity entry and starts a fresh tool session
 - if session-id capture never completes, the session can still run, but restart falls back to a fresh tool conversation
+- if the first routed prompt right after status-command capture never lands truthfully, clisbot retries paste in place first, then does one bounded fresh-session retry before surfacing failure
 
 ## Runner Sunsetting
 

@@ -28,7 +28,7 @@ The challenge is not whether AI is useful. It is how to make it work at enterpri
 - Learns from and integrates the two biggest strengths that made OpenClaw popular: memory and native channel integration with deep, channel-specific conversation and presentation capabilities.
 - Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough so you can work from your laptop or on the go without giving up a real coding workspace.
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
-- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, and `/streaming on` to view real-time processing progress for coding tasks.
+- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, `/streaming on` to view real-time processing progress for coding tasks, and `/mention`, `/mention channel`, or `/mention all` to tighten follow-up policy at conversation, route, or bot scope.
 
 ## What to expect
 
@@ -86,6 +86,7 @@ Next steps:
 - To chat with the bot in a group:
   - telegram: Add bot to group, then use slash command in that group /start, you will be guided with command to add a group. Run that command directly or copy that command and chat directly with the bot in DM to ask it do for you (since you are the owner, you are authorized to run that command). After completed, come back to the group and start talk with the bot. 
   - Notice that group has require mention (or tag the bot) enabled by default to avoid abuse. But it also has smart follow up within 5 minutes by default so you dont need to tag it again. You could change the mode by asking the bot to do for you.
+  - If you want stricter mention behavior, use `/mention` for this conversation only, `/mention channel` for the current channel or group default, or `/mention all` for the current bot default.
   - For long running task such as coding, you might want to toggle streaming mode on with slash command inside the chat "/streaming on", check streaming status anytime with "/streaming status". In slack, native slash command is unconventional so you can get around to use slash command with a space prefix such as " /streaming on", or use alias "\streaming on". This is also true for any other slash command supported by `clisbot`. 
   - slack: 
 - If you want to add more owner or app admin, grant that principal explicitly with the platform prefix plus the channel-native user id, for example `clisbot auth add-user app --role owner --user telegram:1276408333` or `clisbot auth add-user app --role admin --user slack:U123ABC456`.
@@ -289,26 +290,18 @@ trust_level = "trusted"
 
 Most users only need a small set of commands at first:
 
-- `clisbot start`
-- `clisbot restart`
-- `clisbot stop`
-- `clisbot status`
-- `clisbot logs`
-- `clisbot auth show app`
-- `clisbot auth show agent-defaults`
-- `clisbot auth add-user app --role owner --user <principal>`
-- `clisbot auth add-user agent --agent <id> --role admin --user <principal>`
-- `clisbot pairing approve slack <CODE>`
-- `clisbot pairing approve telegram <CODE>`
-- `clisbot bots list`
-- `clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist`
-- `clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist`
-- `clisbot routes add --channel telegram group:<chatId> --bot default`
-- `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-- `clisbot routes add --channel slack channel:<channelId> --bot default`
-- `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`
-- `clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent <id>`
-- `clisbot --help`
+- `clisbot start`: start the bot runtime and create the default first-run setup when needed.
+- `clisbot restart`: restart the runtime cleanly; use this first when the bot stops responding.
+- `clisbot stop`: stop the runtime cleanly before upgrades, config changes, or maintenance.
+- `clisbot status`: check whether the runtime, channels, and active sessions look healthy.
+- `clisbot logs`: inspect recent runtime logs when startup, routing, or replies look wrong.
+- `clisbot runner list`: list the live tmux-backed runner sessions and see what is active.
+- `clisbot runner watch <session-name>`: live-watch one specific session when debugging a real run.
+- `clisbot runner watch --latest`: jump straight into the most recently active session.
+
+Full operator command reference:
+
+- [CLI Commands Guide](docs/user-guide/cli-commands.md)
 
 If you are running from the repo instead of the global package:
 
@@ -322,7 +315,7 @@ If you are running from the repo instead of the global package:
 
 ## In Chat
 
-`clisbot` supports a small set of chat-native commands for thread control, transcript access, and quick shell execution.
+`clisbot` supports a small set of chat-native commands for thread control and workflow acceleration inside Slack and Telegram.
 
 Native coding-CLI command compatibility:
 
@@ -340,37 +333,26 @@ Common commands:
 
 - `/start`: show onboarding or route-status help for the current conversation.
 - `/help`: show the available clisbot conversation commands.
-- `/status`: show the current route status, follow-up policy, and operator setup hints.
-- `/whoami`: show the current sender and route identity for the active conversation.
 - `/stop`: interrupt the current running turn.
-- `/followup status`: show the current thread follow-up mode.
-- `/followup auto`: allow natural in-thread follow-up after the bot has replied.
-- `/followup mention-only`: require an explicit mention for later turns in the thread.
-- `/followup pause`: pause passive follow-up so the bot does not keep interrupting the thread unless explicitly mentioned again.
-- `/followup resume`: restore the default follow-up behavior for that conversation.
-- `/transcript`: return the current conversation transcript when the route `verbose` policy allows it.
-- `::transcript` or `\transcript`: transcript shortcuts from the default slash-style prefixes.
-- `/bash <command>`: run a shell command in the current agent workspace when the resolved agent role allows `shellExecute`.
-- `!<command>`: shorthand for `/bash <command>`.
+- `/streaming on`, `/streaming off`, `/streaming status`: turn live progress on when you want to follow long coding work, then turn it back off when you only want final answers; in Slack, use ` /streaming on` or `\streaming on` when Slack grabs the raw slash command.
+- `/followup status`, `/followup auto`, `/followup mention-only`, `/followup pause`, `/followup resume`: control whether the bot keeps naturally following the thread, stays quiet, or requires an explicit mention again; fast shorthands include `/mention`, `/pause`, and `/resume`.
+- `/queue <message>`: queue the next prompt behind the current run so the bot can finish one thing, then keep going automatically without you babysitting every step.
+- `/loop <schedule or count> <message>`: turn one instruction into repeated work, from recurring automation to brute-force progress like `/loop 3 tiếp đi em` when you want the AI to keep pushing instead of stopping early.
 
-Command prefix defaults:
+Why `/queue` and `/loop` matter:
 
-- slash-style shortcuts: `["::", "\\"]`
-- bash shortcuts: `["!"]`
-- both are configurable with `bots.defaults.commandPrefixes`, `bots.slack.defaults.commandPrefixes`, or `bots.telegram.defaults.commandPrefixes`
+- `/queue` is a very simple workflow primitive: stack the next prompts now, let the bot run them one by one later.
+- `/loop` is the force multiplier: use it for recurring review/reporting, or just to keep the AI moving through multi-step coding work with less laziness and fewer early stops.
 
-Sensitive actions now follow auth and route policy:
+Examples:
 
-- `/transcript` depends on the route `verbose` policy
-- `/bash` depends on resolved agent auth through `shellExecute`
-- use `clisbot auth --help` to inspect scopes and mutate role users or permissions
-- use `clisbot routes --help` for route-level setup and route policy guidance
+- `/queue tiếp đi em`
+- `/queue code review theo architecture, guideline và fix, test`
+- `/loop 3 tiếp đi em`
 
-Follow-up behavior matters in team threads:
+Detailed slash-command guide:
 
-- `auto` is convenient when a thread is actively collaborating with the bot.
-- `pause` is useful when the bot has already participated but you do not want it to keep jumping into every follow-up message.
-- `mention-only` is the stricter mode when you want every new bot turn to require an explicit call.
+- [Slash Commands](docs/user-guide/slash-commands.md)
 
 ## Docs
 
@@ -399,27 +381,6 @@ Follow-up behavior matters in team threads:
 - durable agent sessions, workspaces, follow-up policy, commands, attachments, and operator controls that stay reusable across all those surfaces
 
 tmux is still the current stability boundary. One agent maps to one durable runner session in one workspace, and every CLI, channel, or workflow layer should route onto that durable runtime instead of recreating the agent from scratch.
-
-## Launch MVP Path
-
-See [docs/overview/launch-mvp-path.md](docs/overview/launch-mvp-path.md) for the full current launch order.
-
-Short snapshot:
-
-1. Foundations first:
-   - frictionless start and credential persistence
-   - runtime stability and truthful status or debug UX
-   - `/loop` as the current differentiating workflow feature
-2. International launch gate:
-   - Claude, Codex, and Gemini as the well-tested core CLI trio
-   - current shared channel package remains Slack plus Telegram
-3. Vietnam launch package:
-   - add Zalo Official Account and Zalo Personal on top of the same core trio
-4. Next expansion wave:
-   - more CLIs such as Cursor, Amp, OpenCode, Qwen, Kilo, and Minimax, prioritized by real userbase demand
-   - more channels such as Discord, WhatsApp, Google Workspace, and Microsoft Teams
-5. Open launch decision:
-   - whether native CLI slash-command compatibility, override, and customization should ship before broader push
 
 ## Completed
 

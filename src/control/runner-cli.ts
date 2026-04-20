@@ -10,6 +10,7 @@ import {
   listRunnerSessions,
   sortRunnerSessionMetadataNewestFirst,
   type RunnerSessionMetadata,
+  type RunnerSessionSummary,
 } from "./runner-debug-state.ts";
 
 const SMOKE_BACKENDS = ["codex", "claude", "gemini", "all"] as const;
@@ -170,7 +171,7 @@ export function renderRunnerHelp() {
     `  ${renderCliCommand("runner smoke --backend all --suite launch-trio [--workspace <path>] [--agent <id>] [--artifact-dir <path>] [--timeout-ms <n>] [--keep-session] [--json]")}`,
     "",
     "Operator session debugging:",
-    "  - `list` shows current tmux runner sessions, newest admitted turn first when known",
+    "  - `list` shows current tmux runner sessions, newest admitted turn first when known, plus stored sessionId/state when available",
     "  - `inspect` captures one snapshot from a named tmux session",
     "  - `watch --latest` follows the session that most recently admitted a new prompt",
     "  - `watch --next` waits for the next newly admitted prompt, then follows that session",
@@ -407,18 +408,27 @@ async function runListCli() {
   console.log([
     renderCliCommand("runner list"),
     "",
-    ...sessions.map((session) => {
-      if (!session.entry) {
-        return `- ${session.sessionName}`;
-      }
-      return [
-        `- ${session.sessionName}`,
-        `  agent: ${session.entry.agentId}`,
-        `  sessionKey: ${session.entry.sessionKey}`,
-        `  lastAdmittedPromptAt: ${formatTimestamp(session.entry.lastAdmittedPromptAt)}`,
-      ].join("\n");
-    }),
+    ...sessions.map(renderRunnerListSession),
   ].join("\n"));
+}
+
+function renderRunnerListSession(session: RunnerSessionSummary) {
+  if (!session.entry) {
+    return [
+      `- sessionName: ${session.sessionName}`,
+      "  sessionId: none",
+      "  state: unmanaged",
+    ].join("\n");
+  }
+
+  return [
+    `- sessionName: ${session.sessionName}`,
+    `  agent: ${session.entry.agentId}`,
+    `  sessionKey: ${session.entry.sessionKey}`,
+    `  sessionId: ${session.entry.sessionId?.trim() || "none"}`,
+    `  state: ${session.entry.runtime?.state ?? "no-runtime"}`,
+    `  lastAdmittedPromptAt: ${formatTimestamp(session.entry.lastAdmittedPromptAt)}`,
+  ].join("\n");
 }
 
 async function runInspectCli(args: string[]) {

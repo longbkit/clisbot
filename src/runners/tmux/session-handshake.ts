@@ -11,12 +11,16 @@ const PASTE_SETTLE_POLL_INTERVAL_MS = 40;
 const PASTE_SETTLE_QUIET_WINDOW_MS = 60;
 const PASTE_SETTLE_MULTILINE_MAX_WAIT_MS = 800;
 const PASTE_SETTLE_SINGLE_LINE_MAX_WAIT_MS = 80;
+const PASTE_CONFIRM_MAX_ATTEMPTS = 3;
 const PASTE_CAPTURE_REVALIDATE_POLL_INTERVAL_MS = 40;
 const PASTE_CAPTURE_REVALIDATE_MAX_WAIT_MS = 160;
 const SUBMIT_CONFIRM_POLL_INTERVAL_MS = 40;
 const SUBMIT_CONFIRM_MAX_WAIT_MS = 160;
 const SUBMIT_SNAPSHOT_CONFIRM_POLL_INTERVAL_MS = 40;
 const SUBMIT_SNAPSHOT_CONFIRM_MAX_WAIT_MS = 320;
+const POST_STATUS_SETTLE_POLL_INTERVAL_MS = 40;
+const POST_STATUS_SETTLE_QUIET_WINDOW_MS = 80;
+const POST_STATUS_SETTLE_MAX_WAIT_MS = 240;
 const TMUX_MISSING_TARGET_PATTERN = /(?:no current target|can't find pane|can't find window)/i;
 const TMUX_MISSING_SESSION_PATTERN = /(?:can't find session:|no server running on )/i;
 const TMUX_SERVER_UNAVAILABLE_PATTERN = /(?:No such file or directory|error connecting to|failed to connect to server)/i;
@@ -28,6 +32,24 @@ export class TmuxBootstrapSessionLostError extends Error {
   ) {
     super(`tmux bootstrap lost session "${sessionName}": ${detail}`);
     this.name = "TmuxBootstrapSessionLostError";
+  }
+}
+
+export class TmuxPasteUnconfirmedError extends Error {
+  constructor(readonly attempts: number) {
+    super(
+      `tmux paste was not confirmed after ${attempts} delivery attempts. clisbot did not send Enter because the prompt was not truthfully visible in the pane.`,
+    );
+    this.name = "TmuxPasteUnconfirmedError";
+  }
+}
+
+export class TmuxSubmitUnconfirmedError extends Error {
+  constructor() {
+    super(
+      "tmux submit was not confirmed after Enter. The pane state did not change, so clisbot did not treat the prompt as truthfully submitted.",
+    );
+    this.name = "TmuxSubmitUnconfirmedError";
   }
 }
 
@@ -58,34 +80,24 @@ export async function submitTmuxSessionInput(params: {
   const prePasteSnapshot = normalizePaneText(
     await params.tmux.capturePane(params.sessionName, captureLines),
   );
-  await params.tmux.sendLiteral(params.sessionName, params.text);
-  const pasteSettlement = await waitForPanePasteSettlement({
+  const pasteDelivery = await deliverTmuxPasteWithConfirmation({
     tmux: params.tmux,
     sessionName: params.sessionName,
-    baseline: prePasteState,
     text: params.text,
-    minDelayMs: params.promptSubmitDelayMs,
+    baselineState: prePasteState,
+    baselineSnapshot: prePasteSnapshot,
+    captureLines,
+    promptSubmitDelayMs: params.promptSubmitDelayMs,
+    timingContext: params.timingContext,
   });
-  let preSubmitState = pasteSettlement.state;
-  if (!pasteSettlement.visible) {
-    logLatencyDebug("tmux-paste-retry", params.timingContext, {
+  if (!pasteDelivery.confirmed) {
+    logLatencyDebug("tmux-paste-unconfirmed", params.timingContext, {
       sessionName: params.sessionName,
+      attempts: pasteDelivery.attempts,
     });
-    const snapshotConfirmed = await waitForPanePasteSnapshotConfirmation({
-      tmux: params.tmux,
-      sessionName: params.sessionName,
-      baselineSnapshot: prePasteSnapshot,
-      captureLines,
-    });
-    if (!snapshotConfirmed) {
-      logLatencyDebug("tmux-paste-unconfirmed", params.timingContext, {
-        sessionName: params.sessionName,
-      });
-      preSubmitState = prePasteState;
-    } else {
-      preSubmitState = await params.tmux.getPaneState(params.sessionName);
-    }
+    throw new TmuxPasteUnconfirmedError(pasteDelivery.attempts);
   }
+  const preSubmitState = pasteDelivery.state;
 
   await params.tmux.sendKey(params.sessionName, "Enter");
   if (
@@ -116,18 +128,10 @@ export async function submitTmuxSessionInput(params: {
     return;
   }
 
-  if (!pasteSettlement.visible) {
-    throw new Error(
-      "tmux paste was not confirmed before Enter, and submission still could not be confirmed after Enter. clisbot did not treat the prompt as truthfully delivered.",
-    );
-  }
-
   logLatencyDebug("tmux-submit-unconfirmed", params.timingContext, {
     sessionName: params.sessionName,
   });
-  throw new Error(
-    "tmux submit was not confirmed after Enter. The pane state did not change, so clisbot did not treat the prompt as truthfully submitted.",
-  );
+  throw new TmuxSubmitUnconfirmedError();
 }
 
 export async function captureTmuxSessionIdentity(params: {
@@ -184,6 +188,14 @@ export async function captureTmuxSessionIdentity(params: {
 
     const sessionId = extractSessionId(snapshot, params.pattern);
     if (sessionId) {
+      await waitForTmuxPaneSettle({
+        tmux: params.tmux,
+        sessionName: params.sessionName,
+        captureLines: params.captureLines,
+        pollIntervalMs: POST_STATUS_SETTLE_POLL_INTERVAL_MS,
+        quietWindowMs: POST_STATUS_SETTLE_QUIET_WINDOW_MS,
+        maxWaitMs: POST_STATUS_SETTLE_MAX_WAIT_MS,
+      });
       return sessionId;
     }
   }
@@ -400,6 +412,61 @@ async function waitForPaneSubmitSnapshotConfirmation(params: {
   }
 }
 
+async function deliverTmuxPasteWithConfirmation(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  text: string;
+  baselineState: TmuxPaneState;
+  baselineSnapshot: string;
+  captureLines: number;
+  promptSubmitDelayMs: number;
+  timingContext?: LatencyDebugContext;
+}) {
+  for (let attempt = 1; attempt <= PASTE_CONFIRM_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 1) {
+      logLatencyDebug("tmux-paste-retry", params.timingContext, {
+        sessionName: params.sessionName,
+        attempt,
+      });
+    }
+    await params.tmux.sendLiteral(params.sessionName, params.text);
+    const pasteSettlement = await waitForPanePasteSettlement({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baseline: params.baselineState,
+      text: params.text,
+      minDelayMs: params.promptSubmitDelayMs,
+    });
+    if (pasteSettlement.visible) {
+      return {
+        confirmed: true as const,
+        state: pasteSettlement.state,
+        attempts: attempt,
+      };
+    }
+
+    const snapshotConfirmed = await waitForPanePasteSnapshotConfirmation({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baselineSnapshot: params.baselineSnapshot,
+      captureLines: params.captureLines,
+    });
+    if (snapshotConfirmed) {
+      return {
+        confirmed: true as const,
+        state: await params.tmux.getPaneState(params.sessionName),
+        attempts: attempt,
+      };
+    }
+  }
+
+  return {
+    confirmed: false as const,
+    state: params.baselineState,
+    attempts: PASTE_CONFIRM_MAX_ATTEMPTS,
+  };
+}
+
 async function waitForPanePasteSettlement(params: {
   tmux: TmuxClient;
   sessionName: string;
@@ -467,6 +534,59 @@ async function waitForPanePasteSnapshotConfirmation(params: {
       return false;
     }
     await sleep(Math.min(PASTE_CAPTURE_REVALIDATE_POLL_INTERVAL_MS, remainingMs));
+  }
+}
+
+async function waitForTmuxPaneSettle(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  captureLines: number;
+  pollIntervalMs: number;
+  quietWindowMs: number;
+  maxWaitMs: number;
+}) {
+  let previousSnapshot = "";
+  let previousState: TmuxPaneState | null = null;
+  let lastChangeAt = Date.now();
+  const deadline = Date.now() + params.maxWaitMs;
+
+  while (true) {
+    let snapshot = "";
+    let state: TmuxPaneState;
+    try {
+      snapshot = normalizePaneText(
+        await params.tmux.capturePane(params.sessionName, params.captureLines),
+      );
+      state = await params.tmux.getPaneState(params.sessionName);
+    } catch (error) {
+      if (isRetryableBootstrapTargetError(error)) {
+        if (Date.now() >= deadline) {
+          return;
+        }
+        await sleep(params.pollIntervalMs);
+        continue;
+      }
+      if (isBootstrapSessionGoneError(error)) {
+        throw buildBootstrapSessionLostError(params.sessionName, error);
+      }
+      throw error;
+    }
+
+    if (
+      snapshot !== previousSnapshot ||
+      !previousState ||
+      !arePaneStatesEqual(previousState, state)
+    ) {
+      previousSnapshot = snapshot;
+      previousState = state;
+      lastChangeAt = Date.now();
+    }
+
+    if (Date.now() - lastChangeAt >= params.quietWindowMs || Date.now() >= deadline) {
+      return;
+    }
+
+    await sleep(params.pollIntervalMs);
   }
 }
 
