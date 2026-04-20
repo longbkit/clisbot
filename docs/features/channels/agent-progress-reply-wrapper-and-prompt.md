@@ -18,6 +18,7 @@ The feature combines three pieces:
 - auto-create a stable local `clisbot` wrapper for dev and local runtime use
 - expose the wrapper to agent runner sessions
 - inject a short channel context and reply command into the agent-bound prompt
+- keep that prompt guidance terse, including a channel-specific message-length hint and `--file` as the generic attachment flag
 - support `responseMode: "message-tool"` so progress and final replies come from `clisbot message send`, not from pane settlement
 - support `streaming` for both response modes, with `message-tool` preview modeled as one disposable draft message
 - support channel-owned `surfaceNotifications` so queued work and managed loop ticks can announce when they actually start

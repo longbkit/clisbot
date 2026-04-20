@@ -35,6 +35,7 @@ export type ChannelRuntimeLifecycleEvent = {
   summary?: string;
   detail?: string;
   actions?: string[];
+  ownerAlertAfterMs?: number;
 };
 
 export type ChannelRuntimeBot = {

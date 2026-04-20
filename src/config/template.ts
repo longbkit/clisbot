@@ -10,6 +10,7 @@ import {
   getDefaultTmuxSocketPath,
   getDefaultWorkspaceTemplate,
 } from "../shared/paths.ts";
+import { getDefaultRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
 
 type DefaultChannelBootstrapOptions = {
   slackEnabled?: boolean;
@@ -30,11 +31,12 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
   const sessionStorePath = collapseHomePath(getDefaultSessionStorePath());
   const workspaceTemplate = collapseHomePath(getDefaultWorkspaceTemplate());
   const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const defaultRuntimeMonitorRestartBackoff = getDefaultRuntimeMonitorRestartBackoff();
 
   return JSON.stringify(
     {
       meta: {
-        schemaVersion: "0.1.41",
+        schemaVersion: "0.1.42",
         lastTouchedAt: new Date().toISOString(),
       },
       app: {
@@ -76,22 +78,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             defaultTimezone,
           },
           runtimeMonitor: {
-            restartBackoff: {
-              fastRetry: {
-                delaySeconds: 10,
-                maxRestarts: 3,
-              },
-              stages: [
-                {
-                  delayMinutes: 15,
-                  maxRestarts: 4,
-                },
-                {
-                  delayMinutes: 30,
-                  maxRestarts: 4,
-                },
-              ],
-            },
+            restartBackoff: defaultRuntimeMonitorRestartBackoff,
             ownerAlerts: {
               enabled: true,
               minIntervalMinutes: 30,

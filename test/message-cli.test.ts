@@ -321,11 +321,16 @@ describe("message cli", () => {
     expect(logs[0]).toContain("message send");
     expect(logs[0]).toContain("--body-file");
     expect(logs[0]).toContain("--message-file");
+    expect(logs[0]).toContain("--file <path-or-url>");
+    expect(logs[0]).toContain("--media (compat only)");
     expect(logs[0]).toContain("--input <plain|md|html|mrkdwn|blocks>");
     expect(logs[0]).toContain("--render <native|none|html|mrkdwn|blocks>");
     expect(logs[0]).toContain("--topic-id <telegram-topic-id>");
     expect(logs[0]).toContain("Telegram topic id");
     expect(logs[0]).toContain("Render Rules:");
+    expect(logs[0]).toContain("Final payload must stay under 4096 chars");
+    expect(logs[0]).toContain("Prefer text under 4000 chars");
+    expect(logs[0]).toContain("Max 50 blocks; keep header text under 150 and section text under 3000");
   });
 
   test("routes telegram send with --topic-id through the resolved bot config", async () => {
@@ -438,6 +443,46 @@ describe("message cli", () => {
       threadId: "171234.000100",
     });
     expect(replyTargets[0]?.kind).toBe("reply");
+  });
+
+  test("accepts --file as the preferred attachment flag", async () => {
+    const { deps, calls } = createDependencies();
+
+    await runMessageCli([
+      "send",
+      "--channel",
+      "slack",
+      "--target",
+      "channel:C123",
+      "--message",
+      "hello",
+      "--file",
+      "report.pdf",
+    ], deps);
+
+    expect(calls[0]).toEqual({
+      provider: "slack",
+      action: "send",
+      params: {
+        botToken: "xoxb-test",
+        target: "channel:C123",
+        threadId: undefined,
+        replyTo: undefined,
+        message: "hello",
+        media: "report.pdf",
+        messageId: undefined,
+        emoji: undefined,
+        remove: false,
+        limit: undefined,
+        query: undefined,
+        pollQuestion: undefined,
+        pollOptions: [],
+        inputFormat: "md",
+        renderMode: "native",
+        progress: false,
+        final: false,
+      },
+    });
   });
 
   test("routes telegram unsupported history actions through the provider guard", async () => {
@@ -668,6 +713,26 @@ describe("message cli", () => {
         "--final",
       ], deps),
     ).rejects.toThrow("--progress and --final cannot be used together");
+  });
+
+  test("rejects using --file together with --media", async () => {
+    const { deps } = createDependencies();
+
+    await expect(
+      runMessageCli([
+        "send",
+        "--channel",
+        "slack",
+        "--target",
+        "channel:C123",
+        "--message",
+        "done",
+        "--file",
+        "report.pdf",
+        "--media",
+        "report.png",
+      ], deps),
+    ).rejects.toThrow("--file and --media are aliases; use only one");
   });
 
   test("uses only injected plugins and fails when the requested plugin is absent", async () => {

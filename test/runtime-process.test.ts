@@ -8,6 +8,7 @@ import {
   type ProcessLiveness,
   readRuntimeLog,
   readRuntimePid,
+  startDetachedRuntime,
   stopDetachedRuntime,
 } from "../src/control/runtime-process.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
@@ -157,6 +158,63 @@ describe("runtime monitor state", () => {
     expect(status.restartStageIndex).toBe(1);
     expect(status.nextRestartAt).toBe("2026-04-15T00:15:00.000Z");
     expect(status.stopReason).toBe("restart-budget-exhausted");
+  });
+
+  test("prefers a live monitor pid from monitor state when the pid file is missing", async () => {
+    const dir = createTempDir();
+    const monitorStatePath = join(dir, "clisbot-monitor.json");
+    writeFileSync(
+      monitorStatePath,
+      `${JSON.stringify({
+        monitorPid: process.pid,
+        phase: "active",
+        startedAt: "2026-04-15T00:00:00.000Z",
+        updatedAt: "2026-04-15T00:01:00.000Z",
+      }, null, 2)}\n`,
+    );
+
+    const status = await getRuntimeStatus({
+      monitorStatePath,
+      pidPath: join(dir, "missing.pid"),
+      logPath: join(dir, "clisbot.log"),
+      configPath: join(dir, "clisbot.json"),
+    });
+
+    expect(status.running).toBe(true);
+    expect(status.pid).toBe(process.pid);
+    expect(status.serviceState).toBe("active");
+  });
+});
+
+describe("startDetachedRuntime", () => {
+  test("does not spawn a second monitor when monitor state already points to a live service", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+    const pidPath = join(dir, "clisbot.pid");
+    const monitorStatePath = join(dir, "clisbot-monitor.json");
+    writeFileSync(configPath, "{}\n");
+    writeFileSync(
+      monitorStatePath,
+      `${JSON.stringify({
+        monitorPid: process.pid,
+        phase: "active",
+        startedAt: "2026-04-15T00:00:00.000Z",
+        updatedAt: "2026-04-15T00:01:00.000Z",
+      }, null, 2)}\n`,
+    );
+
+    const result = await startDetachedRuntime({
+      scriptPath: join(dir, "should-not-run.js"),
+      configPath,
+      pidPath,
+      monitorStatePath,
+      logPath: join(dir, "clisbot.log"),
+      runtimeCredentialsPath: join(dir, "runtime-credentials.json"),
+    });
+
+    expect(result.alreadyRunning).toBe(true);
+    expect(result.pid).toBe(process.pid);
+    expect(await readRuntimePid(pidPath)).toBe(process.pid);
   });
 });
 
@@ -380,5 +438,52 @@ describe("stopDetachedRuntime", () => {
 
     expect(result.stopped).toBe(true);
     expect(signals).toEqual([{ pid: 434343, signal: "SIGTERM" }]);
+  });
+
+  test("stops a live monitor recorded only in monitor state when the pid file is missing", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+    const monitorStatePath = join(dir, "clisbot-monitor.json");
+    writeFileSync(configPath, `${JSON.stringify(createConfig(), null, 2)}\n`);
+    writeFileSync(
+      monitorStatePath,
+      `${JSON.stringify({
+        monitorPid: 424242,
+        phase: "active",
+        runtimePid: 434343,
+        startedAt: "2026-04-15T00:00:00.000Z",
+        updatedAt: "2026-04-15T00:00:00.000Z",
+      }, null, 2)}\n`,
+    );
+    const signals: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+    let monitorRunning = true;
+
+    const result = await stopDetachedRuntime(
+      {
+        configPath,
+        pidPath: join(dir, "missing.pid"),
+        monitorStatePath,
+        runtimeCredentialsPath: join(dir, "state", "runtime-credentials.json"),
+      },
+      {
+        processLiveness: (pid) => {
+          if (pid === 424242) {
+            return monitorRunning ? "running" : "missing";
+          }
+          return "missing";
+        },
+        sendSignal: ((pid: number, signal: NodeJS.Signals) => {
+          signals.push({ pid, signal });
+          if (pid === 424242 && signal === "SIGTERM") {
+            monitorRunning = false;
+          }
+          return true;
+        }) as typeof process.kill,
+        sleep: async () => undefined,
+      },
+    );
+
+    expect(result.stopped).toBe(true);
+    expect(signals).toEqual([{ pid: 424242, signal: "SIGTERM" }]);
   });
 });

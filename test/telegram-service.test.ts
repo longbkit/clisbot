@@ -343,6 +343,119 @@ describe("buildTelegramCommandRegistrations", () => {
 });
 
 describe("TelegramPollingService", () => {
+  test("retries polling conflict with backoff and reports recovery instead of stopping the service", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-telegram-service-"));
+    const previousFetch = globalThis.fetch;
+    const lifecycleEvents: Array<{
+      connection: "active" | "failed";
+      summary?: string;
+      detail?: string;
+      actions?: string[];
+      ownerAlertAfterMs?: number;
+    }> = [];
+    let getUpdatesCalls = 0;
+    let service: TelegramPollingService | undefined;
+    let resolveRecovered!: () => void;
+    const recovered = new Promise<void>((resolve) => {
+      resolveRecovered = resolve;
+    });
+
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.telegram.default.polling = {
+      timeoutSeconds: 1,
+      retryDelayMs: 1,
+    };
+
+    globalThis.fetch = (async (input) => {
+      const method = String(input).split("/").pop() ?? "";
+      if (method === "getMe") {
+        return new Response(JSON.stringify({
+          ok: true,
+          result: {
+            id: 1,
+            username: "mybot",
+          },
+        }));
+      }
+
+      if (method === "setMyCommands") {
+        return new Response(JSON.stringify({
+          ok: true,
+          result: true,
+        }));
+      }
+
+      if (method === "getUpdates") {
+        getUpdatesCalls += 1;
+        if (getUpdatesCalls === 1) {
+          return new Response(JSON.stringify({
+            ok: true,
+            result: [],
+          }));
+        }
+
+        if (getUpdatesCalls === 2) {
+          return new Response(JSON.stringify({
+            ok: false,
+            error_code: 409,
+            description:
+              "Conflict: terminated by other getUpdates request; make sure that only one bot instance is running",
+          }));
+        }
+
+        return new Response(JSON.stringify({
+          ok: true,
+          result: [],
+        }));
+      }
+
+      throw new Error(`unexpected method ${method}`);
+    }) as typeof fetch;
+
+    try {
+      service = new TelegramPollingService(
+        loadedConfig,
+        {
+          registerSurfaceNotificationHandler() {},
+          unregisterSurfaceNotificationHandler() {},
+        } as any,
+        new ProcessedEventsStore(join(tempDir, "processed-events.json")),
+        new ActivityStore(join(tempDir, "activity.json")),
+        "default",
+        { botToken: "telegram-token" },
+        async (event) => {
+          lifecycleEvents.push(event);
+          if (event.connection === "active" && lifecycleEvents.some((entry) => entry.connection === "failed")) {
+            resolveRecovered();
+          }
+        },
+      );
+
+      await service.start();
+      await recovered;
+      await service.stop();
+
+      expect(getUpdatesCalls).toBeGreaterThanOrEqual(3);
+      expect(lifecycleEvents.map((event) => event.connection)).toEqual(["failed", "active"]);
+      expect(lifecycleEvents[0]?.summary).toBe(
+        "Telegram polling is temporarily blocked because another poller is already using this bot token.",
+      );
+      expect(lifecycleEvents[0]?.actions).toContain(
+        "clisbot will keep retrying automatically with backoff until Telegram polling can recover",
+      );
+      expect(lifecycleEvents[0]?.ownerAlertAfterMs).toBe(5 * 60_000);
+      expect(lifecycleEvents[1]?.detail).toBe(
+        "Telegram polling recovered after a polling-conflict retry.",
+      );
+    } finally {
+      if (service) {
+        await service.stop().catch(() => undefined);
+      }
+      globalThis.fetch = previousFetch;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("posts unrouted mention guidance for forum topics through the service handler", async () => {
     const apiCalls = await runTelegramServiceUpdate({
       update: {

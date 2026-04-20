@@ -149,6 +149,31 @@ function resolveMonitorStatePath(
   return expandHomePath(getDefaultRuntimeMonitorStatePath());
 }
 
+function resolveLiveMonitorPid(params: {
+  pidFromFile: number | null;
+  monitorState: RuntimeMonitorState | null;
+  processLiveness?: (pid: number) => ProcessLiveness;
+}) {
+  const processLiveness = params.processLiveness ?? getProcessLiveness;
+  if (params.pidFromFile && processLiveness(params.pidFromFile) === "running") {
+    return params.pidFromFile;
+  }
+
+  const monitorPid = params.monitorState?.monitorPid;
+  if (monitorPid && processLiveness(monitorPid) === "running") {
+    return monitorPid;
+  }
+
+  return null;
+}
+
+function resolveKnownMonitorPid(params: {
+  pidFromFile: number | null;
+  monitorState: RuntimeMonitorState | null;
+}) {
+  return params.pidFromFile ?? params.monitorState?.monitorPid ?? null;
+}
+
 function resolveRuntimeCredentialsPath(
   runtimeCredentialsPath?: string,
   configPath?: string,
@@ -350,11 +375,18 @@ export async function startDetachedRuntime(params: {
   );
   const existingPid = await readRuntimePid(pidPath);
   const existingMonitorState = await readRuntimeMonitorState(monitorStatePath);
-  if (existingPid && isProcessRunning(existingPid)) {
+  const liveMonitorPid = resolveLiveMonitorPid({
+    pidFromFile: existingPid,
+    monitorState: existingMonitorState,
+  });
+  if (liveMonitorPid) {
+    if (existingPid !== liveMonitorPid) {
+      await writeRuntimePid(pidPath, liveMonitorPid);
+    }
     return {
       alreadyRunning: true,
       createdConfig: false,
-      pid: existingPid,
+      pid: liveMonitorPid,
       configPath,
       logPath,
     } satisfies RuntimeStartResult;
@@ -462,10 +494,14 @@ export async function stopDetachedRuntime(params: {
   const sendSignal = dependencies.sendSignal ?? kill;
   const sleepFn = dependencies.sleep ?? sleep;
 
-  const existingLiveness = existingPid ? processLiveness(existingPid) : "missing";
-  if (existingPid && existingLiveness === "running") {
-    sendSignal(existingPid, "SIGTERM");
-    const exited = await waitForProcessExit(existingPid, STOP_WAIT_TIMEOUT_MS, {
+  const monitorPid = resolveKnownMonitorPid({
+    pidFromFile: existingPid,
+    monitorState,
+  });
+  const monitorLiveness = monitorPid ? processLiveness(monitorPid) : "missing";
+  if (monitorPid && monitorLiveness === "running") {
+    sendSignal(monitorPid, "SIGTERM");
+    const exited = await waitForProcessExit(monitorPid, STOP_WAIT_TIMEOUT_MS, {
       processLiveness,
       sleep: sleepFn,
     });
@@ -473,7 +509,7 @@ export async function stopDetachedRuntime(params: {
       throw new Error(`clisbot did not stop within ${STOP_WAIT_TIMEOUT_MS}ms`);
     }
     stopped = true;
-  } else if (existingPid && existingLiveness === "zombie") {
+  } else if (monitorPid && monitorLiveness === "zombie") {
     stopped = true;
   }
 
@@ -490,7 +526,7 @@ export async function stopDetachedRuntime(params: {
       }
       stopped = true;
     } catch (error) {
-      if (!(existingPid && existingLiveness === "running")) {
+      if (!(monitorPid && monitorLiveness === "running")) {
         throw error;
       }
     }
@@ -563,12 +599,15 @@ export async function getRuntimeStatus(params: {
     preferConfigSibling,
   });
   const pid = await readRuntimePid(pidPath);
-  const liveness = pid ? getProcessLiveness(pid) : "missing";
   const monitorState = await readRuntimeMonitorState(monitorStatePath);
+  const liveMonitorPid = resolveLiveMonitorPid({
+    pidFromFile: pid,
+    monitorState,
+  });
 
   return {
-    running: liveness === "running",
-    pid: liveness === "running" && pid ? pid : undefined,
+    running: liveMonitorPid != null,
+    pid: liveMonitorPid ?? undefined,
     configPath,
     pidPath,
     logPath,

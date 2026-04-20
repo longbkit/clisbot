@@ -60,6 +60,15 @@ function parseOptionValue(args: string[], name: string) {
   return values.length > 0 ? values.at(-1) : undefined;
 }
 
+function parseAliasedOptionValue(args: string[], preferredName: string, aliasName: string) {
+  const preferredValues = parseRepeatedOption(args, preferredName);
+  const aliasValues = parseRepeatedOption(args, aliasName);
+  if (preferredValues.length > 0 && aliasValues.length > 0) {
+    throw new Error(`${preferredName} and ${aliasName} are aliases; use only one`);
+  }
+  return preferredValues.at(-1) ?? aliasValues.at(-1);
+}
+
 function parseThreadingOptions(args: string[], channel: "slack" | "telegram") {
   const threadId = parseOptionValue(args, "--thread-id");
   const topicId = parseOptionValue(args, "--topic-id");
@@ -82,6 +91,10 @@ function parseMessageBodyFileOption(args: string[]) {
     throw new Error("--body-file and --message-file are aliases; use only one");
   }
   return bodyFileValues.at(-1) ?? messageFileValues.at(-1);
+}
+
+function parseMessageAttachmentOption(args: string[]) {
+  return parseAliasedOptionValue(args, "--file", "--media");
 }
 
 function parseIntegerOption(args: string[], name: string) {
@@ -129,7 +142,7 @@ function parseMessageCommand(args: string[]): ParsedMessageCommand | null {
     target: parseOptionValue(rest, "--target"),
     message: parseOptionValue(rest, "--message") ?? parseOptionValue(rest, "-m"),
     messageFile: parseMessageBodyFileOption(rest),
-    media: parseOptionValue(rest, "--media"),
+    media: parseMessageAttachmentOption(rest),
     messageId: parseOptionValue(rest, "--message-id"),
     emoji: parseOptionValue(rest, "--emoji"),
     remove: hasFlag(rest, "--remove"),
@@ -154,7 +167,7 @@ export function renderMessageHelp() {
     renderCliCommand("message"),
     "",
     "Usage:",
-    `  ${renderCliCommand("message send --channel <slack|telegram> --target <dest> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>] [--media <path-or-url>] [--reply-to <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--force-document] [--silent] [--progress|--final]")}`,
+    `  ${renderCliCommand("message send --channel <slack|telegram> --target <dest> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>] [--file <path-or-url>] [--reply-to <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--force-document] [--silent] [--progress|--final]")}`,
     `  ${renderCliCommand("message poll --channel <slack|telegram> --target <dest> --poll-question <text> --poll-option <value> [--poll-option <value>] [--account <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--silent]")}`,
     `  ${renderCliCommand("message react --channel <slack|telegram> --target <dest> --message-id <id> --emoji <emoji> [--account <id>] [--remove]")}`,
     `  ${renderCliCommand("message reactions --channel <slack|telegram> --target <dest> --message-id <id> [--account <id>]")}`,
@@ -170,6 +183,8 @@ export function renderMessageHelp() {
     "  --message <text>              Inline message body",
     "  --body-file <path>            Read the message body from a file",
     "                                Alias: --message-file (compat only)",
+    "  --file <path-or-url>          Attach a file or remote URL",
+    "                                Alias: --media (compat only)",
     "  --input <plain|md|html|mrkdwn|blocks>",
     "                               Input content format. Default: md",
     "  --render <native|none|html|mrkdwn|blocks>",
@@ -185,6 +200,11 @@ export function renderMessageHelp() {
     "  blocks                        Slack only. Render Markdown into Block Kit",
     "  html                          Telegram only",
     "  mrkdwn                        Slack only",
+    "",
+    "Length Guidance:",
+    "  Telegram native/html         Final payload must stay under 4096 chars; leave headroom after HTML-safe rendering",
+    "  Slack text/mrkdwn            Prefer text under 4000 chars; Slack truncates very long text after 40000",
+    "  Slack blocks                 Max 50 blocks; keep header text under 150 and section text under 3000",
     "",
     "Threading:",
     "  --thread-id <id>              Slack thread ts",

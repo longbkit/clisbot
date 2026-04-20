@@ -35,6 +35,10 @@ import {
   printCommandOutcomeFooter,
 } from "./runtime-cli-shared.ts";
 
+function getOperatorConfigPath() {
+  return expandHomePath(process.env.CLISBOT_CONFIG_PATH || DEFAULT_CONFIG_PATH);
+}
+
 function getPrimaryWorkspacePath(
   summary: Awaited<ReturnType<typeof getRuntimeOperatorSummary>>,
 ) {
@@ -124,7 +128,9 @@ function registerProcessHandlers(
 }
 
 async function printStatusSummary() {
-  const runtimeStatus = await getRuntimeStatus();
+  const runtimeStatus = await getRuntimeStatus({
+    configPath: getOperatorConfigPath(),
+  });
   console.log(`version: ${getClisbotVersion()}`);
   console.log(`running: ${runtimeStatus.running ? "yes" : "no"}`);
   if (runtimeStatus.pid) {
@@ -184,7 +190,9 @@ async function printStatusSummary() {
 
 async function printDiagnosticsAfterLogTail() {
   try {
-    const runtimeStatus = await getRuntimeStatus();
+    const runtimeStatus = await getRuntimeStatus({
+      configPath: getOperatorConfigPath(),
+    });
     const summary = await getRuntimeOperatorSummary({
       configPath: runtimeStatus.configPath,
       runtimeRunning: runtimeStatus.running,
@@ -299,6 +307,7 @@ export async function printCliError(error: unknown) {
 
 export async function stop(hard = false) {
   const result = await stopDetachedRuntime({
+    configPath: getOperatorConfigPath(),
     hard,
   });
   if (!result.stopped && !hard) {
@@ -326,6 +335,7 @@ export async function stop(hard = false) {
 
 export async function restart() {
   await stopDetachedRuntime({
+    configPath: getOperatorConfigPath(),
     hard: false,
   });
 }
@@ -335,7 +345,11 @@ export async function status() {
 }
 
 export async function logs(lines: number) {
+  const runtimeStatus = await getRuntimeStatus({
+    configPath: getOperatorConfigPath(),
+  });
   const result = await readRuntimeLog({
+    logPath: runtimeStatus.logPath,
     lines,
   });
   if (!result.text) {

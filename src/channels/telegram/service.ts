@@ -128,6 +128,18 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
 ];
 
 const TELEGRAM_STARTUP_CONFLICT_MAX_WAIT_MS = 6_000;
+const TELEGRAM_POLLING_CONFLICT_BACKOFF_MAX_DELAY_MS = 30_000;
+const TELEGRAM_POLLING_CONFLICT_SLEEP_SLICE_MS = 250;
+const TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_DELAY_MS = 5 * 60_000;
+
+function computeTelegramPollingConflictBackoffDelayMs(baseDelayMs: number, attempt: number) {
+  const safeBaseDelayMs = Math.max(1, baseDelayMs);
+  const boundedAttempt = Math.max(1, attempt);
+  return Math.min(
+    safeBaseDelayMs * (2 ** (boundedAttempt - 1)),
+    TELEGRAM_POLLING_CONFLICT_BACKOFF_MAX_DELAY_MS,
+  );
+}
 
 export function renderTelegramUnroutedRouteMessage(params: {
   mode: "start" | "help" | "status" | "whoami";
@@ -230,6 +242,8 @@ export class TelegramPollingService {
   private nextUpdateId?: number;
   private loopPromise?: Promise<void>;
   private activePollController?: AbortController;
+  private pollingConflictActive = false;
+  private pollingConflictAttempt = 0;
   private readonly inFlightUpdates = new Set<Promise<void>>();
   private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
 
@@ -288,7 +302,13 @@ export class TelegramPollingService {
     this.botUserId = me.id;
     this.botUsername = me.username ?? "";
     console.log(`telegram bot @${this.botUsername || this.botUserId} (${this.botId})`);
-    await this.initializeOffset();
+    try {
+      await this.initializeOffset();
+    } catch (error) {
+      if (!isTelegramPollingConflict(error)) {
+        throw error;
+      }
+    }
     await this.registerCommands();
     this.running = true;
     this.loopPromise = this.pollLoop();
@@ -337,6 +357,7 @@ export class TelegramPollingService {
           },
         );
         this.activePollController = undefined;
+        await this.recoverFromPollingConflictIfNeeded();
 
         const dispatched = dispatchTelegramUpdates({
           updates,
@@ -357,25 +378,63 @@ export class TelegramPollingService {
           return;
         }
         if (isTelegramPollingConflict(error)) {
-          this.running = false;
-          await this.reportLifecycle?.({
-            connection: "failed",
-            summary: "Telegram polling stopped because another instance is already using this bot token.",
-            detail:
-              error instanceof Error ? error.message : String(error),
-            actions: [
-              "stop the other Telegram poller that is using the same bot token",
-              `run ${renderCliCommand("start", { inline: true })} again after the token is no longer in use elsewhere`,
-            ],
-          });
-          console.error(
-            "telegram polling stopped: another bot instance is already calling getUpdates for this token",
-          );
-          return;
+          await this.handlePollingConflict(error, telegramConfig.polling.retryDelayMs);
+          continue;
         }
         console.error("telegram polling error", error);
         await sleep(telegramConfig.polling.retryDelayMs);
       }
+    }
+  }
+
+  private async handlePollingConflict(error: unknown, retryDelayMs: number) {
+    this.pollingConflictAttempt += 1;
+    const nextDelayMs = computeTelegramPollingConflictBackoffDelayMs(
+      retryDelayMs,
+      this.pollingConflictAttempt,
+    );
+
+    if (!this.pollingConflictActive) {
+      this.pollingConflictActive = true;
+      await this.reportLifecycle?.({
+        connection: "failed",
+        summary: "Telegram polling is temporarily blocked because another poller is already using this bot token.",
+        detail:
+          error instanceof Error ? error.message : String(error),
+        actions: [
+          "stop the other Telegram poller that is using the same bot token if it is unintended",
+          "clisbot will keep retrying automatically with backoff until Telegram polling can recover",
+        ],
+        ownerAlertAfterMs: TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_DELAY_MS,
+      });
+      console.error(
+        "telegram polling blocked: another bot instance is already calling getUpdates for this token; retrying with backoff",
+      );
+    }
+
+    await this.waitForPollingConflictRetryDelay(nextDelayMs);
+  }
+
+  private async recoverFromPollingConflictIfNeeded() {
+    if (!this.pollingConflictActive) {
+      return;
+    }
+
+    this.pollingConflictActive = false;
+    this.pollingConflictAttempt = 0;
+    await this.reportLifecycle?.({
+      connection: "active",
+      detail: "Telegram polling recovered after a polling-conflict retry.",
+    });
+    console.log("telegram polling recovered after polling conflict");
+  }
+
+  private async waitForPollingConflictRetryDelay(delayMs: number) {
+    let remainingMs = Math.max(0, delayMs);
+    while (this.running && remainingMs > 0) {
+      const sliceMs = Math.min(remainingMs, TELEGRAM_POLLING_CONFLICT_SLEEP_SLICE_MS);
+      await sleep(sliceMs);
+      remainingMs -= sliceMs;
     }
   }
 

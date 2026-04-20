@@ -341,6 +341,155 @@ describe("RuntimeSupervisor", () => {
     ]);
   });
 
+  test("sends one delayed owner alert when a channel failure stays active", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
+    const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));
+    const sentMessages: string[] = [];
+    let reportFailure!: () => Promise<void>;
+
+    const plugins: ChannelPlugin[] = [
+      {
+        id: "telegram",
+        isEnabled: () => true,
+        listBots: () => [{ botId: "default", config: {} }],
+        createRuntimeService: (context) => {
+          reportFailure = async () =>
+            await context.reportLifecycle({
+              connection: "failed",
+              summary: "Telegram polling is temporarily blocked because another poller is already using this bot token.",
+              detail: "Conflict: terminated by other getUpdates request",
+              ownerAlertAfterMs: 20,
+            });
+          return {
+            start: async () => undefined,
+            stop: async () => undefined,
+            getRuntimeIdentity: () => ({
+              botId: "default",
+              label: "bot=@longluong2bot",
+            }),
+          };
+        },
+        renderHealthSummary: (state) =>
+          state === "starting"
+            ? "Telegram channel is starting."
+            : state === "disabled"
+              ? "Telegram channel is disabled in config."
+              : "Telegram channel is stopped.",
+        renderActiveHealthSummary: () => "Telegram polling connected for 1 bot(s).",
+        markStartupFailure: (store, error) => store.markTelegramFailure(error),
+        runMessageCommand: async (_loadedConfig, command) => {
+          sentMessages.push(command.message ?? "");
+          return { botId: "default", result: { ok: true } };
+        },
+        resolveMessageReplyTarget: () => null,
+      },
+    ];
+
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(configPath, "{}\n");
+
+    const supervisor = new RuntimeSupervisor(undefined, {
+      loadConfig: async () => {
+        const loaded = createLoadedConfigAt(configPath);
+        loaded.raw.app.auth.roles.owner.users = ["telegram:1276408333"];
+        return loaded;
+      },
+      listChannelPlugins: () => plugins,
+      runtimeHealthStore,
+      createAgentService: () =>
+        ({
+          start: async () => undefined,
+          stop: async () => undefined,
+        }) as any,
+      createProcessedEventsStore: () => ({}) as any,
+      createActivityStore: () => ({}) as any,
+    });
+
+    await supervisor.start();
+    await reportFailure();
+    await Bun.sleep(60);
+
+    expect(sentMessages).toHaveLength(1);
+    expect(sentMessages[0]).toContain("clisbot channel alert");
+    expect(sentMessages[0]).toContain("telegram/default");
+    expect(sentMessages[0]).toContain("another poller is already using this bot token");
+  });
+
+  test("cancels a delayed owner alert when the channel recovers before the threshold", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
+    const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));
+    const sentMessages: string[] = [];
+    let reportFailure!: () => Promise<void>;
+    let reportRecovery!: () => Promise<void>;
+
+    const plugins: ChannelPlugin[] = [
+      {
+        id: "telegram",
+        isEnabled: () => true,
+        listBots: () => [{ botId: "default", config: {} }],
+        createRuntimeService: (context) => {
+          reportFailure = async () =>
+            await context.reportLifecycle({
+              connection: "failed",
+              summary: "Telegram polling is temporarily blocked because another poller is already using this bot token.",
+              detail: "Conflict: terminated by other getUpdates request",
+              ownerAlertAfterMs: 50,
+            });
+          reportRecovery = async () =>
+            await context.reportLifecycle({
+              connection: "active",
+              detail: "Telegram polling recovered after a polling-conflict retry.",
+            });
+          return {
+            start: async () => undefined,
+            stop: async () => undefined,
+          };
+        },
+        renderHealthSummary: (state) =>
+          state === "starting"
+            ? "Telegram channel is starting."
+            : state === "disabled"
+              ? "Telegram channel is disabled in config."
+              : "Telegram channel is stopped.",
+        renderActiveHealthSummary: () => "Telegram polling connected for 1 bot(s).",
+        markStartupFailure: (store, error) => store.markTelegramFailure(error),
+        runMessageCommand: async (_loadedConfig, command) => {
+          sentMessages.push(command.message ?? "");
+          return { botId: "default", result: { ok: true } };
+        },
+        resolveMessageReplyTarget: () => null,
+      },
+    ];
+
+    const configPath = join(tempDir, "clisbot.json");
+    writeFileSync(configPath, "{}\n");
+
+    const supervisor = new RuntimeSupervisor(undefined, {
+      loadConfig: async () => {
+        const loaded = createLoadedConfigAt(configPath);
+        loaded.raw.app.auth.roles.owner.users = ["telegram:1276408333"];
+        return loaded;
+      },
+      listChannelPlugins: () => plugins,
+      runtimeHealthStore,
+      createAgentService: () =>
+        ({
+          start: async () => undefined,
+          stop: async () => undefined,
+        }) as any,
+      createProcessedEventsStore: () => ({}) as any,
+      createActivityStore: () => ({}) as any,
+    });
+
+    await supervisor.start();
+    await reportFailure();
+    await Bun.sleep(10);
+    await reportRecovery();
+    await Bun.sleep(80);
+
+    expect(sentMessages).toHaveLength(0);
+  });
+
   test("marks enabled channels as failed when the runtime hits a fatal error", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-supervisor-"));
     const runtimeHealthStore = new RuntimeHealthStore(join(tempDir, "runtime-health.json"));

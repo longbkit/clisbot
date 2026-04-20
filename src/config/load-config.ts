@@ -21,6 +21,7 @@ import {
   clisbotConfigSchema,
 } from "./schema.ts";
 import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
+import { normalizeRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
 
 export type RuntimeConfig = ClisbotConfig & {
   session: ClisbotConfig["app"]["session"] & {
@@ -199,6 +200,13 @@ function materializeLoadedConfig(
       ),
     },
   };
+
+  runtimeRaw.app.control.runtimeMonitor.restartBackoff = normalizeRuntimeMonitorRestartBackoff(
+    runtimeRaw.app.control.runtimeMonitor.restartBackoff,
+  );
+  runtimeRaw.control.runtimeMonitor.restartBackoff = normalizeRuntimeMonitorRestartBackoff(
+    runtimeRaw.control.runtimeMonitor.restartBackoff,
+  );
 
   return {
     configPath: expandedConfigPath,

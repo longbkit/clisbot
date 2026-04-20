@@ -90,7 +90,7 @@ describe("renderDefaultConfigTemplate", () => {
     const parsed = JSON.parse(text);
     const config = clisbotConfigSchema.parse(parsed);
 
-    expect(config.meta.schemaVersion).toBe("0.1.41");
+    expect(config.meta.schemaVersion).toBe("0.1.42");
     expect(Object.keys(config)).toEqual(["meta", "app", "bots", "agents"]);
     expect(config.bots.slack.defaults.defaultBotId).toBe("default");
     expect(config.bots.telegram.defaults.defaultBotId).toBe("default");
@@ -98,6 +98,6 @@ describe("renderDefaultConfigTemplate", () => {
     const editable = await readEditableConfig(
       new URL("../config/clisbot.json.template", import.meta.url).pathname,
     );
-    expect(editable.config.meta.schemaVersion).toBe("0.1.41");
+    expect(editable.config.meta.schemaVersion).toBe("0.1.42");
   });
 });

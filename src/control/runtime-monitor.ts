@@ -4,14 +4,20 @@ import { dirname } from "node:path";
 import { kill } from "node:process";
 import { once } from "node:events";
 import { listChannelPlugins } from "../channels/registry.ts";
-import type { ParsedMessageCommand } from "../channels/message-command.ts";
 import { loadConfig, type LoadedConfig } from "../config/load-config.ts";
 import type { ClisbotConfig } from "../config/schema.ts";
+import {
+  getConfiguredRuntimeMonitorRestartBudget,
+  getRuntimeMonitorRestartPlan,
+  normalizeRuntimeMonitorRestartBackoff,
+  RUNTIME_MONITOR_RESTART_RESET_AFTER_MS,
+} from "../config/runtime-monitor-backoff.ts";
 import { installRuntimeConsoleTimestamps } from "../shared/logging.ts";
 import { ensureDir, getDefaultRuntimeMonitorStatePath, getDefaultRuntimePidPath } from "../shared/paths.ts";
 import { sleep } from "../shared/process.ts";
 import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
+import { sendOwnerAlert as deliverOwnerAlert } from "./owner-alerts.ts";
 
 export type RuntimeMonitorPhase = "starting" | "active" | "backoff" | "stopped";
 export type RuntimeMonitorAlertKind = "backoff" | "stopped";
@@ -115,213 +121,11 @@ export async function writeRuntimeMonitorState(
   await writeTextFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
 }
 
-function dedupe(values: string[]) {
-  return [...new Set(values.filter(Boolean))];
-}
-
 function summarizeExit(params: { code: number | null; signal: NodeJS.Signals | null }) {
   if (params.signal) {
     return `signal ${params.signal}`;
   }
   return `code ${params.code ?? 0}`;
-}
-
-function getRestartPlan(
-  config: ClisbotConfig["app"]["control"]["runtimeMonitor"]["restartBackoff"],
-  restartNumber: number,
-) {
-  const fastRetryMaxRestarts = config.fastRetry.maxRestarts;
-  const totalRestarts =
-    fastRetryMaxRestarts +
-    config.stages.reduce((sum: number, stage) => sum + stage.maxRestarts, 0);
-
-  if (restartNumber >= 1 && restartNumber <= fastRetryMaxRestarts) {
-    return {
-      mode: "fast-retry" as const,
-      stageIndex: -1,
-      delayMs: config.fastRetry.delaySeconds * 1000,
-      restartAttemptInStage: restartNumber,
-      restartsRemaining: totalRestarts - restartNumber,
-      totalRestarts,
-      stageMaxRestarts: fastRetryMaxRestarts,
-    };
-  }
-
-  let completedRestarts = fastRetryMaxRestarts;
-
-  for (let index = 0; index < config.stages.length; index += 1) {
-    const stage = config.stages[index]!;
-    const stageStart = completedRestarts + 1;
-    const stageEnd = completedRestarts + stage.maxRestarts;
-    if (restartNumber >= stageStart && restartNumber <= stageEnd) {
-      return {
-        mode: "backoff" as const,
-        stageIndex: index,
-        delayMs: stage.delayMinutes * 60_000,
-        restartAttemptInStage: restartNumber - completedRestarts,
-        restartsRemaining: totalRestarts - restartNumber,
-        totalRestarts,
-        stageMaxRestarts: stage.maxRestarts,
-      };
-    }
-    completedRestarts = stageEnd;
-  }
-
-  return null;
-}
-
-function parseOwnerPrincipal(principal: string) {
-  const trimmed = principal.trim();
-  if (!trimmed) {
-    return null;
-  }
-  const [platform, userId] = trimmed.split(":", 2);
-  if (
-    (platform !== "slack" && platform !== "telegram") ||
-    !userId?.trim()
-  ) {
-    return null;
-  }
-  return {
-    platform,
-    userId: userId.trim(),
-  } as const;
-}
-
-function buildOwnerAlertCommand(params: {
-  platform: "slack" | "telegram";
-  botId: string;
-  userId: string;
-  message: string;
-}): ParsedMessageCommand {
-  return {
-    action: "send",
-    channel: params.platform,
-    account: params.botId,
-    target: params.platform === "slack" ? `user:${params.userId}` : params.userId,
-    message: params.message,
-    messageFile: undefined,
-    media: undefined,
-    messageId: undefined,
-    emoji: undefined,
-    remove: false,
-    threadId: undefined,
-    replyTo: undefined,
-    limit: undefined,
-    query: undefined,
-    pollQuestion: undefined,
-    pollOptions: [],
-    forceDocument: false,
-    silent: false,
-    progress: false,
-    final: false,
-    json: false,
-    inputFormat: "md",
-    renderMode: "native",
-  };
-}
-
-async function sendOwnerAlert(params: {
-  configPath: string;
-  message: string;
-  dependencies: RuntimeMonitorDependencies;
-}) {
-  const plugins = params.dependencies.listChannelPlugins();
-  const loadedByPlatform = new Map<"slack" | "telegram", LoadedConfig>();
-  const delivered: string[] = [];
-  const failed: Array<{ principal: string; detail: string }> = [];
-
-  async function loadPlatform(platform: "slack" | "telegram") {
-    const existing = loadedByPlatform.get(platform);
-    if (existing) {
-      return existing;
-    }
-    const loaded = await params.dependencies.loadConfig(params.configPath, {
-      materializeChannels: [platform],
-    });
-    loadedByPlatform.set(platform, loaded);
-    return loaded;
-  }
-
-  const ownersByPlatform = new Map<"slack" | "telegram", string[]>();
-  for (const platform of ["slack", "telegram"] as const) {
-    try {
-      const loaded = await loadPlatform(platform);
-      const principals = dedupe(loaded.raw.app.auth.roles.owner?.users ?? []);
-      ownersByPlatform.set(
-        platform,
-        principals
-          .map(parseOwnerPrincipal)
-          .filter((entry): entry is NonNullable<typeof entry> => entry?.platform === platform)
-          .map((entry) => entry.userId),
-      );
-    } catch {
-      ownersByPlatform.set(platform, []);
-    }
-  }
-
-  for (const platform of ["slack", "telegram"] as const) {
-    const ownerIds = ownersByPlatform.get(platform) ?? [];
-    if (ownerIds.length === 0) {
-      continue;
-    }
-
-    const loaded = await loadPlatform(platform).catch(() => null);
-    if (!loaded) {
-      for (const userId of ownerIds) {
-        failed.push({
-          principal: `${platform}:${userId}`,
-          detail: "config could not be loaded with resolved credentials",
-        });
-      }
-      continue;
-    }
-
-    const plugin = plugins.find((entry) => entry.id === platform);
-    if (!plugin || !plugin.isEnabled(loaded)) {
-      continue;
-    }
-
-    const botIds = dedupe(
-      plugin.listBots(loaded).map((entry) => entry.botId),
-    );
-    for (const userId of ownerIds) {
-      let deliveredToPrincipal = false;
-      const principal = `${platform}:${userId}`;
-      for (const botId of botIds) {
-        try {
-          await plugin.runMessageCommand(
-            loaded,
-            buildOwnerAlertCommand({
-              platform,
-              botId,
-              userId,
-              message: params.message,
-            }),
-          );
-          delivered.push(`${principal} via ${platform}/${botId}`);
-          deliveredToPrincipal = true;
-          break;
-        } catch (error) {
-          failed.push({
-            principal,
-            detail: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-      if (!deliveredToPrincipal && botIds.length === 0) {
-        failed.push({
-          principal,
-          detail: "no enabled bots were available for this platform",
-        });
-      }
-    }
-  }
-
-  return {
-    delivered,
-    failed,
-  };
 }
 
 function renderBackoffAlertMessage(params: {
@@ -330,24 +134,32 @@ function renderBackoffAlertMessage(params: {
   stageIndex: number;
   restartAttemptInStage: number;
   stageMaxRestarts: number;
-  totalRestarts: number;
+  totalConfiguredRestarts: number;
   nextRestartAt: string;
+  repeatingFinalStage: boolean;
   exit: { code: number | null; signal: NodeJS.Signals | null; at: string };
 }) {
+  const restartLine = params.repeatingFinalStage
+    ? `restart: ${params.restartNumber} (steady-state at final stage; configured ladder ${params.totalConfiguredRestarts})`
+    : `restart: ${params.restartNumber}/${params.totalConfiguredRestarts}`;
+  const stageAttemptLine = params.repeatingFinalStage
+    ? "stage attempt: steady-state retry on final stage"
+    : `stage attempt: ${params.restartAttemptInStage}/${params.stageMaxRestarts}`;
+
   return [
     "clisbot runtime alert",
     "",
     "status: runtime exited unexpectedly and entered restart backoff",
     `last exit: ${summarizeExit(params.exit)} at ${params.exit.at}`,
     `next restart: ${params.nextRestartAt}`,
-    `restart: ${params.restartNumber}/${params.totalRestarts}`,
+    restartLine,
     `stage: ${params.stageIndex + 1}/${params.config.restartBackoff.stages.length}`,
-    `stage attempt: ${params.restartAttemptInStage}/${params.stageMaxRestarts}`,
+    stageAttemptLine,
   ].join("\n");
 }
 
 function renderStoppedAlertMessage(params: {
-  totalRestarts: number;
+  totalConfiguredRestarts: number;
   exit: { code: number | null; signal: NodeJS.Signals | null; at: string };
 }) {
   return [
@@ -355,7 +167,7 @@ function renderStoppedAlertMessage(params: {
     "",
     "status: runtime stopped after exhausting the configured restart budget",
     `last exit: ${summarizeExit(params.exit)} at ${params.exit.at}`,
-    `restart budget used: ${params.totalRestarts}`,
+    `restart budget used: ${params.totalConfiguredRestarts}`,
     `action: inspect ${renderCliCommand("logs", { inline: true })}, fix the fault, then start the service again`,
   ].join("\n");
 }
@@ -366,6 +178,7 @@ class RuntimeMonitor {
   private stopRequested = false;
   private activeChild: ChildProcess | null = null;
   private latestState: RuntimeMonitorState | null = null;
+  private loadedConfig?: LoadedConfig;
 
   constructor(
     private readonly scriptPath: string,
@@ -384,11 +197,14 @@ class RuntimeMonitor {
 
     try {
       const loadedConfig = await this.dependencies.loadConfig(this.configPath);
+      this.loadedConfig = loadedConfig;
       const monitorConfig = loadedConfig.raw.control.runtimeMonitor;
+      monitorConfig.restartBackoff = normalizeRuntimeMonitorRestartBackoff(
+        monitorConfig.restartBackoff,
+      );
       let restartNumber = 0;
-      let totalRestarts = monitorConfig.restartBackoff.stages.reduce(
-        (sum, stage) => sum + stage.maxRestarts,
-        0,
+      let totalConfiguredRestarts = getConfiguredRuntimeMonitorRestartBudget(
+        monitorConfig.restartBackoff,
       );
 
       await this.writeState({
@@ -396,6 +212,7 @@ class RuntimeMonitor {
       });
 
       while (!this.stopRequested) {
+        const runStartedAt = this.dependencies.now();
         const child = this.dependencies.spawnChild(
           process.execPath,
           [this.scriptPath, "serve-foreground"],
@@ -425,14 +242,20 @@ class RuntimeMonitor {
         }
 
         const exitAt = new Date().toISOString();
+        if (this.dependencies.now() - runStartedAt >= RUNTIME_MONITOR_RESTART_RESET_AFTER_MS) {
+          restartNumber = 0;
+        }
         const nextRestartNumber = restartNumber + 1;
-        const plan = getRestartPlan(monitorConfig.restartBackoff, nextRestartNumber);
+        const plan = getRuntimeMonitorRestartPlan(
+          monitorConfig.restartBackoff,
+          nextRestartNumber,
+        );
         if (!plan) {
           await this.maybeSendAlert(
             "stopped",
             monitorConfig,
             renderStoppedAlertMessage({
-              totalRestarts,
+              totalConfiguredRestarts,
               exit: {
                 code: exit.code,
                 signal: exit.signal,
@@ -454,7 +277,7 @@ class RuntimeMonitor {
         }
 
         restartNumber = nextRestartNumber;
-        totalRestarts = plan.totalRestarts;
+        totalConfiguredRestarts = plan.totalConfiguredRestarts;
         const nextRestartAt = new Date(
           this.dependencies.now() + plan.delayMs,
         ).toISOString();
@@ -468,8 +291,9 @@ class RuntimeMonitor {
               stageIndex: plan.stageIndex,
               restartAttemptInStage: plan.restartAttemptInStage,
               stageMaxRestarts: plan.stageMaxRestarts,
-              totalRestarts,
+              totalConfiguredRestarts,
               nextRestartAt,
+              repeatingFinalStage: plan.repeatingFinalStage,
               exit: {
                 code: exit.code,
                 signal: exit.signal,
@@ -586,10 +410,13 @@ class RuntimeMonitor {
     }
 
     try {
-      const result = await sendOwnerAlert({
-        configPath: this.configPath,
+      if (!this.loadedConfig) {
+        return;
+      }
+      const result = await deliverOwnerAlert({
+        loadedConfig: this.loadedConfig,
         message,
-        dependencies: this.dependencies,
+        listChannelPlugins: this.dependencies.listChannelPlugins,
       });
       if (result.delivered.length === 0 && result.failed.length > 0) {
         console.error(
