@@ -116,6 +116,7 @@ const TELEGRAM_FULL_COMMANDS: TelegramRegisteredCommand[] = [
   { command: "stop", description: "Interrupt current run" },
   { command: "nudge", description: "Send one extra Enter to the session" },
   { command: "followup", description: "Show or change follow-up mode" },
+  { command: "mention", description: "Require explicit mention for later turns" },
   { command: "pause", description: "Pause passive follow-up for this conversation" },
   { command: "resume", description: "Restore route follow-up defaults for this conversation" },
   { command: "streaming", description: "Show or change streaming mode" },

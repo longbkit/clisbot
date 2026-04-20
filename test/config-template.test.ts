@@ -19,8 +19,11 @@ describe("renderDefaultConfigTemplate", () => {
     expect("channels" in config).toBe(false);
     expect(config.app.auth.defaultRole).toBe("member");
     expect(config.app.control.configReload.watch).toBe(true);
+    expect(config.bots.defaults.allowBots).toBe(false);
     expect(config.bots.slack.defaults.enabled).toBe(false);
+    expect(config.bots.slack.defaults.allowBots).toBe(false);
     expect(config.bots.telegram.defaults.enabled).toBe(false);
+    expect(config.bots.telegram.defaults.allowBots).toBe(false);
     expect(config.bots.slack.default.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.bots.slack.default.botToken).toBe("${SLACK_BOT_TOKEN}");
     expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");

@@ -19,6 +19,7 @@ describe("parseAgentCommand", () => {
     expect(parsed).toEqual({
       type: "control",
       name: "transcript",
+      mode: "default",
     });
   });
 
@@ -46,6 +47,17 @@ describe("parseAgentCommand", () => {
     expect(parsed).toEqual({
       type: "control",
       name: "transcript",
+      mode: "default",
+    });
+  });
+
+  test("parses transcript full as the expanded transcript mode", () => {
+    const parsed = parseAgentCommand("/transcript full");
+
+    expect(parsed).toEqual({
+      type: "control",
+      name: "transcript",
+      mode: "full",
     });
   });
 
@@ -119,6 +131,40 @@ describe("parseAgentCommand", () => {
       type: "control",
       name: "followup",
       action: "resume",
+    });
+  });
+
+  test("parses mention shorthand with conversation, channel, and all scopes", () => {
+    expect(parseAgentCommand("/mention")).toEqual({
+      type: "control",
+      name: "followup",
+      action: "mention-only",
+      mode: "mention-only",
+      scope: "conversation",
+    });
+
+    expect(parseAgentCommand("/mention channel")).toEqual({
+      type: "control",
+      name: "followup",
+      action: "mention-only",
+      mode: "mention-only",
+      scope: "channel",
+    });
+
+    expect(parseAgentCommand("/mention all")).toEqual({
+      type: "control",
+      name: "followup",
+      action: "mention-only",
+      mode: "mention-only",
+      scope: "all",
+    });
+
+    expect(parseAgentCommand("/followup mention-only channel")).toEqual({
+      type: "control",
+      name: "followup",
+      action: "mention-only",
+      mode: "mention-only",
+      scope: "channel",
     });
   });
 

@@ -267,7 +267,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     expect(text).toContain(
       "`clisbot routes set-agent --channel telegram topic:-1003455688247:3 --bot default --agent <id>`",
     );
-    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/mention`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 
   test("renders onboarding guidance for unrouted help in groups", () => {
@@ -281,7 +281,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
     expect(text).toContain("Ask the bot owner to choose one of these:");
-    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/mention`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 
   test("renders onboarding guidance for unrouted status in groups", () => {
@@ -294,7 +294,7 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     });
 
     expect(text).toContain("clisbot: this Telegram topic is not configured yet.");
-    expect(text).toContain("After that, routed commands such as `/status`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
+    expect(text).toContain("After that, routed commands such as `/status`, `/mention`, `/stop`, `/nudge`, `/followup`, and `/bash` will work here.");
   });
 });
 
@@ -325,6 +325,7 @@ describe("buildTelegramCommandRegistrations", () => {
       "stop",
       "nudge",
       "followup",
+      "mention",
       "pause",
       "resume",
       "streaming",
@@ -343,6 +344,55 @@ describe("buildTelegramCommandRegistrations", () => {
 });
 
 describe("TelegramPollingService", () => {
+  test("drops routed bot-originated messages when allowBots is false", async () => {
+    const completed: string[] = [];
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.telegram.default.groups["-1000"] = {
+      enabled: true,
+      agentId: "default",
+      requireMention: true,
+      allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
+      topics: {},
+    };
+
+    await (TelegramPollingService.prototype as any).handleUpdate.call(
+      {
+        loadedConfig,
+        botUsername: "mybot",
+        botUserId: 999,
+        botId: "default",
+        agentService: {},
+        processedEventsStore: {
+          getStatus: async () => null,
+          markCompleted: async (eventId: string) => {
+            completed.push(eventId);
+          },
+        },
+        getBotConfig: () => resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, "default"),
+      },
+      {
+        update_id: 42,
+        message: {
+          message_id: 42,
+          text: "@mybot hello",
+          from: {
+            id: 123,
+            is_bot: true,
+            username: "otherbot",
+          },
+          chat: {
+            id: -1000,
+            type: "supergroup",
+          },
+        },
+      },
+    );
+
+    expect(completed).toEqual(["telegram:42"]);
+  });
+
   test("retries polling conflict with backoff and reports recovery instead of stopping the service", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-telegram-service-"));
     const previousFetch = globalThis.fetch;

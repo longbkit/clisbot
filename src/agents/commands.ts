@@ -37,6 +37,7 @@ export type AgentControlSlashCommandName =
   | "loop-help"
   | "loop";
 export type AgentFollowUpSlashAction = "status" | "auto" | "mention-only" | "pause" | "resume";
+export type AgentFollowUpScope = "conversation" | "channel" | "all";
 export type AgentStreamingSlashAction = "status" | "on" | "off" | "latest" | "all";
 export type AgentResponseModeSlashAction = "status" | "capture-pane" | "message-tool";
 export type AgentAdditionalMessageModeSlashAction = "status" | "queue" | "steer";
@@ -61,6 +62,7 @@ export type AgentControlSlashCommand =
   | {
       type: "control";
       name: "transcript";
+      mode: "default" | "full";
     }
   | {
       type: "control";
@@ -89,6 +91,7 @@ export type AgentControlSlashCommand =
       name: "followup";
       action: AgentFollowUpSlashAction;
       mode?: FollowUpMode;
+      scope?: AgentFollowUpScope;
     }
   | {
       type: "control";
@@ -231,9 +234,13 @@ export function parseAgentCommand(
   }
 
   if (lowered === "transcript") {
+    const transcriptMode = withoutSlash.slice(command.length).trim().toLowerCase() === "full"
+      ? "full"
+      : "default";
     return {
       type: "control",
       name: "transcript",
+      mode: transcriptMode,
     };
   }
 
@@ -286,6 +293,11 @@ export function parseAgentCommand(
     return parseFollowUpSlashCommand(
       withoutSlash.slice(command.length).trim().toLowerCase(),
     );
+  }
+
+  if (lowered === "mention") {
+    const scope = withoutSlash.slice(command.length).trim().toLowerCase();
+    return parseFollowUpSlashCommand(scope ? `mention-only ${scope}` : "mention-only");
   }
 
   if (lowered === "pause") {
@@ -538,7 +550,8 @@ export function renderAgentControlSlashHelp() {
     "- `/status`: show the current route status and operator setup commands",
     "- `/help`: show available control slash commands",
     "- `/whoami`: show the current platform, route, and sender identity details",
-    "- `/transcript`: show the current conversation session transcript when the route verbose policy allows it",
+    "- `/transcript`: show a short recent session snapshot when the route verbose policy allows it",
+    "- `/transcript full`: show a longer session snapshot when you need the full pane context",
     "- `/attach`: attach this thread to the active run and resume live updates when it is still processing",
     "- `/detach`: stop live updates for this thread while still posting the final result here",
     "- `/watch every 30s [for 10m]`: post the latest state on an interval until the run settles or the watch window ends",
@@ -547,6 +560,11 @@ export function renderAgentControlSlashHelp() {
     "- `/followup status`: show the current conversation follow-up policy",
     "- `/followup auto`: allow natural follow-up after the bot has replied in-thread",
     "- `/followup mention-only`: require explicit mention for each later turn",
+    "- `/followup mention-only channel`: persist mention-only as the default for the current channel or group",
+    "- `/followup mention-only all`: persist mention-only as the default for all routed conversations on this bot",
+    "- `/mention`: shortcut for `/followup mention-only` in this conversation",
+    "- `/mention channel`: shortcut for `/followup mention-only channel`",
+    "- `/mention all`: shortcut for `/followup mention-only all`",
     "- `/followup pause`: stop passive follow-up until the next explicit mention",
     "- `/followup resume`: clear the runtime override and restore config defaults",
     "- `/pause`: shortcut for `/followup pause`",
@@ -605,8 +623,25 @@ function parseWatchCommand(raw: string) {
   };
 }
 
+function parseFollowUpScope(raw: string): AgentFollowUpScope {
+  if (raw === "channel") {
+    return "channel";
+  }
+
+  if (raw === "all") {
+    return "all";
+  }
+
+  return "conversation";
+}
+
 function parseFollowUpSlashCommand(action: string): AgentControlSlashCommand {
-  if (!action || action === "status") {
+  const [rawAction = "", rawScope = ""] = action
+    .split(/\s+/, 2)
+    .map((token) => token.trim().toLowerCase());
+  const scope = parseFollowUpScope(rawScope);
+
+  if (!rawAction || rawAction === "status") {
     return {
       type: "control",
       name: "followup",
@@ -614,25 +649,27 @@ function parseFollowUpSlashCommand(action: string): AgentControlSlashCommand {
     };
   }
 
-  if (action === "auto") {
+  if (rawAction === "auto") {
     return {
       type: "control",
       name: "followup",
       action: "auto",
       mode: "auto",
+      scope,
     };
   }
 
-  if (action === "mention-only") {
+  if (rawAction === "mention-only") {
     return {
       type: "control",
       name: "followup",
       action: "mention-only",
       mode: "mention-only",
+      scope,
     };
   }
 
-  if (action === "pause") {
+  if (rawAction === "pause") {
     return {
       type: "control",
       name: "followup",
@@ -641,7 +678,7 @@ function parseFollowUpSlashCommand(action: string): AgentControlSlashCommand {
     };
   }
 
-  if (action === "resume") {
+  if (rawAction === "resume") {
     return {
       type: "control",
       name: "followup",

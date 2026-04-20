@@ -28,7 +28,7 @@ The challenge is not whether AI is useful. It is how to make it work at enterpri
 - Learns from and integrates the two biggest strengths that made OpenClaw popular: memory and native channel integration with deep, channel-specific conversation and presentation capabilities.
 - Not just a tmux bridge. Slack and Telegram are treated as real channel surfaces with routing, thread or topic continuity, pairing, follow-up control, and attachment-aware interaction instead of plain text passthrough so you can work from your laptop or on the go without giving up a real coding workspace.
 - Team-first by design, with `AGENTS`, `USER`, and `MEMORY` context bootstrapping shaped for shared team reality instead of only personal solo-assistant flows.
-- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, and `/streaming on` to view real-time processing progress for coding tasks.
+- Useful for coding, operations, teamwork, and general assistant work, with fast chat controls such as `!<command>` and `/bash <command>` for terminal-like control, `/loop` to bring loop-style automation beyond Claude, `/queue` to add follow-up prompts in the same session without interrupting the current run, `/streaming on` to view real-time processing progress for coding tasks, and `/mention`, `/mention channel`, or `/mention all` to tighten follow-up policy at conversation, route, or bot scope.
 
 ## What to expect
 
@@ -86,6 +86,7 @@ Next steps:
 - To chat with the bot in a group:
   - telegram: Add bot to group, then use slash command in that group /start, you will be guided with command to add a group. Run that command directly or copy that command and chat directly with the bot in DM to ask it do for you (since you are the owner, you are authorized to run that command). After completed, come back to the group and start talk with the bot. 
   - Notice that group has require mention (or tag the bot) enabled by default to avoid abuse. But it also has smart follow up within 5 minutes by default so you dont need to tag it again. You could change the mode by asking the bot to do for you.
+  - If you want stricter mention behavior, use `/mention` for this conversation only, `/mention channel` for the current channel or group default, or `/mention all` for the current bot default.
   - For long running task such as coding, you might want to toggle streaming mode on with slash command inside the chat "/streaming on", check streaming status anytime with "/streaming status". In slack, native slash command is unconventional so you can get around to use slash command with a space prefix such as " /streaming on", or use alias "\streaming on". This is also true for any other slash command supported by `clisbot`. 
   - slack: 
 - If you want to add more owner or app admin, grant that principal explicitly with the platform prefix plus the channel-native user id, for example `clisbot auth add-user app --role owner --user telegram:1276408333` or `clisbot auth add-user app --role admin --user slack:U123ABC456`.

@@ -33,6 +33,7 @@ import {
 } from "../agents/loop-control-shared.ts";
 import {
   renderChannelSnapshot,
+  renderCompactChannelTranscript,
   escapeCodeFence,
   resolveDetachedInteractionNote,
 } from "../shared/transcript.ts";
@@ -63,6 +64,7 @@ import {
   getConversationStreaming,
   setConversationStreaming,
 } from "./streaming-config.ts";
+import { setScopedConversationFollowUpMode } from "./follow-up-mode-config.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../control/latency-debug.ts";
 import { sleep } from "../shared/process.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
@@ -95,6 +97,7 @@ export type ProcessChannelInteractionResult = {
 const MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS = 3_000;
 const MESSAGE_TOOL_FINAL_GRACE_POLL_MS = 100;
 const MESSAGE_TOOL_PREVIEW_SIGNAL_POLL_MS = 100;
+const TRANSCRIPT_PREVIEW_MAX_CHARS = 1200;
 
 function renderSensitiveCommandDisabledMessage() {
   return [
@@ -286,7 +289,7 @@ function renderRouteStatusMessage(params: {
     "- `/whoami`",
     "- `/status`",
     "- `/attach`, `/detach`, `/watch every <duration>`",
-    "- `/followup status`",
+    "- `/followup status`, `/mention`, `/mention channel`, `/mention all`",
     "- `/streaming status|on|off|latest|all`",
     "- `/responsemode status`",
     "- `/additionalmessagemode status`",
@@ -391,6 +394,49 @@ function renderAdditionalMessageModeStatusMessage(params: {
     "Per-message override:",
     "- `/queue <message>` always uses queued delivery for that one message",
   );
+
+  return lines.join("\n");
+}
+
+function renderFollowUpModeUpdateMessage(params: {
+  scope: "conversation" | "channel" | "all";
+  mode: "auto" | "mention-only" | "paused";
+  persisted?: {
+    label: string;
+    configPath: string;
+    followUpMode: "auto" | "mention-only" | "paused";
+  };
+}) {
+  if (!params.persisted) {
+    if (params.mode === "paused") {
+      return "Follow-up paused for this conversation until the next explicit mention.";
+    }
+
+    return `Follow-up mode set to \`${params.mode}\` for this conversation.`;
+  }
+
+  const lines = [
+    `Updated follow-up mode for \`${params.persisted.label}\`.`,
+    `config.followUp.mode: \`${params.persisted.followUpMode}\``,
+    `config: \`${params.persisted.configPath}\``,
+    `currentConversation.overrideMode: \`${params.mode}\``,
+    "The current conversation changes immediately.",
+    "If config reload is enabled, the broader default should apply automatically shortly.",
+  ];
+
+  if (params.scope === "all") {
+    lines.splice(
+      4,
+      0,
+      "This persists the bot-wide default for later routed conversations on this bot.",
+    );
+  } else if (params.scope === "channel") {
+    lines.splice(
+      4,
+      0,
+      "This persists the default for the current channel, group, or DM container.",
+    );
+  }
 
   return lines.join("\n");
 }
@@ -1268,15 +1314,21 @@ export async function processChannelInteraction<TChunk>(params: {
 
       const transcript = await params.agentService.captureTranscript(params.sessionTarget);
       await params.postText(
-        renderChannelSnapshot({
-          agentId: transcript.agentId,
-          sessionName: transcript.sessionName,
-          workspacePath: transcript.workspacePath,
-          status: "completed",
-          snapshot: transcript.snapshot || "(no tmux output yet)",
-          maxChars: params.maxChars,
-          note: "transcript command",
-        }),
+        slashCommand.mode === "full"
+          ? renderChannelSnapshot({
+              agentId: transcript.agentId,
+              sessionName: transcript.sessionName,
+              workspacePath: transcript.workspacePath,
+              status: "completed",
+              snapshot: transcript.snapshot || "(no tmux output yet)",
+              maxChars: params.maxChars,
+              note: "transcript command (full)",
+            })
+          : renderCompactChannelTranscript({
+              snapshot: transcript.snapshot || "(no tmux output yet)",
+              maxChars: Math.min(params.maxChars, TRANSCRIPT_PREVIEW_MAX_CHARS),
+              fullCommand: "/transcript full",
+            }),
       );
       return interactionResult;
     }
@@ -1372,15 +1424,35 @@ export async function processChannelInteraction<TChunk>(params: {
           "Follow-up policy reset to route defaults for this conversation.",
         );
       } else if (slashCommand.mode) {
-        await params.agentService.setConversationFollowUpMode(
-          params.sessionTarget,
-          slashCommand.mode,
-        );
-        await params.postText(
-          slashCommand.mode === "paused"
-            ? "Follow-up paused for this conversation until the next explicit mention."
-            : `Follow-up mode set to \`${slashCommand.mode}\` for this conversation.`,
-        );
+        if (slashCommand.scope === "channel" || slashCommand.scope === "all") {
+          await params.agentService.setConversationFollowUpMode(
+            params.sessionTarget,
+            slashCommand.mode,
+          );
+          const persisted = await setScopedConversationFollowUpMode({
+            identity: params.identity,
+            scope: slashCommand.scope,
+            mode: slashCommand.mode,
+          });
+          await params.postText(
+            renderFollowUpModeUpdateMessage({
+              scope: slashCommand.scope,
+              mode: slashCommand.mode,
+              persisted,
+            }),
+          );
+        } else {
+          await params.agentService.setConversationFollowUpMode(
+            params.sessionTarget,
+            slashCommand.mode,
+          );
+          await params.postText(
+            renderFollowUpModeUpdateMessage({
+              scope: "conversation",
+              mode: slashCommand.mode,
+            }),
+          );
+        }
       }
       await params.agentService.recordConversationReply(params.sessionTarget);
       return interactionResult;

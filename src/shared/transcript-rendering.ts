@@ -334,6 +334,25 @@ export function renderSlackTranscript(params: {
   return `${lines.join("\n")}\n\n\`\`\`\n${body}\n\`\`\``;
 }
 
+export function renderCompactChannelTranscript(params: {
+  snapshot: string;
+  maxChars: number;
+  fullCommand?: string;
+}) {
+  const body = escapeCodeFence(truncateTail(params.snapshot || "(no tmux output yet)", params.maxChars));
+  const fullCommand = params.fullCommand ?? "/transcript full";
+
+  return [
+    "Transcript",
+    "",
+    "Recent session snapshot:",
+    "```",
+    body,
+    "```",
+    `Use \`${fullCommand}\` if you want the longer pane snapshot.`,
+  ].join("\n");
+}
+
 export const renderSlackSnapshot = renderSlackTranscript;
 export const renderChannelInteraction = renderSlackInteraction;
 export const renderChannelTranscript = renderSlackTranscript;

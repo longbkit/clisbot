@@ -50,6 +50,7 @@ describe("slack feedback helpers", () => {
     );
     expect(text).toContain("mention this bot (clisbot)");
     expect(text).toContain("`\\start`");
+    expect(text).toContain("`\\mention`");
     expect(text).not.toContain("@clisbot");
   });
 
@@ -58,8 +59,8 @@ describe("slack feedback helpers", () => {
 
     expect(text).toContain("requires a bot mention");
     expect(text).toContain("mention this bot (clisbot)");
-    expect(text).toContain("`\\start`");
     expect(text).toContain("`\\status`");
+    expect(text).toContain("`\\mention`");
     expect(text).not.toContain("@clisbot");
   });
 

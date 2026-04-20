@@ -41,6 +41,11 @@ If this page and runtime ever disagree, runtime wins.
 - `/followup status`
 - `/followup auto`
 - `/followup mention-only`
+- `/followup mention-only channel`
+- `/followup mention-only all`
+- `/mention`: shortcut for `/followup mention-only` in the current conversation
+- `/mention channel`: persist mention-only as the default for the current channel or group and apply it to this conversation now
+- `/mention all`: persist mention-only as the default for all routed conversations on the current bot and apply it to this conversation now
 - `/followup pause`
 - `/followup resume`
 - `/pause`: shortcut for `/followup pause`
@@ -92,6 +97,9 @@ Useful operator note:
 
 ## Notes
 
+- follow-up scope defaults to the current conversation
+- `channel` scope means the current channel, group, or DM container
+- `all` scope means the current bot defaults across routed conversations
 - This page is intentionally short and inventory-first
 - Native coding-CLI command or skill pass-through is documented in `docs/user-guide/native-cli-commands.md`
 - Detailed output wording review lives in `docs/research/channels/2026-04-14-slash-command-output-audit.md`
