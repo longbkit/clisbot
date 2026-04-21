@@ -697,10 +697,10 @@ const agentsDefaultsSchema = z.object({
 
 export const clisbotConfigSchema = z.object({
   meta: z.object({
-    schemaVersion: z.string().min(1).default("0.1.42"),
+    schemaVersion: z.string().min(1).default("0.1.43"),
     lastTouchedAt: z.string().optional(),
   }).default({
-    schemaVersion: "0.1.42",
+    schemaVersion: "0.1.43",
   }),
   app: z.object({
     session: appSessionSchema.default({

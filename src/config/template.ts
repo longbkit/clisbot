@@ -36,7 +36,7 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
   return JSON.stringify(
     {
       meta: {
-        schemaVersion: "0.1.42",
+        schemaVersion: "0.1.43",
         lastTouchedAt: new Date().toISOString(),
       },
       app: {
