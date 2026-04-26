@@ -155,6 +155,7 @@ The released `0.1.43` snapshot is preserved here for migration review:
 - session storage and session key policy
 - runner defaults and session-id capture/resume policy
 - runtime monitor, cleanup, and loop defaults
+- app, agent, bot, provider-default, and route timezone defaults
 - persisted auth policy shape
 
 ## Non-Goals
@@ -175,3 +176,4 @@ The released `0.1.43` snapshot is preserved here for migration review:
 
 - [Target Config And CLI Mental Model Migration](../../tasks/features/configuration/2026-04-18-target-config-and-cli-mental-model-migration.md)
 - [Surface Policy Shape Standardization And 0.1.43 Compatibility](../../tasks/features/configuration/2026-04-24-surface-policy-shape-standardization-and-0.1.43-compatibility.md)
+- [Timezone Config CLI And Loop Resolution](../../tasks/features/configuration/2026-04-26-timezone-config-cli-and-loop-resolution.md)
