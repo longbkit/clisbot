@@ -40,6 +40,8 @@ type FakeSession = {
 
 class FakeTmuxClient {
   readonly sessionCommands: string[] = [];
+  hasSessionCalls = 0;
+  listSessionsCalls = 0;
   serverDefaultsEnsured = 0;
   private sessions = new Map<string, FakeSession>();
   private readonly invalidResumeSessionIds = new Set<string>();
@@ -123,10 +125,19 @@ class FakeTmuxClient {
   }
 
   async hasSession(sessionName: string) {
+    this.hasSessionCalls += 1;
     if (!this.serverRunning) {
       return false;
     }
     return this.sessions.has(sessionName);
+  }
+
+  async listSessions() {
+    this.listSessionsCalls += 1;
+    if (!this.serverRunning) {
+      return [];
+    }
+    return [...this.sessions.keys()];
   }
 
   async newSession(params: {
@@ -2538,6 +2549,98 @@ describe("AgentService session identity", () => {
       expect(typeof firstSessionId).toBe("string");
       expect(secondRun.snapshot).toContain(`PONG ${firstSessionId ?? ""}`);
       expect(fakeTmux.sessionCommands[1]).toContain(`resume ${firstSessionId ?? ""}`);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("cleans stale sessions with one tmux session listing", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+            runnerCommand: "codex",
+            runnerArgs: ["-C", "{workspace}"],
+            staleAfterMinutes: 1,
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const fakeTmux = new FakeTmuxClient();
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const staleAt = Date.now() - 2 * 60_000;
+      const sessionKeys = [
+        "agent:default:slack:channel:c4:thread:700.801",
+        "agent:default:slack:channel:c4:thread:700.802",
+        "agent:default:slack:channel:c4:thread:700.803",
+      ];
+      const liveTarget = { agentId: "default", sessionKey: sessionKeys[1]! };
+      const liveResolved = resolveAgentTarget(loaded, liveTarget);
+      await fakeTmux.newSession({
+        sessionName: liveResolved.sessionName,
+        cwd: tempDir,
+        command: "codex -C .",
+      });
+
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          Object.fromEntries(
+            sessionKeys.map((sessionKey) => [
+              sessionKey,
+              {
+                agentId: "default",
+                sessionKey,
+                sessionId: RUNNER_GENERATED_ID,
+                workspacePath: join(tempDir, "workspaces", "default"),
+                runnerCommand: "codex",
+                runtime: { state: "idle" },
+                updatedAt: staleAt,
+              },
+            ]),
+          ),
+          null,
+          2,
+        ),
+      );
+
+      await service.cleanupStaleSessions();
+
+      expect(fakeTmux.listSessionsCalls).toBe(1);
+      expect(fakeTmux.hasSessionCalls).toBe(0);
+      expect(await fakeTmux.listSessions()).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

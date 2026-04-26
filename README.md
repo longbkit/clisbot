@@ -321,8 +321,11 @@ trust_level = "trusted"
 - If that trust screen is still blocking, attach directly and continue from tmux with `tmux -S ~/.clisbot/state/clisbot.sock attach -t agent-default-main`.
 - If Gemini startup says it is waiting for manual authorization, authenticate Gemini directly first or provide a headless auth path such as `GEMINI_API_KEY` or Vertex AI credentials; `clisbot` now treats that screen as a startup blocker instead of a healthy ready session.
 - If Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment.
-- If the bot does not answer, check that your shell environment really contains the expected tokens and restart `clisbot` after changing them.
+- If the bot does not answer, check `clisbot status` first. Healthy channels should show `connection=active`; if a channel stays `starting`, inspect `clisbot logs`.
+- If a routed message was accepted but no reply arrives, send one test message and immediately run `clisbot runner watch --latest --lines 100` in a terminal. This shows the live tmux runner pane and usually reveals missing CLI auth, trust prompts, stuck startup, or model/provider errors.
+- If Codex works in your normal terminal but the routed runner shows `Missing environment variable: CODEX_CLIPROXYAPI_KEY`, remember that `clisbot` runs Codex from a detached background process and tmux session. Start or restart `clisbot` from a shell where `echo $CODEX_CLIPROXYAPI_KEY` prints a value, or export the key in the environment used by your service manager. Existing tmux runner sessions keep their old environment, so recycle them after fixing env.
 - If runtime startup still fails, run `clisbot logs` and inspect the recent log tail that `clisbot` now prints automatically on startup failure.
+- If a normal restart is not enough, use `clisbot stop --hard` to stop the runtime and kill all tmux runner sessions on the configured clisbot socket, then start again from a shell with the correct environment.
 - If you need the full command list, run `clisbot --help`.
 - If you need step-by-step operator docs, start with [docs/user-guide/README.md](docs/user-guide/README.md).
 - If Slack thread behavior feels too eager, use `/followup pause` or `/followup mention-only`.
@@ -335,11 +338,12 @@ Most users only need a small set of commands at first:
 - `clisbot start`: start the bot runtime and create the default first-run setup when needed.
 - `clisbot restart`: restart the runtime cleanly; use this first when the bot stops responding.
 - `clisbot stop`: stop the runtime cleanly before upgrades, config changes, or maintenance.
+- `clisbot stop --hard`: stop the runtime and kill all tmux runner sessions on the configured clisbot socket; use this when stale runner panes, old environment variables, or stuck sessions survive a normal restart.
 - `clisbot status`: check whether the runtime, channels, and active sessions look healthy.
 - `clisbot logs`: inspect recent runtime logs when startup, routing, or replies look wrong.
 - `clisbot runner list`: list the live tmux-backed runner sessions and see what is active.
 - `clisbot runner watch <session-name>`: live-watch one specific session when debugging a real run.
-- `clisbot runner watch --latest`: jump straight into the most recently active session.
+- `clisbot runner watch --latest --lines 100`: jump straight into the most recently active session with enough context to debug a just-submitted message.
 
 Full operator command reference:
 

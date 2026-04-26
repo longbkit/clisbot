@@ -365,6 +365,7 @@ export class RunnerService {
     this.cleanupInFlight = true;
     try {
       const entries = await this.sessionState.listEntries();
+      const liveSessionNames = new Set(await this.tmux.listSessions());
       const now = Date.now();
 
       for (const entry of entries) {
@@ -385,7 +386,7 @@ export class RunnerService {
           continue;
         }
 
-        if (!(await this.tmux.hasSession(resolved.sessionName))) {
+        if (!liveSessionNames.has(resolved.sessionName)) {
           continue;
         }
 
