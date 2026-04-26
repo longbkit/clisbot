@@ -222,7 +222,28 @@ This project maps channel messages into tmux-backed agents.
     ).toBe(["line 1", "line 2", "line 3"].join("\n"));
   });
 
-  test("deriveBoundedRunningRewritePreview keeps only the latest changed lines for a large rewrite", () => {
+  test("deriveBoundedRunningRewritePreview keeps unchanged context for a small rewrite", () => {
+    const previous = [
+      "Reviewing the code path.",
+      "The queue renderer owns the visible state.",
+      "Working... 1s",
+    ].join("\n");
+    const current = [
+      "Reviewing the code path.",
+      "The queue renderer owns the visible state.",
+      "Working... 2s",
+    ].join("\n");
+
+    expect(
+      deriveBoundedRunningRewritePreview({
+        previousSnapshot: previous,
+        snapshot: current,
+        maxLines: 8,
+      }),
+    ).toBe(current);
+  });
+
+  test("deriveBoundedRunningRewritePreview keeps the latest full-context tail for a large rewrite", () => {
     const previous = ["draft 1", "draft 2"].join("\n");
     const current = [
       "final 1",
@@ -239,7 +260,7 @@ This project maps channel messages into tmux-backed agents.
         maxLines: 2,
       }),
     ).toBe([
-      "...[3 more changed lines]",
+      "...[3 more lines]",
       "final 4",
       "final 5",
     ].join("\n"));

@@ -1907,6 +1907,75 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(reconciled.join("\n")).not.toContain("draft three");
   });
 
+  test("does not start pane streaming after a message-tool final reply already arrived", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await sleep(0);
+            runtime.lastMessageToolReplyAt = Date.now();
+            runtime.messageToolFinalReplyAt = runtime.lastMessageToolReplyAt;
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "late pane draft after final",
+              fullSnapshot: "late pane draft after final",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "final pane output",
+              fullSnapshot: "final pane output",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Working");
+    expect(reconciled).toContain("");
+    expect(reconciled.join("\n")).not.toContain("late pane draft after final");
+    expect(reconciled.join("\n")).not.toContain("final pane output");
+  });
+
   test("cleans up the live draft after a message-tool final reply when response is final", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];

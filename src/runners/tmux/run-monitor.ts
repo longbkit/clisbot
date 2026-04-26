@@ -47,7 +47,13 @@ export type TmuxRunMonitorParams = {
   }) => Promise<void>;
 };
 
+function shouldUsePostSubmitBaseline(snapshot: string, prompt: string) {
+  const trimmedPrompt = prompt.trim();
+  return Boolean(trimmedPrompt) && snapshot.includes(trimmedPrompt);
+}
+
 export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
+  let baselineSnapshot = params.initialSnapshot;
   let previousSnapshot = params.initialSnapshot;
   let previousRunningTruth = "";
   let previousRenderedRunningSnapshot = "";
@@ -64,13 +70,20 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       sessionName: params.sessionName,
       promptSubmitDelayMs: params.promptSubmitDelayMs,
     });
-    await submitTmuxSessionInput({
+    const submitResult = await submitTmuxSessionInput({
       tmux: params.tmux,
       sessionName: params.sessionName,
       text: params.prompt,
       promptSubmitDelayMs: params.promptSubmitDelayMs,
       timingContext: params.timingContext,
     });
+    if (
+      submitResult.submittedSnapshot &&
+      shouldUsePostSubmitBaseline(submitResult.submittedSnapshot, params.prompt)
+    ) {
+      baselineSnapshot = submitResult.submittedSnapshot;
+      previousSnapshot = submitResult.submittedSnapshot;
+    }
     sawPromptSubmission = true;
     lastPaneChangeAt = Date.now();
     await params.onPromptSubmitted?.();
@@ -100,7 +113,7 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
     const hasActiveTimer = hasActiveTimerStatus(snapshot);
     const currentRunningSnapshot = deriveRunningInteractionSnapshot(snapshot);
     const baselineRunningSnapshot =
-      deriveInteractionText(params.initialSnapshot, snapshot) || currentRunningSnapshot;
+      deriveInteractionText(baselineSnapshot, snapshot) || currentRunningSnapshot;
     const runningDelta = priorSnapshot
       ? deriveRunningInteractionText(priorSnapshot, snapshot)
       : currentRunningSnapshot;
@@ -142,7 +155,7 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       await params.onRunning({
         snapshot: runningSnapshot,
         fullSnapshot: snapshot,
-        initialSnapshot: params.initialSnapshot,
+        initialSnapshot: baselineSnapshot,
       });
     }
 
@@ -152,9 +165,9 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
         snapshot:
           previousRenderedRunningSnapshot ||
           previousRunningTruth ||
-          deriveInteractionText(params.initialSnapshot, snapshot),
+          deriveInteractionText(baselineSnapshot, snapshot),
         fullSnapshot: previousSnapshot,
-        initialSnapshot: params.initialSnapshot,
+        initialSnapshot: baselineSnapshot,
       });
     }
 
@@ -164,9 +177,9 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       now - lastPaneChangeAt >= params.idleTimeoutMs
     ) {
       await params.onCompleted({
-        snapshot: deriveInteractionText(params.initialSnapshot, previousSnapshot),
+        snapshot: deriveInteractionText(baselineSnapshot, previousSnapshot),
         fullSnapshot: previousSnapshot,
-        initialSnapshot: params.initialSnapshot,
+        initialSnapshot: baselineSnapshot,
       });
       return;
     }

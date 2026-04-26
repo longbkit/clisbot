@@ -671,6 +671,16 @@ async function executePromptDelivery<TChunk>(params: {
     );
   }
 
+  function hasMessageToolFinalReplyBoundary(params: {
+    messageToolFinalReplyAt?: number;
+  }) {
+    return (
+      typeof activePreviewStartedAt === "number" &&
+      typeof params.messageToolFinalReplyAt === "number" &&
+      params.messageToolFinalReplyAt >= activePreviewStartedAt
+    );
+  }
+
   async function getMessageToolRuntimeSignals() {
     if (params.route.responseMode !== "message-tool" || params.forceQueuedDelivery === true) {
       return {
@@ -878,6 +888,19 @@ async function executePromptDelivery<TChunk>(params: {
           }
 
           await (renderChain = renderChain.then(async () => {
+            const initialSignals = await getMessageToolRuntimeSignals();
+            if (messageToolPreview && hasMessageToolFinalReplyBoundary(initialSignals)) {
+              await handoffMessageToolPreview();
+              return;
+            }
+            if (
+              messageToolPreview &&
+              hasMessageToolReplyBoundary(initialSignals) &&
+              !update.forceVisible
+            ) {
+              await handoffMessageToolPreview();
+              return;
+            }
             if (messageToolPreviewHandedOff && !paneManagedDelivery && !update.forceVisible) {
               return;
             }
@@ -898,12 +921,6 @@ async function executePromptDelivery<TChunk>(params: {
             if (renderedQueueStart) {
               return;
             }
-            const signals = await getMessageToolRuntimeSignals();
-            if (messageToolPreview && hasMessageToolReplyBoundary(signals)) {
-              await handoffMessageToolPreview();
-              return;
-            }
-
             const nextState = buildRenderedMessageState({
               platform: params.identity.platform,
               status: update.status,

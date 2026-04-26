@@ -190,13 +190,13 @@ export function deriveBoundedRunningRewritePreview(params: {
     return current === previous ? current : "";
   }
 
-  if (changedLines.length <= maxLines) {
-    return changedLines.join("\n");
+  if (currentLines.length <= maxLines) {
+    return current;
   }
 
   return [
-    `...[${changedLines.length - maxLines} more changed lines]`,
-    ...changedLines.slice(-maxLines),
+    `...[${currentLines.length - maxLines} more lines]`,
+    ...currentLines.slice(-maxLines),
   ].join("\n");
 }
 
