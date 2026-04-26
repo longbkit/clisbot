@@ -12,6 +12,7 @@ related:
   - docs/releases/v0.1.44.md
   - docs/tasks/features/configuration/2026-04-25-config-downgrade-and-restore-ux.md
   - docs/workflow/ai-agent-operating-preferences.md
+  - docs/workflow/decision-and-struggle-patterns.md
   - docs/lessons/2026-04-14-auth-and-config-design-should-run-a-self-review-checklist-before-converging.md
   - docs/lessons/2026-04-14-feature-review-should-evaluate-product-contract-not-just-config-syntax.md
   - docs/lessons/2026-04-16-cross-cutting-refactors-need-explicit-scope-control-validation-tracking-and-surface-lockstep.md
@@ -178,7 +179,7 @@ Future work for this repository should preserve these preferences:
 - test compatibility and end-to-end paths before claiming completion
 - when a human pushes on mental model, treat that as design signal, not bikeshedding
 
-The reviewable workflow form of these preferences is captured in [AI Agent Operating Preferences](../workflow/ai-agent-operating-preferences.md). Use that file as the staging point before promoting any of these rules into `AGENTS.md`.
+The reviewable workflow form of these preferences is captured in [AI Agent Operating Preferences](../workflow/ai-agent-operating-preferences.md) and [Decision And Struggle Patterns](../workflow/decision-and-struggle-patterns.md). Use those files as staging points before promoting any of these rules into `AGENTS.md`.
 
 ## Reusable Checklist
 

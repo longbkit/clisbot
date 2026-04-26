@@ -17,6 +17,7 @@ This folder should capture:
 - [code-review-checklist.md](code-review-checklist.md): short high-leverage checklist for looping AI code review until naming, mental model, user flow, and risk issues are cleaned up
 - [working-prompts.md](working-prompts.md): reusable prompts that are showing good results in real `clisbot` workflow loops
 - [ai-agent-operating-preferences.md](ai-agent-operating-preferences.md): review draft of durable AI-agent operating preferences learned from real `clisbot` work, intended as a staging point before selected rules move into `AGENTS.md`
+- [decision-and-struggle-patterns.md](decision-and-struggle-patterns.md): review draft of decision patterns and recurring AI struggle patterns to prevent repeated mistakes before selected rules move into `AGENTS.md`
 
 ## Current Direction
 
@@ -26,6 +27,7 @@ The current workflow direction is:
 - review loops should walk the same high-leverage checklist repeatedly until the artifact is truly clear
 - tasks should be shaped into `Ready` quality before they are handed to autonomous execution flows
 - durable repo-work preferences should be captured in `docs/workflow/` first when they need human review before becoming hard `AGENTS.md` rules
+- repeated human corrections should be distilled into decision and struggle patterns, not treated as one-off feedback
 
 ## Boundaries
 

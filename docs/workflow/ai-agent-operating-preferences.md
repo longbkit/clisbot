@@ -6,6 +6,10 @@ Working review draft.
 
 This page captures durable operating preferences learned from real `clisbot` work. It is intentionally placed in `docs/workflow/` as a reviewable step before promoting selected rules into `AGENTS.md`.
 
+Related workflow note:
+
+- [Decision And Struggle Patterns](decision-and-struggle-patterns.md)
+
 ## Why This Exists
 
 The April 2026 auth config and release cycle showed that AI agents can produce locally plausible work while still missing the operator mental model, migration risk, or surrounding docs and CLI surfaces.
