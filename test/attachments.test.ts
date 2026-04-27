@@ -24,9 +24,9 @@ describe("attachment prompt shaping", () => {
     );
   });
 
-  test("passes audio attachment paths as transcribable text", () => {
+  test("prepends audio attachment paths as normal file mentions", () => {
     expect(prependAttachmentMentions("please transcribe", ["/tmp/voice.oga"])).toBe(
-      "(voice message: /tmp/voice.oga) please transcribe",
+      "@/tmp/voice.oga please transcribe",
     );
   });
 });
@@ -149,7 +149,7 @@ describe("telegram attachment downloads", () => {
 
       expect(paths).toHaveLength(1);
       expect(paths[0]?.endsWith("file-without-extension.oga")).toBe(true);
-      expect(prependAttachmentMentions("", paths)).toBe(`(voice message: ${paths[0]})`);
+      expect(prependAttachmentMentions("", paths)).toBe(`@${paths[0]}`);
       expect(await Bun.file(paths[0]!).text()).toBe("voice-bytes");
     } finally {
       globalThis.fetch = originalFetch;

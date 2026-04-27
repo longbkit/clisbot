@@ -158,6 +158,10 @@ The mid-prompt recovery gap is no longer the old asymmetric failure path.
 
 Practical consequence:
 
+- if tmux dies while an in-memory active run is still monitored, the monitor owns recovery and should not be bypassed by admission-time cleanup
+- if only persisted `running` or `detached` runtime remains and the tmux session is gone, that projection is stale and should be cleared to `idle` before the next prompt starts
+- `runner list` remains a live-runner debug surface; stale persisted runtime belongs in status/debug output, not in the live runner list
+
 - a transient tmux or runner-session drop mid-prompt can now self-heal when same-context reopen succeeds
 - if only a fresh session can be opened, the current run still fails truthfully instead of pretending the old context survived
 - the final message is noisier than it should be and can look sloppy or misleading

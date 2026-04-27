@@ -635,7 +635,7 @@ export class RunnerService {
   }
 
   canRecoverMidRun(error: unknown) {
-    return isRecoverableStartupSessionLoss(error);
+    return isRecoverableStartupSessionLoss(error) || isTransientTmuxTargetError(error);
   }
 
   canRetryPromptAfterFreshStart(error: unknown) {

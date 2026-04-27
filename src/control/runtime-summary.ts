@@ -283,6 +283,7 @@ export async function getRuntimeOperatorSummary(params: {
   ] satisfies ChannelOperatorSummary[];
 
   const timezone = resolveConfigTimezone({ config: loadedConfig.raw });
+  const runningTmuxSessions = runnerSessions.filter((session) => session.live).length;
 
   return {
     loadedConfig,
@@ -305,7 +306,7 @@ export async function getRuntimeOperatorSummary(params: {
     ).length,
     bootstrappedAgents: agentSummaries.filter((item) => item.bootstrapState === "bootstrapped")
       .length,
-    runningTmuxSessions: runnerSessions.length,
+    runningTmuxSessions,
     runnerSessions,
   } satisfies RuntimeOperatorSummary;
 }

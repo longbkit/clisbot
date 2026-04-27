@@ -257,13 +257,21 @@ function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
     return ["", "Active runs:", "  none"];
   }
 
+  const liveRunnerSessionKeys = new Set(
+    summary.runnerSessions
+      .filter((session) => session.live && session.entry)
+      .map((session) => session.entry!.sessionKey),
+  );
+
   return [
     "",
     "Active runs:",
     ...summary.activeRuns.map((run) => {
       const startedAt = run.startedAt ? new Date(run.startedAt).toISOString() : "unknown";
       const detachedAt = run.detachedAt ? ` detachedAt=${new Date(run.detachedAt).toISOString()}` : "";
-      return `  - agent=${run.agentId} state=${run.state} startedAt=${startedAt}${detachedAt} sessionKey=${run.sessionKey}`;
+      const runnerLive = liveRunnerSessionKeys.has(run.sessionKey);
+      const liveSuffix = runnerLive ? "" : " runner=lost";
+      return `  - agent=${run.agentId} state=${run.state}${liveSuffix} startedAt=${startedAt}${detachedAt} sessionKey=${run.sessionKey}`;
     }),
   ];
 }
@@ -288,9 +296,9 @@ function renderRunnerSessionSummaryLines(summary: RuntimeOperatorSummary) {
     "Runner sessions:",
     ...visibleSessions.map((session) => {
       if (!session.entry) {
-        return `  - ${session.sessionName}`;
+        return `  - ${session.sessionName} live=${session.live ? "yes" : "no"}`;
       }
-      return `  - ${session.sessionName} agent=${session.entry.agentId} sessionKey=${session.entry.sessionKey} lastAdmittedPromptAt=${formatSessionTimestamp(session.entry.lastAdmittedPromptAt)}`;
+      return `  - ${session.sessionName} live=${session.live ? "yes" : "no"} agent=${session.entry.agentId} state=${session.entry.runtime?.state ?? "no-runtime"} sessionKey=${session.entry.sessionKey} lastAdmittedPromptAt=${formatSessionTimestamp(session.entry.lastAdmittedPromptAt)}`;
     }),
     ...(hiddenCount > 0 ? [`  (${hiddenCount}) sessions more`] : []),
     `  hint: ${renderCliCommand("runner list", { inline: true })} or ${renderCliCommand("runner watch --latest", { inline: true })}`,

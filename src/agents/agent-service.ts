@@ -358,8 +358,8 @@ export class AgentService {
     return this.activeRuns.submitSessionInput(target, text);
   }
 
-  isSessionBusy(target: AgentSessionTarget) {
-    return this.activeRuns.hasActiveRun(target) || this.queue.isBusy(target.sessionKey);
+  async isSessionBusy(target: AgentSessionTarget) {
+    return (await this.activeRuns.hasLiveActiveRun(target)) || this.queue.isBusy(target.sessionKey);
   }
 
   async isAwaitingFollowUpRouting(target: AgentSessionTarget) {
@@ -367,7 +367,7 @@ export class AgentService {
       return true;
     }
 
-    if (!this.activeRuns.hasActiveRun(target)) {
+    if (!(await this.activeRuns.hasLiveActiveRun(target))) {
       return false;
     }
 
@@ -615,7 +615,7 @@ export class AgentService {
         }),
       {
         text: prompt,
-        canStart: async () => !this.activeRuns.hasActiveRun(target),
+        canStart: async () => !(await this.activeRuns.hasLiveActiveRun(target)),
       },
     );
   }
@@ -731,7 +731,7 @@ export class AgentService {
       nextRunAt,
     };
 
-    if (this.isSessionBusy(managed.target)) {
+    if (await this.isSessionBusy(managed.target)) {
       nextLoopState.skippedRuns += 1;
       if (!(await this.updateManagedIntervalLoop(managed, nextLoopState))) {
         this.dropManagedIntervalLoop(loopId);

@@ -244,6 +244,7 @@ describe("runtime summaries", () => {
     expect(text).not.toContain("telegram enabled=no connection=");
     expect(text).toContain("agent=work");
     expect(text).toContain("state=detached");
+    expect(text).toContain("runner=lost");
     expect(text).toContain("sessionKey=agent:work:slack:channel:C123:thread:1.2");
   });
 
@@ -270,6 +271,7 @@ describe("runtime summaries", () => {
       runnerSessions: [
         {
           sessionName: "session-6",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-6",
@@ -281,6 +283,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-5",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-5",
@@ -292,6 +295,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-4",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-4",
@@ -303,6 +307,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-3",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-3",
@@ -314,6 +319,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-2",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-2",
@@ -325,6 +331,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-1",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-1",

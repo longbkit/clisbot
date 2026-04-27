@@ -10,6 +10,7 @@ export type RunnerSessionMetadata = {
 
 export type RunnerSessionSummary = {
   sessionName: string;
+  live: boolean;
   entry?: StoredSessionEntry;
 };
 
@@ -49,9 +50,9 @@ export async function listRunnerSessions(
   const metadata = buildRunnerSessionMetadata(loadedConfig, await sessionStore.list());
   const sessionByName = new Map(metadata.map((item) => [item.sessionName, item.entry]));
   const tmux = new TmuxClient(loadedConfig.raw.tmux.socketPath);
-  const sessions = await tmux.listSessions();
+  const liveSessionNames = new Set(await tmux.listSessions());
 
-  return [...sessions]
+  return [...liveSessionNames]
     .sort((left, right) => {
       const leftEntry = sessionByName.get(left);
       const rightEntry = sessionByName.get(right);
@@ -69,6 +70,7 @@ export async function listRunnerSessions(
     })
     .map((sessionName) => ({
       sessionName,
+      live: true,
       entry: sessionByName.get(sessionName),
     }));
 }

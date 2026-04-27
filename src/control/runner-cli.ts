@@ -418,6 +418,7 @@ function renderRunnerListSession(session: RunnerSessionSummary) {
       `- sessionName: ${session.sessionName}`,
       "  sessionId: none",
       "  state: unmanaged",
+      "  live: yes",
     ].join("\n");
   }
 
@@ -427,6 +428,7 @@ function renderRunnerListSession(session: RunnerSessionSummary) {
     `  sessionKey: ${session.entry.sessionKey}`,
     `  sessionId: ${session.entry.sessionId?.trim() || "none"}`,
     `  state: ${session.entry.runtime?.state ?? "no-runtime"}`,
+    `  live: ${session.live ? "yes" : "no"}`,
     `  lastAdmittedPromptAt: ${formatTimestamp(session.entry.lastAdmittedPromptAt)}`,
   ].join("\n");
 }

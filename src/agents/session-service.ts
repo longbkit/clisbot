@@ -354,13 +354,40 @@ export class SessionService {
     return this.activeRuns.has(target.sessionKey);
   }
 
+  async hasLiveActiveRun(target: AgentSessionTarget) {
+    if (this.activeRuns.has(target.sessionKey)) {
+      return true;
+    }
+    // Persisted runtime is only a projection; if tmux is gone, this clears it to idle.
+    return Boolean(await this.reconcilePersistedActiveRun(target));
+  }
+
   canSteerActiveRun(target: AgentSessionTarget) {
     return this.activeRuns.get(target.sessionKey)?.steeringReady ?? false;
   }
 
   async submitSessionInput(target: AgentSessionTarget, text: string) {
-    const result = await this.runnerSessions.submitSessionInput(target, text);
     const run = this.activeRuns.get(target.sessionKey);
+    let result: Awaited<ReturnType<RunnerService["submitSessionInput"]>>;
+    try {
+      result = await this.runnerSessions.submitSessionInput(target, text);
+    } catch (error) {
+      if (
+        run &&
+        await this.recoverLostMidRun(
+          target.sessionKey,
+          {
+            runId: run.runId,
+          },
+          error,
+        )
+      ) {
+        throw new Error(
+          "The active runner session was lost before steering could be submitted. clisbot started recovery for the active run; resend the steering message after recovery completes.",
+        );
+      }
+      throw error;
+    }
     if (!run) {
       return result;
     }
