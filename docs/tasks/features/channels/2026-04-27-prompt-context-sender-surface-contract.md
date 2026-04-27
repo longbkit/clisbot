@@ -21,7 +21,7 @@ Queue, steering, and loop are message delivery situations. They should share the
 
 ## Status
 
-Ready
+Done
 
 ## Current Prompt Contract
 

@@ -70,6 +70,7 @@ import { renderCliCommand } from "../shared/cli-name.ts";
 import type { ProcessingIndicatorLifecycle } from "./processing-indicator.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
 import { resolveChannelIdentityBotId } from "./channel-identity.ts";
+import type { StoredLoopSender } from "../agents/loop-state.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -575,13 +576,29 @@ function buildLoopSurfaceBinding(identity: ChannelInteractionIdentity) {
   };
 }
 
+function buildLoopSender(identity: ChannelInteractionIdentity): StoredLoopSender | undefined {
+  const providerId = identity.senderId?.trim();
+  if (!providerId) {
+    return undefined;
+  }
+  return {
+    senderId: identity.platform === "slack"
+      ? `slack:${providerId.toUpperCase()}`
+      : `telegram:${providerId}`,
+    providerId,
+    displayName: identity.senderName,
+    handle: identity.senderHandle,
+  };
+}
+
 async function executePromptDelivery<TChunk>(params: {
   agentService: AgentService;
   sessionTarget: AgentSessionTarget;
   identity: ChannelInteractionIdentity;
   route: ChannelInteractionRoute;
   maxChars: number;
-  promptText: string;
+  promptText: string | (() => string);
+  queueText?: string;
   postText: PostText<TChunk>;
   reconcileText: ReconcileText<TChunk>;
   observerId: string;
@@ -782,7 +799,7 @@ async function executePromptDelivery<TChunk>(params: {
       agentId: params.route.agentId,
       promptSummary:
         params.notificationPromptSummary ??
-        summarizeSurfaceNotificationText(params.promptText),
+        summarizeSurfaceNotificationText(params.queueText ?? String(params.promptText)),
     });
     if (!text) {
       queueStartPending = false;
@@ -838,7 +855,7 @@ async function executePromptDelivery<TChunk>(params: {
           agentId: params.route.agentId,
           promptSummary:
             params.notificationPromptSummary ??
-            summarizeSurfaceNotificationText(params.promptText),
+            summarizeSurfaceNotificationText(params.queueText ?? String(params.promptText)),
         }) ??
         renderPlatformInteraction({
           platform: params.identity.platform,
@@ -860,7 +877,7 @@ async function executePromptDelivery<TChunk>(params: {
           agentId: params.route.agentId,
           promptSummary:
             params.notificationPromptSummary ??
-            summarizeSurfaceNotificationText(params.promptText),
+            summarizeSurfaceNotificationText(params.queueText ?? String(params.promptText)),
         }) ??
         renderPlatformInteraction({
           platform: params.identity.platform,
@@ -891,6 +908,7 @@ async function executePromptDelivery<TChunk>(params: {
       {
         observerId: params.observerId,
         timingContext: params.timingContext,
+        queueText: params.queueText,
         onUpdate: async (update) => {
           if (update.status === "running" && !loggedFirstRunningUpdate) {
             loggedFirstRunningUpdate = true;
@@ -1333,12 +1351,13 @@ export async function processChannelInteraction<TChunk>(params: {
     !sessionBusy;
   const queueByMode = !explicitQueueMessage && params.route.additionalMessageMode === "queue" && sessionBusy;
   const forceQueuedDelivery = typeof explicitQueueMessage === "string" || queueByMode;
-  const delayedPromptText =
+  const delayedPromptText = () =>
     explicitQueueMessage
       ? params.agentPromptBuilder
         ? params.agentPromptBuilder(explicitQueueMessage)
         : explicitQueueMessage
       : params.agentPromptText ?? params.text;
+  const delayedPromptQueueText = explicitQueueMessage ?? params.text;
   const isSensitiveCommand = slashCommand?.type === "bash";
 
   if (isSensitiveCommand && !auth.canUseShell) {
@@ -1808,7 +1827,8 @@ export async function processChannelInteraction<TChunk>(params: {
           identity: params.identity,
           route: params.route,
           maxChars: params.maxChars,
-          promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+          promptText: () => buildLoopPromptText(resolvedLoopPrompt.text),
+          queueText: resolvedLoopPrompt.text,
           queueStartMode: params.route.surfaceNotifications.queueStart,
           notificationPromptSummary: summarizeManagedLoopPrompt(
             resolvedLoopPrompt.text,
@@ -1832,7 +1852,7 @@ export async function processChannelInteraction<TChunk>(params: {
       });
       const createdLoop = await params.agentService.createCalendarLoop({
         target: params.sessionTarget,
-        promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+        promptText: resolvedLoopPrompt.text,
         canonicalPromptText: resolvedLoopPrompt.text,
         promptSummary: summarizeManagedLoopPrompt(
           resolvedLoopPrompt.text,
@@ -1848,6 +1868,7 @@ export async function processChannelInteraction<TChunk>(params: {
         timezone: effectiveTimezone,
         maxRuns: maxRunsPerLoop,
         createdBy: params.senderId,
+        sender: buildLoopSender(params.identity),
         protectedControlMutationRule: params.protectedControlMutationRule,
       });
       await params.postText(
@@ -1876,7 +1897,7 @@ export async function processChannelInteraction<TChunk>(params: {
 
     const createdLoop = await params.agentService.createIntervalLoop({
       target: params.sessionTarget,
-      promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+      promptText: resolvedLoopPrompt.text,
       canonicalPromptText: resolvedLoopPrompt.text,
       promptSummary: summarizeManagedLoopPrompt(
         resolvedLoopPrompt.text,
@@ -1887,6 +1908,7 @@ export async function processChannelInteraction<TChunk>(params: {
       intervalMs: effectiveIntervalMs!,
       maxRuns: maxRunsPerLoop,
       createdBy: params.senderId,
+      sender: buildLoopSender(params.identity),
       force: slashCommand.params.force,
       protectedControlMutationRule: params.protectedControlMutationRule,
     });
@@ -1965,6 +1987,9 @@ export async function processChannelInteraction<TChunk>(params: {
       params.sessionTarget,
       buildSteeringPromptText({
         text: params.transformSessionInputText?.(explicitSteerMessage) ?? explicitSteerMessage,
+        identity: params.identity,
+        agentId: params.route.agentId,
+        time: Date.now(),
         protectedControlMutationRule: params.protectedControlMutationRule,
       }),
     );
@@ -1984,6 +2009,9 @@ export async function processChannelInteraction<TChunk>(params: {
         params.sessionTarget,
         buildSteeringPromptText({
           text: params.transformSessionInputText?.(params.text) ?? params.text,
+          identity: params.identity,
+          agentId: params.route.agentId,
+          time: Date.now(),
           protectedControlMutationRule: params.protectedControlMutationRule,
         }),
       );
@@ -2003,6 +2031,7 @@ export async function processChannelInteraction<TChunk>(params: {
     route: params.route,
     maxChars: params.maxChars,
     promptText: delayedPromptText,
+    queueText: delayedPromptQueueText,
     queueStartMode: params.route.surfaceNotifications.queueStart,
     notificationPromptSummary:
       explicitQueueMessage ??

@@ -503,9 +503,8 @@ function buildRecurringLoopCreateBase(
 }
 
 function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
-  const deliveryContext = request.deliveryContext ?? request.context;
   return {
-    promptText: deliveryContext.buildLoopPromptText(request.resolvedPrompt.text),
+    promptText: request.resolvedPrompt.text,
     canonicalPromptText: request.resolvedPrompt.text,
     promptSummary: summarizeLoopPrompt(
       request.resolvedPrompt.text,

@@ -1915,7 +1915,8 @@ describe("AgentService session identity", () => {
 
     expect(firstService.listIntervalLoops({ sessionKey: target.sessionKey })).toHaveLength(1);
     const persistedBeforeStop = readFileSync(storePath, "utf8");
-    expect(persistedBeforeStop).toContain("\"intervalLoops\"");
+    expect(persistedBeforeStop).toContain("\"loops\"");
+    expect(persistedBeforeStop).not.toContain("\"intervalLoops\"");
     await firstService.stop();
 
     const secondService = new AgentService(loadedConfig, { tmux });
@@ -2013,6 +2014,8 @@ describe("AgentService session identity", () => {
     }
 
     expect(transcript.snapshot).toContain("check deploy");
+    expect(transcript.snapshot).toContain("- sender: slack:U123 [slack:U123]");
+    expect(transcript.snapshot).toContain("- message: scheduled loop ");
     expect(transcript.snapshot).toContain("To send a user-visible progress update or final reply, use the following CLI command:");
     expect(transcript.snapshot).toContain("use that command to send progress updates and the final reply back to the conversation");
     expect(transcript.snapshot).not.toContain("legacy wrapped prompt with progress instructions");

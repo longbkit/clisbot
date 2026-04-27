@@ -5,6 +5,7 @@ export type ChannelIdentity = {
   conversationKind: "dm" | "channel" | "group" | "topic";
   senderId?: string;
   senderName?: string;
+  senderHandle?: string;
   channelId?: string;
   channelName?: string;
   chatId?: string;

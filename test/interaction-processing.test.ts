@@ -68,6 +68,10 @@ function createIdentity(
   };
 }
 
+function renderCapturedPrompt(prompt: string | (() => string)) {
+  return typeof prompt === "function" ? prompt() : prompt;
+}
+
 function createTelegramTopicIdentity(
   overrides: Partial<ChannelInteractionIdentity> = {},
 ): ChannelInteractionIdentity {
@@ -1570,7 +1574,7 @@ describe("processChannelInteraction agent prompt text", () => {
     await processChannelInteraction({
       agentService: {
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -1609,7 +1613,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -2410,7 +2414,7 @@ describe("processChannelInteraction agent prompt text", () => {
           submitCalls += 1;
         },
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2462,7 +2466,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2580,7 +2584,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2633,7 +2637,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2686,7 +2690,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => false,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -2975,7 +2979,7 @@ describe("processChannelInteraction agent prompt text", () => {
         isAwaitingFollowUpRouting: async () => false,
         hasActiveRun: () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -3164,7 +3168,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3219,7 +3223,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3274,7 +3278,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3338,7 +3342,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3407,7 +3411,7 @@ describe("processChannelInteraction agent prompt text", () => {
           intervalMs: number;
           maxRuns: number;
         }) => {
-          enqueued.push(promptText);
+          enqueued.push(renderCapturedPrompt(promptText));
           scheduledIntervalMs = intervalMs;
           createdMaxRuns = maxRuns;
           return {
@@ -3453,7 +3457,7 @@ describe("processChannelInteraction agent prompt text", () => {
         ],
         getActiveIntervalLoopCount: () => 1,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -3489,7 +3493,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toContain("Started loop `loop123` every 2h.");
     expect(scheduledIntervalMs).toBe(7_200_000);
     expect(createdMaxRuns).toBe(20);
-    expect(enqueued).toEqual(["wrapped:check deploy"]);
+    expect(enqueued).toEqual(["check deploy"]);
   });
 
   test("loop calendar mode schedules the first run using route timezone", async () => {
@@ -3609,7 +3613,7 @@ describe("processChannelInteraction agent prompt text", () => {
           }),
           getWorkspacePath: () => workspacePath,
           enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-            enqueued.push(prompt);
+            enqueued.push(renderCapturedPrompt(prompt));
             return {
               positionAhead: enqueued.length - 1,
               result: Promise.resolve({

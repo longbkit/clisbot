@@ -1,5 +1,11 @@
 import type { ChannelIdentity } from "./channel-identity.ts";
 import { resolveChannelIdentityBotId } from "./channel-identity.ts";
+import {
+  buildSurfacePromptContext,
+  renderPermissionGuidance,
+  renderSurfacePromptContext,
+  type SurfacePromptContext,
+} from "./surface-prompt-context.ts";
 import { getClisbotPromptCommand } from "../control/clisbot-wrapper.ts";
 import { getRenderedCliName, renderCliCommand } from "../shared/cli-name.ts";
 
@@ -10,14 +16,14 @@ export type ChannelAgentPromptConfig = {
 };
 
 export const BASE_TEMPLATE = `<system>
-[{{timestamp}}] {{identity_summary}}
+{{message_context}}
 
 You are operating inside clisbot.
 {{delivery_intro}}
 {{reply_command}}
 {{reply_rules}}
 {{reply_style_hint}}
-{{configuration_guidance}}{{protected_control_suffix}}
+{{configuration_guidance}}{{permission_guidance}}{{protected_control_suffix}}
 </system>
 
 <user>
@@ -26,7 +32,9 @@ You are operating inside clisbot.
 
 export const STEERING_TEMPLATE = `<system>
 A new user message arrived while you were still working.
-Adjust your current work if needed and continue.{{protected_control_suffix}}
+Adjust your current work if needed and continue.
+
+{{message_context}}{{permission_guidance}}{{protected_control_suffix}}
 </system>
 
 <user>
@@ -109,6 +117,10 @@ export function buildAgentPromptText(params: {
   streaming?: "off" | "latest" | "all";
   protectedControlMutationRule?: string;
   timezone?: string;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  scheduledLoopId?: string;
 }) {
   return buildChannelPromptText({
     ...params,
@@ -118,10 +130,18 @@ export function buildAgentPromptText(params: {
 
 export function buildSteeringPromptText(params: {
   text: string;
+  identity?: ChannelIdentity;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
   protectedControlMutationRule?: string;
 }) {
   return buildChannelPromptText({
     text: params.text,
+    identity: params.identity,
+    agentId: params.agentId,
+    time: params.time,
+    promptContext: params.promptContext,
     mode: "steer",
     protectedControlMutationRule: params.protectedControlMutationRule,
   });
@@ -135,6 +155,10 @@ function buildChannelPromptText(params: {
   streaming?: "off" | "latest" | "all";
   protectedControlMutationRule?: string;
   timezone?: string;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  scheduledLoopId?: string;
   mode: ChannelPromptMode;
 }) {
   if (params.mode === "message" && !params.config?.enabled) {
@@ -142,7 +166,10 @@ function buildChannelPromptText(params: {
   }
 
   if (params.mode === "steer") {
+    const context = resolvePromptContext(params);
     return renderTemplate(STEERING_TEMPLATE, {
+      message_context: renderSurfacePromptContext(context),
+      permission_guidance: renderPermissionGuidanceWithPrefix(context),
       message_body: params.text,
       protected_control_suffix: renderProtectedControlSuffix(
         params.protectedControlMutationRule,
@@ -156,19 +183,47 @@ function buildChannelPromptText(params: {
     responseMode: params.responseMode,
     streaming: params.streaming,
   });
+  const context = resolvePromptContext(params);
 
   return renderTemplate(BASE_TEMPLATE, {
-    timestamp: renderPromptTimestamp(params.timezone),
-    identity_summary: renderIdentitySummary(params.identity!),
+    message_context: renderSurfacePromptContext(context),
     delivery_intro: promptParts.deliveryIntro,
     reply_command: promptParts.replyCommand,
     reply_rules: promptParts.replyRules,
     reply_style_hint: promptParts.replyStyleHint,
     configuration_guidance: renderConfigurationGuidance(),
+    permission_guidance: renderPermissionGuidanceWithPrefix(context),
     protected_control_suffix: renderProtectedControlSuffix(
       params.protectedControlMutationRule,
     ),
     message_body: params.text,
+  });
+}
+
+function resolvePromptContext(params: {
+  identity?: ChannelIdentity;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  scheduledLoopId?: string;
+}) {
+  if (params.promptContext) {
+    return params.promptContext;
+  }
+  if (!params.identity) {
+    return {
+      time: params.time ? new Date(params.time).toISOString() : new Date().toISOString(),
+      surface: {
+        surfaceId: "unknown",
+        kind: "channel" as const,
+      },
+    };
+  }
+  return buildSurfacePromptContext({
+    identity: params.identity,
+    agentId: params.agentId,
+    time: params.time,
+    scheduledLoopId: params.scheduledLoopId,
   });
 }
 
@@ -229,6 +284,11 @@ function renderConfigurationGuidance() {
     `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, or ${renderCliCommand("auth --help", { inline: true })} for details.`,
     `For schedule/loop/reminder requests, inspect ${renderCliCommand("loops --help", { inline: true })} and use the loops CLI.`,
   ].join("\n");
+}
+
+function renderPermissionGuidanceWithPrefix(context?: SurfacePromptContext) {
+  const guidance = renderPermissionGuidance(context);
+  return guidance ? `\n${guidance}` : "";
 }
 
 function renderCapturePaneDeliveryIntro() {

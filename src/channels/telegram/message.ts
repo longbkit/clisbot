@@ -43,6 +43,7 @@ export type TelegramAudio = {
 
 export type TelegramMessage = {
   message_id: number;
+  date?: number;
   message_thread_id?: number;
   text?: string;
   caption?: string;

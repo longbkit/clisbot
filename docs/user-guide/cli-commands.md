@@ -352,7 +352,8 @@ Important behavior:
 ## Auth
 
 - `clisbot auth list [--json]`
-- `clisbot auth get <app|agent-defaults|agent> [--agent <id>] [--json]`
+- `clisbot auth show <app|agent-defaults|agent> [--agent <id>] [--json]`
+- `clisbot auth get-permissions --sender <principal> --agent <id> [--json] [--verbose]`
 - `clisbot auth add-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
 - `clisbot auth remove-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
 - `clisbot auth add-permission <app|agent-defaults|agent> --role <role> --permission <permission> [--agent <id>]`
@@ -365,6 +366,9 @@ Important behavior:
 - `agent --agent <id>` edits one agent override under `agents.list[].auth`
 - `add-user` and `remove-user` mutate `roles.<role>.users`
 - `add-permission` and `remove-permission` mutate `roles.<role>.allow`
+- `get-permissions` is read-only and returns the sender's effective permissions for one agent
+- use `--sender <principal>` for permission checks and `--user <principal>` for role assignment
+- `principal` format is `<platform>:<provider-user-id>`, for example `telegram:1276408333` or `slack:U123ABC456`
 - agent-specific writes clone the inherited role from `agents.defaults.auth.roles.<role>` into the target agent override on first mutation
 - app permissions are limited to the app permission set: `configManage`, `appAuthManage`, `agentAuthManage`, `promptGovernanceManage`
 - agent permissions are limited to the agent permission set shown by `clisbot auth --help`

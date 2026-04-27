@@ -19,6 +19,7 @@ import { ProcessedEventsStore } from "../processed-events-store.ts";
 import { ActivityStore } from "../../control/activity-store.ts";
 import { renderChannelInteraction } from "../../shared/transcript.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
+import { recordSurfaceDirectoryIdentity } from "../surface-directory.ts";
 import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
 import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
@@ -524,6 +525,7 @@ export class SlackSocketService {
           : rawText,
         senderId:
           typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
+        platform: "slack",
       });
     }
     if (requiresMention && !wasMentioned) {
@@ -635,6 +637,14 @@ export class SlackSocketService {
       channelId,
       threadTs,
     };
+    void recordSurfaceDirectoryIdentity({
+      stateDir: this.loadedConfig.stateDir,
+      identity,
+    }).catch(() => undefined);
+    const promptTime =
+      messageTs && Number.isFinite(Number(messageTs))
+        ? Number(messageTs) * 1000
+        : Date.now();
     const auth = resolveChannelAuth({
       config: this.loadedConfig.raw,
       agentId: params.route.agentId,
@@ -651,6 +661,8 @@ export class SlackSocketService {
       responseMode: params.route.responseMode,
       streaming: params.route.streaming,
       protectedControlMutationRule,
+      agentId: params.route.agentId,
+      time: promptTime,
     });
     const timingContext = {
       platform: "slack" as const,
@@ -729,6 +741,8 @@ export class SlackSocketService {
             responseMode: params.route.responseMode,
             streaming: params.route.streaming,
             protectedControlMutationRule,
+            agentId: params.route.agentId,
+            time: Date.now(),
             timezone: this.agentService.resolveEffectiveTimezone({
               agentId: params.route.agentId,
               routeTimezone: params.route.timezone,

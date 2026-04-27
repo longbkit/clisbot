@@ -327,4 +327,79 @@ describe("auth cli", () => {
     expect(output.roles.member?.users).toEqual(["slack:U123"]);
     expect(output.roles.member?.allow).toContain("sendMessage");
   });
+
+  test("gets effective sender permissions with dynamic explanations", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-auth-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+
+    const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+    config.agents.list = [{ id: "default" }];
+    await writeEditableConfig(process.env.CLISBOT_CONFIG_PATH!, config);
+
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runAuthCli([
+      "get-permissions",
+      "--sender",
+      "telegram:1276408333",
+      "--agent",
+      "default",
+      "--json",
+    ]);
+
+    const output = JSON.parse(logs.join("\n")) as {
+      sender: string;
+      permissions: Record<string, { allowed: boolean; explanation: string }>;
+      resolution?: unknown;
+    };
+
+    expect(output.sender).toBe("telegram:1276408333");
+    expect(output.permissions.manageLoop.allowed).toBe(true);
+    expect(output.permissions.manageLoop.explanation).toStartWith("Can ");
+    expect(output.permissions.runShellSlashCommand.allowed).toBe(false);
+    expect(output.permissions.runShellSlashCommand.explanation).toStartWith("Cannot ");
+    expect(output.permissions.runShellSlashCommand.explanation).toContain("/bash");
+    expect(output.permissions.runShellSlashCommand.explanation).toContain("workspace file reads/edits are separate");
+    expect(output.resolution).toBeUndefined();
+  });
+
+  test("gets verbose sender permission resolution details", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-auth-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+
+    const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+    config.agents.list = [{ id: "default" }];
+    config.app.auth.roles.owner.users = ["telegram:1276408333"];
+    await writeEditableConfig(process.env.CLISBOT_CONFIG_PATH!, config);
+
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runAuthCli([
+      "get-permissions",
+      "--sender",
+      "telegram:1276408333",
+      "--agent",
+      "default",
+      "--json",
+      "--verbose",
+    ]);
+
+    const output = JSON.parse(logs.join("\n")) as {
+      permissions: Record<string, { allowed: boolean; explanation: string }>;
+      resolution?: { appRole?: string; effective?: { mayManageProtectedResources?: boolean } };
+    };
+
+    expect(output.permissions.manageProtectedResources.allowed).toBe(true);
+    expect(output.permissions.manageProtectedResources.explanation).toStartWith("Can ");
+    expect(output.resolution?.appRole).toBe("owner");
+    expect(output.resolution?.effective?.mayManageProtectedResources).toBe(true);
+  });
 });

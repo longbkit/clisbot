@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { IntervalLoopStatus, StoredIntervalLoop, StoredLoopSurfaceBinding } from "./loop-state.ts";
+import type { IntervalLoopStatus, StoredLoop, StoredLoopSender, StoredLoopSurfaceBinding } from "./loop-state.ts";
 import {
   computeNextCalendarLoopRunAtMs,
   FORCE_LOOP_INTERVAL_MS,
@@ -29,6 +29,7 @@ function createStoredLoopBase(params: {
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
   createdBy?: string;
+  sender?: StoredLoopSender;
   surfaceBinding?: StoredLoopSurfaceBinding;
   maxRuns: number;
 }) {
@@ -48,7 +49,27 @@ function createStoredLoopBase(params: {
     promptSummary: params.promptSummary,
     promptSource: params.promptSource,
     createdBy: params.createdBy,
+    sender: params.sender ?? deriveLegacyLoopSender({
+      createdBy: params.createdBy,
+      surfaceBinding: params.surfaceBinding,
+    }),
     surfaceBinding: params.surfaceBinding,
+  };
+}
+
+function deriveLegacyLoopSender(params: {
+  createdBy?: string;
+  surfaceBinding?: StoredLoopSurfaceBinding;
+}): StoredLoopSender | undefined {
+  const providerId = params.createdBy?.trim();
+  if (!providerId) {
+    return undefined;
+  }
+  return {
+    providerId,
+    senderId: params.surfaceBinding?.platform
+      ? `${params.surfaceBinding.platform}:${params.surfaceBinding.platform === "slack" ? providerId.toUpperCase() : providerId}`
+      : undefined,
   };
 }
 
@@ -62,8 +83,9 @@ export function createStoredIntervalLoop(params: {
   intervalMs: number;
   maxRuns: number;
   createdBy?: string;
+  sender?: StoredLoopSender;
   force: boolean;
-}): StoredIntervalLoop {
+}): StoredLoop {
   return {
     ...createStoredLoopBase({
       nextRunAt: Date.now(),
@@ -73,6 +95,7 @@ export function createStoredIntervalLoop(params: {
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
       createdBy: params.createdBy,
+      sender: params.sender,
       surfaceBinding: params.surfaceBinding,
       maxRuns: params.maxRuns,
     }),
@@ -96,6 +119,7 @@ export function createStoredCalendarLoop(params: {
   timezone: string;
   maxRuns: number;
   createdBy?: string;
+  sender?: StoredLoopSender;
 }) {
   const nextRunAt =
     computeNextCalendarLoopRunAtMs({
@@ -120,6 +144,7 @@ export function createStoredCalendarLoop(params: {
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
       createdBy: params.createdBy,
+      sender: params.sender,
       surfaceBinding: params.surfaceBinding,
       maxRuns: params.maxRuns,
     }),
@@ -130,10 +155,10 @@ export function createStoredCalendarLoop(params: {
     minute: params.minute,
     timezone: params.timezone,
     force: false as const,
-  } satisfies StoredIntervalLoop;
+  } satisfies StoredLoop;
 }
 
-export function renderLoopStatusSchedule(loop: IntervalLoopStatus | StoredIntervalLoop) {
+export function renderLoopStatusSchedule(loop: IntervalLoopStatus | StoredLoop) {
   if (loop.kind === "calendar") {
     return `schedule: \`${formatCalendarLoopSchedule({
       cadence: loop.cadence,

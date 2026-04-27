@@ -61,13 +61,17 @@ Important current behavior:
 
 - app `owner` and app `admin` bypass DM pairing
 - app `owner` and app `admin` implicitly satisfy agent-admin checks
+- `principal` is the auth identity format `<platform>:<provider-user-id>`
 - principals stay platform-scoped such as `telegram:1276408333` and `slack:U123ABC456`
+- use `--user <principal>` when assigning roles or permissions to a user
+- use `--sender <principal>` when checking the effective permissions for the current message sender
 
 ## Common Commands
 
 ```bash
 clisbot auth show app
 clisbot auth show agent-defaults
+clisbot auth get-permissions --sender telegram:1276408333 --agent default --json
 clisbot auth add-user app --role owner --user telegram:1276408333
 clisbot auth add-user app --role admin --user slack:U123ABC456
 clisbot auth add-user agent --agent support --role admin --user slack:UOPS1
@@ -88,6 +92,7 @@ Runtime rule:
 - keep dangerous commands on auth, not on surface allowlists
 - use surface policy to answer "who may talk here"
 - use auth roles to answer "what may they do after they get in"
+- use `clisbot auth get-permissions --sender <principal> --agent <id> --json` for a read-only effective permission check before sensitive actions
 - use `disabled` when you want certainty that nobody gets a reply there
 
 ## Related Docs

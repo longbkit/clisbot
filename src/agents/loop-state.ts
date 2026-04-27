@@ -1,6 +1,13 @@
 import type { LoopCalendarCadence } from "./loop-command.ts";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
 
+export type StoredLoopSender = {
+  senderId?: string;
+  providerId?: string;
+  displayName?: string;
+  handle?: string;
+};
+
 export type StoredLoopSurfaceBinding = Pick<
   ChannelIdentity,
   "platform" | "botId" | "conversationKind" | "channelId" | "chatId" | "threadTs" | "topicId"
@@ -23,10 +30,11 @@ type StoredLoopBase = {
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
   createdBy?: string;
+  sender?: StoredLoopSender;
   surfaceBinding?: StoredLoopSurfaceBinding;
 };
 
-export type StoredIntervalLoop =
+export type StoredLoop =
   | (StoredLoopBase & {
       kind?: "interval";
       intervalMs: number;
@@ -43,7 +51,9 @@ export type StoredIntervalLoop =
       force: false;
     });
 
-export type IntervalLoopStatus = StoredIntervalLoop & {
+export type StoredIntervalLoop = StoredLoop;
+
+export type IntervalLoopStatus = StoredLoop & {
   agentId: string;
   sessionKey: string;
   remainingRuns: number;

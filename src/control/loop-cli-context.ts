@@ -110,6 +110,8 @@ function resolveSlackLoopCliContext(params: LoopCliContextParams): LoopCliContex
         cliTool,
         responseMode: route.responseMode,
         streaming: route.streaming,
+        agentId: sessionTarget.agentId,
+        time: Date.now(),
         timezone: resolveConfigTimezone({
           config: params.loadedConfig.raw,
           agentId: sessionTarget.agentId,
@@ -188,6 +190,8 @@ function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliCon
         cliTool,
         responseMode: route.responseMode,
         streaming: route.streaming,
+        agentId: sessionTarget.agentId,
+        time: Date.now(),
         timezone: resolveConfigTimezone({
           config: params.loadedConfig.raw,
           agentId: sessionTarget.agentId,

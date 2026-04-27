@@ -57,6 +57,7 @@ import {
 } from "../../config/channel-bots.ts";
 import type { ResolvedTelegramBotConfig } from "../../config/channel-bots.ts";
 import { buildAgentPromptText } from "../agent-prompt.ts";
+import { recordSurfaceDirectoryIdentity } from "../surface-directory.ts";
 import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
 import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
@@ -741,6 +742,8 @@ export class TelegramPollingService {
           .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
           .join(" ")
           .trim() || message.from?.username?.trim() || undefined,
+        senderHandle: message.from?.username?.trim() || undefined,
+        platform: "telegram",
       });
     }
     if (route.requireMention && !wasMentioned) {
@@ -812,11 +815,16 @@ export class TelegramPollingService {
           message.from?.id != null ? String(message.from.id).trim() : undefined,
         senderName:
           senderName || message.from?.username?.trim() || undefined,
+        senderHandle: message.from?.username?.trim() || undefined,
         chatId: String(message.chat.id),
         chatName: message.chat.title?.trim() || undefined,
         topicId:
           routeInfo.topicId != null ? String(routeInfo.topicId) : undefined,
       };
+      void recordSurfaceDirectoryIdentity({
+        stateDir: this.loadedConfig.stateDir,
+        identity,
+      }).catch(() => undefined);
       const cliTool =
         getAgentEntry(this.loadedConfig, route.agentId)?.cli ??
         this.loadedConfig.raw.agents.defaults.cli;
@@ -828,6 +836,10 @@ export class TelegramPollingService {
       const protectedControlMutationRule = auth.mayManageProtectedResources
         ? undefined
         : DEFAULT_PROTECTED_CONTROL_RULE;
+      const promptTime =
+        typeof message.date === "number" && Number.isFinite(message.date)
+          ? message.date * 1000
+          : Date.now();
       const agentPromptText = buildAgentPromptText({
         text: enrichPromptText(text),
         identity,
@@ -836,6 +848,8 @@ export class TelegramPollingService {
         responseMode: route.responseMode,
         streaming: route.streaming,
         protectedControlMutationRule,
+        agentId: route.agentId,
+        time: promptTime,
       });
       const timingContext = {
         platform: "telegram" as const,
@@ -883,6 +897,8 @@ export class TelegramPollingService {
               responseMode: route.responseMode,
               streaming: route.streaming,
               protectedControlMutationRule,
+              agentId: route.agentId,
+              time: Date.now(),
               timezone: this.agentService.resolveEffectiveTimezone({
                 agentId: route.agentId,
                 routeTimezone: route.timezone,
