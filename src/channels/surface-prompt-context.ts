@@ -26,7 +26,7 @@ export type SurfacePromptContext = {
   };
 };
 
-function isoTime(value?: number | string | Date) {
+export function resolveSurfacePromptTime(value?: number | string | Date) {
   if (value instanceof Date) {
     return value.toISOString();
   }
@@ -125,7 +125,7 @@ export function buildSurfacePromptContext(params: {
   const senderId = senderIdFromIdentity(params.identity);
   const providerId = params.identity.senderId?.trim();
   return {
-    time: isoTime(params.time),
+    time: resolveSurfacePromptTime(params.time),
     sender: senderId && providerId
       ? {
           senderId,
@@ -164,6 +164,10 @@ export function renderSenderPromptText(sender?: SurfacePromptContext["sender"]) 
 }
 
 export function renderSurfacePromptText(surface: SurfacePromptContext["surface"]) {
+  if (surface.surfaceId === "unknown") {
+    return "unavailable";
+  }
+
   const platform = surface.surfaceId.startsWith("slack:") ? "Slack" : "Telegram";
   if (surface.parent) {
     const parentKind = surface.parent.surfaceId.includes(":group:") ? "group" : "channel";

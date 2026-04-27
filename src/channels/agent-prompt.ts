@@ -4,6 +4,7 @@ import {
   buildSurfacePromptContext,
   renderPermissionGuidance,
   renderSurfacePromptContext,
+  resolveSurfacePromptTime,
   type SurfacePromptContext,
 } from "./surface-prompt-context.ts";
 import { getClisbotPromptCommand } from "../control/clisbot-wrapper.ts";
@@ -212,7 +213,7 @@ function resolvePromptContext(params: {
   }
   if (!params.identity) {
     return {
-      time: params.time ? new Date(params.time).toISOString() : new Date().toISOString(),
+      time: resolveSurfacePromptTime(params.time),
       surface: {
         surfaceId: "unknown",
         kind: "channel" as const,

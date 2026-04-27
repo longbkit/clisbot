@@ -318,6 +318,18 @@ follow up on the last point
     );
   });
 
+  test("renders steering context truthfully when identity is unavailable", () => {
+    const prompt = buildSteeringPromptText({
+      text: "continue",
+      time: "not a timestamp",
+    });
+
+    expect(prompt).toContain("Message context:");
+    expect(prompt).toContain("- sender: unavailable");
+    expect(prompt).toContain("- surface: unavailable");
+    expect(prompt).not.toContain("Telegram channel [unknown]");
+  });
+
   test("heredoc command substitution survives tricky message bodies", () => {
     const messageBodies = [
       "plain text",
