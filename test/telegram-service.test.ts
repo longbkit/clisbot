@@ -6,6 +6,7 @@ import {
   buildTelegramCommandRegistrations,
   dispatchTelegramUpdates,
   renderTelegramUnroutedRouteMessage,
+  resolveTelegramMessageTopicId,
   TelegramPollingService,
 } from "../src/channels/telegram/service.ts";
 import { resolveTelegramBotConfig } from "../src/config/channel-bots.ts";
@@ -137,6 +138,7 @@ async function runTelegramServiceUpdate(params: {
   update: TelegramUpdate;
   botUsername?: string;
   loadedConfig?: LoadedConfig;
+  agentService?: unknown;
 }) {
   const tempDir = mkdtempSync(join(tmpdir(), "clisbot-telegram-service-"));
   const previousFetch = globalThis.fetch;
@@ -160,10 +162,10 @@ async function runTelegramServiceUpdate(params: {
   try {
     const service = new TelegramPollingService(
       params.loadedConfig ?? createLoadedConfig(),
-      {
+      (params.agentService ?? {
         registerSurfaceNotificationHandler() {},
         unregisterSurfaceNotificationHandler() {},
-      } as any,
+      }) as any,
       new ProcessedEventsStore(join(tempDir, "processed-events.json")),
       new ActivityStore(join(tempDir, "activity.json")),
       "default",
@@ -223,6 +225,36 @@ describe("renderTelegramUnroutedRouteMessage", () => {
     ).toContain(
       "`clisbot routes set-agent --channel telegram topic:-1003455688247:3 --bot default --agent <id>`",
     );
+  });
+});
+
+describe("resolveTelegramMessageTopicId", () => {
+  test("treats supergroup message_thread_id as a topic even when chat.is_forum is absent", () => {
+    expect(
+      resolveTelegramMessageTopicId({
+        message_id: 10,
+        text: "topic message",
+        chat: {
+          id: -1003455688247,
+          type: "supergroup",
+        },
+        message_thread_id: 4,
+      }),
+    ).toBe(4);
+  });
+
+  test("falls back to the general topic only for known forum supergroups", () => {
+    expect(
+      resolveTelegramMessageTopicId({
+        message_id: 10,
+        text: "general topic message",
+        chat: {
+          id: -1003455688247,
+          type: "supergroup",
+          is_forum: true,
+        },
+      }),
+    ).toBe(1);
   });
 });
 
@@ -299,5 +331,59 @@ describe("TelegramPollingService shared audience enforcement", () => {
     });
 
     expect(apiCalls).toEqual([]);
+  });
+
+  test("does not collapse a disabled topic message into the parent group route", async () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.telegram.default.groupPolicy = "allowlist";
+    loadedConfig.raw.bots.telegram.default.groups["-1001"] = {
+      enabled: true,
+      policy: "open",
+      requireMention: false,
+      allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
+      topics: {
+        "4": {
+          enabled: true,
+          policy: "disabled",
+          requireMention: true,
+          allowBots: false,
+          allowUsers: [],
+          blockUsers: [],
+        },
+      },
+    };
+    let routedPromptCount = 0;
+
+    const apiCalls = await runTelegramServiceUpdate({
+      loadedConfig,
+      agentService: {
+        registerSurfaceNotificationHandler() {},
+        unregisterSurfaceNotificationHandler() {},
+        async getConversationFollowUpState() {
+          routedPromptCount += 1;
+          return {};
+        },
+      },
+      update: {
+        update_id: 44,
+        message: {
+          message_id: 44,
+          message_thread_id: 4,
+          text: "hello from disabled topic",
+          from: {
+            id: 9999,
+          },
+          chat: {
+            id: -1001,
+            type: "supergroup",
+          },
+        },
+      },
+    });
+
+    expect(apiCalls).toEqual([]);
+    expect(routedPromptCount).toBe(0);
   });
 });

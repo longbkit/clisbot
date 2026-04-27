@@ -12,11 +12,19 @@ export function createSessionId() {
 }
 
 export function extractSessionId(snapshot: string, pattern: string) {
-  const regex = new RegExp(pattern, "i");
-  const match = snapshot.match(regex);
-  if (!match) {
-    return null;
+  const regex = new RegExp(pattern, "ig");
+  let lastMatch: RegExpExecArray | null = null;
+
+  for (;;) {
+    const match = regex.exec(snapshot);
+    if (!match) {
+      break;
+    }
+    if (!match[0]) {
+      break;
+    }
+    lastMatch = match;
   }
 
-  return (match[1] ?? match[0] ?? "").trim() || null;
+  return (lastMatch?.[1] ?? lastMatch?.[0] ?? "").trim() || null;
 }

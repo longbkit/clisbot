@@ -1023,12 +1023,13 @@ describe("AgentService session identity", () => {
         agentId: "default",
         sessionKey: "agent:default:telegram:group:-1001:topic:6a",
       };
-      const updates: Array<{ note?: string }> = [];
+      const updates: Array<{ note?: string; forceVisible?: boolean }> = [];
 
       const result = await service.enqueuePrompt(target, "ping", {
         onUpdate: (update) => {
           updates.push({
             note: update.note,
+            forceVisible: update.forceVisible,
           });
         },
       }).result;
@@ -1038,9 +1039,8 @@ describe("AgentService session identity", () => {
       expect(result.status).toBe("completed");
       expect(result.snapshot).toContain(`PONG ${sessionId ?? ""}`);
       expect(fakeTmux.sessionCommands).toHaveLength(2);
-      expect(
-        updates.some((update) => update.note?.includes("retrying the prompt once")),
-      ).toBe(true);
+      expect(updates.some((update) => update.forceVisible)).toBe(false);
+      expect(updates.some((update) => update.note?.includes("fresh runner session"))).toBe(false);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

@@ -1,7 +1,12 @@
 import { extractSessionId } from "../../agents/session-identity.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 import { sleep } from "../../shared/process.ts";
-import { normalizePaneText, splitNormalizedLines, trimBlankLines } from "../../shared/transcript.ts";
+import {
+  deriveInteractionText,
+  normalizePaneText,
+  splitNormalizedLines,
+  trimBlankLines,
+} from "../../shared/transcript.ts";
 import type { TmuxClient, TmuxPaneState } from "./client.ts";
 
 const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
@@ -145,7 +150,7 @@ export async function captureTmuxSessionIdentity(params: {
   timeoutMs: number;
   pollIntervalMs: number;
 }) {
-  await submitTmuxSessionInput({
+  let statusSubmission = await submitTmuxSessionInput({
     tmux: params.tmux,
     sessionName: params.sessionName,
     text: params.statusCommand,
@@ -177,7 +182,7 @@ export async function captureTmuxSessionIdentity(params: {
         captureLines: params.captureLines,
       });
       deadline = Date.now() + params.timeoutMs;
-      await submitTmuxSessionInput({
+      statusSubmission = await submitTmuxSessionInput({
         tmux: params.tmux,
         sessionName: params.sessionName,
         text: params.statusCommand,
@@ -187,7 +192,10 @@ export async function captureTmuxSessionIdentity(params: {
       continue;
     }
 
-    const sessionId = extractSessionId(snapshot, params.pattern);
+    const sessionId = extractSessionId(
+      deriveInteractionText(statusSubmission.submittedSnapshot, snapshot),
+      params.pattern,
+    );
     if (sessionId) {
       await waitForTmuxPaneSettle({
         tmux: params.tmux,

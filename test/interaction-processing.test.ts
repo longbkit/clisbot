@@ -148,6 +148,65 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("Recovery succeeded. Continuing the current run.");
   });
 
+  test("keeps the working placeholder for silent fresh-session prompt retries", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _promptText: string, params: any) => {
+          const updatePromise = params.onUpdate({
+            status: "running",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "",
+            fullSnapshot: "",
+            initialSnapshot: "",
+          });
+          return {
+            positionAhead: 0,
+            result: Promise.resolve(updatePromise).then(() => ({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "completed after retry",
+              fullSnapshot: "completed after retry",
+              initialSnapshot: "",
+            })),
+          };
+        },
+        recordConversationReply: async () => undefined,
+        getConversationFollowUpState: async () => ({}),
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "continue",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Working");
+    expect(reconciled.join("\n")).not.toContain("Retrying");
+    expect(reconciled.join("\n")).not.toContain("truthfully");
+  });
+
   test("renders force-visible running updates even after message-tool preview handoff", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
@@ -1803,8 +1862,8 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Working");
-    expect(reconciled).toContain("working draft");
     expect(reconciled.at(-1)).toContain("working draft");
+    expect(reconciled.at(-1)).toContain("Working");
   });
 
   test("hands off the live draft after a message-tool reply boundary", async () => {
@@ -1877,7 +1936,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft one");
+    expect(reconciled.some((text) => text.includes("draft one"))).toBe(true);
     expect(reconciled.at(-1)).toBe("");
     expect(posted.join("\n")).not.toContain("draft two");
     expect(reconciled.join("\n")).not.toContain("draft two");
@@ -1967,7 +2026,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft one");
+    expect(reconciled.some((text) => text.includes("draft one"))).toBe(true);
     expect(reconciled.filter((text) => text === "")).toHaveLength(1);
     expect(posted.join("\n")).not.toContain("draft two");
     expect(posted.join("\n")).not.toContain("draft three");
@@ -2107,7 +2166,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft before final");
+    expect(reconciled.some((text) => text.includes("draft before final"))).toBe(true);
     expect(reconciled.at(-1)).toBe("");
   });
 

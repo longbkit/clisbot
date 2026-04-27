@@ -1050,11 +1050,8 @@ function resolveRouteAndTarget(params: {
   botUsername: string;
   botId: string;
 }) {
-  const isForum = params.message.chat.is_forum === true;
-  const topicId =
-    params.message.chat.type === "supergroup" && isForum
-      ? (params.message.message_thread_id ?? 1)
-      : undefined;
+  const topicId = resolveTelegramMessageTopicId(params.message);
+  const isForum = params.message.chat.is_forum === true || topicId != null;
   const routeInfo = resolveTelegramConversationRoute({
     loadedConfig: params.loadedConfig,
     chatType: params.message.chat.type,
@@ -1089,4 +1086,19 @@ function resolveRouteAndTarget(params: {
       topicId,
     }),
   };
+}
+
+export function resolveTelegramMessageTopicId(message: TelegramMessage) {
+  if (message.chat.type !== "supergroup") {
+    return undefined;
+  }
+
+  if (
+    typeof message.message_thread_id === "number" &&
+    Number.isFinite(message.message_thread_id)
+  ) {
+    return message.message_thread_id;
+  }
+
+  return message.chat.is_forum === true ? 1 : undefined;
 }

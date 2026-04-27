@@ -707,7 +707,15 @@ Finagling
         content: "Thinking...\nFound the issue.",
         maxChars: 200,
       }),
-    ).toBe("Thinking...\nFound the issue.");
+    ).toBe("Thinking...\nFound the issue.\n\n_Working..._");
+
+    expect(
+      renderTelegramInteraction({
+        status: "running",
+        content: "Thinking...\nFound the issue.",
+        maxChars: 200,
+      }),
+    ).toBe("Thinking...\nFound the issue.\n\nWorking...");
 
     expect(
       renderSlackInteraction({

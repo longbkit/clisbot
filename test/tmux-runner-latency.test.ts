@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 import {
+  captureTmuxSessionIdentity,
   dismissTmuxTrustPromptIfPresent,
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
@@ -10,6 +11,59 @@ import {
 import { monitorTmuxRun } from "../src/runners/tmux/run-monitor.ts";
 
 describe("tmux runner latency behavior", () => {
+  test("captureTmuxSessionIdentity reads the session id from the fresh status output only", async () => {
+    const staleId = "11111111-1111-1111-1111-111111111111";
+    const currentId = "22222222-2222-2222-2222-222222222222";
+    let snapshot = `old transcript mentions ${staleId}`;
+    let state = {
+      cursorX: 0,
+      cursorY: 0,
+      historySize: 0,
+    };
+
+    const fakeTmux = {
+      async sendLiteral(_sessionName: string, text: string) {
+        snapshot = `${snapshot}\n> ${text}`;
+        state = {
+          cursorX: text.length,
+          cursorY: state.cursorY,
+          historySize: state.historySize,
+        };
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key !== "Enter") {
+          return;
+        }
+        snapshot = `${snapshot.replace(/\n> \/status$/, "")}\nSTATUS session id: ${currentId}`;
+        state = {
+          cursorX: 0,
+          cursorY: state.cursorY + 1,
+          historySize: state.historySize + 1,
+        };
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      captureTmuxSessionIdentity({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        promptSubmitDelayMs: 1,
+        captureLines: 80,
+        statusCommand: "/status",
+        pattern:
+          "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+        timeoutMs: 100,
+        pollIntervalMs: 1,
+      }),
+    ).resolves.toBe(currentId);
+  });
+
   test("waitForTmuxSessionBootstrap returns before the full startup budget once output appears", async () => {
     let captureCount = 0;
     const fakeTmux = {

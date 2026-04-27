@@ -148,7 +148,7 @@ describe("routes cli", () => {
     });
   });
 
-  test("added telegram groups default to usable open sender policy through group admission allowlist", async () => {
+  test("added telegram groups inherit usable open sender policy through group admission allowlist", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -168,7 +168,8 @@ describe("routes cli", () => {
 
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
     expect(rawConfig.bots.telegram.default.groupPolicy).toBe("allowlist");
-    expect(rawConfig.bots.telegram.default.groups["-1001234567890"].policy).toBe("open");
+    expect(rawConfig.bots.telegram.default.groups["*"].policy).toBe("open");
+    expect(rawConfig.bots.telegram.default.groups["-1001234567890"].policy).toBeUndefined();
 
     const loadedConfig = await loadConfigWithoutEnvResolution(process.env.CLISBOT_CONFIG_PATH!);
     const resolved = resolveTelegramConversationRoute({
@@ -182,6 +183,50 @@ describe("routes cli", () => {
     expect(resolved.status).toBe("admitted");
     expect(resolved.route?.policy).toBe("open");
     expect(resolved.route?.requireMention).toBe(true);
+  });
+
+  test("clears exact shared route policy so it inherits the wildcard sender policy", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "telegram",
+      "topic:-1001234567890:4",
+      "--bot",
+      "default",
+      "--policy",
+      "disabled",
+    ]);
+    await runRoutesCli([
+      "clear-policy",
+      "--channel",
+      "telegram",
+      "topic:-1001234567890:4",
+      "--bot",
+      "default",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.telegram.default.groups["-1001234567890"].topics["4"].policy)
+      .toBeUndefined();
+
+    const loadedConfig = await loadConfigWithoutEnvResolution(process.env.CLISBOT_CONFIG_PATH!);
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig,
+      chatType: "supergroup",
+      chatId: -1001234567890,
+      topicId: 4,
+      isForum: true,
+      botId: "default",
+    });
+
+    expect(resolved.status).toBe("admitted");
+    expect(resolved.route?.policy).toBe("open");
   });
 
   test("accepts route ids after option values instead of mistaking --bot values for the route", async () => {

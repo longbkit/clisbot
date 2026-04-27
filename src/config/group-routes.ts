@@ -96,6 +96,21 @@ function normalizeTelegramTopics(
   );
 }
 
+function orderWildcardFirst<TGroupRoute>(
+  routes: Record<string, TGroupRoute>,
+) {
+  const wildcard = routes[SHARED_GROUPS_WILDCARD_ROUTE_ID];
+  if (!wildcard) {
+    return routes;
+  }
+  return {
+    [SHARED_GROUPS_WILDCARD_ROUTE_ID]: wildcard,
+    ...Object.fromEntries(
+      Object.entries(routes).filter(([routeId]) => routeId !== SHARED_GROUPS_WILDCARD_ROUTE_ID),
+    ),
+  };
+}
+
 function normalizeGroupRouteMap<TGroupRoute extends Record<string, unknown>>(params: {
   provider: Provider;
   owner: GroupRouteOwner<TGroupRoute>;
@@ -108,8 +123,15 @@ function normalizeGroupRouteMap<TGroupRoute extends Record<string, unknown>>(par
     if (!normalizedRouteId) {
       continue;
     }
+    const shell = params.createRoute();
+    if (
+      normalizedRouteId !== SHARED_GROUPS_WILDCARD_ROUTE_ID &&
+      !Object.hasOwn(route, "policy")
+    ) {
+      delete shell.policy;
+    }
     const normalizedRoute = {
-      ...params.createRoute(),
+      ...shell,
       ...route,
       ...(params.provider === "telegram"
         ? {
@@ -119,13 +141,20 @@ function normalizeGroupRouteMap<TGroupRoute extends Record<string, unknown>>(par
           }
         : {}),
     } as TGroupRoute;
+    const baseShell = params.createRoute();
+    if (
+      normalizedRouteId !== SHARED_GROUPS_WILDCARD_ROUTE_ID &&
+      !Object.hasOwn(route, "policy")
+    ) {
+      delete baseShell.policy;
+    }
     nextRoutes[normalizedRouteId] = {
-      ...params.createRoute(),
+      ...baseShell,
       ...mergeGroupRoute(nextRoutes[normalizedRouteId], normalizedRoute),
     };
   }
 
-  params.owner.groups = nextRoutes;
+  params.owner.groups = orderWildcardFirst(nextRoutes);
 }
 
 function normalizeProviderGroupRoutes<TBotConfig extends GroupRouteOwner<any>>(params: {
@@ -191,10 +220,14 @@ function ensureDefaultGroupWildcardRoute<TGroupRoute extends Record<string, unkn
         delete params.owner.groups[legacyRouteId];
       }
     }
+    params.owner.groups = orderWildcardFirst(params.owner.groups);
     return;
   }
 
-  params.owner.groups[SHARED_GROUPS_WILDCARD_ROUTE_ID] = params.createRoute();
+  params.owner.groups = {
+    [SHARED_GROUPS_WILDCARD_ROUTE_ID]: params.createRoute(),
+    ...params.owner.groups,
+  };
 }
 
 export function normalizeConfigGroupRoutes(config: ClisbotConfig) {

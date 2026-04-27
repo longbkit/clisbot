@@ -610,10 +610,6 @@ export class SessionService {
       sessionKey: run.resolved.sessionKey,
     };
 
-    await this.notifyRecoveryStep(
-      run,
-      "Prompt delivery did not settle truthfully in the current runner session. clisbot is opening one fresh runner session and retrying the prompt once.",
-    );
     try {
       const fresh = await this.runnerSessions.startFreshSession(target, params.timingContext);
       const currentRun = this.getRun(sessionKey, params.runId);
@@ -630,8 +626,6 @@ export class SessionService {
         snapshot: "",
         fullSnapshot: fresh.initialSnapshot,
         initialSnapshot: fresh.initialSnapshot,
-        note: "Retrying the prompt in one fresh runner session.",
-        forceVisible: true,
       });
       await this.sessionState.setSessionRuntime(currentRun.resolved, {
         state: "running",

@@ -122,6 +122,21 @@ export function resolveEffectiveDirectMessageRoute(
   return mergeRoute(wildcardRoute, effectiveExactRoute);
 }
 
+function orderWildcardFirst<TRoute>(
+  routes: Record<string, TRoute>,
+) {
+  const wildcard = routes[DIRECT_MESSAGE_WILDCARD_ROUTE_ID];
+  if (!wildcard) {
+    return routes;
+  }
+  return {
+    [DIRECT_MESSAGE_WILDCARD_ROUTE_ID]: wildcard,
+    ...Object.fromEntries(
+      Object.entries(routes).filter(([routeId]) => routeId !== DIRECT_MESSAGE_WILDCARD_ROUTE_ID),
+    ),
+  };
+}
+
 function normalizeDirectMessageRouteMap(params: {
   owner: DirectMessageRouteOwner;
   exactAdmissionMode: "inherit" | "explicit";
@@ -145,7 +160,7 @@ function normalizeDirectMessageRouteMap(params: {
     };
   }
 
-  params.owner.directMessages = nextRoutes;
+  params.owner.directMessages = orderWildcardFirst(nextRoutes);
 }
 
 function normalizeProviderDirectMessageRoutes<TConfig extends {
@@ -232,11 +247,15 @@ export function ensureBotDirectMessageWildcardRoute(
         delete bot.directMessages[legacyRouteId];
       }
     }
+    bot.directMessages = orderWildcardFirst(bot.directMessages);
     return bot.directMessages[DIRECT_MESSAGE_WILDCARD_ROUTE_ID]!;
   }
 
   const createdRoute = createDirectMessageRouteShell(policy);
-  bot.directMessages[DIRECT_MESSAGE_WILDCARD_ROUTE_ID] = createdRoute;
+  bot.directMessages = {
+    [DIRECT_MESSAGE_WILDCARD_ROUTE_ID]: createdRoute,
+    ...bot.directMessages,
+  };
   return createdRoute;
 }
 

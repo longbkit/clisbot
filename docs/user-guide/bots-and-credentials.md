@@ -100,6 +100,7 @@ Routes live under that bot.
 - `directMessages["*"]` and `groups["*"]` are the canonical wildcard storage nodes
 - exact DM routes may carry admission config as well as behavior overrides
 - bot-level defaults answer "what usually happens under this bot"; exact routes answer "what is special for this one surface"
+- exact group/channel/topic routes should omit `policy` when they should inherit `groups["*"].policy`
 
 ## Common Commands
 

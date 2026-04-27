@@ -265,7 +265,7 @@ Important behavior:
 - shared routes enforce sender lists at ingress for Slack channels or groups and Telegram groups or topics
 - app `owner` and app `admin` do not bypass `groupPolicy`/`channelPolicy` admission; after a group is admitted and enabled, they bypass sender allowlists, while shared `blockUsers` still applies
 - `disabled` means silent, even for app `owner` and app `admin`
-- adding `group:<id>` without `--policy` uses the default in-group sender policy `open`
+- adding `group:<id>` without `--policy` inherits the default in-group sender policy from `group:*`; exact group/channel/topic routes should omit `policy` unless that surface intentionally differs
 - the deny message intentionally uses `group` as the common human-facing many-people term
 - shared allowlist failures are denied before runner ingress with:
   - `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to \`allowUsers\` for this surface.`

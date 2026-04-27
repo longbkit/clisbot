@@ -296,12 +296,13 @@ function getOrCreateRoute(
     const bot = ensureSlackBot(config, botId);
     if (parsed.storage === "directMessages") {
       if (!bot.directMessages[parsed.key] && options.create) {
-        bot.directMessages[parsed.key] = createDirectMessageRoute(
+        const createdRoute = createDirectMessageRoute(
           config,
           provider,
           botId,
           options.policy,
         );
+        bot.directMessages[parsed.key] = createdRoute;
       }
       return bot.directMessages[parsed.key];
     }
@@ -314,19 +315,20 @@ function getOrCreateRoute(
   const bot = ensureTelegramBot(config, botId);
   if (parsed.storage === "directMessages") {
     if (!bot.directMessages[parsed.key] && options.create) {
-      bot.directMessages[parsed.key] = createDirectMessageRoute(
+      const createdRoute = createDirectMessageRoute(
         config,
         provider,
         botId,
         options.policy,
       );
+      bot.directMessages[parsed.key] = createdRoute;
     }
     return bot.directMessages[parsed.key];
   }
 
   if (!bot.groups[parsed.key] && options.create) {
     bot.groups[parsed.key] = {
-      ...createBaseRoute("group", options.policy),
+      ...createBaseRoute("group", parsed.kind === "topic" ? undefined : options.policy),
       topics: {},
     };
   }
@@ -607,6 +609,10 @@ async function getSetClearRouteField(args: string[], action: string) {
     route.policy = policy as BotRouteConfig["policy"];
     await writeEditableConfig(configPath, config);
     console.log(`set policy for ${provider}/${botId}/${parsed.routeId} to ${policy}`);
+  } else if (action === "clear-policy") {
+    delete route.policy;
+    await writeEditableConfig(configPath, config);
+    console.log(`cleared policy for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-require-mention") {
     console.log(`${provider}/${botId}/${parsed.routeId} requireMention: ${route.requireMention ?? "(default)"}`);
   } else if (action === "set-require-mention") {
@@ -776,6 +782,7 @@ export async function runRoutesCli(args: string[]) {
     action === "clear-agent" ||
     action === "get-policy" ||
     action === "set-policy" ||
+    action === "clear-policy" ||
     action === "get-require-mention" ||
     action === "set-require-mention" ||
     action === "get-allow-bots" ||

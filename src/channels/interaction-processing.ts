@@ -793,6 +793,14 @@ async function executePromptDelivery<TChunk>(params: {
     sessionKey: params.sessionTarget.sessionKey,
   });
 
+  function assertRunUpdateBelongsToSession(update: { sessionKey: string }) {
+    if (update.sessionKey !== params.sessionTarget.sessionKey) {
+      throw new Error(
+        `Refusing to render runner output for sessionKey ${update.sessionKey} into ${params.sessionTarget.sessionKey}.`,
+      );
+    }
+  }
+
   async function maybeRenderQueueStartNotification() {
     if (!queueStartPending) {
       return false;
@@ -914,6 +922,7 @@ async function executePromptDelivery<TChunk>(params: {
         timingContext: params.timingContext,
         queueText: params.queueText,
         onUpdate: async (update) => {
+          assertRunUpdateBelongsToSession(update);
           if (update.status === "running" && !loggedFirstRunningUpdate) {
             loggedFirstRunningUpdate = true;
             logLatencyDebug("channel-first-running-update", params.timingContext, {
@@ -1075,6 +1084,7 @@ async function executePromptDelivery<TChunk>(params: {
     }
 
     const finalResult = await result;
+    assertRunUpdateBelongsToSession(finalResult);
     await renderChain;
 
     if (params.suppressDetachedSettlement && finalResult.status === "detached") {

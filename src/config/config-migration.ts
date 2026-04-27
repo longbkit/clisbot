@@ -87,6 +87,22 @@ function mergeRoute(
   };
 }
 
+function orderWildcardFirst<TRoute>(
+  routes: Record<string, TRoute>,
+  wildcardRouteId: string,
+) {
+  const wildcardRoute = routes[wildcardRouteId];
+  if (!wildcardRoute) {
+    return routes;
+  }
+  return {
+    [wildcardRouteId]: wildcardRoute,
+    ...Object.fromEntries(
+      Object.entries(routes).filter(([routeId]) => routeId !== wildcardRouteId),
+    ),
+  };
+}
+
 function stripLegacyDirectMessageAdmission(route: Record<string, unknown>) {
   const nextRoute = { ...route };
   delete nextRoute.enabled;
@@ -122,7 +138,7 @@ function normalizeDirectMessages(params: {
     };
   }
 
-  params.owner.directMessages = nextRoutes;
+  params.owner.directMessages = orderWildcardFirst(nextRoutes, DIRECT_MESSAGE_WILDCARD_ROUTE_ID);
 }
 
 function normalizeTelegramTopics(
@@ -137,10 +153,14 @@ function normalizeTelegramTopics(
     if (!normalizedTopicId) {
       continue;
     }
-    nextTopics[normalizedTopicId] = {
-      ...createSlackGroupRouteShell("disabled"),
+    const normalizedRoute = {
+      ...createSlackGroupRouteShell("open"),
       ...rawRoute,
     };
+    if (!Object.hasOwn(rawRoute, "policy")) {
+      delete (normalizedRoute as { policy?: unknown }).policy;
+    }
+    nextTopics[normalizedTopicId] = normalizedRoute;
   }
   return nextTopics;
 }
@@ -160,14 +180,20 @@ function normalizeGroups(params: {
     if (!routeId) {
       continue;
     }
+    const routeShell: Record<string, unknown> = params.provider === "telegram"
+      ? createTelegramGroupRouteShell("open")
+      : createSlackGroupRouteShell("open");
+    if (routeId !== SHARED_GROUPS_WILDCARD_ROUTE_ID && !Object.hasOwn(rawRoute, "policy")) {
+      delete routeShell.policy;
+    }
     const normalizedRoute = params.provider === "telegram"
       ? {
-          ...createTelegramGroupRouteShell("disabled"),
+          ...routeShell,
           ...rawRoute,
           topics: normalizeTelegramTopics(rawRoute.topics),
         }
       : {
-          ...createSlackGroupRouteShell("disabled"),
+          ...routeShell,
           ...rawRoute,
         };
     const existingTopics = params.provider === "telegram"
@@ -177,9 +203,7 @@ function normalizeGroups(params: {
       ? ((normalizedRoute as TelegramBotConfig["groups"][string]).topics as Record<string, unknown>)
       : undefined;
     nextRoutes[routeId] = {
-      ...(params.provider === "telegram"
-        ? createTelegramGroupRouteShell("disabled")
-        : createSlackGroupRouteShell("disabled")),
+      ...routeShell,
       ...mergeRoute(nextRoutes[routeId], normalizedRoute),
       ...(params.provider === "telegram"
         ? {
@@ -192,7 +216,7 @@ function normalizeGroups(params: {
     };
   }
 
-  params.owner.groups = nextRoutes;
+  params.owner.groups = orderWildcardFirst(nextRoutes, SHARED_GROUPS_WILDCARD_ROUTE_ID);
 }
 
 function applySurfacePolicyToWildcardRoute(params: {
@@ -236,7 +260,7 @@ function syncDmPolicy(
     policy: effectivePolicy,
   });
   directMessages[DIRECT_MESSAGE_WILDCARD_ROUTE_ID] = nextWildcardRoute;
-  owner.directMessages = directMessages;
+  owner.directMessages = orderWildcardFirst(directMessages, DIRECT_MESSAGE_WILDCARD_ROUTE_ID);
   owner.dmPolicy = effectivePolicy;
 }
 
@@ -305,7 +329,7 @@ function syncGroupPolicy(params: {
     params.legacyExactAdmission,
   );
   groups[SHARED_GROUPS_WILDCARD_ROUTE_ID] = nextWildcardRoute;
-  params.owner.groups = groups;
+  params.owner.groups = orderWildcardFirst(groups, SHARED_GROUPS_WILDCARD_ROUTE_ID);
   params.owner.groupPolicy = groupPolicy;
   if (params.provider === "slack") {
     params.owner.channelPolicy = channelPolicy;

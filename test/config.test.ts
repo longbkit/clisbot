@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
+import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
 import { readEditableConfig } from "../src/config/config-file.ts";
 import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
 import { resolveSlackBotConfig } from "../src/config/channel-bots.ts";
@@ -279,6 +280,69 @@ describe("loadConfig", () => {
       expect.stringContaining("applying 0.1.45 config to"),
       expect.stringContaining("applied 0.1.43 -> 0.1.45; backup:"),
     ]);
+  });
+
+  test("migrates legacy exact shared routes without policy to inherit wildcard sender policy", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.41";
+    delete config.bots.slack.default.groupPolicy;
+    delete config.bots.slack.default.channelPolicy;
+    delete config.bots.telegram.default.groupPolicy;
+    config.bots.slack.default.groups = {
+      C1234567890: {
+        enabled: true,
+        requireMention: true,
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    };
+    config.bots.telegram.default.groups = {
+      "-1001234567890": {
+        enabled: true,
+        requireMention: false,
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+        topics: {
+          "42": {
+            enabled: true,
+            allowUsers: [],
+            blockUsers: [],
+            streaming: "all",
+          },
+        },
+      },
+    };
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+
+    expect(loaded.raw.bots.slack.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.channelPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.groups.C1234567890?.policy).toBeUndefined();
+    expect(loaded.raw.bots.telegram.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.telegram.default.groups["*"]?.policy).toBe("open");
+    expect(loaded.raw.bots.telegram.default.groups["-1001234567890"]?.policy).toBeUndefined();
+    expect(
+      loaded.raw.bots.telegram.default.groups["-1001234567890"]?.topics["42"]?.policy,
+    ).toBeUndefined();
+
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig: loaded,
+      chatType: "supergroup",
+      chatId: -1001234567890,
+      topicId: 42,
+      isForum: true,
+      botId: "default",
+    });
+
+    expect(resolved.status).toBe("admitted");
+    expect(resolved.route?.policy).toBe("open");
   });
 
   test("migrates 0.1.44 timezone defaults into app timezone", async () => {
