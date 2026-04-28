@@ -7,8 +7,8 @@ GitHub Releases should publish a shorter summary and link back to the matching f
 
 ## Releases
 
-- [Unreleased](docs/releases/unreleased.md)
-- [v0.1.44](docs/releases/v0.1.44.md) - shared group access controls, canonical route naming, automatic 0.1.43 config upgrade with backup, and improved routes CLI help
+- [Upcoming](docs/releases/upcoming.md)
+- [v0.1.45](docs/releases/v0.1.45.md) - shared group policy, config migration, loop reliability, prompt context, Telegram audio, and streaming isolation
 - [v0.1.43](docs/releases/v0.1.43.md) - consolidated 0.1.42 + 0.1.43 note covering runtime recovery, follow-up controls, truthful tmux submission, and safer Slack thread attachment hydration
 - [v0.1.41](docs/releases/v0.1.41.md) - DM auth cleanup, bot-scoped pairing approval, and schema clarification
 - [v0.1.39](docs/releases/v0.1.39.md) - the first large release note for the current bot-first product shape
