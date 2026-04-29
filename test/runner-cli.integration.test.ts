@@ -170,11 +170,13 @@ describe("runner cli integration", () => {
     expect(result.stdout.indexOf("sessionName: alpha")).toBeLessThan(
       result.stdout.indexOf("sessionName: gamma"),
     );
+    expect(result.stdout).not.toContain("sessionKey:");
     expect(result.stdout).toContain("sessionId: session-beta");
     expect(result.stdout).toContain("sessionId: none");
     expect(result.stdout).toContain("state: running");
     expect(result.stdout).toContain("state: idle");
     expect(result.stdout).toContain("sessionName: gamma\n  sessionId: none\n  state: unmanaged");
+    expect(result.stdout).not.toContain("live:");
     expect(result.stdout).toContain("lastAdmittedPromptAt");
   }, 15000);
 
@@ -302,6 +304,11 @@ describe("runner cli integration", () => {
     ]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("session: beta");
+    expect(result.stdout).toContain("sessionId: none");
+    expect(result.stdout).toContain("state: watching");
+    expect(result.stdout).not.toContain("sessionKey:");
+    expect(result.stdout).not.toContain("intervalMs:");
+    expect(result.stdout).not.toContain("status:");
     expect(result.stdout).toContain("beta latest output");
   }, 20000);
 
@@ -345,6 +352,11 @@ describe("runner cli integration", () => {
     ]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("session: alpha");
+    expect(result.stdout).toContain("sessionId: none");
+    expect(result.stdout).toContain("state: watching");
+    expect(result.stdout).not.toContain("sessionKey:");
+    expect(result.stdout).not.toContain("intervalMs:");
+    expect(result.stdout).not.toContain("status:");
     expect(result.stdout).toContain("alpha indexed output");
   }, 20000);
 

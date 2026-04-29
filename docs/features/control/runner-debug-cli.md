@@ -77,7 +77,9 @@ It is intentionally separate from `updatedAt` because:
 - prefixes each entry header with `sessionName:` for faster scanning
 - sorts sessions by newest `lastAdmittedPromptAt` when known
 - shows mapped `sessionId` when stored, otherwise `sessionId: none`
+- does not repeat the logical `sessionKey` in each row
 - shows simple state from stored runtime when available, otherwise `state: unmanaged` for tmux-only sessions
+- does not print a separate `live` field; this command is already a live tmux inventory
 - still shows unnamed tmux-only sessions even if no persisted metadata row matches
 
 ### `clisbot runner inspect <session-name>`
@@ -94,6 +96,7 @@ It is intentionally separate from `updatedAt` because:
 - `--lines <n>` controls the pane tail window
 - `--interval <duration>` controls the polling cadence
 - `--timeout <duration>` bounds the watch window when desired
+- the watch header shows `session`, `agent`, `sessionId`, `lines`, and current `state`
 
 ### `clisbot runner watch --latest`
 

@@ -389,10 +389,9 @@ function isTmuxSessionMissingError(error: unknown) {
 function renderWatchFrame(params: {
   sessionName: string;
   lines: number;
-  intervalMs: number;
-  sessionKey?: string;
+  sessionId?: string;
   agentId?: string;
-  status: string;
+  state: string;
   snapshot: string;
 }) {
   return [
@@ -400,10 +399,9 @@ function renderWatchFrame(params: {
     "",
     `session: ${params.sessionName}`,
     params.agentId ? `agent: ${params.agentId}` : null,
-    params.sessionKey ? `sessionKey: ${params.sessionKey}` : null,
+    `sessionId: ${params.sessionId?.trim() || "none"}`,
     `lines: ${params.lines}`,
-    `intervalMs: ${params.intervalMs}`,
-    `status: ${params.status}`,
+    `state: ${params.state}`,
     "",
     params.snapshot.trimEnd() || "(empty pane)",
   ].filter((line): line is string => Boolean(line)).join("\n");
@@ -444,17 +442,14 @@ function renderRunnerListSession(session: RunnerSessionSummary) {
       prefix,
       "  sessionId: none",
       "  state: unmanaged",
-      "  live: yes",
     ].join("\n");
   }
 
   return [
     prefix,
     `  agent: ${session.entry.agentId}`,
-    `  sessionKey: ${session.entry.sessionKey}`,
     `  sessionId: ${session.entry.sessionId?.trim() || "none"}`,
     `  state: ${session.entry.runtime?.state ?? "no-runtime"}`,
-    `  live: ${session.live ? "yes" : "no"}`,
     `  lastAdmittedPromptAt: ${formatTimestamp(session.entry.lastAdmittedPromptAt)}`,
   ].join("\n");
 }
@@ -607,11 +602,10 @@ async function runWatchCli(args: string[]) {
 
     const frame = renderWatchFrame({
       sessionName: selection.sessionName,
-      sessionKey: selection.metadata?.entry.sessionKey,
+      sessionId: selection.metadata?.entry.sessionId,
       agentId: selection.metadata?.entry.agentId,
       lines: options.lines,
-      intervalMs: options.intervalMs,
-      status,
+      state: status,
       snapshot,
     });
 
