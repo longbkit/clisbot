@@ -185,6 +185,27 @@ export class SessionService {
     }
   }
 
+  async clearLostPersistedActiveRuns() {
+    const entries = await this.sessionState.listEntries();
+    for (const entry of entries) {
+      if (!entry.runtime || entry.runtime.state === "idle") {
+        continue;
+      }
+      if (this.activeRuns.has(entry.sessionKey)) {
+        continue;
+      }
+      const resolved = this.resolveTarget({
+        agentId: entry.agentId,
+        sessionKey: entry.sessionKey,
+      });
+      if (!(await this.tmux.hasSession(resolved.sessionName))) {
+        await this.sessionState.setSessionRuntime(resolved, {
+          state: "idle",
+        });
+      }
+    }
+  }
+
   async executePrompt(
     target: AgentSessionTarget,
     prompt: string,
@@ -349,6 +370,38 @@ export class SessionService {
     run.observerFailures.delete(observerId);
     return {
       detached: true,
+    };
+  }
+
+  async interruptActiveRun(target: AgentSessionTarget) {
+    const run =
+      this.activeRuns.get(target.sessionKey) ??
+      (await this.reconcilePersistedActiveRun(target));
+    if (!run) {
+      return {
+        interrupted: false,
+      };
+    }
+
+    const error = new Error("Run interrupted by /stop.");
+    const update = this.createRunUpdate({
+      resolved: run.resolved,
+      status: "error",
+      snapshot: error.message,
+      fullSnapshot: run.latestUpdate.fullSnapshot,
+      initialSnapshot: run.latestUpdate.initialSnapshot,
+      note: "Run interrupted.",
+    });
+    await this.sessionState.setSessionRuntime(run.resolved, {
+      state: "idle",
+    });
+    await this.notifyRunObservers(run, update);
+    if (!run.initialResult.settled) {
+      run.initialResult.reject(error);
+    }
+    this.activeRuns.delete(run.resolved.sessionKey);
+    return {
+      interrupted: true,
     };
   }
 

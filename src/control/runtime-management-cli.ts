@@ -35,6 +35,12 @@ import {
   printCommandOutcomeFooter,
 } from "./runtime-cli-shared.ts";
 
+type RestartDependencies = {
+  stopDetachedRuntime: typeof stopDetachedRuntime;
+  getRuntimeStatus: typeof getRuntimeStatus;
+  warn: (message: string) => void;
+};
+
 function getOperatorConfigPath() {
   return expandHomePath(process.env.CLISBOT_CONFIG_PATH || DEFAULT_CONFIG_PATH);
 }
@@ -333,11 +339,29 @@ export async function stop(hard = false) {
   printCommandOutcomeFooter("success");
 }
 
-export async function restart() {
-  await stopDetachedRuntime({
-    configPath: getOperatorConfigPath(),
-    hard: false,
-  });
+export async function restart(
+  dependencies: RestartDependencies = {
+    stopDetachedRuntime,
+    getRuntimeStatus,
+    warn: (message) => console.error(message),
+  },
+) {
+  const configPath = getOperatorConfigPath();
+  try {
+    await dependencies.stopDetachedRuntime({
+      configPath,
+      hard: false,
+    });
+  } catch (error) {
+    const status = await dependencies.getRuntimeStatus({ configPath });
+    if (status.running) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    dependencies.warn(
+      `warning: clisbot stop reported an error, but status now shows the service is stopped; continuing with start. Stop error: ${message}`,
+    );
+  }
 }
 
 export async function status() {

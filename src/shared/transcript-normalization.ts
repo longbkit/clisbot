@@ -391,19 +391,48 @@ function isTimerDrivenStatusLine(line: string) {
 }
 
 export function hasActiveTimerStatus(snapshot: string) {
-  return splitNormalizedLines(snapshot).some((line) => isActiveTimerStatusLine(line));
+  return Boolean(extractLatestActiveTimerStatusLine(snapshot));
 }
 
 export function extractLatestActiveTimerStatusLine(snapshot: string) {
   const lines = splitNormalizedLines(snapshot);
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     const line = lines[index]?.trim() ?? "";
-    if (isActiveTimerStatusLine(line)) {
+    if (isActiveTimerStatusLine(line) && isLiveTimerStatusLine(lines, index)) {
       return line;
     }
   }
 
   return "";
+}
+
+function isLiveTimerStatusLine(lines: string[], timerIndex: number) {
+  for (let index = timerIndex + 1; index < lines.length; index += 1) {
+    const trimmed = lines[index]?.trim() ?? "";
+    if (!trimmed) {
+      continue;
+    }
+    if (isRunnerIdlePromptLine(trimmed) || isRunnerPromptMetadataLine(trimmed)) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+function isRunnerIdlePromptLine(trimmed: string) {
+  return trimmed.startsWith("› ") || trimmed === "›" || trimmed.startsWith("> ");
+}
+
+function isRunnerPromptMetadataLine(trimmed: string) {
+  return (
+    /^gpt-[\w.-]+ .*·/.test(trimmed) ||
+    trimmed.startsWith("model:") ||
+    trimmed.startsWith("directory:") ||
+    trimmed.startsWith("ctx:") ||
+    trimmed.startsWith("tokens:") ||
+    trimmed.startsWith("? for shortcuts")
+  );
 }
 
 function shouldDropCodexChromeLine(line: string) {

@@ -98,7 +98,7 @@ function createRun(resolved: ResolvedAgentTarget, observers: Map<string, any>) {
     initialResult: {
       promise: Promise.resolve(createUpdate(resolved, { status: "completed" })),
       resolve: () => {},
-      reject: () => {},
+      reject: (_error?: unknown) => {},
       settled: false,
     },
     latestUpdate: update,
@@ -240,6 +240,61 @@ describe("SessionService observer delivery", () => {
     expect(observer.intervalMs).toBe(5 * 60_000);
     expect(observer.expiresAt).toBeUndefined();
     expect(typeof observer.lastSentAt).toBe("number");
+  });
+
+  test("interruptActiveRun settles observers, clears runtime, and removes the active run", async () => {
+    const resolved = createResolvedTarget();
+    const setSessionRuntime = mock(async () => undefined);
+    const manager = new SessionService(
+      {} as TmuxClient,
+      {
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {} as RunnerService,
+      () => resolved,
+    ) as any;
+    const seenUpdates: RunUpdate[] = [];
+    let rejectedError: unknown;
+    const run = createRun(
+      resolved,
+      new Map([
+        [
+          "telegram-processing",
+          {
+            id: "telegram-processing",
+            mode: "live" as const,
+            onUpdate: async (update: RunUpdate) => {
+              seenUpdates.push(update);
+            },
+          },
+        ],
+      ]),
+    );
+    run.initialResult = {
+      promise: new Promise(() => undefined),
+      resolve: () => undefined,
+      reject: (error: unknown) => {
+        rejectedError = error;
+        run.initialResult.settled = true;
+      },
+      settled: false,
+    };
+    manager.activeRuns.set(resolved.sessionKey, run);
+
+    const result = await manager.interruptActiveRun({
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+    });
+
+    expect(result).toEqual({ interrupted: true });
+    expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
+      state: "idle",
+    });
+    expect(manager.activeRuns.has(resolved.sessionKey)).toBe(false);
+    expect(seenUpdates).toHaveLength(1);
+    expect(seenUpdates[0]?.status).toBe("error");
+    expect(seenUpdates[0]?.note).toBe("Run interrupted.");
+    expect((rejectedError as Error).message).toBe("Run interrupted by /stop.");
   });
 
   test("detached transition notifies live observers before downgrading them to sparse polling", async () => {
@@ -554,6 +609,57 @@ describe("SessionService observer delivery", () => {
     expect(observation.active).toBe(false);
     expect(observation.update.status).toBe("completed");
     expect(observation.update.snapshot).toBe("no active run anymore");
+  });
+
+  test("clearLostPersistedActiveRuns clears persisted running state without rehydrating live sessions", async () => {
+    const resolved = createResolvedTarget();
+    const liveResolved = {
+      ...resolved,
+      sessionKey: "session-live",
+      sessionName: "tmux-live",
+    };
+    const setSessionRuntime = mock(async () => undefined);
+    const manager = new SessionService(
+      {
+        hasSession: async (sessionName: string) => sessionName === liveResolved.sessionName,
+      } as unknown as TmuxClient,
+      {
+        listEntries: async () => [
+          {
+            agentId: resolved.agentId,
+            sessionKey: resolved.sessionKey,
+            workspacePath: resolved.workspacePath,
+            updatedAt: Date.now(),
+            runtime: {
+              state: "running" as const,
+              startedAt: 456,
+            },
+          },
+          {
+            agentId: liveResolved.agentId,
+            sessionKey: liveResolved.sessionKey,
+            workspacePath: liveResolved.workspacePath,
+            updatedAt: Date.now(),
+            runtime: {
+              state: "running" as const,
+              startedAt: 789,
+            },
+          },
+        ],
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {} as RunnerService,
+      (target) => target.sessionKey === liveResolved.sessionKey ? liveResolved : resolved,
+    ) as any;
+    manager.startRunMonitor = mock(() => undefined);
+
+    await manager.clearLostPersistedActiveRuns();
+
+    expect(setSessionRuntime).toHaveBeenCalledTimes(1);
+    expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
+      state: "idle",
+    });
+    expect(manager.startRunMonitor).not.toHaveBeenCalled();
   });
 
   test("observeActiveRun resumes live updates for a detached run", async () => {

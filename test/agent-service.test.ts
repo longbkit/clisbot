@@ -234,6 +234,16 @@ class FakeTmuxClient {
   }
 
   async sendKey(sessionName: string, key: string) {
+    if (key === "Escape") {
+      const session = this.requireSession(sessionName);
+      session.pendingInput = "";
+      session.longRunning = false;
+      session.snapshot = `${session.snapshot}\nINTERRUPTED`;
+      session.cursorX = 0;
+      session.cursorY += 1;
+      session.historySize += 1;
+      return;
+    }
     if (key !== "Enter") {
       return;
     }
@@ -1034,6 +1044,76 @@ describe("AgentService session identity", () => {
 
       expect(run.snapshot).toContain("PONG");
       expect(fakeTmux.serverDefaultsEnsured).toBe(0);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("captures a missing stored session id before reusing an existing tmux session", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:telegram:group:-1001:topic:4335",
+      };
+      const resolved = resolveAgentTarget(loaded, target);
+      await fakeTmux.newSession({
+        sessionName: resolved.sessionName,
+        cwd: resolved.workspacePath,
+        command: "fake-cli -C /tmp",
+      });
+
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(run.snapshot).toContain(`STATUS session id: ${RUNNER_GENERATED_ID}`);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+      expect(fakeTmux.sessionCommands).toHaveLength(1);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -3569,6 +3649,98 @@ describe("AgentService session identity", () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  test("interruptSession clears a detached active run and unblocks the next queued prompt", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+    let service: AgentService | undefined;
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            streamOverrides: {
+              updateIntervalMs: 5,
+              idleTimeoutMs: 100,
+              noOutputTimeoutMs: 5000,
+              maxRuntimeSec: 1,
+            },
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c11:thread:906.1006",
+      };
+
+      const first = await service.enqueuePrompt(target, "stream-forever", {
+        onUpdate: () => undefined,
+      }).result;
+      expect(first.status).toBe("detached");
+
+      const second = service.enqueuePrompt(target, "ping", {
+        queueItem: createStoredQueueItem({
+          promptText: "ping",
+          promptSummary: "ping",
+        }),
+        onUpdate: () => undefined,
+      });
+      await Bun.sleep(80);
+      expect((await service.listQueuedPrompts(target)).map((item) => item.text)).toEqual(["ping"]);
+
+      const stopped = await service.interruptSession(target);
+      expect(stopped.interrupted).toBe(true);
+      expect(readSessionEntry(storePath, target.sessionKey)?.runtime?.state).toBe("idle");
+      expect(await service.listActiveSessionRuntimes()).toEqual([]);
+
+      const secondResult = await Promise.race([
+        second.result,
+        Bun.sleep(8_000).then(() => {
+          throw new Error("queued prompt stayed blocked after /stop");
+        }),
+      ]);
+      expect(secondResult.status).toBe("completed");
+      expect(secondResult.snapshot).toContain("PONG");
+      expect(await service.listQueuedPrompts(target)).toEqual([]);
+    } finally {
+      await service?.stop().catch(() => undefined);
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 10_000);
 
   test("opens a fresh session when mid-prompt loss has no resumable context", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));

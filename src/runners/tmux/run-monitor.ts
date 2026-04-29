@@ -78,7 +78,7 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let previousRenderedRunningSnapshot = "";
   let lastPaneChangeAt = params.startedAt;
   let sawActivity = false;
-  let sawPaneChange = false;
+  let sawPaneChange = !params.prompt;
   let sawPromptSubmission = Boolean(params.prompt);
   let detachedNotified = params.detachedAlready;
   let firstMeaningfulDeltaLogged = false;

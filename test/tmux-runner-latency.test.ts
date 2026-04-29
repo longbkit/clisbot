@@ -730,6 +730,79 @@ describe("tmux runner latency behavior", () => {
     expect(completions).toEqual([""]);
   });
 
+  test("monitorTmuxRun clears a rehydrated idle run without waiting for pane changes", async () => {
+    const completions: string[] = [];
+    const fakeTmux = {
+      async capturePane() {
+        return "READY\n›";
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: undefined,
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1_000,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot: "READY\n›",
+      detachedAlready: false,
+      onRunning: async () => undefined,
+      onDetached: async () => undefined,
+      onCompleted: async (update) => {
+        completions.push(update.snapshot);
+      },
+    });
+
+    expect(completions).toEqual([""]);
+  });
+
+  test("monitorTmuxRun ignores stale active timers once later output has settled", async () => {
+    const snapshot = [
+      "› request",
+      "",
+      "Older draft.",
+      "",
+      "• Working (5m 02s • esc to interrupt)",
+      "",
+      "Final answer.",
+    ].join("\n");
+    const completions: string[] = [];
+    const fakeTmux = {
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await monitorTmuxRun({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      prompt: undefined,
+      promptSubmitDelayMs: 1,
+      captureLines: 80,
+      updateIntervalMs: 5,
+      idleTimeoutMs: 15,
+      noOutputTimeoutMs: 1_000,
+      maxRuntimeMs: 10_000,
+      startedAt: Date.now(),
+      initialSnapshot: "› request\n\nOlder draft.",
+      detachedAlready: false,
+      onRunning: async () => undefined,
+      onDetached: async () => undefined,
+      onCompleted: async (update) => {
+        completions.push(update.snapshot);
+      },
+    });
+
+    expect(completions).toHaveLength(1);
+    expect(completions[0]).toContain("Final answer.");
+    expect(completions[0]).not.toContain("Working (5m 02s");
+  });
+
   test("monitorTmuxRun does not leak the previous settled transcript into the first running preview", async () => {
     const initialSnapshot = [
       "Previous answer",

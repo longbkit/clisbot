@@ -227,7 +227,12 @@ export class AgentService {
   }
 
   async interruptSession(target: AgentSessionTarget) {
-    return this.runnerSessions.interruptSession(target);
+    const runner = await this.runnerSessions.interruptSession(target);
+    const activeRun = await this.activeRuns.interruptActiveRun(target);
+    return {
+      ...runner,
+      interrupted: runner.interrupted || activeRun.interrupted,
+    };
   }
 
   async nudgeSession(target: AgentSessionTarget) {
@@ -257,6 +262,7 @@ export class AgentService {
   }
 
   async listActiveSessionRuntimes(): Promise<ActiveSessionRuntimeInfo[]> {
+    await this.activeRuns.clearLostPersistedActiveRuns();
     return this.sessionState.listActiveSessionRuntimes();
   }
 

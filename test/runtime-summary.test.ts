@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ActivityStore } from "../src/control/activity-store.ts";
@@ -190,7 +190,7 @@ describe("runtime summaries", () => {
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
   });
 
-  test("renders active runs in operator status output", async () => {
+  test("clears lost persisted active runs before operator status output", async () => {
     delete process.env.CLISBOT_HOME;
     process.env.SLACK_APP_TOKEN = "app";
     process.env.SLACK_BOT_TOKEN = "bot";
@@ -242,10 +242,11 @@ describe("runtime summaries", () => {
     expect(text).toContain("Active runs:");
     expect(text).toContain("telegram enabled=no");
     expect(text).not.toContain("telegram enabled=no connection=");
-    expect(text).toContain("agent=work");
-    expect(text).toContain("state=detached");
-    expect(text).toContain("runner=lost");
-    expect(text).toContain("sessionKey=agent:work:slack:channel:C123:thread:1.2");
+    expect(text).toContain("Active runs:\n  none");
+    expect(text).not.toContain("agent=work state=detached");
+    expect(text).not.toContain("runner=lost");
+    const persisted = JSON.parse(readFileSync(config.app.session.storePath, "utf8"));
+    expect(persisted["agent:work:slack:channel:C123:thread:1.2"].runtime.state).toBe("idle");
   });
 
   test("shows only the five most recent runner sessions in status output", () => {

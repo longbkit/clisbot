@@ -62,6 +62,22 @@ Durable one-shot queue control is being staged for the next release.
 - Fixed status-command session-id capture fallback so full-pane rewrites can
   still read the cleaned `/status` delta when the raw append exists but does
   not contain the session id.
+- Fixed existing tmux session reuse when the stored `sessionId` is missing:
+  clisbot now captures the runner conversation id before submitting the next
+  prompt instead of keeping the session entry permanently non-resumable.
+- Fixed `clisbot restart` recovery for the case where `stop` reports a timeout
+  but `status` already shows the service is stopped; restart now continues into
+  `start` and prints the stop warning instead of leaving the service down.
+- Fixed running-state reconciliation for tmux panes that are already idle:
+  stale active timer lines in scrollback no longer keep a session `running`,
+  and rehydrated active runs can settle without waiting for another pane
+  change.
+- Fixed chat `/stop` so it clears clisbot's active-run state and unblocks the
+  next queued prompt after sending the runner interrupt, instead of depending
+  only on later pane settlement.
+- Fixed operator active-run listing so stale persisted `running` projections
+  with no matching tmux session are cleared instead of continuing to show
+  `runner=lost`.
 
 ### Security
 

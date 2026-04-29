@@ -119,7 +119,7 @@ They cover durable concepts that must stay coherent even if the concrete runner 
 
 - reserved control slash commands are handled by clisbot before runner input forwarding
 - `/transcript` returns the current full conversation session transcript
-- `/stop` sends `Escape` to interrupt current processing in the current conversation session
+- `/stop` sends `Escape` to interrupt current processing in the current conversation session, clears active-run state, and lets queued prompts continue
 - unknown slash commands are forwarded unchanged to the native agent CLI
 
 ## Test Case 6: Agent Bash Commands Run In The Agent Workspace Without Taking Over The Main CLI Pane

@@ -203,6 +203,9 @@ Current behavior:
 - `clisbot status` shows monitor state, current runtime pid when one is active, and `next restart` when the service is in backoff
 - if the runtime worker crashes repeatedly, the monitor retries with bounded backoff instead of requiring an immediate manual restart
 - if the monitor finds a stale worker without a live monitor, `stop` and the next `start` clean that worker up before continuing
+- if an older `clisbot restart` reports a stop timeout during an update, run
+  `clisbot status`; when it shows `running: no`, recover explicitly with
+  `clisbot start`
 
 Current config points:
 

@@ -438,10 +438,7 @@ export class RunnerService {
       });
       try {
         await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-        await this.sessionState.touchSessionEntry(resolved, {
-          sessionId: existing?.sessionId,
-          runnerCommand: resolved.runner.command,
-        });
+        await this.syncSessionIdentity(resolved);
       } catch (error) {
         throw await this.mapSessionError(error, resolved.sessionName, "during startup");
       }
@@ -851,7 +848,6 @@ export class RunnerService {
       });
       try {
         await this.tmux.sendKey(resolved.sessionName, "Escape");
-        await sleep(150);
       } catch {
         // Ignore interrupt failures and return the session state.
       }

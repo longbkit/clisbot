@@ -33,7 +33,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/attach`: attach this thread to the active run and resume live updates
 - `/detach`: stop live updates for this thread while still posting the final result here
 - `/watch every 30s [for 10m]`: post latest run state on an interval until settle or timeout
-- `/stop`: send Escape to interrupt the current conversation session
+- `/stop`: send Escape to interrupt the current conversation session, clear active-run state, and let queued prompts continue
 - `/new`: trigger a new runner conversation for the current routed session, then capture and store the new session id
 - `/nudge`: send one extra Enter to the current tmux session without resending prompt text
 
