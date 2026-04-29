@@ -771,7 +771,10 @@ export class SessionService {
   }
 
   private async hasStoredResumableSessionId(resolved: ResolvedAgentTarget) {
-    if (resolved.runner.sessionId.resume.mode !== "command") {
+    if (
+      resolved.runner.sessionId.resume.mode !== "command" &&
+      resolved.runner.sessionId.create.mode !== "explicit"
+    ) {
       return false;
     }
     const entry = await this.sessionState.getEntry(resolved.sessionKey);

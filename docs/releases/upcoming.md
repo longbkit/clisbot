@@ -56,6 +56,9 @@ Durable one-shot queue control is being staged for the next release.
 - Fixed startup ready-pattern matching so stale prompt markers earlier in a tmux
   pane do not let first-submit proceed before the currently launching runner is
   actually ready.
+- Fixed mid-run recovery for runners that use explicit session ids without a
+  separate resume command; recovery now restarts with the stored id instead of
+  clearing and rotating it.
 
 ### Security
 

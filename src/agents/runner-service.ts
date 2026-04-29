@@ -110,6 +110,13 @@ function isRetryableFreshStartFault(error: unknown) {
   );
 }
 
+function canRestartWithStoredSessionId(resolved: ResolvedAgentTarget) {
+  return (
+    resolved.runner.sessionId.resume.mode === "command" ||
+    resolved.runner.sessionId.create.mode === "explicit"
+  );
+}
+
 export class RunnerService {
   private cleanupInFlight = false;
   private readonly sessionIdentityCaptureRetryAt = new Map<string, number>();
@@ -649,7 +656,7 @@ export class RunnerService {
   async reopenRunContext(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
     const resolved = this.resolveTarget(target);
     const existing = await this.sessionState.getEntry(resolved.sessionKey);
-    if (!existing?.sessionId || resolved.runner.sessionId.resume.mode !== "command") {
+    if (!existing?.sessionId || !canRestartWithStoredSessionId(resolved)) {
       throw new Error(`Runner session "${resolved.sessionName}" cannot reopen the same conversation context.`);
     }
     return this.ensureRunnerReady(target, { allowFreshRetryBeforePrompt: false, timingContext });

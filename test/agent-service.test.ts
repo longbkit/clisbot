@@ -3725,6 +3725,72 @@ describe("AgentService session identity", () => {
     }
   });
 
+  test("reopens an explicit session id context after mid-prompt loss", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "explicit",
+                args: ["--session-id", "{sessionId}"],
+              },
+              capture: {
+                mode: "off",
+                statusCommand: "/status",
+                pattern: "[0-9a-fA-F-]{36}",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "off",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:telegram:group:-1001:topic:4-explicit",
+      };
+
+      const result = await service.enqueuePrompt(target, "recover-mid-run", {
+        onUpdate: () => undefined,
+      }).result;
+
+      const sessionId = readSessionId(storePath, target.sessionKey);
+      expect(typeof sessionId).toBe("string");
+      expect(result.snapshot).toContain(`CONTINUE ${sessionId ?? ""}`);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(sessionId);
+      expect(fakeTmux.sessionCommands).toHaveLength(2);
+      expect(fakeTmux.sessionCommands[0]).toContain(`--session-id ${sessionId ?? ""}`);
+      expect(fakeTmux.sessionCommands[1]).toContain(`--session-id ${sessionId ?? ""}`);
+      expect(fakeTmux.sessionCommands[1]).not.toContain("resume");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("preserves stored session id when same-context recovery fails", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 

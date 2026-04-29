@@ -100,7 +100,7 @@ Checklist:
 
 - [ ] The chosen session-id strategy is explicit: runner-generated, explicit, captured later, or none.
 - [ ] A killed tmux session can recover without losing the intended conversation when the backend supports resume.
-- [ ] Stale or rejected session ids are cleared truthfully instead of causing silent drift.
+- [ ] Stale or rejected session ids are preserved truthfully; operators use `/new` for intentional rotation.
 - [ ] Session continuity metadata stays backend-neutral outside the runner boundary.
 
 Minimum evidence:

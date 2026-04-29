@@ -206,7 +206,7 @@ Example shape:
 That means:
 
 - clisbot generates the session id
-- every restart passes that same session id back to the tool
+- every restart or recovery passes that same session id back to the tool
 - a separate resume command is not required
 
 ## What Matches OpenClaw Well
