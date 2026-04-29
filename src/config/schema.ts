@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidLoopTimezone } from "../agents/loop-command.ts";
 import {
+  INTERACTIVE_CLI_STARTUP_DELAY_MS,
   SUPPORTED_AGENT_CLI_TOOLS,
   SUPPORTED_BOOTSTRAP_MODES,
 } from "./agent-tool-presets.ts";
@@ -11,10 +12,12 @@ import {
   defaultAgentAuthConfig,
   defaultAppAuthConfig,
 } from "./auth-schema.ts";
+import { CURRENT_SCHEMA_VERSION } from "./config-migration.ts";
 import { getDefaultRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
 
 const defaultSessionIdPattern =
   "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
+const codexStartupReadyPattern = "(?:^|\\s)›\\s";
 
 const runnerSessionIdCreateSchema = z.object({
   mode: z.enum(["runner", "explicit"]).default("runner"),
@@ -254,6 +257,7 @@ const slackBotSchema = z.object({
   appTokenFile: z.string().optional(),
   botTokenFile: z.string().optional(),
   allowBots: z.boolean().optional(),
+  dmPolicy: dmPolicySchema.optional(),
   channelPolicy: conversationPolicySchema.optional(),
   groupPolicy: conversationPolicySchema.optional(),
   agentPrompt: agentPromptSchema.optional(),
@@ -279,8 +283,9 @@ const slackProviderDefaultsSchema = z.object({
   defaultBotId: z.string().min(1).default("default"),
   mode: z.literal("socket").default("socket"),
   allowBots: z.boolean().default(false),
-  channelPolicy: conversationPolicySchema.default("disabled"),
-  groupPolicy: conversationPolicySchema.default("disabled"),
+  dmPolicy: dmPolicySchema.default("pairing"),
+  channelPolicy: conversationPolicySchema.default("allowlist"),
+  groupPolicy: conversationPolicySchema.default("allowlist"),
   agentPrompt: agentPromptSchema.default({
     enabled: true,
     maxProgressMessages: 3,
@@ -310,6 +315,7 @@ const slackProviderDefaultsSchema = z.object({
   }),
   timezone: timezoneSchema.optional(),
   directMessages: z.record(z.string(), botRouteSchema).default({}),
+  groups: z.record(z.string(), botRouteSchema).default({}),
 });
 
 const telegramBotSchema = z.object({
@@ -320,6 +326,7 @@ const telegramBotSchema = z.object({
   botToken: z.string().optional(),
   tokenFile: z.string().optional(),
   allowBots: z.boolean().optional(),
+  dmPolicy: dmPolicySchema.optional(),
   groupPolicy: conversationPolicySchema.optional(),
   agentPrompt: agentPromptSchema.optional(),
   commandPrefixes: commandPrefixesOverrideSchema.optional(),
@@ -344,7 +351,8 @@ const telegramProviderDefaultsSchema = z.object({
   defaultBotId: z.string().min(1).default("default"),
   mode: z.literal("polling").default("polling"),
   allowBots: z.boolean().default(false),
-  groupPolicy: conversationPolicySchema.default("disabled"),
+  dmPolicy: dmPolicySchema.default("pairing"),
+  groupPolicy: conversationPolicySchema.default("allowlist"),
   agentPrompt: agentPromptSchema.default({
     enabled: true,
     maxProgressMessages: 3,
@@ -366,6 +374,7 @@ const telegramProviderDefaultsSchema = z.object({
   }),
   timezone: timezoneSchema.optional(),
   directMessages: z.record(z.string(), botRouteSchema).default({}),
+  groups: z.record(z.string(), telegramGroupRouteSchema).default({}),
   polling: z.object({
     timeoutSeconds: z.number().int().positive().default(20),
     retryDelayMs: z.number().int().positive().default(1000),
@@ -403,8 +412,9 @@ const slackBotsSchema = z.object({
     defaultBotId: "default",
     mode: "socket",
     allowBots: false,
-    channelPolicy: "disabled",
-    groupPolicy: "disabled",
+    dmPolicy: "pairing",
+    channelPolicy: "allowlist",
+    groupPolicy: "allowlist",
     agentPrompt: {
       enabled: true,
       maxProgressMessages: 3,
@@ -432,10 +442,20 @@ const slackBotsSchema = z.object({
       participationTtlMin: 5,
     },
     directMessages: {
-      "dm:*": {
+      "*": {
         enabled: true,
         requireMention: false,
         policy: "pairing",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    },
+    groups: {
+      "*": {
+        enabled: true,
+        requireMention: true,
+        policy: "open",
         allowUsers: [],
         blockUsers: [],
         allowBots: false,
@@ -450,7 +470,8 @@ const telegramBotsSchema = z.object({
     defaultBotId: "default",
     mode: "polling",
     allowBots: false,
-    groupPolicy: "disabled",
+    dmPolicy: "pairing",
+    groupPolicy: "allowlist",
     agentPrompt: {
       enabled: true,
       maxProgressMessages: 3,
@@ -470,13 +491,24 @@ const telegramBotsSchema = z.object({
       participationTtlMin: 5,
     },
     directMessages: {
-      "dm:*": {
+      "*": {
         enabled: true,
         requireMention: false,
         policy: "pairing",
         allowUsers: [],
         blockUsers: [],
         allowBots: false,
+      },
+    },
+    groups: {
+      "*": {
+        enabled: true,
+        requireMention: true,
+        policy: "open",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+        topics: {},
       },
     },
     polling: {
@@ -552,6 +584,7 @@ const agentRunnerOverrideSchema = z.object({
 
 const agentOverrideSchema = z.object({
   workspace: z.string().optional(),
+  timezone: timezoneSchema.optional(),
   responseMode: responseModeSchema.optional(),
   additionalMessageMode: additionalMessageModeSchema.optional(),
   auth: agentAuthOverrideSchema.optional(),
@@ -605,6 +638,8 @@ const agentsDefaultsSchema = z.object({
         "-C",
         "{workspace}",
       ],
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+      startupReadyPattern: codexStartupReadyPattern,
       sessionId: {
         create: {
           mode: "runner",
@@ -633,6 +668,7 @@ const agentsDefaultsSchema = z.object({
     claude: runnerFamilySchema.default({
       command: "claude",
       args: ["--dangerously-skip-permissions"],
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
       sessionId: {
         create: {
           mode: "explicit",
@@ -654,7 +690,7 @@ const agentsDefaultsSchema = z.object({
     gemini: runnerFamilySchema.default({
       command: "gemini",
       args: ["--approval-mode=yolo", "--sandbox=false"],
-      startupDelayMs: 15000,
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
       startupRetryCount: 2,
       startupRetryDelayMs: 1000,
       startupReadyPattern: "Type your message or @path/to/file",
@@ -697,12 +733,13 @@ const agentsDefaultsSchema = z.object({
 
 export const clisbotConfigSchema = z.object({
   meta: z.object({
-    schemaVersion: z.string().min(1).default("0.1.43"),
+    schemaVersion: z.string().min(1).default(CURRENT_SCHEMA_VERSION),
     lastTouchedAt: z.string().optional(),
   }).default({
-    schemaVersion: "0.1.43",
+    schemaVersion: CURRENT_SCHEMA_VERSION,
   }),
   app: z.object({
+    timezone: timezoneSchema.optional(),
     session: appSessionSchema.default({
       mainKey: "main",
       identityLinks: {},
@@ -805,8 +842,9 @@ export const clisbotConfigSchema = z.object({
         defaultBotId: "default",
         mode: "socket",
         allowBots: false,
-        channelPolicy: "disabled",
-        groupPolicy: "disabled",
+        dmPolicy: "pairing",
+        channelPolicy: "allowlist",
+        groupPolicy: "allowlist",
         agentPrompt: {
           enabled: true,
           maxProgressMessages: 3,
@@ -834,10 +872,20 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "dm:*": {
+          "*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        groups: {
+          "*": {
+            enabled: true,
+            requireMention: true,
+            policy: "open",
             allowUsers: [],
             blockUsers: [],
             allowBots: false,
@@ -850,8 +898,9 @@ export const clisbotConfigSchema = z.object({
         defaultBotId: "default",
         mode: "socket",
         allowBots: false,
-        channelPolicy: "disabled",
-        groupPolicy: "disabled",
+        dmPolicy: "pairing",
+        channelPolicy: "allowlist",
+        groupPolicy: "allowlist",
         agentPrompt: {
           enabled: true,
           maxProgressMessages: 3,
@@ -879,10 +928,20 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "dm:*": {
+          "*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        groups: {
+          "*": {
+            enabled: true,
+            requireMention: true,
+            policy: "open",
             allowUsers: [],
             blockUsers: [],
             allowBots: false,
@@ -896,7 +955,8 @@ export const clisbotConfigSchema = z.object({
         defaultBotId: "default",
         mode: "polling",
         allowBots: false,
-        groupPolicy: "disabled",
+        dmPolicy: "pairing",
+        groupPolicy: "allowlist",
         agentPrompt: {
           enabled: true,
           maxProgressMessages: 3,
@@ -916,13 +976,24 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "dm:*": {
+          "*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
             allowUsers: [],
             blockUsers: [],
             allowBots: false,
+          },
+        },
+        groups: {
+          "*": {
+            enabled: true,
+            requireMention: true,
+            policy: "open",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+            topics: {},
           },
         },
         polling: {
@@ -936,7 +1007,8 @@ export const clisbotConfigSchema = z.object({
         defaultBotId: "default",
         mode: "polling",
         allowBots: false,
-        groupPolicy: "disabled",
+        dmPolicy: "pairing",
+        groupPolicy: "allowlist",
         agentPrompt: {
           enabled: true,
           maxProgressMessages: 3,
@@ -956,13 +1028,24 @@ export const clisbotConfigSchema = z.object({
           participationTtlMin: 5,
         },
         directMessages: {
-          "dm:*": {
+          "*": {
             enabled: true,
             requireMention: false,
             policy: "pairing",
             allowUsers: [],
             blockUsers: [],
             allowBots: false,
+          },
+        },
+        groups: {
+          "*": {
+            enabled: true,
+            requireMention: true,
+            policy: "open",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+            topics: {},
           },
         },
         polling: {
@@ -1012,6 +1095,8 @@ export const clisbotConfigSchema = z.object({
             "-C",
             "{workspace}",
           ],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+          startupReadyPattern: codexStartupReadyPattern,
           sessionId: {
             create: {
               mode: "runner",
@@ -1040,6 +1125,7 @@ export const clisbotConfigSchema = z.object({
         claude: {
           command: "claude",
           args: ["--dangerously-skip-permissions"],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           sessionId: {
             create: {
               mode: "explicit",
@@ -1061,7 +1147,7 @@ export const clisbotConfigSchema = z.object({
         gemini: {
           command: "gemini",
           args: ["--approval-mode=yolo", "--sandbox=false"],
-          startupDelayMs: 15000,
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupRetryCount: 2,
           startupRetryDelayMs: 1000,
           startupReadyPattern: "Type your message or @path/to/file",
@@ -1142,6 +1228,8 @@ export const clisbotConfigSchema = z.object({
             "-C",
             "{workspace}",
           ],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+          startupReadyPattern: codexStartupReadyPattern,
           sessionId: {
             create: {
               mode: "runner",
@@ -1170,6 +1258,7 @@ export const clisbotConfigSchema = z.object({
         claude: {
           command: "claude",
           args: ["--dangerously-skip-permissions"],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           sessionId: {
             create: {
               mode: "explicit",
@@ -1191,7 +1280,7 @@ export const clisbotConfigSchema = z.object({
         gemini: {
           command: "gemini",
           args: ["--approval-mode=yolo", "--sandbox=false"],
-          startupDelayMs: 15000,
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupRetryCount: 2,
           startupRetryDelayMs: 1000,
           startupReadyPattern: "Type your message or @path/to/file",

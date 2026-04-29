@@ -30,6 +30,13 @@ Ownership intent:
 
 The old names `ActiveRunManager` and `RunnerSessionService` are no longer part of the architecture vocabulary.
 
+Active-run liveness contract:
+
+- an in-memory active run is supervised by `SessionService` and its run monitor
+- the monitor owns transitions from runner loss to recovery or terminal failure
+- persisted session runtime is only a resumable projection; if it says `running` or `detached` but the runner backend no longer has the tmux session, clear that projection to `idle`
+- user ingress should not clear an in-memory active run just because a tmux liveness probe fails, because that would skip the monitor-owned recovery path
+
 ## Agents Rule
 
 The agents layer is backend-agnostic.

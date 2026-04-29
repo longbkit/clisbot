@@ -4,30 +4,30 @@ import {
   resolveSlackDirectMessageConfig,
 } from "../../config/channel-bots.ts";
 import {
-  buildSharedChannelRoute,
-  type SharedChannelRoute,
-  type SharedChannelRouteOverride,
+  buildSurfaceRoute,
+  isSurfaceRouteEnabled,
+  mergeSurfaceRouteOverride,
+  type ResolvedSurfaceRouteStatus,
+  type SurfaceRoute,
+  type SurfaceRouteOverride,
 } from "../route-policy.ts";
 import { type SlackConversationKind } from "./session-routing.ts";
 
-export type SlackRoute = SharedChannelRoute & {
+export type SlackRoute = SurfaceRoute & {
   replyToMode: "thread" | "all";
 };
 
 export type SlackResolvedRoute = {
   conversationKind: SlackConversationKind;
   route: SlackRoute | null;
+  status: ResolvedSurfaceRouteStatus;
 };
 
-type SlackRouteOverride = SharedChannelRouteOverride;
-
-function isAdmittedRoute(route: SlackRouteOverride | undefined | null) {
-  return !!route && route.enabled !== false && route.policy !== "disabled";
-}
+type SlackRouteOverride = SurfaceRouteOverride;
 
 function buildRoute(loadedConfig: LoadedConfig, params: {
   route?: SlackRouteOverride | null;
-  requireMention: boolean;
+  policy: "open" | "allowlist";
   botId?: string;
   accountId?: string;
 }): SlackRoute {
@@ -36,69 +36,77 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
     params.botId ?? params.accountId,
   );
   return {
-    ...buildSharedChannelRoute({
+    ...buildSurfaceRoute({
       loadedConfig,
       channel: "slack",
       channelConfig: slackConfig,
       route: params.route,
-      requireMention: params.requireMention,
+      policy: params.policy,
+      requireMention: true,
     }),
     replyToMode: slackConfig.replyToMode,
   };
 }
 
-function resolveChannelRoute(
-  loadedConfig: LoadedConfig,
-  channelId: string,
-  botId?: string,
-  accountId?: string,
-): SlackRoute | null {
-  const resolvedBotId = botId ?? accountId;
-  const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
-  const route = slackConfig.groups[`channel:${channelId}`] ?? slackConfig.groups["*"];
-  if (isAdmittedRoute(route)) {
-    return buildRoute(loadedConfig, {
-      route,
-      requireMention: false,
-      botId: resolvedBotId,
-    });
+function resolveSharedRouteStatus(route: SlackRouteOverride | undefined) {
+  if (!route) {
+    return "missing" as const;
   }
-
-  if (slackConfig.channelPolicy === "open") {
-    return buildRoute(loadedConfig, {
-      requireMention: true,
-      botId: resolvedBotId,
-    });
-  }
-
-  return null;
+  return isSurfaceRouteEnabled(route) ? "admitted" as const : "disabled" as const;
 }
 
-function resolveGroupRoute(
+function resolveSharedAdmissionStatus(params: {
+  policy?: "disabled" | "allowlist" | "open";
+  exactRoute?: SlackRouteOverride;
+}) {
+  if (params.policy === "disabled") {
+    return "disabled" as const;
+  }
+  if (params.policy === "allowlist" && !params.exactRoute) {
+    return "missing" as const;
+  }
+  return undefined;
+}
+
+function resolveSharedRoute(
   loadedConfig: LoadedConfig,
   channelId: string,
+  conversationKind: SlackConversationKind,
   botId?: string,
   accountId?: string,
-): SlackRoute | null {
+) {
   const resolvedBotId = botId ?? accountId;
   const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
-  const route = slackConfig.groups[`group:${channelId}`] ?? slackConfig.groups["*"];
-  if (isAdmittedRoute(route)) {
-    return buildRoute(loadedConfig, {
+  const exactRoute = slackConfig.groups[channelId];
+  const admissionStatus = resolveSharedAdmissionStatus({
+    policy: conversationKind === "channel" ? slackConfig.channelPolicy : slackConfig.groupPolicy,
+    exactRoute,
+  });
+  if (admissionStatus) {
+    return {
+      route: null,
+      status: admissionStatus,
+    };
+  }
+  const route = mergeSurfaceRouteOverride(
+    slackConfig.groups["*"],
+    exactRoute,
+  );
+  const status = resolveSharedRouteStatus(route);
+  if (status !== "admitted") {
+    return {
+      route: null,
+      status,
+    };
+  }
+  return {
+    route: buildRoute(loadedConfig, {
       route,
-      requireMention: false,
+      policy: route?.policy === "allowlist" ? "allowlist" : "open",
       botId: resolvedBotId,
-    });
-  }
-
-  if (slackConfig.groupPolicy === "open") {
-    return buildRoute(loadedConfig, {
-      requireMention: true,
-      botId: resolvedBotId,
-    });
-  }
-
-  return null;
+    }),
+    status,
+  };
 }
 
 function resolveDirectMessageRoute(
@@ -110,13 +118,13 @@ function resolveDirectMessageRoute(
   const resolvedBotId = botId ?? accountId;
   const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
   const route = resolveSlackDirectMessageConfig(slackConfig, userId);
-  if (!isAdmittedRoute(route)) {
+  if (!isSurfaceRouteEnabled(route)) {
     return null;
   }
 
   return buildRoute(loadedConfig, {
     route,
-    requireMention: false,
+    policy: route?.policy === "open" ? "open" : "allowlist",
     botId: resolvedBotId,
   });
 }
@@ -133,30 +141,31 @@ export function resolveSlackConversationRoute(
   const channelId = event.channel as string | undefined;
 
   if (channelType === "im") {
+    const route = resolveDirectMessageRoute(
+      loadedConfig,
+      typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
+      options.botId,
+      options.accountId,
+    );
     return {
       conversationKind: "dm",
-      route: resolveDirectMessageRoute(
+      route,
+      status: route ? "admitted" : "disabled",
+    };
+  }
+
+  const shared = channelId
+    ? resolveSharedRoute(
         loadedConfig,
-        typeof event.user === "string" ? event.user.trim().toUpperCase() : undefined,
+        channelId,
+        channelType === "mpim" ? "group" : "channel",
         options.botId,
         options.accountId,
-      ),
-    };
-  }
-
-  if (channelType === "mpim") {
-    return {
-      conversationKind: "group",
-      route: channelId
-        ? resolveGroupRoute(loadedConfig, channelId, options.botId, options.accountId)
-        : null,
-    };
-  }
-
+      )
+    : { route: null, status: "missing" as const };
   return {
-    conversationKind: "channel",
-    route: channelId
-      ? resolveChannelRoute(loadedConfig, channelId, options.botId, options.accountId)
-      : null,
+    conversationKind: channelType === "mpim" ? "group" : "channel",
+    route: shared.route,
+    status: shared.status,
   };
 }

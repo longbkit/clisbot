@@ -6,6 +6,12 @@ import { ensureDir, sanitizeSessionName } from "../../shared/paths.ts";
 const CONTENT_TYPE_EXTENSION_MAP: Record<string, string> = {
   "application/json": ".json",
   "application/pdf": ".pdf",
+  "audio/mpeg": ".mp3",
+  "audio/mp4": ".m4a",
+  "audio/ogg": ".oga",
+  "audio/wav": ".wav",
+  "audio/webm": ".webm",
+  "audio/x-wav": ".wav",
   "image/jpeg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",

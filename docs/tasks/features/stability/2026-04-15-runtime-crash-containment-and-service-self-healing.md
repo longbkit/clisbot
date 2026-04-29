@@ -148,7 +148,8 @@ The mid-prompt recovery gap is no longer the old asymmetric failure path.
   - first try reopening the same conversation context with the stored `sessionId`
   - on a successful reopen, the same run now immediately sends `continue exactly where you left off` before any queued follow-up can run
   - same-context reopen is now retried up to `2` times before falling through
-  - if same-context recovery is unavailable or fails, open a fresh session without replaying the old prompt
+  - if same-context recovery is unavailable and no stored resumable session id exists, open a fresh session without replaying the old prompt
+  - if a stored resumable session id exists but cannot be reopened, preserve the mapping and fail truthfully; `/new` is the explicit rotation path
   - fail the current run truthfully and tell the user to resend the full prompt or context
 - recovery notes are now forced visible in-channel even when route `streaming` is `off`
 - channel-facing error rendering still adds noise today:
@@ -158,8 +159,13 @@ The mid-prompt recovery gap is no longer the old asymmetric failure path.
 
 Practical consequence:
 
+- if tmux dies while an in-memory active run is still monitored, the monitor owns recovery and should not be bypassed by admission-time cleanup
+- if only persisted `running` or `detached` runtime remains and the tmux session is gone, that projection is stale and should be cleared to `idle` before the next prompt starts
+- `runner list` remains a live-runner debug surface; stale persisted runtime belongs in status/debug output, not in the live runner list
+
 - a transient tmux or runner-session drop mid-prompt can now self-heal when same-context reopen succeeds
 - if only a fresh session can be opened, the current run still fails truthfully instead of pretending the old context survived
+- if a stored native session id exists but cannot be reopened, clisbot preserves that mapping and tells the operator to use `/new` when they intentionally want a new native conversation
 - the final message is noisier than it should be and can look sloppy or misleading
 
 Resilience requirement:
@@ -246,7 +252,7 @@ The current P0 shipped slice is:
 - periodic session cleanup no longer leaves an unhandled rejection path behind
 - channel runtime services now have a supervisor-owned lifecycle callback for post-start health updates
 - Telegram polling conflict after startup now reports a failed channel state instead of silently stopping while the pid stays alive
-- mid-prompt runner-session loss now attempts same-context recovery first, then opens a fresh session without prompt replay if context continuity is gone
+- mid-prompt runner-session loss now attempts same-context recovery first, then either opens a fresh session without prompt replay when no resumable session id exists or fails truthfully while preserving the stored id
 - recovery-step notes for that path now render even when channel `streaming` is `off`
 
 Partially hardened, but not done:
@@ -323,7 +329,7 @@ Runner recovery exists, but it is intentionally narrow and bounded.
 
 Startup and pre-prompt recovery:
 
-- `RunnerService` can retry a recoverable startup session loss by clearing the stored session id and opening a fresh runner session
+- `RunnerService` can retry a recoverable startup session loss by restarting the runner while preserving the stored session id
 - this is a bounded retry, not an open-ended loop
 
 Ready-state verification:
@@ -336,7 +342,8 @@ Mid-prompt recovery:
 - current recovery first tries reopening the same conversation context using the stored `sessionId`
 - if reopen succeeds, the active run immediately nudges the runner with `continue exactly where you left off`
 - same-context reopen is retried up to `2` times before the system gives up on continuity
-- if same-context reopen is unavailable or fails, it opens a fresh session without replaying the old prompt
+- if same-context reopen is unavailable and no stored resumable session id exists, it opens a fresh session without replaying the old prompt
+- if same-context reopen fails while a stored resumable session id exists, it preserves the mapping and fails truthfully
 - this is bounded recovery, but it is not yet governed by a broader runtime-wide restart or backoff strategy
 
 ### 4. Observer-delivery retry

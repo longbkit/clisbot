@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import type { IntervalLoopStatus, StoredIntervalLoop, StoredLoopSurfaceBinding } from "./loop-state.ts";
+import type { IntervalLoopStatus, StoredLoop, StoredLoopSender, StoredLoopSurfaceBinding } from "./loop-state.ts";
 import {
   computeNextCalendarLoopRunAtMs,
   FORCE_LOOP_INTERVAL_MS,
@@ -21,6 +21,25 @@ function createLoopId() {
   return randomUUID().split("-")[0] ?? randomUUID();
 }
 
+export function buildStoredLoopSender(params: {
+  platform: "slack" | "telegram";
+  providerId: string;
+  displayName?: string;
+  handle?: string;
+}): StoredLoopSender | undefined {
+  const providerId = params.providerId.trim();
+  if (!providerId) {
+    return undefined;
+  }
+  const normalizedProviderId = params.platform === "slack" ? providerId.toUpperCase() : providerId;
+  return {
+    senderId: `${params.platform}:${normalizedProviderId}`,
+    providerId: normalizedProviderId,
+    displayName: params.displayName,
+    handle: params.handle,
+  };
+}
+
 function createStoredLoopBase(params: {
   nextRunAt: number;
   promptText: string;
@@ -29,6 +48,7 @@ function createStoredLoopBase(params: {
   promptSummary: string;
   promptSource: "custom" | "LOOP.md";
   createdBy?: string;
+  sender?: StoredLoopSender;
   surfaceBinding?: StoredLoopSurfaceBinding;
   maxRuns: number;
 }) {
@@ -48,8 +68,29 @@ function createStoredLoopBase(params: {
     promptSummary: params.promptSummary,
     promptSource: params.promptSource,
     createdBy: params.createdBy,
+    sender: params.sender ?? deriveLegacyLoopSender({
+      createdBy: params.createdBy,
+      surfaceBinding: params.surfaceBinding,
+    }),
     surfaceBinding: params.surfaceBinding,
   };
+}
+
+function deriveLegacyLoopSender(params: {
+  createdBy?: string;
+  surfaceBinding?: StoredLoopSurfaceBinding;
+}): StoredLoopSender | undefined {
+  const providerId = params.createdBy?.trim();
+  if (!providerId) {
+    return undefined;
+  }
+  if (!params.surfaceBinding?.platform) {
+    return { providerId };
+  }
+  return buildStoredLoopSender({
+    platform: params.surfaceBinding.platform,
+    providerId,
+  });
 }
 
 export function createStoredIntervalLoop(params: {
@@ -62,8 +103,9 @@ export function createStoredIntervalLoop(params: {
   intervalMs: number;
   maxRuns: number;
   createdBy?: string;
+  sender?: StoredLoopSender;
   force: boolean;
-}): StoredIntervalLoop {
+}): StoredLoop {
   return {
     ...createStoredLoopBase({
       nextRunAt: Date.now(),
@@ -73,6 +115,7 @@ export function createStoredIntervalLoop(params: {
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
       createdBy: params.createdBy,
+      sender: params.sender,
       surfaceBinding: params.surfaceBinding,
       maxRuns: params.maxRuns,
     }),
@@ -96,6 +139,7 @@ export function createStoredCalendarLoop(params: {
   timezone: string;
   maxRuns: number;
   createdBy?: string;
+  sender?: StoredLoopSender;
 }) {
   const nextRunAt =
     computeNextCalendarLoopRunAtMs({
@@ -120,6 +164,7 @@ export function createStoredCalendarLoop(params: {
       promptSummary: params.promptSummary,
       promptSource: params.promptSource,
       createdBy: params.createdBy,
+      sender: params.sender,
       surfaceBinding: params.surfaceBinding,
       maxRuns: params.maxRuns,
     }),
@@ -130,10 +175,10 @@ export function createStoredCalendarLoop(params: {
     minute: params.minute,
     timezone: params.timezone,
     force: false as const,
-  } satisfies StoredIntervalLoop;
+  } satisfies StoredLoop;
 }
 
-export function renderLoopStatusSchedule(loop: IntervalLoopStatus | StoredIntervalLoop) {
+export function renderLoopStatusSchedule(loop: IntervalLoopStatus | StoredLoop) {
   if (loop.kind === "calendar") {
     return `schedule: \`${formatCalendarLoopSchedule({
       cadence: loop.cadence,
@@ -144,7 +189,33 @@ export function renderLoopStatusSchedule(loop: IntervalLoopStatus | StoredInterv
   return `interval: \`${formatLoopIntervalShort(loop.intervalMs)}\``;
 }
 
-export function renderLoopStartedMessage(params: {
+function formatLoopLocalDateTime(timestampMs: number, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(timestampMs));
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")} ${value("hour")}:${value("minute")} ${timezone}`;
+}
+
+function renderCalendarFirstRunLine(params: {
+  nextRunAt?: number;
+  timezone?: string;
+}) {
+  const nextRunAt = params.nextRunAt ?? 0;
+  const utc = new Date(nextRunAt).toISOString();
+  if (!params.timezone) {
+    return `next run: \`${utc}\``;
+  }
+  return `next run: \`${formatLoopLocalDateTime(nextRunAt, params.timezone)}\` (${utc})`;
+}
+
+type LoopStartedMessageParams = {
   mode: "times" | "interval" | "calendar";
   count?: number;
   intervalMs?: number;
@@ -152,27 +223,37 @@ export function renderLoopStartedMessage(params: {
   timezone?: string;
   nextRunAt?: number;
   maintenancePrompt: boolean;
+  cancelCommand?: string;
   loopId?: string;
   maxRuns?: number;
   sessionLoopCount?: number;
   globalLoopCount?: number;
   warning?: string;
-  cancelCommand?: string;
   firstRunNote?: string;
-}) {
-  if (params.mode === "times") {
-    const count = params.count ?? 1;
-    return [
-      `Started loop for ${count} iteration${count === 1 ? "" : "s"}.`,
-      params.maintenancePrompt ? "prompt: `LOOP.md`" : "prompt: custom",
-      "Runs are queued immediately in order.",
-    ].join("\n");
-  }
+};
 
+function renderTimezoneCorrectionLine(params: LoopStartedMessageParams) {
+  if (params.mode !== "calendar" || !params.cancelCommand || !params.loopId) {
+    return undefined;
+  }
+  return `If timezone is wrong: cancel with \`${params.cancelCommand} ${params.loopId}\`, ask me to set the correct timezone, then create this loop again.`;
+}
+
+function renderTimesLoopStartedMessage(params: LoopStartedMessageParams) {
+  const count = params.count ?? 1;
+  return [
+    `Started loop for ${count} iteration${count === 1 ? "" : "s"}.`,
+    params.maintenancePrompt ? "prompt: `LOOP.md`" : "prompt: custom",
+    "Runs are queued immediately in order.",
+  ].join("\n");
+}
+
+function renderRecurringLoopStartedMessage(params: LoopStartedMessageParams) {
   const scheduleText =
     params.mode === "calendar"
       ? params.scheduleText ?? "scheduled"
       : `every ${formatLoopIntervalShort(params.intervalMs ?? 0)}`;
+  const timezoneCorrectionLine = renderTimezoneCorrectionLine(params);
 
   return [
     `Started loop \`${params.loopId ?? ""}\` ${scheduleText}.`,
@@ -185,12 +266,23 @@ export function renderLoopStartedMessage(params: {
     ...(params.cancelCommand && params.loopId
       ? [`cancel: \`${params.cancelCommand} ${params.loopId}\``]
       : []),
+    ...(timezoneCorrectionLine ? [timezoneCorrectionLine] : []),
     ...(params.warning ? [`warning: ${params.warning}`] : []),
     params.firstRunNote ??
       (params.mode === "calendar"
-        ? `The first run is scheduled for \`${new Date(params.nextRunAt ?? 0).toISOString()}\`.`
+        ? renderCalendarFirstRunLine({
+            nextRunAt: params.nextRunAt,
+            timezone: params.timezone,
+          })
         : "The first run starts now."),
   ].join("\n");
+}
+
+export function renderLoopStartedMessage(params: LoopStartedMessageParams) {
+  if (params.mode === "times") {
+    return renderTimesLoopStartedMessage(params);
+  }
+  return renderRecurringLoopStartedMessage(params);
 }
 
 export function summarizeLoopPrompt(text: string, maintenancePrompt: boolean) {

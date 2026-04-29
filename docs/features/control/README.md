@@ -27,6 +27,7 @@ Those belong to auth, because control is a surface that consumes auth decisions 
 - inspect flows
 - attach flows
 - restart and stop flows
+- authorized chat-channel recovery ingress for the same control semantics
 - health and debug views
 - inspect and cancel persisted managed loops
 - operator-safe intervention points
@@ -65,6 +66,7 @@ The tmux inspection path now has a first-class runner debug CLI for list, inspec
 Current control follow-on work is still broader than that shipped slice:
 
 - richer intervention actions
+- chat-channel recovery commands for current-session runner restart or reset
 - explicit health and recovery flows
 - config reload watch behavior
 

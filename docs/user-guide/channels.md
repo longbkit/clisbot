@@ -1,131 +1,97 @@
 # Routes
 
-## Purpose
+## Mental Model
 
-Use this page for routed Slack and Telegram behavior during setup, debugging, and live operation.
+Use `clisbot routes ...` to manage inbound surfaces under one bot.
 
-Official operator surface:
+Think about routes in two layers:
 
-- `clisbot routes ...`
+1. admit a surface
+2. decide who may talk inside that surface
 
-Mental model:
+Inside stored bot config, those surfaces are split as:
 
-- bots define provider identity and bot-wide defaults
-- routes admit specific inbound surfaces under a bot
-- a route may inherit the bot fallback agent or override it
+- `directMessages`
+- `groups`
 
-## Route Ids
+## Preferred CLI Route Ids
 
-Slack route ids:
+Slack:
 
-- `channel:<channelId>`
-- `group:<groupId>`
-- `dm:<userId|*>`
+- shared surface: `group:<id>`
+- shared wildcard: `group:*`
+- DM: `dm:<userId>`
+- DM wildcard: `dm:*`
 
-Telegram route ids:
+Telegram:
 
-- `group:<chatId>`
-- `topic:<chatId>:<topicId>`
-- `dm:<userId|*>`
+- shared chat: `group:<chatId>`
+- topic: `topic:<chatId>:<topicId>`
+- shared wildcard: `group:*`
+- DM: `dm:<userId>`
+- DM wildcard: `dm:*`
 
-Examples:
+Compatibility:
 
-- `channel:C1234567890`
-- `group:G1234567890`
-- `dm:U1234567890`
-- `group:-1001234567890`
-- `topic:-1001234567890:42`
-- `dm:1276408333`
+- `channel:<id>` is still accepted for older Slack operator flows
+- stored config no longer uses those prefixes inside bot route maps
 
-## Route Commands
-
-Common commands:
-
-```bash
-clisbot routes list
-clisbot routes add --channel slack channel:C1234567890 --bot default
-clisbot routes add --channel slack group:G1234567890 --bot default
-clisbot routes add --channel telegram group:-1001234567890 --bot default
-clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
-clisbot routes add --channel telegram dm:* --bot default
-clisbot routes set-agent --channel slack channel:C1234567890 --bot default --agent support
-clisbot routes set-policy --channel telegram group:-1001234567890 --bot default --policy open
-clisbot routes set-require-mention --channel slack channel:C1234567890 --bot default --value false
-clisbot routes set-allow-bots --channel telegram topic:-1001234567890:42 --bot default --value true
-clisbot routes add-allow-user --channel slack channel:C1234567890 --bot default --user U_OWNER
-clisbot routes add-block-user --channel telegram group:-1001234567890 --bot default --user 1276408333
-clisbot routes set-follow-up-mode --channel slack channel:C1234567890 --bot default --mode mention-only
-clisbot routes set-follow-up-ttl --channel telegram topic:-1001234567890:42 --bot default --minutes 10
-clisbot routes set-response-mode --channel slack channel:C1234567890 --bot default --mode message-tool
-clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue
-```
-
-Behavior rules:
-
-- `add` is create-only
-- if the route already exists, use the matching `set-<key>` command
-- route-local overrides only work after the route exists
-- `dm:*` owns DM admission fields: `policy`, `allowUsers`, `blockUsers`, and effective enabled state
-- exact DM routes such as `dm:U1234567890` or `dm:1276408333` are behavior-only overrides and must not be used for DM auth mutation
-
-## Route Policy
-
-Typical meanings:
-
-- `policy: "open"`: the route is admitted and open to allowed senders
-- `policy: "allowlist"`: the route is admitted but sender access is restricted
-- `policy: "pairing"`: DM-only policy that requires pairing unless auth bypasses it
-- `policy: "disabled"`: the route is configured but inactive
-
-Common defaults:
-
-- Slack public or private shared surfaces usually start with `requireMention: true`
-- Telegram groups and topics usually start with `requireMention: true`
-- DM routes usually start with `requireMention: false`
-
-DM-specific rule:
-
-- pair or allow a DM sender on `dm:*`
-- block a DM sender on `dm:*` too
-- use exact DM routes only for per-user behavior overrides such as `agentId`, `streaming`, `responseMode`, `additionalMessageMode`, `followUp`, `verbose`, or `timezone`
-- pairing approval also lands on the requesting bot's `dm:*` allowUsers, so DM admission stays in one place
-
-## Route Ownership
-
-Routes live under each bot:
+## Stored Config Shape
 
 ```json
 {
   "bots": {
     "slack": {
       "default": {
-        "groups": {
-          "channel:C_GENERAL": {
-            "enabled": true,
-            "policy": "open",
-            "requireMention": false,
-            "agentId": "support"
-          }
-        },
+        "channelPolicy": "allowlist",
+        "groupPolicy": "allowlist",
         "directMessages": {
-          "dm:*": {
+          "*": {
             "enabled": true,
             "policy": "pairing"
+          },
+          "U1234567890": {
+            "enabled": true,
+            "policy": "allowlist",
+            "allowUsers": ["U1234567890"]
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "policy": "open"
+          },
+          "C1234567890": {
+            "enabled": true,
+            "policy": "allowlist",
+            "allowUsers": ["U_OWNER"]
           }
         }
       }
     },
     "telegram": {
       "default": {
+        "groupPolicy": "allowlist",
+        "directMessages": {
+          "*": {
+            "enabled": true,
+            "policy": "pairing"
+          }
+        },
         "groups": {
+          "*": {
+            "enabled": true,
+            "policy": "open",
+            "topics": {}
+          },
           "-1001234567890": {
             "enabled": true,
             "policy": "allowlist",
+            "allowUsers": ["1276408333"],
             "topics": {
               "42": {
                 "enabled": true,
-                "policy": "open",
-                "agentId": "support"
+                "policy": "open"
               }
             }
           }
@@ -136,54 +102,74 @@ Routes live under each bot:
 }
 ```
 
-## Conversation Commands
+## Policy Rules
 
-Useful commands inside routed Slack and Telegram conversations:
+### Shared surfaces
 
-- `/start`
-- `/help`
-- `/status`
-- `/whoami`
-- `/stop`
-- `/nudge`
-- `/followup status`
-- `/followup mention-only` or `/mention`
-- `/followup mention-only channel` or `/mention channel`
-- `/followup mention-only all` or `/mention all`
-- `/followup auto`
-- `/followup pause` or `/pause`
-- `/followup resume` or `/resume`
+- `disabled` means silent for everyone
+- normal users need the shared surface itself to exist when `groupPolicy` or Slack `channelPolicy` is `allowlist`
+- after admission, effective sender policy comes from:
+  - `groups["*"]`
+  - plus the exact shared route
+- `allowUsers` and `blockUsers` are enforced before the runner sees the message
+- default admission is `allowlist`; default in-group sender policy is `open`
 
-Useful rule of thumb:
+### Shared owner/admin behavior
 
-- use route config for admission and route-local behavior
-- use auth roles for privileged actions such as `/bash`
+- app `owner` and app `admin` may use enabled shared surfaces even when allowlist would reject normal users
+- `blockUsers` still wins
+- `disabled` still wins
 
-## Transcript And Bash Rules
+### Shared deny behavior
 
-Current rule split:
+When a shared allowlist rejects a sender, the bot replies:
 
-- transcript visibility is route-local through `verbose`
-- `/bash` depends on resolved auth permissions such as `shellExecute`
+`You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to \`allowUsers\` for this surface.`
 
-Use:
+### DM surfaces
 
-- `clisbot auth --help` for auth mutations
-- `clisbot routes --help` for route mutations
+- `directMessages["*"]` is the normal DM default
+- pairing approval writes to that requesting bot's wildcard DM route
+- exact DM routes may now carry both behavior overrides and per-user admission overrides when needed
 
-## Follow-up And Mode Overrides
+## Invariants
 
-Route-local overrides can control:
+- preferred operator ids are `group:<id>`, `group:*`, `dm:<id|*>`, and `topic:<chatId>:<topicId>`
+- Slack `channel:<id>` remains accepted only so existing operator muscle memory and old scripts do not break immediately
+- stored config under one bot never uses those prefixes anymore
+- `group:*` is the default multi-user sender policy node, not an optional convenience alias
+- the deny reply says `group` even for Slack channels and Telegram topics by design
 
-- `followUp.mode`
-- `followUp.participationTtlMin`
-- `responseMode`
-- `additionalMessageMode`
-- `streaming`
-- `surfaceNotifications`
-- `verbose`
+## Common Commands
 
-That gives one simple pattern:
+```bash
+clisbot routes list
+clisbot routes add --channel slack group:C1234567890 --bot default
+clisbot routes add --channel telegram group:-1001234567890 --bot default
+clisbot routes add --channel telegram group:-1001234567890 --bot alerts --require-mention false --allow-bots true --policy allowlist
+clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
+clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support
+clisbot routes set-policy --channel slack group:* --bot default --policy allowlist
+clisbot routes add-allow-user --channel slack group:* --bot default --user U_OWNER
+clisbot routes add-allow-user --channel telegram group:* --bot alerts --user 1276408333
+clisbot routes add-block-user --channel telegram group:-1001234567890 --bot default --user 1276408333
+clisbot routes set-policy --channel telegram dm:* --bot default --policy pairing
+clisbot routes add-allow-user --channel slack dm:U1234567890 --bot default --user U1234567890
+```
 
-- set stable behavior on the bot
-- override only the few routes that need something different
+## Practical Guidance
+
+- use `group:*` when you want one default sender rule for all shared surfaces under a bot
+- use `routes add-allow-user ... group:* ...` when one user should be allowed in every admitted group under that bot
+- use `routes add ... --policy allowlist --require-mention false --allow-bots true` when a new group route should be created with those settings in one command
+- use one exact shared route when you want to admit only one Slack channel, Slack group, Telegram group, or Telegram topic
+- use `bots set-group-policy --policy allowlist` when groups must be explicitly added before use
+- use `routes set-policy group:<id> --policy allowlist` when only some users may speak inside that group
+- keep `disabled` for admission policy or exact routes where the bot should never answer at all
+
+## Related Docs
+
+- [Bots And Credentials](bots-and-credentials.md)
+- [CLI Commands](cli-commands.md)
+- [Authorization And Roles](auth-and-roles.md)
+- [Surface Policy Shape Standardization And 0.1.43 Compatibility](../tasks/features/configuration/2026-04-24-surface-policy-shape-standardization-and-0.1.43-compatibility.md)

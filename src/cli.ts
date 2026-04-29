@@ -15,6 +15,8 @@ export type ParsedCliCommand =
   | { name: "stop"; hard: boolean }
   | { name: "status" }
   | { name: "logs"; lines: number }
+  | { name: "update"; args: string[] }
+  | { name: "timezone"; args: string[] }
   | { name: "bots"; args: string[] }
   | { name: "routes"; args: string[] }
   | { name: "channels"; args: string[] }
@@ -67,6 +69,20 @@ export function parseCliArgs(argv: string[]): ParsedCliCommand {
     return {
       name: "logs",
       lines: parseLineCount(args.slice(1)),
+    };
+  }
+
+  if (command === "update") {
+    return {
+      name: "update",
+      args: args.slice(1),
+    };
+  }
+
+  if (command === "timezone") {
+    return {
+      name: "timezone",
+      args: args.slice(1),
     };
   }
 
@@ -187,6 +203,11 @@ export function renderCliHelp() {
     "  Raw token input on `start` is only for cold start unless you also pass --persist.",
     "  Fresh bootstrap only enables channels named by flags; ambient env vars alone do not auto-enable extra channels.",
     "",
+    "Working hints:",
+    `  Add extra workspaces with ${renderCliCommand("agents add <id> --cli <codex|claude|gemini>", { inline: true })}, then point traffic with ${renderCliCommand("bots set-agent ...", { inline: true })} or ${renderCliCommand("routes set-agent ...", { inline: true })}.`,
+    `  For shared Slack/Telegram surfaces, the usual flow is ${renderCliCommand("routes add ...", { inline: true })} -> ${renderCliCommand("routes set-agent ...", { inline: true })} -> optional follow-up or allowlist tuning.`,
+    `  For fast runner debugging, start with ${renderCliCommand("runner list", { inline: true })} and ${renderCliCommand("runner watch --latest", { inline: true })}.`,
+    "",
     "Usage:",
     `  ${renderCliCommand("start [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]")}`,
     "               [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
@@ -196,6 +217,8 @@ export function renderCliHelp() {
     `  ${renderCliCommand("status")}`,
     `  ${renderCliCommand("version")}`,
     `  ${renderCliCommand("logs [--lines N]")}`,
+    `  ${renderCliCommand("update --help")}`,
+    `  ${renderCliCommand("timezone <get|set|clear|doctor>")}`,
     `  ${renderCliCommand("bots <subcommand>")}`,
     `  ${renderCliCommand("routes <subcommand>")}`,
     `  ${renderCliCommand("loops <subcommand>")}`,
@@ -219,13 +242,15 @@ export function renderCliHelp() {
     "  status             Show runtime process, config, log, tmux socket status, and recent runner sessions.",
     "  version            Show the installed clisbot version.",
     "  logs               Print the most recent clisbot log lines.",
+    "  update             Print the AI-readable package update guide and release/migration doc links.",
+    `                     See ${renderCliCommand("update --help", { inline: true })} before asking an agent to update clisbot.`,
+    "  timezone           Manage the app-wide wall-clock timezone used by schedules and loops.",
+    `                     See ${renderCliCommand("timezone --help", { inline: true })} for override guidance.`,
     "  bots               Manage provider bot identities, credentials, and bot-level fallback settings.",
     "                     list|add|get|enable|disable|remove|get-default|set-default",
     "                     get-agent|set-agent|clear-agent",
     "                     get-credentials-source|set-credentials",
     "                     get-dm-policy|set-dm-policy",
-    "                     get-group-policy|set-group-policy",
-    "                     get-channel-policy|set-channel-policy (Slack only)",
     `                     See ${renderCliCommand("bots --help", { inline: true })} for examples and credential behavior.`,
     "  routes             Manage admitted inbound surfaces under each bot.",
     "                     list|add|get|enable|disable|remove",

@@ -103,7 +103,7 @@ Live proof on April 5, 2026:
 ### Preconditions
 
 - the Slack app is present in a multi-person direct group
-- the group route is allowed by `groupPolicy` or an explicit `groups` route
+- the explicit `group:<id>` route exists for that Slack multi-person direct group
 
 ### Steps
 
@@ -141,7 +141,7 @@ Live proof on April 5, 2026:
 ### Preconditions
 
 - one Slack DM route exists
-- `bots.slack.default.directMessages."*".policy: "pairing"`
+- `bots.slack.default.directMessages["*"].policy: "pairing"`
 - the test sender is not already present in config `allowFrom`
 - the test sender is not already approved in `~/.clisbot/state/pairing`
 
@@ -208,7 +208,7 @@ Live proof on April 5, 2026:
 ### Preconditions
 
 - one Slack DM route exists
-- `bots.slack.default.directMessages."*".policy: "allowlist"`
+- `bots.slack.default.directMessages["*"].policy: "allowlist"`
 - the test sender is not present in config `allowFrom`
 - the test sender is not present in the pairing allowlist store
 
@@ -412,7 +412,7 @@ Live proof on April 5, 2026:
 ### Preconditions
 
 - the routed Slack or Telegram surface uses a live agent route
-- `control.loop.defaultTimezone` is configured, or the route has an explicit timezone override
+- `app.timezone` is configured, or the route has an explicit timezone override
 
 ### Steps
 

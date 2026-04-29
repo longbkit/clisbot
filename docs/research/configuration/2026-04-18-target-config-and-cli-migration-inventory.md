@@ -16,6 +16,23 @@ related:
 
 # Goal
 
+## Historical Note
+
+This research doc records the 2026-04-18 migration inventory and proposal work.
+
+It is not the stable contract source. For the current contract, use:
+
+- `README.md`
+- `docs/features/configuration/README.md`
+- `docs/user-guide/channels.md`
+- `docs/user-guide/cli-commands.md`
+
+Compatibility note:
+
+- older proposal examples in this doc may show prefixed route keys such as `channel:<id>`, `group:<id>`, or `dm:*`
+- current canonical stored JSON uses raw ids under `groups` and `directMessages`
+- operator-facing route ids still use `group:*`, `dm:*`, and `topic:<chatId>:<topicId>`
+
 Refactor the runtime and operator surfaces so the product reads like this:
 
 1. `app`
@@ -157,12 +174,12 @@ without learning a different naming model for each surface.
 
 | Current path | Target path | Notes |
 | --- | --- | --- |
-| `channels.slack.channels.<id>` | `bots.slack.<botId>.groups."channel:<id>"` or `routes.slack."channel:<id>"` | choose one canonical route storage shape |
-| `channels.slack.groups.<id>` | `bots.slack.<botId>.groups."group:<id>"` or `routes.slack."group:<id>"` | same shape family |
+| `channels.slack.channels.<id>` | `bots.slack.<botId>.groups."<id>"` or `routes.slack."<id>"` | current canonical stored keys use raw ids; older prefixed keys remain compatibility inputs only |
+| `channels.slack.groups.<id>` | `bots.slack.<botId>.groups."<id>"` or `routes.slack."<id>"` | same ownership rule; CLI may still accept compatibility aliases like `channel:<id>` or `group:<id>` |
 | `channels.telegram.groups.<chatId>` | `bots.telegram.<botId>.groups."<chatId>"` or `routes.telegram."<chatId>"` | same ownership rule |
 | `channels.telegram.groups.<chatId>.topics.<topicId>` | topic child under target route shape | preserve Telegram topic override |
-| `channels.slack.directMessages` | bot DM config under `bots.slack.<botId>.directMessages` | direct DM policy should live on bot |
-| `channels.telegram.directMessages` | bot DM config under `bots.telegram.<botId>.directMessages` | same |
+| `channels.slack.directMessages` | bot DM config under `bots.slack.<botId>.directMessages` | current canonical default key is `directMessages["*"]` |
+| `channels.telegram.directMessages` | bot DM config under `bots.telegram.<botId>.directMessages` | current canonical default key is `directMessages["*"]` |
 
 # Current Code Ownership Map
 

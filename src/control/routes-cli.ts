@@ -1,4 +1,9 @@
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
+import {
+  formatTimezoneLocalTime,
+  parseTimezone,
+  resolveConfigTimezone,
+} from "../config/timezone.ts";
 import type {
   BotRouteConfig,
   ClisbotConfig,
@@ -7,26 +12,51 @@ import type {
 import {
   createDirectMessageBehaviorOverride,
   ensureBotDirectMessageWildcardRoute,
-  isDirectMessageWildcardRouteId,
-  isExactDirectMessageRouteId,
+  normalizeDirectMessageRouteId,
 } from "../config/direct-message-routes.ts";
-import { renderCliCommand } from "../shared/cli-name.ts";
+import {
+  getSharedGroupsWildcardRouteId,
+  isSharedGroupsWildcardRouteId,
+  normalizeSharedGroupRouteId,
+} from "../config/group-routes.ts";
+import {
+  renderSlackRouteIdSyntax,
+  renderTelegramRouteIdSyntax,
+} from "../config/route-contract.ts";
+import { renderRoutesHelp } from "./routes-cli-help.ts";
 
 type Provider = "slack" | "telegram";
-type RouteNode = BotRouteConfig | TelegramBotConfig["groups"][string] | TelegramBotConfig["groups"][string]["topics"][string];
+type RouteNode =
+  | BotRouteConfig
+  | TelegramBotConfig["groups"][string]
+  | TelegramBotConfig["groups"][string]["topics"][string];
+
+type ParsedRouteId =
+  | {
+      provider: "slack";
+      routeId: string;
+      storage: "groups";
+      key: string;
+      kind: "group";
+    }
+  | {
+      provider: "telegram";
+      routeId: string;
+      storage: "groups";
+      key: string;
+      kind: "group" | "topic";
+      topicId?: string;
+    }
+  | {
+      provider: "slack" | "telegram";
+      routeId: string;
+      storage: "directMessages";
+      key: string;
+      kind: "dm";
+    };
 
 function getEditableConfigPath() {
   return process.env.CLISBOT_CONFIG_PATH;
-}
-
-function getSlackBots(config: ClisbotConfig) {
-  const { defaults, ...bots } = config.bots.slack;
-  return bots;
-}
-
-function getTelegramBots(config: ClisbotConfig) {
-  const { defaults, ...bots } = config.bots.telegram;
-  return bots;
 }
 
 function parseOptionValue(args: string[], name: string) {
@@ -58,9 +88,15 @@ const ROUTE_ARGUMENT_FLAGS = new Set([
   "--mode",
   "--minutes",
   "--user",
+  "--timezone",
 ]);
 
 function findRouteArgument(args: string[]) {
+  return findPositionalArgs(args)[0];
+}
+
+function findPositionalArgs(args: string[]) {
+  const positional: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (!arg) {
@@ -73,10 +109,9 @@ function findRouteArgument(args: string[]) {
     if (arg.startsWith("--")) {
       continue;
     }
-    return arg;
+    positional.push(arg);
   }
-
-  return undefined;
+  return positional;
 }
 
 function parseBoolean(value: string | undefined, fallback?: boolean) {
@@ -93,6 +128,21 @@ function parseBoolean(value: string | undefined, fallback?: boolean) {
     return false;
   }
   throw new Error("Expected true or false.");
+}
+
+function validateRoutePolicy(parsed: ParsedRouteId, policy: string | undefined) {
+  if (!policy) {
+    return undefined;
+  }
+  const allowedPolicies = parsed.storage === "directMessages"
+    ? ["disabled", "pairing", "allowlist", "open"]
+    : ["disabled", "allowlist", "open"];
+  if (allowedPolicies.includes(policy)) {
+    return policy;
+  }
+  throw new Error(
+    `${parsed.routeId} policy must be one of: ${allowedPolicies.join(", ")}`,
+  );
 }
 
 function parseProvider(args: string[]) {
@@ -118,16 +168,8 @@ function getBotId(args: string[]) {
   return parseOptionValue(args, "--bot") ?? "default";
 }
 
-function getSlackBot(config: ClisbotConfig, botId: string) {
-  return config.bots.slack[botId];
-}
-
-function getTelegramBot(config: ClisbotConfig, botId: string) {
-  return config.bots.telegram[botId];
-}
-
 function ensureSlackBot(config: ClisbotConfig, botId: string) {
-  const bot = getSlackBot(config, botId);
+  const bot = config.bots.slack[botId];
   if (!bot) {
     throw new Error(`Unknown Slack bot: ${botId}`);
   }
@@ -135,18 +177,12 @@ function ensureSlackBot(config: ClisbotConfig, botId: string) {
 }
 
 function ensureTelegramBot(config: ClisbotConfig, botId: string) {
-  const bot = getTelegramBot(config, botId);
+  const bot = config.bots.telegram[botId];
   if (!bot) {
     throw new Error(`Unknown Telegram bot: ${botId}`);
   }
   return bot;
 }
-
-type ParsedRouteId =
-  | { provider: "slack"; routeId: string; storage: "groups"; key: string; kind: "channel" | "group" | "dm" }
-  | { provider: "telegram"; routeId: string; storage: "groups"; key: string; topicId?: string; kind: "group" | "topic" }
-  | { provider: "telegram"; routeId: string; storage: "directMessages"; key: string; kind: "dm" }
-  | { provider: "slack"; routeId: string; storage: "directMessages"; key: string; kind: "dm" };
 
 function parseRouteId(provider: Provider, raw: string | undefined): ParsedRouteId {
   const routeId = raw?.trim();
@@ -154,58 +190,76 @@ function parseRouteId(provider: Provider, raw: string | undefined): ParsedRouteI
     throw new Error(renderRoutesHelp());
   }
 
-  if (provider === "slack") {
-    const [kind, id] = routeId.split(":", 2);
-    if ((kind === "channel" || kind === "group" || kind === "dm") && id?.trim()) {
-      if (kind === "dm") {
-        return { provider, routeId, storage: "directMessages", key: routeId, kind };
-      }
-      return { provider, routeId, storage: "groups", key: routeId, kind };
-    }
-    throw new Error("Slack route ids must use channel:<id>, group:<id>, or dm:<id|*>.");
+  if (routeId === "*" || routeId === "group:*" || isSharedGroupsWildcardRouteId(routeId)) {
+    return {
+      provider,
+      routeId: "group:*",
+      storage: "groups",
+      key: getSharedGroupsWildcardRouteId(),
+      kind: "group",
+    };
   }
 
   const [kind, first, second] = routeId.split(":", 3);
-  if (kind === "group" && first?.trim()) {
-    return { provider, routeId, storage: "groups", key: first.trim(), kind };
-  }
-  if (kind === "topic" && first?.trim() && second?.trim()) {
+  if (kind === "dm" && first?.trim()) {
     return {
       provider,
-      routeId,
+      routeId: first.trim() === "*" ? "dm:*" : `dm:${first.trim()}`,
+      storage: "directMessages",
+      key: normalizeDirectMessageRouteId(first.trim()),
+      kind: "dm",
+    };
+  }
+  if (kind === "topic" && provider === "telegram" && first?.trim() && second?.trim()) {
+    return {
+      provider,
+      routeId: `topic:${first.trim()}:${second.trim()}`,
       storage: "groups",
       key: first.trim(),
       topicId: second.trim(),
       kind: "topic",
     };
   }
-  if (kind === "dm" && first?.trim()) {
-    return { provider, routeId, storage: "directMessages", key: routeId, kind: "dm" };
+  if (
+    (kind === "group" || (provider === "slack" && kind === "channel")) &&
+    first?.trim()
+  ) {
+    return {
+      provider,
+      routeId: `group:${first.trim()}`,
+      storage: "groups",
+      key: normalizeSharedGroupRouteId(provider, `${kind}:${first.trim()}`),
+      kind: "group",
+    };
   }
-  throw new Error("Telegram route ids must use group:<chatId>, topic:<chatId>:<topicId>, or dm:<id|*>.");
+
+  if (provider === "slack") {
+    throw new Error(`Slack route ids must use ${renderSlackRouteIdSyntax()}.`);
+  }
+  throw new Error(`Telegram route ids must use ${renderTelegramRouteIdSyntax()}.`);
 }
 
 function parseCommandRoute(args: string[], provider: Provider) {
   return parseRouteId(provider, findRouteArgument(args));
 }
 
-function isExactDirectMessageRoute(parsed: ParsedRouteId) {
-  return parsed.storage === "directMessages" && isExactDirectMessageRouteId(parsed.routeId);
+function isSharedWildcardRoute(parsed: ParsedRouteId) {
+  return parsed.storage === "groups" && parsed.key === getSharedGroupsWildcardRouteId();
 }
 
-function rejectExactDirectMessageAdmissionChange(parsed: ParsedRouteId, action: string) {
-  if (!isExactDirectMessageRoute(parsed)) {
+function rejectSharedWildcardRemoval(parsed: ParsedRouteId) {
+  if (!isSharedWildcardRoute(parsed)) {
     return;
   }
 
   throw new Error(
-    `Direct-message admission for ${parsed.routeId} is managed on dm:* only. ${action} is not allowed on exact DM routes.`,
+    "Default shared route group:* always exists. Update or disable it instead of removing it.",
   );
 }
 
 function createBaseRoute(kind: ParsedRouteId["kind"], policy?: string): BotRouteConfig {
   const route: BotRouteConfig = {
-    enabled: true,
+    enabled: kind !== "group" ? true : policy !== "disabled",
     requireMention: kind === "dm" ? false : true,
     allowUsers: [],
     blockUsers: [],
@@ -217,14 +271,18 @@ function createBaseRoute(kind: ParsedRouteId["kind"], policy?: string): BotRoute
   return route;
 }
 
-function createRouteConfig(parsed: ParsedRouteId, policy?: string) {
-  if (isExactDirectMessageRoute(parsed)) {
-    if (policy) {
-      rejectExactDirectMessageAdmissionChange(parsed, "Setting policy");
-    }
-    return createDirectMessageBehaviorOverride();
+function createDirectMessageRoute(
+  config: ClisbotConfig,
+  provider: Provider,
+  botId: string,
+  policy?: string,
+) {
+  const wildcardRoute = ensureBotDirectMessageWildcardRoute(config, provider, botId);
+  const route = createDirectMessageBehaviorOverride(wildcardRoute);
+  if (policy) {
+    route.policy = policy as BotRouteConfig["policy"];
   }
-  return createBaseRoute(parsed.kind, policy);
+  return route;
 }
 
 function getOrCreateRoute(
@@ -238,7 +296,13 @@ function getOrCreateRoute(
     const bot = ensureSlackBot(config, botId);
     if (parsed.storage === "directMessages") {
       if (!bot.directMessages[parsed.key] && options.create) {
-        bot.directMessages[parsed.key] = createRouteConfig(parsed, options.policy);
+        const createdRoute = createDirectMessageRoute(
+          config,
+          provider,
+          botId,
+          options.policy,
+        );
+        bot.directMessages[parsed.key] = createdRoute;
       }
       return bot.directMessages[parsed.key];
     }
@@ -251,14 +315,20 @@ function getOrCreateRoute(
   const bot = ensureTelegramBot(config, botId);
   if (parsed.storage === "directMessages") {
     if (!bot.directMessages[parsed.key] && options.create) {
-      bot.directMessages[parsed.key] = createRouteConfig(parsed, options.policy);
+      const createdRoute = createDirectMessageRoute(
+        config,
+        provider,
+        botId,
+        options.policy,
+      );
+      bot.directMessages[parsed.key] = createdRoute;
     }
     return bot.directMessages[parsed.key];
   }
 
   if (!bot.groups[parsed.key] && options.create) {
     bot.groups[parsed.key] = {
-      ...createBaseRoute(parsed.kind, parsed.kind === "group" ? options.policy : "disabled"),
+      ...createBaseRoute("group", parsed.kind === "topic" ? undefined : options.policy),
       topics: {},
     };
   }
@@ -266,11 +336,11 @@ function getOrCreateRoute(
   if (!group) {
     return undefined;
   }
-  if (!("topicId" in parsed) || !parsed.topicId) {
+  if (parsed.kind !== "topic" || !parsed.topicId) {
     return group;
   }
   if (!group.topics[parsed.topicId] && options.create) {
-    group.topics[parsed.topicId] = createBaseRoute(parsed.kind, options.policy);
+    group.topics[parsed.topicId] = createBaseRoute("topic", options.policy);
   }
   return group.topics[parsed.topicId];
 }
@@ -288,56 +358,22 @@ function ensureRoute(
   return route;
 }
 
-function renderRoutesHelp() {
-  return [
-    renderCliCommand("routes"),
-    "",
-    "Usage:",
-    `  ${renderCliCommand("routes --help")}`,
-    `  ${renderCliCommand("routes help")}`,
-    `  ${renderCliCommand("routes list [--channel <slack|telegram>] [--bot <id>] [--json]")}`,
-    `  ${renderCliCommand("routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
-    `  ${renderCliCommand("routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
-    `  ${renderCliCommand("routes get --channel <slack|telegram> <route-id> [--bot <id>] [--json]")}`,
-    `  ${renderCliCommand("routes enable --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes disable --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes remove --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes get-agent --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-agent --channel <slack|telegram> <route-id> [--bot <id>] --agent <id>")}`,
-    `  ${renderCliCommand("routes clear-agent --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes get-policy --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-policy --channel <slack|telegram> <route-id> [--bot <id>] --policy <...>")}`,
-    `  ${renderCliCommand("routes get-require-mention --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-require-mention --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>")}`,
-    `  ${renderCliCommand("routes get-allow-bots --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-allow-bots --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>")}`,
-    `  ${renderCliCommand("routes add-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
-    `  ${renderCliCommand("routes remove-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
-    `  ${renderCliCommand("routes add-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
-    `  ${renderCliCommand("routes remove-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>")}`,
-    `  ${renderCliCommand("routes get-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <auto|mention-only|paused>")}`,
-    `  ${renderCliCommand("routes get-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>] --minutes <n>")}`,
-    `  ${renderCliCommand("routes get-response-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-response-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <capture-pane|message-tool>")}`,
-    `  ${renderCliCommand("routes clear-response-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes get-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    `  ${renderCliCommand("routes set-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <queue|steer>")}`,
-    `  ${renderCliCommand("routes clear-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]")}`,
-    "",
-    "Notes:",
-    "  - For DM auth, mutate `dm:*`, not `dm:<userId>`.",
-    "  - Exact DM routes are behavior-only overrides such as agent, streaming, responseMode, followUp, verbose, or timezone.",
-    "  - `set-policy`, `add/remove-allow-user`, and `add/remove-block-user` reject exact DM routes.",
-    "  - `pairing approve <channel> <code>` writes the approved sender into the requesting bot's `dm:*` allowUsers.",
-    "",
-    "Examples:",
-    `  ${renderCliCommand("routes add-allow-user --channel slack dm:* --bot support --user U123ABC456")}`,
-    `  ${renderCliCommand("routes add-block-user --channel telegram dm:* --bot alerts --user 1276408333")}`,
-    `  ${renderCliCommand("routes add-allow-user --channel slack channel:C1234567890 --bot default --user U_OWNER")}`,
-    `  ${renderCliCommand("routes add-block-user --channel telegram group:-1001234567890 --bot default --user 1276408333")}`,
-  ].join("\n");
+function renderRouteId(params: {
+  provider: Provider;
+  storage: "groups" | "directMessages";
+  key: string;
+  topicId?: string;
+}) {
+  if (params.storage === "directMessages") {
+    return params.key === "*" ? "dm:*" : `dm:${params.key}`;
+  }
+  if (params.key === "*") {
+    return "group:*";
+  }
+  if (params.provider === "telegram" && params.topicId) {
+    return `topic:${params.key}:${params.topicId}`;
+  }
+  return `group:${params.key}`;
 }
 
 async function listRoutes(args: string[]) {
@@ -348,38 +384,83 @@ async function listRoutes(args: string[]) {
   const rows: Array<Record<string, unknown>> = [];
 
   if (provider === undefined || provider === "slack") {
-    for (const [botId, bot] of Object.entries(getSlackBots(config))) {
-      if (botIdFilter && botId !== botIdFilter) {
+    for (const [botId, bot] of Object.entries(config.bots.slack)) {
+      if (botId === "defaults" || (botIdFilter && botId !== botIdFilter)) {
         continue;
       }
-      for (const [routeId, route] of Object.entries(bot.groups ?? {})) {
-        rows.push({ channel: "slack", botId, routeId, kind: routeId.split(":", 1)[0], route });
+      for (const [key, route] of Object.entries(bot.groups ?? {})) {
+        rows.push({
+          channel: "slack",
+          botId,
+          routeId: renderRouteId({
+            provider: "slack",
+            storage: "groups",
+            key,
+          }),
+          kind: key === "*" ? "shared" : "group",
+          route,
+        });
       }
-      for (const [routeId, route] of Object.entries(bot.directMessages ?? {})) {
-        rows.push({ channel: "slack", botId, routeId, kind: "dm", route });
+      for (const [key, route] of Object.entries(bot.directMessages ?? {})) {
+        rows.push({
+          channel: "slack",
+          botId,
+          routeId: renderRouteId({
+            provider: "slack",
+            storage: "directMessages",
+            key,
+          }),
+          kind: "dm",
+          route,
+        });
       }
     }
   }
 
   if (provider === undefined || provider === "telegram") {
-    for (const [botId, bot] of Object.entries(getTelegramBots(config))) {
-      if (botIdFilter && botId !== botIdFilter) {
+    for (const [botId, bot] of Object.entries(config.bots.telegram)) {
+      if (botId === "defaults" || (botIdFilter && botId !== botIdFilter)) {
         continue;
       }
-      for (const [chatId, group] of Object.entries(bot.groups ?? {})) {
-        rows.push({ channel: "telegram", botId, routeId: `group:${chatId}`, kind: "group", route: group });
+      for (const [key, group] of Object.entries(bot.groups ?? {})) {
+        rows.push({
+          channel: "telegram",
+          botId,
+          routeId: renderRouteId({
+            provider: "telegram",
+            storage: "groups",
+            key,
+          }),
+          kind: key === "*" ? "shared" : "group",
+          route: group,
+        });
         for (const [topicId, topic] of Object.entries(group.topics ?? {})) {
           rows.push({
             channel: "telegram",
             botId,
-            routeId: `topic:${chatId}:${topicId}`,
+            routeId: renderRouteId({
+              provider: "telegram",
+              storage: "groups",
+              key,
+              topicId,
+            }),
             kind: "topic",
             route: topic,
           });
         }
       }
-      for (const [routeId, route] of Object.entries(bot.directMessages ?? {})) {
-        rows.push({ channel: "telegram", botId, routeId, kind: "dm", route });
+      for (const [key, route] of Object.entries(bot.directMessages ?? {})) {
+        rows.push({
+          channel: "telegram",
+          botId,
+          routeId: renderRouteId({
+            provider: "telegram",
+            storage: "directMessages",
+            key,
+          }),
+          kind: "dm",
+          route,
+        });
       }
     }
   }
@@ -407,17 +488,22 @@ async function addRoute(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
   const parsed = parseCommandRoute(args, provider);
-  const policy = parseOptionValue(args, "--policy");
+  const policy = validateRoutePolicy(parsed, parseOptionValue(args, "--policy"));
   const requireMention = parseOptionValue(args, "--require-mention");
   const allowBots = parseOptionValue(args, "--allow-bots");
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
 
   const existing = getOrCreateRoute(config, provider, botId, parsed);
   if (existing) {
-    throw new Error(`Route already exists: ${provider}/${botId}/${parsed.routeId}. Use a matching \`set-<key>\` command instead.`);
+    throw new Error(
+      `Route already exists: ${provider}/${botId}/${parsed.routeId}. Use a matching \`set-<key>\` command instead.`,
+    );
   }
 
-  const route = getOrCreateRoute(config, provider, botId, parsed, { create: true, policy });
+  const route = getOrCreateRoute(config, provider, botId, parsed, {
+    create: true,
+    policy,
+  });
   if (!route) {
     throw new Error(`Failed to create route: ${provider}/${botId}/${parsed.routeId}`);
   }
@@ -444,14 +530,15 @@ async function getRoute(args: string[]) {
     console.log(JSON.stringify(route, null, 2));
     return;
   }
-  console.log(JSON.stringify({ channel: provider, botId, routeId: parsed.routeId, configPath, route }, null, 2));
+  console.log(
+    JSON.stringify({ channel: provider, botId, routeId: parsed.routeId, configPath, route }, null, 2),
+  );
 }
 
 async function setRouteEnabled(args: string[], enabled: boolean) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
   const parsed = parseCommandRoute(args, provider);
-  rejectExactDirectMessageAdmissionChange(parsed, enabled ? "Enabling" : "Disabling");
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const route = ensureRoute(config, provider, botId, parsed);
   route.enabled = enabled;
@@ -464,6 +551,7 @@ async function removeRoute(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
   const parsed = parseCommandRoute(args, provider);
+  rejectSharedWildcardRemoval(parsed);
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   ensureRoute(config, provider, botId, parsed);
 
@@ -478,7 +566,7 @@ async function removeRoute(args: string[]) {
     const bot = ensureTelegramBot(config, botId);
     if (parsed.storage === "directMessages") {
       delete bot.directMessages[parsed.key];
-    } else if ("topicId" in parsed && parsed.topicId) {
+    } else if (parsed.kind === "topic" && parsed.topicId) {
       delete bot.groups[parsed.key]?.topics?.[parsed.topicId];
     } else {
       delete bot.groups[parsed.key];
@@ -512,17 +600,19 @@ async function getSetClearRouteField(args: string[], action: string) {
     await writeEditableConfig(configPath, config);
     console.log(`cleared agent for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-policy") {
-    rejectExactDirectMessageAdmissionChange(parsed, "Reading policy");
     console.log(`${provider}/${botId}/${parsed.routeId} policy: ${route.policy ?? "(default)"}`);
   } else if (action === "set-policy") {
-    rejectExactDirectMessageAdmissionChange(parsed, "Setting policy");
-    const policy = parseOptionValue(args, "--policy");
+    const policy = validateRoutePolicy(parsed, parseOptionValue(args, "--policy"));
     if (!policy) {
       throw new Error(renderRoutesHelp());
     }
     route.policy = policy as BotRouteConfig["policy"];
     await writeEditableConfig(configPath, config);
     console.log(`set policy for ${provider}/${botId}/${parsed.routeId} to ${policy}`);
+  } else if (action === "clear-policy") {
+    delete route.policy;
+    await writeEditableConfig(configPath, config);
+    console.log(`cleared policy for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-require-mention") {
     console.log(`${provider}/${botId}/${parsed.routeId} requireMention: ${route.requireMention ?? "(default)"}`);
   } else if (action === "set-require-mention") {
@@ -589,6 +679,26 @@ async function getSetClearRouteField(args: string[], action: string) {
     delete route.additionalMessageMode;
     await writeEditableConfig(configPath, config);
     console.log(`cleared additionalMessageMode for ${provider}/${botId}/${parsed.routeId}`);
+  } else if (action === "get-timezone") {
+    const bot = provider === "slack" ? ensureSlackBot(config, botId) : ensureTelegramBot(config, botId);
+    const agentId = route.agentId ?? bot.agentId ?? config.agents.defaults.defaultAgentId;
+    const resolved = resolveConfigTimezone({
+      config,
+      agentId,
+      routeTimezone: route.timezone,
+      botTimezone: bot.timezone,
+    });
+    console.log(`${provider}/${botId}/${parsed.routeId} timezone: ${route.timezone ?? "(inherit)"}`);
+    console.log(`effective: ${resolved.timezone} (${resolved.source})`);
+    console.log(`localTime: ${formatTimezoneLocalTime(resolved.timezone)}`);
+  } else if (action === "set-timezone") {
+    route.timezone = parseTimezone(parseOptionValue(args, "--timezone") ?? findPositionalArgs(args)[1]);
+    await writeEditableConfig(configPath, config);
+    console.log(`set timezone for ${provider}/${botId}/${parsed.routeId} to ${route.timezone}`);
+  } else if (action === "clear-timezone") {
+    delete route.timezone;
+    await writeEditableConfig(configPath, config);
+    console.log(`cleared timezone for ${provider}/${botId}/${parsed.routeId}`);
   }
 
   console.log(`config: ${configPath}`);
@@ -598,18 +708,20 @@ async function mutateRouteUsers(args: string[], action: string) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
   const parsed = parseCommandRoute(args, provider);
-  rejectExactDirectMessageAdmissionChange(
-    parsed,
-    action.startsWith("add-") ? "Adding allow/block users" : "Removing allow/block users",
-  );
   const user = parseOptionValue(args, "--user");
   if (!user) {
     throw new Error(renderRoutesHelp());
   }
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
-  const route = parsed.storage === "directMessages" && isDirectMessageWildcardRouteId(parsed.routeId)
-    ? ensureBotDirectMessageWildcardRoute(config, provider, botId)
-    : ensureRoute(config, provider, botId, parsed);
+  const route =
+    parsed.storage === "directMessages" && parsed.key === "*"
+      ? ensureBotDirectMessageWildcardRoute(config, provider, botId)
+      : isSharedWildcardRoute(parsed)
+        ? getOrCreateRoute(config, provider, botId, parsed, { create: true })
+        : ensureRoute(config, provider, botId, parsed);
+  if (!route) {
+    throw new Error(`Unknown route: ${provider}/${botId}/${parsed.routeId}`);
+  }
   const field = action.includes("allow") ? "allowUsers" : "blockUsers";
   const current = Array.from(new Set((route[field] ?? []).filter(Boolean)));
 
@@ -670,6 +782,7 @@ export async function runRoutesCli(args: string[]) {
     action === "clear-agent" ||
     action === "get-policy" ||
     action === "set-policy" ||
+    action === "clear-policy" ||
     action === "get-require-mention" ||
     action === "set-require-mention" ||
     action === "get-allow-bots" ||
@@ -683,7 +796,10 @@ export async function runRoutesCli(args: string[]) {
     action === "clear-response-mode" ||
     action === "get-additional-message-mode" ||
     action === "set-additional-message-mode" ||
-    action === "clear-additional-message-mode"
+    action === "clear-additional-message-mode" ||
+    action === "get-timezone" ||
+    action === "set-timezone" ||
+    action === "clear-timezone"
   ) {
     await getSetClearRouteField(rest, action);
     return;

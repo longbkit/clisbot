@@ -1,5 +1,23 @@
 # OpenClaw CLI Message Command Analysis Details
 
+## Historical Note
+
+This companion note is OpenClaw research support material.
+
+It is not the current `clisbot` command or route contract.
+
+For current `clisbot`, use:
+
+- `docs/user-guide/cli-commands.md`
+- `docs/user-guide/channels.md`
+- `docs/features/channels/README.md`
+
+Compatibility note:
+
+- route examples such as Slack `channel:<id>` and `user:<id>` in this doc are OpenClaw-oriented research examples
+- current `clisbot` prefers `group:<id>` for multi-user Slack surfaces and `dm:<id>` for direct-message operator ids
+- Slack `channel:<id>` remains accepted only as compatibility input in current `clisbot`
+
 This companion note holds the deeper source-backed analysis that supports the compact command reference in:
 
 - [OpenClaw CLI Command Surfaces And Slack Telegram Send Syntax](./2026-04-09-openclaw-cli-command-surfaces-and-slack-telegram-send-syntax.md)
@@ -243,6 +261,8 @@ Slack target formats from docs:
 - `channel:<id>`
 - `user:<id>`
 - raw channel id is accepted
+
+These target examples describe the researched OpenClaw CLI, not the current `clisbot` preferred operator naming.
 
 ## Slack text send path
 

@@ -56,7 +56,7 @@ The first useful slice is:
 - require `--force` to stay attached to the interval clause:
   - `/loop 1m --force check CI`
   - `/loop check deploy every 1m --force`
-- resolve wall-clock loop timezone from route override first, then `control.loop.defaultTimezone`, then host timezone
+- resolve wall-clock loop timezone from one-off loop override, route/topic, agent, bot, `app.timezone`, legacy defaults, then host timezone
 - persist the effective timezone on each wall-clock loop so later config edits do not silently shift old jobs
 - cap every interval loop by `control.loop.maxRunsPerLoop`
 - cap total active interval loops by `control.loop.maxActiveLoops`

@@ -104,7 +104,7 @@ They should stay separate from end-user channel behavior.
 
 ### Steps
 
-1. Run `clisbot loops status --channel slack --target channel:<id> --thread-id <thread-ts>`
+1. Run `clisbot loops status --channel slack --target group:<id> --thread-id <thread-ts>`
 
 ### Expected Results
 
@@ -121,13 +121,14 @@ They should stay separate from end-user channel behavior.
 
 ### Steps
 
-1. Run `clisbot loops create --channel slack --target channel:<id> --thread-id <thread-ts> every day at 07:00 check CI`
-2. Or run `clisbot loops create --channel slack --target channel:<id> --new-thread every day at 07:00 check CI`
-3. For Telegram topic routing, run `clisbot loops create --channel telegram --target <chatId> --topic-id <topicId> every weekday at 07:00 standup`
+1. Run `clisbot loops create --channel slack --target group:<id> --thread-id <thread-ts> --sender slack:<user-id> every day at 07:00 check CI`
+2. Or run `clisbot loops create --channel slack --target group:<id> --new-thread --sender slack:<user-id> every day at 07:00 check CI`
+3. For Telegram topic routing, run `clisbot loops create --channel telegram --target <chatId> --topic-id <topicId> --sender telegram:<user-id> every weekday at 07:00 standup`
 
 ### Expected Results
 
 - the new loop is persisted onto the targeted routed session
+- creation fails without `--sender`, and the persisted recurring loop stores creator metadata
 - Slack `--new-thread` creates a fresh thread anchor first, then persists the loop against that thread target
 - Telegram topic routing uses `--topic-id`, not `--thread-id`
 - the stored loop matches the same parser and validation rules as channel `/loop`
@@ -143,7 +144,7 @@ They should stay separate from end-user channel behavior.
 
 ### Steps
 
-1. Run `clisbot loops --channel slack --target channel:<id> --thread-id <thread-ts> 3 review backlog`
+1. Run `clisbot loops --channel slack --target group:<id> --thread-id <thread-ts> --sender slack:<user-id> 3 review backlog`
 
 ### Expected Results
 
@@ -178,9 +179,9 @@ They should stay separate from end-user channel behavior.
 
 ### Steps
 
-1. Run `clisbot loops cancel --channel slack --target channel:<id> --thread-id <thread-ts> --all`
-2. Run `clisbot loops status --channel slack --target channel:<id> --thread-id <thread-ts>`
-3. Run `clisbot loops cancel --channel slack --target channel:<id> --thread-id <thread-ts> --all --app`
+1. Run `clisbot loops cancel --channel slack --target group:<id> --thread-id <thread-ts> --all`
+2. Run `clisbot loops status --channel slack --target group:<id> --thread-id <thread-ts>`
+3. Run `clisbot loops cancel --channel slack --target group:<id> --thread-id <thread-ts> --all --app`
 4. Run `clisbot loops status`
 
 ### Expected Results

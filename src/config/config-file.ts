@@ -3,8 +3,12 @@ import { dirname } from "node:path";
 import { ensureDir, expandHomePath, getDefaultConfigPath } from "../shared/paths.ts";
 import { readTextFile, writeTextFile } from "../shared/fs.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "./schema.ts";
+import { applyDynamicPathDefaults, assertNoLegacyPrivilegeCommands } from "./config-document.ts";
+import { normalizeConfigDocumentShape } from "./config-migration.ts";
+import { upgradeEditableConfigFileIfNeeded } from "./config-upgrade.ts";
 import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
-import { applyDynamicPathDefaults, assertNoLegacyPrivilegeCommands } from "./load-config.ts";
+import { normalizeConfigGroupRoutes } from "./group-routes.ts";
+import { pruneConfigForPersistence } from "./persisted-config.ts";
 import { renderDefaultConfigTemplate } from "./template.ts";
 
 export async function ensureEditableConfigFile(configPath = getDefaultConfigPath()) {
@@ -31,13 +35,19 @@ export async function readEditableConfig(configPath = getDefaultConfigPath()): P
   config: ClisbotConfig;
 }> {
   const expandedConfigPath = await ensureEditableConfigFile(configPath);
+  await upgradeEditableConfigFileIfNeeded(expandedConfigPath);
   const text = await readTextFile(expandedConfigPath);
-  const parsed = JSON.parse(text);
+  const parsed = normalizeConfigDocumentShape(JSON.parse(text));
   assertNoLegacyPrivilegeCommands(parsed);
   return {
     configPath: expandedConfigPath,
-    config: normalizeConfigDirectMessageRoutes(
-      clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+    config: normalizeConfigGroupRoutes(
+      normalizeConfigDirectMessageRoutes(
+        clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+        {
+          exactAdmissionMode: "explicit",
+        },
+      ),
     ),
   };
 }
@@ -45,9 +55,13 @@ export async function readEditableConfig(configPath = getDefaultConfigPath()): P
 export async function writeEditableConfig(configPath: string, config: ClisbotConfig) {
   const expandedConfigPath = expandHomePath(configPath);
   await ensureDir(dirname(expandedConfigPath));
-  const normalizedConfig = normalizeConfigDirectMessageRoutes(config);
+  const normalizedConfig = normalizeConfigGroupRoutes(
+    normalizeConfigDirectMessageRoutes(config, {
+      exactAdmissionMode: "explicit",
+    }),
+  );
   const nextConfig = {
-    ...normalizedConfig,
+    ...pruneConfigForPersistence(normalizedConfig),
     meta: {
       ...normalizedConfig.meta,
       lastTouchedAt: new Date().toISOString(),

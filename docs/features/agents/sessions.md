@@ -92,8 +92,9 @@ Current recovery rule:
 - if tmux still exists, continue using the live process
 - if the tmux runner was sunset as stale, keep the stored session entry and logical conversation identity
 - if tmux is gone but a stored `sessionId` exists, start a new runner and reuse that `sessionId` when the runner supports it
-- if that stored `sessionId` is no longer attachable for this `sessionKey`, clear it and start a fresh tool session
+- if that stored `sessionId` is no longer attachable for this `sessionKey`, preserve the mapping and fail truthfully instead of silently starting a new tool conversation
 - if no `sessionId` is available, start a fresh runner session
+- `/new` is the explicit operator path for triggering a new runner conversation and storing the new active `sessionId`
 
 Current queue and recovery ordering rule:
 
@@ -211,7 +212,8 @@ The session split now exists, but several lifecycle policies are still not imple
 Current gaps:
 
 - reset policy
-  - no first-class `/new` or automatic rotation policy for `sessionId` yet
+  - chat `/new` now provides the first explicit runner conversation rotation path
+  - broader automatic rotation policy remains intentionally unimplemented
 - durable transcript ownership
   - `sessions.json` stores continuity metadata only
   - clisbot does not yet persist a full append-only transcript model per `sessionId`

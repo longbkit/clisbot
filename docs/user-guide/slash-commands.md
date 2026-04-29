@@ -34,6 +34,7 @@ If this page and runtime ever disagree, runtime wins.
 - `/detach`: stop live updates for this thread while still posting the final result here
 - `/watch every 30s [for 10m]`: post latest run state on an interval until settle or timeout
 - `/stop`: send Escape to interrupt the current conversation session
+- `/new`: trigger a new runner conversation for the current routed session, then capture and store the new session id
 - `/nudge`: send one extra Enter to the current tmux session without resending prompt text
 
 ## Conversation Modes
@@ -84,6 +85,8 @@ If this page and runtime ever disagree, runtime wins.
 Useful operator note:
 
 - encourage users to try `/queue help` and `/loop help` directly in chat when they need the live syntax summary for the current surface
+- chat `/loop` wall-clock creation is immediate to keep the conversational path low-friction; the creation response shows the resolved timezone, next run in local time plus UTC, and the exact cancel command
+- if the timezone is wrong, cancel the loop from that response, set the correct timezone, then create the loop again
 
 ## Shell
 

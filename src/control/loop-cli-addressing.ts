@@ -14,6 +14,7 @@ const LOOP_CONTEXT_FLAGS = new Set([
   "--topic-id",
   "--bot",
   "--account",
+  "--timezone",
 ]);
 
 function parseOptionValues(args: string[], name: string) {
@@ -92,4 +93,3 @@ export function hasLoopContext(args: string[]) {
 export function resolveLoopSubtargetId(addressing: LoopCliAddressing) {
   return addressing.channel === "telegram" ? addressing.topicId : addressing.threadId;
 }
-

@@ -146,7 +146,7 @@ Current tmux submit rule in `clisbot` is intentionally narrow and truthful:
 - after an internal status-command handshake such as `/status`, the runner gives the pane one short settle window before the first user prompt path continues
 - the runner must confirm prompt paste truth before it sends `Enter`
 - if the prompt is still not visible, the runner may retry paste delivery a bounded number of times in the same pane
-- if paste never lands truthfully and no `Enter` was sent, the runner may reset that tmux session and retry once in one fresh session
+- if paste never lands truthfully and no `Enter` was sent, the runner may reset that tmux session and retry once while preserving stored session-id continuity
 - if `Enter` has already been sent, the runner must not blindly full-reset immediately because that could cut off a real run that started late
 
 ## Snapshot And Streaming Capture
@@ -211,9 +211,9 @@ Current clisbot behavior is narrower than the full ideal:
 
 - if a stored `sessionId` exists and `resume.mode` is configured, the runner uses that resume command
 - if `create.mode` is `explicit`, the runner relaunches with the same explicit session id
-- if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot clears that continuity entry and starts a fresh tool session
+- if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot preserves the continuity entry and fails truthfully; operators can use `/new` to intentionally trigger a new runner conversation
 - if session-id capture never completes, the session can still run, but restart falls back to a fresh tool conversation
-- if the first routed prompt right after status-command capture never lands truthfully, clisbot retries paste in place first, then does one bounded fresh-session retry before surfacing failure
+- if the first routed prompt right after status-command capture never lands truthfully, clisbot retries paste in place first, then restarts the runner while preserving the stored session id before surfacing failure
 
 ## Runner Sunsetting
 

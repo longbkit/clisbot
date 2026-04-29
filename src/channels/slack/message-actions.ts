@@ -4,6 +4,7 @@ import { webApi as slackWebApi } from "@slack/bolt";
 import { deleteSlackMessage, postSlackText } from "./transport.ts";
 import { resolveSlackMessageContent } from "./content.ts";
 import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import { normalizeSlackSurfaceTarget } from "./target-normalization.ts";
 
 const { WebClient } = slackWebApi;
 
@@ -40,47 +41,21 @@ function normalizeSlackEmoji(raw: string) {
   return raw.trim().replaceAll(":", "");
 }
 
-function normalizeSlackTarget(raw: string) {
-  const value = raw.trim();
-  if (!value) {
-    throw new Error("Missing Slack target");
-  }
-
-  if (value.startsWith("channel:")) {
-    return {
-      kind: "channel" as const,
-      value: value.slice("channel:".length),
-    };
-  }
-
-  if (value.startsWith("user:")) {
-    return {
-      kind: "user" as const,
-      value: value.slice("user:".length),
-    };
-  }
-
-  return {
-    kind: "channel" as const,
-    value,
-  };
-}
-
 async function resolveSlackTarget(
   client: SlackClient,
   rawTarget: string,
   threadId?: string,
   replyTo?: string,
 ): Promise<SlackResolvedTarget> {
-  const parsed = normalizeSlackTarget(rawTarget);
-  let channelId = parsed.value;
-  if (parsed.kind === "user") {
+  const parsed = normalizeSlackSurfaceTarget(rawTarget);
+  let channelId = parsed.channelId;
+  if (parsed.userId) {
     const opened = await client.conversations.open({
-      users: parsed.value,
+      users: parsed.userId,
     });
     channelId = opened.channel?.id ?? "";
     if (!channelId) {
-      throw new Error(`Unable to open Slack DM for user ${parsed.value}`);
+      throw new Error(`Unable to open Slack DM for user ${parsed.userId}`);
     }
   }
 

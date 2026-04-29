@@ -244,19 +244,24 @@ clisbot routes --help
 Most-used commands:
 
 - `clisbot routes list`
-- `clisbot routes add --channel slack channel:C1234567890 --bot default`
+- `clisbot routes add --channel slack group:C1234567890 --bot default`
 - `clisbot routes add --channel slack group:G1234567890 --bot default`
 - `clisbot routes add --channel telegram group:-1001234567890 --bot default`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot default`
 - `clisbot routes add --channel telegram dm:* --bot default`
-- `clisbot routes set-agent --channel slack channel:C1234567890 --bot default --agent support`
+- `clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support`
 - `clisbot routes set-require-mention --channel telegram group:-1001234567890 --bot default --value false`
-- `clisbot routes set-response-mode --channel slack channel:C1234567890 --bot default --mode message-tool`
+- `clisbot routes set-response-mode --channel slack group:C1234567890 --bot default --mode message-tool`
 - `clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue`
 
 Important behavior:
 
-- route ids are explicit: `channel:<id>`, `group:<id>`, `topic:<chatId>:<topicId>`, `dm:<id|*>`
+- preferred route ids are `group:<id>`, `group:*`, `topic:<chatId>:<topicId>`, and `dm:<id|*>`
+- stored config uses raw ids plus `*` inside `directMessages` and `groups`
+- legacy Slack `channel:<id>` input is still accepted for compatibility
+- `group:*` is the default multi-user sender policy node of a bot
+- `disabled` means truly silent, including owner/admin and pairing guidance
+- owner/admin do not bypass `groupPolicy`/`channelPolicy` admission; after a group is admitted and enabled, they bypass sender allowlists, while `blockUsers` still wins
 - `add` is create-only
 - if the route already exists, use the matching `set-<key>` command
 - route-local auth visibility still depends on `verbose` and resolved auth roles
@@ -272,7 +277,8 @@ Important behavior:
 - with leading interval syntax, place `--force` immediately after the interval token
 - with `every ...` syntax, place `--force` immediately after the interval clause
 - wall-clock schedules must use `HH:MM` in 24-hour format and wait until the next matching local time instead of firing immediately
-- wall-clock schedules resolve timezone from route override first, then `control.loop.defaultTimezone`, then host timezone
+- wall-clock schedules resolve timezone from the effective timezone resolver: one-off loop override, route/topic, agent, bot, `app.timezone`, legacy fallbacks, then host fallback only when config is missing
+- chat `/loop` wall-clock creation persists immediately and returns the resolved timezone, local next run, UTC next run, and exact cancel command so a wrong timezone can be fixed quickly
 - managed loops are created with ids, bounded by `control.loop.maxRunsPerLoop`, and capped globally by `control.loop.maxActiveLoops`
 - managed loops use `skip-if-busy`, so a tick is dropped instead of stacking more queued work when the session is already busy
 - managed loops persist in session state and are restored after restart
@@ -283,12 +289,8 @@ Timezone config examples:
 
 ```json
 {
-  "control": {
-    "loop": {
-      "maxRunsPerLoop": 20,
-      "maxActiveLoops": 10,
-      "defaultTimezone": "Asia/Ho_Chi_Minh"
-    }
+  "app": {
+    "timezone": "Asia/Ho_Chi_Minh"
   }
 }
 ```
@@ -314,7 +316,9 @@ Timezone config examples:
 }
 ```
 
-- route `timezone` overrides `control.loop.defaultTimezone`
+- agent `timezone` overrides `app.timezone` for that assistant/workspace
+- route `timezone` overrides app/agent timezone for that surface
+- use `clisbot timezone set <iana>` for the app default, `clisbot agents set-timezone --agent <id> <iana>` for one assistant/workspace, and `clisbot routes set-timezone ... <iana>` for one surface
 - once a wall-clock loop is created, its effective timezone is persisted on that loop record
 - if the service is already running, restart it after changing channel enablement
 - `clisbot routes` and `clisbot routes --help` print setup guidance for Slack ids, Telegram group or topic ids, allowlists, and routed auth docs
@@ -327,25 +331,27 @@ Current subcommands:
 
 - `clisbot loops list`
 - `clisbot loops status`
-- `clisbot loops status --channel slack --target channel:C123 --thread-id 1712345678.123456`
-- `clisbot loops create --channel slack --target channel:C123 --thread-id 1712345678.123456 every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target channel:C123 --new-thread every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target dm:U1234567890 --new-thread every day at 09:00 check inbox`
-- `clisbot loops --channel telegram --target -1001234567890 --topic-id 42 5m check CI`
-- `clisbot loops --channel slack --target channel:C123 --thread-id 1712345678.123456 3 review backlog`
+- `clisbot loops status --channel slack --target group:C123 --thread-id 1712345678.123456`
+- `clisbot loops create --channel slack --target group:C123 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI`
+- `clisbot loops create --channel slack --target group:C123 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
+- `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
+- `clisbot loops --channel telegram --target -1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
+- `clisbot loops --channel slack --target group:C123 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog`
 - `clisbot loops cancel <id>`
-- `clisbot loops cancel --channel slack --target channel:C123 --thread-id 1712345678.123456 --all`
+- `clisbot loops cancel --channel slack --target group:C123 --thread-id 1712345678.123456 --all`
 - `clisbot loops cancel --all`
 
 Targeting rules:
 
 - `--target` chooses the routed surface
-- on Slack, use `channel:<id>`, `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids
+- on Slack, use `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids
 - on Telegram, `--target` is the numeric chat id
 - `--thread-id` means an existing Slack thread ts
 - `--topic-id` means a Telegram topic id
 - omitting the sub-surface flag targets the parent Slack channel/group/DM or the parent Telegram chat
 - `--new-thread` is Slack-only and creates a fresh thread anchor before the loop starts
+- `--sender <principal>` is required for loop creation and records the human creator as `slack:<user-id>` or `telegram:<user-id>`
+- `--sender-name <name>` and `--sender-handle <handle>` optionally store readable creator context for scheduled prompts
 - in Telegram forum groups, omitting `--topic-id` targets the parent chat surface; sends then follow Telegram's normal no-`message_thread_id` behavior, which is the General topic when that forum has one
 
 Important behavior:
@@ -353,6 +359,7 @@ Important behavior:
 - `list` is always app-wide inventory
 - bare `status` is app-wide inventory; scoped `status --channel ... --target ...` matches `/loop status` for one routed session
 - recurring CLI-created loops reuse the same parser family as `/loop` and land in the same persisted session store
+- CLI loop creation fails without `--sender` so delayed work keeps a real creator instead of rendering sender as unavailable
 - the CLI accepts the same expression families as `/loop`: interval, forced interval, times/count, and wall-clock schedules
 - omitting the prompt body loads `LOOP.md` from the target workspace, matching maintenance-loop behavior from chat
 - every row includes `agentId` and `sessionKey` because the operator CLI is app-wide rather than route-scoped

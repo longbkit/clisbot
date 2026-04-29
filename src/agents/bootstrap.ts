@@ -14,7 +14,7 @@ export function resolveTemplateRoot(moduleDir: string) {
   ];
 
   for (const candidate of candidates) {
-    if (existsSync(join(candidate, "openclaw")) && existsSync(join(candidate, "customized"))) {
+    if (existsSync(join(candidate, "default")) && existsSync(join(candidate, "customized"))) {
       return candidate;
     }
   }
@@ -23,7 +23,7 @@ export function resolveTemplateRoot(moduleDir: string) {
 }
 
 const TEMPLATE_ROOT = resolveTemplateRoot(dirname(fileURLToPath(import.meta.url)));
-const OPENCLAW_TEMPLATE_DIR = join(TEMPLATE_ROOT, "openclaw");
+const DEFAULT_TEMPLATE_DIR = join(TEMPLATE_ROOT, "default");
 const CUSTOMIZED_TEMPLATE_DIR = join(TEMPLATE_ROOT, "customized");
 const CUSTOMIZED_DEFAULT_TEMPLATE_DIR = join(CUSTOMIZED_TEMPLATE_DIR, "default");
 
@@ -91,7 +91,7 @@ function collectTemplateFiles(rootDir: string, toolId: AgentCliToolId, prefix = 
 
 function getTemplateFiles(toolId: AgentCliToolId, mode: AgentBootstrapMode) {
   return [
-    ...collectTemplateFiles(OPENCLAW_TEMPLATE_DIR, toolId),
+    ...collectTemplateFiles(DEFAULT_TEMPLATE_DIR, toolId),
     ...collectTemplateFiles(CUSTOMIZED_DEFAULT_TEMPLATE_DIR, toolId).map((file) => ({
       ...file,
       customized: true,

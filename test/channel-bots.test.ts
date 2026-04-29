@@ -72,20 +72,24 @@ describe("channel bots", () => {
     ]);
   });
 
-  test("treats exact DM routes as behavior-only overrides", () => {
+  test("allows exact DM routes to carry admission config in the canonical shape", () => {
     const config = createConfig();
     config.bots.slack.work.directMessages = {
       "*": {
         enabled: true,
-        policy: "allowlist",
-        allowUsers: ["U123"],
+        policy: "pairing",
+        allowUsers: [],
         blockUsers: ["U999"],
         allowBots: false,
         responseMode: "capture-pane",
       },
       U123: {
+        enabled: true,
+        policy: "allowlist",
+        allowUsers: ["U123"],
+        blockUsers: ["U555"],
         responseMode: "message-tool",
-      } as any,
+      },
     };
 
     const normalized = normalizeConfigDirectMessageRoutes(
@@ -98,7 +102,7 @@ describe("channel bots", () => {
 
     expect(resolved?.policy).toBe("allowlist");
     expect(resolved?.allowUsers).toEqual(["U123"]);
-    expect(resolved?.blockUsers).toEqual(["U999"]);
+    expect(resolved?.blockUsers).toEqual(["U999", "U555"]);
     expect(resolved?.responseMode).toBe("message-tool");
   });
 });

@@ -10,7 +10,7 @@ describe("bootstrap template root resolution", () => {
 
     try {
       const moduleDir = join(baseDir, "src", "agents");
-      mkdirSync(join(baseDir, "templates", "openclaw"), { recursive: true });
+      mkdirSync(join(baseDir, "templates", "default"), { recursive: true });
       mkdirSync(join(baseDir, "templates", "customized"), { recursive: true });
       mkdirSync(moduleDir, { recursive: true });
 
@@ -25,7 +25,7 @@ describe("bootstrap template root resolution", () => {
 
     try {
       const moduleDir = join(baseDir, "dist");
-      mkdirSync(join(baseDir, "templates", "openclaw"), { recursive: true });
+      mkdirSync(join(baseDir, "templates", "default"), { recursive: true });
       mkdirSync(join(baseDir, "templates", "customized"), { recursive: true });
       mkdirSync(moduleDir, { recursive: true });
 

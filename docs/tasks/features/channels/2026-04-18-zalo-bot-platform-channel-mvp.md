@@ -71,12 +71,19 @@ Add a new root:
         "enabled": false,
         "defaultBotId": "default",
         "mode": "polling",
-        "groupPolicy": "disabled",
+        "groupPolicy": "allowlist",
         "directMessages": {
           "*": {
             "enabled": true,
             "requireMention": false,
             "policy": "pairing"
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "requireMention": true,
+            "policy": "open"
           }
         }
       },

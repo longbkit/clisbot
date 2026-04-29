@@ -21,17 +21,22 @@
                 "app_mentions:read",
                 "assistant:write",
                 "channels:history",
+                "channels:read",
                 "chat:write",
                 "files:read",
                 "files:write",
                 "groups:history",
+                "groups:read",
                 "im:history",
+                "im:read",
                 "im:write",
                 "mpim:history",
+                "mpim:read",
                 "pins:read",
                 "pins:write",
                 "reactions:read",
-                "reactions:write"
+                "reactions:write",
+                "users:read"
             ]
         },
         "pkce_enabled": false

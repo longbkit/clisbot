@@ -2,7 +2,7 @@
 
 This guide documents what the Slack app for `clisbot` needs right now, what is optional, and what can wait.
 
-It is based on the current code paths in `src/channels/slack/*` and the current docs as of 2026-04-14.
+It is based on the current code paths in `src/channels/slack/*` and the current docs as of 2026-04-27.
 
 The shipped `app-manifest.json` is a setup-friendly template, not a strict minimum-permission manifest.
 This guide is the truth source for separating core requirements from optional or future permissions.
@@ -30,15 +30,20 @@ This is not listed under bot scopes in the manifest, but it is still mandatory f
 | `app_mentions:read` | Receive explicit `@bot` mentions | Mention-driven inbound turns | Explicit mentions stop reaching the bot | Required |
 | `chat:write` | Post, update, and clear Slack replies in threads | Normal reply sending, streaming edits, delete path, status fallback | The bot cannot reply normally | Required |
 | `channels:history` | Read routed public-channel messages and recover thread context | Public channels, thread follow-up, attachment hydration | Public-channel flow becomes unreliable or dead | Required if public channels are supported |
+| `channels:read` | Resolve public-channel names for prompt context | `conversations.info` display enrichment | Prompts fall back to raw Slack channel ids | Required for readable public-channel context |
 | `groups:history` | Read routed private-channel or group messages and recover thread context | Private groups, thread follow-up, attachment hydration | Private-group flow becomes unreliable or dead | Required if private groups stay supported |
+| `groups:read` | Resolve private-channel names for prompt context | `conversations.info` display enrichment | Prompts fall back to raw Slack private-channel ids | Required for readable private-channel context |
 | `im:history` | Read DM messages and hydrate DM context | Slack DMs, pairing, DM follow-up | DM handling becomes unreliable | Required if DMs stay supported |
+| `im:read` | Resolve DM surface metadata when Slack exposes it through conversation lookup | `conversations.info` display enrichment | DM prompts keep provider ids without richer labels | Required for readable DM context |
 | `im:write` | Open a DM when operator CLI targets `user:U...` | `clisbot message send --channel slack --target user:...` | User-targeted DM send path fails | Useful now, likely still needed |
 | `mpim:history` | Read multi-person DM messages and recover thread context | MPIM/group-style Slack conversations | MPIM routes cannot work truthfully | Required if MPIM routes stay supported |
+| `mpim:read` | Resolve MPIM names for prompt context | `conversations.info` display enrichment | MPIM prompts fall back to raw Slack ids | Required for readable MPIM context |
 | `reactions:read` | Read reactions through operator CLI | `clisbot message reactions` | Reaction inspection fails | Optional for chat bot core, required for full message CLI |
 | `reactions:write` | Add or remove processing reactions | Ack reaction, typing reaction, message CLI react/unreact | Bot still works, but reaction-based feedback degrades | Strongly recommended |
 | `pins:read` | List pins through operator CLI | `clisbot message pins` | Pin inspection fails | Optional for chat bot core, required for full message CLI |
 | `pins:write` | Add or remove pins through operator CLI | `clisbot message pin` and `unpin` | Pin mutation fails | Optional for chat bot core, required for full message CLI |
 | `files:write` | Upload media through operator CLI | `clisbot message send --media ...` | Slack media send path fails | Useful now, likely still needed |
+| `users:read` | Resolve sender names and handles for prompt context | `users.info` display enrichment | Prompts fall back to raw Slack user ids | Required for readable sender context |
 
 ## Required Event Subscriptions
 
@@ -69,11 +74,6 @@ These are not needed by the current code paths, but they make sense only if Slac
 | --- | --- | --- | --- |
 | `commands` | Native Slack slash-command endpoint instead of typed message commands | Not used now | Medium if native Slack UX becomes a product goal |
 | Interactivity enabled | Buttons, menus, modal submits, richer Block Kit actions | Not used now | Medium to high if structured Slack UI ships |
-| `channels:read` | Channel discovery, validation, richer operator tooling | Not used now | Low to medium |
-| `groups:read` | Private-group discovery and validation | Not used now | Low to medium |
-| `im:read` | Richer DM metadata lookups | Not used now | Low |
-| `mpim:read` | Richer MPIM metadata lookups | Not used now | Low |
-| `users:read` | User lookup or richer identity displays | Not used now | Low to medium |
 | `users.profile:read` | Profile-aware status or routing help | Not used now | Low |
 | `users:read.email` | Email-aware identity mapping | Not used now | Low unless enterprise mapping becomes important |
 | `team:read` | Workspace metadata in status or diagnostics | Not used now | Low |
@@ -97,7 +97,7 @@ These are broad or legacy-looking for the current `clisbot` Slack design and sho
 If the goal is current `clisbot` Slack support with the least permission surface:
 
 1. Keep the manifest small and truth-based.
-2. Treat `chat:write`, the `history` scopes, `app_mentions:read`, and the routed `message.*` events as the real core.
+2. Treat `chat:write`, the `history` scopes, the prompt-context read scopes, `app_mentions:read`, and the routed `message.*` events as the real core.
 3. Keep `reactions:*`, `pins:*`, `files:write`, and `im:write` only if you want the full operator `message` CLI and richer Slack workflow support.
 4. Keep `assistant:write` and `files:read` as explicitly optional, not silently mandatory.
 5. Add `commands` or interactivity only when `clisbot` actually ships native Slack slash commands, buttons, or structured actions.

@@ -110,7 +110,7 @@ describe("pairing cli", () => {
 
       expect(lines.join("\n")).toContain("Approved telegram sender 123456 for bot default.");
       const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-      expect(rawConfig.bots.telegram.default.directMessages["dm:*"].allowUsers).toEqual(["123456"]);
+      expect(rawConfig.bots.telegram.default.directMessages["*"].allowUsers).toEqual(["123456"]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
@@ -146,8 +146,8 @@ describe("pairing cli", () => {
       });
 
       const updatedConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-      expect(updatedConfig.bots.telegram.support.directMessages["dm:*"].allowUsers).toEqual(["123456"]);
-      expect(updatedConfig.bots.telegram.default.directMessages["dm:*"]).toBeUndefined();
+      expect(updatedConfig.bots.telegram.support.directMessages["*"].allowUsers).toEqual(["123456"]);
+      expect(updatedConfig.bots.telegram.default.directMessages["*"].allowUsers).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

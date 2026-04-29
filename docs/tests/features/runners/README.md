@@ -189,7 +189,7 @@ Implemented
 - the runner detects that the live tmux session is missing
 - the runner creates a new tmux session for the same `sessionKey`
 - the runner uses the stored tool `sessionId` to resume the prior conversation instead of starting from scratch
-- if the backend rejects or loses that stored `sessionId`, the runner clears it and starts a fresh session for the same `sessionKey`
+- if the backend rejects or loses that stored `sessionId`, clisbot preserves the mapping and fails truthfully instead of silently creating a new conversation; operators can use `/new` to trigger a new runner conversation intentionally
 
 ## Test Case 7A: tmux Runner Can Capture A Runner-Generated Session Id
 
@@ -237,9 +237,9 @@ Implemented
 
 - the runner does not send `Enter` until prompt paste is truthfully confirmed
 - the runner retries paste delivery a bounded number of times in the same pane first
-- if paste still never lands, the runner kills only that tmux session, clears continuity safely, and retries once in one fresh session
-- the prompt is replayed only on that safe fresh retry path where no truthful `Enter` happened yet
-- if the fresh retry succeeds, the user sees one truthful successful run instead of a stuck idle session
+- if paste still never lands, the runner kills only that tmux session, preserves stored session-id continuity, and retries once by reopening the same native conversation
+- the prompt is replayed only on that safe restart path where no truthful `Enter` happened yet
+- if the restart succeeds, the user sees one truthful successful run instead of a stuck idle session
 
 ## Test Case 7B: tmux Runner Can Reuse An Explicit Session Id
 

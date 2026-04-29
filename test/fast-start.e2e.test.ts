@@ -175,4 +175,29 @@ describe("fast start e2e", () => {
     expect(persistedConfig.bots.telegram.defaults.enabled).toBe(false);
     expect(persistedConfig.bots.telegram.default.enabled).toBe(false);
   }, 15000);
+
+  test("uses CLISBOT_CLI_NAME for direct repo-local command rendering", async () => {
+    const subprocess = Bun.spawn([
+      bunExecutable,
+      "src/main.ts",
+      "--help",
+    ], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        CLISBOT_CLI_NAME: "clisbot-dev",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const exitCode = await subprocess.exited;
+    const stderr = await new Response(subprocess.stderr).text();
+    const stdout = await new Response(subprocess.stdout).text();
+
+    expect(exitCode).toBe(0);
+    expect(stderr.trim()).toBe("");
+    expect(stdout).toContain("clisbot-dev start");
+    expect(stdout).toContain("Use `clisbot-dev status`");
+  }, 15000);
 });

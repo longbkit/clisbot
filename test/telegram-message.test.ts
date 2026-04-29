@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   hasForeignTelegramMention,
   hasTelegramBotMention,
+  resolveTelegramTopicName,
 } from "../src/channels/telegram/message.ts";
 
 describe("telegram message helpers", () => {
@@ -16,5 +17,20 @@ describe("telegram message helpers", () => {
     expect(hasForeignTelegramMention("@mybot please check", "mybot")).toBe(false);
     expect(hasForeignTelegramMention("@mybot please check @otherbot", "mybot")).toBe(false);
     expect(hasForeignTelegramMention("plain follow-up", "mybot")).toBe(false);
+  });
+
+  test("resolves topic names from topic creation metadata", () => {
+    expect(resolveTelegramTopicName({
+      message_id: 1,
+      chat: {
+        id: -1001,
+        type: "supergroup",
+      },
+      reply_to_message: {
+        forum_topic_created: {
+          name: "clisbot-streaming",
+        },
+      },
+    })).toBe("clisbot-streaming");
   });
 });

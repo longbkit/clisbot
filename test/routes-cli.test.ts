@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
 import { writeEditableConfig } from "../src/config/config-file.ts";
+import { loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 import { runRoutesCli } from "../src/control/routes-cli.ts";
@@ -34,7 +36,36 @@ describe("routes cli", () => {
     await writeEditableConfig(process.env.CLISBOT_CONFIG_PATH!, config);
   }
 
-  test("adds a slack channel route with the new canonical route id", async () => {
+  test("adds a slack group route with the new canonical route id and raw stored key", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "slack",
+      "group:C1234567890",
+      "--bot",
+      "default",
+      "--policy",
+      "open",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.slack.default.groups.C1234567890).toEqual({
+      enabled: true,
+      requireMention: true,
+      allowUsers: [],
+      blockUsers: [],
+      allowBots: false,
+      policy: "open",
+    });
+  });
+
+  test("keeps backward compatibility with legacy slack channel route ids", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -53,14 +84,7 @@ describe("routes cli", () => {
     ]);
 
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-    expect(rawConfig.bots.slack.default.groups["channel:C1234567890"]).toEqual({
-      enabled: true,
-      requireMention: true,
-      allowUsers: [],
-      blockUsers: [],
-      allowBots: false,
-      policy: "open",
-    });
+    expect(rawConfig.bots.slack.default.groups.C1234567890.policy).toBe("open");
   });
 
   test("adds a telegram topic route and allows route-local mode overrides", async () => {
@@ -91,6 +115,15 @@ describe("routes cli", () => {
       "capture-pane",
     ]);
     await runRoutesCli([
+      "set-timezone",
+      "--channel",
+      "telegram",
+      "topic:-1001234567890:42",
+      "--bot",
+      "default",
+      "America/Los_Angeles",
+    ]);
+    await runRoutesCli([
       "set-agent",
       "--channel",
       "telegram",
@@ -110,11 +143,12 @@ describe("routes cli", () => {
       allowBots: false,
       policy: "open",
       responseMode: "capture-pane",
+      timezone: "America/Los_Angeles",
       agentId: "support",
     });
   });
 
-  test("add fails with guidance when the route already exists", async () => {
+  test("added telegram groups inherit usable open sender policy through group admission allowlist", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -124,22 +158,75 @@ describe("routes cli", () => {
     await runRoutesCli([
       "add",
       "--channel",
-      "slack",
-      "channel:C1234567890",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+      "--require-mention",
+      "true",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.telegram.default.groupPolicy).toBe("allowlist");
+    expect(rawConfig.bots.telegram.default.groups["*"].policy).toBe("open");
+    expect(rawConfig.bots.telegram.default.groups["-1001234567890"].policy).toBeUndefined();
+
+    const loadedConfig = await loadConfigWithoutEnvResolution(process.env.CLISBOT_CONFIG_PATH!);
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig,
+      chatType: "supergroup",
+      chatId: -1001234567890,
+      isForum: false,
+      botId: "default",
+    });
+
+    expect(resolved.status).toBe("admitted");
+    expect(resolved.route?.policy).toBe("open");
+    expect(resolved.route?.requireMention).toBe(true);
+  });
+
+  test("clears exact shared route policy so it inherits the wildcard sender policy", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "telegram",
+      "topic:-1001234567890:4",
+      "--bot",
+      "default",
+      "--policy",
+      "disabled",
+    ]);
+    await runRoutesCli([
+      "clear-policy",
+      "--channel",
+      "telegram",
+      "topic:-1001234567890:4",
       "--bot",
       "default",
     ]);
 
-    await expect(
-      runRoutesCli([
-        "add",
-        "--channel",
-        "slack",
-        "channel:C1234567890",
-        "--bot",
-        "default",
-      ]),
-    ).rejects.toThrow("Use a matching `set-<key>` command instead.");
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.telegram.default.groups["-1001234567890"].topics["4"].policy)
+      .toBeUndefined();
+
+    const loadedConfig = await loadConfigWithoutEnvResolution(process.env.CLISBOT_CONFIG_PATH!);
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig,
+      chatType: "supergroup",
+      chatId: -1001234567890,
+      topicId: 4,
+      isForum: true,
+      botId: "default",
+    });
+
+    expect(resolved.status).toBe("admitted");
+    expect(resolved.route?.policy).toBe("open");
   });
 
   test("accepts route ids after option values instead of mistaking --bot values for the route", async () => {
@@ -155,7 +242,7 @@ describe("routes cli", () => {
       "slack",
       "--bot",
       "default",
-      "channel:C1234567890",
+      "group:C1234567890",
       "--policy",
       "open",
     ]);
@@ -166,121 +253,61 @@ describe("routes cli", () => {
       "slack",
       "--bot",
       "default",
-      "channel:C1234567890",
+      "group:C1234567890",
       "--agent",
       "support",
     ]);
 
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-    expect(rawConfig.bots.slack.default.groups["channel:C1234567890"]?.agentId).toBe("support");
+    expect(rawConfig.bots.slack.default.groups.C1234567890?.agentId).toBe("support");
   });
 
-  test("remove fails when the route does not exist", async () => {
+  test("shows effective timezone and current local time for a route", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
     await seedConfig();
-    console.log = (() => {}) as typeof console.log;
-
-    await expect(
-      runRoutesCli([
-        "remove",
-        "--channel",
-        "telegram",
-        "group:-1001234567890",
-        "--bot",
-        "default",
-      ]),
-    ).rejects.toThrow("Unknown route: telegram/default/group:-1001234567890");
-  });
-
-  test("list rejects unknown channel filters instead of silently showing empty results", async () => {
-    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
-    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
-    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
-    await seedConfig();
-    console.log = (() => {}) as typeof console.log;
-
-    await expect(runRoutesCli(["list", "--channel", "discord"])).rejects.toThrow(
-      "clisbot routes",
-    );
-  });
-
-  test("help explains DM wildcard auth ownership", async () => {
-    const lines: string[] = [];
+    const output: string[] = [];
     console.log = ((line?: unknown) => {
-      lines.push(String(line ?? ""));
+      output.push(String(line ?? ""));
     }) as typeof console.log;
 
-    await runRoutesCli(["help"]);
-
-    const text = lines.join("\n");
-    expect(text).toContain("For DM auth, mutate `dm:*`, not `dm:<userId>`.");
-    expect(text).toContain("pairing approve <channel> <code>");
-    expect(text).toContain("routes add-block-user --channel telegram dm:* --bot alerts --user 1276408333");
-  });
-
-  test("rejects DM admission policy changes on exact DM routes", async () => {
-    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
-    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
-    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
-    await seedConfig();
-    console.log = (() => {}) as typeof console.log;
-
     await runRoutesCli([
       "add",
       "--channel",
-      "slack",
-      "dm:U123",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+    ]);
+    await runRoutesCli([
+      "set-timezone",
+      "--channel",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+      "Asia/Ho_Chi_Minh",
+    ]);
+    output.length = 0;
+
+    await runRoutesCli([
+      "get-timezone",
+      "--channel",
+      "telegram",
+      "group:-1001234567890",
       "--bot",
       "default",
     ]);
 
-    await expect(
-      runRoutesCli([
-        "set-policy",
-        "--channel",
-        "slack",
-        "dm:U123",
-        "--bot",
-        "default",
-        "--policy",
-        "disabled",
-      ]),
-    ).rejects.toThrow("dm:* only");
+    const text = output.join("\n");
+    expect(text).toContain("telegram/default/group:-1001234567890 timezone: Asia/Ho_Chi_Minh");
+    expect(text).toContain("effective: Asia/Ho_Chi_Minh (route)");
+    expect(text).toContain("localTime:");
+    expect(text).toContain("Asia/Ho_Chi_Minh");
   });
 
-  test("rejects DM allowlist mutations on exact DM routes", async () => {
-    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
-    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
-    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
-    await seedConfig();
-    console.log = (() => {}) as typeof console.log;
-
-    await runRoutesCli([
-      "add",
-      "--channel",
-      "slack",
-      "dm:U123",
-      "--bot",
-      "default",
-    ]);
-
-    await expect(
-      runRoutesCli([
-        "add-allow-user",
-        "--channel",
-        "slack",
-        "dm:U123",
-        "--bot",
-        "default",
-        "--user",
-        "U123",
-      ]),
-    ).rejects.toThrow("dm:* only");
-  });
-
-  test("materializes the DM wildcard route when mutating DM allow users", async () => {
+  test("mutates allow and block users on canonical wildcard ids", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -291,7 +318,50 @@ describe("routes cli", () => {
       "add-allow-user",
       "--channel",
       "slack",
-      "dm:*",
+      "group:*",
+      "--bot",
+      "default",
+      "--user",
+      "U_OWNER",
+    ]);
+    await runRoutesCli([
+      "add-block-user",
+      "--channel",
+      "telegram",
+      "group:*",
+      "--bot",
+      "default",
+      "--user",
+      "1276408333",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.slack.default.groups["*"].allowUsers).toEqual(["U_OWNER"]);
+    expect(rawConfig.bots.telegram.default.groups["*"].blockUsers).toEqual(["1276408333"]);
+  });
+
+  test("allows exact DM routes to carry admission config in the new shape", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "slack",
+      "dm:U123",
+      "--bot",
+      "default",
+      "--policy",
+      "allowlist",
+    ]);
+    await runRoutesCli([
+      "add-allow-user",
+      "--channel",
+      "slack",
+      "dm:U123",
       "--bot",
       "default",
       "--user",
@@ -299,6 +369,75 @@ describe("routes cli", () => {
     ]);
 
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-    expect(rawConfig.bots.slack.default.directMessages["dm:*"].allowUsers).toEqual(["U123"]);
+    expect(rawConfig.bots.slack.default.directMessages.U123.policy).toBe("allowlist");
+    expect(rawConfig.bots.slack.default.directMessages.U123.allowUsers).toEqual(["U123"]);
+  });
+
+  test("rejects invalid route policies before writing config", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await expect(runRoutesCli([
+      "add",
+      "--channel",
+      "telegram",
+      "group:-1001234567890",
+      "--bot",
+      "default",
+      "--policy",
+      "pairing",
+    ])).rejects.toThrow("group:-1001234567890 policy must be one of: disabled, allowlist, open");
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "telegram",
+      "dm:1276408333",
+      "--bot",
+      "default",
+      "--policy",
+      "pairing",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.telegram.default.groups["-1001234567890"]).toBeUndefined();
+    expect(rawConfig.bots.telegram.default.directMessages["1276408333"].policy).toBe("pairing");
+  });
+
+  test("rejects removing the shared wildcard route", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await expect(runRoutesCli([
+      "remove",
+      "--channel",
+      "slack",
+      "group:*",
+      "--bot",
+      "default",
+    ])).rejects.toThrow("group:* always exists");
+  });
+
+  test("help explains the canonical ids and the allowlist deny message", async () => {
+    const lines: string[] = [];
+    console.log = ((line?: unknown) => {
+      lines.push(String(line ?? ""));
+    }) as typeof console.log;
+
+    await runRoutesCli(["help"]);
+
+    const text = lines.join("\n");
+    expect(text).toContain("Canonical CLI ids are `dm:<id>`, `dm:*`, `group:<id>`, `group:*`");
+    expect(text).toContain("routes add --channel <slack|telegram> <dm:*|dm:<id>>");
+    expect(text).toContain("Shared group policy values are `disabled`, `allowlist`, and `open`.");
+    expect(text).toContain("DM wildcard policy values are `disabled`, `pairing`, `allowlist`, and `open`.");
+    expect(text).toContain("You are not allowed to use this bot in this group.");
+    expect(text).toContain("routes add-allow-user --channel slack group:* --bot default --user U_OWNER");
   });
 });

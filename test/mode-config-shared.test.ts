@@ -18,10 +18,10 @@ function createTelegramTopicTarget(chatId: string, topicId: string): ConfiguredS
 }
 
 describe("resolveConfiguredSurfaceModeTarget", () => {
-  test("exact DM mode targets inherit from dm:* and materialize behavior-only overrides on write", () => {
+  test("exact DM mode targets inherit from wildcard admission and store under raw ids", () => {
     const config = createConfig();
-    config.bots.slack.default.directMessages["dm:*"] = {
-      enabled: true,
+    config.bots.slack.default.directMessages["*"] = {
+      enabled: false,
       requireMention: false,
       policy: "allowlist",
       allowUsers: ["U123"],
@@ -40,18 +40,19 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     expect(binding.get()).toBe("latest");
     binding.set("off");
 
-    expect(config.bots.slack.default.directMessages["dm:U123"]?.streaming).toBe("off");
-    expect(config.bots.slack.default.directMessages["dm:U123"]?.policy).toBeUndefined();
-    expect(config.bots.slack.default.directMessages["dm:U123"]?.allowUsers).toEqual([]);
-    expect(config.bots.slack.default.directMessages["dm:U123"]?.blockUsers).toEqual([]);
+    expect(config.bots.slack.default.directMessages["U123"]?.streaming).toBe("off");
+    expect(config.bots.slack.default.directMessages["U123"]?.policy).toBe("allowlist");
+    expect(config.bots.slack.default.directMessages["U123"]?.enabled).toBe(false);
   });
 
   test("telegram topic inherits group mode values without requiring an explicit topic override", () => {
     const config = createConfig();
     config.bots.telegram.default.groups["-1001"] = {
-      ...config.bots.telegram.default.groups["-1001"],
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
       streaming: "latest",
       responseMode: "message-tool",
       additionalMessageMode: "queue",
@@ -72,9 +73,11 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
   test("telegram topic writes create a topic override even when the topic previously only inherited", () => {
     const config = createConfig();
     config.bots.telegram.default.groups["-1001"] = {
-      ...config.bots.telegram.default.groups["-1001"],
+      enabled: true,
       requireMention: true,
       allowBots: false,
+      allowUsers: [],
+      blockUsers: [],
       streaming: "latest",
       topics: {},
     };
@@ -90,22 +93,6 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     );
     expect(
       config.bots.telegram.default.groups["-1001"]?.topics["4"]?.additionalMessageMode,
-    ).toBe(
-      "steer",
-    );
-  });
-
-  test("telegram open-group topic can read from channel defaults and materialize a topic override on write", () => {
-    const config = createConfig();
-    config.bots.telegram.defaults.groupPolicy = "open";
-    config.bots.telegram.default.streaming = "all";
-
-    const target = createTelegramTopicTarget("-1009", "7");
-    const binding = resolveConfiguredSurfaceModeTarget(config, "streaming", target);
-
-    expect(binding.get()).toBe("all");
-    binding.set("off");
-
-    expect(config.bots.telegram.default.groups["-1009"]?.topics["7"]?.streaming).toBe("off");
+    ).toBe("steer");
   });
 });

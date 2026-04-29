@@ -1,7 +1,7 @@
 import {
   type FollowUpMode,
 } from "./follow-up-policy.ts";
-import type { IntervalLoopStatus, StoredIntervalLoop } from "./loop-state.ts";
+import type { IntervalLoopStatus, StoredLoop, StoredLoopSender } from "./loop-state.ts";
 import {
   computeNextCalendarLoopRunAtMs,
   type LoopCalendarCadence,
@@ -32,6 +32,7 @@ import {
   renderLoopStartNotification,
   type SurfaceNotificationsConfig,
 } from "../channels/surface-notifications.ts";
+import { buildSurfacePromptContextWithDirectory } from "../channels/surface-directory.ts";
 import {
   buildConfiguredTargetFromIdentity,
   resolveConfiguredSurfaceModeTarget,
@@ -66,6 +67,8 @@ import {
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
 } from "../config/channel-bots.ts";
+import { resolveSharedGroupsWildcardRoute } from "../config/group-routes.ts";
+import { resolveConfigTimezone } from "../config/timezone.ts";
 
 type StreamUpdate = RunUpdate;
 
@@ -75,14 +78,13 @@ type StreamCallbacks = {
 
 type ManagedIntervalLoop = {
   target: AgentSessionTarget;
-  loop: StoredIntervalLoop;
+  loop: StoredLoop;
   timer?: ReturnType<typeof setTimeout>;
 };
 
 type LoopConfig = {
   maxRunsPerLoop: number;
   maxActiveLoops: number;
-  defaultTimezone?: string;
   legacyMaxTimes?: number;
 };
 
@@ -267,6 +269,10 @@ export class AgentService {
     return this.runnerSessions.nudgeSession(target);
   }
 
+  async triggerNewSession(target: AgentSessionTarget) {
+    return this.runnerSessions.triggerNewSession(target);
+  }
+
   async getConversationFollowUpState(target: AgentSessionTarget) {
     return this.sessionState.getConversationFollowUpState(target);
   }
@@ -357,8 +363,8 @@ export class AgentService {
     return this.activeRuns.submitSessionInput(target, text);
   }
 
-  isSessionBusy(target: AgentSessionTarget) {
-    return this.activeRuns.hasActiveRun(target) || this.queue.isBusy(target.sessionKey);
+  async isSessionBusy(target: AgentSessionTarget) {
+    return (await this.activeRuns.hasLiveActiveRun(target)) || this.queue.isBusy(target.sessionKey);
   }
 
   async isAwaitingFollowUpRouting(target: AgentSessionTarget) {
@@ -366,7 +372,7 @@ export class AgentService {
       return true;
     }
 
-    if (!this.activeRuns.hasActiveRun(target)) {
+    if (!(await this.activeRuns.hasLiveActiveRun(target))) {
       return false;
     }
 
@@ -395,8 +401,22 @@ export class AgentService {
     return {
       maxRunsPerLoop: raw.maxRunsPerLoop ?? raw.legacyMaxTimes ?? 50,
       maxActiveLoops: raw.maxActiveLoops ?? 10,
-      defaultTimezone: raw.defaultTimezone,
     };
+  }
+
+  resolveEffectiveTimezone(params: {
+    agentId?: string;
+    routeTimezone?: string;
+    botTimezone?: string;
+    loopTimezone?: string;
+  } = {}) {
+    return resolveConfigTimezone({
+      config: this.loadedConfig.raw,
+      agentId: params.agentId,
+      routeTimezone: params.routeTimezone,
+      botTimezone: params.botTimezone,
+      loopTimezone: params.loopTimezone,
+    });
   }
 
   async createIntervalLoop(params: {
@@ -410,6 +430,7 @@ export class AgentService {
     intervalMs: number;
     maxRuns: number;
     createdBy?: string;
+    sender?: StoredLoopSender;
     force: boolean;
   }) {
     if (this.intervalLoops.size >= this.getLoopConfig().maxActiveLoops) {
@@ -428,6 +449,7 @@ export class AgentService {
       intervalMs: params.intervalMs,
       maxRuns: params.maxRuns,
       createdBy: params.createdBy,
+      sender: params.sender,
       force: params.force,
     });
 
@@ -459,6 +481,7 @@ export class AgentService {
     timezone: string;
     maxRuns: number;
     createdBy?: string;
+    sender?: StoredLoopSender;
   }) {
     if (this.intervalLoops.size >= this.getLoopConfig().maxActiveLoops) {
       throw new Error(
@@ -481,6 +504,7 @@ export class AgentService {
       timezone: params.timezone,
       maxRuns: params.maxRuns,
       createdBy: params.createdBy,
+      sender: params.sender,
     });
 
     const resolved = this.resolveTarget(params.target);
@@ -583,24 +607,27 @@ export class AgentService {
 
   enqueuePrompt(
     target: AgentSessionTarget,
-    prompt: string,
+    prompt: string | (() => string),
     callbacks: StreamCallbacks & {
       observerId?: string;
       timingContext?: LatencyDebugContext;
+      queueText?: string;
     },
   ) {
     return this.queue.enqueue(
       target.sessionKey,
-      async () =>
-        this.activeRuns.executePrompt(target, prompt, {
+      async () => {
+        const promptText = typeof prompt === "function" ? prompt() : prompt;
+        return this.activeRuns.executePrompt(target, promptText, {
           id: callbacks.observerId ?? `prompt:${target.sessionKey}`,
           mode: "live",
           timingContext: callbacks.timingContext,
           onUpdate: callbacks.onUpdate,
-        }),
+        });
+      },
       {
-        text: prompt,
-        canStart: async () => !this.activeRuns.hasActiveRun(target),
+        text: callbacks.queueText ?? (typeof prompt === "string" ? prompt : undefined),
+        canStart: async () => !(await this.activeRuns.hasLiveActiveRun(target)),
       },
     );
   }
@@ -674,7 +701,7 @@ export class AgentService {
 
   private async isManagedLoopPersisted(managed: ManagedIntervalLoop) {
     const entry = await this.sessionState.getEntry(managed.target.sessionKey);
-    return (entry?.intervalLoops ?? []).some((loop) => loop.id === managed.loop.id);
+    return (entry?.loops ?? entry?.intervalLoops ?? []).some((loop) => loop.id === managed.loop.id);
   }
 
   private dropManagedIntervalLoop(loopId: string) {
@@ -709,14 +736,14 @@ export class AgentService {
     const attemptedRuns = managed.loop.attemptedRuns + 1;
     const now = Date.now();
     const nextRunAt = this.computeNextManagedLoopRunAtMs(managed.loop, now);
-    const nextLoopState: StoredIntervalLoop = {
+    const nextLoopState: StoredLoop = {
       ...managed.loop,
       attemptedRuns,
       updatedAt: now,
       nextRunAt,
     };
 
-    if (this.isSessionBusy(managed.target)) {
+    if (await this.isSessionBusy(managed.target)) {
       nextLoopState.skippedRuns += 1;
       if (!(await this.updateManagedIntervalLoop(managed, nextLoopState))) {
         this.dropManagedIntervalLoop(loopId);
@@ -740,7 +767,10 @@ export class AgentService {
       await this.notifyManagedLoopStart(managed.target, nextLoopState);
     }
 
-    const promptText = this.buildManagedLoopPrompt(managed.target.agentId, nextLoopState);
+    const promptText = await this.buildManagedLoopPrompt(
+      managed.target.agentId,
+      nextLoopState,
+    );
     const { result } = this.enqueuePrompt(
       managed.target,
       promptText,
@@ -806,8 +836,9 @@ export class AgentService {
       const routeKey = identity.conversationKind === "group"
         ? identity.channelId ? `group:${identity.channelId}` : undefined
         : identity.channelId ? `channel:${identity.channelId}` : undefined;
+      const wildcardRoute = resolveSharedGroupsWildcardRoute(routeCollection);
       const route = identity.channelId
-        ? routeCollection[routeKey ?? ""] ?? routeCollection["*"]
+        ? routeCollection[routeKey ?? ""] ?? wildcardRoute
         : undefined;
       return {
         ...resolved,
@@ -836,7 +867,8 @@ export class AgentService {
     }
 
     const groupRoute = identity.chatId
-      ? channelConfig.groups[identity.chatId] ?? channelConfig.groups["*"]
+      ? channelConfig.groups[identity.chatId] ??
+        resolveSharedGroupsWildcardRoute(channelConfig.groups)
       : undefined;
     resolved = {
       ...resolved,
@@ -855,13 +887,13 @@ export class AgentService {
 
   private async notifyManagedLoopStart(
     target: AgentSessionTarget,
-    loop: StoredIntervalLoop,
+    loop: StoredLoop,
   ) {
     if (!loop.surfaceBinding) {
       return;
     }
 
-    const identity = this.buildLoopChannelIdentity(loop.surfaceBinding);
+    const identity = this.buildLoopChannelIdentity(loop);
     const notifications = this.resolveLoopSurfaceNotifications(identity);
     const text =
       loop.kind === "calendar"
@@ -936,7 +968,7 @@ export class AgentService {
 
   private async updateManagedIntervalLoop(
     managed: ManagedIntervalLoop,
-    nextLoopState: StoredIntervalLoop,
+    nextLoopState: StoredLoop,
   ) {
     const replaced = await this.sessionState.replaceIntervalLoopIfPresent(
       this.resolveTarget(managed.target),
@@ -959,7 +991,7 @@ export class AgentService {
       .test(message);
   }
 
-  private computeNextManagedLoopRunAtMs(loop: StoredIntervalLoop, nowMs: number) {
+  private computeNextManagedLoopRunAtMs(loop: StoredLoop, nowMs: number) {
     if (loop.kind === "calendar") {
       return (
         computeNextCalendarLoopRunAtMs({
@@ -975,12 +1007,12 @@ export class AgentService {
     return nowMs + loop.intervalMs;
   }
 
-  private buildManagedLoopPrompt(agentId: string, loop: StoredIntervalLoop) {
+  private async buildManagedLoopPrompt(agentId: string, loop: StoredLoop) {
     if (!loop.canonicalPromptText || !loop.surfaceBinding) {
       return loop.promptText;
     }
 
-    const identity = this.buildLoopChannelIdentity(loop.surfaceBinding);
+    const identity = this.buildLoopChannelIdentity(loop);
     const channelConfig =
       identity.platform === "slack"
         ? resolveSlackBotConfig(
@@ -992,6 +1024,14 @@ export class AgentService {
             resolveChannelIdentityBotId(identity),
           );
     const { responseMode, streaming } = this.resolveLoopSurfaceModes(identity);
+    const promptTime = Date.now();
+    const promptContext = await buildSurfacePromptContextWithDirectory({
+      stateDir: this.loadedConfig.stateDir,
+      identity,
+      agentId,
+      time: promptTime,
+      scheduledLoopId: loop.id,
+    });
 
     return buildAgentPromptText({
       text: loop.canonicalPromptText,
@@ -1001,18 +1041,30 @@ export class AgentService {
       responseMode,
       streaming,
       protectedControlMutationRule: loop.protectedControlMutationRule,
+      agentId,
+      time: promptTime,
+      promptContext,
+      scheduledLoopId: loop.id,
     });
   }
 
-  private buildLoopChannelIdentity(binding: StoredLoopSurfaceBinding): ChannelIdentity {
+  private buildLoopChannelIdentity(loop: StoredLoop): ChannelIdentity {
+    const binding = loop.surfaceBinding!;
+    const sender = loop.sender;
     return {
       platform: binding.platform,
       botId: binding.botId ?? binding.accountId,
       conversationKind: binding.conversationKind,
+      senderId: sender?.providerId ?? loop.createdBy,
+      senderName: sender?.displayName,
+      senderHandle: sender?.handle,
       channelId: binding.channelId,
+      channelName: binding.channelName,
       chatId: binding.chatId,
+      chatName: binding.chatName,
       threadTs: binding.threadTs,
       topicId: binding.topicId,
+      topicName: binding.topicName,
     };
   }
 

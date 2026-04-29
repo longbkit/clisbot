@@ -16,7 +16,6 @@ function createLoadedConfig(): LoadedConfig {
   );
   config.bots.defaults.dmScope = "per-channel-peer";
   config.bots.telegram.defaults.allowBots = false;
-  config.bots.telegram.defaults.groupPolicy = "allowlist";
   config.bots.telegram.defaults.streaming = "all";
   config.bots.telegram.defaults.response = "final";
   config.bots.telegram.defaults.responseMode = "message-tool";
@@ -32,21 +31,37 @@ function createLoadedConfig(): LoadedConfig {
     enabled: true,
     botToken: "telegram-token",
     groups: {
-      "-1001": {
-        enabled: true,
+      "*": {
+        enabled: false,
         requireMention: true,
         allowBots: false,
-        agentId: "default",
-        allowUsers: [],
-        blockUsers: [],
+        allowUsers: ["100"],
+        blockUsers: ["200"],
         topics: {
           "4": {
             enabled: true,
+            allowUsers: ["300"],
+            blockUsers: ["400"],
+          },
+        },
+      },
+      "-1001": {
+        enabled: true,
+        policy: "open",
+        requireMention: true,
+        allowBots: false,
+        agentId: "default",
+        allowUsers: ["500"],
+        blockUsers: ["600"],
+        topics: {
+          "4": {
+            enabled: true,
+            policy: "open",
             requireMention: false,
             allowBots: false,
             agentId: "claude",
-            allowUsers: [],
-            blockUsers: [],
+            allowUsers: ["700"],
+            blockUsers: ["800"],
             verbose: "off",
             timezone: "Asia/Ho_Chi_Minh",
           },
@@ -54,7 +69,7 @@ function createLoadedConfig(): LoadedConfig {
       },
     },
     directMessages: {
-      "dm:*": {
+      "*": {
         enabled: true,
         policy: "open",
         allowUsers: [],
@@ -65,7 +80,7 @@ function createLoadedConfig(): LoadedConfig {
       },
     },
   };
-  config.agents.list = [{ id: "default" }, { id: "claude" }];
+  config.agents.list = [{ id: "default" }, { id: "claude" }, { id: "bound-agent" }];
 
   return {
     configPath: "/tmp/clisbot.json",
@@ -94,22 +109,29 @@ describe("Telegram route resolution", () => {
     });
 
     expect(resolved.conversationKind).toBe("topic");
+    expect(resolved.status).toBe("admitted");
     expect(resolved.route?.agentId).toBe("claude");
     expect(resolved.route?.requireMention).toBe(false);
     expect(resolved.route?.verbose).toBe("off");
     expect(resolved.route?.timezone).toBe("Asia/Ho_Chi_Minh");
-    expect("privilegeCommands" in (resolved.route ?? {})).toBe(false);
   });
 
-  test("uses agent additionalMessageMode when the route does not override it", () => {
+  test("merges wildcard group and topic audience into exact Telegram topic routes", () => {
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig: createLoadedConfig(),
+      chatType: "supergroup",
+      chatId: -1001,
+      topicId: 4,
+      isForum: true,
+    });
+
+    expect(resolved.route?.allowUsers).toEqual(["100", "500", "300", "700"]);
+    expect(resolved.route?.blockUsers).toEqual(["200", "600", "400", "800"]);
+  });
+
+  test("requires an exact shared route when group admission is allowlist", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.bots.telegram.defaults.groupPolicy = "open";
-    loadedConfig.raw.agents.list = [
-      {
-        id: "default",
-        additionalMessageMode: "queue",
-      },
-    ];
+    delete loadedConfig.raw.bots.telegram.default.groups["-1001"];
 
     const resolved = resolveTelegramConversationRoute({
       loadedConfig,
@@ -118,10 +140,26 @@ describe("Telegram route resolution", () => {
       isForum: false,
     });
 
-    expect(resolved.route?.additionalMessageMode).toBe("queue");
+    expect(resolved.status).toBe("missing");
+    expect(resolved.route).toBeNull();
   });
 
-  test("inherits telegram route verbose from channel defaults", () => {
+  test("marks multi-user surfaces disabled when group admission is disabled", () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.telegram.default.groupPolicy = "disabled";
+
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig,
+      chatType: "supergroup",
+      chatId: -1001,
+      isForum: false,
+    });
+
+    expect(resolved.status).toBe("disabled");
+    expect(resolved.route).toBeNull();
+  });
+
+  test("inherits telegram route verbose from provider defaults in DMs", () => {
     const resolved = resolveTelegramConversationRoute({
       loadedConfig: createLoadedConfig(),
       chatType: "private",
@@ -156,20 +194,9 @@ describe("Telegram route resolution", () => {
     expect(target.sessionKey).toBe("agent:default:telegram:dm:12345");
   });
 
-  test("does not expose route-local privilege commands anymore", () => {
-    const resolved = resolveTelegramConversationRoute({
-      loadedConfig: createLoadedConfig(),
-      chatType: "private",
-      chatId: 12345,
-      isForum: false,
-    });
-
-    expect("privilegeCommands" in (resolved.route ?? {})).toBe(false);
-  });
-
-  test("uses bot fallback agent when route agent is not overridden", () => {
+  test("uses bot fallback agent when DM route agent is not overridden", () => {
     const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.bots.telegram.default.directMessages["dm:*"]!.agentId = undefined;
+    loadedConfig.raw.bots.telegram.default.directMessages["*"]!.agentId = undefined;
     loadedConfig.raw.bots.telegram.default.agentId = "bound-agent";
 
     const resolved = resolveTelegramConversationRoute({
@@ -180,35 +207,5 @@ describe("Telegram route resolution", () => {
     });
 
     expect(resolved.route?.agentId).toBe("bound-agent");
-  });
-
-  test("uses account-specific telegram bot fallback when the bot id is provided", () => {
-    const loadedConfig = createLoadedConfig();
-    loadedConfig.raw.bots.telegram.ops = {
-      enabled: true,
-      botToken: "ops-telegram-token",
-      agentId: "ops-agent",
-      directMessages: {
-        "dm:*": {
-          enabled: true,
-          policy: "open",
-          allowUsers: [],
-          blockUsers: [],
-          requireMention: false,
-          allowBots: false,
-        },
-      },
-      groups: {},
-    };
-
-    const resolved = resolveTelegramConversationRoute({
-      loadedConfig,
-      chatType: "private",
-      chatId: 12345,
-      isForum: false,
-      accountId: "ops",
-    });
-
-    expect(resolved.route?.agentId).toBe("ops-agent");
   });
 });

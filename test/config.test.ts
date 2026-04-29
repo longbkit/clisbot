@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
+import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
+import { INTERACTIVE_CLI_STARTUP_DELAY_MS } from "../src/config/agent-tool-presets.ts";
 import { readEditableConfig } from "../src/config/config-file.ts";
 import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
 import { resolveSlackBotConfig } from "../src/config/channel-bots.ts";
@@ -24,6 +26,7 @@ describe("loadConfig", () => {
   const originalSlackAppToken = process.env.SLACK_APP_TOKEN;
   const originalSlackBotToken = process.env.SLACK_BOT_TOKEN;
   const originalTelegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+  const originalWarn = console.warn;
 
   afterEach(() => {
     if (tempDir) {
@@ -34,12 +37,16 @@ describe("loadConfig", () => {
     process.env.SLACK_APP_TOKEN = originalSlackAppToken;
     process.env.SLACK_BOT_TOKEN = originalSlackBotToken;
     process.env.TELEGRAM_BOT_TOKEN = originalTelegramBotToken;
+    console.warn = originalWarn;
   });
 
   test("loads the new config shape and expands env-backed bot credentials", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
     const configPath = join(tempDir, "clisbot.json");
     const config = buildTemplateConfig();
+    expect(config.agents.defaults.runner.codex.startupReadyPattern).toBeUndefined();
+    expect(config.agents.defaults.runner.gemini.startupReadyPattern).toBeUndefined();
+    expect(config.app.control.runtimeMonitor.restartBackoff).toBeUndefined();
 
     config.app.session.mainKey = "main";
     config.app.session.identityLinks = {
@@ -63,6 +70,7 @@ describe("loadConfig", () => {
       mode: "auto",
       participationTtlMin: 13,
     };
+    config.bots.slack.default.dmPolicy = "allowlist";
     config.bots.slack.default.directMessages = {
       "*": {
         enabled: true,
@@ -128,13 +136,13 @@ describe("loadConfig", () => {
     });
     expect(resolvedSlackBot.followUp.mode).toBe("auto");
     expect(resolvedSlackBot.followUp.participationTtlMin).toBe(13);
-    expect(resolvedSlackBot.directMessages["dm:*"]?.policy).toBe("allowlist");
-    expect(resolvedSlackBot.directMessages["dm:*"]?.allowUsers).toEqual(["U999"]);
-    expect(resolvedSlackBot.directMessages["dm:*"]?.blockUsers).toEqual(["U555"]);
-    expect(resolvedSlackBot.directMessages["dm:U123"]?.policy).toBeUndefined();
-    expect(resolvedSlackBot.directMessages["dm:U123"]?.allowUsers).toEqual([]);
-    expect(resolvedSlackBot.directMessages["dm:U123"]?.responseMode).toBe("message-tool");
-    expect(resolvedSlackBot.directMessages["dm:U123"]?.additionalMessageMode).toBe("queue");
+    expect(resolvedSlackBot.directMessages["*"]?.policy).toBe("allowlist");
+    expect(resolvedSlackBot.directMessages["*"]?.allowUsers).toEqual(["U999"]);
+    expect(resolvedSlackBot.directMessages["*"]?.blockUsers).toEqual(["U555"]);
+    expect(resolvedSlackBot.directMessages["U123"]?.policy).toBe("pairing");
+    expect(resolvedSlackBot.directMessages["U123"]?.allowUsers).toEqual([]);
+    expect(resolvedSlackBot.directMessages["U123"]?.responseMode).toBe("message-tool");
+    expect(resolvedSlackBot.directMessages["U123"]?.additionalMessageMode).toBe("queue");
     expect(loaded.raw.agents.defaults.runner.codex.sessionId!.capture.mode).toBe(
       "status-command",
     );
@@ -172,6 +180,309 @@ describe("loadConfig", () => {
     expect(resolvedDefaultAgent.runner.sessionId.create.mode).toBe("runner");
     expect(resolvedDefaultAgent.runner.sessionId.capture.mode).toBe("status-command");
     expect(resolvedDefaultAgent.runner.sessionId.resume.mode).toBe("command");
+    expect(resolvedDefaultAgent.runner.startupReadyPattern).toBe("(?:^|\\s)›\\s");
+  });
+
+  test("migrates released 0.1.43 route keys into the new canonical surface shape", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.43";
+    delete config.app.timezone;
+    config.app.control.loop.defaultTimezone = "Asia/Ho_Chi_Minh";
+    config.bots.defaults.timezone = "UTC";
+    delete config.bots.slack.default.dmPolicy;
+    config.bots.slack.defaults.directMessages = {
+      "dm:*": {
+        enabled: true,
+        policy: "pairing",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    };
+    config.bots.slack.default.directMessages = {
+      "dm:*": {
+        enabled: true,
+        policy: "allowlist",
+        allowUsers: ["U_OWNER"],
+        blockUsers: [],
+        allowBots: false,
+      },
+      "dm:U_DEV": {
+        enabled: false,
+        policy: "disabled",
+        allowUsers: ["U_DEV"],
+        responseMode: "capture-pane",
+      },
+    };
+    config.bots.slack.default.groups = {
+      "groups:*": {
+        enabled: false,
+        policy: "disabled",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+      "channel:C123": {
+        enabled: true,
+        policy: "allowlist",
+        allowUsers: ["U_DEVOPS"],
+        blockUsers: [],
+        allowBots: false,
+      },
+    };
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    process.env.SLACK_APP_TOKEN = "app-token";
+    process.env.SLACK_BOT_TOKEN = "bot-token";
+    process.env.TELEGRAM_BOT_TOKEN = "telegram-token";
+    const warnings: string[] = [];
+    console.warn = ((message?: unknown) => {
+      warnings.push(String(message ?? ""));
+    }) as typeof console.warn;
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+
+    expect(loaded.raw.meta.schemaVersion).toBe("0.1.45");
+    expect(loaded.raw.app.timezone).toBe("Asia/Ho_Chi_Minh");
+    expect(loaded.raw.app.control.loop.defaultTimezone).toBeUndefined();
+    expect(loaded.raw.bots.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.slack.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.telegram.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.slack.default.directMessages["*"]?.policy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.directMessages["U_DEV"]?.enabled).toBe(true);
+    expect(loaded.raw.bots.slack.default.directMessages["U_DEV"]?.policy).toBe("pairing");
+    expect(loaded.raw.bots.slack.default.directMessages["U_DEV"]?.allowUsers).toEqual([]);
+    expect(loaded.raw.bots.slack.default.directMessages["U_DEV"]?.responseMode).toBe(
+      "capture-pane",
+    );
+    expect(loaded.raw.bots.slack.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.groups["*"]?.policy).toBe("open");
+    expect(loaded.raw.bots.slack.default.groups["C123"]?.policy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.groups["C123"]?.allowUsers).toEqual(["U_DEVOPS"]);
+
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const backups = readdirSync(join(tempDir, "backups"));
+    expect(rewrittenConfig.meta.schemaVersion).toBe("0.1.45");
+    expect(rewrittenConfig.app.timezone).toBe("Asia/Ho_Chi_Minh");
+    expect(rewrittenConfig.app.control.loop.defaultTimezone).toBeUndefined();
+    expect(rewrittenConfig.bots.defaults.timezone).toBeUndefined();
+    expect(rewrittenConfig.bots.slack.defaults.timezone).toBeUndefined();
+    expect(rewrittenConfig.bots.telegram.defaults.timezone).toBeUndefined();
+    expect(rewrittenConfig.bots.slack.default.groups["*"].policy).toBe("open");
+    expect(backups).toHaveLength(1);
+    expect(backups[0]).toContain("clisbot.json.0.1.43.");
+    const backupConfig = JSON.parse(readFileSync(join(tempDir, "backups", backups[0]!), "utf8"));
+    expect(backupConfig.meta.schemaVersion).toBe("0.1.43");
+    expect(backupConfig.bots.slack.default.groups["groups:*"].policy).toBe("disabled");
+    expect(warnings).toEqual([
+      expect.stringContaining("backup 0.1.43 config to"),
+      "clisbot config upgrade: preparing 0.1.43 -> 0.1.45",
+      "clisbot config upgrade: dry-run validating 0.1.45 config",
+      expect.stringContaining("applying 0.1.45 config to"),
+      expect.stringContaining("applied 0.1.43 -> 0.1.45; backup:"),
+    ]);
+  });
+
+  test("migrates legacy exact shared routes without policy to inherit wildcard sender policy", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.41";
+    delete config.bots.slack.default.groupPolicy;
+    delete config.bots.slack.default.channelPolicy;
+    delete config.bots.telegram.default.groupPolicy;
+    config.bots.slack.default.groups = {
+      C1234567890: {
+        enabled: true,
+        requireMention: true,
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    };
+    config.bots.telegram.default.groups = {
+      "-1001234567890": {
+        enabled: true,
+        requireMention: false,
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+        topics: {
+          "42": {
+            enabled: true,
+            allowUsers: [],
+            blockUsers: [],
+            streaming: "all",
+          },
+        },
+      },
+    };
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+
+    expect(loaded.raw.bots.slack.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.channelPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.slack.default.groups.C1234567890?.policy).toBeUndefined();
+    expect(loaded.raw.bots.telegram.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.telegram.default.groups["*"]?.policy).toBe("open");
+    expect(loaded.raw.bots.telegram.default.groups["-1001234567890"]?.policy).toBeUndefined();
+    expect(
+      loaded.raw.bots.telegram.default.groups["-1001234567890"]?.topics["42"]?.policy,
+    ).toBeUndefined();
+
+    const resolved = resolveTelegramConversationRoute({
+      loadedConfig: loaded,
+      chatType: "supergroup",
+      chatId: -1001234567890,
+      topicId: 42,
+      isForum: true,
+      botId: "default",
+    });
+
+    expect(resolved.status).toBe("admitted");
+    expect(resolved.route?.policy).toBe("open");
+  });
+
+  test("migrates 0.1.44 timezone defaults into app timezone", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.44";
+    delete config.app.timezone;
+    config.bots.defaults.timezone = "Asia/Ho_Chi_Minh";
+    config.bots.slack.defaults.timezone = "America/Los_Angeles";
+    config.bots.telegram.defaults.timezone = "Asia/Singapore";
+    config.bots.telegram.default.timezone = "Asia/Tokyo";
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const backups = readdirSync(join(tempDir, "backups"));
+
+    expect(loaded.raw.meta.schemaVersion).toBe("0.1.45");
+    expect(loaded.raw.app.timezone).toBe("Asia/Ho_Chi_Minh");
+    expect(loaded.raw.bots.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.slack.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.telegram.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.telegram.default.timezone).toBe("Asia/Tokyo");
+    expect(rewrittenConfig.app.timezone).toBe("Asia/Ho_Chi_Minh");
+    expect(rewrittenConfig.bots.telegram.default.timezone).toBe("Asia/Tokyo");
+    expect(backups).toHaveLength(1);
+    expect(backups[0]).toContain("clisbot.json.0.1.44.");
+  });
+
+  test("clears runner-owned startup defaults during 0.1.45 config upgrade", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.44";
+    config.agents.defaults.runner.defaults.startupDelayMs = 12345;
+    config.app.control.runtimeMonitor.restartBackoff = {
+      fastRetry: {
+        delaySeconds: 10,
+        maxRestarts: 3,
+      },
+      stages: [
+        {
+          delayMinutes: 15,
+          maxRestarts: 4,
+        },
+        {
+          delayMinutes: 30,
+          maxRestarts: 4,
+        },
+      ],
+    };
+    config.agents.defaults.runner.codex.startupReadyPattern = "custom-codex-ready";
+    config.agents.defaults.runner.gemini.startupDelayMs = 12345;
+    config.agents.defaults.runner.gemini.startupRetryCount = 7;
+    config.agents.defaults.runner.gemini.startupRetryDelayMs = 4321;
+    config.agents.defaults.runner.gemini.startupReadyPattern = "custom-gemini-ready";
+    config.agents.defaults.runner.gemini.startupBlockers = [
+      {
+        pattern: "custom-blocker",
+        message: "custom blocker",
+      },
+    ];
+    config.agents.defaults.runner.gemini.promptSubmitDelayMs = 999;
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const resolvedDefaultAgent = new AgentService(loaded).getResolvedAgentConfig("default");
+
+    expect(rewrittenConfig.app.control.runtimeMonitor.restartBackoff).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.codex.startupReadyPattern).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupRetryCount).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupRetryDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupReadyPattern).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupBlockers).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.promptSubmitDelayMs).toBeUndefined();
+    expect(resolvedDefaultAgent.runner.startupReadyPattern).toBe("(?:^|\\s)›\\s");
+    expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
+  });
+
+  test("clears stale current-schema shared startup defaults on load", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.45";
+    config.agents.defaults.runner.defaults.startupDelayMs = 3000;
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const backups = readdirSync(join(tempDir, "backups"));
+    const resolvedDefaultAgent = new AgentService(loaded).getResolvedAgentConfig("default");
+
+    expect(rewrittenConfig.meta.schemaVersion).toBe("0.1.45");
+    expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
+    expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
+    expect(backups).toHaveLength(1);
+    expect(backups[0]).toContain("clisbot.json.0.1.45.");
+  });
+
+  test("preserves current-schema disabled wildcard sender policy", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+    config.bots.telegram.default.groups["*"] = {
+      enabled: false,
+      policy: "disabled",
+      requireMention: true,
+      allowUsers: [],
+      blockUsers: [],
+      allowBots: false,
+      topics: {},
+    };
+
+    await Bun.write(configPath, JSON.stringify(config));
+    const warnings: string[] = [];
+    console.warn = ((message?: unknown) => {
+      warnings.push(String(message ?? ""));
+    }) as typeof console.warn;
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+
+    expect(loaded.raw.bots.telegram.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.telegram.default.groups["*"]?.enabled).toBe(false);
+    expect(loaded.raw.bots.telegram.default.groups["*"]?.policy).toBe("disabled");
+    expect(warnings).toEqual([]);
   });
 
   test("rejects legacy privilegeCommands config keys", async () => {

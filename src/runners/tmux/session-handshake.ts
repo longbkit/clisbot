@@ -1,7 +1,13 @@
 import { extractSessionId } from "../../agents/session-identity.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
 import { sleep } from "../../shared/process.ts";
-import { normalizePaneText, splitNormalizedLines, trimBlankLines } from "../../shared/transcript.ts";
+import {
+  deriveInteractionText,
+  extractScrolledAppend,
+  normalizePaneText,
+  splitNormalizedLines,
+  trimBlankLines,
+} from "../../shared/transcript.ts";
 import type { TmuxClient, TmuxPaneState } from "./client.ts";
 
 const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
@@ -103,32 +109,30 @@ export async function submitTmuxSessionInput(params: {
   );
 
   await params.tmux.sendKey(params.sessionName, "Enter");
-  if (
-    await waitForPaneSubmitConfirmation({
-      tmux: params.tmux,
-      sessionName: params.sessionName,
-      baseline: preSubmitState,
-      baselineSnapshot: preSubmitSnapshot,
-      captureLines,
-    })
-  ) {
-    return;
+  const submitted = await waitForPaneSubmitConfirmation({
+    tmux: params.tmux,
+    sessionName: params.sessionName,
+    baseline: preSubmitState,
+    baselineSnapshot: preSubmitSnapshot,
+    captureLines,
+  });
+  if (submitted.confirmed) {
+    return { submittedSnapshot: preSubmitSnapshot };
   }
 
   logLatencyDebug("tmux-submit-enter-retry", params.timingContext, {
     sessionName: params.sessionName,
   });
   await params.tmux.sendKey(params.sessionName, "Enter");
-  if (
-    await waitForPaneSubmitConfirmation({
-      tmux: params.tmux,
-      sessionName: params.sessionName,
-      baseline: preSubmitState,
-      baselineSnapshot: preSubmitSnapshot,
-      captureLines,
-    })
-  ) {
-    return;
+  const retrySubmitted = await waitForPaneSubmitConfirmation({
+    tmux: params.tmux,
+    sessionName: params.sessionName,
+    baseline: preSubmitState,
+    baselineSnapshot: preSubmitSnapshot,
+    captureLines,
+  });
+  if (retrySubmitted.confirmed) {
+    return { submittedSnapshot: preSubmitSnapshot };
   }
 
   logLatencyDebug("tmux-submit-unconfirmed", params.timingContext, {
@@ -147,7 +151,7 @@ export async function captureTmuxSessionIdentity(params: {
   timeoutMs: number;
   pollIntervalMs: number;
 }) {
-  await submitTmuxSessionInput({
+  let statusSubmission = await submitTmuxSessionInput({
     tmux: params.tmux,
     sessionName: params.sessionName,
     text: params.statusCommand,
@@ -179,7 +183,7 @@ export async function captureTmuxSessionIdentity(params: {
         captureLines: params.captureLines,
       });
       deadline = Date.now() + params.timeoutMs;
-      await submitTmuxSessionInput({
+      statusSubmission = await submitTmuxSessionInput({
         tmux: params.tmux,
         sessionName: params.sessionName,
         text: params.statusCommand,
@@ -189,7 +193,10 @@ export async function captureTmuxSessionIdentity(params: {
       continue;
     }
 
-    const sessionId = extractSessionId(snapshot, params.pattern);
+    const sessionId = extractSessionId(
+      deriveSessionIdentityText(statusSubmission.submittedSnapshot, snapshot),
+      params.pattern,
+    );
     if (sessionId) {
       await waitForTmuxPaneSettle({
         tmux: params.tmux,
@@ -204,6 +211,15 @@ export async function captureTmuxSessionIdentity(params: {
   }
 
   return null;
+}
+
+function deriveSessionIdentityText(submittedSnapshot: string, snapshot: string) {
+  const rawSubmitted = normalizePaneText(submittedSnapshot);
+  const rawSnapshot = normalizePaneText(snapshot);
+  return (
+    extractScrolledAppend(rawSubmitted, rawSnapshot) ||
+    deriveInteractionText(submittedSnapshot, snapshot)
+  );
 }
 
 export async function dismissTmuxTrustPromptIfPresent(params: {
@@ -365,10 +381,15 @@ async function waitForPaneSubmitConfirmation(params: {
   while (true) {
     const state = await params.tmux.getPaneState(params.sessionName);
     if (hasPaneStateChanged(params.baseline, state)) {
-      return true;
+      return {
+        confirmed: true,
+        snapshot: normalizePaneText(
+          await params.tmux.capturePane(params.sessionName, params.captureLines),
+        ),
+      };
     }
 
-    const snapshotChanged = await waitForPaneSubmitSnapshotConfirmation({
+    const snapshotChange = await waitForPaneSubmitSnapshotConfirmation({
       tmux: params.tmux,
       sessionName: params.sessionName,
       baselineSnapshot: params.baselineSnapshot,
@@ -378,13 +399,16 @@ async function waitForPaneSubmitConfirmation(params: {
         Math.max(0, deadline - Date.now()),
       ),
     });
-    if (snapshotChanged) {
-      return true;
+    if (snapshotChange.confirmed) {
+      return snapshotChange;
     }
 
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
-      return false;
+      return {
+        confirmed: false,
+        snapshot: params.baselineSnapshot,
+      };
     }
     await sleep(Math.min(SUBMIT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
   }
@@ -404,12 +428,18 @@ async function waitForPaneSubmitSnapshotConfirmation(params: {
       await params.tmux.capturePane(params.sessionName, params.captureLines),
     );
     if (snapshot !== params.baselineSnapshot) {
-      return true;
+      return {
+        confirmed: true,
+        snapshot,
+      };
     }
 
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) {
-      return false;
+      return {
+        confirmed: false,
+        snapshot: params.baselineSnapshot,
+      };
     }
     await sleep(Math.min(SUBMIT_SNAPSHOT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
   }

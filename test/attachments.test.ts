@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { prependAttachmentMentions } from "../src/agents/attachments/prompt.ts";
 import { saveWorkspaceAttachment } from "../src/agents/attachments/storage.ts";
 import { resolveSlackAttachmentPaths } from "../src/channels/slack/attachments.ts";
+import { resolveTelegramAttachmentPaths } from "../src/channels/telegram/attachments.ts";
 
 describe("attachment prompt shaping", () => {
   test("prepends attachment mentions before normal text", () => {
@@ -20,6 +21,12 @@ describe("attachment prompt shaping", () => {
   test("does not prepend attachment mentions to slash commands", () => {
     expect(prependAttachmentMentions("/transcript", ["/tmp/a.md"])).toBe(
       "/transcript",
+    );
+  });
+
+  test("prepends audio attachment paths as normal file mentions", () => {
+    expect(prependAttachmentMentions("please transcribe", ["/tmp/voice.oga"])).toBe(
+      "@/tmp/voice.oga please transcribe",
     );
   });
 });
@@ -73,6 +80,81 @@ describe("workspace attachment storage", () => {
 
     expect(first.endsWith("spec-plan.md")).toBe(true);
     expect(second.endsWith("spec-plan-2.md")).toBe(true);
+  });
+
+  test("maps audio content types to audio extensions", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-attachments-"));
+    const filePath = await saveWorkspaceAttachment({
+      workspacePath: tempDir,
+      sessionKey: "main",
+      messageId: "1",
+      buffer: Buffer.from("voice"),
+      contentType: "audio/ogg",
+      defaultBaseName: "telegram-voice",
+    });
+
+    expect(filePath.endsWith("telegram-voice.oga")).toBe(true);
+  });
+});
+
+describe("telegram attachment downloads", () => {
+  test("downloads voice messages and preserves an audio extension from Telegram metadata", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-telegram-attachments-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = ((async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/getFile")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            result: {
+              file_path: "voice/file-without-extension",
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json",
+            },
+          },
+        );
+      }
+
+      return new Response(Buffer.from("voice-bytes"), {
+        status: 200,
+        headers: {
+          "content-type": "application/octet-stream",
+        },
+      });
+    }) as unknown) as typeof fetch;
+
+    try {
+      const paths = await resolveTelegramAttachmentPaths({
+        message: {
+          message_id: 123,
+          chat: {
+            id: 456,
+            type: "private",
+          },
+          voice: {
+            file_id: "voice-file-id",
+            mime_type: "audio/ogg",
+          },
+        },
+        botToken: "telegram-token",
+        workspacePath: tempDir,
+        sessionKey: "agent-default-telegram-dm-456",
+        messageId: "123",
+      });
+
+      expect(paths).toHaveLength(1);
+      expect(paths[0]?.endsWith("file-without-extension.oga")).toBe(true);
+      expect(prependAttachmentMentions("", paths)).toBe(`@${paths[0]}`);
+      expect(await Bun.file(paths[0]!).text()).toBe("voice-bytes");
+    } finally {
+      globalThis.fetch = originalFetch;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

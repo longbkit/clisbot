@@ -84,7 +84,7 @@ Current lifecycle rule:
 - status-command continuity capture now requires a truthful handoff back into the first user-prompt path:
   - settle the pane after `/status`
   - confirm paste before `Enter`
-  - allow one bounded fresh-session retry only when paste never landed and `Enter` was never sent
+  - allow one bounded runner restart with the stored native session id preserved when paste never landed and `Enter` was never sent
 - the goal is higher cold-start stability without forcing every healthy startup to wait longer up front
 
 ## Related CLI Doc

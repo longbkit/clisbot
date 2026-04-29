@@ -5,6 +5,8 @@ export type StoredRecentConversationMessage = {
   text?: string;
   senderId?: string;
   senderName?: string;
+  senderHandle?: string;
+  platform?: "slack" | "telegram";
 };
 
 export type StoredRecentConversationState = {
@@ -20,6 +22,8 @@ function normalizeMessage(
     text: message.text?.trim() || undefined,
     senderId: message.senderId?.trim() || undefined,
     senderName: message.senderName?.trim() || undefined,
+    senderHandle: message.senderHandle?.trim() || undefined,
+    platform: message.platform,
   };
 }
 
@@ -28,7 +32,17 @@ function normalizeReplayLine(text: string) {
 }
 
 function renderSenderLabel(message: StoredRecentConversationMessage) {
-  return message.senderName ?? message.senderId;
+  const rawSenderId = message.senderId?.trim();
+  const senderId = rawSenderId && message.platform
+    ? `${message.platform}:${message.platform === "slack" ? rawSenderId.toUpperCase() : rawSenderId}`
+    : rawSenderId;
+  if (!senderId) {
+    return message.senderName;
+  }
+  const details = [senderId, message.senderHandle ? `@${message.senderHandle}` : undefined]
+    .filter(Boolean)
+    .join(", ");
+  return `${message.senderName?.trim() || senderId} [${details}]`;
 }
 
 export function appendRecentConversationMessage(

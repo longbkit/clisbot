@@ -103,6 +103,53 @@ function cloneSlackRoutes(routes: Record<string, BotRouteConfig>) {
   );
 }
 
+function mergeBotRoute(
+  base: BotRouteConfig | undefined,
+  override: BotRouteConfig | undefined,
+) {
+  if (!base) {
+    return override ? cloneBotRoute(override)! : undefined;
+  }
+  if (!override) {
+    return cloneBotRoute(base)!;
+  }
+  return {
+    ...base,
+    ...override,
+    allowUsers: [...new Set([...(base.allowUsers ?? []), ...(override.allowUsers ?? [])])],
+    blockUsers: [...new Set([...(base.blockUsers ?? []), ...(override.blockUsers ?? [])])],
+    commandPrefixes: override.commandPrefixes
+      ? cloneCommandPrefixes(override.commandPrefixes)
+      : base.commandPrefixes
+        ? cloneCommandPrefixes(base.commandPrefixes)
+        : undefined,
+    surfaceNotifications: override.surfaceNotifications
+      ? cloneSurfaceNotifications(override.surfaceNotifications)
+      : base.surfaceNotifications
+        ? cloneSurfaceNotifications(base.surfaceNotifications)
+        : undefined,
+    followUp: override.followUp
+      ? cloneFollowUp(override.followUp)
+      : base.followUp
+        ? cloneFollowUp(base.followUp)
+        : undefined,
+  } satisfies BotRouteConfig;
+}
+
+function mergeSlackRoutes(
+  base: Record<string, BotRouteConfig>,
+  override: Record<string, BotRouteConfig>,
+) {
+  const merged: Record<string, BotRouteConfig> = {};
+  for (const routeId of new Set([...Object.keys(base), ...Object.keys(override)])) {
+    const route = mergeBotRoute(base[routeId], override[routeId]);
+    if (route) {
+      merged[routeId] = route;
+    }
+  }
+  return merged;
+}
+
 function cloneTelegramRoutes(routes: TelegramBotConfig["groups"]) {
   return Object.fromEntries(
     Object.entries(routes).map(([key, route]) => [
@@ -127,6 +174,60 @@ function cloneTelegramRoutes(routes: TelegramBotConfig["groups"]) {
       },
     ]),
   );
+}
+
+function cloneTelegramGroupRoute(route: TelegramBotConfig["groups"][string] | undefined) {
+  if (!route) {
+    return undefined;
+  }
+  return {
+    ...cloneBotRoute(route)!,
+    topics: Object.fromEntries(
+      Object.entries(route.topics ?? {}).map(([topicId, topicRoute]) => [
+        topicId,
+        cloneBotRoute(topicRoute)!,
+      ]),
+    ),
+  } satisfies TelegramBotConfig["groups"][string];
+}
+
+function mergeTelegramGroupRoute(
+  base: TelegramBotConfig["groups"][string] | undefined,
+  override: TelegramBotConfig["groups"][string] | undefined,
+) {
+  if (!base) {
+    return cloneTelegramGroupRoute(override);
+  }
+  if (!override) {
+    return cloneTelegramGroupRoute(base);
+  }
+
+  return {
+    ...mergeBotRoute(base, override)!,
+    topics: Object.fromEntries(
+      [...new Set([
+        ...Object.keys(base.topics ?? {}),
+        ...Object.keys(override.topics ?? {}),
+      ])].map((topicId) => [
+        topicId,
+        mergeBotRoute(base.topics?.[topicId], override.topics?.[topicId])!,
+      ]),
+    ),
+  } satisfies TelegramBotConfig["groups"][string];
+}
+
+function mergeTelegramRoutes(
+  base: TelegramBotConfig["groups"],
+  override: TelegramBotConfig["groups"],
+) {
+  const merged: TelegramBotConfig["groups"] = {};
+  for (const routeId of new Set([...Object.keys(base), ...Object.keys(override)])) {
+    const route = mergeTelegramGroupRoute(base[routeId], override[routeId]);
+    if (route) {
+      merged[routeId] = route;
+    }
+  }
+  return merged;
 }
 
 function getSlackBotsRecord(
@@ -268,7 +369,10 @@ export function resolveSlackBotConfig(
       ...cloneSlackRoutes(providerDefaults.directMessages),
       ...cloneSlackRoutes(botConfig.directMessages ?? {}),
     },
-    groups: cloneSlackRoutes(botConfig.groups ?? {}),
+    groups: mergeSlackRoutes(
+      providerDefaults.groups,
+      botConfig.groups ?? {},
+    ),
     appToken: botConfig.appToken?.trim() ?? "",
     botToken: botConfig.botToken?.trim() ?? "",
   };
@@ -320,7 +424,10 @@ export function resolveTelegramBotConfig(
       ...cloneSlackRoutes(providerDefaults.directMessages),
       ...cloneSlackRoutes(botConfig.directMessages ?? {}),
     },
-    groups: cloneTelegramRoutes(botConfig.groups ?? {}),
+    groups: mergeTelegramRoutes(
+      providerDefaults.groups,
+      botConfig.groups ?? {},
+    ),
     botToken: botConfig.botToken?.trim() ?? "",
   };
 }
@@ -329,14 +436,18 @@ export function resolveSlackDirectMessageConfig(
   config: ResolvedSlackBotConfig,
   userId?: string | null,
 ) {
-  return resolveEffectiveDirectMessageRoute(config.directMessages, userId);
+  return resolveEffectiveDirectMessageRoute(config.directMessages, userId, {
+    exactAdmissionMode: "explicit",
+  });
 }
 
 export function resolveTelegramDirectMessageConfig(
   config: ResolvedTelegramBotConfig,
   senderId?: string | number | null,
 ) {
-  return resolveEffectiveDirectMessageRoute(config.directMessages, senderId);
+  return resolveEffectiveDirectMessageRoute(config.directMessages, senderId, {
+    exactAdmissionMode: "explicit",
+  });
 }
 
 export function resolveSlackDirectMessageAdmissionConfig(

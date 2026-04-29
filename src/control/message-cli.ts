@@ -12,6 +12,7 @@ import {
   parseMessageInputFormat,
   parseMessageRenderMode,
 } from "../channels/message-format.ts";
+import { renderSlackTargetSyntax } from "../config/route-contract.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
 function getConfigPath() {
@@ -210,12 +211,16 @@ export function renderMessageHelp() {
     "  --thread-id <id>              Slack thread ts",
     "  --topic-id <id>               Telegram topic id",
     "",
+    "Targets:",
+    `  Slack accepts ${renderSlackTargetSyntax()}`,
+    "  Telegram `--target` is the numeric chat id",
+    "",
     "Examples:",
     `  ${renderCliCommand("message send --channel telegram --target -1001234567890 --topic-id 42 --message \"## Status\"")}`,
     `  ${renderCliCommand("message send --channel telegram --target -1001234567890 --topic-id 42 --input html --render none --message \"<b>Status</b>\"")}`,
-    `  ${renderCliCommand("message send --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 --message \"## Status\"")}`,
-    `  ${renderCliCommand("message send --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 --input mrkdwn --render none --message \"*Status*\"")}`,
-    `  ${renderCliCommand("message send --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 --input blocks --render none --body-file ./reply-blocks.json")}`,
+    `  ${renderCliCommand("message send --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --message \"## Status\"")}`,
+    `  ${renderCliCommand("message send --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --input mrkdwn --render none --message \"*Status*\"")}`,
+    `  ${renderCliCommand("message send --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --input blocks --render none --body-file ./reply-blocks.json")}`,
   ].join("\n");
 }
 

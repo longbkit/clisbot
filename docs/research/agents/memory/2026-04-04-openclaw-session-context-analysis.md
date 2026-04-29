@@ -1,5 +1,23 @@
 # OpenClaw Session And Context Analysis
 
+## Historical Note
+
+This document captures early OpenClaw-oriented research.
+
+It is useful for understanding why some older `clisbot` docs discussed `channel` versus `group` session buckets, but it is not the current `clisbot` naming contract.
+
+For current `clisbot`, use:
+
+- `README.md`
+- `docs/architecture/surface-architecture.md`
+- `docs/user-guide/channels.md`
+
+Compatibility note:
+
+- examples such as `agent:<agentId>:<channel>:group:<id>` and `agent:<agentId>:<channel>:channel:<id>` in this doc are OpenClaw research examples
+- current `clisbot` operator naming standardizes multi-user surfaces around `group:<id>` and `topic:<chatId>:<topicId>`
+- Slack `channel:<id>` remains compatibility input only in current `clisbot`
+
 ## Summary
 
 This document captures the initial analysis of how OpenClaw organizes session state, conversation transcripts, workspace context, and durable memory.
@@ -114,6 +132,8 @@ Examples:
 - `agent:<agentId>:<channel>:group:<id>`
 - `agent:<agentId>:<channel>:channel:<id>`
 - thread or topic suffixes for thread-isolated conversations
+
+These examples describe the researched OpenClaw model, not the current `clisbot` operator contract.
 
 This means thread context is not a separate memory file.
 

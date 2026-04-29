@@ -321,7 +321,7 @@ export function renderLoopHelpLines() {
     "- `/loop /codereview 3 times`: run the slash command 3 times",
     "- `/loop status`: show active loops for this session",
     `- \`/loop cancel\`, \`/loop cancel <id>\`, \`/loop cancel --all\`, \`/loop cancel --all ${LOOP_APP_FLAG}\`: cancel active loops`,
-    `- intervals must be at least \`1m\`; intervals below \`5m\` require \`${LOOP_FORCE_FLAG}\` right after the interval clause; wall-clock schedules use \`every ... at HH:MM\`; timezone resolves from route override, then \`control.loop.defaultTimezone\`, then host timezone; bare numbers mean times, compact durations such as \`5m\` mean intervals, and the historical default loop cap was \`${DEFAULT_LOOP_MAX_TIMES}\``,
+    `- intervals must be at least \`1m\`; intervals below \`5m\` require \`${LOOP_FORCE_FLAG}\` right after the interval clause; wall-clock schedules use \`every ... at HH:MM\`; the first wall-clock loop created with \`clisbot loops create\` requires \`--confirm\`; timezone resolves from route/topic, agent, bot, app timezone, then legacy defaults and host; bare numbers mean times, compact durations such as \`5m\` mean intervals, and the historical default loop cap was \`${DEFAULT_LOOP_MAX_TIMES}\``,
   ];
 }
 
@@ -362,17 +362,6 @@ export function isValidLoopTimezone(raw: string) {
   } catch {
     return false;
   }
-}
-
-export function resolveLoopTimezone(...candidates: Array<string | undefined>) {
-  for (const candidate of candidates) {
-    const trimmed = candidate?.trim();
-    if (trimmed && isValidLoopTimezone(trimmed)) {
-      return trimmed;
-    }
-  }
-  const host = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return host?.trim() || "UTC";
 }
 
 export function computeNextCalendarLoopRunAtMs(params: {

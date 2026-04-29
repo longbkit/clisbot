@@ -62,7 +62,7 @@ describe("agents cli", () => {
     expect(rawConfig.agents.list).toHaveLength(1);
     expect(rawConfig.agents.list[0]?.id).toBe("default");
     expect(rawConfig.agents.list[0]?.cli).toBe("codex");
-    expect(rawConfig.agents.list[0]?.runner?.command).toBe("codex");
+    expect(rawConfig.agents.list[0]?.runner).toBeUndefined();
     expect(rawConfig.agents.list[0]?.bootstrap?.botType).toBe("personal-assistant");
     expect(existsSync(join(tempDir, "workspaces", "default", "BOOTSTRAP.md"))).toBe(true);
     expect(existsSync(join(tempDir, "workspaces", "default", "AGENTS.md"))).toBe(true);
@@ -113,7 +113,7 @@ describe("agents cli", () => {
     expect(userMd).not.toContain("# USER.md - About Your Human");
   });
 
-  test("keeps runner override when the selected tool differs from defaults", async () => {
+  test("inherits runner defaults when the selected tool differs from the global default", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-agents-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -133,8 +133,7 @@ describe("agents cli", () => {
     };
 
     expect(rawConfig.agents.list[0]?.cli).toBe("claude");
-    expect(rawConfig.agents.list[0]?.runner?.command).toBe("claude");
-    expect(rawConfig.agents.list[0]?.runner?.args).toEqual(["--dangerously-skip-permissions"]);
+    expect(rawConfig.agents.list[0]?.runner).toBeUndefined();
   });
 
   test("adds a gemini agent with tool-specific runner defaults and bootstrap files", async () => {
@@ -173,28 +172,7 @@ describe("agents cli", () => {
     };
 
     expect(rawConfig.agents.list[0]?.cli).toBe("gemini");
-    expect(rawConfig.agents.list[0]?.runner?.command).toBe("gemini");
-    expect(rawConfig.agents.list[0]?.runner?.args).toEqual([
-      "--approval-mode=yolo",
-      "--sandbox=false",
-    ]);
-    expect(rawConfig.agents.list[0]?.runner?.startupReadyPattern).toBe(
-      "Type your message or @path/to/file",
-    );
-    expect(rawConfig.agents.list[0]?.runner?.startupBlockers).toEqual([
-      {
-        pattern:
-          "Please visit the following URL to authorize the application|Enter the authorization code:",
-        message:
-          "Gemini CLI is waiting for manual OAuth authorization. Authenticate Gemini once in a direct interactive terminal, or configure headless auth such as GEMINI_API_KEY or Vertex AI before routing Gemini through clisbot.",
-      },
-      {
-        pattern:
-          "How would you like to authenticate for this project\\?|Failed to sign in\\.|Manual authorization is required but the current session is non-interactive",
-        message:
-          "Gemini CLI is blocked in its authentication setup flow or sign-in recovery. Complete Gemini authentication directly first, or switch clisbot to a headless auth path such as GEMINI_API_KEY or Vertex AI before routing prompts.",
-      },
-    ]);
+    expect(rawConfig.agents.list[0]?.runner).toBeUndefined();
     expect(existsSync(join(tempDir, "workspaces", "gem", "GEMINI.md"))).toBe(true);
   });
 
@@ -330,6 +308,23 @@ describe("agents cli", () => {
     rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
     expect(rawConfig.agents.list[0]?.additionalMessageMode).toBeUndefined();
     expect(output.join("\n")).toContain("cleared additionalMessageMode for work");
+  });
+
+  test("sets and clears agent timezone override", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-agents-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    console.log = (() => {}) as typeof console.log;
+
+    await runAgentsCli(["add", "work", "--cli", "claude"]);
+    await runAgentsCli(["set-timezone", "--agent", "work", "America/Los_Angeles"]);
+
+    let rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.agents.list[0]?.timezone).toBe("America/Los_Angeles");
+
+    await runAgentsCli(["clear-timezone", "--agent", "work"]);
+    rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.agents.list[0]?.timezone).toBeUndefined();
   });
 
   test("lists agent responseMode state", async () => {

@@ -50,6 +50,13 @@ describe("parseCliArgs", () => {
     });
   });
 
+  test("parses update help command", () => {
+    expect(parseCliArgs(["bun", "src/main.ts", "update", "--help"])).toEqual({
+      name: "update",
+      args: ["--help"],
+    });
+  });
+
   test("parses channels subcommands", () => {
     expect(parseCliArgs(["bun", "src/main.ts", "channels", "enable", "slack"])).toEqual({
       name: "channels",
@@ -77,6 +84,13 @@ describe("parseCliArgs", () => {
     expect(parseCliArgs(["bun", "src/main.ts", "agents", "list", "--json"])).toEqual({
       name: "agents",
       args: ["list", "--json"],
+    });
+  });
+
+  test("parses timezone subcommands", () => {
+    expect(parseCliArgs(["bun", "src/main.ts", "timezone", "get"])).toEqual({
+      name: "timezone",
+      args: ["get"],
     });
   });
 
@@ -198,8 +212,12 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot runner watch --latest");
     expect(help).toContain("clisbot version");
     expect(help).toContain("clisbot logs [--lines N]");
+    expect(help).toContain("clisbot update --help");
+    expect(help).toContain("clisbot update --help");
     expect(help).toContain("clisbot bots <subcommand>");
     expect(help).toContain("clisbot bots --help");
+    expect(help).not.toContain("get-group-policy|set-group-policy");
+    expect(help).not.toContain("get-channel-policy|set-channel-policy");
     expect(help).toContain("clisbot start --help");
     expect(help).toContain("clisbot routes <subcommand>");
     expect(help).toContain("clisbot routes --help");

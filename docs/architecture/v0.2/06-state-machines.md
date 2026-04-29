@@ -74,6 +74,7 @@ Rules:
 - `detached` is still active, not terminal
 - `detached` does not mean paused
 - `idle` means no active runtime projection remains
+- `SessionRuntimeState` is a persisted projection, not the source of truth for a live run
 
 Projection rule:
 
@@ -83,6 +84,13 @@ Projection rule:
 | `RunState = starting` or `running` | `running` |
 | `RunState = detached` | `detached` |
 | terminal outcome written and run closed | `idle` |
+
+Liveness rule:
+
+- an in-memory active run owned by `SessionService` is monitor-owned; only the run monitor should convert runner loss into recovery, terminal failure, or idle
+- a persisted `running` or `detached` runtime without an in-memory active run must be checked against the runner backend before it blocks new work
+- if that persisted projection points to a missing tmux session, clear it to `idle` and let the next prompt follow the normal startup/resume path
+- do not use tmux liveness checks in admission paths to delete an in-memory active run, because that can bypass mid-run recovery
 
 ## 4. RunState
 

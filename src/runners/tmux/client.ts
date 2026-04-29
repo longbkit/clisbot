@@ -5,6 +5,8 @@ const MAIN_WINDOW_NAME = "main";
 const TMUX_NOT_FOUND_CODE = "ENOENT";
 const TMUX_SERVER_BOOTSTRAP_TIMEOUT_MS = 1_000;
 const TMUX_SERVER_BOOTSTRAP_POLL_MS = 25;
+const TMUX_MISSING_TARGET_PATTERN =
+  /(?:no current target|can't find pane|can't find window|no such pane|no such window)/i;
 const TMUX_SERVER_DEFAULTS = [
   ["exit-empty", "off"],
   ["destroy-unattached", "off"],
@@ -29,6 +31,10 @@ export class TmuxClient {
     return /no server running|No such file or directory|failed to connect to server|error connecting to/i.test(
       output,
     );
+  }
+
+  private isMissingTargetOutput(output: string) {
+    return TMUX_MISSING_TARGET_PATTERN.test(output);
   }
 
   private async exec(args: string[], options: { cwd?: string } = {}): Promise<TmuxExecResult> {
@@ -178,9 +184,17 @@ export class TmuxClient {
     await this.withServerBootstrapRetry(async () => {
       await this.ensureServerDefaults();
     });
-    await this.withServerBootstrapRetry(async () => {
-      await this.freezeWindowName(`${params.sessionName}:${MAIN_WINDOW_NAME}`);
-    });
+    try {
+      await this.withServerBootstrapRetry(async () => {
+        await this.freezeWindowName(`${params.sessionName}:${MAIN_WINDOW_NAME}`);
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (this.isMissingTargetOutput(message) && !(await this.hasSession(params.sessionName))) {
+        throw new Error(`can't find session: ${params.sessionName}`);
+      }
+      throw error;
+    }
   }
 
   async newWindow(params: {
@@ -285,7 +299,11 @@ export class TmuxClient {
       this.rawTarget(target),
       "#{cursor_x}\t#{cursor_y}\t#{history_size}",
     ]);
-    const [cursorXRaw, cursorYRaw, historySizeRaw] = output.trim().split("\t");
+    const trimmedOutput = output.trim();
+    if (!trimmedOutput) {
+      throw new Error(`tmux pane state unavailable for ${target}: <empty>`);
+    }
+    const [cursorXRaw, cursorYRaw, historySizeRaw] = trimmedOutput.split("\t");
     const cursorX = Number.parseInt(cursorXRaw ?? "", 10);
     const cursorY = Number.parseInt(cursorYRaw ?? "", 10);
     const historySize = Number.parseInt(historySizeRaw ?? "", 10);
@@ -294,7 +312,7 @@ export class TmuxClient {
       !Number.isFinite(cursorY) ||
       !Number.isFinite(historySize)
     ) {
-      throw new Error(`tmux pane state parse failed for ${target}: ${output.trim()}`);
+      throw new Error(`tmux pane state unavailable for ${target}: ${trimmedOutput}`);
     }
     return {
       cursorX,

@@ -11,7 +11,7 @@ Bounded retry rule for this flow:
 - startup: one fresh-start retry if the runner times out before ready state
 - paste: up to three prompt-delivery attempts before `Enter`
 - submit: one retry if `Enter` still does not confirm execution
-- post-paste failure before any truthful `Enter`: one fresh-session retry of the whole first-prompt flow
+- post-paste failure before any truthful `Enter`: one runner restart that preserves the stored native session id, then one retry of the first-prompt flow
 
 ## Status
 
@@ -56,7 +56,7 @@ The fix must respect the project requirement that stability and speed are both f
   - one post-`/status` settle window before the first user prompt
   - up to three paste attempts before `Enter`
   - one `Enter` retry if submit confirmation still does not arrive
-  - one full fresh-session retry only when paste never landed truthfully and `Enter` was never sent
+  - one runner restart with the stored native session id preserved when paste never landed truthfully and `Enter` was never sent
 - live Claude tracing on April 13, 2026 confirmed two concrete runner-side gaps:
   - Claude trust prompt startup text had drifted away from the older Codex-style trust prompt detection, so a fresh Claude workspace could still be blocked even when higher layers thought startup had finished
   - multiline prompt paste could become visibly settled only after the fixed `promptSubmitDelayMs`, so the first `Enter` could be sent too early and get ignored
@@ -98,7 +98,7 @@ The fix must respect the project requirement that stability and speed are both f
 - clisbot sends `Enter` only after paste truth is confirmed, then waits only a short confirmation window for pane state to change
 - if pane state still does not change, clisbot retries only `Enter` once
 - if paste never lands truthfully, clisbot throws an explicit paste-unconfirmed error without sending `Enter`
-- if that paste-unconfirmed failure happens on the first routed prompt, clisbot kills the tmux session, clears session-id continuity, and retries once in one fresh runner session
+- if that paste-unconfirmed failure happens on the first routed prompt, clisbot kills the tmux session, preserves session-id continuity, and retries once by restarting the runner against the same stored native session id
 - if pane state remains unchanged after the second `Enter`, clisbot throws an explicit submit-unconfirmed error instead of pretending the prompt was submitted
 - if startup times out under a configured ready-pattern gate, clisbot does one fresh-start retry before surfacing the startup failure
 - latency instrumentation now emits:

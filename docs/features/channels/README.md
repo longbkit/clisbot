@@ -95,6 +95,14 @@ Channels is where those surfaces live.
 
 Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 
+Current surface contract to preserve:
+
+- one-person surfaces live under `directMessages`
+- many-people surfaces live under `groups`
+- operator ids stay human-facing as `dm:<id|*>`, `group:<id>`, `group:*`, and `topic:<chatId>:<topicId>`
+- Slack `channel:<id>` remains compatibility input only
+- the many-people human-facing term stays `group` even when the provider transport is a Slack channel or a Telegram topic
+
 - thread-backed Slack conversations are isolated by session key
 - killed tmux-session recovery with stored runner session-id resume is proven
 - implicit no-mention thread follow-up depends on Slack app `message.*` event subscriptions for the routed conversation kind
@@ -110,7 +118,7 @@ Keep the Slack MVP truthful on `SLACK_TEST_CHANNEL`.
 - Slack and Telegram direct messages now default to `policy: "pairing"` to match OpenClaw
 - shared surfaces keep the OpenClaw-style secure posture of `allowlist` plus `requireMention: true` by default
 - unrouted shared-surface onboarding guidance now follows one shared policy layer: Slack explicit mentions still surface route guidance, and Telegram group or topic explicit mentions now do the same while keeping Telegram-native slash onboarding
-- OpenClaw’s Slack-only sparse-config fallback to `groupPolicy: "open"` is documented as research nuance, not copied as a `clisbot` default
+- OpenClaw’s sparse shared-surface history is kept as research context; current `clisbot` uses admission `allowlist` plus sender default `open`
 - Slack should acknowledge accepted inbound messages immediately with a configurable reaction, Slack assistant thread status, and a live in-thread processing reply
 - default Slack feedback should keep `ackReaction: ""`, `typingReaction: ""`, and `processingStatus.enabled: true`
 - active long-running sessions should support `/attach`, `/detach`, and `/watch every <duration>` so users can control how this thread follows the run without switching to raw transcript by default

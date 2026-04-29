@@ -6,7 +6,11 @@ Give agent sessions a stable local `clisbot` command and a channel-owned prompt 
 
 ## Status
 
-In Progress
+Done
+
+## Outcome
+
+The channel-owned prompt envelope is implemented and now includes the compact `Message context` contract from [Prompt Context Sender And Surface Contract](2026-04-27-prompt-context-sender-surface-contract.md). The wrapper still provides the exact `clisbot message send` command for Slack and Telegram, while sender/surface context and permission guidance are rendered through the shared prompt path.
 
 ## Why
 

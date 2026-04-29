@@ -62,6 +62,14 @@ function renderOwnerSummaryLines(summary: RuntimeOperatorSummary) {
   return lines;
 }
 
+function renderTimezoneSummaryLines(summary: RuntimeOperatorSummary) {
+  return [
+    "Timezone:",
+    `  - effective=${summary.timezoneSummary.effective} source=${summary.timezoneSummary.source} app=${summary.timezoneSummary.appTimezone ?? "(unset)"}`,
+    `  - change app default with ${renderCliCommand("timezone set <iana-timezone>", { inline: true })}; use agent/route timezone only for scoped overrides`,
+  ];
+}
+
 function hasConfiguredPrivilegedPrincipal(summary: RuntimeOperatorSummary) {
   return (
     summary.ownerSummary.ownerPrincipals.length > 0 ||
@@ -108,10 +116,10 @@ function appendChannelNextStepLines(
     `${prefix}- after DM works, add the bot to the target Slack channel or Telegram group/topic`,
   );
   lines.push(
-    `${prefix}- add the route with ${renderCliCommand("routes add --channel slack channel:<channelId> --bot default", { inline: true })} or ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}`,
+    `${prefix}- add the route with ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })} or ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}`,
   );
   lines.push(
-    `${prefix}- bind the agent with ${renderCliCommand("routes set-agent --channel slack channel:<channelId> --bot default --agent <id>", { inline: true })} or ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}`,
+    `${prefix}- bind the agent with ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })} or ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}`,
   );
 
   if (telegramEnabled) {
@@ -176,14 +184,16 @@ function renderChannelSummaryLine(channel: ChannelOperatorSummary) {
     ? ` last=${formatTime(channel.lastActivityAt)} via ${channel.lastActivityAgentId ?? "unknown"}`
     : " last=never";
   const dm = ` dm=${channel.directMessagesEnabled ? channel.directMessagesPolicy : "disabled"}`;
-  const group = channel.groupPolicy ? ` groups=${channel.groupPolicy}` : "";
+  const sharedDefault = channel.sharedDefaultPolicy
+    ? ` sharedDefault=${channel.sharedDefaultPolicy}`
+    : "";
   const render =
     ` streaming=${channel.streaming} response=${channel.response} responseMode=${channel.responseMode} additionalMessageMode=${channel.additionalMessageMode}`;
   const routeHint =
     channel.configuredSurfaceCount === 0
       ? " routes=none"
       : ` routes=${channel.configuredSurfaceCount}`;
-  return `  - ${channel.channel} enabled=${channel.enabled ? "yes" : "no"} connection=${channel.connection} defaultAgent=${channel.defaultAgentId}${render}${dm}${group}${routeHint}${last}`;
+  return `  - ${channel.channel} enabled=${channel.enabled ? "yes" : "no"} connection=${channel.connection} defaultAgent=${channel.defaultAgentId}${render}${dm}${sharedDefault}${routeHint}${last}`;
 }
 
 function renderChannelDiagnosticLines(summary: RuntimeOperatorSummary) {
@@ -222,6 +232,9 @@ function renderChannelDiagnosticLinesForChannel(channel: ChannelOperatorSummary)
   for (const action of channel.healthActions) {
     lines.push(`    action: ${action}`);
   }
+  if (channel.sharedDefaultPolicy) {
+    lines.push(`    sharedDefault: ${channel.sharedDefaultPolicy}`);
+  }
   return lines;
 }
 
@@ -244,13 +257,21 @@ function renderActiveRunSummaryLines(summary: RuntimeOperatorSummary) {
     return ["", "Active runs:", "  none"];
   }
 
+  const liveRunnerSessionKeys = new Set(
+    summary.runnerSessions
+      .filter((session) => session.live && session.entry)
+      .map((session) => session.entry!.sessionKey),
+  );
+
   return [
     "",
     "Active runs:",
     ...summary.activeRuns.map((run) => {
       const startedAt = run.startedAt ? new Date(run.startedAt).toISOString() : "unknown";
       const detachedAt = run.detachedAt ? ` detachedAt=${new Date(run.detachedAt).toISOString()}` : "";
-      return `  - agent=${run.agentId} state=${run.state} startedAt=${startedAt}${detachedAt} sessionKey=${run.sessionKey}`;
+      const runnerLive = liveRunnerSessionKeys.has(run.sessionKey);
+      const liveSuffix = runnerLive ? "" : " runner=lost";
+      return `  - agent=${run.agentId} state=${run.state}${liveSuffix} startedAt=${startedAt}${detachedAt} sessionKey=${run.sessionKey}`;
     }),
   ];
 }
@@ -275,9 +296,9 @@ function renderRunnerSessionSummaryLines(summary: RuntimeOperatorSummary) {
     "Runner sessions:",
     ...visibleSessions.map((session) => {
       if (!session.entry) {
-        return `  - ${session.sessionName}`;
+        return `  - ${session.sessionName} live=${session.live ? "yes" : "no"}`;
       }
-      return `  - ${session.sessionName} agent=${session.entry.agentId} sessionKey=${session.entry.sessionKey} lastAdmittedPromptAt=${formatSessionTimestamp(session.entry.lastAdmittedPromptAt)}`;
+      return `  - ${session.sessionName} live=${session.live ? "yes" : "no"} agent=${session.entry.agentId} state=${session.entry.runtime?.state ?? "no-runtime"} sessionKey=${session.entry.sessionKey} lastAdmittedPromptAt=${formatSessionTimestamp(session.entry.lastAdmittedPromptAt)}`;
     }),
     ...(hiddenCount > 0 ? [`  (${hiddenCount}) sessions more`] : []),
     `  hint: ${renderCliCommand("runner list", { inline: true })} or ${renderCliCommand("runner watch --latest", { inline: true })}`,
@@ -314,6 +335,7 @@ function appendChannelSetupNote(
     lines.push(
       `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
     );
+    lines.push(`${prefix}    sharedDefault: ${channel.sharedDefaultPolicy ?? "n/a"}`);
     lines.push(
       `${prefix}    add group: ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}`,
     );
@@ -336,18 +358,12 @@ function appendChannelSetupNote(
   lines.push(
     `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
   );
-  lines.push(`${prefix}    groups: ${channel.groupPolicy ?? "n/a"}`);
+  lines.push(`${prefix}    sharedDefault: ${channel.sharedDefaultPolicy ?? "n/a"}`);
   lines.push(
-    `${prefix}    add channel: ${renderCliCommand("routes add --channel slack channel:<channelId> --bot default", { inline: true })}`,
+    `${prefix}    add group: ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })}`,
   );
   lines.push(
-    `${prefix}    bind channel: ${renderCliCommand("routes set-agent --channel slack channel:<channelId> --bot default --agent <id>", { inline: true })}`,
-  );
-  lines.push(
-    `${prefix}    add group: ${renderCliCommand("routes add --channel slack group:<groupId> --bot default", { inline: true })}`,
-  );
-  lines.push(
-    `${prefix}    bind group: ${renderCliCommand("routes set-agent --channel slack group:<groupId> --bot default --agent <id>", { inline: true })}`,
+    `${prefix}    bind group: ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })}`,
   );
   lines.push(
     `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
@@ -417,6 +433,8 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
   const lines = [
     ...renderOwnerSummaryLines(summary),
     "",
+    ...renderTimezoneSummaryLines(summary),
+    "",
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),
   ];
@@ -475,6 +493,8 @@ export function renderStatusSummary(summary: RuntimeOperatorSummary) {
   const lines = [
     `stats agents=${summary.configuredAgents} bootstrapped=${summary.bootstrappedAgents} pendingBootstrap=${summary.bootstrapPendingAgents} tmuxSessions=${summary.runningTmuxSessions}`,
     ...renderOwnerSummaryLines(summary),
+    "",
+    ...renderTimezoneSummaryLines(summary),
     "",
     ...renderAgentSummaryLines(summary),
     ...renderChannelSummaryLines(summary),

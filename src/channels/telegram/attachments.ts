@@ -46,9 +46,23 @@ async function downloadTelegramAttachment(params: {
     buffer: downloaded.buffer,
     originalFilename:
       params.originalFilename || basename(fileInfo.file_path),
-    contentType: downloaded.contentType ?? params.contentType,
+    contentType: resolveTelegramAttachmentContentType({
+      downloadedContentType: downloaded.contentType,
+      fallbackContentType: params.contentType,
+    }),
     defaultBaseName: params.defaultBaseName,
   });
+}
+
+function resolveTelegramAttachmentContentType(params: {
+  downloadedContentType?: string;
+  fallbackContentType?: string;
+}) {
+  const downloaded = params.downloadedContentType?.split(";")[0]?.trim().toLowerCase();
+  if (!downloaded || downloaded === "application/octet-stream") {
+    return params.fallbackContentType ?? params.downloadedContentType;
+  }
+  return params.downloadedContentType;
 }
 
 export async function resolveTelegramAttachmentPaths(params: {
@@ -97,6 +111,47 @@ export async function resolveTelegramAttachmentPaths(params: {
       }
     } catch (error) {
       console.error("telegram photo download failed", error);
+    }
+  }
+
+  const voice = params.message.voice;
+  if (voice?.file_id) {
+    try {
+      const filePath = await downloadTelegramAttachment({
+        botToken: params.botToken,
+        fileId: voice.file_id,
+        workspacePath: params.workspacePath,
+        sessionKey: params.sessionKey,
+        messageId: params.messageId,
+        contentType: voice.mime_type ?? "audio/ogg",
+        defaultBaseName: "telegram-voice",
+      });
+      if (filePath) {
+        attachmentPaths.push(filePath);
+      }
+    } catch (error) {
+      console.error("telegram voice download failed", error);
+    }
+  }
+
+  const audio = params.message.audio;
+  if (audio?.file_id) {
+    try {
+      const filePath = await downloadTelegramAttachment({
+        botToken: params.botToken,
+        fileId: audio.file_id,
+        workspacePath: params.workspacePath,
+        sessionKey: params.sessionKey,
+        messageId: params.messageId,
+        originalFilename: audio.file_name,
+        contentType: audio.mime_type,
+        defaultBaseName: "telegram-audio",
+      });
+      if (filePath) {
+        attachmentPaths.push(filePath);
+      }
+    } catch (error) {
+      console.error("telegram audio download failed", error);
     }
   }
 

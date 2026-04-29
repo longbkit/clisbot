@@ -1160,7 +1160,7 @@
         calls: [
           "src/agents/runner-service.ts > RunnerService.ensureSessionReady",
           "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
-          "src/agents/runner-service.ts > RunnerService.retryFreshStartWithClearedSessionId",
+          "src/agents/runner-service.ts > RunnerService.retryRunnerRestartPreservingSessionId",
           "src/agents/runner-service.ts > RunnerService.mapSessionError"
         ],
         tags: ["owner surface", "warn"]
@@ -1748,9 +1748,9 @@
         file: "src/agents/session-state.ts",
         function: "AgentSessionState.clearSessionIdEntry",
         level: 1,
-        description: "Clears stored session ID and forces runtime back to idle, typically before a fresh restart path.",
+        description: "Clears stored session ID and forces runtime back to idle, only for explicit fresh-session reset paths.",
         concerns: ["identity reset", "idle write"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.retryFreshStartWithClearedSessionId", "src/agents/runner-service.ts > RunnerService.startFreshSession"],
+        calledBy: ["src/agents/runner-service.ts > RunnerService.startFreshSession"],
         calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
         tags: ["state sink"]
       },

@@ -7,12 +7,15 @@ import {
   resolveTelegramBotId,
 } from "../config/channel-bots.ts";
 import { buildAgentPromptText } from "../channels/agent-prompt.ts";
+import { resolveConfigTimezone } from "../config/timezone.ts";
 import type { ChannelIdentity } from "../channels/channel-identity.ts";
-import type { SharedChannelRoute } from "../channels/route-policy.ts";
+import type { SurfaceRoute } from "../channels/route-policy.ts";
 import { resolveSlackConversationRoute } from "../channels/slack/route-config.ts";
 import { resolveSlackConversationTarget } from "../channels/slack/session-routing.ts";
+import { normalizeSlackSurfaceTarget } from "../channels/slack/target-normalization.ts";
 import { resolveTelegramConversationRoute } from "../channels/telegram/route-config.ts";
 import { resolveTelegramConversationTarget } from "../channels/telegram/session-routing.ts";
+import { renderSlackTargetUsageError } from "../config/route-contract.ts";
 
 type LoopCliChannel = "slack" | "telegram";
 
@@ -23,7 +26,7 @@ export type LoopCliContext = {
   threadId?: string;
   sessionTarget: AgentSessionTarget;
   identity: ChannelIdentity;
-  route: SharedChannelRoute;
+  route: SurfaceRoute;
   buildLoopPromptText: (text: string) => string;
 };
 
@@ -44,64 +47,11 @@ export type SlackLoopTarget = {
 };
 
 export function normalizeSlackLoopTarget(raw: string): SlackLoopTarget {
-  const target = raw.trim();
-  if (!target) {
-    throw new Error("--target is required");
+  try {
+    return normalizeSlackSurfaceTarget(raw);
+  } catch {
+    throw new Error(renderSlackTargetUsageError("loop targets"));
   }
-
-  if (target.startsWith("channel:")) {
-    return {
-      conversationKind: "channel",
-      channelType: "channel",
-      channelId: target.slice("channel:".length),
-    };
-  }
-
-  if (target.startsWith("group:")) {
-    return {
-      conversationKind: "group",
-      channelType: "mpim",
-      channelId: target.slice("group:".length),
-    };
-  }
-
-  if (target.startsWith("dm:")) {
-    const channelId = target.slice("dm:".length);
-    return {
-      conversationKind: "dm",
-      channelType: "im",
-      channelId,
-      userId: channelId.startsWith("U") ? channelId : undefined,
-    };
-  }
-
-  if (target.startsWith("D")) {
-    return {
-      conversationKind: "dm",
-      channelType: "im",
-      channelId: target,
-    };
-  }
-
-  if (target.startsWith("G")) {
-    return {
-      conversationKind: "group",
-      channelType: "mpim",
-      channelId: target,
-    };
-  }
-
-  if (target.startsWith("C")) {
-    return {
-      conversationKind: "channel",
-      channelType: "channel",
-      channelId: target,
-    };
-  }
-
-  throw new Error(
-    "Slack loop targets must use channel:<id>, group:<id>, dm:<user-or-channel-id>, or a raw C/G/D id.",
-  );
 }
 
 function resolveSlackLoopCliContext(params: LoopCliContextParams): LoopCliContext {
@@ -160,6 +110,14 @@ function resolveSlackLoopCliContext(params: LoopCliContextParams): LoopCliContex
         cliTool,
         responseMode: route.responseMode,
         streaming: route.streaming,
+        agentId: sessionTarget.agentId,
+        time: Date.now(),
+        timezone: resolveConfigTimezone({
+          config: params.loadedConfig.raw,
+          agentId: sessionTarget.agentId,
+          routeTimezone: route.timezone,
+          botTimezone: route.botTimezone,
+        }).timezone,
       }),
   };
 }
@@ -232,6 +190,14 @@ function resolveTelegramLoopCliContext(params: LoopCliContextParams): LoopCliCon
         cliTool,
         responseMode: route.responseMode,
         streaming: route.streaming,
+        agentId: sessionTarget.agentId,
+        time: Date.now(),
+        timezone: resolveConfigTimezone({
+          config: params.loadedConfig.raw,
+          agentId: sessionTarget.agentId,
+          routeTimezone: route.timezone,
+          botTimezone: route.botTimezone,
+        }).timezone,
       }),
   };
 }

@@ -119,7 +119,7 @@ function resolveDirectMessageModeTarget<TField extends SurfaceModeField>(params:
     );
   }
 
-  const routeKey = `dm:${normalizedTargetId}`;
+  const routeKey = normalizedTargetId === "*" ? "*" : normalizedTargetId;
   const exactRoute = resolveDirectMessageExactRoute(params.routes, normalizedTargetId);
   const wildcardRoute = resolveDirectMessageWildcardRoute(params.routes);
 
@@ -130,7 +130,7 @@ function resolveDirectMessageModeTarget<TField extends SurfaceModeField>(params:
     set: (value: SurfaceModeValueMap[TField]) => {
       const route =
         params.routes[routeKey] ??
-        (params.routes[routeKey] = createDirectMessageBehaviorOverride());
+        (params.routes[routeKey] = createDirectMessageBehaviorOverride(wildcardRoute));
       setModeValue(route, params.field, value);
     },
     label: `${params.botLabel} ${routeKey}`,
@@ -161,7 +161,7 @@ function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   const [kind, targetId] = params.target.split(":", 2);
   if (!targetId?.trim()) {
     throw new Error(
-      `Slack ${renderFieldLabel(field)} target must use channel:<id>, group:<id>, or dm:<id>.`,
+      `Slack ${renderFieldLabel(field)} target must use group:<id> or dm:<id>.`,
     );
   }
 
@@ -179,22 +179,22 @@ function resolveSlackConfigTarget<TField extends SurfaceModeField>(
   }
 
   if (kind === "channel" || kind === "group") {
-    const routeKey = `${kind}:${targetId.trim()}`;
+    const routeKey = targetId.trim();
     const route = bot.groups[routeKey];
     if (!route) {
-      throw new Error(`Route not configured yet: slack ${routeKey}. Add the route first.`);
+      throw new Error(`Route not configured yet: slack group:${routeKey}. Add the route first.`);
     }
     return {
       get: () => getModeValue(route, field) ?? getModeValue(bot, field),
       set: (value) => {
         setModeValue(route, field, value);
       },
-      label: `slack ${routeKey}`,
+      label: `slack group:${routeKey}`,
     };
   }
 
   throw new Error(
-    `Slack ${renderFieldLabel(field)} target must use channel:<id>, group:<id>, or dm:<id>.`,
+    `Slack ${renderFieldLabel(field)} target must use group:<id> or dm:<id>.`,
   );
 }
 
@@ -265,9 +265,7 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
     }
     const group = bot.groups[chatId];
     const topic = group?.topics?.[nextTopicId];
-    const canInheritFromBotDefaults =
-      (bot.groupPolicy ?? config.bots.telegram.defaults.groupPolicy) === "open";
-    if (!group && !canInheritFromBotDefaults) {
+    if (!group) {
       throw new Error(
         `Route not configured yet: telegram topic:${chatId}:${nextTopicId}. Add the route first.`,
       );
@@ -306,10 +304,8 @@ export function buildConfiguredTargetFromIdentity(identity: ChannelIdentity) {
   if (identity.platform === "slack") {
     const target =
       identity.conversationKind === "dm"
-        ? `dm:${identity.senderId ?? identity.channelId ?? "*"}`
-        : identity.conversationKind === "group"
-          ? `group:${identity.channelId ?? ""}`
-          : `channel:${identity.channelId ?? ""}`;
+      ? `dm:${identity.senderId ?? identity.channelId ?? "*"}`
+        : `group:${identity.channelId ?? ""}`;
 
     return {
       channel: "slack" as const,

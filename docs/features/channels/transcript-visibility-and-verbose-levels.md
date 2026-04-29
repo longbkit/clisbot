@@ -43,13 +43,13 @@ The cleaner split is:
 Supported on:
 
 - `bots.slack.defaults.verbose`
-- `bots.slack.<botId>.groups."channel:<channelId>".verbose`
-- `bots.slack.<botId>.groups."group:<groupId>".verbose`
-- `bots.slack.<botId>.directMessages."*".verbose`
+- `bots.slack.<botId>.groups["<channelId>"].verbose`
+- `bots.slack.<botId>.groups["<groupId>"].verbose`
+- `bots.slack.<botId>.directMessages["*"].verbose`
 - `bots.telegram.defaults.verbose`
 - `bots.telegram.<botId>.groups."<chatId>".verbose`
 - `bots.telegram.<botId>.groups."<chatId>".topics."<topicId>".verbose`
-- `bots.telegram.<botId>.directMessages."*".verbose`
+- `bots.telegram.<botId>.directMessages["*"].verbose`
 
 Example:
 

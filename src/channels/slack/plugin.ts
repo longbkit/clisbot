@@ -10,65 +10,7 @@ import { SlackSocketService } from "./service.ts";
 import { deleteSlackMessageAction, editSlackMessage, getSlackReactions, listSlackPins, pinSlackMessage, reactSlackMessage, readSlackMessages, searchSlackMessages, sendSlackMessage, sendSlackPoll, unpinSlackMessage } from "./message-actions.ts";
 import { resolveSlackConversationRoute } from "./route-config.ts";
 import { resolveSlackConversationTarget } from "./session-routing.ts";
-
-function normalizeSlackFollowUpTarget(rawTarget: string) {
-  const target = rawTarget.trim();
-  if (!target) {
-    return null;
-  }
-
-  if (target.startsWith("channel:")) {
-    return {
-      conversationKind: "channel" as const,
-      channelId: target.slice("channel:".length),
-      channelType: "channel" as const,
-    };
-  }
-
-  if (target.startsWith("group:")) {
-    return {
-      conversationKind: "group" as const,
-      channelId: target.slice("group:".length),
-      channelType: "mpim" as const,
-    };
-  }
-
-  if (target.startsWith("dm:")) {
-    return {
-      conversationKind: "dm" as const,
-      channelId: target.slice("dm:".length),
-      channelType: "im" as const,
-    };
-  }
-
-  if (target.startsWith("user:")) {
-    return null;
-  }
-
-  if (target.startsWith("D")) {
-    return {
-      conversationKind: "dm" as const,
-      channelId: target,
-      channelType: "im" as const,
-    };
-  }
-  if (target.startsWith("G")) {
-    return {
-      conversationKind: "group" as const,
-      channelId: target,
-      channelType: "mpim" as const,
-    };
-  }
-  if (target.startsWith("C")) {
-    return {
-      conversationKind: "channel" as const,
-      channelId: target,
-      channelType: "channel" as const,
-    };
-  }
-
-  return null;
-}
+import { normalizeSlackSurfaceTarget } from "./target-normalization.ts";
 
 function resolveSlackReplyTarget(params: {
   loadedConfig: Parameters<ChannelPlugin["resolveMessageReplyTarget"]>[0]["loadedConfig"];
@@ -79,8 +21,10 @@ function resolveSlackReplyTarget(params: {
     return null;
   }
 
-  const normalized = normalizeSlackFollowUpTarget(params.command.target);
-  if (!normalized) {
+  let normalized;
+  try {
+    normalized = normalizeSlackSurfaceTarget(params.command.target);
+  } catch {
     return null;
   }
 

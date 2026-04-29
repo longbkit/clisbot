@@ -77,5 +77,7 @@ The next important growth areas are:
   - truthful identity, capability, and limit awareness from docs, source, and current environment
 - agent runtime introspection:
   - read and mutate queue, loop, and active-run state through a standard agent-facing bridge
+- agent-managed queueing:
+  - let an active agent create bounded same-session follow-up prompts through a documented queue control surface
 - agent work-management interface:
   - normalize task and work-item operations now, then split a dedicated feature area later only if backend adapters grow large enough

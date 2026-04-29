@@ -2,77 +2,71 @@
 
 ## Summary
 
-Authorization is the system that defines who may do what in `clisbot`.
+Authorization defines who may do what in `clisbot`.
 
-It owns the permission model across app-level control, agent-level runtime actions, owner claim, and the contract between advisory prompt guidance and hard runtime enforcement.
+The current split is:
+
+- surface admission and surface audience policy are stored in config
+- app and agent permissions are resolved by auth
 
 ## State
 
 Active
 
-## Why It Exists
+## Current Contract
 
-Authorization is broader than config shape and broader than operator control surfaces alone.
+### Surface-level rules
 
-It needs one clear home for:
+- `disabled` means fully disabled and silent, even for app `owner` and app `admin`
+- on enabled shared surfaces, app `owner` and app `admin` may bypass allowlist checks
+- `blockUsers` still wins
+- shared allowlist failures are denied before runner ingress
 
-- roles and permissions
-- app scope versus agent scope
-- owner claim
-- resolution order
-- advisory versus enforced behavior
-- cross-system ownership across configuration, channels, agents, and control
+Current shared deny text:
 
-Without that, the repository keeps blurring:
+`You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to \`allowUsers\` for this surface.`
 
-- persisted policy shape
-- auth semantics
-- in-chat gating
-- operator-side enforcement
+### DM and shared defaults
 
-## Scope
+- DM defaults live on `directMessages["*"]`
+- shared defaults live on `groups["*"]`
+- CLI ids stay human-facing:
+  - `dm:*`
+  - `group:*`
+  - `group:<id>`
+  - `topic:<chatId>:<topicId>`
 
-- app roles and permissions
-- agent roles and permissions
-- owner claim semantics
-- permission resolution order
-- prompt auth context contract
-- runtime gating contract for routed actions
-- dependency rules for control, channels, agents, and configuration
+### App roles
 
-## Non-Goals
+- app `owner` and app `admin` bypass DM pairing
+- app `owner` and app `admin` do not bypass `groupPolicy`/`channelPolicy` admission; after a group is admitted and enabled, they bypass sender allowlist checks
+- they do not bypass `disabled`
+- they do not bypass `blockUsers`
 
-- identity registry design
-- OAuth or provider login flows
-- backend-specific auth mechanics inside runners
-- schema-loading details that belong to configuration
-- operator CLI implementation details that belong to control
+## Implementation Invariants
 
-## Related Task Folder
-
-- [docs/tasks/features/auth](../../tasks/features/auth)
-
-## Related Feature Docs
-
-- [App And Agent Authorization And Owner Claim](app-and-agent-authorization-and-owner-claim.md)
-
-## Related Test Docs
-
-- [docs/tests/features/auth](../../tests/features/auth/README.md)
-
-## Dependencies
-
-- [Configuration](../configuration/README.md)
-- [Control](../control/README.md)
-- [Channels](../channels/README.md)
-- [Agents](../agents/README.md)
+- owner/admin sender-policy bypass applies only after the surface is admitted and enabled
+- `disabled` is stronger than owner/admin convenience
+- `blockUsers` is stronger than allowlist bypass
+- shared allowlist rejection must happen before runner ingress
+- the shared deny text stays generic to the many-people mental model and therefore says `group`
 
 ## Current Focus
 
-Keep the auth feature area truthful as active work:
+The shipped auth slice is now:
 
-- `app.auth` and `agents.<id>.auth` are now live in config and runtime resolution
-- `clisbot auth ...` exists for operator auth inspection and mutation
-- channels already consume resolved auth for pairing bypass, `/whoami`, `/status`, and `/bash`
-- automatic first-owner claim is now live for the first DM within the configured claim window
-- advisory versus enforced boundaries still need to stay explicit across channels, control, and prompt rules
+- app and agent roles
+- first-owner claim
+- DM pairing bypass for owner/admin
+- shared-surface audience gating for Slack and Telegram
+- explicit deny-before-runner behavior for shared allowlist failures
+
+The next auth slice is:
+
+- command-level permission enforcement for sensitive actions on already-admitted surfaces
+
+## Related Docs
+
+- [Authorization And Roles](../../user-guide/auth-and-roles.md)
+- [Configuration](../configuration/README.md)
+- [Audience-Scoped Access And Delegated Specialist Bots](../../tasks/features/auth/2026-04-21-audience-scoped-access-and-delegated-specialist-bots.md)

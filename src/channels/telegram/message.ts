@@ -25,8 +25,25 @@ export type TelegramPhotoSize = {
   file_size?: number;
 };
 
+export type TelegramVoice = {
+  file_id: string;
+  mime_type?: string;
+  file_size?: number;
+  duration?: number;
+};
+
+export type TelegramAudio = {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+  duration?: number;
+  title?: string;
+};
+
 export type TelegramMessage = {
   message_id: number;
+  date?: number;
   message_thread_id?: number;
   text?: string;
   caption?: string;
@@ -34,8 +51,16 @@ export type TelegramMessage = {
   chat: TelegramChat;
   document?: TelegramFileDocument;
   photo?: TelegramPhotoSize[];
+  voice?: TelegramVoice;
+  audio?: TelegramAudio;
+  forum_topic_created?: {
+    name?: string;
+  };
   reply_to_message?: {
     from?: TelegramUser;
+    forum_topic_created?: {
+      name?: string;
+    };
   };
 };
 
@@ -95,6 +120,14 @@ export function isTelegramBotOriginatedMessage(message: TelegramMessage) {
 
 export function isReplyToTelegramBot(message: TelegramMessage, botUserId?: number) {
   return Boolean(botUserId && message.reply_to_message?.from?.id === botUserId);
+}
+
+export function resolveTelegramTopicName(message: TelegramMessage) {
+  return (
+    message.forum_topic_created?.name?.trim() ||
+    message.reply_to_message?.forum_topic_created?.name?.trim() ||
+    undefined
+  );
 }
 
 function escapeRegExp(raw: string) {

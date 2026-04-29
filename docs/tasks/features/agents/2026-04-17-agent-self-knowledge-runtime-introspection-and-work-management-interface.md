@@ -118,6 +118,10 @@ Examples of possible backends:
 - define what minimal work graph or task model the agent needs
 - define permission, sync, and observability expectations
 
+## Related Follow-Up Tasks
+
+- [Agent-Managed Queue Workflow And Queues CLI](2026-04-28-agent-managed-queue-workflow-and-queues-cli.md)
+
 ### Questions To Answer
 
 1. What is the minimum stable work-item model?

@@ -1,5 +1,21 @@
 # Default DM Agent CLI Surface
 
+## Historical Note
+
+This task doc predates the current surface-policy standardization.
+
+Use the current stable docs for the active contract:
+
+- [Configuration](../../../features/configuration/README.md)
+- [CLI Commands](../../../user-guide/cli-commands.md)
+- [Channels](../../../user-guide/channels.md)
+
+Compatibility note:
+
+- canonical stored DM keys now use `directMessages["*"]` and `directMessages["<id>"]`
+- operator-facing route ids still use `dm:*`
+- older examples in this task doc that used `directMessages["dm:*"]` should now be read as historical only
+
 ## Summary
 
 Add a first-class `clisbot bots ...` surface to inspect, set, and clear the default direct-message fallback agent for a bot without forcing operators to:
@@ -17,7 +33,7 @@ Planned
 Current behavior exposes a product seam that is easy to trip over:
 
 - `clisbot bots set-agent --channel slack --bot default --agent claude` changes the bot fallback agent
-- a default DM override may still live at `bots.<channel>.defaults.directMessages["dm:*"].agentId`
+- a default DM override may still live at `bots.<channel>.defaults.directMessages["*"].agentId`
 - `clisbot routes clear-agent --channel slack dm:* --bot default` only works after a bot-level `dm:*` route exists
 - if the operator never materialized `dm:*`, the CLI says `Unknown route`, even though an effective DM override still exists in defaults
 
@@ -33,7 +49,7 @@ In practice this pushed the live operator flow toward direct config edits, which
 - add a bot-level CLI surface for DM default agent control
 - support both `slack` and `telegram`
 - make the surface target the defaults layer directly:
-  - `bots.<channel>.defaults.directMessages["dm:*"].agentId`
+  - `bots.<channel>.defaults.directMessages["*"].agentId`
 - keep route-level `dm:*` commands as the materialized-route surface only
 - document the difference between:
   - bot fallback agent
@@ -51,8 +67,8 @@ clisbot bots clear-dm-agent --channel <slack|telegram> [--bot <id>]
 
 ## Product Rules
 
-- `get-dm-agent` reads the effective value stored on the defaults-layer `dm:*` node for the selected provider
-- `set-dm-agent` creates the defaults-layer `dm:*` node if needed, then writes `agentId`
+- `get-dm-agent` reads the effective value stored on the defaults-layer `directMessages["*"]` node for the selected provider
+- `set-dm-agent` creates the defaults-layer `directMessages["*"]` node if needed, then writes `agentId`
 - `clear-dm-agent` removes only the defaults-layer `agentId`, not the full DM policy node
 - route commands keep their current meaning:
   - they operate on materialized bot-level routes only

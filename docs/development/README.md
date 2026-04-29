@@ -12,9 +12,11 @@ Default repo-local setup:
 
 ```bash
 CLISBOT_HOME=~/.clisbot-dev
+CLISBOT_CLI_NAME=clisbot-dev
 ```
 
 That means the convenience scripts stay pinned to `~/.clisbot-dev` even if your shell still has stale `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, or `CLISBOT_LOG_PATH` exported from another runtime.
+`CLISBOT_CLI_NAME` keeps repo-local help text, prompt permission guidance, and monitor-spawned runtime messages aligned with the `clisbot-dev` command name.
 
 If you want to run a dev instance beside your main bot, keep using a separate `CLISBOT_HOME`:
 

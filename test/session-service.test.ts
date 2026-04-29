@@ -79,7 +79,9 @@ function createUpdate(
 
 function createManager(resolved: ResolvedAgentTarget) {
   return new SessionService(
-    {} as TmuxClient,
+    {
+      hasSession: async () => true,
+    } as unknown as TmuxClient,
     {} as AgentSessionState,
     {} as RunnerService,
     () => resolved,
@@ -89,6 +91,7 @@ function createManager(resolved: ResolvedAgentTarget) {
 function createRun(resolved: ResolvedAgentTarget, observers: Map<string, any>) {
   const update = createUpdate(resolved, { snapshot: "initial" });
   return {
+    runId: undefined as string | undefined,
     resolved,
     observers,
     observerFailures: new Map<string, number>(),
@@ -410,6 +413,48 @@ describe("SessionService observer delivery", () => {
     });
   });
 
+  test("submitSessionInput starts recovery instead of steering into a lost tmux target", async () => {
+    const resolved = createResolvedTarget();
+    const submitSessionInput = mock(async () => {
+      throw new Error("no such pane: %1");
+    });
+    const reopenRunContext = mock(async () => ({
+      resolved,
+      initialSnapshot: "reopened pane",
+    }));
+    const manager = new SessionService(
+      {} as TmuxClient,
+      {
+        setSessionRuntime: async () => undefined,
+      } as unknown as AgentSessionState,
+      {
+        submitSessionInput,
+        canRecoverMidRun: () => true,
+        reopenRunContext,
+      } as unknown as RunnerService,
+      () => resolved,
+    ) as any;
+    const run = createRun(resolved, new Map());
+    run.runId = "run-1";
+    manager.activeRuns.set(resolved.sessionKey, run);
+
+    let restartParams: any;
+    manager.startRunMonitor = (_sessionKey: string, params: unknown) => {
+      restartParams = params;
+    };
+
+    await expect(
+      manager.submitSessionInput(
+        { agentId: resolved.agentId, sessionKey: resolved.sessionKey },
+        "steer after pane loss",
+      ),
+    ).rejects.toThrow("active runner session was lost before steering could be submitted");
+
+    expect(submitSessionInput).toHaveBeenCalledTimes(1);
+    expect(reopenRunContext).toHaveBeenCalledTimes(1);
+    expect(restartParams.prompt).toBe(MID_RUN_RECOVERY_CONTINUE_PROMPT);
+  });
+
   test("observeRun rehydrates a persisted active run before attach falls back to transcript", async () => {
     const resolved = createResolvedTarget();
     const capturePane = mock(async () => "Still working through the repository.");
@@ -598,5 +643,50 @@ describe("SessionService observer delivery", () => {
     expect(setSessionRuntime).toHaveBeenCalledWith(resolved, {
       state: "idle",
     });
+  });
+
+  test("executePrompt preserves in-memory active runs so monitor-owned recovery can handle tmux loss", async () => {
+    const resolved = createResolvedTarget();
+    const setSessionRuntime = mock(async () => undefined);
+    const ensureRunnerReady = mock(async () => {
+      throw new Error("runner startup sentinel");
+    });
+    const manager = new SessionService(
+      {
+        hasSession: async () => false,
+      } as unknown as TmuxClient,
+      {
+        markPromptAdmitted: async () => undefined,
+        getEntry: async () => undefined,
+        setSessionRuntime,
+      } as unknown as AgentSessionState,
+      {
+        ensureRunnerReady,
+      } as unknown as RunnerService,
+      () => resolved,
+    ) as any;
+    const staleRun = createRun(resolved, new Map());
+    staleRun.runId = "stale-run";
+    manager.activeRuns.set(resolved.sessionKey, staleRun);
+    manager.startRunMonitor = mock(() => undefined);
+    manager.failActiveRun = mock(async () => undefined);
+
+    const error = await manager.executePrompt(
+      {
+        agentId: resolved.agentId,
+        sessionKey: resolved.sessionKey,
+      },
+      "new prompt after tmux was killed",
+      {
+        id: "thread-observer",
+        mode: "live",
+        onUpdate: async () => undefined,
+      },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ActiveRunInProgressError);
+    expect(ensureRunnerReady).not.toHaveBeenCalled();
+    expect(setSessionRuntime).not.toHaveBeenCalled();
+    expect(manager.activeRuns.get(resolved.sessionKey)).toBe(staleRun);
   });
 });

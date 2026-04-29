@@ -1,5 +1,5 @@
 import type { FollowUpMode, StoredFollowUpState } from "./follow-up-policy.ts";
-import type { IntervalLoopStatus, StoredIntervalLoop } from "./loop-state.ts";
+import type { IntervalLoopStatus, StoredLoop } from "./loop-state.ts";
 import type { ResolvedAgentTarget } from "./resolved-target.ts";
 import type { StoredSessionRuntime } from "./run-observation.ts";
 import type { SessionRuntimeInfo } from "./session-runtime.ts";
@@ -25,7 +25,8 @@ type SessionEntryUpdate = (existing: {
   followUp?: StoredFollowUpState;
   runnerCommand?: string;
   runtime?: StoredSessionRuntime;
-  intervalLoops?: StoredIntervalLoop[];
+  loops?: StoredLoop[];
+  intervalLoops?: StoredLoop[];
   recentConversation?: StoredRecentConversationState;
 } | null) => {
   sessionId?: string;
@@ -33,7 +34,7 @@ type SessionEntryUpdate = (existing: {
   followUp?: StoredFollowUpState;
   runnerCommand?: string;
   runtime?: StoredSessionRuntime;
-  intervalLoops?: StoredIntervalLoop[];
+  loops?: StoredLoop[];
   recentConversation?: StoredRecentConversationState;
 };
 
@@ -62,7 +63,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: params.runnerCommand ?? existing?.runnerCommand ?? resolved.runner.command,
       runtime: params.runtime ?? existing?.runtime,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -79,7 +80,7 @@ export class AgentSessionState {
       runtime: {
         state: "idle",
       },
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -94,7 +95,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -109,7 +110,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -157,7 +158,7 @@ export class AgentSessionState {
   }): Promise<IntervalLoopStatus[]> {
     const entries = await this.sessionStore.list();
     return entries.flatMap((entry) =>
-      (entry.intervalLoops ?? [])
+      getStoredLoops(entry)
         .filter((loop) => !params?.sessionKey || entry.sessionKey === params.sessionKey)
         .map((loop) => ({
           ...loop,
@@ -170,25 +171,25 @@ export class AgentSessionState {
 
   async setIntervalLoop(
     resolved: ResolvedAgentTarget,
-    loop: StoredIntervalLoop,
+    loop: StoredLoop,
   ) {
     return this.upsertSessionEntry(resolved, (existing) => ({
       sessionId: existing?.sessionId,
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
-      intervalLoops: [...(existing?.intervalLoops ?? []).filter((item) => item.id !== loop.id), loop],
+      loops: [...getStoredLoops(existing).filter((item) => item.id !== loop.id), loop],
       recentConversation: existing?.recentConversation,
     }));
   }
 
   async replaceIntervalLoopIfPresent(
     resolved: ResolvedAgentTarget,
-    loop: StoredIntervalLoop,
+    loop: StoredLoop,
   ) {
     let replaced = false;
     await this.sessionStore.update(resolved.sessionKey, (existing) => {
-      const currentLoops = existing?.intervalLoops ?? [];
+      const currentLoops = getStoredLoops(existing);
       if (!currentLoops.some((item) => item.id === loop.id)) {
         return existing;
       }
@@ -203,7 +204,7 @@ export class AgentSessionState {
         lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
         followUp: existing?.followUp,
         runtime: existing?.runtime,
-        intervalLoops: currentLoops.map((item) => (item.id === loop.id ? loop : item)),
+        loops: currentLoops.map((item) => (item.id === loop.id ? loop : item)),
         recentConversation: existing?.recentConversation,
         updatedAt: Date.now(),
       };
@@ -220,7 +221,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
-      intervalLoops: (existing?.intervalLoops ?? []).filter((item) => item.id !== loopId),
+      loops: getStoredLoops(existing).filter((item) => item.id !== loopId),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -231,7 +232,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
-      intervalLoops: [],
+      loops: [],
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -239,7 +240,7 @@ export class AgentSessionState {
   async removeIntervalLoopById(loopId: string) {
     const entries = await this.sessionStore.list();
     for (const entry of entries) {
-      if (!(entry.intervalLoops ?? []).some((loop) => loop.id === loopId)) {
+      if (!getStoredLoops(entry).some((loop) => loop.id === loopId)) {
         continue;
       }
 
@@ -247,11 +248,12 @@ export class AgentSessionState {
         if (!existing) {
           return existing;
         }
+        const { intervalLoops: _legacyLoops, ...rest } = existing;
 
         return {
-          ...existing,
-          lastAdmittedPromptAt: existing.lastAdmittedPromptAt,
-          intervalLoops: (existing.intervalLoops ?? []).filter((loop) => loop.id !== loopId),
+          ...rest,
+          lastAdmittedPromptAt: rest.lastAdmittedPromptAt,
+          loops: getStoredLoops(existing).filter((loop) => loop.id !== loopId),
           updatedAt: Date.now(),
         };
       });
@@ -266,7 +268,7 @@ export class AgentSessionState {
     let cleared = 0;
 
     for (const entry of entries) {
-      const loopCount = entry.intervalLoops?.length ?? 0;
+      const loopCount = getStoredLoops(entry).length;
       if (loopCount === 0) {
         continue;
       }
@@ -276,11 +278,12 @@ export class AgentSessionState {
         if (!existing) {
           return existing;
         }
+        const { intervalLoops: _legacyLoops, ...rest } = existing;
 
         return {
-          ...existing,
-          lastAdmittedPromptAt: existing.lastAdmittedPromptAt,
-          intervalLoops: [],
+          ...rest,
+          lastAdmittedPromptAt: rest.lastAdmittedPromptAt,
+          loops: [],
           updatedAt: Date.now(),
         };
       });
@@ -301,7 +304,7 @@ export class AgentSessionState {
         overrideMode: mode,
       },
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -317,7 +320,7 @@ export class AgentSessionState {
           }
         : undefined,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -365,7 +368,7 @@ export class AgentSessionState {
                 : {}),
             }
           : existing?.runtime,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));
   }
@@ -380,7 +383,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: appendRecentConversationMessage(existing?.recentConversation, message),
     }));
   }
@@ -405,7 +408,7 @@ export class AgentSessionState {
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
       runtime: existing?.runtime,
-      intervalLoops: existing?.intervalLoops,
+      loops: getStoredLoops(existing),
       recentConversation: markRecentConversationProcessed(existing?.recentConversation, marker),
     }));
   }
@@ -425,12 +428,19 @@ export class AgentSessionState {
         lastAdmittedPromptAt: next.lastAdmittedPromptAt ?? existing?.lastAdmittedPromptAt,
         followUp: next.followUp,
         runtime: next.runtime ?? existing?.runtime,
-        intervalLoops: next.intervalLoops ?? existing?.intervalLoops,
+        loops: next.loops ?? getStoredLoops(existing),
         recentConversation: next.recentConversation ?? existing?.recentConversation,
         updatedAt: Date.now(),
       };
     });
   }
+}
+
+function getStoredLoops(entry: {
+  loops?: StoredLoop[];
+  intervalLoops?: StoredLoop[];
+} | null | undefined) {
+  return entry?.loops ?? entry?.intervalLoops ?? [];
 }
 
 function hasActiveRuntime(

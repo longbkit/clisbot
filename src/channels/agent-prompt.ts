@@ -1,5 +1,12 @@
 import type { ChannelIdentity } from "./channel-identity.ts";
 import { resolveChannelIdentityBotId } from "./channel-identity.ts";
+import {
+  buildSurfacePromptContext,
+  renderPermissionGuidance,
+  renderSurfacePromptContext,
+  resolveSurfacePromptTime,
+  type SurfacePromptContext,
+} from "./surface-prompt-context.ts";
 import { getClisbotPromptCommand } from "../control/clisbot-wrapper.ts";
 import { getRenderedCliName, renderCliCommand } from "../shared/cli-name.ts";
 
@@ -10,14 +17,14 @@ export type ChannelAgentPromptConfig = {
 };
 
 export const BASE_TEMPLATE = `<system>
-[{{timestamp}}] {{identity_summary}}
+{{message_context}}
 
 You are operating inside clisbot.
 {{delivery_intro}}
 {{reply_command}}
 {{reply_rules}}
 {{reply_style_hint}}
-{{configuration_guidance}}{{protected_control_suffix}}
+{{configuration_guidance}}{{permission_guidance}}{{protected_control_suffix}}
 </system>
 
 <user>
@@ -26,7 +33,9 @@ You are operating inside clisbot.
 
 export const STEERING_TEMPLATE = `<system>
 A new user message arrived while you were still working.
-Adjust your current work if needed and continue.{{protected_control_suffix}}
+Adjust your current work if needed and continue.
+
+{{message_context}}{{permission_guidance}}{{protected_control_suffix}}
 </system>
 
 <user>
@@ -108,6 +117,11 @@ export function buildAgentPromptText(params: {
   responseMode?: "capture-pane" | "message-tool";
   streaming?: "off" | "latest" | "all";
   protectedControlMutationRule?: string;
+  timezone?: string;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  scheduledLoopId?: string;
 }) {
   return buildChannelPromptText({
     ...params,
@@ -117,10 +131,18 @@ export function buildAgentPromptText(params: {
 
 export function buildSteeringPromptText(params: {
   text: string;
+  identity?: ChannelIdentity;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
   protectedControlMutationRule?: string;
 }) {
   return buildChannelPromptText({
     text: params.text,
+    identity: params.identity,
+    agentId: params.agentId,
+    time: params.time,
+    promptContext: params.promptContext,
     mode: "steer",
     protectedControlMutationRule: params.protectedControlMutationRule,
   });
@@ -133,6 +155,11 @@ function buildChannelPromptText(params: {
   responseMode?: "capture-pane" | "message-tool";
   streaming?: "off" | "latest" | "all";
   protectedControlMutationRule?: string;
+  timezone?: string;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  scheduledLoopId?: string;
   mode: ChannelPromptMode;
 }) {
   if (params.mode === "message" && !params.config?.enabled) {
@@ -140,7 +167,10 @@ function buildChannelPromptText(params: {
   }
 
   if (params.mode === "steer") {
+    const context = resolvePromptContext(params);
     return renderTemplate(STEERING_TEMPLATE, {
+      message_context: renderSurfacePromptContext(context),
+      permission_guidance: renderPermissionGuidanceWithPrefix(context),
       message_body: params.text,
       protected_control_suffix: renderProtectedControlSuffix(
         params.protectedControlMutationRule,
@@ -154,19 +184,47 @@ function buildChannelPromptText(params: {
     responseMode: params.responseMode,
     streaming: params.streaming,
   });
+  const context = resolvePromptContext(params);
 
   return renderTemplate(BASE_TEMPLATE, {
-    timestamp: renderPromptTimestamp(),
-    identity_summary: renderIdentitySummary(params.identity!),
+    message_context: renderSurfacePromptContext(context),
     delivery_intro: promptParts.deliveryIntro,
     reply_command: promptParts.replyCommand,
     reply_rules: promptParts.replyRules,
     reply_style_hint: promptParts.replyStyleHint,
     configuration_guidance: renderConfigurationGuidance(),
+    permission_guidance: renderPermissionGuidanceWithPrefix(context),
     protected_control_suffix: renderProtectedControlSuffix(
       params.protectedControlMutationRule,
     ),
     message_body: params.text,
+  });
+}
+
+function resolvePromptContext(params: {
+  identity?: ChannelIdentity;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  scheduledLoopId?: string;
+}) {
+  if (params.promptContext) {
+    return params.promptContext;
+  }
+  if (!params.identity) {
+    return {
+      time: resolveSurfacePromptTime(params.time),
+      surface: {
+        surfaceId: "unknown",
+        kind: "channel" as const,
+      },
+    };
+  }
+  return buildSurfacePromptContext({
+    identity: params.identity,
+    agentId: params.agentId,
+    time: params.time,
+    scheduledLoopId: params.scheduledLoopId,
   });
 }
 
@@ -223,7 +281,15 @@ function buildReplyStyleHint(identity: ChannelIdentity) {
 
 function renderConfigurationGuidance() {
   const cliName = getRenderedCliName();
-  return `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, or ${renderCliCommand("auth --help", { inline: true })} for details.`;
+  return [
+    `When the user asks to change ${cliName} configuration, use ${cliName} CLI commands; see ${renderCliCommand("--help", { inline: true })}, ${renderCliCommand("bots --help", { inline: true })}, ${renderCliCommand("routes --help", { inline: true })}, ${renderCliCommand("auth --help", { inline: true })}, or ${renderCliCommand("update --help", { inline: true })} for details.`,
+    `For schedule/loop/reminder requests, inspect ${renderCliCommand("loops --help", { inline: true })} and use the loops CLI.`,
+  ].join("\n");
+}
+
+function renderPermissionGuidanceWithPrefix(context?: SurfacePromptContext) {
+  const guidance = renderPermissionGuidance(context);
+  return guidance ? `\n${guidance}` : "";
 }
 
 function renderCapturePaneDeliveryIntro() {
@@ -240,88 +306,6 @@ function renderProtectedControlSuffix(rule?: string) {
 
 function renderTemplate(template: string, values: Record<string, string>) {
   return template.replaceAll(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_, key: string) => values[key] ?? "");
-}
-
-function renderPromptTimestamp() {
-  const date = new Date();
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-    timeZoneName: "shortOffset",
-  });
-  return formatter.format(date).replace(",", "");
-}
-
-function renderIdentitySummary(identity: ChannelIdentity) {
-  const segments = [renderConversationSummary(identity)];
-  const sender = renderSenderSummary(identity);
-  if (sender) {
-    segments.push(sender);
-  }
-  return segments.join(" | ");
-}
-
-function renderConversationSummary(identity: ChannelIdentity) {
-  if (identity.platform === "slack") {
-    const scopeLabel =
-      identity.conversationKind === "dm"
-        ? "Slack direct message"
-        : identity.conversationKind === "group"
-          ? "Slack group"
-          : "Slack channel";
-    const segments = [scopeLabel];
-    const channel = renderLabeledTarget(identity.channelName, identity.channelId, "#");
-    if (channel) {
-      segments.push(channel);
-    }
-    if (identity.threadTs) {
-      segments.push(`thread ${identity.threadTs}`);
-    }
-    return segments.join(" ");
-  }
-
-  if (identity.conversationKind === "dm") {
-    return ["Telegram direct message", renderLabeledTarget(identity.chatName, identity.chatId)]
-      .filter(Boolean)
-      .join(" ");
-  }
-
-  if (identity.conversationKind === "topic") {
-    const topic = renderNamedValue("topic", identity.topicName, identity.topicId);
-    const group = renderNamedValue("in group", identity.chatName, identity.chatId);
-    return [topic, group].filter(Boolean).join(" ");
-  }
-
-  return ["Telegram group", renderLabeledTarget(identity.chatName, identity.chatId)]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function renderSenderSummary(identity: ChannelIdentity) {
-  const sender = renderLabeledTarget(identity.senderName, identity.senderId);
-  return sender ? `sender ${sender}` : "";
-}
-
-function renderLabeledTarget(name?: string, id?: string, namePrefix = "") {
-  const normalizedName = name?.trim();
-  const normalizedId = id?.trim();
-  if (normalizedName && normalizedId) {
-    return `${namePrefix}${normalizedName} (${normalizedId})`;
-  }
-  if (normalizedName) {
-    return `${namePrefix}${normalizedName}`;
-  }
-  return normalizedId ?? "";
-}
-
-function renderNamedValue(label: string, name?: string, id?: string) {
-  const value = renderLabeledTarget(name, id);
-  return value ? `${label} ${value}` : "";
 }
 
 function buildReplyCommandBase(params: {

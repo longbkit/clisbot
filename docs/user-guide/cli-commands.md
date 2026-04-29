@@ -80,6 +80,7 @@ Bot id rules:
 - `clisbot status`
 - `clisbot version`
 - `clisbot logs`
+- `clisbot update`
 - `clisbot bots ...`
 - `clisbot routes ...`
 - `clisbot agents ...`
@@ -97,12 +98,14 @@ Bot id rules:
 - `clisbot stop [--hard]`: stop runtime, optionally clean all tmux sessions on the clisbot socket
 - `clisbot status`: inspect runtime, config, log, tmux state, and the five most recent runner sessions
 - `clisbot logs [--lines N]`: print recent logs
+- `clisbot update --help`: print the AI-readable package update guide, including stable/beta defaults, release notes, and migration index links
 - `clisbot init [first-run flags...]`: bootstrap config and optional first agent without starting runtime
 
 Focused help:
 
 - `clisbot start --help`: first-run help for tokens, bot bootstrap, and examples
 - `clisbot init --help`: same bootstrap help without starting the runtime
+- `clisbot update --help`: package update checklist for humans and agents
 
 ## Bots
 
@@ -138,10 +141,6 @@ Core commands:
 - `clisbot bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
 - `clisbot bots get-dm-policy --channel <slack|telegram> [--bot <id>]`
 - `clisbot bots set-dm-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
-- `clisbot bots get-group-policy --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots set-group-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|allowlist|open>`
-- `clisbot bots get-channel-policy --channel slack [--bot <id>]`
-- `clisbot bots set-channel-policy --channel slack [--bot <id>] --policy <disabled|allowlist|open>`
 
 Token aliases:
 
@@ -163,6 +162,9 @@ Important behavior:
 - if `--agent` is passed on `bots add`, it binds an existing agent
 - if `--cli` and `--bot-type` are passed on `bots add`, the command creates and bootstraps a new agent for that bot
 - `bots add` rejects ambiguous input such as passing both `--agent` and `--cli`
+- shared-route admission for normal users comes from `groupPolicy` or Slack `channelPolicy`
+- with default admission `allowlist`, normal users need explicit routes such as `group:<id>` or `topic:<chatId>:<topicId>`
+- stored `groups["*"]` is the default sender rule after that shared surface is admitted
 
 ## Routes
 
@@ -186,14 +188,23 @@ Notes:
 
 Route ids:
 
-- Slack public channel: `channel:C123456`
-- Slack private group or MPIM: `group:G123456`
+- Slack shared surface: `group:C123456` or `group:G123456`
+- Shared default fine-grain route: `group:*`
 - Slack direct message fallback: `dm:*`
 - Slack specific DM peer: `dm:U123456`
 - Telegram group: `group:-1001234567890`
 - Telegram topic: `topic:-1001234567890:42`
+- Shared default fine-grain route: `group:*`
 - Telegram direct message fallback: `dm:*`
 - Telegram specific DM peer: `dm:1276408333`
+
+Notes:
+
+- canonical CLI shared wildcard route id is `group:*`
+- canonical stored wildcard key under a bot is `groups["*"]`
+- legacy shorthand `*`, old `groups:*`, and Slack `channel:<id>` input are still accepted for compatibility
+- canonical operator naming still treats `group:<id>` as the preferred multi-user route id across providers
+- `group:*` is the bot default multi-user sender policy node and should be updated, not treated as removable
 
 Core commands:
 
@@ -239,21 +250,29 @@ Policy rules:
   - `pairing`
   - `allowlist`
   - `open`
-- for exact DM routes such as `dm:U123456` or `dm:1276408333`, admission policy stays on `dm:*`
-- exact DM routes are behavior-only overrides for fields such as `agentId`, `streaming`, `responseMode`, `additionalMessageMode`, `followUp`, `verbose`, and `timezone`
+- exact DM routes such as `dm:U123456` or `dm:1276408333` may now carry per-user admission and behavior overrides when needed
 
 Important behavior:
 
 - `routes add` fails if the target bot does not exist
 - `routes add` fails if the same route already exists under that bot and points to `set-agent` or another `set-<key>` command
+- `routes add` can set route creation options in one command, including `--policy`, `--require-mention`, and `--allow-bots`
 - `disable` keeps the route in config but stops using it for now
 - `remove` deletes the route from config
 - `routes enable` and `routes disable` are the fast toggle when you want to keep the route definition but stop or resume handling
 - `routes set-agent` answers the operator question: which agent should handle this surface?
 - an explicit route agent always wins over the bot-specific fallback agent
-- `allowUsers` and `blockUsers` apply to who may talk to the bot on that route, not to which groups or channels exist
-- DM auth is owned by `dm:*`; `routes set-policy`, `add/remove-allow-user`, and `add/remove-block-user` reject exact DM routes
-- `pairing approve <channel> <code>` now writes the approved sender into the requesting bot's `directMessages."dm:*".allowUsers`
+- shared surfaces use two gates:
+  - gate 1 admission: `groupPolicy` or Slack `channelPolicy`; default `allowlist` means normal users need an explicit shared route such as `group:<id>` or `topic:<chatId>:<topicId>`
+  - gate 2 sender policy: stored `groups["*"]` plus any route-local `allowUsers` and `blockUsers`; default is `open`
+- shared routes enforce sender lists at ingress for Slack channels or groups and Telegram groups or topics
+- app `owner` and app `admin` do not bypass `groupPolicy`/`channelPolicy` admission; after a group is admitted and enabled, they bypass sender allowlists, while shared `blockUsers` still applies
+- `disabled` means silent, even for app `owner` and app `admin`
+- adding `group:<id>` without `--policy` inherits the default in-group sender policy from `group:*`; exact group/channel/topic routes should omit `policy` unless that surface intentionally differs
+- the deny message intentionally uses `group` as the common human-facing many-people term
+- shared allowlist failures are denied before runner ingress with:
+  - `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to \`allowUsers\` for this surface.`
+- `pairing approve <channel> <code>` writes the approved sender into the requesting bot's wildcard DM route allowlist
 
 How to add or block users:
 
@@ -261,19 +280,26 @@ How to add or block users:
 - Slack DM block: `clisbot routes add-block-user --channel slack dm:* --bot <bot-id> --user U123ABC456`
 - Telegram DM allow: `clisbot routes add-allow-user --channel telegram dm:* --bot <bot-id> --user 1276408333`
 - Telegram DM block: `clisbot routes add-block-user --channel telegram dm:* --bot <bot-id> --user 1276408333`
-- Shared channel/group allow or block stays on that shared route itself, for example `channel:<id>`, `group:<id>`, or `topic:<chatId>:<topicId>`
-- If you want one DM peer to behave differently but not change admission, create or mutate `dm:<userId>` and only change behavior fields there
+- Shared default allow: `clisbot routes add-allow-user --channel slack group:* --bot <bot-id> --user U_OWNER`
+- Shared default block: `clisbot routes add-block-user --channel telegram group:* --bot <bot-id> --user 1276408333`
+- `group:*` writes to the default sender rule for all admitted groups under that bot, stored as `groups["*"]`
+- Shared channel/group allow or block stays on that shared route itself, for example `group:<id>` or `topic:<chatId>:<topicId>`
+- If one DM peer needs different admission or behavior, mutate that exact `dm:<userId>` route
 
 Examples:
 
-- `clisbot routes add --channel slack channel:C_GENERAL`
+- `clisbot routes add --channel slack group:C_GENERAL`
 - `clisbot routes add --channel slack group:G_SUPPORT --bot support --require-mention false`
+- `clisbot routes add --channel telegram group:-1001234567890 --bot alerts --require-mention false --allow-bots true --policy allowlist`
 - `clisbot routes add --channel slack dm:* --bot support --policy allowlist`
 - `clisbot routes add --channel slack dm:U_OWNER --bot support`
 - `clisbot routes add --channel telegram group:-1001234567890`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot support --require-mention false`
-- `clisbot routes set-agent --channel slack channel:C_GENERAL --agent product`
+- `clisbot routes set-agent --channel slack group:C_GENERAL --agent product`
 - `clisbot routes set-require-mention --channel telegram topic:-1001234567890:42 --value false`
+- `clisbot routes set-allow-bots --channel telegram group:-1001234567890 --bot alerts --value true`
+- `clisbot routes set-policy --channel telegram group:* --bot alerts --policy allowlist`
+- `clisbot routes add-allow-user --channel telegram group:* --bot alerts --user 1276408333`
 - `clisbot routes add-allow-user --channel slack dm:* --bot support --user U_OWNER`
 - `clisbot routes add-block-user --channel telegram group:-1001234567890 --user 1276408333`
 
@@ -322,14 +348,15 @@ Important behavior:
 - `agents remove` fails while any bot or route still references that agent
 - `agents set-default` defines the global fallback agent when a more specific bot or route choice is absent
 - `--workspace` is optional; a sensible default workspace path exists
-- `agents bootstrap` is the template refresh or upgrade path
+- `agents bootstrap` is the template refresh or update path
 - without `--force`, `agents bootstrap` shows what files would change before overwriting them
 - when practical, `agents bootstrap` shows a diff or at least a file-by-file overwrite plan
 
 ## Auth
 
 - `clisbot auth list [--json]`
-- `clisbot auth get <app|agent-defaults|agent> [--agent <id>] [--json]`
+- `clisbot auth show <app|agent-defaults|agent> [--agent <id>] [--json]`
+- `clisbot auth get-permissions --sender <principal> --agent <id> [--json] [--verbose]`
 - `clisbot auth add-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
 - `clisbot auth remove-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]`
 - `clisbot auth add-permission <app|agent-defaults|agent> --role <role> --permission <permission> [--agent <id>]`
@@ -342,6 +369,9 @@ Important behavior:
 - `agent --agent <id>` edits one agent override under `agents.list[].auth`
 - `add-user` and `remove-user` mutate `roles.<role>.users`
 - `add-permission` and `remove-permission` mutate `roles.<role>.allow`
+- `get-permissions` is read-only and returns the sender's effective permissions for one agent
+- use `--sender <principal>` for permission checks and `--user <principal>` for role assignment
+- `principal` format is `<platform>:<provider-user-id>`, for example `telegram:1276408333` or `slack:U123ABC456`
 - agent-specific writes clone the inherited role from `agents.defaults.auth.roles.<role>` into the target agent override on first mutation
 - app permissions are limited to the app permission set: `configManage`, `appAuthManage`, `agentAuthManage`, `promptGovernanceManage`
 - agent permissions are limited to the agent permission set shown by `clisbot auth --help`
@@ -458,35 +488,64 @@ Important behavior:
 
 - `clisbot loops list`
 - `clisbot loops status`
-- `clisbot loops status --channel slack --target channel:C1234567890 --thread-id 1712345678.123456`
-- `clisbot loops create --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target channel:C1234567890 --new-thread every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target dm:U1234567890 --new-thread every day at 09:00 check inbox`
-- `clisbot loops --channel telegram --target -1001234567890 --topic-id 42 5m check CI`
-- `clisbot loops --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 3 review backlog`
+- `clisbot loops status --channel slack --target group:C1234567890 --thread-id 1712345678.123456`
+- `clisbot loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI`
+- `clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
+- `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
+- `clisbot loops --channel telegram --target -1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
+- `clisbot loops --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog`
 - `clisbot loops cancel <id>`
-- `clisbot loops cancel --channel slack --target channel:C1234567890 --thread-id 1712345678.123456 --all`
+- `clisbot loops cancel --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --all`
 - `clisbot loops cancel --all`
 
 Targeting:
 
 - `--target` selects the routed surface
-- Slack accepts `channel:<id>`, `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids
+- Slack accepts `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids
 - Telegram expects the numeric chat id in `--target`
 - `--thread-id` means an existing Slack thread ts
 - `--topic-id` means a Telegram topic id
 - omitting the sub-surface flag targets the parent Slack channel/group/DM or Telegram chat
 - `--new-thread` is Slack-only and creates a fresh thread anchor before the loop starts
+- `--sender <principal>` is required for loop creation and records the human creator as `slack:<user-id>` or `telegram:<user-id>`
+- `--sender-name <name>` and `--sender-handle <handle>` optionally store readable creator context for scheduled prompts
 - in Telegram forum groups, omitting `--topic-id` targets the parent chat surface; sends then follow Telegram's normal no-`message_thread_id` behavior, which is the General topic when that forum has one
 
 Examples:
 
 - recurring loops are created from chat with `/loop 5m check CI` or `/loop every day at 07:00 check CI`
 - use scoped `clisbot loops ... --channel ... --target ...` when you want the same session-specific create, status, or cancel behavior from the operator CLI
+- CLI loop creation fails without `--sender` so delayed work keeps a real creator instead of rendering sender as unavailable
 - use app-wide `clisbot loops list`, `clisbot loops status`, or `clisbot loops cancel --all` when you want global inventory or emergency cleanup
 - CLI creation accepts the same expression families as `/loop`: interval, forced interval, times/count, and calendar schedules
 - omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
 - count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
+- the first wall-clock loop create attempt returns confirmation-required output and does not persist a loop until rerun with `--confirm`
+- AI agents should inspect `clisbot loops --help` for schedule, loop, or reminder requests and follow the CLI output instead of guessing loop state
+
+## Timezone
+
+- `clisbot timezone get`
+- `clisbot timezone set Asia/Ho_Chi_Minh`
+- `clisbot timezone clear`
+- `clisbot timezone doctor`
+- `clisbot agents get-timezone --agent default`
+- `clisbot agents set-timezone --agent support-us America/Los_Angeles`
+- `clisbot agents clear-timezone --agent support-us`
+- `clisbot routes get-timezone --channel telegram group:-1001234567890 --bot default`
+- `clisbot routes set-timezone --channel telegram group:-1001234567890 --bot default Asia/Ho_Chi_Minh`
+- `clisbot routes clear-timezone --channel telegram topic:-1001234567890:4 --bot default`
+- `clisbot bots get-timezone --channel telegram --bot default`
+- `clisbot bots set-timezone --channel telegram --bot default Asia/Ho_Chi_Minh`
+- `clisbot bots clear-timezone --channel telegram --bot default`
+
+Timezone guidance:
+
+- app timezone is the normal default; prefer `clisbot timezone set <iana>` when the whole install should use one timezone
+- agent timezone is for one assistant/workspace that mostly serves a different timezone
+- route timezone is for one Slack channel, Telegram group, or topic that has different local time from its app or agent default
+- bot timezone is advanced fallback for a concrete provider bot; do not use provider-default timezone fields
+- CLI first wall-clock loop creation prints the resolved timezone before persisting; if it is wrong, set timezone first, then create again
 
 ## First-Run Flows
 
@@ -520,7 +579,7 @@ clisbot start \
 Slack channel to the same default agent:
 
 ```bash
-clisbot routes add --channel slack channel:C_GENERAL
+clisbot routes add --channel slack group:C_GENERAL
 ```
 
 Telegram topic to the same default agent:
@@ -549,7 +608,7 @@ clisbot bots add \
   --bot-type team \
   --persist
 
-clisbot routes add --channel slack channel:C_SUPPORT --bot support --require-mention false
+clisbot routes add --channel slack group:C_SUPPORT --bot support --require-mention false
 ```
 
 Telegram alerts bot with a fresh Gemini personal agent:

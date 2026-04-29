@@ -12,6 +12,25 @@ related:
 
 # Status
 
+## Historical Note
+
+This doc is a design-era comparison for the v0.1.39 proposal.
+
+It should be read as historical migration context, not as the current canonical config contract.
+
+Current canonical shape:
+
+- `directMessages["*"]`
+- `directMessages["<id>"]`
+- `groups["*"]`
+- `groups["<id>"]`
+- Telegram topics under `groups["<chatId>"].topics["<topicId>"]`
+
+Compatibility note:
+
+- operator-facing route ids still use `dm:*`, `group:*`, and `topic:<chatId>:<topicId>`
+- legacy storage-like aliases such as `channel:<id>` and `group:<id>` are accepted as compatibility input only
+
 - `config/clisbot.json.v0.1.0.template` is the current shipped runtime template.
 - `config/clisbot.json.v0.1.39.template` is the proposed next-shape template.
 - `v0.1.39` is still a design artifact. It documents the target mental model and the migration contract. It does not claim current runtime parsing is already switched.
@@ -155,9 +174,9 @@ That difference is now kept visible in the proposal so current supported behavio
 | `channels.slack.accounts.<id>` | `bots.slack.<id>` | bot-rooted Slack config |
 | `channels.telegram.accounts.<id>` | `bots.telegram.<id>` | bot-rooted Telegram config |
 | `bindings[].agentId` for provider/account fallback | provider bot `agentId` | routing moves into the bot |
-| `channels.slack.directMessages.*` | `bots.slack.<id>.directMessages.*` | DM-local Slack overrides remain explicit |
-| `channels.telegram.directMessages.*` | `bots.telegram.<id>.directMessages.*` | DM-local Telegram overrides remain explicit |
-| `channels.slack.channels.<id>` and `channels.slack.groups.<id>` | `bots.slack.<id>.groups."channel:<id>"` and `bots.slack.<id>.groups."group:<id>"` | unified route map with explicit key prefixes |
+| `channels.slack.directMessages.*` | `bots.slack.<id>.directMessages.*` | DM-local Slack overrides remain explicit; canonical default key is `directMessages["*"]` |
+| `channels.telegram.directMessages.*` | `bots.telegram.<id>.directMessages.*` | DM-local Telegram overrides remain explicit; canonical default key is `directMessages["*"]` |
+| `channels.slack.channels.<id>` and `channels.slack.groups.<id>` | `bots.slack.<id>.groups."<id>"` | current canonical stored keys use raw ids; prefixed aliases are compatibility-only inputs |
 | `channels.telegram.groups.<chatId>` | `bots.telegram.<id>.groups."<chatId>"` | Telegram group root |
 | `channels.telegram.groups.<chatId>.topics.<topicId>` | `bots.telegram.<id>.groups."<chatId>".topics."<topicId>"` | Telegram topic override |
 

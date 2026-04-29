@@ -108,6 +108,8 @@ Do not let surface view models leak back into agent-layer contracts or persisten
 
 ## Naming Rules
 
+Use [Glossary](glossary.md) as the canonical vocabulary before introducing or renaming a model.
+
 Names must reveal the layer.
 
 Recommended naming pattern:

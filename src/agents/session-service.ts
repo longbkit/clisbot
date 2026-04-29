@@ -133,11 +133,13 @@ export class ActiveRunInProgressError extends Error {
 function createDeferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+  void promise.catch(() => undefined);
   const deferred: Deferred<T> = {
-    promise: new Promise<T>((nextResolve, nextReject) => {
-      resolve = nextResolve;
-      reject = nextReject;
-    }),
+    promise,
     resolve: (value) => {
       if (deferred.settled) {
         return;
@@ -354,13 +356,40 @@ export class SessionService {
     return this.activeRuns.has(target.sessionKey);
   }
 
+  async hasLiveActiveRun(target: AgentSessionTarget) {
+    if (this.activeRuns.has(target.sessionKey)) {
+      return true;
+    }
+    // Persisted runtime is only a projection; if tmux is gone, this clears it to idle.
+    return Boolean(await this.reconcilePersistedActiveRun(target));
+  }
+
   canSteerActiveRun(target: AgentSessionTarget) {
     return this.activeRuns.get(target.sessionKey)?.steeringReady ?? false;
   }
 
   async submitSessionInput(target: AgentSessionTarget, text: string) {
-    const result = await this.runnerSessions.submitSessionInput(target, text);
     const run = this.activeRuns.get(target.sessionKey);
+    let result: Awaited<ReturnType<RunnerService["submitSessionInput"]>>;
+    try {
+      result = await this.runnerSessions.submitSessionInput(target, text);
+    } catch (error) {
+      if (
+        run &&
+        await this.recoverLostMidRun(
+          target.sessionKey,
+          {
+            runId: run.runId,
+          },
+          error,
+        )
+      ) {
+        throw new Error(
+          "The active runner session was lost before steering could be submitted. clisbot started recovery for the active run; resend the steering message after recovery completes.",
+        );
+      }
+      throw error;
+    }
     if (!run) {
       return result;
     }
@@ -583,28 +612,25 @@ export class SessionService {
       sessionKey: run.resolved.sessionKey,
     };
 
-    await this.notifyRecoveryStep(
-      run,
-      "Prompt delivery did not settle truthfully in the current runner session. clisbot is opening one fresh runner session and retrying the prompt once.",
-    );
     try {
-      const fresh = await this.runnerSessions.startFreshSession(target, params.timingContext);
+      const restarted = await this.runnerSessions.restartRunnerPreservingSessionId(
+        target,
+        params.timingContext,
+      );
       const currentRun = this.getRun(sessionKey, params.runId);
       if (!currentRun) {
         return true;
       }
       const restartedAt = Date.now();
-      currentRun.resolved = fresh.resolved;
+      currentRun.resolved = restarted.resolved;
       currentRun.steeringReady = false;
       currentRun.startedAt = restartedAt;
       currentRun.latestUpdate = this.createRunUpdate({
         resolved: currentRun.resolved,
         status: currentRun.latestUpdate.status === "detached" ? "detached" : "running",
         snapshot: "",
-        fullSnapshot: fresh.initialSnapshot,
-        initialSnapshot: fresh.initialSnapshot,
-        note: "Retrying the prompt in one fresh runner session.",
-        forceVisible: true,
+        fullSnapshot: restarted.initialSnapshot,
+        initialSnapshot: restarted.initialSnapshot,
       });
       await this.sessionState.setSessionRuntime(currentRun.resolved, {
         state: "running",
@@ -614,16 +640,16 @@ export class SessionService {
       this.startRunMonitor(sessionKey, {
         ...params,
         promptRetryAttempt: 1,
-        initialSnapshot: fresh.initialSnapshot,
+        initialSnapshot: restarted.initialSnapshot,
         startedAt: restartedAt,
       });
       return true;
-    } catch (freshError) {
+    } catch (restartError) {
       await this.failActiveRun(
         sessionKey,
         run.runId,
         await this.runnerSessions.mapRunError(
-          freshError,
+          restartError,
           run.resolved.sessionName,
           run.latestUpdate.fullSnapshot,
         ),
@@ -710,9 +736,19 @@ export class SessionService {
       if (!currentRun) {
         return true;
       }
+      if (await this.hasStoredResumableSessionId(currentRun.resolved)) {
+        await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("resume-failed"));
+        await this.failActiveRun(
+          sessionKey,
+          currentRun.runId,
+          new Error(buildRunRecoveryNote("manual-new-required")),
+        );
+        return true;
+      }
+
       await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("fresh-attempt"));
       try {
-        await this.runnerSessions.startFreshSession(target, params.timingContext);
+        await this.runnerSessions.restartRunnerWithFreshSessionId(target, params.timingContext);
       } catch (freshError) {
         await this.failActiveRun(
           sessionKey,
@@ -732,6 +768,14 @@ export class SessionService {
       );
       return true;
     }
+  }
+
+  private async hasStoredResumableSessionId(resolved: ResolvedAgentTarget) {
+    if (resolved.runner.sessionId.resume.mode !== "command") {
+      return false;
+    }
+    const entry = await this.sessionState.getEntry(resolved.sessionKey);
+    return Boolean(entry?.sessionId);
   }
 
   private startRunMonitor(

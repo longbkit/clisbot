@@ -8,6 +8,8 @@ export function prependAttachmentMentions(text: string, attachmentPaths: string[
     return normalizedText;
   }
 
-  const mentions = attachmentPaths.map((value) => `@${value}`).join(" ");
+  const mentions = attachmentPaths
+    .map((value) => `@${value}`)
+    .join(" ");
   return normalizedText ? `${mentions} ${normalizedText}` : mentions;
 }

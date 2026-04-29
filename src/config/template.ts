@@ -10,7 +10,7 @@ import {
   getDefaultTmuxSocketPath,
   getDefaultWorkspaceTemplate,
 } from "../shared/paths.ts";
-import { getDefaultRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
+import { CURRENT_SCHEMA_VERSION } from "./config-migration.ts";
 
 type DefaultChannelBootstrapOptions = {
   slackEnabled?: boolean;
@@ -31,15 +31,15 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
   const sessionStorePath = collapseHomePath(getDefaultSessionStorePath());
   const workspaceTemplate = collapseHomePath(getDefaultWorkspaceTemplate());
   const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-  const defaultRuntimeMonitorRestartBackoff = getDefaultRuntimeMonitorRestartBackoff();
 
   return JSON.stringify(
     {
       meta: {
-        schemaVersion: "0.1.43",
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         lastTouchedAt: new Date().toISOString(),
       },
       app: {
+        timezone: defaultTimezone,
         session: {
           mainKey: "main",
           identityLinks: {},
@@ -75,10 +75,8 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
           loop: {
             maxRunsPerLoop: 20,
             maxActiveLoops: 10,
-            defaultTimezone,
           },
           runtimeMonitor: {
-            restartBackoff: defaultRuntimeMonitorRestartBackoff,
             ownerAlerts: {
               enabled: true,
               minIntervalMinutes: 30,
@@ -91,7 +89,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
           allowBots: false,
           requireMention: true,
           dmScope: "per-channel-peer",
-          groupPolicy: "allowlist",
           commandPrefixes: {
             slash: ["::", "\\"],
             bash: ["!"],
@@ -109,7 +106,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             mode: "auto",
             participationTtlMin: 5,
           },
-          timezone: defaultTimezone,
         },
         slack: {
           defaults: {
@@ -117,8 +113,9 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             defaultBotId: "default",
             mode: "socket",
             allowBots: false,
-            channelPolicy: "disabled",
-            groupPolicy: "disabled",
+            dmPolicy: "pairing",
+            channelPolicy: "allowlist",
+            groupPolicy: "allowlist",
             agentPrompt: {
               enabled: true,
               maxProgressMessages: 3,
@@ -133,10 +130,20 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
               loadingMessages: [],
             },
             directMessages: {
-              "dm:*": {
+              "*": {
                 enabled: true,
                 requireMention: false,
                 policy: "pairing",
+                allowUsers: [],
+                blockUsers: [],
+                allowBots: false,
+              },
+            },
+            groups: {
+              "*": {
+                enabled: true,
+                requireMention: true,
+                policy: "open",
                 allowUsers: [],
                 blockUsers: [],
                 allowBots: false,
@@ -159,13 +166,15 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
               mode: "auto",
               participationTtlMin: 5,
             },
-            timezone: defaultTimezone,
           },
           default: {
             enabled: slackEnabled,
             name: "default",
             appToken: renderEnvReference("SLACK_APP_TOKEN", options.slackAppTokenRef),
             botToken: renderEnvReference("SLACK_BOT_TOKEN", options.slackBotTokenRef),
+            dmPolicy: "pairing",
+            channelPolicy: "allowlist",
+            groupPolicy: "allowlist",
             directMessages: {},
             groups: {},
           },
@@ -176,20 +185,32 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             defaultBotId: "default",
             mode: "polling",
             allowBots: false,
-            groupPolicy: "disabled",
+            dmPolicy: "pairing",
+            groupPolicy: "allowlist",
             agentPrompt: {
               enabled: true,
               maxProgressMessages: 3,
               requireFinalResponse: true,
             },
             directMessages: {
-              "dm:*": {
+              "*": {
                 enabled: true,
                 requireMention: false,
                 policy: "pairing",
                 allowUsers: [],
                 blockUsers: [],
                 allowBots: false,
+              },
+            },
+            groups: {
+              "*": {
+                enabled: true,
+                requireMention: true,
+                policy: "open",
+                allowUsers: [],
+                blockUsers: [],
+                allowBots: false,
+                topics: {},
               },
             },
             commandPrefixes: {
@@ -209,7 +230,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
               mode: "auto",
               participationTtlMin: 5,
             },
-            timezone: defaultTimezone,
             polling: {
               timeoutSeconds: 20,
               retryDelayMs: 1000,
@@ -219,6 +239,8 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             enabled: telegramEnabled,
             name: "default",
             botToken: renderEnvReference("TELEGRAM_BOT_TOKEN", options.telegramBotTokenRef),
+            dmPolicy: "pairing",
+            groupPolicy: "allowlist",
             directMessages: {},
             groups: {},
           },
@@ -251,7 +273,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
                 socketPath: tmuxSocketPath,
               },
               trustWorkspace: true,
-              startupDelayMs: 3000,
               startupRetryCount: 2,
               startupRetryDelayMs: 1000,
               promptSubmitDelayMs: 150,
@@ -328,25 +349,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             gemini: {
               command: "gemini",
               args: ["--approval-mode=yolo", "--sandbox=false"],
-              startupDelayMs: 15000,
-              startupRetryCount: 2,
-              startupRetryDelayMs: 1000,
-              startupReadyPattern: "Type your message or @path/to/file",
-              startupBlockers: [
-                {
-                  pattern:
-                    "Please visit the following URL to authorize the application|Enter the authorization code:",
-                  message:
-                    "Gemini CLI is waiting for manual OAuth authorization. Authenticate Gemini once in a direct interactive terminal, or configure headless auth such as GEMINI_API_KEY or Vertex AI before routing Gemini through clisbot.",
-                },
-                {
-                  pattern:
-                    "How would you like to authenticate for this project\\?|Failed to sign in\\.|Manual authorization is required but the current session is non-interactive",
-                  message:
-                    "Gemini CLI is blocked in its authentication setup flow or sign-in recovery. Complete Gemini authentication directly first, or switch clisbot to a headless auth path such as GEMINI_API_KEY or Vertex AI before routing prompts.",
-                },
-              ],
-              promptSubmitDelayMs: 200,
               sessionId: {
                 create: {
                   mode: "runner",

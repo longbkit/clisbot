@@ -138,4 +138,30 @@ describe("bots cli", () => {
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
     expect(rawConfig.bots.telegram.default.agentId).toBe("support");
   });
+
+  test("sets and clears concrete bot timezone", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+
+    console.log = (() => {}) as typeof console.log;
+
+    await runBotsCli([
+      "set-timezone",
+      "--channel",
+      "telegram",
+      "--bot",
+      "default",
+      "Asia/Ho_Chi_Minh",
+    ]);
+    let rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.telegram.default.timezone).toBe("Asia/Ho_Chi_Minh");
+
+    await runBotsCli(["clear-timezone", "--channel", "telegram", "--bot", "default"]);
+    rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.telegram.default.timezone).toBeUndefined();
+  });
 });

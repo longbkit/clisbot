@@ -49,8 +49,11 @@ Examples:
 - for `every ...` syntax, `--force` must appear immediately after the interval clause, for example `/loop check deploy every 1m --force`
 - wall-clock schedules must use `HH:MM` in 24-hour format
 - wall-clock schedules wait until the next matching local time; they do not fire immediately on creation
-- wall-clock schedules resolve timezone from route override first, then `control.loop.defaultTimezone`, then host timezone
+- wall-clock schedules resolve timezone through the shared effective timezone resolver: one-off loop timezone, route/topic timezone, agent timezone, bot timezone, `app.timezone`, legacy default fallbacks, then host fallback only if no configured timezone exists
 - once created, a wall-clock loop stores the resolved effective timezone on the loop itself so later config changes do not silently shift old schedules
+- chat `/loop` wall-clock creation persists immediately; the no-side-effect first-loop confirmation gate is for operator CLI creation
+- every chat wall-clock creation response must include the resolved timezone, next run in local time plus UTC, and the exact cancel command so the user can quickly undo and recreate if timezone is wrong
+- AI agents should inspect `clisbot loops --help` for schedule/loop/reminder requests when they need to create loops through the CLI
 - interval loops receive an id and are tracked in managed state
 - managed loops stop after `control.loop.maxRunsPerLoop` attempts
 - managed loop scheduling is `skip-if-busy`, so a busy session drops that tick instead of piling a queue
@@ -123,8 +126,9 @@ Wall-clock loops also store:
 
 - interval loops run once immediately after creation, then compute later runs from `intervalMs`
 - wall-clock loops do not run immediately; they wait for the next matching local time
-- wall-clock timezone is resolved in this order: route override, then `control.loop.defaultTimezone`, then host timezone
+- wall-clock timezone is resolved by the shared effective timezone resolver used by prompt timestamps and loop creation
 - the effective wall-clock timezone is frozen onto the persisted loop record at creation time so later config changes do not silently shift existing schedules
+- chat `/loop` does not use the first-loop no-side-effect gate; instead it must make correction cheap by showing timezone, local next run, UTC next run, and cancel guidance after creation
 - restart recovery uses the persisted `nextRunAt` timestamp instead of replaying an entire missed history
 
 ### Code Paths

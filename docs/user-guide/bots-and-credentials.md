@@ -1,23 +1,20 @@
 # Bots And Credentials
 
-## Purpose
+## Mental Model
 
-Use this page when you need to manage Slack or Telegram bot identities, credentials, and provider-level bot defaults.
+One bot is one provider identity.
 
-Official operator surface:
+A bot owns:
 
-- `clisbot bots ...`
+- credentials
+- a fallback `agentId`
+- DM defaults
+- shared-surface defaults
+- exact DM and shared-surface overrides
 
-Mental model:
+Routes live under that bot.
 
-- one bot = one provider identity plus its credentials
-- routes are attached under a bot
-- a bot may define a fallback `agentId`
-- a route may keep that fallback or override it
-
-## Config Shape
-
-The official config shape is:
+## Preferred Stored Shape
 
 ```json
 {
@@ -25,70 +22,99 @@ The official config shape is:
     "slack": {
       "defaults": {
         "enabled": true,
-        "defaultBotId": "default"
+        "defaultBotId": "default",
+        "dmPolicy": "pairing",
+        "channelPolicy": "allowlist",
+        "groupPolicy": "allowlist",
+        "directMessages": {
+          "*": {
+            "enabled": true,
+            "policy": "pairing"
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "policy": "open"
+          }
+        }
       },
       "default": {
         "appToken": "${SLACK_APP_TOKEN}",
         "botToken": "${SLACK_BOT_TOKEN}",
-        "agentId": "default"
-      },
-      "ops": {
-        "appToken": "${SLACK_OPS_APP_TOKEN}",
-        "botToken": "${SLACK_OPS_BOT_TOKEN}",
-        "agentId": "ops"
+        "agentId": "default",
+        "dmPolicy": "pairing",
+        "channelPolicy": "allowlist",
+        "groupPolicy": "allowlist",
+        "directMessages": {},
+        "groups": {}
       }
     },
     "telegram": {
       "defaults": {
         "enabled": true,
-        "defaultBotId": "default"
+        "defaultBotId": "default",
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
+        "directMessages": {
+          "*": {
+            "enabled": true,
+            "policy": "pairing"
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "policy": "open",
+            "topics": {}
+          }
+        }
       },
       "default": {
         "botToken": "${TELEGRAM_BOT_TOKEN}",
-        "agentId": "default"
-      },
-      "alerts": {
-        "botToken": "${TELEGRAM_ALERTS_BOT_TOKEN}",
-        "agentId": "alerts"
+        "agentId": "default",
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
+        "directMessages": {},
+        "groups": {}
       }
     }
   }
 }
 ```
 
-Key rules:
+## Important Rules
 
-- `bots.<provider>.defaults.defaultBotId` is the default bot when `--bot` is omitted
-- `bots.<provider>.<botId>` stores one bot
-- Slack bots use both `appToken` and `botToken`
-- Telegram bots use `botToken`
-- route maps live under each bot, not at the provider root
+- stored config uses raw ids plus `*` inside `directMessages` and `groups`
+- CLI still uses `dm:<id>` and `group:<id>`
+- `dmPolicy` is a quick alias for the wildcard DM default
+- Slack `channelPolicy` and `groupPolicy` control shared-surface admission
+- Telegram `groupPolicy` controls Telegram group admission
+- `groups["*"].policy` controls the default sender policy inside admitted groups
+- `disabled` means silent, even for owner/admin
 
-## CLI Flow
+## Invariants
 
-Most operators only need these commands:
+- Slack `channel:<id>` is compatibility input only; preferred operator naming is still `group:<id>`
+- `group:*` is the bot's default multi-user sender policy node
+- `directMessages["*"]` and `groups["*"]` are the canonical wildcard storage nodes
+- exact DM routes may carry admission config as well as behavior overrides
+- bot-level defaults answer "what usually happens under this bot"; exact routes answer "what is special for this one surface"
+- exact group/channel/topic routes should omit `policy` when they should inherit `groups["*"].policy`
+
+## Common Commands
 
 ```bash
 clisbot bots list
-clisbot bots get --channel telegram --bot default
 clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist
 clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist
-clisbot bots set-agent --channel telegram --bot default --agent support
-clisbot bots set-agent --channel slack --bot ops --agent ops
+clisbot bots set-agent --channel slack --bot default --agent support
 clisbot bots set-default --channel telegram --bot alerts
-clisbot bots set-default --channel slack --bot ops
 clisbot bots get-credentials-source --channel slack --bot default
 clisbot bots set-dm-policy --channel telegram --bot default --policy pairing
-clisbot bots set-group-policy --channel telegram --bot default --policy allowlist
-clisbot bots set-channel-policy --channel slack --bot default --policy disabled
+clisbot bots set-group-policy --channel slack --bot default --policy allowlist
+clisbot routes set-policy --channel slack group:C1234567890 --bot default --policy allowlist
 ```
-
-Behavior rules:
-
-- `add` is create-only
-- if the bot already exists, use `set-agent`, `set-credentials`, or another `set-<key>` command
-- raw token input without `--persist` is runtime-only and needs a running `clisbot`
-- `--persist` writes canonical credential files and keeps raw secrets out of `clisbot.json`
 
 ## Credential Sources
 
@@ -96,82 +122,26 @@ Preferred order:
 
 1. canonical credential files
 2. env placeholders such as `${SLACK_BOT_TOKEN}`
-3. runtime-only mem credentials during bootstrap or a running session
+3. runtime-only mem credentials
 
-Canonical credential files:
-
-- `~/.clisbot/credentials/telegram/<botId>/bot-token`
-- `~/.clisbot/credentials/slack/<botId>/app-token`
-- `~/.clisbot/credentials/slack/<botId>/bot-token`
-
-Supported persisted fields:
-
-- `credentialType`
-- `tokenFile`
-- `appTokenFile`
-- `botTokenFile`
-
-Current guardrail:
-
-- raw token literals are not allowed as long-lived values inside `clisbot.json`
-
-## Token Input Semantics
-
-These inputs mean different things:
-
-- `--bot-token TELEGRAM_BOT_TOKEN`
-  - treat as env var name
-- `--bot-token '${TELEGRAM_BOT_TOKEN}'`
-  - treat as env placeholder
-- `--bot-token "$TELEGRAM_BOT_TOKEN"`
-  - shell expands first, so `clisbot` receives the real token value
-  - without `--persist`, that becomes a runtime-only mem credential
-
-## Practical Examples
-
-Create one Telegram bot and persist the token:
-
-```bash
-clisbot bots add \
-  --channel telegram \
-  --bot default \
-  --bot-token TELEGRAM_BOT_TOKEN \
-  --persist
-```
-
-Create one Slack bot and persist both tokens:
-
-```bash
-clisbot bots add \
-  --channel slack \
-  --bot default \
-  --app-token SLACK_APP_TOKEN \
-  --bot-token SLACK_BOT_TOKEN \
-  --persist
-```
-
-Point a Slack bot at a different fallback agent:
-
-```bash
-clisbot bots set-agent --channel slack --bot default --agent support
-```
-
-Show how the current bot gets its credentials:
-
-```bash
-clisbot bots get-credentials-source --channel telegram --bot default
-```
+Raw token literals should not live long-term in `clisbot.json`.
 
 ## What `start` Does
 
 On first run:
 
-- `clisbot start` creates the default config if needed
-- explicit token flags create or update the requested bots
-- only the providers you name are enabled
-- routes are still manual by design
+- `clisbot start` creates the config if needed
+- explicit token flags create or update the requested bot
+- only the providers you enable are started
+- shared routes are still manual by design
 
 After first run:
 
-- use `clisbot bots ...` to add more bots or rotate credentials
-- use `clisbot routes ...` to expose specific channels, groups, topics, or DMs under those bots
+- use `clisbot bots ...` for credentials and fallback agent changes
+- use `clisbot routes ...` for DM, group, and topic admission
+
+## Related Docs
+
+- [Routes](channels.md)
+- [CLI Commands](cli-commands.md)
+- [Surface Policy Shape Standardization And 0.1.43 Compatibility](../tasks/features/configuration/2026-04-24-surface-policy-shape-standardization-and-0.1.43-compatibility.md)

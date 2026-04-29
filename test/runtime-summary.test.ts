@@ -155,16 +155,17 @@ describe("runtime summaries", () => {
     expect(text).toContain("additionalMessageMode=steer");
     expect(text).toContain("Channel health:");
     expect(text).toContain("dm=pairing");
+    expect(text).toContain("sharedDefault=open");
     expect(text).toContain("routes=none");
     expect(text).toContain("telegram: no explicit group or topic routes are configured yet");
     expect(startText).toContain("telegram: no explicit group or topic routes are configured yet");
     expect(startText).toContain("DM the Telegram or Slack bot first to confirm it responds normally");
     expect(startText).toContain("after DM works, add the bot to the target Slack channel or Telegram group/topic");
     expect(startText).toContain(
-      "add the route with `clisbot routes add --channel slack channel:<channelId> --bot default` or `clisbot routes add --channel telegram group:<chatId> --bot default`",
+      "add the route with `clisbot routes add --channel slack group:<channelId> --bot default` or `clisbot routes add --channel telegram group:<chatId> --bot default`",
     );
     expect(startText).toContain(
-      "bind the agent with `clisbot routes set-agent --channel slack channel:<channelId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`",
+      "bind the agent with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`",
     );
     expect(startText).toContain(
       "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",
@@ -243,6 +244,7 @@ describe("runtime summaries", () => {
     expect(text).not.toContain("telegram enabled=no connection=");
     expect(text).toContain("agent=work");
     expect(text).toContain("state=detached");
+    expect(text).toContain("runner=lost");
     expect(text).toContain("sessionKey=agent:work:slack:channel:C123:thread:1.2");
   });
 
@@ -254,6 +256,11 @@ describe("runtime summaries", () => {
         adminPrincipals: [],
         ownerClaimWindowMinutes: 30,
       },
+      timezoneSummary: {
+        effective: "UTC",
+        source: "app",
+        appTimezone: "UTC",
+      },
       agentSummaries: [],
       channelSummaries: [],
       activeRuns: [],
@@ -264,6 +271,7 @@ describe("runtime summaries", () => {
       runnerSessions: [
         {
           sessionName: "session-6",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-6",
@@ -275,6 +283,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-5",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-5",
@@ -286,6 +295,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-4",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-4",
@@ -297,6 +307,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-3",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-3",
@@ -308,6 +319,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-2",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-2",
@@ -319,6 +331,7 @@ describe("runtime summaries", () => {
         },
         {
           sessionName: "session-1",
+          live: true,
           entry: {
             agentId: "default",
             sessionKey: "session-1",

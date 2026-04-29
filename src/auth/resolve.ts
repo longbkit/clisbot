@@ -5,7 +5,10 @@ export type ResolvedChannelAuth = {
   principal?: string;
   appRole: string;
   agentRole: string;
+  appPermissions?: string[];
+  agentPermissions?: string[];
   mayBypassPairing: boolean;
+  mayBypassSharedSenderPolicy: boolean;
   mayManageProtectedResources: boolean;
   canUseShell: boolean;
 };
@@ -129,6 +132,19 @@ export function resolveChannelAuth(params: {
   identity: ChannelIdentity;
 }): ResolvedChannelAuth {
   const principal = resolveAuthPrincipal(params.identity);
+  return resolvePrincipalAuth({
+    config: params.config,
+    agentId: params.agentId,
+    principal,
+  });
+}
+
+export function resolvePrincipalAuth(params: {
+  config: ClisbotConfig;
+  agentId: string;
+  principal?: string;
+}): ResolvedChannelAuth {
+  const principal = params.principal ? normalizeAuthPrincipal(params.principal) : undefined;
   const appAuth = params.config.app.auth;
   const explicitAppRole = findExplicitRole(appAuth.roles, principal);
   const appRole = explicitAppRole ?? appAuth.defaultRole;
@@ -150,7 +166,10 @@ export function resolveChannelAuth(params: {
     principal,
     appRole,
     agentRole,
+    appPermissions: [...getAllowedPermissions(params.config.app.auth.roles, appRole)],
+    agentPermissions: [...agentPermissions],
     mayBypassPairing: appAdminLike,
+    mayBypassSharedSenderPolicy: appAdminLike,
     mayManageProtectedResources,
     canUseShell: appAdminLike || agentPermissions.has("shellExecute"),
   };

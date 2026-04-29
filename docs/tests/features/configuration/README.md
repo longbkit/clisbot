@@ -22,8 +22,8 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 - the file is created at `~/.clisbot/clisbot.json`
 - the tmux socket path is `~/.clisbot/state/clisbot.sock`
 - the default agent workspace is `~/.clisbot/workspaces/default`
-- the generated Slack default bot route maps are empty
-- the generated Telegram default bot route maps are empty
+- the generated Slack default bot keeps `directMessages: {}` and creates wildcard defaults at `defaults.directMessages["*"]` and `defaults.groups["*"]`
+- the generated Telegram default bot keeps `directMessages: {}` and creates wildcard defaults at `defaults.directMessages["*"]` and `defaults.groups["*"]`
 
 ## Test Case 2: Start Refuses First Run Without Default Channel Tokens
 
@@ -66,18 +66,18 @@ They cover config bootstrap, env substitution, and how the system wiring is reso
 
 ### Steps
 
-1. Start the service with `channelPolicy: "allowlist"` and `groupPolicy: "allowlist"`
-2. Send traffic from an allowed channel
-3. Send traffic from a non-listed channel
-4. Repeat with `channelPolicy: "open"`
-5. Repeat with `groupPolicy: "open"` for a Slack MPIM route
+1. Add one explicit Slack channel route and one explicit Slack MPIM route
+2. Leave another Slack channel and another Slack MPIM route unconfigured
+3. Send traffic from the configured shared routes
+4. Send traffic from the unconfigured shared routes as a normal user
+5. Tighten the shared wildcard sender route to `allowlist`, then verify only allowlisted senders may talk inside the configured shared routes
 
 ### Expected Results
 
-- allowlisted channels route to the configured agent
-- non-listed channels are rejected under `channelPolicy: "allowlist"`
-- open-channel behavior remains mention-gated unless the config explicitly changes that rule
-- Slack MPIM group behavior is controlled independently by `groupPolicy`
+- configured shared routes are admitted and route to the configured agent
+- unconfigured shared routes are rejected for normal users when `groupPolicy` or Slack `channelPolicy` is `allowlist`, even if `groups["*"]` exists
+- `groups["*"]` changes sender policy only after the shared surface is admitted
+- shared-surface admission depends on `groupPolicy` or Slack `channelPolicy`; sender allowlists live on `groups["*"]` and exact routes
 
 ## Test Case 5: Runner And Interaction Policy Resolve From One Config Source
 

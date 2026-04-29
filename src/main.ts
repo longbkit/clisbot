@@ -9,6 +9,8 @@ import { runLoopsCli } from "./control/loops-cli.ts";
 import { runMessageCli } from "./control/message-cli.ts";
 import { runRoutesCli } from "./control/routes-cli.ts";
 import { runRunnerCli } from "./control/runner-cli.ts";
+import { runTimezoneCli } from "./control/timezone-cli.ts";
+import { runUpdateCli } from "./control/update-cli.ts";
 import { initConfig, start } from "./control/runtime-bootstrap-cli.ts";
 import {
   logs,
@@ -32,7 +34,7 @@ const INTERNAL_CLI_NAME_FLAG = "--internal-cli-name";
 export function prepareCliArgv(argv: string[]) {
   const flagIndex = argv.findIndex((arg) => arg === INTERNAL_CLI_NAME_FLAG);
   if (flagIndex === -1) {
-    setRenderedCliName();
+    setRenderedCliName(process.env.CLISBOT_CLI_NAME);
     return argv;
   }
 
@@ -98,12 +100,22 @@ async function runBuiltinCommand(command: ReturnType<typeof parseCliArgs>) {
     return true;
   }
 
+  if (command.name === "update") {
+    await runUpdateCli(command.args);
+    return true;
+  }
+
   return false;
 }
 
 async function runControlCommand(command: ReturnType<typeof parseCliArgs>) {
   if (command.name === "channels") {
     await runChannelsCli(command.args);
+    return true;
+  }
+
+  if (command.name === "timezone") {
+    await runTimezoneCli(command.args);
     return true;
   }
 

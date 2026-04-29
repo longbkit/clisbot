@@ -32,6 +32,7 @@ describe("resolveChannelAuth", () => {
 
     expect(auth.appRole).toBe("admin");
     expect(auth.mayBypassPairing).toBe(true);
+    expect(auth.mayBypassSharedSenderPolicy).toBe(true);
     expect(auth.mayManageProtectedResources).toBe(true);
     expect(auth.canUseShell).toBe(true);
   });
@@ -50,6 +51,7 @@ describe("resolveChannelAuth", () => {
     expect(auth.appRole).toBe("member");
     expect(auth.agentRole).toBe("admin");
     expect(auth.mayBypassPairing).toBe(false);
+    expect(auth.mayBypassSharedSenderPolicy).toBe(false);
     expect(auth.mayManageProtectedResources).toBe(false);
     expect(auth.canUseShell).toBe(true);
   });
@@ -82,6 +84,7 @@ describe("resolveChannelAuth", () => {
 
     expect(auth.agentRole).toBe("member");
     expect(auth.mayBypassPairing).toBe(false);
+    expect(auth.mayBypassSharedSenderPolicy).toBe(false);
     expect(auth.canUseShell).toBe(false);
   });
 
@@ -99,6 +102,7 @@ describe("resolveChannelAuth", () => {
     expect(auth.appRole).toBe("member");
     expect(auth.agentRole).toBe("admin");
     expect(auth.mayBypassPairing).toBe(false);
+    expect(auth.mayBypassSharedSenderPolicy).toBe(false);
     expect(auth.canUseShell).toBe(true);
   });
 });

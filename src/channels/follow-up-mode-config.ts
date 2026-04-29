@@ -3,6 +3,7 @@ import { readEditableConfig, writeEditableConfig } from "../config/config-file.t
 import {
   createDirectMessageBehaviorOverride,
   resolveDirectMessageExactRoute,
+  resolveDirectMessageWildcardRoute,
 } from "../config/direct-message-routes.ts";
 import {
   getSlackBotRecord,
@@ -93,29 +94,29 @@ function resolveSlackFollowUpModeTarget(
     if (!targetId) {
       throw new Error("Slack follow-up channel scope requires a senderId or channelId.");
     }
-    const routeKey = `dm:${targetId}`;
+    const routeKey = targetId;
+    const wildcardRoute = resolveDirectMessageWildcardRoute(bot.directMessages);
     const existingRoute =
       resolveDirectMessageExactRoute(bot.directMessages, targetId) ??
-      (bot.directMessages[routeKey] = createDirectMessageBehaviorOverride());
+      (bot.directMessages[routeKey] = createDirectMessageBehaviorOverride(wildcardRoute));
     return {
       get: () => existingRoute.followUp?.mode ?? bot.followUp?.mode,
       set: (value) => {
         getOrCreateFollowUp(existingRoute).mode = value;
       },
-      label: `slack ${routeKey}`,
+      label: `slack dm:${targetId}`,
     };
   }
 
-  const routeKind = params.identity.conversationKind === "group" ? "group" : "channel";
   const channelId = params.identity.channelId?.trim();
   if (!channelId) {
     throw new Error("Slack follow-up channel scope requires a channelId.");
   }
 
-  const routeKey = `${routeKind}:${channelId}`;
+  const routeKey = channelId;
   const route = bot.groups[routeKey];
   if (!route) {
-    throw new Error(`Route not configured yet: slack ${routeKey}. Add the route first.`);
+    throw new Error(`Route not configured yet: slack group:${channelId}. Add the route first.`);
   }
 
   return {
@@ -123,9 +124,9 @@ function resolveSlackFollowUpModeTarget(
     set: (value) => {
       getOrCreateFollowUp(route).mode = value;
     },
-    label: `slack ${routeKey}`,
-  };
-}
+      label: `slack group:${channelId}`,
+    };
+  }
 
 function resolveTelegramFollowUpModeTarget(
   config: ClisbotConfig,
@@ -152,16 +153,17 @@ function resolveTelegramFollowUpModeTarget(
     if (!targetId) {
       throw new Error("Telegram follow-up channel scope requires a senderId or chatId.");
     }
-    const routeKey = `dm:${targetId}`;
+    const routeKey = targetId;
+    const wildcardRoute = resolveDirectMessageWildcardRoute(bot.directMessages);
     const existingRoute =
       resolveDirectMessageExactRoute(bot.directMessages, targetId) ??
-      (bot.directMessages[routeKey] = createDirectMessageBehaviorOverride());
+      (bot.directMessages[routeKey] = createDirectMessageBehaviorOverride(wildcardRoute));
     return {
       get: () => existingRoute.followUp?.mode ?? bot.followUp?.mode,
       set: (value) => {
         getOrCreateFollowUp(existingRoute).mode = value;
       },
-      label: `telegram ${routeKey}`,
+      label: `telegram dm:${targetId}`,
     };
   }
 

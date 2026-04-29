@@ -4,6 +4,8 @@ import {
   cleanInteractionSnapshot,
   cleanRunningInteractionSnapshot,
   deriveBoundedRunningRewritePreview,
+  deriveLatestPromptInteractionSnapshot,
+  deriveLatestPromptRunningInteractionSnapshot,
   deriveMeaningfulPaneSnapshot,
   deriveInteractionText,
   deriveRunningInteractionText,
@@ -192,6 +194,25 @@ This project maps channel messages into tmux-backed agents.
     );
   });
 
+  test("derives the current codex prompt tail without older pane content", () => {
+    const snapshot = [
+      "Previous answer from an older request.",
+      "",
+      "Done.",
+      "",
+      "› new request",
+      "",
+      "New draft line.",
+      "",
+      "• Working... (2m 4s • esc to interrupt)",
+    ].join("\n");
+
+    expect(deriveLatestPromptRunningInteractionSnapshot(snapshot)).toBe(
+      ["New draft line.", "", "• Working... (2m 4s • esc to interrupt)"].join("\n"),
+    );
+    expect(deriveLatestPromptInteractionSnapshot(snapshot)).toBe("New draft line.");
+  });
+
   test("deriveRunningInteractionText ignores pane redraw content that is not a real append", () => {
     const previous = [
       "Em đã thêm regression test cho cả 2 case trên. Verify đã pass:",
@@ -222,7 +243,28 @@ This project maps channel messages into tmux-backed agents.
     ).toBe(["line 1", "line 2", "line 3"].join("\n"));
   });
 
-  test("deriveBoundedRunningRewritePreview keeps only the latest changed lines for a large rewrite", () => {
+  test("deriveBoundedRunningRewritePreview keeps unchanged context for a small rewrite", () => {
+    const previous = [
+      "Reviewing the code path.",
+      "The queue renderer owns the visible state.",
+      "Working... 1s",
+    ].join("\n");
+    const current = [
+      "Reviewing the code path.",
+      "The queue renderer owns the visible state.",
+      "Working... 2s",
+    ].join("\n");
+
+    expect(
+      deriveBoundedRunningRewritePreview({
+        previousSnapshot: previous,
+        snapshot: current,
+        maxLines: 8,
+      }),
+    ).toBe(current);
+  });
+
+  test("deriveBoundedRunningRewritePreview keeps the latest full-context tail for a large rewrite", () => {
     const previous = ["draft 1", "draft 2"].join("\n");
     const current = [
       "final 1",
@@ -239,7 +281,7 @@ This project maps channel messages into tmux-backed agents.
         maxLines: 2,
       }),
     ).toBe([
-      "...[3 more changed lines]",
+      "...[3 more lines]",
       "final 4",
       "final 5",
     ].join("\n"));
@@ -364,6 +406,40 @@ This project maps channel messages into tmux-backed agents.
     expect(cleaned).toContain("• Exploring the workspace");
     expect(cleaned).toContain("• The workspace contains a Bun service and tmux-backed runner integration.");
     expect(cleaned).toContain("Working (3m 12s • esc to interrupt)");
+  });
+
+  test("keeps codex ellipsis timer lines in running snapshots", () => {
+    const cleaned = cleanRunningInteractionSnapshot(`
+› explain this codebase
+
+• Exploring the workspace
+
+• Working... (2m 4s • esc to interrupt)
+    `);
+
+    expect(cleaned).toContain("• Exploring the workspace");
+    expect(cleaned).toContain("Working... (2m 4s • esc to interrupt)");
+  });
+
+  test("latest prompt extraction ignores the idle codex input prompt below a running timer", () => {
+    const snapshot = [
+      "Previous answer.",
+      "",
+      "› current request",
+      "",
+      "• Summarizing findings...",
+      "",
+      "• Working (5m 02s • esc to interrupt)",
+      "",
+      "› Write tests for @filename",
+      "",
+      "  gpt-5.5 high · ~/.clisbot/workspaces/default",
+    ].join("\n");
+
+    expect(deriveLatestPromptRunningInteractionSnapshot(snapshot)).toBe(
+      ["• Summarizing findings...", "", "• Working (5m 02s • esc to interrupt)"].join("\n"),
+    );
+    expect(deriveLatestPromptInteractionSnapshot(snapshot)).toBe("• Summarizing findings...");
   });
 
   test("strips gemini chrome while keeping meaningful content", () => {
@@ -687,6 +763,22 @@ Finagling
         maxChars: 200,
       }),
     ).toBe("Thinking...\nFound the issue.");
+
+    expect(
+      renderTelegramInteraction({
+        status: "running",
+        content: "Thinking...\nFound the issue.",
+        maxChars: 200,
+      }),
+    ).toBe("Thinking...\nFound the issue.");
+
+    expect(
+      renderTelegramInteraction({
+        status: "running",
+        content: "Thinking...\nWorking... (2m 4s • esc to interrupt)",
+        maxChars: 200,
+      }),
+    ).toBe("Thinking...\nWorking... (2m 4s • esc to interrupt)");
 
     expect(
       renderSlackInteraction({

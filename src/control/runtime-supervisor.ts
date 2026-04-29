@@ -31,7 +31,7 @@ type ActiveRuntime = {
   channelServices: ChannelRuntimeEntry[];
 };
 
-const SERVICE_START_TIMEOUT_MS = 8_000;
+const SERVICE_START_TIMEOUT_MS = 30_000;
 
 type RuntimeSupervisorDependencies = {
   loadConfig: typeof loadConfig;

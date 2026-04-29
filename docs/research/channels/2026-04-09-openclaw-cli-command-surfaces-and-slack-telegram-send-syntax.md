@@ -19,6 +19,12 @@ For current `clisbot`, use:
 - `agents`
 - `bots` and `routes` as the operator setup flow
 
+Compatibility note:
+
+- target examples such as `channel:<id>` and `user:<id>` in this note describe OpenClaw or early migration research
+- current `clisbot` prefers `group:<id>` for multi-user Slack surfaces and `dm:<id>` for direct-message operator ids
+- Slack `channel:<id>` remains accepted in `clisbot` only as compatibility syntax
+
 Main conclusions:
 
 - `openclaw message send` is the main outbound CLI surface
@@ -206,6 +212,8 @@ Practical consequence for `clisbot`:
 - `clisbot` can talk about `accountId` in bindings and session keys
 - but `~/.clisbot/clisbot.json` does not yet expose the OpenClaw-style account map needed for first-class multi-account Slack or Telegram setup
 - this is the configuration-model gap the repo still needs to close
+
+This section is retained as migration history and should not be read as the current `clisbot` config contract.
 
 Recommended target shape for `clisbot` parity:
 

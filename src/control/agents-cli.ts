@@ -7,6 +7,7 @@ import {
   inferAgentCliToolId,
 } from "../config/agent-tool-presets.ts";
 import { type ClisbotConfig } from "../config/schema.ts";
+import { parseTimezone } from "../config/timezone.ts";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
 import { applyBootstrapTemplate, getBootstrapWorkspaceState } from "../agents/bootstrap.ts";
 import { parseBotType } from "./channel-bootstrap-flags.ts";
@@ -78,12 +79,16 @@ function renderAgentsHelp() {
     `  ${renderCliCommand("agents bootstrap <id> --bot-type <personal|team> [--force]")}`,
     `  ${renderCliCommand("agents response-mode <status|set|clear> --agent <id> [capture-pane|message-tool]")}`,
     `  ${renderCliCommand("agents additional-message-mode <status|set|clear> --agent <id> [queue|steer]")}`,
+    `  ${renderCliCommand("agents get-timezone --agent <id>")}`,
+    `  ${renderCliCommand("agents set-timezone --agent <id> <iana-timezone>")}`,
+    `  ${renderCliCommand("agents clear-timezone --agent <id>")}`,
     "",
     "Notes:",
     `  - \`agents add\` is the lower-level manual surface; first-run ${renderCliCommand("start", { inline: true })} and ${renderCliCommand("init", { inline: true })} can bootstrap the first \`default\` agent for you`,
     "  - `--cli` is required on `agents add`; supported tools are `codex`, `claude`, and `gemini`",
     "  - omit `--startup-option` to inherit the built-in startup args for the selected CLI tool",
     "  - `response-mode` and `additional-message-mode` mutate per-agent overrides under `agents.list[]`",
+    "  - use agent timezone only when one workspace/assistant should run wall-clock loops in a different timezone than app default",
   ].join("\n");
 }
 
@@ -444,6 +449,41 @@ async function runAgentAdditionalMessageModeCli(args: string[]) {
   console.log(`config: ${configPath}`);
 }
 
+async function runAgentTimezoneCli(
+  args: string[],
+  action: "get-timezone" | "set-timezone" | "clear-timezone",
+) {
+  const agentId = parseSingleOption(args, "--agent");
+  if (!agentId) {
+    throw new Error("Usage: agents <get-timezone|set-timezone|clear-timezone> --agent <id> [iana-timezone]");
+  }
+
+  const { config, configPath } = await readEditableConfig(getEditableConfigPath());
+  const agent = ensureAgentExists(config, agentId);
+
+  if (action === "get-timezone") {
+    console.log(`agent: ${agent.id}`);
+    console.log(`timezone: ${agent.timezone ?? "(inherit)"}`);
+    console.log(`config: ${configPath}`);
+    return;
+  }
+
+  if (action === "clear-timezone") {
+    delete agent.timezone;
+    await writeEditableConfig(configPath, config);
+    console.log(`cleared timezone for ${agent.id}`);
+    console.log("timezone: (inherit)");
+    console.log(`config: ${configPath}`);
+    return;
+  }
+
+  const timezone = parseTimezone(removeConsumedArgs(args, ["--agent"])[0]);
+  agent.timezone = timezone;
+  await writeEditableConfig(configPath, config);
+  console.log(`set timezone for ${agent.id} to ${timezone}`);
+  console.log(`config: ${configPath}`);
+}
+
 export async function runAgentsCli(args: string[]) {
   const subcommand = args[0];
   const rest = args.slice(1);
@@ -480,6 +520,15 @@ export async function runAgentsCli(args: string[]) {
 
   if (subcommand === "additional-message-mode") {
     await runAgentAdditionalMessageModeCli(rest);
+    return;
+  }
+
+  if (
+    subcommand === "get-timezone" ||
+    subcommand === "set-timezone" ||
+    subcommand === "clear-timezone"
+  ) {
+    await runAgentTimezoneCli(rest, subcommand);
     return;
   }
 

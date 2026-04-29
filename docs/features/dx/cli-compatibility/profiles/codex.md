@@ -102,4 +102,5 @@ These are strong enough for running snapshots, but should still be treated as CL
 
 - no explicit startup ready pattern
 - `/status` output shape may drift
+- model release drift can resume an old session under a newer model, which may affect Codex performance and session continuity
 - Codex UI chrome and redraw behavior can still affect pane-derived heuristics

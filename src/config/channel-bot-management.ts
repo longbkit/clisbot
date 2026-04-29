@@ -40,6 +40,32 @@ function getTelegramBots(config: ClisbotConfig) {
   return bots;
 }
 
+function createSlackBotShell(botId: string): ClisbotConfig["bots"]["slack"][string] {
+  return {
+    enabled: false,
+    name: botId,
+    dmPolicy: "pairing",
+    channelPolicy: "allowlist",
+    groupPolicy: "allowlist",
+    appToken: "",
+    botToken: "",
+    directMessages: {},
+    groups: {},
+  };
+}
+
+function createTelegramBotShell(botId: string): ClisbotConfig["bots"]["telegram"][string] {
+  return {
+    enabled: false,
+    name: botId,
+    dmPolicy: "pairing",
+    groupPolicy: "allowlist",
+    botToken: "",
+    directMessages: {},
+    groups: {},
+  };
+}
+
 function reconcileSlackConfiguredBots(config: ClisbotConfig) {
   const enabledBotIds = getEnabledBotIds(getSlackBots(config));
   if (enabledBotIds.length === 0) {
@@ -78,7 +104,7 @@ function applySlackBotConfig(
     throw new Error(`Slack bot ${bot.botId} is incomplete`);
   }
 
-  const existing = config.bots.slack[bot.botId];
+  const existing = config.bots.slack[bot.botId] ?? createSlackBotShell(bot.botId);
   config.bots.slack[bot.botId] = bot.appToken.kind === "env" &&
       bot.botToken.kind === "env"
     ? {
@@ -104,7 +130,7 @@ function applyTelegramBotConfig(
     throw new Error(`Telegram bot ${bot.botId} is incomplete`);
   }
 
-  const existing = config.bots.telegram[bot.botId];
+  const existing = config.bots.telegram[bot.botId] ?? createTelegramBotShell(bot.botId);
   config.bots.telegram[bot.botId] = bot.botToken.kind === "env"
     ? {
         ...existing,
@@ -189,12 +215,14 @@ export function applyBootstrapBotsToConfig(
     for (const botId of Object.keys(getSlackBots(config))) {
       delete config.bots.slack[botId];
     }
+    config.bots.slack.default = createSlackBotShell("default");
     config.bots.slack.defaults.defaultBotId = getFirstBotId(bots.slackBots);
 
     config.bots.telegram.defaults.enabled = bots.telegramBots.length > 0;
     for (const botId of Object.keys(getTelegramBots(config))) {
       delete config.bots.telegram[botId];
     }
+    config.bots.telegram.default = createTelegramBotShell("default");
     config.bots.telegram.defaults.defaultBotId = getFirstBotId(bots.telegramBots);
   }
 

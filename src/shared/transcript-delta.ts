@@ -2,6 +2,9 @@ import {
   cleanInteractionSnapshot,
   cleanRunningInteractionSnapshot,
   collapseBlankLines,
+  looksLikeClaudeSnapshot,
+  looksLikeCodexSnapshot,
+  looksLikeGeminiSnapshot,
   normalizePaneText,
   splitNormalizedLines,
   trimBlankLines,
@@ -106,6 +109,55 @@ export function deriveRunningInteractionSnapshot(currentSnapshot: string) {
   return cleanRunningInteractionSnapshot(currentSnapshot);
 }
 
+function getPromptMarker(lines: string[]) {
+  if (looksLikeCodexSnapshot(lines)) {
+    return /^\s*›\s/;
+  }
+  if (looksLikeClaudeSnapshot(lines)) {
+    return /^\s*❯/;
+  }
+  if (looksLikeGeminiSnapshot(lines)) {
+    return /^\s*>\s/;
+  }
+
+  return null;
+}
+
+function slicePromptBlockFrom(lines: string[], index: number) {
+  return lines.slice(index).join("\n");
+}
+
+function sliceFromLastPromptBlock(raw: string, cleanSnapshot: (snapshot: string) => string) {
+  const lines = splitNormalizedLines(raw);
+  const marker = getPromptMarker(lines);
+  if (!marker) {
+    return "";
+  }
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (!marker.test((lines[index] ?? "").trimStart())) {
+      continue;
+    }
+
+    const promptTail = slicePromptBlockFrom(lines, index);
+    if (cleanSnapshot(promptTail)) {
+      return promptTail;
+    }
+  }
+
+  return "";
+}
+
+export function deriveLatestPromptInteractionSnapshot(currentSnapshot: string) {
+  const promptTail = sliceFromLastPromptBlock(currentSnapshot, cleanInteractionSnapshot);
+  return promptTail ? cleanInteractionSnapshot(promptTail) : "";
+}
+
+export function deriveLatestPromptRunningInteractionSnapshot(currentSnapshot: string) {
+  const promptTail = sliceFromLastPromptBlock(currentSnapshot, cleanRunningInteractionSnapshot);
+  return promptTail ? cleanRunningInteractionSnapshot(promptTail) : "";
+}
+
 export function deriveInteractionText(initialSnapshot: string, currentSnapshot: string) {
   const previous = cleanInteractionSnapshot(initialSnapshot);
   const current = cleanInteractionSnapshot(currentSnapshot);
@@ -190,13 +242,13 @@ export function deriveBoundedRunningRewritePreview(params: {
     return current === previous ? current : "";
   }
 
-  if (changedLines.length <= maxLines) {
-    return changedLines.join("\n");
+  if (currentLines.length <= maxLines) {
+    return current;
   }
 
   return [
-    `...[${changedLines.length - maxLines} more changed lines]`,
-    ...changedLines.slice(-maxLines),
+    `...[${currentLines.length - maxLines} more lines]`,
+    ...currentLines.slice(-maxLines),
   ].join("\n");
 }
 

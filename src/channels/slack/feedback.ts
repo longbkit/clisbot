@@ -38,8 +38,8 @@ export function renderSlackRouteChoiceMessage(params: {
     "clisbot: this Slack channel is not configured yet.",
     "",
     "Ask the bot owner to do these:",
-    `- ${renderCliCommand(`routes add --channel slack channel:${params.channelId} --bot default`, { inline: true })}`,
-    `- ${renderCliCommand(`routes set-agent --channel slack channel:${params.channelId} --bot default --agent <id>`, { inline: true })}`,
+    `- ${renderCliCommand(`routes add --channel slack group:${params.channelId} --bot default`, { inline: true })}`,
+    `- ${renderCliCommand(`routes set-agent --channel slack group:${params.channelId} --bot default --agent <id>`, { inline: true })}`,
     "",
     `After that, ${botReference} and send \`\\start\`, \`\\status\`, or \`\\mention\` here.`,
   ].join("\n");

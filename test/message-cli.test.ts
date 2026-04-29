@@ -48,15 +48,14 @@ function createRawConfig(): LoadedConfig["raw"] {
   config.app.control.configReload.watch = false;
   config.bots.slack.defaults.enabled = true;
   config.bots.slack.defaults.defaultBotId = "work";
-  config.bots.slack.defaults.channelPolicy = "allowlist";
-  config.bots.slack.defaults.groupPolicy = "allowlist";
   config.bots.slack.work = {
     ...config.bots.slack.default,
     enabled: true,
     name: "work",
     groups: {
-      "channel:C123": {
+      C123: {
         enabled: true,
+        policy: "open",
         requireMention: true,
         allowBots: false,
         allowUsers: [],
@@ -69,8 +68,9 @@ function createRawConfig(): LoadedConfig["raw"] {
     enabled: true,
     name: "alerts",
     groups: {
-      "channel:C123": {
+      C123: {
         enabled: true,
+        policy: "open",
         requireMention: true,
         allowBots: false,
         allowUsers: [],
@@ -81,7 +81,6 @@ function createRawConfig(): LoadedConfig["raw"] {
   delete config.bots.slack.default;
   config.bots.telegram.defaults.enabled = true;
   config.bots.telegram.defaults.defaultBotId = "ops";
-  config.bots.telegram.defaults.groupPolicy = "allowlist";
   config.bots.telegram.ops = {
     ...config.bots.telegram.default,
     enabled: true,
@@ -89,6 +88,7 @@ function createRawConfig(): LoadedConfig["raw"] {
     groups: {
       "-1001234567890": {
         enabled: true,
+        policy: "open",
         requireMention: false,
         allowBots: false,
         allowUsers: [],
@@ -107,6 +107,64 @@ function createRawConfig(): LoadedConfig["raw"] {
     control: config.app.control,
     tmux: config.agents.defaults.runner.defaults.tmux,
   };
+}
+
+function normalizeSlackFollowUpTarget(rawTarget: string) {
+  const target = rawTarget.trim();
+  if (!target) {
+    return null;
+  }
+
+  if (target.startsWith("channel:")) {
+    return {
+      conversationKind: "channel" as const,
+      channelId: target.slice("channel:".length),
+      channelType: "channel" as const,
+    };
+  }
+
+  if (target.startsWith("group:")) {
+    const channelId = target.slice("group:".length);
+    return {
+      conversationKind: channelId.startsWith("G") ? ("group" as const) : ("channel" as const),
+      channelId,
+      channelType: channelId.startsWith("G") ? ("mpim" as const) : ("channel" as const),
+    };
+  }
+
+  if (target.startsWith("dm:")) {
+    return {
+      conversationKind: "dm" as const,
+      channelId: target.slice("dm:".length),
+      channelType: "im" as const,
+    };
+  }
+
+  if (target.startsWith("D")) {
+    return {
+      conversationKind: "dm" as const,
+      channelId: target,
+      channelType: "im" as const,
+    };
+  }
+
+  if (target.startsWith("G")) {
+    return {
+      conversationKind: "group" as const,
+      channelId: target,
+      channelType: "mpim" as const,
+    };
+  }
+
+  if (target.startsWith("C")) {
+    return {
+      conversationKind: "channel" as const,
+      channelId: target,
+      channelType: "channel" as const,
+    };
+  }
+
+  return null;
 }
 
 function createDependencies() {
@@ -171,13 +229,7 @@ function createDependencies() {
           if (!command.target) {
             return null;
           }
-          const normalizedTarget = command.target.startsWith("channel:")
-            ? {
-                channelType: "channel" as const,
-                channelId: command.target.slice("channel:".length),
-                conversationKind: "channel" as const,
-              }
-            : null;
+          const normalizedTarget = normalizeSlackFollowUpTarget(command.target);
           if (!normalizedTarget) {
             return null;
           }
@@ -187,7 +239,7 @@ function createDependencies() {
               channel_type: normalizedTarget.channelType,
               channel: normalizedTarget.channelId,
             },
-            { accountId: botId },
+            { botId },
           );
           if (!resolved.route) {
             return null;
@@ -195,7 +247,7 @@ function createDependencies() {
           return resolveSlackConversationTarget({
             loadedConfig,
             agentId: resolved.route.agentId,
-            accountId: botId,
+            botId,
             channelId: normalizedTarget.channelId,
             conversationKind: normalizedTarget.conversationKind,
             threadTs: command.threadId ?? command.replyTo,
@@ -272,7 +324,7 @@ function createDependencies() {
             chatId,
             topicId: Number.isFinite(topicId) ? topicId : undefined,
             isForum: Number.isFinite(topicId),
-            accountId: botId,
+            botId,
           });
           if (!resolved.route) {
             return null;
@@ -280,7 +332,7 @@ function createDependencies() {
           return resolveTelegramConversationTarget({
             loadedConfig,
             agentId: resolved.route.agentId,
-            accountId: botId,
+            botId,
             chatId,
             userId: chatId > 0 ? chatId : undefined,
             conversationKind:
@@ -394,7 +446,7 @@ describe("message cli", () => {
       "--account",
       "alerts",
       "--target",
-      "channel:C123",
+      "group:C123",
       "--message",
       "hello",
       "--thread-id",
@@ -412,7 +464,7 @@ describe("message cli", () => {
         action: "send",
         params: {
           botToken: "xoxb-test",
-          target: "channel:C123",
+          target: "group:C123",
           threadId: "171234.000100",
           replyTo: "171234.000099",
           message: "hello",
@@ -453,7 +505,7 @@ describe("message cli", () => {
       "--channel",
       "slack",
       "--target",
-      "channel:C123",
+      "group:C123",
       "--message",
       "hello",
       "--file",
@@ -465,7 +517,7 @@ describe("message cli", () => {
       action: "send",
       params: {
         botToken: "xoxb-test",
-        target: "channel:C123",
+        target: "group:C123",
         threadId: undefined,
         replyTo: undefined,
         message: "hello",

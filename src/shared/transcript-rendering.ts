@@ -218,6 +218,22 @@ function renderErrorInteractionBody(body: string, footer: string) {
   return `${trimmedBody}\n\n${footer}`;
 }
 
+function renderSlackRunningInteraction(body: string, note?: string) {
+  if (note) {
+    return body ? `${body}\n\n_${note}_` : `_${note}_`;
+  }
+
+  return body || "_Working..._";
+}
+
+function renderTelegramRunningInteraction(body: string, note?: string) {
+  if (note) {
+    return body ? `${body}\n\n${note}` : note;
+  }
+
+  return body || "Working...";
+}
+
 export function renderSlackInteraction(params: {
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
@@ -238,7 +254,7 @@ export function renderSlackInteraction(params: {
   }
 
   if (params.status === "running") {
-    return body || (params.note ? `_${params.note}_` : "_Working..._");
+    return renderSlackRunningInteraction(body, params.note);
   }
 
   if (params.status === "timeout") {
@@ -281,7 +297,7 @@ export function renderTelegramInteraction(params: {
   }
 
   if (params.status === "running") {
-    return body || params.note || "Working...";
+    return renderTelegramRunningInteraction(body, params.note);
   }
 
   if (params.status === "timeout") {

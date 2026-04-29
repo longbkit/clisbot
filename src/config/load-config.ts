@@ -3,7 +3,6 @@ import {
   materializeRuntimeChannelCredentials,
 } from "./channel-credentials.ts";
 import {
-  collapseHomePath,
   expandHomePath,
   getDefaultConfigPath,
   getDefaultProcessedEventsPath,
@@ -20,7 +19,11 @@ import {
   type ClisbotConfig,
   clisbotConfigSchema,
 } from "./schema.ts";
+import { applyDynamicPathDefaults, assertNoLegacyPrivilegeCommands } from "./config-document.ts";
+import { normalizeConfigDocumentShape } from "./config-migration.ts";
+import { upgradeEditableConfigFileIfNeeded } from "./config-upgrade.ts";
 import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
+import { normalizeConfigGroupRoutes } from "./group-routes.ts";
 import { normalizeRuntimeMonitorRestartBackoff } from "./runtime-monitor-backoff.ts";
 
 export type RuntimeConfig = ClisbotConfig & {
@@ -110,17 +113,28 @@ export async function loadConfig(
   options: LoadConfigOptions = {},
 ): Promise<LoadedConfig> {
   const expandedConfigPath = expandHomePath(configPath);
+  await upgradeEditableConfigFileIfNeeded(expandedConfigPath);
   const text = await readTextFile(expandedConfigPath);
-  const parsed = JSON.parse(text);
+  const parsed = normalizeConfigDocumentShape(JSON.parse(text));
   assertNoLegacyPrivilegeCommands(parsed);
-  const withDynamicDefaults = normalizeConfigDirectMessageRoutes(
-    clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+  const withDynamicDefaults = normalizeConfigGroupRoutes(
+    normalizeConfigDirectMessageRoutes(
+      clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+      {
+        exactAdmissionMode: "explicit",
+      },
+    ),
   );
   const substituted = resolveConfigEnvVars(withDynamicDefaults, process.env, {
     skipPaths: getCredentialSkipPaths(withDynamicDefaults),
   }) as unknown;
-  const validated = normalizeConfigDirectMessageRoutes(
-    clisbotConfigSchema.parse(substituted),
+  const validated = normalizeConfigGroupRoutes(
+    normalizeConfigDirectMessageRoutes(
+      clisbotConfigSchema.parse(normalizeConfigDocumentShape(substituted)),
+      {
+        exactAdmissionMode: "explicit",
+      },
+    ),
   );
   const materialized = materializeRuntimeChannelCredentials(validated, {
     env: process.env,
@@ -134,11 +148,17 @@ export async function loadConfigWithoutEnvResolution(
   configPath = getDefaultConfigPath(),
 ): Promise<LoadedConfig> {
   const expandedConfigPath = expandHomePath(configPath);
+  await upgradeEditableConfigFileIfNeeded(expandedConfigPath);
   const text = await readTextFile(expandedConfigPath);
-  const parsed = JSON.parse(text);
+  const parsed = normalizeConfigDocumentShape(JSON.parse(text));
   assertNoLegacyPrivilegeCommands(parsed);
-  const validated = normalizeConfigDirectMessageRoutes(
-    clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+  const validated = normalizeConfigGroupRoutes(
+    normalizeConfigDirectMessageRoutes(
+      clisbotConfigSchema.parse(applyDynamicPathDefaults(parsed)),
+      {
+        exactAdmissionMode: "explicit",
+      },
+    ),
   );
   return materializeLoadedConfig(expandedConfigPath, validated);
 }
@@ -214,82 +234,6 @@ function materializeLoadedConfig(
     stateDir: getDefaultStateDir(),
     raw: runtimeRaw,
   };
-}
-
-export function applyDynamicPathDefaults(
-  parsed: unknown,
-  env: NodeJS.ProcessEnv = process.env,
-) {
-  if (!isRecord(parsed)) {
-    return parsed;
-  }
-
-  const app = isRecord(parsed.app) ? parsed.app : {};
-  const appSession = isRecord(app.session) ? app.session : {};
-  const agents = isRecord(parsed.agents) ? parsed.agents : {};
-  const agentDefaults = isRecord(agents.defaults) ? agents.defaults : {};
-  const runner = isRecord(agentDefaults.runner) ? agentDefaults.runner : {};
-  const runnerDefaults = isRecord(runner.defaults) ? runner.defaults : {};
-  const tmux = isRecord(runnerDefaults.tmux) ? runnerDefaults.tmux : {};
-
-  return {
-    ...parsed,
-    app: {
-      ...app,
-      session: {
-        ...appSession,
-        storePath: typeof appSession.storePath === "string" && appSession.storePath.trim()
-          ? appSession.storePath
-          : collapseHomePath(getDefaultSessionStorePath(env)),
-      },
-    },
-    agents: {
-      ...agents,
-      defaults: {
-        ...agentDefaults,
-        workspace: typeof agentDefaults.workspace === "string" && agentDefaults.workspace.trim()
-          ? agentDefaults.workspace
-          : collapseHomePath(getDefaultWorkspaceTemplate(env)),
-        runner: {
-          ...runner,
-          defaults: {
-            ...runnerDefaults,
-            tmux: {
-              ...tmux,
-              socketPath: typeof tmux.socketPath === "string" && tmux.socketPath.trim()
-                ? tmux.socketPath
-                : collapseHomePath(getDefaultTmuxSocketPath(env)),
-            },
-          },
-        },
-      },
-    },
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function assertNoLegacyPrivilegeCommands(value: unknown, path = "root"): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoLegacyPrivilegeCommands(entry, `${path}[${index}]`));
-    return;
-  }
-
-  if (!isRecord(value)) {
-    return;
-  }
-
-  if (Object.prototype.hasOwnProperty.call(value, "privilegeCommands")) {
-    throw new Error(
-      `Unsupported config key at ${path}.privilegeCommands. Move routed permissions to app.auth and agents.<id>.auth.`,
-    );
-  }
-
-  for (const [key, entry] of Object.entries(value)) {
-    assertNoLegacyPrivilegeCommands(entry, `${path}.${key}`);
-  }
 }
 
 export function getAgentEntry(config: LoadedConfig, agentId: string): AgentEntry | undefined {

@@ -47,9 +47,11 @@ export type ShellCommandResult = {
 const TMUX_MISSING_SESSION_PATTERN = /(?:can't find session:|no server running on )/i;
 const TMUX_SERVER_UNAVAILABLE_PATTERN = /(?:No such file or directory|error connecting to|failed to connect to server)/i;
 const TMUX_DUPLICATE_SESSION_PATTERN = /duplicate session:/i;
-const TMUX_TRANSIENT_TARGET_PATTERN = /(?:no current target|can't find pane|can't find window)/i;
+const TMUX_TRANSIENT_TARGET_PATTERN =
+  /(?:no current target|can't find pane|can't find window|no such pane|no such window|tmux pane state unavailable)/i;
 const SESSION_READY_CAPTURE_RETRY_COUNT = 5;
 const SESSION_READY_CAPTURE_RETRY_DELAY_MS = 100;
+const TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT = 3;
 const SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS = 15_000;
 
 type SessionErrorAction =
@@ -98,6 +100,14 @@ function isRecoverableStartupSessionLoss(error: unknown) {
 
 function isFreshStartRetryablePromptDeliveryError(error: unknown) {
   return error instanceof TmuxPasteUnconfirmedError || error instanceof TmuxSubmitUnconfirmedError;
+}
+
+function isRetryableFreshStartFault(error: unknown) {
+  return (
+    isRecoverableStartupSessionLoss(error) ||
+    isTransientTmuxTargetError(error) ||
+    isFreshStartRetryablePromptDeliveryError(error)
+  );
 }
 
 export class RunnerService {
@@ -213,9 +223,12 @@ export class RunnerService {
     });
   }
 
-  private async captureSessionIdentity(resolved: ResolvedAgentTarget) {
+  private async captureSessionIdentity(
+    resolved: ResolvedAgentTarget,
+    options: { forceStatusCommand?: boolean } = {},
+  ) {
     const capture = resolved.runner.sessionId.capture;
-    if (capture.mode !== "status-command") {
+    if (capture.mode !== "status-command" && !options.forceStatusCommand) {
       return null;
     }
 
@@ -231,7 +244,7 @@ export class RunnerService {
     });
   }
 
-  private async retryFreshStartWithClearedSessionId(
+  private async retryRunnerRestartPreservingSessionId(
     target: AgentSessionTarget,
     resolved: ResolvedAgentTarget,
     remainingFreshRetries: number,
@@ -240,10 +253,7 @@ export class RunnerService {
       return null;
     }
 
-    await this.tmux.killSession(resolved.sessionName);
-    await this.sessionState.clearSessionIdEntry(resolved, {
-      runnerCommand: resolved.runner.command,
-    });
+    await this.killRunnerAndPreserveSessionId(resolved);
     if (resolved.runner.startupRetryDelayMs > 0) {
       await sleep(resolved.runner.startupRetryDelayMs);
     }
@@ -258,14 +268,11 @@ export class RunnerService {
     error: unknown,
     remainingFreshRetries: number,
   ) {
-    if (
-      !isRecoverableStartupSessionLoss(error) &&
-      !isFreshStartRetryablePromptDeliveryError(error)
-    ) {
+    if (!isRetryableFreshStartFault(error)) {
       return null;
     }
 
-    return this.retryFreshStartWithClearedSessionId(
+    return this.retryRunnerRestartPreservingSessionId(
       target,
       resolved,
       remainingFreshRetries,
@@ -277,7 +284,7 @@ export class RunnerService {
     resolved: ResolvedAgentTarget,
     remainingFreshRetries: number,
   ) {
-    return this.retryFreshStartWithClearedSessionId(
+    return this.retryRunnerRestartPreservingSessionId(
       target,
       resolved,
       remainingFreshRetries,
@@ -359,6 +366,7 @@ export class RunnerService {
     this.cleanupInFlight = true;
     try {
       const entries = await this.sessionState.listEntries();
+      const liveSessionNames = new Set(await this.tmux.listSessions());
       const now = Date.now();
 
       for (const entry of entries) {
@@ -379,7 +387,7 @@ export class RunnerService {
           continue;
         }
 
-        if (!(await this.tmux.hasSession(resolved.sessionName))) {
+        if (!liveSessionNames.has(resolved.sessionName)) {
           continue;
         }
 
@@ -423,7 +431,10 @@ export class RunnerService {
       });
       try {
         await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-        await this.syncSessionIdentity(resolved);
+        await this.sessionState.touchSessionEntry(resolved, {
+          sessionId: existing?.sessionId,
+          runnerCommand: resolved.runner.command,
+        });
       } catch (error) {
         throw await this.mapSessionError(error, resolved.sessionName, "during startup");
       }
@@ -456,24 +467,24 @@ export class RunnerService {
     });
 
     try {
-      await this.tmux.newSession({
-        sessionName: resolved.sessionName,
-        cwd: resolved.workspacePath,
-        command,
-      });
-    } catch (error) {
-      const hasSession = await this.tmux.hasSession(resolved.sessionName);
-      if (!isTmuxDuplicateSessionError(error) || !hasSession) {
-        throw error;
+      try {
+        await this.tmux.newSession({
+          sessionName: resolved.sessionName,
+          cwd: resolved.workspacePath,
+          command,
+        });
+      } catch (error) {
+        const hasSession = await this.tmux.hasSession(resolved.sessionName);
+        if (!isTmuxDuplicateSessionError(error) || !hasSession) {
+          throw error;
+        }
       }
-    }
 
-    logLatencyDebug("ensure-session-ready-new-session", timingContext, {
-      startupDelayMs: resolved.runner.startupDelayMs,
-      resumingExistingSession,
-      hasStoredSessionId: Boolean(existing?.sessionId),
-    });
-    try {
+      logLatencyDebug("ensure-session-ready-new-session", timingContext, {
+        startupDelayMs: resolved.runner.startupDelayMs,
+        resumingExistingSession,
+        hasStoredSessionId: Boolean(existing?.sessionId),
+      });
       const bootstrapResult = await waitForTmuxSessionBootstrap({
         tmux: this.tmux,
         sessionName: resolved.sessionName,
@@ -605,7 +616,7 @@ export class RunnerService {
         );
       }
 
-      const retried = await this.retryFreshStartWithClearedSessionId(
+      const retried = await this.retryRunnerRestartPreservingSessionId(
         target,
         resolved,
         resolved.runner.startupRetryCount,
@@ -628,7 +639,7 @@ export class RunnerService {
   }
 
   canRecoverMidRun(error: unknown) {
-    return isRecoverableStartupSessionLoss(error);
+    return isRecoverableStartupSessionLoss(error) || isTransientTmuxTargetError(error);
   }
 
   canRetryPromptAfterFreshStart(error: unknown) {
@@ -644,14 +655,143 @@ export class RunnerService {
     return this.ensureRunnerReady(target, { allowFreshRetryBeforePrompt: false, timingContext });
   }
 
-  async startFreshSession(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
+  async restartRunnerWithFreshSessionId(
+    target: AgentSessionTarget,
+    timingContext?: LatencyDebugContext,
+  ) {
     const resolved = this.resolveTarget(target);
     await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
+    console.log(
+      `clisbot clearing stored sessionId for explicit fresh session ${resolved.sessionName}`,
+    );
     await this.sessionState.clearSessionIdEntry(resolved, { runnerCommand: resolved.runner.command });
     return this.ensureRunnerReady(target, {
       allowFreshRetryBeforePrompt: false,
       timingContext,
     });
+  }
+
+  async triggerNewSession(target: AgentSessionTarget) {
+    const resolved = this.resolveTarget(target);
+    if (!(await this.tmux.hasSession(resolved.sessionName))) {
+      return this.restartRunnerWithFreshSessionIdForNewCommand(target);
+    }
+    return this.triggerNewSessionInLiveRunner(resolved);
+  }
+
+  async restartRunnerPreservingSessionId(
+    target: AgentSessionTarget,
+    timingContext?: LatencyDebugContext,
+  ) {
+    const resolved = this.resolveTarget(target);
+    await this.killRunnerAndPreserveSessionId(resolved);
+    return this.ensureRunnerReady(target, {
+      allowFreshRetryBeforePrompt: false,
+      timingContext,
+    });
+  }
+
+  private async triggerNewSessionInLiveRunner(resolved: ResolvedAgentTarget) {
+    const oldSessionId = (await this.sessionState.getEntry(resolved.sessionKey))?.sessionId;
+    const command = this.resolveNewSessionCommand(resolved);
+    let sessionId: string | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await this.submitNewSessionCommand(resolved, command);
+      sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
+      if (sessionId) {
+        break;
+      }
+    }
+    if (!sessionId) {
+      await this.clearSessionIdAfterNewSessionFailure(resolved, command);
+    }
+    await this.sessionState.touchSessionEntry(resolved, {
+      sessionId,
+      runnerCommand: resolved.runner.command,
+      runtime: {
+        state: "idle",
+      },
+    });
+    return {
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+      sessionName: resolved.sessionName,
+      workspacePath: resolved.workspacePath,
+      command,
+      sessionId,
+      restartedRunner: false,
+    };
+  }
+
+  private async restartRunnerWithFreshSessionIdForNewCommand(target: AgentSessionTarget) {
+    const { resolved } = await this.restartRunnerWithFreshSessionId(target);
+    const entry = await this.sessionState.getEntry(resolved.sessionKey);
+    return {
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+      sessionName: resolved.sessionName,
+      workspacePath: resolved.workspacePath,
+      command: "(fresh runner)",
+      sessionId: entry?.sessionId,
+      restartedRunner: true,
+    };
+  }
+
+  private async submitNewSessionCommand(
+    resolved: ResolvedAgentTarget,
+    command: string,
+  ) {
+    await submitTmuxSessionInput({
+      tmux: this.tmux,
+      sessionName: resolved.sessionName,
+      text: command,
+      promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
+      timingContext: undefined,
+    });
+  }
+
+  private async captureNewSessionIdentityAfterTrigger(
+    resolved: ResolvedAgentTarget,
+    oldSessionId?: string,
+  ) {
+    for (let attempt = 0; attempt < TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT; attempt += 1) {
+      const sessionId = await this.captureSessionIdentity(resolved, {
+        forceStatusCommand: true,
+      });
+      if (sessionId && sessionId !== oldSessionId) {
+        return sessionId;
+      }
+      if (attempt < TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT - 1) {
+        await sleep(SESSION_READY_CAPTURE_RETRY_DELAY_MS);
+      }
+    }
+    return null;
+  }
+
+  private async clearSessionIdAfterNewSessionFailure(
+    resolved: ResolvedAgentTarget,
+    command: string,
+  ): Promise<never> {
+    console.log(
+      `clisbot clearing stored sessionId after ${command} because status capture returned no id for ${resolved.sessionName}`,
+    );
+    await this.sessionState.clearSessionIdEntry(resolved, {
+      runnerCommand: resolved.runner.command,
+    });
+    throw new Error(
+      `${command} completed, but clisbot could not capture a new session id from the runner status command.`,
+    );
+  }
+
+  private async killRunnerAndPreserveSessionId(resolved: ResolvedAgentTarget) {
+    await this.tmux.killSession(resolved.sessionName);
+    await this.sessionState.touchSessionEntry(resolved, {
+      runnerCommand: resolved.runner.command,
+    });
+  }
+
+  private resolveNewSessionCommand(resolved: ResolvedAgentTarget) {
+    return resolved.runner.command.toLowerCase().includes("gemini") ? "/clear" : "/new";
   }
 
   async captureTranscript(target: AgentSessionTarget) {

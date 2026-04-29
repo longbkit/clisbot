@@ -172,6 +172,33 @@ describe("runner cli integration", () => {
     expect(result.stdout).toContain("lastAdmittedPromptAt");
   }, 15000);
 
+  test("list hides stored sessions without a live tmux runner", async () => {
+    const dir = createTempDir();
+    const { configPath, sessionStorePath } = createConfig(dir);
+    const now = Date.now();
+
+    await writeSessionStore(sessionStorePath, [
+      {
+        agentId: "default",
+        sessionKey: "stored-only",
+        sessionId: "session-stored-only",
+        workspacePath: join(dir, "workspaces", "default"),
+        runnerCommand: "codex",
+        lastAdmittedPromptAt: now,
+        runtime: {
+          state: "running",
+        },
+        updatedAt: now,
+      },
+    ]);
+
+    const result = await runRunnerCliCommand(configPath, ["list"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("No tmux runner sessions");
+    expect(result.stdout).not.toContain("stored-only");
+    expect(result.stdout).not.toContain("session-stored-only");
+  }, 15000);
+
   test("inspect captures a named tmux runner snapshot", async () => {
     const dir = createTempDir();
     const { configPath, socketPath } = createConfig(dir);

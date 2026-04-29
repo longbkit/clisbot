@@ -22,11 +22,11 @@ import {
   LOOP_APP_FLAG,
   LOOP_FORCE_FLAG,
   MIN_LOOP_INTERVAL_MS,
-  resolveLoopTimezone,
 } from "../agents/loop-command.ts";
 import {
   renderLoopStartedMessage as renderManagedLoopStartedMessage,
   renderLoopStatusSchedule as renderManagedLoopStatusSchedule,
+  buildStoredLoopSender,
   resolveLoopPromptText as resolveManagedLoopPromptText,
   summarizeLoopPrompt as summarizeManagedLoopPrompt,
   validateLoopInterval as validateManagedLoopInterval,
@@ -71,6 +71,8 @@ import { renderCliCommand } from "../shared/cli-name.ts";
 import type { ProcessingIndicatorLifecycle } from "./processing-indicator.ts";
 import type { ChannelIdentity } from "./channel-identity.ts";
 import { resolveChannelIdentityBotId } from "./channel-identity.ts";
+import type { StoredLoopSender } from "../agents/loop-state.ts";
+import type { SurfacePromptContext } from "./surface-prompt-context.ts";
 
 export type ChannelInteractionRoute = {
   agentId: string;
@@ -83,6 +85,7 @@ export type ChannelInteractionRoute = {
   verbose: "off" | "minimal";
   followUp: FollowUpConfig;
   timezone?: string;
+  botTimezone?: string;
 };
 
 export type ChannelInteractionIdentity = ChannelIdentity;
@@ -184,6 +187,7 @@ function renderWhoAmIMessage(params: {
     `appRole: \`${params.auth.appRole}\``,
     `agentRole: \`${params.auth.agentRole}\``,
     `mayBypassPairing: \`${params.auth.mayBypassPairing}\``,
+    `mayBypassSharedSenderPolicy: \`${params.auth.mayBypassSharedSenderPolicy}\``,
     `mayManageProtectedResources: \`${params.auth.mayManageProtectedResources}\``,
     `canUseShell: \`${params.auth.canUseShell}\``,
     `verbose: \`${params.route.verbose}\``,
@@ -210,6 +214,11 @@ function renderRouteStatusMessage(params: {
   loopState: {
     sessionLoops: ReturnType<AgentService["listIntervalLoops"]>;
     globalLoopCount: number;
+  };
+  timezone: {
+    effective: string;
+    route?: string;
+    bot?: string;
   };
 }) {
   const lines = [
@@ -252,9 +261,12 @@ function renderRouteStatusMessage(params: {
     `verbose: \`${params.route.verbose}\``,
     `appRole: \`${params.auth.appRole}\``,
     `agentRole: \`${params.auth.agentRole}\``,
+    `mayBypassSharedSenderPolicy: \`${params.auth.mayBypassSharedSenderPolicy}\``,
     `mayManageProtectedResources: \`${params.auth.mayManageProtectedResources}\``,
     `canUseShell: \`${params.auth.canUseShell}\``,
-    `timezone: \`${params.route.timezone ?? "(inherit host/app)"}\``,
+    `timezone.effective: \`${params.timezone.effective}\``,
+    `timezone.route: \`${params.timezone.route ?? "(inherit)"}\``,
+    `timezone.bot: \`${params.timezone.bot ?? "(inherit)"}\``,
     `followUp.mode: \`${params.followUpState.overrideMode ?? params.route.followUp.mode}\``,
     `followUp.windowMinutes: \`${formatFollowUpTtlMinutes(params.route.followUp.participationTtlMs)}\``,
     `run.state: \`${params.runtimeState.state}\``,
@@ -507,7 +519,7 @@ function renderLoopUsage() {
     "- `/loop /codereview 3 times`",
     "- `/loop status`",
     `- \`/loop cancel\`, \`/loop cancel <id>\`, \`/loop cancel --all\`, \`/loop cancel --all ${LOOP_APP_FLAG}\``,
-    "- wall-clock loop timezone resolves from route override, then `control.loop.defaultTimezone`, then host timezone",
+    "- wall-clock loop timezone resolves from route/topic, agent, bot, app timezone, then legacy defaults and host timezone",
   ].join("\n");
 }
 
@@ -542,10 +554,16 @@ function renderLoopStatusMessage(params: {
 }
 
 function resolveEffectiveLoopTimezone(params: {
+  agentService: AgentService;
+  agentId: string;
   routeTimezone?: string;
-  defaultTimezone?: string;
+  botTimezone?: string;
 }) {
-  return resolveLoopTimezone(params.routeTimezone, params.defaultTimezone);
+  return params.agentService.resolveEffectiveTimezone({
+    agentId: params.agentId,
+    routeTimezone: params.routeTimezone,
+    botTimezone: params.botTimezone,
+  }).timezone;
 }
 
 function buildLoopSurfaceBinding(identity: ChannelInteractionIdentity) {
@@ -554,10 +572,22 @@ function buildLoopSurfaceBinding(identity: ChannelInteractionIdentity) {
     botId: resolveChannelIdentityBotId(identity),
     conversationKind: identity.conversationKind,
     channelId: identity.channelId,
+    channelName: identity.channelName,
     chatId: identity.chatId,
+    chatName: identity.chatName,
     threadTs: identity.threadTs,
     topicId: identity.topicId,
+    topicName: identity.topicName,
   };
+}
+
+function buildLoopSender(identity: ChannelInteractionIdentity): StoredLoopSender | undefined {
+  return buildStoredLoopSender({
+    platform: identity.platform,
+    providerId: identity.senderId ?? "",
+    displayName: identity.senderName,
+    handle: identity.senderHandle,
+  });
 }
 
 async function executePromptDelivery<TChunk>(params: {
@@ -566,7 +596,8 @@ async function executePromptDelivery<TChunk>(params: {
   identity: ChannelInteractionIdentity;
   route: ChannelInteractionRoute;
   maxChars: number;
-  promptText: string;
+  promptText: string | (() => string);
+  queueText?: string;
   postText: PostText<TChunk>;
   reconcileText: ReconcileText<TChunk>;
   observerId: string;
@@ -590,6 +621,8 @@ async function executePromptDelivery<TChunk>(params: {
   let messageToolPreviewMonitor: Promise<void> | undefined;
   let queueStartPending = false;
   let deferredQueueStartPreview = false;
+  let queueAckPending = false;
+  let queueStartDeferredForAck = false;
   const paneManagedDelivery =
     params.route.responseMode === "capture-pane" || params.forceQueuedDelivery === true;
   const messageToolPreview =
@@ -664,6 +697,16 @@ async function executePromptDelivery<TChunk>(params: {
         params.messageToolFinalReplyAt >= activePreviewStartedAt) ||
       (typeof params.lastMessageToolReplyAt === "number" &&
         params.lastMessageToolReplyAt >= activePreviewStartedAt)
+    );
+  }
+
+  function hasMessageToolFinalReplyBoundary(params: {
+    messageToolFinalReplyAt?: number;
+  }) {
+    return (
+      typeof activePreviewStartedAt === "number" &&
+      typeof params.messageToolFinalReplyAt === "number" &&
+      params.messageToolFinalReplyAt >= activePreviewStartedAt
     );
   }
 
@@ -745,6 +788,14 @@ async function executePromptDelivery<TChunk>(params: {
     sessionKey: params.sessionTarget.sessionKey,
   });
 
+  function assertRunUpdateBelongsToSession(update: { sessionKey: string }) {
+    if (update.sessionKey !== params.sessionTarget.sessionKey) {
+      throw new Error(
+        `Refusing to render runner output for sessionKey ${update.sessionKey} into ${params.sessionTarget.sessionKey}.`,
+      );
+    }
+  }
+
   async function maybeRenderQueueStartNotification() {
     if (!queueStartPending) {
       return false;
@@ -755,7 +806,7 @@ async function executePromptDelivery<TChunk>(params: {
       agentId: params.route.agentId,
       promptSummary:
         params.notificationPromptSummary ??
-        summarizeSurfaceNotificationText(params.promptText),
+        summarizeSurfaceNotificationText(params.queueText ?? String(params.promptText)),
     });
     if (!text) {
       queueStartPending = false;
@@ -764,6 +815,11 @@ async function executePromptDelivery<TChunk>(params: {
 
     if (previewEnabled && responseChunks.length === 0) {
       deferredQueueStartPreview = true;
+      return true;
+    }
+
+    if (queueAckPending && responseChunks.length === 0) {
+      queueStartDeferredForAck = true;
       return true;
     }
 
@@ -781,14 +837,44 @@ async function executePromptDelivery<TChunk>(params: {
       return true;
     }
 
-    const posted = await params.postText(text);
-    if (posted.length > 0) {
+    const postedNew = await renderResponseText(text);
+    if (postedNew) {
       await recordVisibleReply("reply", "channel");
+      activePreviewStartedAt = Date.now();
     }
-    return posted.length > 0;
+    renderedState = {
+      text,
+      body: "",
+    };
+    return postedNew;
   }
 
   function buildInitialPlaceholderText(positionAhead: number) {
+    if (
+      queueStartPending &&
+      params.forceQueuedDelivery === true &&
+      positionAhead === 0
+    ) {
+      queueStartPending = false;
+      return (
+        renderQueueStartNotification({
+          mode: params.queueStartMode ?? "none",
+          agentId: params.route.agentId,
+          promptSummary:
+            params.notificationPromptSummary ??
+            summarizeSurfaceNotificationText(params.queueText ?? String(params.promptText)),
+        }) ??
+        renderPlatformInteraction({
+          platform: params.identity.platform,
+          status: "running",
+          content: "",
+          queuePosition: positionAhead,
+          maxChars: Number.POSITIVE_INFINITY,
+          note: "Working...",
+        })
+      );
+    }
+
     if (deferredQueueStartPreview && queueStartPending) {
       deferredQueueStartPreview = false;
       queueStartPending = false;
@@ -798,7 +884,7 @@ async function executePromptDelivery<TChunk>(params: {
           agentId: params.route.agentId,
           promptSummary:
             params.notificationPromptSummary ??
-            summarizeSurfaceNotificationText(params.promptText),
+            summarizeSurfaceNotificationText(params.queueText ?? String(params.promptText)),
         }) ??
         renderPlatformInteraction({
           platform: params.identity.platform,
@@ -829,7 +915,9 @@ async function executePromptDelivery<TChunk>(params: {
       {
         observerId: params.observerId,
         timingContext: params.timingContext,
+        queueText: params.queueText,
         onUpdate: async (update) => {
+          assertRunUpdateBelongsToSession(update);
           if (update.status === "running" && !loggedFirstRunningUpdate) {
             loggedFirstRunningUpdate = true;
             logLatencyDebug("channel-first-running-update", params.timingContext, {
@@ -839,6 +927,19 @@ async function executePromptDelivery<TChunk>(params: {
           }
 
           await (renderChain = renderChain.then(async () => {
+            const initialSignals = await getMessageToolRuntimeSignals();
+            if (messageToolPreview && hasMessageToolFinalReplyBoundary(initialSignals)) {
+              await handoffMessageToolPreview();
+              return;
+            }
+            if (
+              messageToolPreview &&
+              hasMessageToolReplyBoundary(initialSignals) &&
+              !update.forceVisible
+            ) {
+              await handoffMessageToolPreview();
+              return;
+            }
             if (messageToolPreviewHandedOff && !paneManagedDelivery && !update.forceVisible) {
               return;
             }
@@ -859,12 +960,6 @@ async function executePromptDelivery<TChunk>(params: {
             if (renderedQueueStart) {
               return;
             }
-            const signals = await getMessageToolRuntimeSignals();
-            if (messageToolPreview && hasMessageToolReplyBoundary(signals)) {
-              await handoffMessageToolPreview();
-              return;
-            }
-
             const nextState = buildRenderedMessageState({
               platform: params.identity.platform,
               status: update.status,
@@ -892,7 +987,7 @@ async function executePromptDelivery<TChunk>(params: {
       },
     );
     queueStartPending =
-      positionAhead > 0 &&
+      (positionAhead > 0 || params.forceQueuedDelivery === true) &&
       (params.queueStartMode ?? "none") !== "none";
     if (params.onPromptAccepted) {
       await params.onPromptAccepted();
@@ -910,7 +1005,17 @@ async function executePromptDelivery<TChunk>(params: {
         text: placeholderText,
         body: "",
       };
-    } else if (paneManagedDelivery && positionAhead > 0 && params.route.streaming !== "off") {
+    } else if (
+      paneManagedDelivery &&
+      positionAhead === 0 &&
+      params.forceQueuedDelivery === true
+    ) {
+      await maybeRenderQueueStartNotification();
+    } else if (
+      paneManagedDelivery &&
+      positionAhead > 0 &&
+      (params.route.streaming !== "off" || params.forceQueuedDelivery === true)
+    ) {
       const queuedText = renderPlatformInteraction({
         platform: params.identity.platform,
         status: "queued",
@@ -919,7 +1024,13 @@ async function executePromptDelivery<TChunk>(params: {
         maxChars: Number.POSITIVE_INFINITY,
         note: "Waiting for the agent queue to clear.",
       });
-      const postedNew = await renderResponseText(queuedText);
+      queueAckPending = true;
+      let postedNew = false;
+      try {
+        postedNew = await renderResponseText(queuedText);
+      } finally {
+        queueAckPending = false;
+      }
       if (postedNew) {
         await recordVisibleReply("reply", "channel");
       }
@@ -927,6 +1038,10 @@ async function executePromptDelivery<TChunk>(params: {
         text: queuedText,
         body: "",
       };
+      if (queueStartDeferredForAck) {
+        queueStartDeferredForAck = false;
+        await maybeRenderQueueStartNotification();
+      }
     }
 
     const returnOnToolFinal =
@@ -964,8 +1079,8 @@ async function executePromptDelivery<TChunk>(params: {
     }
 
     const finalResult = await result;
+    assertRunUpdateBelongsToSession(finalResult);
     await renderChain;
-    await maybeRenderQueueStartNotification();
 
     if (params.suppressDetachedSettlement && finalResult.status === "detached") {
       return;
@@ -1140,6 +1255,7 @@ export async function processChannelInteraction<TChunk>(params: {
   text: string;
   agentPromptText?: string;
   agentPromptBuilder?: (text: string) => string;
+  promptContext?: SurfacePromptContext;
   protectedControlMutationRule?: string;
   route: ChannelInteractionRoute;
   maxChars: number;
@@ -1160,6 +1276,7 @@ export async function processChannelInteraction<TChunk>(params: {
     appRole: "member",
     agentRole: "member",
     mayBypassPairing: false,
+    mayBypassSharedSenderPolicy: false,
     mayManageProtectedResources: false,
     canUseShell: false,
   };
@@ -1244,12 +1361,16 @@ export async function processChannelInteraction<TChunk>(params: {
     !sessionBusy;
   const queueByMode = !explicitQueueMessage && params.route.additionalMessageMode === "queue" && sessionBusy;
   const forceQueuedDelivery = typeof explicitQueueMessage === "string" || queueByMode;
-  const delayedPromptText =
-    explicitQueueMessage
-      ? params.agentPromptBuilder
-        ? params.agentPromptBuilder(explicitQueueMessage)
-        : explicitQueueMessage
-      : params.agentPromptText ?? params.text;
+  const delayedPromptQueueText = explicitQueueMessage ?? params.text;
+  const delayedPromptText = () => {
+    if (forceQueuedDelivery && params.agentPromptBuilder) {
+      return params.agentPromptBuilder(delayedPromptQueueText);
+    }
+    if (explicitQueueMessage) {
+      return explicitQueueMessage;
+    }
+    return params.agentPromptText ?? params.text;
+  };
   const isSensitiveCommand = slashCommand?.type === "bash";
 
   if (isSensitiveCommand && !auth.canUseShell) {
@@ -1278,6 +1399,16 @@ export async function processChannelInteraction<TChunk>(params: {
           loopState: {
             sessionLoops,
             globalLoopCount: params.agentService.getActiveIntervalLoopCount?.() ?? 0,
+          },
+          timezone: {
+            effective: resolveEffectiveLoopTimezone({
+              agentService: params.agentService,
+              agentId: params.sessionTarget.agentId,
+              routeTimezone: params.route.timezone,
+              botTimezone: params.route.botTimezone,
+            }),
+            route: params.route.timezone,
+            bot: params.route.botTimezone,
           },
         }),
       );
@@ -1390,6 +1521,30 @@ export async function processChannelInteraction<TChunk>(params: {
         stopped.interrupted
           ? `Interrupted agent \`${stopped.agentId}\` session \`${stopped.sessionName}\`.`
           : `Agent \`${stopped.agentId}\` session \`${stopped.sessionName}\` was not running.`,
+      );
+      await params.agentService.recordConversationReply(params.sessionTarget);
+      return interactionResult;
+    }
+
+    if (slashCommand.name === "new") {
+      if (sessionBusy) {
+        await params.postText(
+          "This session is busy. Use `/stop` first if you want to interrupt it before triggering a new runner conversation.",
+        );
+        await params.agentService.recordConversationReply(params.sessionTarget);
+        return interactionResult;
+      }
+
+      const rotated = await params.agentService.triggerNewSession(params.sessionTarget);
+      await params.postText(
+        [
+          `Triggered a new runner conversation for agent \`${rotated.agentId}\`.`,
+          `sessionName: \`${rotated.sessionName}\``,
+          `storedSessionId: \`${rotated.sessionId ?? "none"}\``,
+          rotated.restartedRunner
+            ? "No live runner existed, so clisbot opened a fresh runner session."
+            : `triggerCommand: \`${rotated.command}\``,
+        ].join("\n"),
       );
       await params.agentService.recordConversationReply(params.sessionTarget);
       return interactionResult;
@@ -1709,7 +1864,8 @@ export async function processChannelInteraction<TChunk>(params: {
           identity: params.identity,
           route: params.route,
           maxChars: params.maxChars,
-          promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+          promptText: () => buildLoopPromptText(resolvedLoopPrompt.text),
+          queueText: resolvedLoopPrompt.text,
           queueStartMode: params.route.surfaceNotifications.queueStart,
           notificationPromptSummary: summarizeManagedLoopPrompt(
             resolvedLoopPrompt.text,
@@ -1726,12 +1882,14 @@ export async function processChannelInteraction<TChunk>(params: {
 
     if (slashCommand.params.mode === "calendar") {
       const effectiveTimezone = resolveEffectiveLoopTimezone({
+        agentService: params.agentService,
+        agentId: params.sessionTarget.agentId,
         routeTimezone: params.route.timezone,
-        defaultTimezone: loopConfig.defaultTimezone,
+        botTimezone: params.route.botTimezone,
       });
       const createdLoop = await params.agentService.createCalendarLoop({
         target: params.sessionTarget,
-        promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+        promptText: resolvedLoopPrompt.text,
         canonicalPromptText: resolvedLoopPrompt.text,
         promptSummary: summarizeManagedLoopPrompt(
           resolvedLoopPrompt.text,
@@ -1747,6 +1905,7 @@ export async function processChannelInteraction<TChunk>(params: {
         timezone: effectiveTimezone,
         maxRuns: maxRunsPerLoop,
         createdBy: params.senderId,
+        sender: buildLoopSender(params.identity),
         protectedControlMutationRule: params.protectedControlMutationRule,
       });
       await params.postText(
@@ -1775,7 +1934,7 @@ export async function processChannelInteraction<TChunk>(params: {
 
     const createdLoop = await params.agentService.createIntervalLoop({
       target: params.sessionTarget,
-      promptText: buildLoopPromptText(resolvedLoopPrompt.text),
+      promptText: resolvedLoopPrompt.text,
       canonicalPromptText: resolvedLoopPrompt.text,
       promptSummary: summarizeManagedLoopPrompt(
         resolvedLoopPrompt.text,
@@ -1786,6 +1945,7 @@ export async function processChannelInteraction<TChunk>(params: {
       intervalMs: effectiveIntervalMs!,
       maxRuns: maxRunsPerLoop,
       createdBy: params.senderId,
+      sender: buildLoopSender(params.identity),
       force: slashCommand.params.force,
       protectedControlMutationRule: params.protectedControlMutationRule,
     });
@@ -1864,6 +2024,15 @@ export async function processChannelInteraction<TChunk>(params: {
       params.sessionTarget,
       buildSteeringPromptText({
         text: params.transformSessionInputText?.(explicitSteerMessage) ?? explicitSteerMessage,
+        identity: params.identity,
+        agentId: params.route.agentId,
+        time: Date.now(),
+        promptContext: params.promptContext
+          ? {
+              ...params.promptContext,
+              time: new Date().toISOString(),
+            }
+          : undefined,
         protectedControlMutationRule: params.protectedControlMutationRule,
       }),
     );
@@ -1883,6 +2052,15 @@ export async function processChannelInteraction<TChunk>(params: {
         params.sessionTarget,
         buildSteeringPromptText({
           text: params.transformSessionInputText?.(params.text) ?? params.text,
+          identity: params.identity,
+          agentId: params.route.agentId,
+          time: Date.now(),
+          promptContext: params.promptContext
+            ? {
+                ...params.promptContext,
+                time: new Date().toISOString(),
+              }
+            : undefined,
           protectedControlMutationRule: params.protectedControlMutationRule,
         }),
       );
@@ -1902,6 +2080,7 @@ export async function processChannelInteraction<TChunk>(params: {
     route: params.route,
     maxChars: params.maxChars,
     promptText: delayedPromptText,
+    queueText: delayedPromptQueueText,
     queueStartMode: params.route.surfaceNotifications.queueStart,
     notificationPromptSummary:
       explicitQueueMessage ??

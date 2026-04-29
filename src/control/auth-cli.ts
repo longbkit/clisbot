@@ -2,6 +2,11 @@ import {
   APP_ADMIN_PERMISSIONS,
   DEFAULT_AGENT_ADMIN_PERMISSIONS,
 } from "../auth/defaults.ts";
+import {
+  normalizeAuthPrincipal,
+  resolvePrincipalAuth,
+  type ResolvedChannelAuth,
+} from "../auth/resolve.ts";
 import { readEditableConfig, writeEditableConfig } from "../config/config-file.ts";
 import type { AgentEntry, ClisbotConfig } from "../config/schema.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
@@ -73,6 +78,7 @@ function renderAuthCliHelp() {
     "Usage:",
     `  ${renderCliCommand("auth list [--json]")}`,
     `  ${renderCliCommand("auth show <app|agent-defaults|agent> [--agent <id>] [--json]")}`,
+    `  ${renderCliCommand("auth get-permissions --sender <principal> --agent <id> [--json] [--verbose]")}`,
     `  ${renderCliCommand("auth add-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]")}`,
     `  ${renderCliCommand("auth remove-user <app|agent-defaults|agent> --role <role> --user <principal> [--agent <id>]")}`,
     `  ${renderCliCommand("auth add-permission <app|agent-defaults|agent> --role <role> --permission <permission> [--agent <id>]")}`,
@@ -90,11 +96,14 @@ function renderAuthCliHelp() {
     "Notes:",
     "  add-user/remove-user mutate roles.<role>.users",
     "  add-permission/remove-permission mutate roles.<role>.allow",
+    "  principal format is <platform>:<provider-user-id>, for example telegram:1276408333 or slack:U123",
+    "  get-permissions is read-only; use --sender when checking the current message sender",
     "  agent role edits clone the inherited agent-defaults role into the target agent override on first write",
     "  app `owner` and `admin` principals bypass DM pairing automatically once they are granted",
     "",
     "Examples:",
     `  ${renderCliCommand("auth add-user app --role owner --user telegram:1276408333")}`,
+    `  ${renderCliCommand("auth get-permissions --sender telegram:1276408333 --agent default --json")}`,
     `  ${renderCliCommand("auth remove-user app --role admin --user slack:U123")}`,
     `  ${renderCliCommand("auth add-user agent --agent default --role admin --user slack:U123")}`,
     `  ${renderCliCommand("auth add-permission agent-defaults --role member --permission shellExecute")}`,
@@ -287,6 +296,99 @@ async function showAuth(args: string[]) {
   console.log(JSON.stringify(payload, null, 2));
 }
 
+function renderPermissionExplanation(allowed: boolean, allowedText: string, deniedText: string) {
+  return allowed ? `Can ${allowedText}` : `Cannot ${deniedText}`;
+}
+
+function permissionEntry(allowed: boolean, allowedText: string, deniedText = allowedText) {
+  return {
+    allowed,
+    explanation: renderPermissionExplanation(allowed, allowedText, deniedText),
+  };
+}
+
+function buildEffectivePermissionEntries(auth: ResolvedChannelAuth) {
+  const appAdminLike = auth.appRole === "owner" || auth.appRole === "admin";
+  const agentPermissions = auth.agentPermissions ?? [];
+  const allows = (permission: string) => appAdminLike || agentPermissions.includes(permission);
+  return {
+    sendMessage: permissionEntry(
+      allows("sendMessage"),
+      "send normal prompts to this agent from the current surface.",
+    ),
+    manageQueue: permissionEntry(
+      allows("queueManage"),
+      "use queue commands when a request should wait behind the active run.",
+    ),
+    manageLoop: permissionEntry(
+      allows("loopManage"),
+      "create, inspect, and cancel scheduled or repeated messages with clisbot loops. Use for requests like every 7am, daily, weekly, every 5m, or run 3 times.",
+      "create, inspect, or cancel scheduled or repeated messages with clisbot loops.",
+    ),
+    runShellSlashCommand: permissionEntry(
+      auth.canUseShell,
+      "use shell through clisbot slash commands such as /bash. Normal agent workspace file reads/edits are separate from this permission.",
+    ),
+    manageProtectedResources: permissionEntry(
+      auth.mayManageProtectedResources,
+      "change protected clisbot resources such as auth, routes, bots, agents, runtime controls, config, and prompt-governance settings.",
+      "change protected clisbot resources such as auth, routes, bots, agents, runtime controls, config, or prompt-governance settings.",
+    ),
+  };
+}
+
+function buildVerbosePermissionResolution(auth: ResolvedChannelAuth) {
+  return {
+    principal: auth.principal,
+    appRole: auth.appRole,
+    agentRole: auth.agentRole,
+    appPermissions: auth.appPermissions ?? [],
+    agentPermissions: auth.agentPermissions ?? [],
+    effective: {
+      mayBypassPairing: auth.mayBypassPairing,
+      mayBypassSharedSenderPolicy: auth.mayBypassSharedSenderPolicy,
+      mayManageProtectedResources: auth.mayManageProtectedResources,
+      canUseShell: auth.canUseShell,
+    },
+  };
+}
+
+function buildEffectivePermissionPayload(config: ClisbotConfig, args: string[]) {
+  const sender = normalizeAuthPrincipal(parseSingleOption(args, "--sender") ?? "");
+  const agentId = parseSingleOption(args, "--agent")?.trim();
+  if (!sender) {
+    throw new Error("Missing value for --sender");
+  }
+  if (!agentId) {
+    throw new Error("Missing value for --agent");
+  }
+  ensureAgentEntry(config, agentId);
+
+  const auth = resolvePrincipalAuth({ config, agentId, principal: sender });
+  return {
+    sender,
+    agentId,
+    permissions: buildEffectivePermissionEntries(auth),
+    ...(hasFlag(args, "--verbose")
+      ? {
+          resolution: buildVerbosePermissionResolution(auth),
+        }
+      : {}),
+  };
+}
+
+async function getPermissions(args: string[]) {
+  const { config } = await readEditableConfig(getEditableConfigPath());
+  const payload = buildEffectivePermissionPayload(config, args);
+
+  if (hasFlag(args, "--json")) {
+    console.log(JSON.stringify(payload, null, 2));
+    return;
+  }
+
+  console.log(JSON.stringify(payload, null, 2));
+}
+
 async function mutateUsers(
   mode: "add" | "remove",
   args: string[],
@@ -359,6 +461,11 @@ export async function runAuthCli(args: string[]) {
 
   if (command === "show") {
     await showAuth(rest);
+    return;
+  }
+
+  if (command === "get-permissions") {
+    await getPermissions(rest);
     return;
   }
 

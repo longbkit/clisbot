@@ -68,6 +68,10 @@ function createIdentity(
   };
 }
 
+function renderCapturedPrompt(prompt: string | (() => string)) {
+  return typeof prompt === "function" ? prompt() : prompt;
+}
+
 function createTelegramTopicIdentity(
   overrides: Partial<ChannelInteractionIdentity> = {},
 ): ChannelInteractionIdentity {
@@ -142,6 +146,65 @@ describe("processChannelInteraction sensitive command gating", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Recovery succeeded. Continuing the current run.");
+  });
+
+  test("keeps the working placeholder for silent prompt retries", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _promptText: string, params: any) => {
+          const updatePromise = params.onUpdate({
+            status: "running",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "",
+            fullSnapshot: "",
+            initialSnapshot: "",
+          });
+          return {
+            positionAhead: 0,
+            result: Promise.resolve(updatePromise).then(() => ({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "completed after retry",
+              fullSnapshot: "completed after retry",
+              initialSnapshot: "",
+            })),
+          };
+        },
+        recordConversationReply: async () => undefined,
+        getConversationFollowUpState: async () => ({}),
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "continue",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Working");
+    expect(reconciled.join("\n")).not.toContain("Retrying");
+    expect(reconciled.join("\n")).not.toContain("truthfully");
   });
 
   test("renders force-visible running updates even after message-tool preview handoff", async () => {
@@ -455,6 +518,7 @@ describe("processChannelInteraction sensitive command gating", () => {
         appRole: "member",
         agentRole: "admin",
         mayBypassPairing: false,
+        mayBypassSharedSenderPolicy: false,
         mayManageProtectedResources: false,
         canUseShell: true,
       },
@@ -558,6 +622,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("principalExample: `slack:U123`");
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
+    expect(posted[0]).toContain("mayBypassSharedSenderPolicy: `false`");
     expect(posted[0]).toContain("canUseShell: `false`");
     expect(posted[0]).toContain("verbose: `minimal`");
   });
@@ -610,6 +675,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("principalExample: `telegram:123`");
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
+    expect(posted[0]).toContain("mayBypassSharedSenderPolicy: `false`");
     expect(posted[0]).toContain("verbose: `minimal`");
   });
 
@@ -633,13 +699,20 @@ describe("processChannelInteraction sensitive command gating", () => {
           startedAt,
           detachedAt,
         }),
+        resolveEffectiveTimezone: () => ({
+          timezone: "America/Los_Angeles",
+          source: "agent",
+        }),
         recordConversationReply: async () => undefined,
       } as any,
       sessionTarget: createTarget(),
       identity: createIdentity(),
       senderId: "U123",
       text: "/status",
-      route: createRoute(),
+      route: createRoute({
+        timezone: "Asia/Ho_Chi_Minh",
+        botTimezone: "UTC",
+      }),
       maxChars: 4000,
       postText: async (text) => {
         posted.push(text);
@@ -661,10 +734,14 @@ describe("processChannelInteraction sensitive command gating", () => {
     expect(posted[0]).toContain("principalFormat: `slack:<nativeUserId>`");
     expect(posted[0]).toContain("principalExample: `slack:U123`");
     expect(posted[0]).toContain("run.state: `detached`");
+    expect(posted[0]).toContain("timezone.effective: `America/Los_Angeles`");
+    expect(posted[0]).toContain("timezone.route: `Asia/Ho_Chi_Minh`");
+    expect(posted[0]).toContain("timezone.bot: `UTC`");
     expect(posted[0]).toContain(`run.startedAt: \`${new Date(startedAt).toISOString()}\``);
     expect(posted[0]).toContain(`run.detachedAt: \`${new Date(detachedAt).toISOString()}\``);
     expect(posted[0]).toContain("appRole: `member`");
     expect(posted[0]).toContain("agentRole: `member`");
+    expect(posted[0]).toContain("mayBypassSharedSenderPolicy: `false`");
     expect(posted[0]).toContain("canUseShell: `false`");
     expect(posted[0]).toContain("/attach`, `/detach`, `/watch every <duration>`");
     expect(posted[0]).toContain("/transcript` enabled on this route (`verbose: minimal`)");
@@ -679,6 +756,10 @@ describe("processChannelInteraction sensitive command gating", () => {
         getConversationFollowUpState: async () => ({}),
         getSessionRuntime: async () => ({
           state: "idle",
+        }),
+        resolveEffectiveTimezone: () => ({
+          timezone: "UTC",
+          source: "app",
         }),
         recordConversationReply: async () => undefined,
       } as any,
@@ -853,14 +934,14 @@ describe("processChannelInteraction sensitive command gating", () => {
       });
 
       const updated = JSON.parse(readFileSync(configPath, "utf8"));
-      expect(updated.bots.slack.default.groups["channel:C123"].followUp.mode).toBe("mention-only");
+      expect(updated.bots.slack.default.groups.C123.followUp.mode).toBe("mention-only");
     } finally {
       process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
       rmSync(configDir, { recursive: true, force: true });
     }
 
     expect(setModeCalls).toBe(1);
-    expect(posted[0]).toContain("Updated follow-up mode for `slack channel:C123`.");
+    expect(posted[0]).toContain("Updated follow-up mode for `slack group:C123`.");
     expect(posted[0]).toContain("config.followUp.mode: `mention-only`");
     expect(posted[0]).toContain("currentConversation.overrideMode: `mention-only`");
   });
@@ -1014,7 +1095,7 @@ describe("processChannelInteraction sensitive command gating", () => {
               default: {
                 ...template.bots.slack.default,
                 groups: {
-                  "channel:C123": {
+                  C123: {
                     requireMention: true,
                     streaming: "all",
                   },
@@ -1050,7 +1131,7 @@ describe("processChannelInteraction sensitive command gating", () => {
     }
 
     expect(posted[0]).toContain("Streaming mode: `latest`");
-    expect(posted[0]).toContain("config.target: `slack channel:C123`");
+    expect(posted[0]).toContain("config.target: `slack group:C123`");
     expect(posted[0]).not.toContain("activeRoute.streaming:");
     expect(posted[0]).not.toContain("config.streaming:");
   });
@@ -1418,7 +1499,6 @@ describe("processChannelInteraction sensitive command gating", () => {
         getLoopConfig: () => ({
           maxRunsPerLoop: 20,
           maxActiveLoops: 10,
-          defaultTimezone: "UTC",
         }),
         createIntervalLoop: async (params: { protectedControlMutationRule?: string }) => {
           observedProtectedRule = params.protectedControlMutationRule;
@@ -1553,7 +1633,7 @@ describe("processChannelInteraction agent prompt text", () => {
     await processChannelInteraction({
       agentService: {
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -1592,7 +1672,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -1625,6 +1705,57 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(observedPrompt).toContain("Refuse protected control changes.");
     expect(observedPrompt).toContain("<user>\nupdate clisbot.json\n</user>");
+  });
+
+  test("rebuilds route-queued prompt envelopes when the queued item starts", async () => {
+    let observedPrompt = "";
+    let buildCount = 0;
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string | (() => string)) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "done",
+              fullSnapshot: "done",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "follow up after the active run",
+      agentPromptText: "stale prompt envelope",
+      agentPromptBuilder: (text) => {
+        buildCount += 1;
+        return `fresh prompt envelope ${buildCount}: ${text}`;
+      },
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "queue",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => [text],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(buildCount).toBe(1);
+    expect(observedPrompt).toBe(
+      "fresh prompt envelope 1: follow up after the active run",
+    );
+    expect(observedPrompt).not.toBe("stale prompt envelope");
   });
 
   test("does not post a pane final settlement when message-tool mode has streaming off and no tool final arrives", async () => {
@@ -1731,8 +1862,8 @@ describe("processChannelInteraction agent prompt text", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Working");
-    expect(reconciled).toContain("working draft");
     expect(reconciled.at(-1)).toContain("working draft");
+    expect(reconciled.at(-1)).not.toContain("Working...");
   });
 
   test("hands off the live draft after a message-tool reply boundary", async () => {
@@ -1805,7 +1936,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft one");
+    expect(reconciled.some((text) => text.includes("draft one"))).toBe(true);
     expect(reconciled.at(-1)).toBe("");
     expect(posted.join("\n")).not.toContain("draft two");
     expect(reconciled.join("\n")).not.toContain("draft two");
@@ -1895,12 +2026,81 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft one");
+    expect(reconciled.some((text) => text.includes("draft one"))).toBe(true);
     expect(reconciled.filter((text) => text === "")).toHaveLength(1);
     expect(posted.join("\n")).not.toContain("draft two");
     expect(posted.join("\n")).not.toContain("draft three");
     expect(reconciled.join("\n")).not.toContain("draft two");
     expect(reconciled.join("\n")).not.toContain("draft three");
+  });
+
+  test("does not start pane streaming after a message-tool final reply already arrived", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await sleep(0);
+            runtime.lastMessageToolReplyAt = Date.now();
+            runtime.messageToolFinalReplyAt = runtime.lastMessageToolReplyAt;
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "late pane draft after final",
+              fullSnapshot: "late pane draft after final",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "final pane output",
+              fullSnapshot: "final pane output",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Working");
+    expect(reconciled).toContain("");
+    expect(reconciled.join("\n")).not.toContain("late pane draft after final");
+    expect(reconciled.join("\n")).not.toContain("final pane output");
   });
 
   test("cleans up the live draft after a message-tool final reply when response is final", async () => {
@@ -1966,7 +2166,7 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(posted).toHaveLength(1);
-    expect(reconciled).toContain("draft before final");
+    expect(reconciled.some((text) => text.includes("draft before final"))).toBe(true);
     expect(reconciled.at(-1)).toBe("");
   });
 
@@ -2324,7 +2524,7 @@ describe("processChannelInteraction agent prompt text", () => {
           submitCalls += 1;
         },
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2376,7 +2576,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2485,7 +2685,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(reconciled.at(-1)).toContain("queued reply complete");
   });
 
-  test("queue mode forces queued acknowledgment and clisbot-managed settlement while busy", async () => {
+  test("queue mode acknowledges queued work while streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     let observedPrompt = "";
@@ -2494,7 +2694,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2532,13 +2732,13 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(observedPrompt).toBe("follow up after the active run");
-    expect(posted).toHaveLength(2);
-    expect(posted[0]).toContain("Queued message is now running");
-    expect(posted[1]).toContain("queued mode final");
-    expect(reconciled).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("queued mode final");
   });
 
-  test("explicit queue command stays silent until final settlement when streaming is off", async () => {
+  test("explicit queue command acknowledges queue acceptance while streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     let observedPrompt = "";
@@ -2547,7 +2747,7 @@ describe("processChannelInteraction agent prompt text", () => {
       agentService: {
         isAwaitingFollowUpRouting: async () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 1,
             result: Promise.resolve({
@@ -2585,13 +2785,114 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(observedPrompt).toBe("send the short summary after the current run");
-    expect(posted).toHaveLength(2);
-    expect(posted[0]).toContain("Queued message is now running");
-    expect(posted[1]).toContain("queued final only");
-    expect(reconciled).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("queued final only");
   });
 
-  test("queue start notification is posted on running updates even when message-tool streaming is off", async () => {
+  test("explicit queue command renders queue start immediately when the queue is empty and streaming is off", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => false,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 0,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "empty queue final",
+              fullSnapshot: "empty queue final",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue send the short summary now",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(observedPrompt).toBe("send the short summary now");
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued message is now running");
+    expect(posted[0]).not.toContain("Queued: 0 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("empty queue final");
+  });
+
+  test("explicit queue command uses queue start as the initial preview when the queue is empty", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => false,
+        enqueuePrompt: () => ({
+          positionAhead: 0,
+          result: Promise.resolve({
+            status: "completed",
+            agentId: "default",
+            sessionKey: createTarget().sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            snapshot: "empty queue streaming final",
+            fullSnapshot: "empty queue streaming final",
+            initialSnapshot: "",
+          }),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue send the short summary now",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued message is now running");
+    expect(posted[0]).not.toContain("Working");
+    expect(reconciled.at(-1)).toContain("empty queue streaming final");
+  });
+
+  test("queue start notification is rendered on running updates even when message-tool streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -2645,14 +2946,16 @@ describe("processChannelInteraction agent prompt text", () => {
       },
     });
 
-    expect(posted).toHaveLength(2);
-    expect(posted[0]).toContain("Queued message is now running");
-    expect(posted[1]).toContain("queued final after running");
-    expect(reconciled).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(2);
+    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(reconciled[1]).toContain("queued final after running");
   });
 
   test("queue start notifications can be disabled per route", async () => {
     const posted: string[] = [];
+    const reconciled: string[] = [];
 
     await processChannelInteraction({
       agentService: {
@@ -2690,11 +2993,17 @@ describe("processChannelInteraction agent prompt text", () => {
         posted.push(text);
         return [text];
       },
-      reconcileText: async (_chunks, text) => [text],
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
     });
 
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain("queued final only");
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled).toHaveLength(1);
+    expect(reconciled[0]).toContain("queued final only");
+    expect(reconciled[0]).not.toContain("Queued message is now running");
   });
 
   test("explicit steer command injects a steering message into the active run", async () => {
@@ -2780,7 +3089,7 @@ describe("processChannelInteraction agent prompt text", () => {
         isAwaitingFollowUpRouting: async () => false,
         hasActiveRun: () => true,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          observedPrompt = prompt;
+          observedPrompt = renderCapturedPrompt(prompt);
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -2957,6 +3266,79 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toBe("No active or resumable session to nudge for agent `default`.");
   });
 
+  test("new triggers a new runner conversation for the current session", async () => {
+    const posted: string[] = [];
+    let rotatedTarget = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isSessionBusy: async () => false,
+        triggerNewSession: async (target: AgentSessionTarget) => {
+          rotatedTarget = target.sessionKey;
+          return {
+            agentId: target.agentId,
+            sessionKey: target.sessionKey,
+            sessionName: "session",
+            workspacePath: "/tmp/workspace",
+            command: "/new",
+            sessionId: "11111111-1111-1111-1111-111111111111",
+            restartedRunner: false,
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/new",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(rotatedTarget).toBe(createTarget().sessionKey);
+    expect(posted[0]).toContain("Triggered a new runner conversation");
+    expect(posted[0]).toContain("storedSessionId: `11111111-1111-1111-1111-111111111111`");
+    expect(posted[0]).toContain("triggerCommand: `/new`");
+  });
+
+  test("new rejects while the session is busy", async () => {
+    const posted: string[] = [];
+    let rotated = false;
+
+    await processChannelInteraction({
+      agentService: {
+        isSessionBusy: async () => true,
+        triggerNewSession: async () => {
+          rotated = true;
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/new",
+      route: createRoute({
+        responseMode: "message-tool",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(rotated).toBe(false);
+    expect(posted[0]).toContain("This session is busy.");
+  });
+
   test("loop times mode queues all iterations immediately and wraps prompts", async () => {
     const posted: string[] = [];
     const enqueued: string[] = [];
@@ -2969,7 +3351,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3024,7 +3406,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3079,7 +3461,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3143,7 +3525,7 @@ describe("processChannelInteraction agent prompt text", () => {
         }),
         getWorkspacePath: () => "/tmp/workspace",
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: enqueued.length - 1,
             result: Promise.resolve({
@@ -3212,7 +3594,7 @@ describe("processChannelInteraction agent prompt text", () => {
           intervalMs: number;
           maxRuns: number;
         }) => {
-          enqueued.push(promptText);
+          enqueued.push(renderCapturedPrompt(promptText));
           scheduledIntervalMs = intervalMs;
           createdMaxRuns = maxRuns;
           return {
@@ -3258,7 +3640,7 @@ describe("processChannelInteraction agent prompt text", () => {
         ],
         getActiveIntervalLoopCount: () => 1,
         enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-          enqueued.push(prompt);
+          enqueued.push(renderCapturedPrompt(prompt));
           return {
             positionAhead: 0,
             result: Promise.resolve({
@@ -3294,7 +3676,7 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toContain("Started loop `loop123` every 2h.");
     expect(scheduledIntervalMs).toBe(7_200_000);
     expect(createdMaxRuns).toBe(20);
-    expect(enqueued).toEqual(["wrapped:check deploy"]);
+    expect(enqueued).toEqual(["check deploy"]);
   });
 
   test("loop calendar mode schedules the first run using route timezone", async () => {
@@ -3307,9 +3689,12 @@ describe("processChannelInteraction agent prompt text", () => {
         getLoopConfig: () => ({
           maxRunsPerLoop: 20,
           maxActiveLoops: 10,
-          defaultTimezone: "UTC",
         }),
         getWorkspacePath: () => "/tmp/workspace",
+        resolveEffectiveTimezone: ({ routeTimezone }: { routeTimezone?: string }) => ({
+          timezone: routeTimezone ?? "UTC",
+          source: routeTimezone ? "route" : "app",
+        }),
         createCalendarLoop: async ({
           cadence,
           timezone,
@@ -3391,7 +3776,9 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(observedTimezone).toBe("Asia/Ho_Chi_Minh");
     expect(posted[0]).toContain("Started loop `loopcal1` every day at 07:00.");
     expect(posted[0]).toContain("timezone: `Asia/Ho_Chi_Minh`");
-    expect(posted[0]).toContain("The first run is scheduled for `2026-04-13T00:00:00.000Z`.");
+    expect(posted[0]).toContain("next run: `2026-04-13 07:00 Asia/Ho_Chi_Minh` (2026-04-13T00:00:00.000Z)");
+    expect(posted[0]).toContain("cancel: `/loop cancel loopcal1`");
+    expect(posted[0]).toContain("If timezone is wrong: cancel with `/loop cancel loopcal1`");
   });
 
   test("loop maintenance mode reads LOOP.md when no prompt is provided", async () => {
@@ -3409,7 +3796,7 @@ describe("processChannelInteraction agent prompt text", () => {
           }),
           getWorkspacePath: () => workspacePath,
           enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
-            enqueued.push(prompt);
+            enqueued.push(renderCapturedPrompt(prompt));
             return {
               positionAhead: enqueued.length - 1,
               result: Promise.resolve({

@@ -1,13 +1,14 @@
 {
   "meta": {
-    "schemaVersion": "0.1.43",
-    "lastTouchedAt": "2026-04-18T10:10:00Z"
+    "schemaVersion": "0.1.45",
+    "lastTouchedAt": "2026-04-24T06:21:29.693Z"
   },
   "app": {
+    "timezone": "UTC",
     "session": {
       "mainKey": "main",
       "identityLinks": {},
-      "storePath": "~/.clisbot/state/sessions.json"
+      "storePath": "~/.clisbot-dev/state/sessions.json"
     },
     "auth": {
       "ownerClaimWindowMinutes": 30,
@@ -48,8 +49,7 @@
       },
       "loop": {
         "maxRunsPerLoop": 20,
-        "maxActiveLoops": 10,
-        "defaultTimezone": "UTC"
+        "maxActiveLoops": 10
       },
       "runtimeMonitor": {
         "restartBackoff": {
@@ -58,6 +58,22 @@
             "maxRestarts": 3
           },
           "stages": [
+            {
+              "delayMinutes": 1,
+              "maxRestarts": 2
+            },
+            {
+              "delayMinutes": 3,
+              "maxRestarts": 2
+            },
+            {
+              "delayMinutes": 5,
+              "maxRestarts": 2
+            },
+            {
+              "delayMinutes": 10,
+              "maxRestarts": 3
+            },
             {
               "delayMinutes": 15,
               "maxRestarts": 4
@@ -80,7 +96,6 @@
       "allowBots": false,
       "requireMention": true,
       "dmScope": "per-channel-peer",
-      "groupPolicy": "allowlist",
       "commandPrefixes": {
         "slash": [
           "::",
@@ -102,17 +117,17 @@
       "followUp": {
         "mode": "auto",
         "participationTtlMin": 5
-      },
-      "timezone": "UTC"
+      }
     },
     "slack": {
       "defaults": {
-        "enabled": true,
+        "enabled": false,
         "defaultBotId": "default",
         "mode": "socket",
         "allowBots": false,
-        "channelPolicy": "disabled",
-        "groupPolicy": "disabled",
+        "dmPolicy": "pairing",
+        "channelPolicy": "allowlist",
+        "groupPolicy": "allowlist",
         "agentPrompt": {
           "enabled": true,
           "maxProgressMessages": 3,
@@ -127,10 +142,20 @@
           "loadingMessages": []
         },
         "directMessages": {
-          "dm:*": {
+          "*": {
             "enabled": true,
             "requireMention": false,
             "policy": "pairing",
+            "allowUsers": [],
+            "blockUsers": [],
+            "allowBots": false
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "requireMention": true,
+            "policy": "open",
             "allowUsers": [],
             "blockUsers": [],
             "allowBots": false
@@ -157,271 +182,54 @@
         "followUp": {
           "mode": "auto",
           "participationTtlMin": 5
-        },
-        "timezone": "UTC"
+        }
       },
       "default": {
-        "enabled": true,
+        "enabled": false,
         "name": "default",
-        "agentId": "default",
         "appToken": "${SLACK_APP_TOKEN}",
         "botToken": "${SLACK_BOT_TOKEN}",
-        "channelPolicy": "disabled",
-        "groupPolicy": "disabled",
-        "allowBots": false,
-        "commandPrefixes": {
-          "slash": [
-            "::",
-            "\\"
-          ],
-          "bash": [
-            "!"
-          ]
-        },
-        "response": "final",
-        "responseMode": "message-tool",
-        "additionalMessageMode": "steer",
-        "surfaceNotifications": {
-          "queueStart": "brief",
-          "loopStart": "brief"
-        },
-        "verbose": "minimal",
-        "followUp": {
-          "mode": "auto",
-          "participationTtlMin": 5
-        },
-        "timezone": "UTC",
-        "directMessages": {
-          "dm:*": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "pairing",
-            "allowUsers": [],
-            "blockUsers": [],
-            "allowBots": false,
-            "agentId": "default",
-            "commandPrefixes": {
-              "slash": [
-                "::",
-                "\\"
-              ],
-              "bash": [
-                "!"
-              ]
-            },
-            "streaming": "off",
-            "response": "final",
-            "responseMode": "message-tool",
-            "additionalMessageMode": "steer",
-            "surfaceNotifications": {
-              "queueStart": "brief",
-              "loopStart": "brief"
-            },
-            "verbose": "minimal",
-            "followUp": {
-              "mode": "auto",
-              "participationTtlMin": 5
-            },
-            "timezone": "America/Los_Angeles"
-          },
-          "dm:U_OWNER": {
-            "agentId": "default"
-          }
-        },
-        "groups": {
-          "dm:*": {
-            "enabled": true,
-            "requireMention": true,
-            "policy": "disabled",
-            "allowUsers": [],
-            "blockUsers": [],
-            "allowBots": false
-          },
-          "channel:C_GENERAL": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "open",
-            "allowUsers": [
-              "*"
-            ],
-            "blockUsers": [],
-            "allowBots": false,
-            "streaming": "all",
-            "response": "all",
-            "surfaceNotifications": {
-              "queueStart": "full",
-              "loopStart": "brief"
-            },
-            "followUp": {
-              "mode": "auto",
-              "participationTtlMin": 10
-            }
-          },
-          "channel:C_PRODUCT": {
-            "enabled": true,
-            "requireMention": true,
-            "agentId": "reviewer",
-            "policy": "allowlist",
-            "allowUsers": [
-              "U_PM",
-              "U_ENG_MANAGER"
-            ],
-            "blockUsers": [
-              "U_SPAMMER"
-            ],
-            "responseMode": "capture-pane",
-            "additionalMessageMode": "queue",
-            "verbose": "off"
-          },
-          "group:G_LEADERSHIP": {
-            "enabled": true,
-            "requireMention": true,
-            "policy": "allowlist",
-            "allowUsers": [
-              "U_OWNER",
-              "U_CTO"
-            ],
-            "blockUsers": [],
-            "commandPrefixes": {
-              "slash": [
-                "::"
-              ],
-              "bash": [
-                "!"
-              ]
-            },
-            "followUp": {
-              "mode": "mention-only",
-              "participationTtlMin": 15
-            },
-            "timezone": "Asia/Ho_Chi_Minh"
-          }
-        }
-      },
-      "support": {
-        "enabled": true,
-        "name": "support",
-        "agentId": "claude",
-        "credentialType": "tokenFile",
-        "appTokenFile": "~/.clisbot/credentials/slack/support.app-token",
-        "botTokenFile": "~/.clisbot/credentials/slack/support.bot-token",
+        "dmPolicy": "pairing",
         "channelPolicy": "allowlist",
-        "groupPolicy": "disabled",
-        "allowBots": true,
-        "commandPrefixes": {
-          "slash": [
-            "::",
-            "\\",
-            "/support"
-          ],
-          "bash": [
-            "!"
-          ]
-        },
-        "streaming": "all",
-        "response": "all",
-        "responseMode": "capture-pane",
-        "additionalMessageMode": "queue",
-        "surfaceNotifications": {
-          "queueStart": "full",
-          "loopStart": "brief"
-        },
-        "verbose": "minimal",
-        "followUp": {
-          "mode": "mention-only",
-          "participationTtlMin": 10
-        },
-        "timezone": "Asia/Ho_Chi_Minh",
-        "directMessages": {
-          "*": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "open",
-            "allowUsers": [
-              "*"
-            ],
-            "blockUsers": [
-              "U_BANNED"
-            ],
-            "allowBots": true,
-            "agentId": "claude",
-            "streaming": "all",
-            "response": "final",
-            "responseMode": "message-tool",
-            "additionalMessageMode": "steer",
-            "surfaceNotifications": {
-              "queueStart": "full",
-              "loopStart": "brief"
-            },
-            "verbose": "minimal",
-            "followUp": {
-              "mode": "auto",
-              "participationTtlMin": 10
-            }
-          },
-          "dm:U_SUPPORT": {
-            "agentId": "reviewer"
-          }
-        },
-        "groups": {
-          "dm:*": {
-            "enabled": true,
-            "requireMention": true,
-            "policy": "disabled",
-            "allowUsers": [],
-            "blockUsers": [],
-            "allowBots": true
-          },
-          "channel:C_SUPPORT": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "open",
-            "allowUsers": [
-              "*"
-            ],
-            "blockUsers": [],
-            "allowBots": true,
-            "response": "all"
-          },
-          "channel:C_ESCALATION": {
-            "enabled": true,
-            "requireMention": true,
-            "agentId": "reviewer",
-            "policy": "allowlist",
-            "allowUsers": [
-              "U_SUPPORT_LEAD",
-              "U_ONCALL"
-            ],
-            "blockUsers": [],
-            "responseMode": "capture-pane",
-            "additionalMessageMode": "queue",
-            "verbose": "off"
-          },
-          "group:G_SUPPORT_PRIVATE": {
-            "enabled": true,
-            "requireMention": true,
-            "policy": "allowlist",
-            "allowUsers": [
-              "U_SUPPORT_LEAD"
-            ],
-            "blockUsers": [],
-            "timezone": "Asia/Ho_Chi_Minh"
-          }
-        }
+        "groupPolicy": "allowlist",
+        "directMessages": {},
+        "groups": {}
       }
     },
     "telegram": {
       "defaults": {
-        "enabled": true,
+        "enabled": false,
         "defaultBotId": "default",
         "mode": "polling",
         "allowBots": false,
-        "groupPolicy": "disabled",
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
         "agentPrompt": {
           "enabled": true,
           "maxProgressMessages": 3,
           "requireFinalResponse": true
         },
+        "directMessages": {
+          "*": {
+            "enabled": true,
+            "requireMention": false,
+            "policy": "pairing",
+            "allowUsers": [],
+            "blockUsers": [],
+            "allowBots": false
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "requireMention": true,
+            "policy": "open",
+            "allowUsers": [],
+            "blockUsers": [],
+            "allowBots": false,
+            "topics": {}
+          }
+        },
         "commandPrefixes": {
           "slash": [
             "::",
@@ -443,17 +251,6 @@
         "followUp": {
           "mode": "auto",
           "participationTtlMin": 5
-        },
-        "timezone": "UTC",
-        "directMessages": {
-          "dm:*": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "pairing",
-            "allowUsers": [],
-            "blockUsers": [],
-            "allowBots": false
-          }
         },
         "polling": {
           "timeoutSeconds": 20,
@@ -461,210 +258,12 @@
         }
       },
       "default": {
-        "enabled": true,
+        "enabled": false,
         "name": "default",
-        "agentId": "default",
         "botToken": "${TELEGRAM_BOT_TOKEN}",
-        "groupPolicy": "disabled",
-        "allowBots": false,
-        "commandPrefixes": {
-          "slash": [
-            "::",
-            "\\"
-          ],
-          "bash": [
-            "!"
-          ]
-        },
-        "response": "final",
-        "responseMode": "message-tool",
-        "additionalMessageMode": "steer",
-        "surfaceNotifications": {
-          "queueStart": "brief",
-          "loopStart": "brief"
-        },
-        "verbose": "minimal",
-        "followUp": {
-          "mode": "auto",
-          "participationTtlMin": 5
-        },
-        "timezone": "UTC",
-        "directMessages": {
-          "*": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "pairing",
-            "allowUsers": [],
-            "blockUsers": [],
-            "allowBots": false,
-            "agentId": "default",
-            "commandPrefixes": {
-              "slash": [
-                "::",
-                "\\"
-              ],
-              "bash": [
-                "!"
-              ]
-            },
-            "streaming": "off",
-            "response": "final",
-            "responseMode": "message-tool",
-            "additionalMessageMode": "steer",
-            "surfaceNotifications": {
-              "queueStart": "brief",
-              "loopStart": "brief"
-            },
-            "verbose": "minimal",
-            "followUp": {
-              "mode": "auto",
-              "participationTtlMin": 5
-            }
-          },
-          "dm:1276408333": {
-            "agentId": "default"
-          }
-        },
-        "groups": {
-          "dm:*": {
-            "enabled": true,
-            "requireMention": true,
-            "policy": "disabled",
-            "allowUsers": [],
-            "blockUsers": [],
-            "allowBots": false
-          },
-          "-1003455688247": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "open",
-            "allowUsers": [
-              "*"
-            ],
-            "blockUsers": [],
-            "allowBots": false,
-            "response": "all",
-            "surfaceNotifications": {
-              "queueStart": "full",
-              "loopStart": "brief"
-            },
-            "topics": {
-              "1207": {
-                "enabled": true,
-                "streaming": "all",
-                "agentId": "claude",
-                "policy": "open",
-                "allowUsers": [
-                  "*"
-                ],
-                "blockUsers": [],
-                "allowBots": false,
-                "response": "all",
-                "additionalMessageMode": "queue"
-              },
-              "2201": {
-                "enabled": true,
-                "requireMention": true,
-                "agentId": "reviewer",
-                "policy": "allowlist",
-                "allowUsers": [
-                  "1276408333",
-                  "555000111"
-                ],
-                "blockUsers": [
-                  "999999999"
-                ],
-                "responseMode": "capture-pane",
-                "verbose": "off",
-                "timezone": "Asia/Ho_Chi_Minh"
-              }
-            }
-          },
-          "-1003987654321": {
-            "enabled": true,
-            "requireMention": true,
-            "agentId": "claude",
-            "policy": "open",
-            "allowUsers": [
-              "*"
-            ],
-            "blockUsers": [],
-            "allowBots": false,
-            "followUp": {
-              "mode": "mention-only",
-              "participationTtlMin": 15
-            },
-            "topics": {}
-          }
-        }
-      },
-      "support": {
-        "enabled": true,
-        "name": "support",
-        "agentId": "reviewer",
-        "credentialType": "tokenFile",
-        "tokenFile": "~/.clisbot/credentials/telegram/support.bot-token",
-        "groupPolicy": "disabled",
-        "allowBots": false,
-        "commandPrefixes": {
-          "slash": [
-            "::",
-            "\\",
-            "/support"
-          ],
-          "bash": [
-            "!"
-          ]
-        },
-        "streaming": "off",
-        "response": "final",
-        "responseMode": "message-tool",
-        "additionalMessageMode": "steer",
-        "surfaceNotifications": {
-          "queueStart": "brief",
-          "loopStart": "brief"
-        },
-        "verbose": "minimal",
-        "followUp": {
-          "mode": "mention-only",
-          "participationTtlMin": 15
-        },
-        "timezone": "Asia/Ho_Chi_Minh",
-        "directMessages": {
-          "*": {
-            "enabled": true,
-            "requireMention": false,
-            "policy": "allowlist",
-            "allowUsers": [
-              "1276408333",
-              "555000111"
-            ],
-            "blockUsers": [
-              "999999999"
-            ],
-            "allowBots": false,
-            "agentId": "reviewer",
-            "streaming": "off",
-            "response": "final",
-            "responseMode": "message-tool",
-            "additionalMessageMode": "steer",
-            "surfaceNotifications": {
-              "queueStart": "brief",
-              "loopStart": "brief"
-            },
-            "verbose": "minimal",
-            "followUp": {
-              "mode": "paused",
-              "participationTtlMin": 15
-            }
-          },
-          "dm:1276408333": {
-            "agentId": "reviewer"
-          },
-          "dm:555000111": {
-            "agentId": "reviewer"
-          }
-        },
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
+        "directMessages": {},
         "groups": {}
       }
     }
@@ -672,18 +271,59 @@
   "agents": {
     "defaults": {
       "defaultAgentId": "default",
-      "workspace": "~/.clisbot/workspaces/{agentId}",
+      "workspace": "~/.clisbot-dev/workspaces/{agentId}",
       "cli": "codex",
       "bootstrap": {
-        "botType": "team-assistant"
+        "botType": "personal-assistant"
+      },
+      "auth": {
+        "defaultRole": "member",
+        "roles": {
+          "admin": {
+            "allow": [
+              "sendMessage",
+              "helpView",
+              "statusView",
+              "identityView",
+              "transcriptView",
+              "runObserve",
+              "runInterrupt",
+              "streamingManage",
+              "queueManage",
+              "steerManage",
+              "loopManage",
+              "shellExecute",
+              "runNudge",
+              "followupManage",
+              "responseModeManage",
+              "additionalMessageModeManage"
+            ],
+            "users": []
+          },
+          "member": {
+            "allow": [
+              "sendMessage",
+              "helpView",
+              "statusView",
+              "identityView",
+              "transcriptView",
+              "runObserve",
+              "runInterrupt",
+              "streamingManage",
+              "queueManage",
+              "steerManage",
+              "loopManage"
+            ],
+            "users": []
+          }
+        }
       },
       "runner": {
         "defaults": {
           "tmux": {
-            "socketPath": "~/.clisbot/state/clisbot.sock"
+            "socketPath": "~/.clisbot-dev/state/clisbot.sock"
           },
           "trustWorkspace": true,
-          "startupDelayMs": 3000,
           "startupRetryCount": 2,
           "startupRetryDelayMs": 1000,
           "promptSubmitDelayMs": 150,
@@ -748,7 +388,11 @@
               ]
             },
             "capture": {
-              "mode": "off"
+              "mode": "off",
+              "statusCommand": "/status",
+              "pattern": "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+              "timeoutMs": 5000,
+              "pollIntervalMs": 250
             },
             "resume": {
               "mode": "command",
@@ -804,72 +448,8 @@
             }
           }
         }
-      },
-      "auth": {
-        "defaultRole": "member",
-        "roles": {
-          "admin": {
-            "allow": [
-              "sendMessage",
-              "helpView",
-              "statusView",
-              "identityView",
-              "transcriptView",
-              "runObserve",
-              "runInterrupt",
-              "streamingManage",
-              "queueManage",
-              "steerManage",
-              "loopManage",
-              "shellExecute",
-              "runNudge",
-              "followUpManage",
-              "responseModeManage",
-              "additionalMessageModeManage"
-            ],
-            "users": []
-          },
-          "member": {
-            "allow": [
-              "sendMessage",
-              "helpView",
-              "statusView",
-              "identityView",
-              "transcriptView",
-              "runObserve",
-              "runInterrupt",
-              "streamingManage",
-              "queueManage",
-              "steerManage",
-              "loopManage"
-            ],
-            "users": []
-          }
-        }
       }
     },
-    "list": [
-      {
-        "id": "default"
-      },
-      {
-        "id": "claude",
-        "cli": "claude"
-      },
-      {
-        "id": "gemini",
-        "cli": "gemini"
-      },
-      {
-        "id": "reviewer",
-        "runner": {
-          "defaults": {
-            "stream": {
-              "maxRuntimeMin": 45
-            }
-          }
-        }
-      }
-    ]
+    "list": []
   }
 }

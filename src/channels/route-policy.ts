@@ -4,10 +4,13 @@ import { resolveConfigDurationMs } from "../config/duration.ts";
 import { getAgentEntry, type LoadedConfig } from "../config/load-config.ts";
 import type { SurfaceNotificationsConfig } from "./surface-notifications.ts";
 
-export type SharedChannelRoute = {
+export type SurfaceRoute = {
   agentId: string;
+  policy: "open" | "allowlist";
   requireMention: boolean;
   allowBots: boolean;
+  allowUsers?: string[];
+  blockUsers?: string[];
   commandPrefixes: CommandPrefixes;
   streaming: "off" | "latest" | "all";
   response: "all" | "final";
@@ -17,14 +20,19 @@ export type SharedChannelRoute = {
   verbose: "off" | "minimal";
   followUp: FollowUpConfig;
   timezone?: string;
+  botTimezone?: string;
 };
 
-export type SharedChannelRouteOverride = {
+export type ResolvedSurfaceRouteStatus = "admitted" | "disabled" | "missing";
+
+export type SurfaceRouteOverride = {
   enabled?: boolean;
   policy?: "open" | "pairing" | "allowlist" | "disabled";
   agentId?: string;
   requireMention?: boolean;
   allowBots?: boolean;
+  allowUsers?: string[];
+  blockUsers?: string[];
   commandPrefixes?: Partial<CommandPrefixes>;
   streaming?: "off" | "latest" | "all";
   response?: "all" | "final";
@@ -40,7 +48,7 @@ export type SharedChannelRouteOverride = {
   timezone?: string;
 };
 
-type SharedChannelConfig = {
+type SurfaceRouteConfig = {
   agentId?: string;
   allowBots: boolean;
   commandPrefixes: CommandPrefixes;
@@ -58,15 +66,46 @@ type SharedChannelConfig = {
   timezone?: string;
 };
 
-type BuildSharedChannelRouteParams = {
+type BuildSurfaceRouteParams = {
   loadedConfig: LoadedConfig;
   channel: "slack" | "telegram";
-  channelConfig: SharedChannelConfig;
-  route?: SharedChannelRouteOverride | null;
+  channelConfig: SurfaceRouteConfig;
+  route?: SurfaceRouteOverride | null;
+  policy: "open" | "allowlist";
   requireMention: boolean;
 };
 
-export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): SharedChannelRoute {
+function mergeRouteAudienceEntries(...sources: Array<string[] | undefined>) {
+  return [...new Set(
+    sources.flatMap((source) =>
+      (source ?? []).map((entry) => entry.trim()).filter(Boolean),
+    ),
+  )];
+}
+
+export function mergeSurfaceRouteOverride<
+  TRoute extends SurfaceRouteOverride,
+>(
+  base: TRoute | undefined | null,
+  override: TRoute | undefined | null,
+) {
+  if (!base) {
+    return override ?? undefined;
+  }
+
+  if (!override) {
+    return base;
+  }
+
+  return {
+    ...base,
+    ...override,
+    allowUsers: mergeRouteAudienceEntries(base.allowUsers, override.allowUsers),
+    blockUsers: mergeRouteAudienceEntries(base.blockUsers, override.blockUsers),
+  } satisfies TRoute;
+}
+
+export function buildSurfaceRoute(params: BuildSurfaceRouteParams): SurfaceRoute {
   const agentId =
     params.route?.agentId ??
     params.channelConfig.agentId ??
@@ -75,8 +114,11 @@ export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): 
 
   return {
     agentId,
+    policy: params.route?.policy === "open" ? "open" : params.policy,
     requireMention: params.route?.requireMention ?? params.requireMention,
     allowBots: params.route?.allowBots ?? params.channelConfig.allowBots,
+    allowUsers: [...(params.route?.allowUsers ?? [])],
+    blockUsers: [...(params.route?.blockUsers ?? [])],
     commandPrefixes: {
       slash: params.route?.commandPrefixes?.slash ?? params.channelConfig.commandPrefixes.slash,
       bash: params.route?.commandPrefixes?.bash ?? params.channelConfig.commandPrefixes.bash,
@@ -114,6 +156,17 @@ export function buildSharedChannelRoute(params: BuildSharedChannelRouteParams): 
         defaultMinutes: 5,
       }),
     },
-    timezone: params.route?.timezone ?? params.channelConfig.timezone,
+    timezone: params.route?.timezone,
+    botTimezone: params.channelConfig.timezone,
   };
+}
+
+export function isSurfaceRouteEnabled(
+  route: SurfaceRouteOverride | undefined | null,
+) {
+  return !!route && route.enabled !== false && route.policy !== "disabled";
+}
+
+export function renderGroupRouteAccessDeniedMessage() {
+  return "You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to `allowUsers` for this surface.";
 }
