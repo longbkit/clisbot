@@ -273,7 +273,6 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
                 socketPath: tmuxSocketPath,
               },
               trustWorkspace: true,
-              startupDelayMs: 3000,
               startupRetryCount: 2,
               startupRetryDelayMs: 1000,
               promptSubmitDelayMs: 150,

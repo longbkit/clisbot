@@ -748,7 +748,7 @@ export class SessionService {
 
       await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("fresh-attempt"));
       try {
-        await this.runnerSessions.startFreshSession(target, params.timingContext);
+        await this.runnerSessions.restartRunnerWithFreshSessionId(target, params.timingContext);
       } catch (freshError) {
         await this.failActiveRun(
           sessionKey,

@@ -23,6 +23,9 @@ const defaultOwnedRunnerFields: Partial<Record<AgentCliToolId, string[]>> = {
     "promptSubmitDelayMs",
   ],
 };
+const defaultOwnedRunnerDefaultFields: Record<string, unknown> = {
+  startupDelayMs: 3000,
+};
 
 function isRecord(value: unknown): value is MutableRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -109,6 +112,18 @@ function pruneRunnerDefaults(config: MutableRecord, forceRunnerStartupDefaults: 
   const runner = nestedRecord(config, ["agents", "defaults", "runner"]);
   if (!runner) {
     return;
+  }
+  const runnerDefaults = runner.defaults;
+  if (isRecord(runnerDefaults)) {
+    for (const [field, defaultValue] of Object.entries(defaultOwnedRunnerDefaultFields)) {
+      if (
+        forceRunnerStartupDefaults ||
+        (Object.hasOwn(runnerDefaults, field) &&
+          areJsonEqual(runnerDefaults[field], defaultValue))
+      ) {
+        delete runnerDefaults[field];
+      }
+    }
   }
   for (const toolId of ["codex", "gemini"] as const) {
     const target = runner[toolId];

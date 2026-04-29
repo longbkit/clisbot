@@ -189,7 +189,7 @@ Implemented
 - the runner detects that the live tmux session is missing
 - the runner creates a new tmux session for the same `sessionKey`
 - the runner uses the stored tool `sessionId` to resume the prior conversation instead of starting from scratch
-- if the backend rejects or loses that stored `sessionId`, clisbot preserves the mapping and fails truthfully instead of silently creating a new conversation; operators can use `/new` to rotate the native CLI conversation intentionally
+- if the backend rejects or loses that stored `sessionId`, clisbot preserves the mapping and fails truthfully instead of silently creating a new conversation; operators can use `/new` to trigger a new runner conversation intentionally
 
 ## Test Case 7A: tmux Runner Can Capture A Runner-Generated Session Id
 

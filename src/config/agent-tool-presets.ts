@@ -39,6 +39,7 @@ export type AgentToolTemplate = {
 
 const SESSION_ID_PATTERN =
   "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
+export const INTERACTIVE_CLI_STARTUP_DELAY_MS = 15_000;
 
 export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTemplate> = {
   codex: {
@@ -48,7 +49,7 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
       "--no-alt-screen",
     ],
     trustWorkspace: true,
-    startupDelayMs: 3000,
+    startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
     startupRetryCount: 2,
     startupRetryDelayMs: 1000,
     startupReadyPattern: "(?:^|\\s)›\\s",
@@ -82,7 +83,7 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
     command: "claude",
     startupOptions: ["--dangerously-skip-permissions"],
     trustWorkspace: true,
-    startupDelayMs: 3000,
+    startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
     startupRetryCount: 2,
     startupRetryDelayMs: 1000,
     promptSubmitDelayMs: 150,
@@ -112,7 +113,7 @@ export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTempl
     command: "gemini",
     startupOptions: ["--approval-mode=yolo", "--sandbox=false"],
     trustWorkspace: true,
-    startupDelayMs: 15_000,
+    startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
     startupRetryCount: 2,
     startupRetryDelayMs: 1000,
     startupReadyPattern: "Type your message or @path/to/file",

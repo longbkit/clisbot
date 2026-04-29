@@ -51,6 +51,7 @@ const TMUX_TRANSIENT_TARGET_PATTERN =
   /(?:no current target|can't find pane|can't find window|no such pane|no such window|tmux pane state unavailable)/i;
 const SESSION_READY_CAPTURE_RETRY_COUNT = 5;
 const SESSION_READY_CAPTURE_RETRY_DELAY_MS = 100;
+const TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT = 3;
 const SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS = 15_000;
 
 type SessionErrorAction =
@@ -654,7 +655,10 @@ export class RunnerService {
     return this.ensureRunnerReady(target, { allowFreshRetryBeforePrompt: false, timingContext });
   }
 
-  async startFreshSession(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
+  async restartRunnerWithFreshSessionId(
+    target: AgentSessionTarget,
+    timingContext?: LatencyDebugContext,
+  ) {
     const resolved = this.resolveTarget(target);
     await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
     console.log(
@@ -667,12 +671,12 @@ export class RunnerService {
     });
   }
 
-  async startNewNativeSession(target: AgentSessionTarget) {
+  async triggerNewSession(target: AgentSessionTarget) {
     const resolved = this.resolveTarget(target);
     if (!(await this.tmux.hasSession(resolved.sessionName))) {
-      return this.startFreshNativeSessionForNewCommand(target);
+      return this.restartRunnerWithFreshSessionIdForNewCommand(target);
     }
-    return this.rotateLiveNativeSession(resolved);
+    return this.triggerNewSessionInLiveRunner(resolved);
   }
 
   async restartRunnerPreservingSessionId(
@@ -687,14 +691,19 @@ export class RunnerService {
     });
   }
 
-  private async rotateLiveNativeSession(resolved: ResolvedAgentTarget) {
-    const command = this.resolveNativeNewSessionCommand(resolved);
-    await this.submitNativeNewSessionCommand(resolved, command);
-    const sessionId = await this.captureSessionIdentity(resolved, {
-      forceStatusCommand: true,
-    });
+  private async triggerNewSessionInLiveRunner(resolved: ResolvedAgentTarget) {
+    const oldSessionId = (await this.sessionState.getEntry(resolved.sessionKey))?.sessionId;
+    const command = this.resolveNewSessionCommand(resolved);
+    let sessionId: string | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await this.submitNewSessionCommand(resolved, command);
+      sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
+      if (sessionId) {
+        break;
+      }
+    }
     if (!sessionId) {
-      await this.clearSessionIdAfterNativeNewFailure(resolved, command);
+      await this.clearSessionIdAfterNewSessionFailure(resolved, command);
     }
     await this.sessionState.touchSessionEntry(resolved, {
       sessionId,
@@ -714,8 +723,8 @@ export class RunnerService {
     };
   }
 
-  private async startFreshNativeSessionForNewCommand(target: AgentSessionTarget) {
-    const { resolved } = await this.startFreshSession(target);
+  private async restartRunnerWithFreshSessionIdForNewCommand(target: AgentSessionTarget) {
+    const { resolved } = await this.restartRunnerWithFreshSessionId(target);
     const entry = await this.sessionState.getEntry(resolved.sessionKey);
     return {
       agentId: resolved.agentId,
@@ -728,7 +737,7 @@ export class RunnerService {
     };
   }
 
-  private async submitNativeNewSessionCommand(
+  private async submitNewSessionCommand(
     resolved: ResolvedAgentTarget,
     command: string,
   ) {
@@ -741,7 +750,25 @@ export class RunnerService {
     });
   }
 
-  private async clearSessionIdAfterNativeNewFailure(
+  private async captureNewSessionIdentityAfterTrigger(
+    resolved: ResolvedAgentTarget,
+    oldSessionId?: string,
+  ) {
+    for (let attempt = 0; attempt < TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT; attempt += 1) {
+      const sessionId = await this.captureSessionIdentity(resolved, {
+        forceStatusCommand: true,
+      });
+      if (sessionId && sessionId !== oldSessionId) {
+        return sessionId;
+      }
+      if (attempt < TRIGGER_NEW_SESSION_CAPTURE_RETRY_COUNT - 1) {
+        await sleep(SESSION_READY_CAPTURE_RETRY_DELAY_MS);
+      }
+    }
+    return null;
+  }
+
+  private async clearSessionIdAfterNewSessionFailure(
     resolved: ResolvedAgentTarget,
     command: string,
   ): Promise<never> {
@@ -752,7 +779,7 @@ export class RunnerService {
       runnerCommand: resolved.runner.command,
     });
     throw new Error(
-      `Native ${command} completed, but clisbot could not capture a new session id from /status.`,
+      `${command} completed, but clisbot could not capture a new session id from the runner status command.`,
     );
   }
 
@@ -763,7 +790,7 @@ export class RunnerService {
     });
   }
 
-  private resolveNativeNewSessionCommand(resolved: ResolvedAgentTarget) {
+  private resolveNewSessionCommand(resolved: ResolvedAgentTarget) {
     return resolved.runner.command.toLowerCase().includes("gemini") ? "/clear" : "/new";
   }
 

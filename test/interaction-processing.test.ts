@@ -3266,14 +3266,14 @@ describe("processChannelInteraction agent prompt text", () => {
     expect(posted[0]).toBe("No active or resumable session to nudge for agent `default`.");
   });
 
-  test("new rotates native session id for the current session", async () => {
+  test("new triggers a new runner conversation for the current session", async () => {
     const posted: string[] = [];
     let rotatedTarget = "";
 
     await processChannelInteraction({
       agentService: {
         isSessionBusy: async () => false,
-        startNewNativeSession: async (target: AgentSessionTarget) => {
+        triggerNewSession: async (target: AgentSessionTarget) => {
           rotatedTarget = target.sessionKey;
           return {
             agentId: target.agentId,
@@ -3303,9 +3303,9 @@ describe("processChannelInteraction agent prompt text", () => {
     });
 
     expect(rotatedTarget).toBe(createTarget().sessionKey);
-    expect(posted[0]).toContain("Started a new native CLI conversation");
+    expect(posted[0]).toContain("Triggered a new runner conversation");
     expect(posted[0]).toContain("storedSessionId: `11111111-1111-1111-1111-111111111111`");
-    expect(posted[0]).toContain("nativeCommand: `/new`");
+    expect(posted[0]).toContain("triggerCommand: `/new`");
   });
 
   test("new rejects while the session is busy", async () => {
@@ -3315,7 +3315,7 @@ describe("processChannelInteraction agent prompt text", () => {
     await processChannelInteraction({
       agentService: {
         isSessionBusy: async () => true,
-        startNewNativeSession: async () => {
+        triggerNewSession: async () => {
           rotated = true;
         },
         recordConversationReply: async () => undefined,

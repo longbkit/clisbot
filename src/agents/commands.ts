@@ -568,7 +568,7 @@ export function renderAgentControlSlashHelp() {
     "- `/detach`: stop live updates for this thread while still posting the final result here",
     "- `/watch every 30s [for 10m]`: post the latest state on an interval until the run settles or the watch window ends",
     "- `/stop`: send Escape to interrupt the current conversation session",
-    "- `/new`: start a new native CLI conversation for this routed session and store the new session id",
+    "- `/new`: trigger a new runner conversation for this routed session and store the new session id",
     "- `/nudge`: send one extra Enter to the current tmux session without resending the prompt text",
     "- `/followup status`: show the current conversation follow-up policy",
     "- `/followup auto`: allow natural follow-up after the bot has replied in-thread",

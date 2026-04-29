@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidLoopTimezone } from "../agents/loop-command.ts";
 import {
+  INTERACTIVE_CLI_STARTUP_DELAY_MS,
   SUPPORTED_AGENT_CLI_TOOLS,
   SUPPORTED_BOOTSTRAP_MODES,
 } from "./agent-tool-presets.ts";
@@ -637,6 +638,7 @@ const agentsDefaultsSchema = z.object({
         "-C",
         "{workspace}",
       ],
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
       startupReadyPattern: codexStartupReadyPattern,
       sessionId: {
         create: {
@@ -666,6 +668,7 @@ const agentsDefaultsSchema = z.object({
     claude: runnerFamilySchema.default({
       command: "claude",
       args: ["--dangerously-skip-permissions"],
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
       sessionId: {
         create: {
           mode: "explicit",
@@ -687,7 +690,7 @@ const agentsDefaultsSchema = z.object({
     gemini: runnerFamilySchema.default({
       command: "gemini",
       args: ["--approval-mode=yolo", "--sandbox=false"],
-      startupDelayMs: 15000,
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
       startupRetryCount: 2,
       startupRetryDelayMs: 1000,
       startupReadyPattern: "Type your message or @path/to/file",
@@ -1092,6 +1095,7 @@ export const clisbotConfigSchema = z.object({
             "-C",
             "{workspace}",
           ],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupReadyPattern: codexStartupReadyPattern,
           sessionId: {
             create: {
@@ -1121,6 +1125,7 @@ export const clisbotConfigSchema = z.object({
         claude: {
           command: "claude",
           args: ["--dangerously-skip-permissions"],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           sessionId: {
             create: {
               mode: "explicit",
@@ -1142,7 +1147,7 @@ export const clisbotConfigSchema = z.object({
         gemini: {
           command: "gemini",
           args: ["--approval-mode=yolo", "--sandbox=false"],
-          startupDelayMs: 15000,
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupRetryCount: 2,
           startupRetryDelayMs: 1000,
           startupReadyPattern: "Type your message or @path/to/file",
@@ -1223,6 +1228,7 @@ export const clisbotConfigSchema = z.object({
             "-C",
             "{workspace}",
           ],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupReadyPattern: codexStartupReadyPattern,
           sessionId: {
             create: {
@@ -1252,6 +1258,7 @@ export const clisbotConfigSchema = z.object({
         claude: {
           command: "claude",
           args: ["--dangerously-skip-permissions"],
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           sessionId: {
             create: {
               mode: "explicit",
@@ -1273,7 +1280,7 @@ export const clisbotConfigSchema = z.object({
         gemini: {
           command: "gemini",
           args: ["--approval-mode=yolo", "--sandbox=false"],
-          startupDelayMs: 15000,
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupRetryCount: 2,
           startupRetryDelayMs: 1000,
           startupReadyPattern: "Type your message or @path/to/file",

@@ -269,8 +269,8 @@ export class AgentService {
     return this.runnerSessions.nudgeSession(target);
   }
 
-  async startNewNativeSession(target: AgentSessionTarget) {
-    return this.runnerSessions.startNewNativeSession(target);
+  async triggerNewSession(target: AgentSessionTarget) {
+    return this.runnerSessions.triggerNewSession(target);
   }
 
   async getConversationFollowUpState(target: AgentSessionTarget) {

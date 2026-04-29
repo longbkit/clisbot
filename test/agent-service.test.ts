@@ -519,6 +519,7 @@ function buildConfig(params: {
     ...config.agents.defaults.runner[cli],
     command: params.runnerCommand,
     args: params.runnerArgs,
+    ...(params.startupDelayMs !== undefined ? { startupDelayMs: params.startupDelayMs } : {}),
     startupReadyPattern: params.startupReadyPattern,
     ...(params.sessionId ? { sessionId: params.sessionId } : {}),
   };
@@ -610,7 +611,7 @@ describe("AgentService session identity", () => {
     }
   });
 
-  test("new native session command rotates and stores the captured session id", async () => {
+  test("new session command triggers the runner and stores the captured session id", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -665,7 +666,7 @@ describe("AgentService session identity", () => {
       }).result;
       expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
 
-      const rotated = await service.startNewNativeSession(target);
+      const rotated = await service.triggerNewSession(target);
 
       expect(rotated.command).toBe("/new");
       expect(rotated.sessionId).toBe(ROTATED_RUNNER_ID);
@@ -675,7 +676,73 @@ describe("AgentService session identity", () => {
     }
   });
 
-  test("new native session command uses clear for Gemini", async () => {
+  test("new session command retries when the first trigger does not rotate the session id", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c1:thread:new-retry",
+      };
+      const sessionName = "agent-default-slack-channel-c1-thread-new-retry";
+
+      await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+      fakeTmux.ignoreNextEnter(sessionName);
+
+      const rotated = await service.triggerNewSession(target);
+
+      expect(rotated.command).toBe("/new");
+      expect(rotated.sessionId).toBe(ROTATED_RUNNER_ID);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(ROTATED_RUNNER_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("new session command uses clear for Gemini", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -730,7 +797,7 @@ describe("AgentService session identity", () => {
         onUpdate: () => undefined,
       }).result;
 
-      const rotated = await service.startNewNativeSession(target);
+      const rotated = await service.triggerNewSession(target);
 
       expect(rotated.command).toBe("/clear");
       expect(rotated.sessionId).toBe(ROTATED_RUNNER_ID);
@@ -1636,6 +1703,7 @@ describe("AgentService session identity", () => {
       );
       const loaded = await loadConfig(configPath);
       loaded.raw.agents.defaults.runner.defaults.startupDelayMs = 50;
+      loaded.raw.agents.defaults.runner.codex.startupDelayMs = 50;
       loaded.raw.agents.defaults.runner.codex.startupReadyPattern =
         "Type your message or @path/to/file";
       const tmux = new FakeTmuxClient();
@@ -3544,7 +3612,7 @@ describe("AgentService session identity", () => {
 
       expect(receivedError).toBeInstanceOf(Error);
       expect((receivedError as Error).message).toBe(
-        "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to rotate the native CLI conversation, then resend the prompt.",
+        "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to trigger a new runner conversation, then resend the prompt.",
       );
       expect(fakeTmux.sessionCommands[1]).toContain(`resume ${RUNNER_GENERATED_ID}`);
       expect(fakeTmux.sessionCommands).toHaveLength(2);

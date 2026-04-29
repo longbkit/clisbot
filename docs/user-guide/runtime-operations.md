@@ -271,7 +271,7 @@ Important rule:
 - stale cleanup kills the live tmux session only
 - it does not delete the stored `sessionKey -> sessionId` mapping in `~/.clisbot/state/sessions.json`
 - automatic startup retry, prompt-delivery retry, and same-context recovery also preserve the stored mapping; if the native session id cannot be resumed, clisbot fails truthfully instead of silently creating a new conversation
-- use chat `/new` when you intentionally want to rotate the native CLI conversation for the same routed session; Codex and Claude receive `/new`, Gemini receives `/clear`, and clisbot then runs `/status` to capture the new `sessionId`
+- use chat `/new` when you intentionally want to trigger a new runner conversation for the same routed session; Codex and Claude receive `/new`, Gemini receives `/clear`, and clisbot then runs `/status` to capture the new `sessionId`
 - the next message on the same conversation can recreate tmux and resume the prior AI CLI session when the runner supports resume
 - idle is determined from clisbot session activity, not from tmux CPU or pane movement directly
 - the cleanup loop skips sessions that are currently busy in the clisbot queue

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
 import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
+import { INTERACTIVE_CLI_STARTUP_DELAY_MS } from "../src/config/agent-tool-presets.ts";
 import { readEditableConfig } from "../src/config/config-file.ts";
 import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
 import { resolveSlackBotConfig } from "../src/config/channel-bots.ts";
@@ -385,6 +386,7 @@ describe("loadConfig", () => {
     const config = buildTemplateConfig();
 
     config.meta.schemaVersion = "0.1.44";
+    config.agents.defaults.runner.defaults.startupDelayMs = 12345;
     config.app.control.runtimeMonitor.restartBackoff = {
       fastRetry: {
         delaySeconds: 10,
@@ -421,6 +423,7 @@ describe("loadConfig", () => {
     const resolvedDefaultAgent = new AgentService(loaded).getResolvedAgentConfig("default");
 
     expect(rewrittenConfig.app.control.runtimeMonitor.restartBackoff).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.codex.startupReadyPattern).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.gemini.startupDelayMs).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.gemini.startupRetryCount).toBeUndefined();
@@ -429,6 +432,29 @@ describe("loadConfig", () => {
     expect(rewrittenConfig.agents.defaults.runner.gemini.startupBlockers).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.gemini.promptSubmitDelayMs).toBeUndefined();
     expect(resolvedDefaultAgent.runner.startupReadyPattern).toBe("(?:^|\\s)›\\s");
+    expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
+  });
+
+  test("clears stale current-schema shared startup defaults on load", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.meta.schemaVersion = "0.1.45";
+    config.agents.defaults.runner.defaults.startupDelayMs = 3000;
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const backups = readdirSync(join(tempDir, "backups"));
+    const resolvedDefaultAgent = new AgentService(loaded).getResolvedAgentConfig("default");
+
+    expect(rewrittenConfig.meta.schemaVersion).toBe("0.1.45");
+    expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
+    expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
+    expect(backups).toHaveLength(1);
+    expect(backups[0]).toContain("clisbot.json.0.1.45.");
   });
 
   test("preserves current-schema disabled wildcard sender policy", async () => {

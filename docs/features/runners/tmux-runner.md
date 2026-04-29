@@ -211,7 +211,7 @@ Current clisbot behavior is narrower than the full ideal:
 
 - if a stored `sessionId` exists and `resume.mode` is configured, the runner uses that resume command
 - if `create.mode` is `explicit`, the runner relaunches with the same explicit session id
-- if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot preserves the continuity entry and fails truthfully; operators can use `/new` to intentionally rotate the native CLI conversation
+- if a stored `sessionId` cannot be brought back for the current `sessionKey`, clisbot preserves the continuity entry and fails truthfully; operators can use `/new` to intentionally trigger a new runner conversation
 - if session-id capture never completes, the session can still run, but restart falls back to a fresh tool conversation
 - if the first routed prompt right after status-command capture never lands truthfully, clisbot retries paste in place first, then restarts the runner while preserving the stored session id before surfacing failure
 
