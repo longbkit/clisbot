@@ -60,6 +60,44 @@ describe("TmuxClient", () => {
     await client.killSession("cold-start-test");
   }, 10000);
 
+  test("targets exact session names instead of tmux prefix matches", async () => {
+    socketDir = mkdtempSync(join(tmpdir(), "clisbot-socket-"));
+    const socketPath = join(socketDir, "clisbot.sock");
+    const client = new TmuxClient(socketPath);
+    const exactSessionName = "agent-default-telegram-group-1003455688247-topic-1";
+    const foreignSessionName = "agent-default-telegram-group-1003455688247-topic-1207";
+
+    await client.newSession({
+      sessionName: foreignSessionName,
+      cwd: socketDir,
+      command: "cat",
+    });
+
+    expect(await client.hasSession(exactSessionName)).toBe(false);
+
+    await client.newSession({
+      sessionName: exactSessionName,
+      cwd: socketDir,
+      command: "cat",
+    });
+
+    await client.sendLiteral(exactSessionName, "exact-session-only");
+    await Bun.sleep(100);
+    await client.sendKey(exactSessionName, "Enter");
+    await Bun.sleep(300);
+
+    const exactPane = await client.capturePane(exactSessionName, 20);
+    const foreignPane = await client.capturePane(foreignSessionName, 20);
+    expect(exactPane).toContain("exact-session-only");
+    expect(foreignPane).not.toContain("exact-session-only");
+
+    await client.killSession(exactSessionName);
+    expect(await client.hasSession(exactSessionName)).toBe(false);
+    expect(await client.hasSession(foreignSessionName)).toBe(true);
+
+    await client.killSession(foreignSessionName);
+  }, 10000);
+
   test("creates a transient window and captures its pane output", async () => {
     socketDir = mkdtempSync(join(tmpdir(), "clisbot-socket-"));
     const socketPath = join(socketDir, "clisbot.sock");

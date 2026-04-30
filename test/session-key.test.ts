@@ -84,8 +84,31 @@ describe("session key routing", () => {
       mainKey: "main",
     });
 
-    expect(sessionName).toBe("agent-default-slack-channel-c123-thread-1775291908-430139");
+    expect(sessionName).toMatch(
+      /^agent-default-slack-channel-c123-thread-1775291908-430139-[0-9a-f]{8}$/,
+    );
     expect(sessionName).not.toContain(":");
     expect(sessionName).not.toContain(".");
+  });
+
+  test("keeps tmux session names unique when different session keys normalize to the same base name", () => {
+    const first = buildTmuxSessionName({
+      template: "{sessionKey}",
+      agentId: "default",
+      workspacePath: "/tmp/workspace/default",
+      sessionKey: "agent:default:telegram:group:qa/a",
+      mainKey: "main",
+    });
+    const second = buildTmuxSessionName({
+      template: "{sessionKey}",
+      agentId: "default",
+      workspacePath: "/tmp/workspace/default",
+      sessionKey: "agent:default:telegram:group:qa-a",
+      mainKey: "main",
+    });
+
+    expect(first).not.toBe(second);
+    expect(first).toMatch(/^agent-default-telegram-group-qa-a-[0-9a-f]{8}$/);
+    expect(second).toMatch(/^agent-default-telegram-group-qa-a-[0-9a-f]{8}$/);
   });
 });

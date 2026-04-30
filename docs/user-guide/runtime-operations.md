@@ -256,7 +256,7 @@ clisbot inspect --index 1
 ```
 
 ```bash
-tmux -S ~/.clisbot/state/clisbot.sock attach -t agent-default-main
+tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>
 ```
 
 - if Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment

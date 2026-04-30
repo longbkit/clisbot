@@ -81,6 +81,12 @@ staged for the next release.
 - Fixed existing tmux session reuse when the stored `sessionId` is missing:
   clisbot now captures the runner conversation id before submitting the next
   prompt instead of keeping the session entry permanently non-resumable.
+- Fixed tmux session targeting to use exact session-name matches instead of
+  tmux prefix matching, so a routed surface with no stored `sessionId` cannot
+  silently reuse a foreign live runner whose name shares the same prefix.
+- Changed tmux session naming from plain normalized text to a readable prefix
+  plus a stable short `sessionKey` hash, so two logical sessions can no longer
+  collapse onto the same exact tmux runner name after normalization.
 - Fixed `clisbot restart` recovery for the case where `stop` reports a timeout
   but `status` already shows the service is stopped; restart now continues into
   `start` and prints the stop warning instead of leaving the service down.

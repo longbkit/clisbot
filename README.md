@@ -320,7 +320,7 @@ If the quick start does not work, check these in order:
 trust_level = "trusted"
 ```
 
-- If that trust screen is still blocking, attach directly and continue from tmux with `tmux -S ~/.clisbot/state/clisbot.sock attach -t agent-default-main`.
+- If that trust screen is still blocking, inspect the live session name with `clisbot runner list`, then attach directly with `tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>`.
 - If Gemini startup says it is waiting for manual authorization, authenticate Gemini directly first or provide a headless auth path such as `GEMINI_API_KEY` or Vertex AI credentials; `clisbot` now treats that screen as a startup blocker instead of a healthy ready session.
 - If Codex warns that `bubblewrap` is missing on Linux, install `bubblewrap` in the runtime environment.
 - If the bot does not answer, check `clisbot status` first. Healthy channels should show `connection=active`; if a channel stays `starting`, inspect `clisbot logs`.

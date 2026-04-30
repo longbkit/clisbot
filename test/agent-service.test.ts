@@ -1914,9 +1914,9 @@ describe("AgentService session identity", () => {
         sessionKey: "main",
       });
 
-      expect(resolved.sessionName).toBe("main");
+      expect(resolved.sessionName).toMatch(/^main-[0-9a-f]{8}$/);
       expect(newSessionCount).toBe(3);
-      expect(await tmux.hasSession("main")).toBe(true);
+      expect(await tmux.hasSession(resolved.sessionName)).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

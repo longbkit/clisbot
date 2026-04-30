@@ -461,6 +461,6 @@ That page now holds:
 - the default workspace for agent `default` is `~/.clisbot/workspaces/default`
 - tmux session names now derive from session keys, so one agent can have multiple tmux sessions at once
 - the default session name template is `agents.defaults.session.name = "{sessionKey}"`
-- tmux session names are created by normalizing the rendered value into a tmux-safe name, replacing every non-alphanumeric character with `-`
+- tmux session names use a readable tmux-safe prefix plus a stable short hash from the logical `sessionKey`
 - prefer `clisbot runner list`, `clisbot inspect --latest`, and `clisbot watch --latest|--next` before dropping to raw tmux
 - if the Codex trust screen appears stale after attaching, press `Ctrl-L` inside the tmux session to redraw the pane

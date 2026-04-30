@@ -87,9 +87,13 @@ That said, tmux session naming should be treated as runner identity, not as the 
 Current default naming rule:
 
 - `agents.defaults.session.name: "{sessionKey}"`
-- the rendered name is normalized into a tmux-safe form by replacing every non-alphanumeric character with `-`
+- the rendered name is normalized into a tmux-safe readable prefix
+- clisbot appends a stable short hash from the logical `sessionKey`
+- tmux operations must still target that session name exactly using tmux's
+  exact-match syntax, because raw tmux target lookup otherwise accepts unique
+  prefixes and can attach the wrong runner
 
-This keeps names readable and tmux-safe, but it is not a strict reversible encoding of `sessionKey`.
+This keeps names readable and tmux-safe while preserving a one-runner-per-session-key identity boundary, but it is not a strict reversible encoding of `sessionKey`.
 
 The important distinction is:
 

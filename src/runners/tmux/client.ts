@@ -77,8 +77,16 @@ export class TmuxClient {
     return result.stdout;
   }
 
+  private sessionTarget(sessionName: string) {
+    return `=${sessionName}`;
+  }
+
   private target(sessionName: string) {
-    return `${sessionName}:${MAIN_WINDOW_NAME}`;
+    return `${this.sessionTarget(sessionName)}:${MAIN_WINDOW_NAME}`;
+  }
+
+  private windowTarget(sessionName: string, windowName: string) {
+    return `${this.sessionTarget(sessionName)}:${windowName}`;
   }
 
   private rawTarget(target: string) {
@@ -86,7 +94,7 @@ export class TmuxClient {
   }
 
   async hasSession(sessionName: string) {
-    const result = await this.exec(["has-session", "-t", sessionName]);
+    const result = await this.exec(["has-session", "-t", this.sessionTarget(sessionName)]);
     return result.exitCode === 0;
   }
 
@@ -210,7 +218,7 @@ export class TmuxClient {
       "-F",
       "#{pane_id}",
       "-t",
-      params.sessionName,
+      this.sessionTarget(params.sessionName),
       "-n",
       params.name,
       "-c",
@@ -218,7 +226,7 @@ export class TmuxClient {
       params.command,
     ]);
 
-    await this.freezeWindowName(`${params.sessionName}:${params.name}`);
+    await this.freezeWindowName(this.windowTarget(params.sessionName, params.name));
 
     return paneId.trim();
   }
@@ -232,7 +240,7 @@ export class TmuxClient {
     const output = await this.execOrThrow([
       "list-windows",
       "-t",
-      sessionName,
+      this.sessionTarget(sessionName),
       "-F",
       "#{window_name}\t#{pane_id}",
     ]);
@@ -322,7 +330,7 @@ export class TmuxClient {
   }
 
   async killSession(sessionName: string) {
-    await this.exec(["kill-session", "-t", sessionName]);
+    await this.exec(["kill-session", "-t", this.sessionTarget(sessionName)]);
   }
 
   async killPane(target: string) {

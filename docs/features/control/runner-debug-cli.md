@@ -11,7 +11,7 @@ Examples:
 - `clisbot runner list`
 - `clisbot runner inspect --latest`
 - `clisbot runner inspect --index 1`
-- `clisbot runner watch agent-default-main --lines 20 --interval 1s`
+- `clisbot runner watch <session-name> --lines 20 --interval 1s`
 - `clisbot runner watch --index 1 --lines 20 --interval 1s`
 - `clisbot runner watch --latest --lines 20 --interval 1s`
 - `clisbot runner watch --next --timeout 120s --lines 20 --interval 1s`

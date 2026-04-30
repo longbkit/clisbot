@@ -32,9 +32,9 @@ The important rule is:
 
 Current tmux naming rule:
 
-- tmux session name is the `sessionKey` normalized into a tmux-safe name by replacing every non-alphanumeric character with `-`
-- this keeps names readable and practical for operator use
-- it is deterministic, but not a strict reversible one-to-one encoding
+- tmux session name starts with a tmux-safe readable prefix derived from the rendered template value
+- clisbot appends a stable short hash from the logical `sessionKey`
+- this keeps names readable for operators while preserving one unique tmux runner name per logical session
 - raw `sessionKey` is not used directly because tmux rewrites characters such as `:` during target parsing
 
 ## Current Store
@@ -94,6 +94,10 @@ For one routed conversation:
 Current recovery rule:
 
 - if tmux still exists, continue using the live process
+- tmux existence checks and follow-up pane commands must target the exact
+  tmux session name, not a tmux prefix match, so one `sessionKey` can never
+  silently attach to a foreign runner whose name merely starts with the same
+  prefix
 - if the tmux runner was sunset as stale, keep the stored session entry and logical conversation identity
 - if tmux is gone but a stored `sessionId` exists, start a new runner and reuse that `sessionId` when the runner supports it
 - if that stored `sessionId` is no longer attachable for this `sessionKey`, preserve the mapping and fail truthfully instead of silently starting a new tool conversation

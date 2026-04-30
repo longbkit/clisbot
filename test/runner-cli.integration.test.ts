@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
+import { loadConfig } from "../src/config/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 import { ensureDir } from "../src/shared/paths.ts";
@@ -83,6 +85,14 @@ async function createSessionWithOutput(tmux: TmuxClient, socketDir: string, sess
   await Bun.sleep(400);
 }
 
+async function resolveRunnerSessionName(configPath: string, sessionKey: string) {
+  const loaded = await loadConfig(configPath);
+  return resolveAgentTarget(loaded, {
+    agentId: "default",
+    sessionKey,
+  }).sessionName;
+}
+
 async function runCliCommand(configPath: string, args: string[]) {
   const subprocess = Bun.spawn([BUN_COMMAND, "run", "src/main.ts", ...args], {
     cwd: REPO_ROOT,
@@ -129,9 +139,11 @@ describe("runner cli integration", () => {
     const { configPath, sessionStorePath, socketPath } = createConfig(dir);
     const tmux = new TmuxClient(socketPath);
     const now = Date.now();
+    const alphaSessionName = await resolveRunnerSessionName(configPath, "alpha");
+    const betaSessionName = await resolveRunnerSessionName(configPath, "beta");
 
-    await createSessionWithOutput(tmux, dir, "alpha", "alpha output");
-    await createSessionWithOutput(tmux, dir, "beta", "beta output");
+    await createSessionWithOutput(tmux, dir, alphaSessionName, "alpha output");
+    await createSessionWithOutput(tmux, dir, betaSessionName, "beta output");
     await createSessionWithOutput(tmux, dir, "gamma", "gamma output");
     await writeSessionStore(sessionStorePath, [
       {
@@ -162,12 +174,12 @@ describe("runner cli integration", () => {
 
     const result = await runRunnerCliCommand(configPath, ["list"]);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("- [1] sessionName: beta");
-    expect(result.stdout).toContain("- [2] sessionName: alpha");
-    expect(result.stdout.indexOf("sessionName: beta")).toBeLessThan(
-      result.stdout.indexOf("sessionName: alpha"),
+    expect(result.stdout).toContain(`- [1] sessionName: ${betaSessionName}`);
+    expect(result.stdout).toContain(`- [2] sessionName: ${alphaSessionName}`);
+    expect(result.stdout.indexOf(`sessionName: ${betaSessionName}`)).toBeLessThan(
+      result.stdout.indexOf(`sessionName: ${alphaSessionName}`),
     );
-    expect(result.stdout.indexOf("sessionName: alpha")).toBeLessThan(
+    expect(result.stdout.indexOf(`sessionName: ${alphaSessionName}`)).toBeLessThan(
       result.stdout.indexOf("sessionName: gamma"),
     );
     expect(result.stdout).not.toContain("sessionKey:");
@@ -224,13 +236,15 @@ describe("runner cli integration", () => {
     const { configPath, sessionStorePath, socketPath } = createConfig(dir);
     const tmux = new TmuxClient(socketPath);
     const now = Date.now();
+    const alphaSessionName = await resolveRunnerSessionName(configPath, "alpha");
+    const betaSessionName = await resolveRunnerSessionName(configPath, "beta");
 
     const alphaOutput = [
       "alpha inspect output",
       ...Array.from({ length: 80 }, (_, index) => `alpha default line ${index + 1}`),
     ].join("\n");
-    await createSessionWithOutput(tmux, dir, "alpha", alphaOutput);
-    await createSessionWithOutput(tmux, dir, "beta", "beta inspect output");
+    await createSessionWithOutput(tmux, dir, alphaSessionName, alphaOutput);
+    await createSessionWithOutput(tmux, dir, betaSessionName, "beta inspect output");
     await writeSessionStore(sessionStorePath, [
       {
         agentId: "default",
@@ -270,9 +284,11 @@ describe("runner cli integration", () => {
     const { configPath, sessionStorePath, socketPath } = createConfig(dir);
     const tmux = new TmuxClient(socketPath);
     const now = Date.now();
+    const alphaSessionName = await resolveRunnerSessionName(configPath, "alpha");
+    const betaSessionName = await resolveRunnerSessionName(configPath, "beta");
 
-    await createSessionWithOutput(tmux, dir, "alpha", "alpha latest output");
-    await createSessionWithOutput(tmux, dir, "beta", "beta latest output");
+    await createSessionWithOutput(tmux, dir, alphaSessionName, "alpha latest output");
+    await createSessionWithOutput(tmux, dir, betaSessionName, "beta latest output");
     await writeSessionStore(sessionStorePath, [
       {
         agentId: "default",
@@ -303,7 +319,7 @@ describe("runner cli integration", () => {
       "700ms",
     ]);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("session: beta");
+    expect(result.stdout).toContain(`session: ${betaSessionName}`);
     expect(result.stdout).toContain("sessionId: none");
     expect(result.stdout).toContain("state: watching");
     expect(result.stdout).not.toContain("sessionKey:");
@@ -317,9 +333,11 @@ describe("runner cli integration", () => {
     const { configPath, sessionStorePath, socketPath } = createConfig(dir);
     const tmux = new TmuxClient(socketPath);
     const now = Date.now();
+    const alphaSessionName = await resolveRunnerSessionName(configPath, "alpha");
+    const betaSessionName = await resolveRunnerSessionName(configPath, "beta");
 
-    await createSessionWithOutput(tmux, dir, "alpha", "alpha indexed output");
-    await createSessionWithOutput(tmux, dir, "beta", "beta indexed output");
+    await createSessionWithOutput(tmux, dir, alphaSessionName, "alpha indexed output");
+    await createSessionWithOutput(tmux, dir, betaSessionName, "beta indexed output");
     await writeSessionStore(sessionStorePath, [
       {
         agentId: "default",
@@ -351,7 +369,7 @@ describe("runner cli integration", () => {
       "700ms",
     ]);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("session: alpha");
+    expect(result.stdout).toContain(`session: ${alphaSessionName}`);
     expect(result.stdout).toContain("sessionId: none");
     expect(result.stdout).toContain("state: watching");
     expect(result.stdout).not.toContain("sessionKey:");
@@ -364,6 +382,7 @@ describe("runner cli integration", () => {
     const dir = createTempDir();
     const { configPath, sessionStorePath, socketPath } = createConfig(dir);
     const tmux = new TmuxClient(socketPath);
+    const gammaSessionName = await resolveRunnerSessionName(configPath, "gamma");
 
     const watchPromise = runRunnerCliCommand(configPath, [
       "watch",
@@ -377,7 +396,7 @@ describe("runner cli integration", () => {
     ]);
 
     await Bun.sleep(250);
-    await createSessionWithOutput(tmux, dir, "gamma", "gamma next output");
+    await createSessionWithOutput(tmux, dir, gammaSessionName, "gamma next output");
 
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const admittedAt = Date.now();
@@ -396,7 +415,7 @@ describe("runner cli integration", () => {
 
     const result = await watchPromise;
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("session: gamma");
+    expect(result.stdout).toContain(`session: ${gammaSessionName}`);
     expect(result.stdout).toContain("gamma next output");
   }, 20000);
 });

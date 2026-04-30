@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { applyTemplate, sanitizeSessionName } from "../shared/paths.ts";
 
 export const DEFAULT_MAIN_KEY = "main";
@@ -152,5 +153,6 @@ export function buildTmuxSessionName(params: {
     mainKey: normalizeMainKey(params.mainKey),
   });
   const baseName = sanitizeSessionName(rendered);
-  return baseName;
+  const sessionHash = createHash("sha1").update(params.sessionKey).digest("hex").slice(0, 8);
+  return `${baseName}-${sessionHash}`;
 }

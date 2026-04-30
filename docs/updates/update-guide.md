@@ -38,7 +38,7 @@ If a version was published by mistake:
 Example:
 
 ```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-beta.8 instead." --otp=<code>
+npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-beta.9 instead." --otp=<code>
 ```
 
 ## Release Reading
