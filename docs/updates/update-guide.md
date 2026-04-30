@@ -33,12 +33,12 @@ If a version was published by mistake:
 2. deprecate the wrong version after that
 3. start with `npm login` in an attached session
 4. if npm returns a browser approval URL, keep that same session open and continue it after approval
-5. if the write command still returns `EOTP`, ask the operator for a current OTP and rerun the exact command with `--otp=<code>`
+5. do not switch to `--otp`; keep the normal browser or interactive approval flow and stop if that flow cannot complete
 
 Example:
 
 ```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-beta.9 instead." --otp=<code>
+npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.45-beta.9 instead."
 ```
 
 ## Release Reading
