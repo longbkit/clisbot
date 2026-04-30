@@ -418,6 +418,7 @@ describe("loadConfig", () => {
         },
       ],
     };
+    config.agents.defaults.runner.codex.startupDelayMs = 12345;
     config.agents.defaults.runner.codex.startupReadyPattern = "custom-codex-ready";
     config.agents.defaults.runner.gemini.startupDelayMs = 12345;
     config.agents.defaults.runner.gemini.startupRetryCount = 7;
@@ -439,6 +440,7 @@ describe("loadConfig", () => {
 
     expect(rewrittenConfig.app.control.runtimeMonitor.restartBackoff).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.codex.startupDelayMs).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.codex.startupReadyPattern).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.gemini.startupDelayMs).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.gemini.startupRetryCount).toBeUndefined();
@@ -457,6 +459,7 @@ describe("loadConfig", () => {
 
     config.meta.schemaVersion = "0.1.45";
     config.agents.defaults.runner.defaults.startupDelayMs = 3000;
+    config.agents.defaults.runner.codex.startupDelayMs = 3000;
 
     await Bun.write(configPath, JSON.stringify(config));
 
@@ -467,6 +470,7 @@ describe("loadConfig", () => {
 
     expect(rewrittenConfig.meta.schemaVersion).toBe("0.1.45");
     expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.codex.startupDelayMs).toBeUndefined();
     expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
     expect(backups).toHaveLength(1);
     expect(backups[0]).toContain("clisbot.json.0.1.45.");

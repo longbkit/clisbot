@@ -13,7 +13,7 @@ import {
 type MutableRecord = Record<string, unknown>;
 
 const defaultOwnedRunnerFields: Partial<Record<AgentCliToolId, string[]>> = {
-  codex: ["startupReadyPattern"],
+  codex: ["startupDelayMs", "startupReadyPattern"],
   gemini: [
     "startupDelayMs",
     "startupRetryCount",

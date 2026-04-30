@@ -49,8 +49,17 @@ function pruneCurrentSchemaStartupDefaults(config: unknown) {
   const defaults = isRecord(agents?.defaults) ? agents.defaults : undefined;
   const runner = isRecord(defaults?.runner) ? defaults.runner : undefined;
   const runnerDefaults = isRecord(runner?.defaults) ? runner.defaults : undefined;
+  const codexRunner = isRecord(runner?.codex) ? runner.codex : undefined;
+  let pruned = false;
   if (runnerDefaults?.startupDelayMs === 3000) {
     delete runnerDefaults.startupDelayMs;
+    pruned = true;
+  }
+  if (codexRunner?.startupDelayMs === 3000) {
+    delete codexRunner.startupDelayMs;
+    pruned = true;
+  }
+  if (pruned) {
     nextConfig.meta = {
       ...meta,
       schemaVersion: CURRENT_SCHEMA_VERSION,
