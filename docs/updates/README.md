@@ -40,4 +40,5 @@ Write a weekly digest only when there is enough meaningful work for a reader to 
 ## Current Updates
 
 - [Update guide](update-guide.md)
+- [v0.1.51 release guide](releases/v0.1.51-release-guide.md)
 - [v0.1.50 release guide](releases/v0.1.50-release-guide.md)

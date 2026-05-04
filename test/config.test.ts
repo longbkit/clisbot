@@ -113,6 +113,7 @@ describe("loadConfig", () => {
     const loaded = await loadConfig(configPath);
     const resolvedSlackBot = resolveSlackBotConfig(loaded.raw.bots.slack, "default");
 
+    expect(loaded.raw.agents.defaults.runner.defaults.startupDelayMs).toBe(60000);
     expect(loaded.raw.bots.slack.default.appToken).toBe("app-token");
     expect(loaded.raw.bots.slack.default.botToken).toBe("bot-token");
     expect(loaded.raw.bots.telegram.default.botToken).toBe("telegram-token");

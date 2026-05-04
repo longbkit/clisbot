@@ -59,7 +59,7 @@ Bạn muốn dùng OpenClaw nhưng đang vướng vì:
 ### Tôi chỉ muốn biết gần đây có gì mới
 
 - bắt đầu từ [Điểm nổi bật của các bản phát hành gần đây](#recent-release-highlights)
-- sau đó đọc [v0.1.50 Release Notes](../vi/releases/v0.1.50.md) hoặc [v0.1.50 Release Guide](../vi/updates/releases/v0.1.50-release-guide.md)
+- sau đó đọc [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md) hoặc [v0.1.51 Release Guide](../../../docs/updates/releases/v0.1.51-release-guide.md)
 
 ## Vì sao tôi làm clisbot
 
@@ -226,6 +226,7 @@ Full release notes còn có nhiều sửa lỗi và cải tiến operator hữu 
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [Release Notes Index](../vi/releases/README.md)
+- [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md)
 - [v0.1.50 Release Notes](../vi/releases/v0.1.50.md)
 - [v0.1.43 Release Notes](../vi/releases/v0.1.43.md)
 - [v0.1.39 Release Notes](../vi/releases/v0.1.39.md)

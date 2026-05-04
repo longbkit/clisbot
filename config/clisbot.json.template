@@ -410,7 +410,7 @@
             "--approval-mode=yolo",
             "--sandbox=false"
           ],
-          "startupDelayMs": 15000,
+          "startupDelayMs": 60000,
           "startupRetryCount": 2,
           "startupRetryDelayMs": 1000,
           "startupReadyPattern": "Type your message or @path/to/file",

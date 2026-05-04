@@ -54,6 +54,7 @@ describe("renderDefaultConfigTemplate", () => {
     });
     expect(config.agents.defaults.defaultAgentId).toBe("default");
     expect(config.agents.defaults.auth.defaultRole).toBe("member");
+    expect(config.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain("privilegeCommands");
     expect(config.bots.defaults.timezone).toBeUndefined();
     expect(config.bots.slack.defaults.timezone).toBeUndefined();
@@ -122,6 +123,7 @@ describe("renderDefaultConfigTemplate", () => {
 
     expect(config.meta.schemaVersion).toBe("0.1.50");
     expect(Object.keys(config)).toEqual(["meta", "app", "bots", "agents"]);
+    expect(config.agents.defaults.runner.defaults.startupDelayMs).toBe(60000);
     expect(config.bots.slack.defaults.defaultBotId).toBe("default");
     expect(config.bots.telegram.defaults.defaultBotId).toBe("default");
     expect(parsed.bots.slack.defaults.channelPolicy).toBe("allowlist");

@@ -16,7 +16,7 @@
 ## 主要文件
 
 - [update-guide.md（英文原文）](../../../updates/update-guide.md)
-- [v0.1.50 release guide（英文原文）](../../../updates/releases/v0.1.50-release-guide.md)
+- [v0.1.51 release guide（英文原文）](../../../updates/releases/v0.1.51-release-guide.md)
 
 ## 什么时候该看这里
 

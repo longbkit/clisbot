@@ -39,7 +39,7 @@ export type AgentToolTemplate = {
 
 const SESSION_ID_PATTERN =
   "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
-export const INTERACTIVE_CLI_STARTUP_DELAY_MS = 15_000;
+export const INTERACTIVE_CLI_STARTUP_DELAY_MS = 60_000;
 
 export const DEFAULT_AGENT_TOOL_TEMPLATES: Record<AgentCliToolId, AgentToolTemplate> = {
   codex: {

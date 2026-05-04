@@ -14,7 +14,7 @@
 ## 핵심 문서
 
 - [update-guide.md](./update-guide.md)
-- [v0.1.50 릴리스 가이드](./releases/v0.1.50-release-guide.md)
+- [v0.1.51 릴리스 가이드 (English)](../../../updates/releases/v0.1.51-release-guide.md)
 
 ## 언제 읽어야 하나
 

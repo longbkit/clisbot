@@ -24,7 +24,7 @@ const defaultOwnedRunnerFields: Partial<Record<AgentCliToolId, string[]>> = {
   ],
 };
 const defaultOwnedRunnerDefaultFields: Record<string, unknown> = {
-  startupDelayMs: 3000,
+  startupDelayMs: 60000,
 };
 
 function isRecord(value: unknown): value is MutableRecord {
