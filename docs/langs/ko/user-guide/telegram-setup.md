@@ -40,7 +40,7 @@ clisbot start \
 3. bot을 group에 추가
 4. 그 group이나 topic에서 `/whoami` 실행
 5. `clisbot routes add --channel telegram group:<chatId> --bot default` 또는 `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-6. `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default` 또는 `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+6. 그 routed surface가 현재 그 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만 `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>` 또는 `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>`로 override
 
 ## 1단계: BotFather에서 bot 만들기
 
@@ -175,10 +175,12 @@ clisbot routes add --channel telegram group:<chatId> --bot default
 clisbot routes add --channel telegram group:-1001234567890 --bot default
 ```
 
-그다음 어느 agent가 답할지 지정합니다.
+이 group route는 현재 이 bot에 기본값으로 할당된 agent를 사용합니다.
+
+그 group이 현재 이 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만:
 
 ```bash
-clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent default
+clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent support
 ```
 
 명시적 mention 없이도 group에서 동작하게 하려면:
@@ -220,10 +222,12 @@ clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
 clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
 ```
 
-그다음 어느 agent가 답할지 지정합니다.
+이 topic route도 현재 이 bot에 기본값으로 할당된 agent를 사용합니다.
+
+그 topic이 현재 이 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만:
 
 ```bash
-clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent default
+clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent support
 ```
 
 topic route 구조:
@@ -243,11 +247,11 @@ topic route 구조:
 5. 대상 group에 bot 추가
 6. group에서 `/whoami`
 7. `clisbot routes add --channel telegram group:<chatId> --bot default`
-8. `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default`
+8. 그 group route가 현재 그 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만 `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`
 9. group에 일반 test prompt 보내기
 10. topic을 쓴다면 topic 안에서 `/whoami`
 11. `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-12. `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+12. 그 topic route가 현재 그 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만 `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>`
 13. topic에 일반 test prompt 보내기
 
 좋은 테스트 prompt:
@@ -280,9 +284,9 @@ clisbot status
 clisbot logs
 clisbot pairing approve telegram <CODE>
 clisbot routes add --channel telegram group:<chatId> --bot default
-clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default
+clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>
 clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
-clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default
+clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>
 ```
 
 ## 문제 해결

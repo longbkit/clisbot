@@ -37,8 +37,11 @@ export function renderSlackRouteChoiceMessage(params: {
   return [
     "clisbot: this Slack channel is not configured yet.",
     "",
-    "Ask the bot owner to do these:",
+    "Ask the bot owner to do this first:",
     `- ${renderCliCommand(`routes add --channel slack group:${params.channelId} --bot default`, { inline: true })}`,
+    "  This channel will use the agent currently assigned to this bot by default.",
+    "",
+    "Only if this channel should use a different agent than the one currently assigned to this bot by default:",
     `- ${renderCliCommand(`routes set-agent --channel slack group:${params.channelId} --bot default --agent <id>`, { inline: true })}`,
     "",
     `After that, ${botReference} and send \`\\start\`, \`\\status\`, or \`\\mention\` here.`,

@@ -12,20 +12,24 @@ export function renderTelegramRouteChoiceMessage(params: {
       ? "clisbot: this Telegram topic is not configured yet."
       : "clisbot: this Telegram group is not configured yet.",
     "",
-    "Ask the bot owner to choose one of these:",
+    "Ask the bot owner to do this first:",
     "",
-    "Add the whole group to the allowlist:",
+    "Add the whole group route:",
     renderCliCommand(`routes add --channel telegram group:${chatId} --bot default`, { inline: true }),
+    "That group will use the agent currently assigned to that bot by default.",
     "",
-    "Bind the whole group to a specific agent:",
+    "Only if that group should use a different agent than the one currently assigned to that bot by default:",
     renderCliCommand(`routes set-agent --channel telegram group:${chatId} --bot default --agent <id>`, { inline: true }),
   ];
 
   if (topicId != null) {
     lines.push(
       "",
-      "Or bind only this topic to a specific agent:",
+      "Or add only this topic route:",
       renderCliCommand(`routes add --channel telegram topic:${chatId}:${topicId} --bot default`, { inline: true }),
+      "That topic will use the agent currently assigned to that bot by default.",
+      "",
+      "Only if this topic should use a different agent than the one currently assigned to that bot by default:",
       renderCliCommand(`routes set-agent --channel telegram topic:${chatId}:${topicId} --bot default --agent <id>`, { inline: true }),
     );
   }

@@ -58,7 +58,7 @@ clisbot start \
 2. `clisbot pairing approve slack <CODE>`로 pairing 승인
 3. bot을 Slack channel에 초대
 4. `clisbot routes add --channel slack group:<channelId> --bot default`
-5. `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default`
+5. 그 channel이 현재 그 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만 `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 6. `@clisbot hello` 테스트
 
 ## 1단계: Slack app 만들기
@@ -217,10 +217,12 @@ clisbot routes add --channel slack group:C1234567890 --bot default
 clisbot routes set-require-mention --channel slack group:C1234567890 --bot default --value false
 ```
 
-그다음 어느 agent가 답할지 지정:
+이 route는 현재 이 bot에 기본값으로 할당된 agent를 사용합니다.
+
+그 channel이 현재 이 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만:
 
 ```bash
-clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent default
+clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support
 ```
 
 실전 기본값:
@@ -242,10 +244,12 @@ clisbot routes add --channel slack group:<groupId> --bot default
 clisbot routes add --channel slack group:G1234567890 --bot default
 ```
 
-그다음 agent 지정:
+이 route도 현재 이 bot에 기본값으로 할당된 agent를 사용합니다.
+
+그 private channel이 현재 이 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만:
 
 ```bash
-clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent default
+clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent support
 ```
 
 실전 규칙:
@@ -265,7 +269,7 @@ clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent
 4. DM reply 확인
 5. bot을 대상 channel에 초대
 6. `clisbot routes add --channel slack group:<channelId> --bot default`
-7. `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default`
+7. 그 channel이 현재 그 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만 `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 8. `@clisbot hello`
 9. bot reply thread 열기
 10. 같은 thread 안에 plain follow-up reply 하나 보내기
@@ -303,9 +307,9 @@ clisbot status
 clisbot logs
 clisbot pairing approve slack <CODE>
 clisbot routes add --channel slack group:<channelId> --bot default
-clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default
+clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>
 clisbot routes add --channel slack group:<groupId> --bot default
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ## 문제 해결
@@ -331,7 +335,12 @@ clisbot routes set-agent --channel slack group:<groupId> --bot default --agent d
 
 ```bash
 clisbot routes add --channel slack group:<channelId> --bot default
-clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default
+```
+
+그 channel이 현재 그 bot에 기본값으로 할당된 agent와 다른 agent를 써야 할 때만:
+
+```bash
+clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>
 ```
 
 ### 첫 mention은 되는데 plain thread follow-up이 안 된다

@@ -165,6 +165,7 @@ clisbot routes add-allow-user --channel slack dm:U1234567890 --bot default --use
 - dùng `routes add-allow-user ... group:* ...` khi một người cần được phép ở mọi admitted group dưới bot đó
 - dùng `routes add ... --policy allowlist --require-mention false --allow-bots true` khi muốn tạo route mới với các setting đó ngay trong một lệnh
 - dùng route dùng chung cụ thể khi chỉ muốn admit đúng một Slack channel, Slack group, Telegram group, hoặc Telegram topic
+- route dùng chung cụ thể mới sẽ dùng agent hiện đang được gán mặc định cho bot đó; chỉ dùng `routes set-agent ...` khi route đó phải trả lời bằng một agent khác với agent mặc định hiện tại của bot đó
 - dùng `bots set-group-policy --policy allowlist` khi group cần được thêm rõ ràng rồi mới được dùng
 - dùng `routes set-policy group:<id> --policy allowlist` khi chỉ một số người được nói chuyện trong group đó
 - giữ `disabled` cho admission policy hoặc route cụ thể ở nơi bot tuyệt đối không nên trả lời

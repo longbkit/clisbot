@@ -165,6 +165,7 @@ clisbot routes add-allow-user --channel slack dm:U1234567890 --bot default --use
 - 한 사용자를 그 bot 아래의 모든 admit된 group에서 허용하고 싶다면 `routes add-allow-user ... group:* ...`를 씁니다
 - 새 group route를 만들 때 `--policy allowlist --require-mention false --allow-bots true`를 한 번에 주면 초기 생성이 편합니다
 - 한 Slack channel, Slack group, Telegram group, Telegram topic만 admit하고 싶다면 exact shared route를 씁니다
+- 새 exact shared route는 현재 그 bot에 기본값으로 할당된 agent를 사용하며, 그 route가 그 현재 기본 agent와 다른 agent로 답해야 할 때만 `routes set-agent ...`를 씁니다
 - group은 반드시 명시적으로 추가해야만 쓰게 하고 싶다면 `bots set-group-policy --policy allowlist`를 씁니다
 - 특정 group 안에서만 일부 사용자에게 말하게 하려면 `routes set-policy group:<id> --policy allowlist`를 씁니다
 - 절대 응답하면 안 되는 surface라면 `disabled`를 유지하는 편이 가장 명확합니다

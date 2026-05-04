@@ -63,7 +63,7 @@ Sau đó:
 2. approve pairing code bằng `clisbot pairing approve slack <CODE>`
 3. mời bot vào một Slack channel
 4. thêm route đó bằng `clisbot routes add --channel slack group:<channelId> --bot default`
-5. bind route đó bằng `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default`
+5. chỉ khi channel đó phải dùng agent khác với agent hiện đang được gán mặc định cho bot này thì override bằng `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 6. test `@clisbot hello`
 
 Phần còn lại của trang này giải thích từng bước chi tiết hơn.
@@ -232,6 +232,8 @@ Ví dụ:
 clisbot routes add --channel slack group:C1234567890 --bot default
 ```
 
+Route này sẽ dùng agent hiện đang được gán mặc định cho bot này.
+
 Nếu muốn mention là tùy chọn:
 
 ```bash
@@ -239,10 +241,10 @@ clisbot routes add --channel slack group:C1234567890 --bot default
 clisbot routes set-require-mention --channel slack group:C1234567890 --bot default --value false
 ```
 
-Sau đó bind route vào agent sẽ trả lời ở đó:
+Chỉ khi muốn channel đó dùng agent khác với agent hiện đang được gán mặc định cho bot này:
 
 ```bash
-clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent default
+clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support
 ```
 
 Mặc định thực tế:
@@ -266,10 +268,12 @@ Ví dụ:
 clisbot routes add --channel slack group:G1234567890 --bot default
 ```
 
-Sau đó bind route của private channel:
+Route này cũng sẽ dùng agent hiện đang được gán mặc định cho bot này.
+
+Chỉ khi muốn private channel đó dùng agent khác với agent hiện đang được gán mặc định cho bot này:
 
 ```bash
-clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent default
+clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent support
 ```
 
 Dùng kiểu thiết lập này khi Slack conversation id bắt đầu bằng `G`.
@@ -291,7 +295,7 @@ Dùng đúng thứ tự này:
 4. xác nhận DM reply hoạt động
 5. mời bot vào target Slack channel
 6. thêm route bằng `clisbot routes add --channel slack group:<channelId> --bot default`
-7. bind route bằng `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default`
+7. chỉ khi channel đó phải dùng agent khác với agent hiện đang được gán mặc định cho bot này, chạy `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 8. gửi `@clisbot hello`
 9. mở thread trả lời của bot
 10. gửi một plain follow-up reply trong chính thread đó
@@ -350,7 +354,7 @@ clisbot routes add --channel slack group:<channelId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default
+clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>
 ```
 
 ```bash
@@ -358,7 +362,7 @@ clisbot routes add --channel slack group:<groupId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ## Xử lý sự cố
@@ -397,14 +401,24 @@ Cách sửa:
 
 ```bash
 clisbot routes add --channel slack group:<channelId> --bot default
-clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default
+```
+
+Chỉ khi channel đó phải dùng agent khác với agent hiện đang được gán mặc định cho bot này:
+
+```bash
+clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>
 ```
 
 Cho private channel:
 
 ```bash
 clisbot routes add --channel slack group:<groupId> --bot default
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+```
+
+Chỉ khi private channel đó phải dùng agent khác với agent hiện đang được gán mặc định cho bot này:
+
+```bash
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ### Mention đầu tiên chạy nhưng plain thread follow-up không chạy
@@ -451,7 +465,12 @@ Cách sửa:
 
 ```bash
 clisbot routes add --channel slack group:<groupId> --bot default
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+```
+
+Chỉ khi private channel đó phải dùng agent khác với agent hiện đang được gán mặc định cho bot này:
+
+```bash
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ### Tôi đổi scope hoặc event nhưng vẫn không khá hơn

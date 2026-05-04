@@ -214,17 +214,17 @@ describe("dispatchTelegramUpdates", () => {
 
 describe("renderTelegramUnroutedRouteMessage", () => {
   test("includes the exact add-route command for forum topics", () => {
-    expect(
-      renderTelegramUnroutedRouteMessage({
-        mode: "whoami",
-        chatId: -1003455688247,
-        chatType: "supergroup",
-        topicId: 3,
-        isForum: true,
-      }),
-    ).toContain(
-      "`clisbot routes set-agent --channel telegram topic:-1003455688247:3 --bot default --agent <id>`",
-    );
+    const text = renderTelegramUnroutedRouteMessage({
+      mode: "whoami",
+      chatId: -1003455688247,
+      chatType: "supergroup",
+      topicId: 3,
+      isForum: true,
+    });
+
+    expect(text).toContain("That group will use the agent currently assigned to that bot by default.");
+    expect(text).toContain("Only if this topic should use a different agent than the one currently assigned to that bot by default:");
+    expect(text).toContain("`clisbot routes set-agent --channel telegram topic:-1003455688247:3 --bot default --agent <id>`");
   });
 });
 

@@ -44,7 +44,10 @@ describe("slack feedback helpers", () => {
     });
 
     expect(text).toContain("this Slack channel is not configured yet");
+    expect(text).toContain("Ask the bot owner to do this first");
     expect(text).toContain("`clisbot routes add --channel slack group:C123 --bot default`");
+    expect(text).toContain("This channel will use the agent currently assigned to this bot by default.");
+    expect(text).toContain("Only if this channel should use a different agent than the one currently assigned to this bot by default:");
     expect(text).toContain(
       "`clisbot routes set-agent --channel slack group:C123 --bot default --agent <id>`",
     );

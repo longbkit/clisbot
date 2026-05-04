@@ -163,6 +163,7 @@ clisbot routes add-allow-user --channel slack dm:U1234567890 --bot default --use
 - use `routes add-allow-user ... group:* ...` when one user should be allowed in every admitted group under that bot
 - use `routes add ... --policy allowlist --require-mention false --allow-bots true` when a new group route should be created with those settings in one command
 - use one exact shared route when you want to admit only one Slack channel, Slack group, Telegram group, or Telegram topic
+- a new exact shared route uses whichever agent is currently assigned to that bot by default; use `routes set-agent ...` only when that route should answer with a different agent than that current bot-level default
 - use `bots set-group-policy --policy allowlist` when groups must be explicitly added before use
 - use `routes set-policy group:<id> --policy allowlist` when only some users may speak inside that group
 - keep `disabled` for admission policy or exact routes where the bot should never answer at all

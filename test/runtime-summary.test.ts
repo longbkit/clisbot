@@ -170,10 +170,10 @@ describe("runtime summaries", () => {
     expect(startText).toContain("DM the Telegram or Slack bot first to confirm it responds normally");
     expect(startText).toContain("after DM works, add the bot to the target Slack channel or Telegram group/topic");
     expect(startText).toContain(
-      "add the route with `clisbot routes add --channel slack group:<channelId> --bot default` or `clisbot routes add --channel telegram group:<chatId> --bot default`",
+      "add the route with `clisbot routes add --channel slack group:<channelId> --bot default` or `clisbot routes add --channel telegram group:<chatId> --bot default`; that route uses the agent currently assigned to that bot by default",
     );
     expect(startText).toContain(
-      "bind the agent with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`",
+      "only if you want a different agent there than the one currently assigned to that bot by default, bind it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`",
     );
     expect(startText).toContain(
       "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",

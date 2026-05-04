@@ -42,7 +42,7 @@ Then:
 3. add the bot to your group
 4. send `/whoami` in that group or topic
 5. run `clisbot routes add --channel telegram group:<chatId> --bot default` or `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-6. bind that routed surface with `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default` or `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+6. only if that routed surface should use a different agent than the one currently assigned to that bot by default, override it with `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>`
 
 The rest of this page explains each step in detail.
 
@@ -186,10 +186,12 @@ Example:
 clisbot routes add --channel telegram group:-1001234567890 --bot default
 ```
 
-Then bind the group to the agent that should answer there:
+That group route will use whichever agent is currently assigned to that bot by default.
+
+Only if you want that group to use a different agent than the one currently assigned to that bot by default:
 
 ```bash
-clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent default
+clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent support
 ```
 
 If you want the group to work without explicit bot mention:
@@ -233,10 +235,12 @@ Example:
 clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
 ```
 
-Then bind only that topic to the agent that should answer there:
+That topic route will also use whichever agent is currently assigned to that bot by default.
+
+Only if you want that topic to use a different agent than the one currently assigned to that bot by default:
 
 ```bash
-clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent default
+clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent support
 ```
 
 How topic routing works:
@@ -262,11 +266,11 @@ Use this exact order:
 5. add the bot to the target group
 6. run `/whoami` in the group
 7. add the group route with `clisbot routes add --channel telegram group:<chatId> --bot default`
-8. bind the group route with `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default`
+8. only if you want that group route to use a different agent than the one currently assigned to that bot by default, run `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`
 9. send a normal test prompt in the group
 10. if using topics, run `/whoami` inside the topic
 11. add the topic route with `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-12. bind the topic route with `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+12. only if you want that topic route to use a different agent than the one currently assigned to that bot by default, run `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>`
 13. send a normal test prompt in that topic
 
 Good group and topic test prompts:
@@ -314,7 +318,7 @@ clisbot routes add --channel telegram group:<chatId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default
+clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>
 ```
 
 ```bash
@@ -322,7 +326,7 @@ clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default
+clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>
 ```
 
 ## Troubleshooting

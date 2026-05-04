@@ -44,7 +44,7 @@ Sau đó:
 3. thêm bot vào group của bạn
 4. gửi `/whoami` trong group hoặc topic đó
 5. chạy `clisbot routes add --channel telegram group:<chatId> --bot default` hoặc `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-6. bind routed surface đó bằng `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default` hoặc `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+6. chỉ khi routed surface đó phải dùng agent khác với agent hiện đang được gán mặc định cho bot này thì override bằng `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>` hoặc `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>`
 
 Phần còn lại của trang này giải thích chi tiết từng bước.
 
@@ -186,10 +186,12 @@ Ví dụ:
 clisbot routes add --channel telegram group:-1001234567890 --bot default
 ```
 
-Sau đó bind group vào agent sẽ trả lời ở đó:
+Group route này sẽ dùng agent hiện đang được gán mặc định cho bot này.
+
+Chỉ khi muốn group đó dùng agent khác với agent hiện đang được gán mặc định cho bot này:
 
 ```bash
-clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent default
+clisbot routes set-agent --channel telegram group:-1001234567890 --bot default --agent support
 ```
 
 Nếu muốn group hoạt động mà không cần mention bot rõ ràng:
@@ -233,10 +235,12 @@ Ví dụ:
 clisbot routes add --channel telegram topic:-1001234567890:42 --bot default
 ```
 
-Sau đó chỉ bind đúng topic đó vào agent sẽ trả lời ở đó:
+Topic route này cũng sẽ dùng agent hiện đang được gán mặc định cho bot này.
+
+Chỉ khi muốn topic đó dùng agent khác với agent hiện đang được gán mặc định cho bot này:
 
 ```bash
-clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent default
+clisbot routes set-agent --channel telegram topic:-1001234567890:42 --bot default --agent support
 ```
 
 Cách route topic hoạt động:
@@ -262,11 +266,11 @@ Dùng đúng thứ tự này:
 5. thêm bot vào target group
 6. chạy `/whoami` trong group
 7. thêm group route bằng `clisbot routes add --channel telegram group:<chatId> --bot default`
-8. bind group route bằng `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default`
+8. chỉ khi muốn group route đó dùng agent khác với agent hiện đang được gán mặc định cho bot này, chạy `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`
 9. gửi một test prompt bình thường trong group
 10. nếu dùng topic, chạy `/whoami` bên trong topic
 11. thêm topic route bằng `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`
-12. bind topic route bằng `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default`
+12. chỉ khi muốn topic route đó dùng agent khác với agent hiện đang được gán mặc định cho bot này, chạy `clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>`
 13. gửi một test prompt bình thường trong topic đó
 
 Các test prompt tốt cho group và topic:
@@ -313,7 +317,7 @@ clisbot routes add --channel telegram group:<chatId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent default
+clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>
 ```
 
 ```bash
@@ -321,7 +325,7 @@ clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent default
+clisbot routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>
 ```
 
 ## Xử lý sự cố

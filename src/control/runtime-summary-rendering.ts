@@ -116,10 +116,10 @@ function appendChannelNextStepLines(
     `${prefix}- after DM works, add the bot to the target Slack channel or Telegram group/topic`,
   );
   lines.push(
-    `${prefix}- add the route with ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })} or ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}`,
+    `${prefix}- add the route with ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })} or ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}; that route uses the agent currently assigned to that bot by default`,
   );
   lines.push(
-    `${prefix}- bind the agent with ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })} or ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}`,
+    `${prefix}- only if you want a different agent there than the one currently assigned to that bot by default, bind it with ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })} or ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}`,
   );
 
   if (telegramEnabled) {
@@ -340,13 +340,13 @@ function appendChannelSetupNote(
       `${prefix}    add group: ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}`,
     );
     lines.push(
-      `${prefix}    bind group: ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}`,
+      `${prefix}    route uses the agent currently assigned to that bot by default`,
     );
     lines.push(
       `${prefix}    add topic: ${renderCliCommand("routes add --channel telegram topic:<chatId>:<topicId> --bot default", { inline: true })}`,
     );
     lines.push(
-      `${prefix}    bind topic: ${renderCliCommand("routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>", { inline: true })}`,
+      `${prefix}    optional agent override if that surface should use a different agent than the one currently assigned to that bot by default: ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })} or ${renderCliCommand("routes set-agent --channel telegram topic:<chatId>:<topicId> --bot default --agent <id>", { inline: true })}`,
     );
     lines.push(
       `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
@@ -363,7 +363,10 @@ function appendChannelSetupNote(
     `${prefix}    add group: ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })}`,
   );
   lines.push(
-    `${prefix}    bind group: ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })}`,
+    `${prefix}    route uses the agent currently assigned to that bot by default`,
+  );
+  lines.push(
+    `${prefix}    optional agent override if that route should use a different agent than the one currently assigned to that bot by default: ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })}`,
   );
   lines.push(
     `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,

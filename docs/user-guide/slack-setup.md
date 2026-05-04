@@ -61,7 +61,7 @@ Then:
 2. approve the pairing code with `clisbot pairing approve slack <CODE>`
 3. invite the bot to a Slack channel
 4. add that route with `clisbot routes add --channel slack group:<channelId> --bot default`
-5. bind that route with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default`
+5. only if that channel should use a different agent than the one currently assigned to that bot by default, override it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 6. test `@clisbot hello`
 
 The rest of this page explains each step in detail.
@@ -232,6 +232,8 @@ Example:
 clisbot routes add --channel slack group:C1234567890 --bot default
 ```
 
+That route uses whichever agent is currently assigned to that bot by default.
+
 If you want to make mention optional:
 
 ```bash
@@ -239,10 +241,10 @@ clisbot routes add --channel slack group:C1234567890 --bot default
 clisbot routes set-require-mention --channel slack group:C1234567890 --bot default --value false
 ```
 
-Then bind the route to the agent that should answer there:
+Only if you want that channel to use a different agent than the one currently assigned to that bot by default:
 
 ```bash
-clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent default
+clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support
 ```
 
 Practical default:
@@ -266,10 +268,12 @@ Example:
 clisbot routes add --channel slack group:G1234567890 --bot default
 ```
 
-Then bind that private channel route:
+That route also uses whichever agent is currently assigned to that bot by default.
+
+Only if you want that private channel to use a different agent than the one currently assigned to that bot by default:
 
 ```bash
-clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent default
+clisbot routes set-agent --channel slack group:G1234567890 --bot default --agent support
 ```
 
 Use this when the Slack conversation id starts with `G`.
@@ -291,7 +295,7 @@ Use this order:
 4. verify DM reply works
 5. invite the bot into the target Slack channel
 6. add the route with `clisbot routes add --channel slack group:<channelId> --bot default`
-7. bind the route with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default`
+7. only if that channel should use a different agent than the one currently assigned to that bot by default, run `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 8. send `@clisbot hello`
 9. open the bot reply thread
 10. send one plain follow-up reply in that same thread
@@ -352,7 +356,7 @@ clisbot routes add --channel slack group:<channelId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default
+clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>
 ```
 
 ```bash
@@ -360,7 +364,7 @@ clisbot routes add --channel slack group:<groupId> --bot default
 ```
 
 ```bash
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ## Troubleshooting
@@ -399,14 +403,24 @@ Fix:
 
 ```bash
 clisbot routes add --channel slack group:<channelId> --bot default
-clisbot routes set-agent --channel slack group:<channelId> --bot default --agent default
+```
+
+Only if that channel should use a different agent than the one currently assigned to that bot by default:
+
+```bash
+clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>
 ```
 
 For a private channel:
 
 ```bash
 clisbot routes add --channel slack group:<groupId> --bot default
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+```
+
+Only if that private channel should use a different agent than the one currently assigned to that bot by default:
+
+```bash
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ### The first mention works but plain thread follow-up does not
@@ -453,7 +467,12 @@ Fix:
 
 ```bash
 clisbot routes add --channel slack group:<groupId> --bot default
-clisbot routes set-agent --channel slack group:<groupId> --bot default --agent default
+```
+
+Only if that private channel should use a different agent than the one currently assigned to that bot by default:
+
+```bash
+clisbot routes set-agent --channel slack group:<groupId> --bot default --agent <id>
 ```
 
 ### I changed scopes or events and nothing improved
