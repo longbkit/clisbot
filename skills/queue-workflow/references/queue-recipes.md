@@ -104,6 +104,8 @@ Slack thread:
 clisbot queues create --channel slack --target group:<channel_id> --thread-id <thread_ts> --sender slack:<user_id> "<prompt>"
 ```
 
+For Slack queue commands, use `group:<channel_id>` as the simple default. Make sure to include `--thread-id` when the current Slack message is in a thread, and `--topic-id` when the current Telegram message is in a topic.
+
 Inspect the queue:
 
 ```bash

@@ -75,7 +75,6 @@ When operating inside `clisbot` and the task is queue-worthy:
 - use `clisbot queues create`, not ad hoc reminders in prose
 - queue against the exact routed surface
 - include the real `--sender <principal>`
-- do not invent `--current`; it is not supported
 - respect the pending queue cap
 - tell the user what queue depth you chose and why
 - prefer prompts tailored to the current task over blindly replaying a generic sequence
@@ -87,6 +86,7 @@ Addressing reminders:
   `clisbot queues create --channel telegram --target group:<chat_id> --topic-id <topic_id> --sender telegram:<user_id> "<prompt>"`
 - Slack thread example:
   `clisbot queues create --channel slack --target group:<channel_id> --thread-id <thread_ts> --sender slack:<user_id> "<prompt>"`
+  Keep `--thread-id` when the current Slack message is in a thread so queue start/final notifications stay in that thread.
 
 ## Follow-Up Pass Goals
 
