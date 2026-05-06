@@ -541,6 +541,7 @@ export function buildConfig(params: {
   );
 
   config.app.session.mainKey = "main";
+  config.meta.schemaVersion = "0.1.51";
   config.app.session.storePath = params.storePath;
   config.app.control.configReload.watch = false;
   config.app.control.configReload.watchDebounceMs = 250;

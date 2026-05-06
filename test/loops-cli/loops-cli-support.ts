@@ -7,6 +7,7 @@ export function buildConfig(params: {
   workspaceTemplate: string;
 }) {
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+  config.meta.schemaVersion = "0.1.51";
   config.app.session.storePath = params.storePath;
   config.agents.defaults.workspace = params.workspaceTemplate;
   config.agents.defaults.runner.defaults.tmux.socketPath = params.socketPath;

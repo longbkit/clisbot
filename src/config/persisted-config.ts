@@ -12,6 +12,8 @@ import {
 
 type MutableRecord = Record<string, unknown>;
 
+const MIN_PERSISTED_AGENT_STARTUP_DELAY_MS = 30_000;
+
 const defaultOwnedRunnerFields: Partial<Record<AgentCliToolId, string[]>> = {
   codex: ["startupDelayMs", "startupReadyPattern"],
   gemini: [
@@ -65,6 +67,21 @@ function defaultRunner(toolId: AgentCliToolId) {
   );
 }
 
+export function isStaleStartupDelay(value: unknown) {
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value > 0 &&
+    value < MIN_PERSISTED_AGENT_STARTUP_DELAY_MS;
+}
+
+export function deleteStaleStartupDelay(owner: Record<string, unknown> | undefined) {
+  if (!owner || !isStaleStartupDelay(owner.startupDelayMs)) {
+    return false;
+  }
+  delete owner.startupDelayMs;
+  return true;
+}
+
 function pruneDefaultOwnedFields(params: {
   target: MutableRecord;
   toolId: AgentCliToolId;
@@ -72,6 +89,9 @@ function pruneDefaultOwnedFields(params: {
 }) {
   const defaults = defaultRunner(params.toolId) as unknown as MutableRecord;
   for (const field of defaultOwnedRunnerFields[params.toolId] ?? []) {
+    if (field === "startupDelayMs" && deleteStaleStartupDelay(params.target)) {
+      continue;
+    }
     if (
       params.force ||
       (Object.hasOwn(params.target, field) &&
@@ -90,6 +110,7 @@ function pruneAgentRunnerOverride(runner: MutableRecord, cli: AgentCliToolId | u
     return;
   }
   const defaults = defaultRunner(toolId) as unknown as MutableRecord;
+  deleteStaleStartupDelay(runner);
   for (const field of [
     "command",
     "args",
@@ -108,6 +129,15 @@ function pruneAgentRunnerOverride(runner: MutableRecord, cli: AgentCliToolId | u
   }
 }
 
+function pruneAgentRunnerDefaultOverride(runner: MutableRecord) {
+  const defaults = runner.defaults;
+  if (!isRecord(defaults)) {
+    return;
+  }
+  deleteStaleStartupDelay(defaults);
+  deleteIfEmpty(runner, "defaults");
+}
+
 function pruneRunnerDefaults(config: MutableRecord, forceRunnerStartupDefaults: boolean) {
   const runner = nestedRecord(config, ["agents", "defaults", "runner"]);
   if (!runner) {
@@ -116,6 +146,9 @@ function pruneRunnerDefaults(config: MutableRecord, forceRunnerStartupDefaults: 
   const runnerDefaults = runner.defaults;
   if (isRecord(runnerDefaults)) {
     for (const [field, defaultValue] of Object.entries(defaultOwnedRunnerDefaultFields)) {
+      if (field === "startupDelayMs" && deleteStaleStartupDelay(runnerDefaults)) {
+        continue;
+      }
       if (
         forceRunnerStartupDefaults ||
         (Object.hasOwn(runnerDefaults, field) &&
@@ -146,6 +179,7 @@ function pruneAgentOverrides(config: MutableRecord) {
     if (!isRecord(agent) || !isRecord(agent.runner)) {
       continue;
     }
+    pruneAgentRunnerDefaultOverride(agent.runner);
     const cli = typeof agent.cli === "string"
       ? inferAgentCliToolId(agent.cli) ?? undefined
       : undefined;

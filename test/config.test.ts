@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { AgentService } from "../src/agents/agent-service.ts";
 import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
 import { INTERACTIVE_CLI_STARTUP_DELAY_MS } from "../src/config/agent-tool-presets.ts";
-import { readEditableConfig } from "../src/config/config-file.ts";
+import { readEditableConfig, writeEditableConfig } from "../src/config/config-file.ts";
 import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
 import { resolveSlackBotConfig } from "../src/config/channel-bots.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
@@ -453,7 +453,7 @@ describe("loadConfig", () => {
     expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
   });
 
-  test("clears stale current-schema shared startup defaults on load", async () => {
+  test("clears stale current-schema startup delays on load", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
     const configPath = join(tempDir, "clisbot.json");
     const config = buildTemplateConfig();
@@ -461,6 +461,18 @@ describe("loadConfig", () => {
     config.meta.schemaVersion = "0.1.50";
     config.agents.defaults.runner.defaults.startupDelayMs = 3000;
     config.agents.defaults.runner.codex.startupDelayMs = 3000;
+    config.agents.defaults.runner.claude.startupDelayMs = 12000;
+    config.agents.defaults.runner.gemini.startupDelayMs = 15000;
+    config.agents.list = [{
+      id: "default",
+      cli: "codex",
+      runner: {
+        startupDelayMs: 16000,
+        defaults: {
+          startupDelayMs: 17000,
+        },
+      },
+    }];
 
     await Bun.write(configPath, JSON.stringify(config));
 
@@ -472,9 +484,38 @@ describe("loadConfig", () => {
     expect(rewrittenConfig.meta.schemaVersion).toBe("0.1.50");
     expect(rewrittenConfig.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
     expect(rewrittenConfig.agents.defaults.runner.codex.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.claude.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.defaults.runner.gemini.startupDelayMs).toBeUndefined();
+    expect(rewrittenConfig.agents.list[0].runner).toBeUndefined();
     expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
     expect(backups).toHaveLength(1);
     expect(backups[0]).toContain("clisbot.json.0.1.50.");
+  });
+
+  test("drops per-agent startup delay overrides below 30 seconds when persisting config", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+
+    config.agents.list = [{
+      id: "default",
+      cli: "codex",
+      runner: {
+        startupDelayMs: 16000,
+        defaults: {
+          startupDelayMs: 17000,
+        },
+      },
+    }];
+
+    await writeEditableConfig(configPath, config as any);
+
+    const rewrittenConfig = JSON.parse(readFileSync(configPath, "utf8"));
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+    const resolvedDefaultAgent = new AgentService(loaded).getResolvedAgentConfig("default");
+
+    expect(rewrittenConfig.agents.list[0].runner).toBeUndefined();
+    expect(resolvedDefaultAgent.runner.startupDelayMs).toBe(INTERACTIVE_CLI_STARTUP_DELAY_MS);
   });
 
   test("preserves current-schema disabled wildcard sender policy", async () => {

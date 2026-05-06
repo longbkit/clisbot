@@ -9,7 +9,7 @@ import {
 } from "./config-migration.ts";
 import { normalizeConfigDirectMessageRoutes } from "./direct-message-routes.ts";
 import { normalizeConfigGroupRoutes } from "./group-routes.ts";
-import { pruneConfigForPersistence } from "./persisted-config.ts";
+import { deleteStaleStartupDelay, pruneConfigForPersistence } from "./persisted-config.ts";
 import { clisbotConfigSchema } from "./schema.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,15 +49,35 @@ function pruneCurrentSchemaStartupDefaults(config: unknown) {
   const defaults = isRecord(agents?.defaults) ? agents.defaults : undefined;
   const runner = isRecord(defaults?.runner) ? defaults.runner : undefined;
   const runnerDefaults = isRecord(runner?.defaults) ? runner.defaults : undefined;
-  const codexRunner = isRecord(runner?.codex) ? runner.codex : undefined;
+  const familyRunners = ["codex", "claude", "gemini"]
+    .map((family) => isRecord(runner?.[family]) ? runner[family] : undefined);
+  const agentList = Array.isArray(agents?.list) ? agents.list : [];
   let pruned = false;
-  if (runnerDefaults?.startupDelayMs === 3000) {
-    delete runnerDefaults.startupDelayMs;
+  if (deleteStaleStartupDelay(runnerDefaults)) {
     pruned = true;
   }
-  if (codexRunner?.startupDelayMs === 3000) {
-    delete codexRunner.startupDelayMs;
-    pruned = true;
+  for (const familyRunner of familyRunners) {
+    if (deleteStaleStartupDelay(familyRunner)) {
+      pruned = true;
+    }
+  }
+  for (const agent of agentList) {
+    if (!isRecord(agent) || !isRecord(agent.runner)) {
+      continue;
+    }
+    if (deleteStaleStartupDelay(agent.runner)) {
+      pruned = true;
+    }
+    const runnerDefaultsOverride = isRecord(agent.runner.defaults) ? agent.runner.defaults : undefined;
+    if (deleteStaleStartupDelay(runnerDefaultsOverride)) {
+      if (runnerDefaultsOverride && Object.keys(runnerDefaultsOverride).length === 0) {
+        delete agent.runner.defaults;
+      }
+      if (Object.keys(agent.runner).length === 0) {
+        delete agent.runner;
+      }
+      pruned = true;
+    }
   }
   if (pruned) {
     nextConfig.meta = {
