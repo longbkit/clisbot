@@ -397,6 +397,13 @@ async function acceptTrustPrompt(params: {
   sessionName: string;
   captureLines: number;
 }) {
+  // The bypass-permissions warning defaults to "1. No, exit"; navigate down to "2. Yes, I accept" first.
+  const snapshot = normalizePaneText(
+    await params.tmux.capturePane(params.sessionName, params.captureLines),
+  );
+  if (snapshot.includes("Yes, I accept")) {
+    await params.tmux.sendKey(params.sessionName, "Down");
+  }
   await params.tmux.sendKey(params.sessionName, "Enter");
 
   const deadline = Date.now() + TRUST_PROMPT_MAX_WAIT_MS;
