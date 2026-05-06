@@ -3,7 +3,7 @@ import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 import { ensureDir, getDefaultRuntimeHealthPath } from "../shared/paths.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
-export type RuntimeChannel = "slack" | "telegram";
+export type RuntimeChannel = "slack" | "telegram" | "teams";
 export type RuntimeChannelConnection =
   | "disabled"
   | "stopped"
@@ -115,6 +115,18 @@ function summarizeTelegramHealthError(error: unknown) {
   };
 }
 
+function summarizeTeamsHealthError(error: unknown) {
+  return {
+    summary: "Teams channel failed to start.",
+    detail: normalizeErrorMessage(error),
+    actions: [
+      "verify `bots.teams.<botId>.appId` and `bots.teams.<botId>.appPassword` are set correctly",
+      "confirm the port is available and not blocked by a firewall",
+      `run ${renderCliCommand("logs", { inline: true })} again after restarting to confirm the startup error is gone`,
+    ],
+  };
+}
+
 export class RuntimeHealthStore {
   constructor(private readonly filePath = getDefaultRuntimeHealthPath()) {}
 
@@ -200,6 +212,17 @@ export class RuntimeHealthStore {
     const diagnostic = summarizeTelegramHealthError(error);
     await this.setChannel({
       channel: "telegram",
+      connection: "failed",
+      summary: diagnostic.summary,
+      detail: diagnostic.detail,
+      actions: diagnostic.actions,
+    });
+  }
+
+  async markTeamsFailure(error: unknown) {
+    const diagnostic = summarizeTeamsHealthError(error);
+    await this.setChannel({
+      channel: "teams",
       connection: "failed",
       summary: diagnostic.summary,
       detail: diagnostic.detail,

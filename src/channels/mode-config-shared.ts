@@ -9,14 +9,16 @@ import { resolveChannelIdentityBotId } from "./channel-identity.ts";
 import {
   getSlackBotRecord,
   getTelegramBotRecord,
+  getTeamsBotRecord,
   resolveSlackBotId,
   resolveTelegramBotId,
+  resolveTeamsBotId,
 } from "../config/channel-bots.ts";
 
 export type ResponseMode = "capture-pane" | "message-tool";
 export type AdditionalMessageMode = "queue" | "steer";
 export type StreamingMode = "off" | "latest" | "all";
-export type SurfaceModeChannel = "slack" | "telegram";
+export type SurfaceModeChannel = "slack" | "telegram" | "teams";
 export type SurfaceModeField = "responseMode" | "additionalMessageMode" | "streaming";
 
 export type ConfiguredSurfaceModeTarget = {
@@ -292,6 +294,82 @@ function resolveTelegramConfigTarget<TField extends SurfaceModeField>(
   );
 }
 
+function resolveTeamsConfigTarget<TField extends SurfaceModeField>(
+  config: ClisbotConfig,
+  field: TField,
+  params: ConfiguredSurfaceModeTarget,
+): SurfaceModeTargetBinding<TField> {
+  const botId = resolveTeamsBotId(config.bots.teams, params.botId);
+  const bot = getTeamsBotRecord(config.bots.teams, botId);
+  if (!bot) {
+    throw new Error(`Unknown Teams bot: ${botId}`);
+  }
+
+  if (!params.target) {
+    return {
+      get: () => getModeValue(bot, field),
+      set: (value) => {
+        setModeValue(bot, field, value);
+      },
+      label: `teams bot ${botId}`,
+    };
+  }
+
+  const [kind, targetId] = params.target.split(":", 2);
+  if (!targetId?.trim()) {
+    throw new Error(
+      `Teams ${renderFieldLabel(field)} target must use dm:<id>, channel:<id>, or group:<id>.`,
+    );
+  }
+
+  if (kind === "dm") {
+    const binding = resolveDirectMessageModeTarget({
+      field,
+      botLabel: "teams",
+      targetId,
+      routes: bot.directMessages,
+    });
+    return {
+      ...binding,
+      get: () => binding.get() ?? getModeValue(bot, field),
+    };
+  }
+
+  if (kind === "channel") {
+    const routeKey = targetId.trim();
+    const route = bot.channels[routeKey];
+    if (!route) {
+      throw new Error(`Route not configured yet: teams channel:${routeKey}. Add the route first.`);
+    }
+    return {
+      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
+      set: (value) => {
+        setModeValue(route, field, value);
+      },
+      label: `teams channel:${routeKey}`,
+    };
+  }
+
+  if (kind === "group") {
+    const routeKey = targetId.trim();
+    const route = bot.groupChats[routeKey];
+    if (!route) {
+      throw new Error(`Route not configured yet: teams group:${routeKey}. Add the route first.`);
+    }
+    return {
+      get: () => getModeValue(route, field) ?? getModeValue(bot, field),
+      set: (value) => {
+        setModeValue(route, field, value);
+      },
+      label: `teams group:${routeKey}`,
+    };
+  }
+
+  throw new Error(
+    `Teams ${renderFieldLabel(field)} target must use dm:<id>, channel:<id>, or group:<id>.`,
+  );
+}
+
 export function resolveConfiguredSurfaceModeTarget<TField extends SurfaceModeField>(
   config: ClisbotConfig,
   field: TField,
@@ -299,6 +377,10 @@ export function resolveConfiguredSurfaceModeTarget<TField extends SurfaceModeFie
 ) {
   if (params.channel === "slack") {
     return resolveSlackConfigTarget(config, field, params);
+  }
+
+  if (params.channel === "teams") {
+    return resolveTeamsConfigTarget(config, field, params);
   }
 
   return resolveTelegramConfigTarget(config, field, params);
@@ -313,6 +395,21 @@ export function buildConfiguredTargetFromIdentity(identity: ChannelIdentity) {
 
     return {
       channel: "slack" as const,
+      botId: resolveChannelIdentityBotId(identity),
+      target,
+    };
+  }
+
+  if (identity.platform === "teams") {
+    const target =
+      identity.conversationKind === "dm"
+        ? `dm:${identity.senderId ?? identity.chatId ?? "*"}`
+        : identity.conversationKind === "channel"
+          ? `channel:${identity.chatId ?? identity.channelId ?? ""}`
+          : `group:${identity.chatId ?? identity.channelId ?? ""}`;
+
+    return {
+      channel: "teams" as const,
       botId: resolveChannelIdentityBotId(identity),
       target,
     };

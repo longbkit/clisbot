@@ -23,7 +23,7 @@ function createLoopId() {
 }
 
 export function buildStoredLoopSender(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "teams";
   providerId: string;
   displayName?: string;
   handle?: string;
@@ -32,7 +32,7 @@ export function buildStoredLoopSender(params: {
   if (!providerId) {
     return undefined;
   }
-  const normalizedProviderId = params.platform === "slack" ? providerId.toUpperCase() : providerId;
+  const normalizedProviderId = params.platform === "slack" ? providerId.toUpperCase() : providerId.toLowerCase();
   return {
     senderId: `${params.platform}:${normalizedProviderId}`,
     providerId: normalizedProviderId,

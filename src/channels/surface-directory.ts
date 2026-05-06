@@ -6,7 +6,7 @@ import {
 } from "./surface-prompt-context.ts";
 import { ensureDir, fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 
-type Platform = "slack" | "telegram";
+type Platform = "slack" | "telegram" | "teams";
 
 export type SenderDirectoryRecord = {
   senderId: string;
@@ -50,7 +50,13 @@ function resolveDirectoryPath(stateDir: string) {
 }
 
 function platformFromSurfaceId(surfaceId: string): Platform {
-  return surfaceId.startsWith("slack:") ? "slack" : "telegram";
+  if (surfaceId.startsWith("slack:")) {
+    return "slack";
+  }
+  if (surfaceId.startsWith("teams:")) {
+    return "teams";
+  }
+  return "telegram";
 }
 
 async function readDirectory(pathname: string): Promise<SurfaceDirectoryShape> {

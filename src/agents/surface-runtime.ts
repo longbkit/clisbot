@@ -17,6 +17,8 @@ import {
   resolveSlackDirectMessageConfig,
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
+  resolveTeamsBotConfig,
+  resolveTeamsDirectMessageConfig,
 } from "../config/channel-bots.ts";
 import { resolveSharedGroupsWildcardRoute } from "../config/group-routes.ts";
 import { getAgentEntry, type LoadedConfig } from "../config/load-config.ts";
@@ -37,7 +39,7 @@ export type SurfaceNotificationRegistration = SurfaceNotificationTarget & {
 };
 
 export type SurfaceNotificationTarget = {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "teams";
   botId?: string;
   accountId?: string;
 };
@@ -263,7 +265,7 @@ export class SurfaceRuntime {
     });
   }
 
-  private getSurfaceNotificationHandlerKey(platform: "slack" | "telegram", botId?: string) {
+  private getSurfaceNotificationHandlerKey(platform: "slack" | "telegram" | "teams", botId?: string) {
     return `${platform}:${botId?.trim() || "default"}`;
   }
 
@@ -278,20 +280,30 @@ export class SurfaceRuntime {
   }
 
   private resolveChannelPromptConfig(identity: ChannelIdentity) {
-    return identity.platform === "slack"
-      ? resolveSlackBotConfig(
-          this.loadedConfig.raw.bots.slack,
-          resolveChannelIdentityBotId(identity),
-        )
-      : resolveTelegramBotConfig(
-          this.loadedConfig.raw.bots.telegram,
-          resolveChannelIdentityBotId(identity),
-        );
+    if (identity.platform === "slack") {
+      return resolveSlackBotConfig(
+        this.loadedConfig.raw.bots.slack,
+        resolveChannelIdentityBotId(identity),
+      );
+    }
+    if (identity.platform === "teams") {
+      return resolveTeamsBotConfig(
+        this.loadedConfig.raw.bots.teams,
+        resolveChannelIdentityBotId(identity),
+      );
+    }
+    return resolveTelegramBotConfig(
+      this.loadedConfig.raw.bots.telegram,
+      resolveChannelIdentityBotId(identity),
+    );
   }
 
   private resolveSurfaceNotifications(identity: ChannelIdentity): SurfaceNotificationsConfig {
     if (identity.platform === "slack") {
       return this.resolveSlackSurfaceNotifications(identity);
+    }
+    if (identity.platform === "teams") {
+      return this.resolveTeamsSurfaceNotifications(identity);
     }
     return this.resolveTelegramSurfaceNotifications(identity);
   }
@@ -439,9 +451,44 @@ export class SurfaceRuntime {
     }
   }
 
+  private resolveTeamsSurfaceNotifications(identity: ChannelIdentity): SurfaceNotificationsConfig {
+    const channelConfig = resolveTeamsBotConfig(
+      this.loadedConfig.raw.bots.teams,
+      resolveChannelIdentityBotId(identity),
+    );
+    let resolved: SurfaceNotificationsConfig = {
+      queueStart: channelConfig.surfaceNotifications?.queueStart ?? "brief",
+      loopStart: channelConfig.surfaceNotifications?.loopStart ?? "brief",
+    };
+    if (identity.conversationKind === "dm") {
+      const directMessageConfig = resolveTeamsDirectMessageConfig(
+        channelConfig,
+        identity.senderId,
+      );
+      return {
+        ...resolved,
+        ...(directMessageConfig?.surfaceNotifications ?? {}),
+      };
+    }
+    const conversationId = (identity.chatId ?? identity.channelId)?.trim();
+    const isChannel = identity.conversationKind === "channel";
+    const routeCollection = isChannel ? channelConfig.channels : channelConfig.groupChats;
+    const groupRoute = conversationId
+      ? routeCollection[conversationId] ?? routeCollection["*"]
+      : undefined;
+    resolved = {
+      ...resolved,
+      ...(groupRoute?.surfaceNotifications ?? {}),
+    };
+    return resolved;
+  }
+
   private resolveChannelSurfaceModes(identity: ChannelIdentity) {
     if (identity.platform === "slack") {
       return this.resolveSlackSurfaceModes(identity);
+    }
+    if (identity.platform === "teams") {
+      return this.resolveTeamsSurfaceModes(identity);
     }
     return this.resolveTelegramSurfaceModes(identity);
   }
@@ -467,6 +514,20 @@ export class SurfaceRuntime {
     );
     const directMessageConfig = identity.conversationKind === "dm"
       ? resolveTelegramDirectMessageConfig(channelConfig, identity.senderId)
+      : undefined;
+    return {
+      responseMode: directMessageConfig?.responseMode ?? channelConfig.responseMode,
+      streaming: directMessageConfig?.streaming ?? channelConfig.streaming,
+    };
+  }
+
+  private resolveTeamsSurfaceModes(identity: ChannelIdentity) {
+    const channelConfig = resolveTeamsBotConfig(
+      this.loadedConfig.raw.bots.teams,
+      resolveChannelIdentityBotId(identity),
+    );
+    const directMessageConfig = identity.conversationKind === "dm"
+      ? resolveTeamsDirectMessageConfig(channelConfig, identity.senderId)
       : undefined;
     return {
       responseMode: directMessageConfig?.responseMode ?? channelConfig.responseMode,

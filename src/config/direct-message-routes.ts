@@ -3,13 +3,14 @@ import type {
   ClisbotConfig,
   SlackBotConfig,
   TelegramBotConfig,
+  TeamsBotConfig,
 } from "./schema.ts";
 
 type DirectMessageRouteOwner = {
   directMessages: Record<string, BotRouteConfig>;
 };
 
-type Provider = "slack" | "telegram";
+type Provider = "slack" | "telegram" | "teams";
 
 export const DIRECT_MESSAGE_WILDCARD_ROUTE_ID = "*";
 export const LEGACY_DIRECT_MESSAGE_WILDCARD_ROUTE_IDS = ["dm:*", "dm:*".toUpperCase()];
@@ -200,6 +201,10 @@ export function normalizeConfigDirectMessageRoutes(
     providerConfig: config.bots.telegram,
     exactAdmissionMode,
   });
+  normalizeProviderDirectMessageRoutes({
+    providerConfig: config.bots.teams,
+    exactAdmissionMode,
+  });
   return config;
 }
 
@@ -220,11 +225,17 @@ function getProviderBot(
   config: ClisbotConfig,
   provider: Provider,
   botId: string,
-): SlackBotConfig | TelegramBotConfig {
-  const providerBots = provider === "slack" ? config.bots.slack : config.bots.telegram;
+): SlackBotConfig | TelegramBotConfig | TeamsBotConfig {
+  const providerBots =
+    provider === "slack"
+      ? config.bots.slack
+      : provider === "teams"
+        ? config.bots.teams
+        : config.bots.telegram;
   const bot = providerBots[botId];
   if (!bot) {
-    throw new Error(`Unknown ${provider === "slack" ? "Slack" : "Telegram"} bot: ${botId}`);
+    const name = provider === "slack" ? "Slack" : provider === "teams" ? "Teams" : "Telegram";
+    throw new Error(`Unknown ${name} bot: ${botId}`);
   }
   return bot;
 }

@@ -16,7 +16,7 @@ export type MessageAction =
 
 export type ParsedMessageCommand = {
   action: MessageAction;
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "teams";
   account?: string;
   target?: string;
   message?: string;

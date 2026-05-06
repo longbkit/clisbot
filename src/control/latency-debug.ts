@@ -1,4 +1,4 @@
-export type LatencyDebugPlatform = "slack" | "telegram";
+export type LatencyDebugPlatform = "slack" | "telegram" | "teams";
 
 export type LatencyDebugContext = {
   platform?: LatencyDebugPlatform;

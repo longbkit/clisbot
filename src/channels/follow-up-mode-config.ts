@@ -8,8 +8,10 @@ import {
 import {
   getSlackBotRecord,
   getTelegramBotRecord,
+  getTeamsBotRecord,
   resolveSlackBotId,
   resolveTelegramBotId,
+  resolveTeamsBotId,
 } from "../config/channel-bots.ts";
 import type { BotRouteConfig, ClisbotConfig } from "../config/schema.ts";
 import { resolveChannelIdentityBotId, type ChannelIdentity } from "./channel-identity.ts";
@@ -17,7 +19,7 @@ import { resolveChannelIdentityBotId, type ChannelIdentity } from "./channel-ide
 export type ConfiguredFollowUpModeScope = "channel" | "all";
 
 type ConfiguredFollowUpModeTarget = {
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "teams";
   botId?: string;
   scope: ConfiguredFollowUpModeScope;
   identity: ChannelIdentity;
@@ -182,12 +184,78 @@ function resolveTelegramFollowUpModeTarget(
   };
 }
 
+function resolveTeamsFollowUpModeTarget(
+  config: ClisbotConfig,
+  params: ConfiguredFollowUpModeTarget,
+): FollowUpModeTargetBinding {
+  const botId = resolveTeamsBotId(config.bots.teams, params.botId);
+  const bot = getTeamsBotRecord(config.bots.teams, botId);
+  if (!bot) {
+    throw new Error(`Unknown Teams bot: ${botId}`);
+  }
+
+  if (params.scope === "all") {
+    return {
+      get: () => bot.followUp?.mode,
+      set: (value) => {
+        getOrCreateFollowUp(bot).mode = value;
+      },
+      label: `teams bot ${botId}`,
+    };
+  }
+
+  if (params.identity.conversationKind === "dm") {
+    const targetId = params.identity.senderId?.trim() || params.identity.chatId?.trim();
+    if (!targetId) {
+      throw new Error("Teams follow-up channel scope requires a senderId or chatId.");
+    }
+    const routeKey = targetId;
+    const wildcardRoute = resolveDirectMessageWildcardRoute(bot.directMessages);
+    const existingRoute =
+      resolveDirectMessageExactRoute(bot.directMessages, targetId) ??
+      (bot.directMessages[routeKey] = createDirectMessageBehaviorOverride(wildcardRoute));
+    return {
+      get: () => existingRoute.followUp?.mode ?? bot.followUp?.mode,
+      set: (value) => {
+        getOrCreateFollowUp(existingRoute).mode = value;
+      },
+      label: `teams dm:${targetId}`,
+    };
+  }
+
+  const chatId = (params.identity.chatId ?? params.identity.channelId)?.trim();
+  if (!chatId) {
+    throw new Error("Teams follow-up channel scope requires a chatId or channelId.");
+  }
+
+  const isChannel = params.identity.conversationKind === "channel";
+  const routeCollection = isChannel ? bot.channels : bot.groupChats;
+  const route = routeCollection[chatId];
+  if (!route) {
+    throw new Error(
+      `Route not configured yet: teams ${isChannel ? "channel" : "group"}:${chatId}. Add the route first.`,
+    );
+  }
+
+  return {
+    get: () => route.followUp?.mode ?? bot.followUp?.mode,
+    set: (value) => {
+      getOrCreateFollowUp(route).mode = value;
+    },
+    label: `teams ${isChannel ? "channel" : "group"}:${chatId}`,
+  };
+}
+
 function resolveConfiguredFollowUpModeTarget(
   config: ClisbotConfig,
   params: ConfiguredFollowUpModeTarget,
 ) {
   if (params.channel === "slack") {
     return resolveSlackFollowUpModeTarget(config, params);
+  }
+
+  if (params.channel === "teams") {
+    return resolveTeamsFollowUpModeTarget(config, params);
   }
 
   return resolveTelegramFollowUpModeTarget(config, params);

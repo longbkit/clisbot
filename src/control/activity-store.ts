@@ -3,7 +3,7 @@ import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 import { ensureDir, getDefaultActivityStorePath } from "../shared/paths.ts";
 
 type ActivityRecord = {
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "teams";
   surface: string;
   agentId: string;
   updatedAt: string;
@@ -19,7 +19,7 @@ export class ActivityStore {
 
   async record(params: {
     agentId: string;
-    channel: "slack" | "telegram";
+    channel: "slack" | "telegram" | "teams";
     surface: string;
   }) {
     const document = await this.read();

@@ -6,7 +6,7 @@ export type StoredRecentConversationMessage = {
   senderId?: string;
   senderName?: string;
   senderHandle?: string;
-  platform?: "slack" | "telegram";
+  platform?: "slack" | "telegram" | "teams";
 };
 
 export type StoredRecentConversationState = {
@@ -34,7 +34,7 @@ function normalizeReplayLine(text: string) {
 function renderSenderLabel(message: StoredRecentConversationMessage) {
   const rawSenderId = message.senderId?.trim();
   const senderId = rawSenderId && message.platform
-    ? `${message.platform}:${message.platform === "slack" ? rawSenderId.toUpperCase() : rawSenderId}`
+    ? `${message.platform}:${message.platform === "slack" ? rawSenderId.toUpperCase() : rawSenderId.toLowerCase()}`
     : rawSenderId;
   if (!senderId) {
     return message.senderName;

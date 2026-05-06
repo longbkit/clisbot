@@ -22,6 +22,10 @@ export function normalizeAllowEntry(channel: PairingChannel, entry: string) {
     return normalizePrefixedEntry(trimmed, ["slack:", "user:"]).toUpperCase();
   }
 
+  if (channel === "teams") {
+    return normalizePrefixedEntry(trimmed, ["teams:", "user:"]).toLowerCase();
+  }
+
   const stripped = normalizePrefixedEntry(trimmed, ["telegram:", "tg:", "user:"]);
   if (!stripped) {
     return "";

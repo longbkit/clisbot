@@ -31,10 +31,10 @@ function resolveConfigPath(env: NodeJS.ProcessEnv = process.env) {
 
 function parseChannel(raw: string | undefined): PairingChannel {
   const value = raw?.trim().toLowerCase();
-  if (value === "slack" || value === "telegram") {
+  if (value === "slack" || value === "telegram" || value === "teams") {
     return value;
   }
-  throw new Error("Channel required: slack | telegram");
+  throw new Error("Channel required: slack | telegram | teams");
 }
 
 function resolveApprovedBotId(
@@ -61,10 +61,10 @@ function renderPairingCliHelp() {
     "Usage:",
     `  ${renderCliCommand("pairing --help")}`,
     `  ${renderCliCommand("pairing help")}`,
-    `  ${renderCliCommand("pairing list <slack|telegram> [--json]")}`,
-    `  ${renderCliCommand("pairing approve <slack|telegram> <code>")}`,
-    `  ${renderCliCommand("pairing reject <slack|telegram> <code>")}`,
-    `  ${renderCliCommand("pairing clear <slack|telegram>")}`,
+    `  ${renderCliCommand("pairing list <slack|telegram|teams> [--json]")}`,
+    `  ${renderCliCommand("pairing approve <slack|telegram|teams> <code>")}`,
+    `  ${renderCliCommand("pairing reject <slack|telegram|teams> <code>")}`,
+    `  ${renderCliCommand("pairing clear <slack|telegram|teams>")}`,
     "",
     "Notes:",
     "  - `list` shows pending pairing requests for one channel only",

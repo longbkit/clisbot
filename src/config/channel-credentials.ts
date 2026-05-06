@@ -356,7 +356,7 @@ export function materializeRuntimeChannelCredentials(
   options: {
     env?: NodeJS.ProcessEnv;
     runtimeCredentialsPath?: string;
-    materializeChannels?: Array<"slack" | "telegram">;
+    materializeChannels?: Array<"slack" | "telegram" | "teams">;
   } = {},
 ) {
   const env = options.env ?? process.env;

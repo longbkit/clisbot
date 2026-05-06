@@ -13,7 +13,7 @@ export type ChannelRenderedMessageState = {
 };
 
 export function buildRenderedMessageState(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "teams";
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   snapshot: string;
   queuePosition?: number;
@@ -45,7 +45,7 @@ export function buildRenderedMessageState(params: {
 }
 
 export function renderPlatformInteraction(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "teams";
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
   maxChars: number;
@@ -54,9 +54,9 @@ export function renderPlatformInteraction(params: {
   allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
-  return params.platform === "telegram"
-    ? renderTelegramInteraction(params)
-    : renderSlackInteraction(params);
+  return params.platform === "slack"
+    ? renderSlackInteraction(params)
+    : renderTelegramInteraction(params);
 }
 
 export function formatChannelFollowUpStatus(params: {

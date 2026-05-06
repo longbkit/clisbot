@@ -45,9 +45,13 @@ function senderIdFromIdentity(identity: ChannelIdentity) {
   if (!providerId) {
     return undefined;
   }
-  return identity.platform === "slack"
-    ? `slack:${providerId.toUpperCase()}`
-    : `telegram:${providerId}`;
+  if (identity.platform === "slack") {
+    return `slack:${providerId.toUpperCase()}`;
+  }
+  if (identity.platform === "teams") {
+    return `teams:${providerId}`;
+  }
+  return `telegram:${providerId}`;
 }
 
 function buildPermissionCheckCommand(params: {
@@ -84,6 +88,20 @@ function buildTelegramSurface(identity: ChannelIdentity): SurfacePromptContext["
     providerId: identity.chatId,
     kind,
     displayName: identity.chatName,
+  };
+}
+
+function buildTeamsSurface(identity: ChannelIdentity): SurfacePromptContext["surface"] {
+  const kind = identity.conversationKind === "dm"
+    ? "dm"
+    : identity.conversationKind === "channel"
+      ? "channel"
+      : "group";
+  return {
+    surfaceId: `teams:${kind}:${identity.chatId ?? identity.channelId ?? ""}`,
+    providerId: identity.chatId ?? identity.channelId,
+    kind,
+    displayName: identity.chatName ?? identity.channelName,
   };
 }
 
@@ -135,7 +153,9 @@ export function buildSurfacePromptContext(params: {
       : undefined,
     surface: params.identity.platform === "slack"
       ? buildSlackSurface(params.identity)
-      : buildTelegramSurface(params.identity),
+      : params.identity.platform === "teams"
+        ? buildTeamsSurface(params.identity)
+        : buildTelegramSurface(params.identity),
     permissionCheckCommand: buildPermissionCheckCommand({
       senderId,
       agentId: params.agentId,
@@ -167,7 +187,11 @@ export function renderSurfacePromptText(surface: SurfacePromptContext["surface"]
     return "unavailable";
   }
 
-  const platform = surface.surfaceId.startsWith("slack:") ? "Slack" : "Telegram";
+  const platform = surface.surfaceId.startsWith("slack:")
+    ? "Slack"
+    : surface.surfaceId.startsWith("teams:")
+      ? "Teams"
+      : "Telegram";
   if (surface.parent) {
     const parentKind = surface.parent.surfaceId.includes(":group:") ? "group" : "channel";
     const childKind = surface.surfaceId.includes(":thread:") ? "thread" : surface.kind;

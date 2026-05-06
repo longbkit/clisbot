@@ -4,7 +4,7 @@ import path from "node:path";
 import lockfile from "proper-lockfile";
 import { DEFAULT_PAIRING_DIR, ensureDir } from "../../shared/paths.ts";
 
-export type PairingChannel = "slack" | "telegram";
+export type PairingChannel = "slack" | "telegram" | "teams";
 
 export type PairingRequest = {
   id: string;

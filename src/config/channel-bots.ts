@@ -8,6 +8,8 @@ import type {
   SurfaceNotificationsConfig,
   TelegramBotConfig,
   TelegramProviderDefaultsConfig,
+  TeamsBotConfig,
+  TeamsProviderDefaultsConfig,
 } from "./schema.ts";
 import {
   resolveDirectMessageWildcardRoute,
@@ -570,4 +572,160 @@ export function listTelegramAccounts(
     accountId: entry.botId,
     config: entry.config,
   }));
+}
+
+// Teams
+
+export type TeamsBotCredentialConfig = {
+  appId: string;
+  appPassword: string;
+};
+
+export type ResolvedTeamsBotConfig = Omit<TeamsBotConfig, "directMessages" | "channels" | "groupChats"> &
+  TeamsProviderDefaultsConfig & {
+    id: string;
+    directMessages: Record<string, BotRouteConfig>;
+    channels: Record<string, BotRouteConfig>;
+    groupChats: Record<string, BotRouteConfig>;
+    appId: string;
+    appPassword: string;
+  };
+
+function getTeamsBotsRecord(
+  config: ClisbotConfig["bots"]["teams"],
+) {
+  const { defaults, ...bots } = config;
+  return bots;
+}
+
+export function resolveTeamsBotId(
+  config: ClisbotConfig["bots"]["teams"],
+  botId?: string | null,
+) {
+  return normalizeBotId(botId) ?? getConfiguredDefaultBotId({
+    defaultBotId: config.defaults.defaultBotId,
+    bots: getTeamsBotsRecord(config),
+  });
+}
+
+export function getTeamsBotRecord(
+  config: ClisbotConfig["bots"]["teams"],
+  botId: string,
+) {
+  return getTeamsBotsRecord(config)[botId] as TeamsBotConfig | undefined;
+}
+
+export function resolveTeamsBotConfig(
+  config: ClisbotConfig["bots"]["teams"],
+  botId?: string | null,
+): ResolvedTeamsBotConfig {
+  const resolvedBotId = resolveTeamsBotId(config, botId);
+  const providerDefaults = config.defaults;
+  const botConfig = getTeamsBotRecord(config, resolvedBotId);
+  if (!botConfig) {
+    throw new Error(`Unknown Teams bot: ${resolvedBotId}`);
+  }
+
+  return {
+    ...providerDefaults,
+    ...botConfig,
+    id: resolvedBotId,
+    commandPrefixes: {
+      slash:
+        botConfig.commandPrefixes?.slash ??
+        providerDefaults.commandPrefixes.slash,
+      bash:
+        botConfig.commandPrefixes?.bash ??
+        providerDefaults.commandPrefixes.bash,
+    },
+    surfaceNotifications: {
+      queueStart:
+        botConfig.surfaceNotifications?.queueStart ??
+        providerDefaults.surfaceNotifications?.queueStart ??
+        "brief",
+      loopStart:
+        botConfig.surfaceNotifications?.loopStart ??
+        providerDefaults.surfaceNotifications?.loopStart ??
+        "brief",
+    },
+    followUp: {
+      mode: botConfig.followUp?.mode ?? providerDefaults.followUp.mode,
+      participationTtlSec:
+        botConfig.followUp?.participationTtlSec ??
+        providerDefaults.followUp.participationTtlSec,
+      participationTtlMin:
+        botConfig.followUp?.participationTtlMin ??
+        providerDefaults.followUp.participationTtlMin,
+    },
+    directMessages: {
+      ...cloneSlackRoutes(providerDefaults.directMessages),
+      ...cloneSlackRoutes(botConfig.directMessages ?? {}),
+    },
+    channels: mergeSlackRoutes(
+      providerDefaults.channels,
+      botConfig.channels ?? {},
+    ),
+    groupChats: mergeSlackRoutes(
+      providerDefaults.groupChats,
+      botConfig.groupChats ?? {},
+    ),
+    webhook: {
+      port: botConfig.webhook?.port ?? providerDefaults.webhook.port,
+      path: botConfig.webhook?.path ?? providerDefaults.webhook.path,
+      secret: botConfig.webhook?.secret ?? providerDefaults.webhook.secret,
+    },
+    appId: botConfig.appId?.trim() ?? "",
+    appPassword: botConfig.appPassword?.trim() ?? "",
+  };
+}
+
+export function resolveTeamsDirectMessageConfig(
+  config: ResolvedTeamsBotConfig,
+  userId?: string | null,
+) {
+  return resolveEffectiveDirectMessageRoute(config.directMessages, userId, {
+    exactAdmissionMode: "explicit",
+  });
+}
+
+export function resolveTeamsDirectMessageAdmissionConfig(
+  config: ResolvedTeamsBotConfig,
+) {
+  return resolveDirectMessageWildcardRoute(config.directMessages);
+}
+
+export function resolveTeamsBotCredentials(
+  config: ClisbotConfig["bots"]["teams"],
+  botId?: string | null,
+): { botId: string; config: TeamsBotCredentialConfig } {
+  const resolved = resolveTeamsBotConfig(config, botId);
+  if (resolved.appId && resolved.appPassword) {
+    return {
+      botId: resolved.id,
+      config: {
+        appId: resolved.appId,
+        appPassword: resolved.appPassword,
+      },
+    };
+  }
+
+  throw new Error(`Unknown Teams bot: ${resolved.id}`);
+}
+
+export function listTeamsBots(
+  config: ClisbotConfig["bots"]["teams"],
+): Array<{ botId: string; config: TeamsBotCredentialConfig }> {
+  return Object.entries(getTeamsBotsRecord(config))
+    .filter(([, bot]) => bot.enabled !== false)
+    .map(([botId]) => {
+      const resolved = resolveTeamsBotConfig(config, botId);
+      return {
+        botId,
+        config: {
+          appId: resolved.appId,
+          appPassword: resolved.appPassword,
+        },
+      };
+    })
+    .filter(({ config }) => config.appId.trim() && config.appPassword.trim());
 }
