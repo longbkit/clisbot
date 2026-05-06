@@ -59,7 +59,7 @@ OpenClaw를 쓰고 싶지만 이런 점이 걸렸다면:
 ### 최근 무엇이 바뀌었는지만 빨리 알고 싶다
 
 - [최근 릴리스 하이라이트](#recent-release-highlights)부터 보면 된다
-- 이어서 [v0.1.51 릴리스 노트](../../../docs/releases/v0.1.51.md) 또는 [v0.1.51 릴리스 가이드](../../../docs/updates/releases/v0.1.51-release-guide.md)를 읽으면 된다
+- 이어서 [v0.1.52 릴리스 노트](../../../docs/releases/v0.1.52.md) 또는 [v0.1.52 릴리스 가이드](../../../docs/updates/releases/v0.1.52-release-guide.md)를 읽으면 된다
 
 ## 왜 clisbot을 만들었나
 
@@ -226,7 +226,7 @@ clisbot start \
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [릴리스 노트 인덱스](../ko/releases/README.md)
-- [v0.1.51 릴리스 노트](../../../docs/releases/v0.1.51.md)
+- [v0.1.52 릴리스 노트](../../../docs/releases/v0.1.52.md)
 - [v0.1.50 릴리스 노트](../ko/releases/v0.1.50.md)
 - [v0.1.43 릴리스 노트](../ko/releases/v0.1.43.md)
 - [v0.1.39 릴리스 노트](../ko/releases/v0.1.39.md)

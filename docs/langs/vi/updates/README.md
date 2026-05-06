@@ -14,6 +14,7 @@
 ## File chính
 
 - [update-guide.md](./update-guide.md): file `clisbot update` dùng
+- [v0.1.52 release guide (English)](../../../updates/releases/v0.1.52-release-guide.md): bản tóm tắt ngắn cho stable release hiện tại
 - [v0.1.51 release guide (English)](../../../updates/releases/v0.1.51-release-guide.md): bản tóm tắt ngắn cho stable release hiện tại
 
 ## Khi nào đọc nhóm này

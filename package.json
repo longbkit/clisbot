@@ -1,6 +1,6 @@
 {
   "name": "clisbot",
-  "version": "0.1.51",
+  "version": "0.1.52",
   "private": false,
   "description": "Chat surfaces for durable AI coding agents running in tmux",
   "license": "MIT",

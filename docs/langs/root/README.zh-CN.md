@@ -59,7 +59,7 @@
 ### 我只想快速知道最近有什么变化
 
 - 从 [最近版本亮点](#recent-release-highlights) 开始
-- 然后读 [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md) 或 [v0.1.51 Release Guide](../../../docs/updates/releases/v0.1.51-release-guide.md)
+- 然后读 [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md) 或 [v0.1.52 Release Guide](../../../docs/updates/releases/v0.1.52-release-guide.md)
 
 ## 为什么我做 clisbot
 
@@ -226,7 +226,7 @@ clisbot start \
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [Release Notes Index](../zh-CN/releases/README.md)
-- [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md)
+- [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md)
 - [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md)
 - [v0.1.43 Release Notes](../../../docs/releases/v0.1.43.md)
 - [v0.1.39 Release Notes](../../../docs/releases/v0.1.39.md)
