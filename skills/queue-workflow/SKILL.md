@@ -1,134 +1,133 @@
 ---
 name: queue-workflow
-description: Queue-first implementation workflow for clisbot queues. Use when work should keep going past the first pass and needs protection against early stopping, shallow review, naming drift, DRY/KISS regressions, missing docs/tests, or bad fallback behavior.
-version: 1.1.0
-lastUpdate: 2026-05-03T11:22:07Z
+description: Queue-first continuation and review workflow for clisbot queues. Use when work needs deliberate follow-up against early stopping, shallow passes, prompt echoing, history leaking, duplicate files/functions/sections, naming drift, DRY/KISS regressions, missing docs/tests, or bad fallback behavior.
 ---
 
 # Queue Workflow
 
-Use this skill when one implementation pass is not enough.
+Use this skill when a task needs more than one serious pass, or when the user explicitly asks for queue workflow.
 
-AI coding still tends to stop early. One extra `continue` often finds more to fix. This skill turns that into the default workflow by queueing the next passes instead of waiting for the human to remember.
+## Problem
 
-## Navigation
+AI can fail in two opposite ways:
 
-Read only the next file you need:
+- stop early, act lazy, or treat a green first pass as done
+- keep "improving" by adding duplicate sections, files, functions, fallbacks, names, or explanations
 
-- stay in `SKILL.md` for trigger, workflow, queue-depth selection, and reporting
-- read [references/queue-recipes.md](references/queue-recipes.md) for queue plans, prompt-writing rules, and real `clisbot queues` command templates
-- read [references/content-architecture.md](references/content-architecture.md) when improving this skill or any similar skill for context-saving, file split, link structure, or anti-ambiguity
+Queue workflow protects against both. It also catches prompt echoing, history leaking, topic drift away from exact `continue`, shallow queued micro-tasks, and review overload for the human.
+
+The goal is not to split work into tiny tasks. Each pass, including the current pass and every later queue-runner invocation, must inspect context, do the work, validate, simplify, and report clearly.
 
 ## When To Use
 
-Use queue-first when the task is any of:
+Use queue-first when:
 
-- medium or large code changes
-- risky changes across multiple files, layers, or contracts
-- fixes that may have wider regressions than the first patch reveals
-- work that should end with tests, docs, release notes, or backlog updates in sync
-- repo cleanup where naming, glossary, DRY, and KISS matter as much as the raw feature
+- the user explicitly asks for queue workflow, even for small work
+- the task is medium or large
+- code, docs, skill, runbook, or architecture changes may sprawl
+- regressions, missing tests/docs, naming drift, or duplicate structure are plausible
+- the user needs a final version, not draft-history explanation inside the artifact
 
-Skip queue-first only when the task is clearly tiny, low-risk, and fully verifiable in one short pass.
+Skip it only when the user did not ask for queue workflow and the task is clearly tiny, low-risk, and fully verifiable in one short pass.
 
-## First Principles
+Read [references/content-architecture.md](references/content-architecture.md) as the structural foundation for both the current pass and queued passes.
 
-- Early stopping is normal. Design the workflow to continue on purpose.
-- A strong main pass should already solve most of the work when the prompt is good; queue-first exists to protect follow-through, not to excuse a weak first pass.
-- Queued items are external future execution for later turns, not an internal checklist for the current turn.
-- Save context. Keep the top-level file short and move denser details into a few linked reference files.
-- Split enough small, but not too small. Each file should solve one coherent problem.
-- Keep related content near each other. Prefer one file per decision surface over many tiny files.
-- Make every loaded file immediately usable. Avoid long meta explanation before the operational guidance.
-- Write for both AI and humans. Do not rely on unstated assumptions, repo folklore, or ambiguous shorthand.
-- Prefer scoped, concrete queued prompts over generic motivational text.
+## Core Workflow
 
-## Core Rule
+Principles:
 
-Do not treat the first green patch as done when queue support exists and the task deserves follow-through.
+- Durable queues are an external clisbot queue-runner flow; the current agent must not drain pending queue items locally.
+- Queuing follow-up work never lowers the quality bar for the current pass.
+- Run the current pass deeply and thoroughly before reporting: inspect state, edit, validate, simplify, and name what is done now.
+- When the queue runner invokes a queued prompt later, that invocation must also run as a full-quality session, not a small visible micro-task.
+- Preserve the current thread with exact `continue` before switching to a new lens.
+- At queue creation time, do not depend on knowing whether a future pass will finish cleanly; add the control prompts up front after important milestones.
+- Keep final artifacts clean: do not echo user wording or leak draft-history notes unless the user needs a changelog.
 
-Instead:
+Process:
 
-1. Read repo instructions and inspect the current implementation first.
-2. Decide queue depth: small, medium, or large.
-3. If `clisbot queues` is available, queue the follow-up passes early.
-4. Do the main implementation pass.
-5. Let queued passes drive breadth review, simplification, code review, and docs sync.
-6. Only report done after the queue plan is exhausted or intentionally trimmed with a reason.
+1. Inspect repo instructions, current state, existing owners, and similar files/sections/functions before adding anything.
+2. Choose depth: small, medium, or large.
+3. If async follow-up is useful, queue the next pass or batch with `clisbot queues create`; this is for later runner invocations, not for the current turn to consume.
+4. Complete the current pass as deeply as the task deserves.
+5. Report what is done now, what was validated, and which queued follow-ups remain pending.
+6. Claim final completion only after the queue plan is exhausted or intentionally trimmed with a reason.
 
-If you can and should finish the follow-up work in the current turn, do not queue it. If you do queue it, do not silently consume that future work yourself in the same turn and then clear the queue as if it had been executed.
+## Queue Plan
 
-## Queue Depth
+Choose depth:
 
-- Small: one narrow area, few files, one obvious contract, low regression risk, plus 2-3 queued passes.
-- Medium: several files or one meaningful contract surface, likely tests/docs follow-up, plus 4-6 queued passes.
-- Large: multiple layers, cross-cutting contracts, release-facing or architecture-sensitive work, plus the full multi-pass sweep.
+- Small: narrow area, few files, low risk, or explicit user request for queue workflow on a small task.
+- Medium: meaningful contract/doc/skill surface, several related files, or likely validation/docs follow-up.
+- Large: multiple layers, cross-cutting behavior, migration/release-facing work, or architecture-sensitive cleanup.
 
-Prefer shorter batches when the first pass may change scope heavily.
-Prefer the full batch when the task is important, cross-cutting, or likely to hide follow-up work.
-For large or unstable tasks, queue the first wave only and queue the second wave after the code settles.
+Continuation and unknowns budget:
 
-## clisbot Queue Rules
+- Important milestones are the main/current pass, breadth or expansion review, and simplify/DRY-KISS/grouping review.
+- Small: after each important milestone, queue 1 exact `continue`, then 1 exact `anything else`.
+- Medium: after each important milestone, queue 2 exact `continue`, then 1 exact `anything else`.
+- Large: after each important milestone, queue 3 exact `continue`, then 1 exact `anything else`.
+- Queue these control prompts up front because the queue creator cannot know whether a future runner pass will find more work.
+- A runner pass may still stop its own local work when no material change remains, but it should not rewrite the queued control prompt.
 
-When operating inside `clisbot` and the task is queue-worthy:
+Prompt rules:
 
-- use `clisbot queues create`, not ad hoc reminders in prose
-- queue against the exact routed surface
-- include the real `--sender <principal>`
-- respect the pending queue cap
-- tell the user what queue depth you chose and why
-- prefer prompts tailored to the current task over blindly replaying a generic sequence
-- keep each queued prompt focused on one review lens
+- Keep queued prompts in the user's original human language.
+- Use exact `continue` and exact `anything else` for control prompts; do not add words to them.
+- Lens prompts should be objective review instructions, not prompt echoing or draft-history explanation.
+- Each queued review prompt is an independent runner invocation: inspect current state, work deeply, validate, simplify, and report.
 
-Addressing reminders:
+Review lenses:
 
-- Telegram topic example:
-  `clisbot queues create --channel telegram --target group:<chat_id> --topic-id <topic_id> --sender telegram:<user_id> "<prompt>"`
-- Slack thread example:
-  `clisbot queues create --channel slack --target group:<channel_id> --thread-id <thread_ts> --sender slack:<user_id> "<prompt>"`
-  Keep `--thread-id` when the current Slack message is in a thread so queue start/final notifications stay in that thread.
+1. breadth, side effects, and regression bugs
+2. artifact architecture for code, docs, or skills
+3. simplify, naming, DRY/KISS, and grouping
+4. review/fix and validation
+5. docs, release notes, changelog, or help text
+6. alignment with AGENTS.md, architecture docs, or recent lessons learned
+7. reasoning checks: critical thinking, 5 whys, fishbone, or MECE states
 
-## Follow-Up Pass Goals
+Artifact prompts:
 
-The queue should systematically attack common AI coding failure modes:
+- Code: review fundamentals, SOLID, naming, folders, regression bugs, side effects, tests, DRY/KISS, and near-duplicate files/functions/fallbacks.
+- Docs: review doc mode, one reader journey, target 5 H2s, max 7 H2s, on-page structure, no keyword stuffing, and final-version cleanliness.
+- Skills: review trigger/workflow/navigation/reporting ownership, progressive disclosure, line/heading budgets, frontmatter, examples, links, and command truthfulness.
 
-- early stopping
-- narrow local fixes with no breadth review
-- overthinking or bad fallback behavior
-- naming drift or duplicated logic
-- tests and docs lagging behind the code
+Batch skeletons:
 
-## Pass Ordering
+- Small: main/current pass -> `continue` -> `anything else` -> one useful review lens -> `continue` -> `anything else`
+- Medium: main/current pass -> `continue` -> `continue` -> `anything else` -> breadth/regression review -> `continue` -> `continue` -> `anything else` -> simplify/DRY-KISS -> `continue` -> `continue` -> `anything else` -> review/fix
+- Large wave 1: main/current pass -> `continue` -> `continue` -> `continue` -> `anything else` -> breadth/regression review -> `continue` -> `continue` -> `continue` -> `anything else` -> artifact architecture if relevant
+- Large wave 2: simplify/DRY-KISS -> `continue` -> `continue` -> `continue` -> `anything else` -> review/fix -> docs/release/alignment if relevant -> `continue`
 
-Use this order unless the repo or task strongly suggests another order:
+## Queue Operation
 
-1. main implementation
-2. continue pass
-3. breadth review pass
-4. simplify and naming/DRY/KISS pass
-5. code review and fix pass
-6. docs and release/help review pass
-7. final continue pass
+When operating inside `clisbot`:
 
-Do not force every task through every pass if a pass is genuinely not relevant. Trim intentionally and say why.
+- use `clisbot queues create`, not prose reminders
+- run `clisbot queues create --help` if command syntax is uncertain
+- queue against the exact routed surface and respect the pending queue cap
+- do not read pending queue items and execute them locally in the same turn
+- prefer one focused review lens per queued prompt
 
-## Fallback When Queue Is Unavailable
+Slack thread:
 
-If `clisbot queues` is unavailable, emulate the same workflow locally:
+```bash
+clisbot queues create --channel slack --target group:<channel_id> --thread-id <thread_ts> --sender slack:<user_id> "<prompt>"
+```
 
-- make the queue plan explicit in your notes
-- keep working through the same passes in the current turn
-- do not pretend the absence of a queue means the work is done
+Telegram topic:
 
-## Reporting
+```bash
+clisbot queues create --channel telegram --target group:<chat_id> --topic-id <topic_id> --sender telegram:<user_id> "<prompt>"
+```
 
-When you use this skill:
+Syntax check:
 
-- say that you are using a queue-first workflow
-- state the chosen queue depth
-- state which follow-up passes were queued or intentionally skipped
-- keep the queued prompts concrete and operational
-- prefer boring reuse over fresh abstraction unless the repo truly needs the new abstraction
-- point to the exact reference file when a deeper rule set is relevant:
-  - [references/queue-recipes.md](references/queue-recipes.md) for queue plans and command templates
-  - [references/content-architecture.md](references/content-architecture.md) for context-saving structure and anti-ambiguity rules
+```bash
+clisbot queues create --help
+```
+
+Report the chosen depth, artifact recipe if any, validation done in the current pass, follow-up passes queued or skipped, and pending queue work without pretending it is done.
+
+If `clisbot queues` is unavailable, emulate the same passes locally and say queueing was unavailable.
