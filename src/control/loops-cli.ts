@@ -463,13 +463,13 @@ function parseLoopCreator(args: string[], addressing: LoopCliAddressing): LoopCr
   const sender = parseOptionValue(args, LOOP_SENDER_FLAG)?.trim();
   if (!sender) {
     throw new Error(
-      `Loop creation requires ${LOOP_SENDER_FLAG} <principal>, for example ${LOOP_SENDER_FLAG} telegram:1276408333 or ${LOOP_SENDER_FLAG} slack:U1234567890.`,
+      `Loop creation requires ${LOOP_SENDER_FLAG} <principal>, for example ${LOOP_SENDER_FLAG} telegram:1276408333, ${LOOP_SENDER_FLAG} slack:U1234567890, or ${LOOP_SENDER_FLAG} zalo-bot:user-123.`,
     );
   }
   const [platform, ...providerParts] = sender.split(":");
   const providerId = providerParts.join(":").trim();
-  if ((platform !== "slack" && platform !== "telegram") || !providerId) {
-    throw new Error(`${LOOP_SENDER_FLAG} must be a principal like telegram:<id> or slack:<user-id>.`);
+  if ((platform !== "slack" && platform !== "telegram" && platform !== "zalo-bot") || !providerId) {
+    throw new Error(`${LOOP_SENDER_FLAG} must be a principal like telegram:<id>, slack:<user-id>, or zalo-bot:<user-id>.`);
   }
   if (addressing.channel && platform !== addressing.channel) {
     throw new Error(`${LOOP_SENDER_FLAG} platform must match --channel ${addressing.channel}.`);

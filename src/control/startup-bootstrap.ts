@@ -9,6 +9,7 @@ import { describeEnvReference } from "../shared/env-references.ts";
 import {
   describeSlackCredentialSource,
   describeTelegramCredentialSource,
+  describeZaloBotCredentialSource,
 } from "../config/channel-credentials.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
@@ -22,12 +23,14 @@ export const REPO_HELP_HINT =
 export type DefaultChannelAvailability = {
   slack: boolean;
   telegram: boolean;
+  zaloBot: boolean;
 };
 
 export type StartTokenArgs = {
   slackAppTokenRef?: string;
   slackBotTokenRef?: string;
   telegramBotTokenRef?: string;
+  zaloBotTokenRef?: string;
 };
 
 export function getDefaultChannelAvailability(
@@ -36,6 +39,7 @@ export function getDefaultChannelAvailability(
   return {
     slack: Boolean(env.SLACK_APP_TOKEN?.trim() && env.SLACK_BOT_TOKEN?.trim()),
     telegram: Boolean(env.TELEGRAM_BOT_TOKEN?.trim()),
+    zaloBot: Boolean(env.ZALO_BOT_TOKEN?.trim()),
   };
 }
 
@@ -50,16 +54,22 @@ export function getChannelAvailabilityForBootstrap(
     "TELEGRAM_BOT_TOKEN",
     env,
   );
+  const zaloBot = describeEnvReference(
+    tokenArgs.zaloBotTokenRef,
+    "ZALO_BOT_TOKEN",
+    env,
+  );
   return {
     slack: Boolean(slackApp.hasValue && slackBot.hasValue),
     telegram: Boolean(telegramBot.hasValue),
+    zaloBot: Boolean(zaloBot.hasValue),
   };
 }
 
 export function hasAnyDefaultChannelToken(
   availability: DefaultChannelAvailability,
 ) {
-  return availability.slack || availability.telegram;
+  return availability.slack || availability.telegram || availability.zaloBot;
 }
 
 export function renderDisabledConfiguredChannelWarningLines(
@@ -67,6 +77,7 @@ export function renderDisabledConfiguredChannelWarningLines(
     bots: {
       slack: { defaults: { enabled: boolean } };
       telegram: { defaults: { enabled: boolean } };
+      zaloBot: { defaults: { enabled: boolean } };
     };
   },
   availability: DefaultChannelAvailability,
@@ -92,6 +103,15 @@ export function renderDisabledConfiguredChannelWarningLines(
     );
   }
 
+  if (availability.zaloBot && !config.bots.zaloBot.defaults.enabled) {
+    lines.push(
+      "warning default Zalo Bot token is available in ZALO_BOT_TOKEN, but bots.zaloBot.defaults.enabled is false in the existing config.",
+    );
+    lines.push(
+      `Run ${renderCliCommand("bots enable --channel zalo-bot --bot default", { inline: true })} to enable Zalo Bot quickly, or update ${configPath} manually.`,
+    );
+  }
+
   return lines;
 }
 
@@ -107,6 +127,11 @@ export function renderBootstrapTokenUsageLines(
     "TELEGRAM_BOT_TOKEN",
     env,
   );
+  const zaloBot = describeEnvReference(
+    tokenArgs.zaloBotTokenRef,
+    "ZALO_BOT_TOKEN",
+    env,
+  );
 
   if (!(slackApp.hasValue && slackBot.hasValue)) {
     lines.push(
@@ -116,6 +141,11 @@ export function renderBootstrapTokenUsageLines(
   if (!telegramBot.hasValue) {
     lines.push(
       `Telegram channel: token not found (${telegramBot.envName}), pass --telegram-bot-token explicitly for Telegram bootstrap.`,
+    );
+  }
+  if (!zaloBot.hasValue) {
+    lines.push(
+      `Zalo Bot channel: token not found (${zaloBot.envName}), pass --zalo-bot-token explicitly for Zalo Bot bootstrap.`,
     );
   }
 
@@ -128,12 +158,14 @@ export function renderMissingTokenWarningLines(
   const slackApp = describeEnvReference("SLACK_APP_TOKEN", "SLACK_APP_TOKEN", env);
   const slackBot = describeEnvReference("SLACK_BOT_TOKEN", "SLACK_BOT_TOKEN", env);
   const telegramBot = describeEnvReference("TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN", env);
+  const zaloBot = describeEnvReference("ZALO_BOT_TOKEN", "ZALO_BOT_TOKEN", env);
 
   return [
     "warning first-run bootstrap needs explicit channel flags, so clisbot did not start.",
     `Slack token refs: app=${slackApp.envName} (${slackApp.hasValue ? "set" : "missing"}), bot=${slackBot.envName} (${slackBot.hasValue ? "set" : "missing"})`,
     `Telegram token ref: ${telegramBot.envName} (${telegramBot.hasValue ? "set" : "missing"})`,
-    "Pass the channels you want explicitly, for example with --telegram-bot-token or --slack-app-token plus --slack-bot-token.",
+    `Zalo Bot token ref: ${zaloBot.envName} (${zaloBot.hasValue ? "set" : "missing"})`,
+    "Pass the channels you want explicitly, for example with --telegram-bot-token, --zalo-bot-token, or --slack-app-token plus --slack-bot-token.",
     "Use ENV_NAME or ${ENV_NAME} for env-backed setup, or pass a literal token to cold-start with credentialType=mem.",
     `Example: ${renderCliCommand("start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN")}`,
     `Repo docs path (local or GitHub): ${BOTS_AND_CREDENTIALS_DOC_PATH}`,
@@ -148,6 +180,7 @@ export function renderConfiguredChannelTokenIssueLines(
     bots: {
       slack: any;
       telegram: any;
+      zaloBot: any;
     };
   },
   env: NodeJS.ProcessEnv = process.env,
@@ -175,6 +208,17 @@ export function renderConfiguredChannelTokenIssueLines(
     lines.push(error instanceof Error ? error.message : String(error));
   }
 
+  try {
+    if (config.bots.zaloBot.defaults.enabled) {
+      describeZaloBotCredentialSource({
+        config: config.bots.zaloBot,
+        env,
+      });
+    }
+  } catch (error) {
+    lines.push(error instanceof Error ? error.message : String(error));
+  }
+
   if (lines.length === 0) {
     return [];
   }
@@ -192,6 +236,7 @@ export function renderConfiguredChannelTokenStatusLines(
     bots: {
       slack: any;
       telegram: any;
+      zaloBot: any;
     };
   },
   env: NodeJS.ProcessEnv = process.env,
@@ -228,8 +273,23 @@ export function renderConfiguredChannelTokenStatusLines(
     }
   }
 
+  if (config.bots.zaloBot.defaults.enabled) {
+    const botId = config.bots.zaloBot.defaults.defaultBotId || "default";
+    try {
+      const source = describeZaloBotCredentialSource({
+        config: config.bots.zaloBot,
+        env,
+      });
+      lines.push(`Zalo Bot ${botId}: ${source.detail}`);
+    } catch (error) {
+      lines.push(
+        `Zalo Bot ${botId}: unavailable (${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+  }
+
   if (lines.length === 0) {
-    return ["No Slack or Telegram channels are enabled in the current config."];
+    return ["No Slack, Telegram, or Zalo Bot channels are enabled in the current config."];
   }
 
   return lines;
@@ -252,8 +312,10 @@ export function renderPairingSetupHelpLines(
   options: {
     slackEnabled?: boolean;
     telegramEnabled?: boolean;
+    zaloBotEnabled?: boolean;
     slackDirectMessagesPolicy?: string;
     telegramDirectMessagesPolicy?: string;
+    zaloBotDirectMessagesPolicy?: string;
     ownerConfigured?: boolean;
     ownerClaimWindowMinutes?: number;
     conditionalOnly?: boolean;
@@ -262,27 +324,37 @@ export function renderPairingSetupHelpLines(
   const lines: string[] = [];
   const slackPairing = options.slackDirectMessagesPolicy === "pairing";
   const telegramPairing = options.telegramDirectMessagesPolicy === "pairing";
+  const zaloBotPairing = options.zaloBotDirectMessagesPolicy === "pairing";
   const shouldRenderSlack = options.conditionalOnly === true
     ? Boolean(options.slackEnabled && slackPairing)
     : slackPairing;
   const shouldRenderTelegram = options.conditionalOnly === true
     ? Boolean(options.telegramEnabled && telegramPairing)
     : telegramPairing;
+  const shouldRenderZaloBot = options.conditionalOnly === true
+    ? Boolean(options.zaloBotEnabled && zaloBotPairing)
+    : zaloBotPairing;
 
-  if (!shouldRenderSlack && !shouldRenderTelegram) {
+  if (!shouldRenderSlack && !shouldRenderTelegram && !shouldRenderZaloBot) {
     return lines;
   }
 
   lines.push(`${prefix}Pairing notes:`);
 
-  if (shouldRenderSlack && shouldRenderTelegram) {
+  const enabledPairingLabels = [
+    shouldRenderTelegram ? "Telegram" : null,
+    shouldRenderSlack ? "Slack" : null,
+    shouldRenderZaloBot ? "Zalo Bot" : null,
+  ].filter(Boolean);
+
+  if (enabledPairingLabels.length > 1) {
     lines.push(
-      `${prefix}  - Send a direct message (DM) to the Telegram or Slack bot. Send \`/start\` or \`hi\` to receive a pairing code.`,
+      `${prefix}  - Send a direct message (DM) to an enabled bot (${enabledPairingLabels.join(", ")}). Send \`/start\` or \`hi\` to receive a pairing code.`,
     );
   }
 
   if (shouldRenderTelegram) {
-    if (!shouldRenderSlack) {
+    if (enabledPairingLabels.length === 1) {
       lines.push(
         `${prefix}  - Send a direct message (DM) to the Telegram bot. Send \`/start\` or \`hi\` to receive a pairing code.`,
       );
@@ -293,13 +365,24 @@ export function renderPairingSetupHelpLines(
   }
 
   if (shouldRenderSlack) {
-    if (!shouldRenderTelegram) {
+    if (enabledPairingLabels.length === 1) {
       lines.push(
         `${prefix}  - Send a direct message (DM) to the Slack bot. Say \`hi\` to receive a pairing code.`,
       );
     }
     lines.push(
       `${prefix}  - Approve the returned Slack code with: ${renderCliCommand("pairing approve slack <code>", { inline: true })}`,
+    );
+  }
+
+  if (shouldRenderZaloBot) {
+    if (enabledPairingLabels.length === 1) {
+      lines.push(
+        `${prefix}  - Send a direct message (DM) to the Zalo Bot. Send \`hi\` to receive a pairing code.`,
+      );
+    }
+    lines.push(
+      `${prefix}  - Approve the returned Zalo Bot code with: ${renderCliCommand("pairing approve zalo-bot <code>", { inline: true })}`,
     );
   }
 
@@ -332,10 +415,11 @@ export function renderChannelSetupHelpLines(
   return [
     `${prefix}Bot setup docs: ${BOTS_AND_CREDENTIALS_DOC_PATH}`,
     `${prefix}Operator guide: ${USER_GUIDE_DOC_PATH}`,
-    `${prefix}If Slack or Telegram is not responding yet, configure tokens, routes, and defaultAgentId first.`,
+    `${prefix}If Slack, Telegram, or Zalo Bot is not responding yet, configure tokens, routes, and defaultAgentId first.`,
     ...renderPairingSetupHelpLines(prefix, {
       slackDirectMessagesPolicy: "pairing",
       telegramDirectMessagesPolicy: "pairing",
+      zaloBotDirectMessagesPolicy: "pairing",
     }),
     ...renderTmuxDebugHelpLines(prefix),
     ...renderRepoHelpLines(prefix),

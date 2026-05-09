@@ -148,6 +148,8 @@ describe("parseCliArgs", () => {
         "${CUSTOM_SLACK_BOT_TOKEN}",
         "--telegram-bot-token",
         "${CUSTOM_TELEGRAM_BOT_TOKEN}",
+        "--zalo-bot-token",
+        "${CUSTOM_ZALO_BOT_TOKEN}",
       ]),
     ).toEqual({
       name: "init",
@@ -162,6 +164,8 @@ describe("parseCliArgs", () => {
         "${CUSTOM_SLACK_BOT_TOKEN}",
         "--telegram-bot-token",
         "${CUSTOM_TELEGRAM_BOT_TOKEN}",
+        "--zalo-bot-token",
+        "${CUSTOM_ZALO_BOT_TOKEN}",
       ],
     });
   });
@@ -182,6 +186,8 @@ describe("parseCliArgs", () => {
         "${CUSTOM_SLACK_BOT_TOKEN}",
         "--telegram-bot-token",
         "${CUSTOM_TELEGRAM_BOT_TOKEN}",
+        "--zalo-bot-token",
+        "${CUSTOM_ZALO_BOT_TOKEN}",
       ]),
     ).toEqual({
       name: "start",
@@ -196,6 +202,8 @@ describe("parseCliArgs", () => {
         "${CUSTOM_SLACK_BOT_TOKEN}",
         "--telegram-bot-token",
         "${CUSTOM_TELEGRAM_BOT_TOKEN}",
+        "--zalo-bot-token",
+        "${CUSTOM_ZALO_BOT_TOKEN}",
       ],
     });
   });
@@ -220,10 +228,12 @@ describe("renderCliHelp", () => {
     expect(help).toContain("SLACK_APP_TOKEN");
     expect(help).toContain("SLACK_BOT_TOKEN");
     expect(help).toContain("TELEGRAM_BOT_TOKEN");
+    expect(help).toContain("ZALO_BOT_TOKEN");
     expect(help).toContain("Fresh bootstrap only enables channels named by flags");
     expect(help).toContain("One human gets one dedicated long-lived assistant workspace and session path");
     expect(help).toContain("One shared channel or group routes into one shared assistant workspace and session path");
     expect(help).toContain("clisbot start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN");
+    expect(help).toContain("clisbot start --cli codex --bot-type personal --zalo-bot-token ZALO_BOT_TOKEN");
     expect(help).toContain("clisbot restart");
     expect(help).toContain("clisbot stop [--hard]");
     expect(help).toContain("clisbot status");
@@ -241,7 +251,7 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot routes <subcommand>");
     expect(help).toContain("clisbot routes --help");
     expect(help).toContain("clisbot loops <subcommand>");
-    expect(help).toContain("create --channel <slack|telegram> --target <route> [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--new-thread] <expression>");
+    expect(help).toContain("create --channel <slack|telegram|zalo-bot> --target <route> [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--new-thread] <expression>");
     expect(help).toContain("scoped list/status/cancel also accept --channel/--target/--thread-id/--topic-id");
     expect(help).toContain("`--target` selects the routed surface; use `--thread-id` for Slack threads, `--topic-id` for Telegram topics");
     expect(help).toContain("clisbot queues <subcommand>");

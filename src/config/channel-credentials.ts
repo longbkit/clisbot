@@ -4,6 +4,7 @@ import {
   getCanonicalSlackAppTokenPath,
   getCanonicalSlackBotTokenPath,
   getCanonicalTelegramBotTokenPath,
+  getCanonicalZaloBotTokenPath,
   getConfiguredDefaultBotId,
   getCredentialSkipPaths,
   getSlackBotConfig,
@@ -15,28 +16,37 @@ import {
   getTelegramBotsRecord,
   getTelegramEnvReference,
   getTelegramMemEnvName,
+  getZaloBotBotsRecord,
+  getZaloBotConfig,
+  getZaloBotEnvReference,
+  getZaloBotMemEnvName,
   normalizeBotId,
   parseTokenInput,
   type ParsedTokenInput,
   type ResolvedCredentialSource,
   type ResolvedSlackCredential,
   type ResolvedTelegramCredential,
+  type ResolvedZaloBotCredential,
   type SlackPersistentBotConfig,
   type TelegramPersistentBotConfig,
+  type ZaloBotPersistentBotConfig,
   trimString,
 } from "./channel-credentials-shared.ts";
 import {
   clearSlackRuntimeCredential,
   clearTelegramRuntimeCredential,
+  clearZaloBotRuntimeCredential,
   getConfigReloadMtimeMs,
   getRuntimeCredentialDocument,
   persistSlackCredential,
   persistTelegramCredential,
+  persistZaloBotCredential,
   readOptionalCanonicalCredentialFile,
   readRequiredCredentialFile,
   removeRuntimeCredentials,
   setSlackRuntimeCredential,
   setTelegramRuntimeCredential,
+  setZaloBotRuntimeCredential,
 } from "./channel-runtime-credentials.ts";
 import { extractEnvReferenceName } from "../shared/env-references.ts";
 import {
@@ -46,13 +56,15 @@ import {
 
 export class MissingMemCredentialError extends Error {
   constructor(
-    readonly provider: "slack" | "telegram",
+    readonly provider: "slack" | "telegram" | "zalo-bot",
     readonly botId: string,
   ) {
     super(
       provider === "telegram"
         ? `Telegram bot ${botId} is configured with credentialType=mem but no runtime credential is available.`
-        : `Slack bot ${botId} is configured with credentialType=mem but no runtime credential is available.`,
+        : provider === "zalo-bot"
+          ? `Zalo Bot ${botId} is configured with credentialType=mem but no runtime credential is available.`
+          : `Slack bot ${botId} is configured with credentialType=mem but no runtime credential is available.`,
     );
     this.name = "MissingMemCredentialError";
   }
@@ -81,6 +93,11 @@ export function validatePersistentChannelCredentials(config: ClisbotConfig) {
   for (const botId of Object.keys(getTelegramBotsRecord(config.bots.telegram))) {
     const bot = getTelegramBotConfig(config.bots.telegram, botId);
     validateTokenField(bot?.botToken, `bots.telegram.${botId}.botToken`);
+  }
+
+  for (const botId of Object.keys(getZaloBotBotsRecord(config.bots.zaloBot))) {
+    const bot = getZaloBotConfig(config.bots.zaloBot, botId);
+    validateTokenField(bot?.botToken, `bots.zaloBot.${botId}.botToken`);
   }
 }
 
@@ -194,6 +211,118 @@ export function resolveTelegramCredential(params: {
   }
 
   throw new Error(`Unknown Telegram bot: ${botId}`);
+}
+
+export function resolveZaloBotCredential(params: {
+  config: ClisbotConfig["bots"]["zaloBot"];
+  botId?: string | null;
+  accountId?: string | null;
+  env?: NodeJS.ProcessEnv;
+  runtimeCredentialsPath?: string;
+}): ResolvedZaloBotCredential {
+  const env = params.env ?? process.env;
+  const botId = normalizeBotId(params.botId ?? params.accountId) ?? getConfiguredDefaultBotId({
+    defaultBotId: params.config.defaults.defaultBotId,
+    bots: getZaloBotBotsRecord(params.config),
+  });
+  const bot = getZaloBotConfig(params.config, botId);
+
+  if (bot?.credentialType === "mem") {
+    const envName = getZaloBotMemEnvName(botId);
+    const secret = env[envName]?.trim() ||
+      getRuntimeCredentialDocument(params.runtimeCredentialsPath)["zalo-bot"]?.[botId]?.botToken
+        ?.trim();
+    if (!secret) {
+      throw new MissingMemCredentialError("zalo-bot", botId);
+    }
+    return {
+      botId,
+      botToken: secret,
+      source: {
+        source: "cli-ephemeral",
+        detail: "source=cli-ephemeral restartRequiresPersistence=yes",
+      },
+    };
+  }
+
+  const explicitTokenFile = trimString(bot?.tokenFile);
+  const canonicalTokenFile = getCanonicalZaloBotTokenPath(botId, env);
+  if (explicitTokenFile) {
+    return {
+      botId,
+      botToken: readRequiredCredentialFile(
+        explicitTokenFile,
+        `bots.zaloBot.${botId}.tokenFile`,
+      ),
+      source: {
+        source: "credential-file",
+        detail: `source=credential-file path=${collapseHomePath(expandHomePath(explicitTokenFile))}`,
+        paths: [expandHomePath(explicitTokenFile)],
+      },
+    };
+  }
+
+  if (bot?.credentialType === "tokenFile") {
+    return {
+      botId,
+      botToken: readRequiredCredentialFile(
+        canonicalTokenFile,
+        `bots.zaloBot.${botId}`,
+      ),
+      source: {
+        source: "credential-file",
+        detail: `source=credential-file path=${collapseHomePath(canonicalTokenFile)}`,
+        paths: [canonicalTokenFile],
+      },
+    };
+  }
+
+  const canonicalToken = readOptionalCanonicalCredentialFile(canonicalTokenFile);
+  if (canonicalToken) {
+    return {
+      botId,
+      botToken: canonicalToken,
+      source: {
+        source: "credential-file",
+        detail: `source=credential-file path=${collapseHomePath(canonicalTokenFile)}`,
+        paths: [canonicalTokenFile],
+      },
+    };
+  }
+
+  const envReference = getZaloBotEnvReference(params.config, botId);
+  const envName = extractEnvReferenceName(envReference);
+  if (envName) {
+    const value = env[envName]?.trim();
+    if (!value) {
+      throw new MissingEnvVarError(
+        envName,
+        `bots.zaloBot.${botId}.botToken`,
+      );
+    }
+    return {
+      botId,
+      botToken: value,
+      source: {
+        source: "env",
+        detail: `source=env name=${envName}`,
+        names: [envName],
+      },
+    };
+  }
+
+  if (envReference.trim()) {
+    return {
+      botId,
+      botToken: envReference.trim(),
+      source: {
+        source: "config-inline",
+        detail: "source=config-inline legacyCompatibility=yes",
+      },
+    };
+  }
+
+  throw new Error(`Unknown Zalo Bot: ${botId}`);
 }
 
 export function resolveSlackCredential(params: {
@@ -356,7 +485,7 @@ export function materializeRuntimeChannelCredentials(
   options: {
     env?: NodeJS.ProcessEnv;
     runtimeCredentialsPath?: string;
-    materializeChannels?: Array<"slack" | "telegram">;
+    materializeChannels?: Array<"slack" | "telegram" | "zalo-bot">;
   } = {},
 ) {
   const env = options.env ?? process.env;
@@ -367,6 +496,8 @@ export function materializeRuntimeChannelCredentials(
     materializeAll || materializeChannels.includes("telegram");
   const shouldMaterializeSlack =
     materializeAll || materializeChannels.includes("slack");
+  const shouldMaterializeZaloBot =
+    materializeAll || materializeChannels.includes("zalo-bot");
 
   if (shouldMaterializeTelegram && nextConfig.bots.telegram.defaults.enabled) {
     const configuredBotIds = Object.keys(getTelegramBotsRecord(nextConfig.bots.telegram));
@@ -466,6 +597,54 @@ export function materializeRuntimeChannelCredentials(
     }
   }
 
+  if (shouldMaterializeZaloBot && nextConfig.bots.zaloBot.defaults.enabled) {
+    const configuredBotIds = Object.keys(getZaloBotBotsRecord(nextConfig.bots.zaloBot));
+    const botIds = configuredBotIds.length > 0
+      ? configuredBotIds
+      : [getConfiguredDefaultBotId({
+        defaultBotId: nextConfig.bots.zaloBot.defaults.defaultBotId,
+        bots: getZaloBotBotsRecord(nextConfig.bots.zaloBot),
+      })];
+    const resolvedBots: Record<string, ZaloBotPersistentBotConfig> = {};
+    for (const botId of botIds) {
+      const existing = (getZaloBotConfig(nextConfig.bots.zaloBot, botId) ?? {}) as
+        ZaloBotPersistentBotConfig;
+      if (existing.enabled === false) {
+        continue;
+      }
+      let resolved: ResolvedZaloBotCredential | undefined;
+      try {
+        resolved = resolveZaloBotCredential({
+          config: config.bots.zaloBot,
+          botId,
+          env,
+          runtimeCredentialsPath: options.runtimeCredentialsPath,
+        });
+      } catch (error) {
+        if (!(error instanceof MissingMemCredentialError)) {
+          throw error;
+        }
+      }
+      if (!resolved) {
+        continue;
+      }
+      resolvedBots[botId] = {
+        ...existing,
+        botToken: resolved.botToken,
+      };
+    }
+    for (const [botId, resolved] of Object.entries(resolvedBots)) {
+      const current = nextConfig.bots.zaloBot[botId] as ZaloBotPersistentBotConfig | undefined;
+      if (!current) {
+        continue;
+      }
+      nextConfig.bots.zaloBot[botId] = {
+        ...current,
+        botToken: resolved.botToken,
+      };
+    }
+  }
+
   return nextConfig;
 }
 
@@ -524,27 +703,60 @@ export function describeSlackCredentialSource(params: {
   return resolveSlackCredential(params).source;
 }
 
+export function describeZaloBotCredentialSource(params: {
+  config: ClisbotConfig["bots"]["zaloBot"];
+  botId?: string | null;
+  accountId?: string | null;
+  env?: NodeJS.ProcessEnv;
+  runtimeCredentialsPath?: string;
+}) {
+  const env = params.env ?? process.env;
+  const botId = normalizeBotId(params.botId ?? params.accountId) ?? getConfiguredDefaultBotId({
+    defaultBotId: params.config.defaults.defaultBotId,
+    bots: getZaloBotBotsRecord(params.config),
+  });
+  const bot = getZaloBotConfig(params.config, botId);
+  if (bot?.credentialType === "mem") {
+    const envName = getZaloBotMemEnvName(botId);
+    const runtimeBotToken = getRuntimeCredentialDocument(params.runtimeCredentialsPath)["zalo-bot"]?.[botId]
+      ?.botToken?.trim();
+    return {
+      source: "cli-ephemeral" as const,
+      detail: env[envName]?.trim() || runtimeBotToken
+        ? "source=cli-ephemeral restartRequiresPersistence=yes"
+        : "source=cli-ephemeral available=no restartRequiresPersistence=yes",
+    };
+  }
+  return resolveZaloBotCredential(params).source;
+}
+
 export {
   clearSlackRuntimeCredential,
   clearTelegramRuntimeCredential,
+  clearZaloBotRuntimeCredential,
   getCanonicalSlackAppTokenPath,
   getCanonicalSlackBotTokenPath,
   getCanonicalTelegramBotTokenPath,
+  getCanonicalZaloBotTokenPath,
   getConfigReloadMtimeMs,
   getCredentialSkipPaths,
   getSlackMemAppEnvName,
   getSlackMemBotEnvName,
   getTelegramMemEnvName,
+  getZaloBotMemEnvName,
   parseTokenInput,
   persistSlackCredential,
   persistTelegramCredential,
+  persistZaloBotCredential,
   removeRuntimeCredentials,
   setSlackRuntimeCredential,
   setTelegramRuntimeCredential,
+  setZaloBotRuntimeCredential,
 };
 export type {
   ParsedTokenInput,
   ResolvedCredentialSource,
   ResolvedSlackCredential,
   ResolvedTelegramCredential,
+  ResolvedZaloBotCredential,
 };

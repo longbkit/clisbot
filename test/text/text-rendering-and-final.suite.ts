@@ -311,6 +311,7 @@ What changed today vs. yesterday
       status: "completed",
       content: [
         "Đã gửi câu trả lời vào Slack.",
+        "Đã gửi câu trả lời vào Zalo Bot.",
         "",
         "• Waited for background terminal",
         "",

@@ -22,7 +22,10 @@ export function normalizeAllowEntry(channel: PairingChannel, entry: string) {
     return normalizePrefixedEntry(trimmed, ["slack:", "user:"]).toUpperCase();
   }
 
-  const stripped = normalizePrefixedEntry(trimmed, ["telegram:", "tg:", "user:"]);
+  const prefixes = channel === "telegram"
+    ? ["telegram:", "tg:", "user:"]
+    : ["zalo-bot:"];
+  const stripped = normalizePrefixedEntry(trimmed, prefixes);
   if (!stripped) {
     return "";
   }
@@ -87,6 +90,42 @@ export function isTelegramSenderBlocked(params: {
   username?: string;
 }) {
   return isTelegramSenderAllowed({
+    allowFrom: params.blockFrom,
+    userId: params.userId,
+    username: params.username,
+  });
+}
+
+export function isZaloBotSenderAllowed(params: {
+  allowFrom: string[];
+  userId?: string;
+  username?: string;
+}) {
+  const userId = params.userId?.trim() ?? "";
+  const username = params.username?.trim()
+    ? `@${params.username.trim().replace(/^@+/, "").toLowerCase()}`
+    : "";
+  const normalizedAllowFrom = params.allowFrom
+    .map((entry) => normalizeAllowEntry("zalo-bot", entry))
+    .filter(Boolean);
+
+  if (userId && normalizedAllowFrom.includes(userId)) {
+    return true;
+  }
+
+  if (username && normalizedAllowFrom.includes(username)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function isZaloBotSenderBlocked(params: {
+  blockFrom: string[];
+  userId?: string;
+  username?: string;
+}) {
+  return isZaloBotSenderAllowed({
     allowFrom: params.blockFrom,
     userId: params.userId,
     username: params.username,

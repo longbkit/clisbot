@@ -8,8 +8,10 @@ import {
 import {
   getSlackBotRecord,
   getTelegramBotRecord,
+  getZaloBotRecord,
   resolveSlackBotId,
   resolveTelegramBotId,
+  resolveZaloBotId,
 } from "../config/channel-bots.ts";
 import type { BotRouteConfig, ClisbotConfig } from "../config/schema.ts";
 import { resolveChannelIdentityBotId, type ChannelIdentity } from "./channel-identity.ts";
@@ -17,7 +19,7 @@ import { resolveChannelIdentityBotId, type ChannelIdentity } from "./channel-ide
 export type ConfiguredFollowUpModeScope = "channel" | "all";
 
 type ConfiguredFollowUpModeTarget = {
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "zalo-bot";
   botId?: string;
   scope: ConfiguredFollowUpModeScope;
   identity: ChannelIdentity;
@@ -182,12 +184,76 @@ function resolveTelegramFollowUpModeTarget(
   };
 }
 
+function resolveZaloBotFollowUpModeTarget(
+  config: ClisbotConfig,
+  params: ConfiguredFollowUpModeTarget,
+): FollowUpModeTargetBinding {
+  const botId = resolveZaloBotId(config.bots.zaloBot, params.botId);
+  const bot = getZaloBotRecord(config.bots.zaloBot, botId);
+  if (!bot) {
+    throw new Error(`Unknown Zalo Bot: ${botId}`);
+  }
+
+  if (params.scope === "all") {
+    return {
+      get: () => bot.followUp?.mode,
+      set: (value) => {
+        getOrCreateFollowUp(bot).mode = value;
+      },
+      label: `zalo-bot bot ${botId}`,
+    };
+  }
+
+  if (params.identity.conversationKind === "dm") {
+    const targetId = params.identity.senderId?.trim() || params.identity.chatId?.trim();
+    if (!targetId) {
+      throw new Error("Zalo Bot follow-up channel scope requires a senderId or chatId.");
+    }
+    const routeKey = targetId;
+    const wildcardRoute = resolveDirectMessageWildcardRoute(bot.directMessages);
+    const existingRoute =
+      resolveDirectMessageExactRoute(bot.directMessages, targetId) ??
+      (bot.directMessages[routeKey] = createDirectMessageBehaviorOverride(wildcardRoute));
+    return {
+      get: () => existingRoute.followUp?.mode ?? bot.followUp?.mode,
+      set: (value) => {
+        getOrCreateFollowUp(existingRoute).mode = value;
+      },
+      label: `zalo-bot dm:${targetId}`,
+    };
+  }
+
+  const chatId = params.identity.chatId?.trim();
+  if (!chatId) {
+    throw new Error("Zalo Bot follow-up channel scope requires a chatId.");
+  }
+
+  const route =
+    bot.groups[chatId] ??
+    (bot.groups[chatId] = {
+      enabled: true,
+      allowUsers: [],
+      blockUsers: [],
+    });
+  return {
+    get: () => route.followUp?.mode ?? bot.followUp?.mode,
+    set: (value) => {
+      getOrCreateFollowUp(route).mode = value;
+    },
+    label: `zalo-bot group:${chatId}`,
+  };
+}
+
 function resolveConfiguredFollowUpModeTarget(
   config: ClisbotConfig,
   params: ConfiguredFollowUpModeTarget,
 ) {
   if (params.channel === "slack") {
     return resolveSlackFollowUpModeTarget(config, params);
+  }
+
+  if (params.channel === "zalo-bot") {
+    return resolveZaloBotFollowUpModeTarget(config, params);
   }
 
   return resolveTelegramFollowUpModeTarget(config, params);

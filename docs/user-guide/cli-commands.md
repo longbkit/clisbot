@@ -54,7 +54,7 @@ Start from what you want to do.
 
 ## Common Flags
 
-- `--channel <slack|telegram>`
+- `--channel <slack|telegram|zalo-bot>`
 - `--bot <id>`
 - `--agent <id>`
 - `--json`
@@ -116,6 +116,7 @@ Examples:
 
 - a Slack bot entry stores one app token source and one bot token source
 - a Telegram bot entry stores one bot token source
+- a Zalo Bot entry stores one bot token source
 
 A bot can define:
 
@@ -125,29 +126,32 @@ A bot can define:
 
 Core commands:
 
-- `clisbot bots list [--channel <slack|telegram>] [--json]`
+- `clisbot bots list [--channel <slack|telegram|zalo-bot>] [--json]`
 - `clisbot bots add --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
+- `clisbot bots add --channel zalo-bot [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
 - `clisbot bots add --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
-- `clisbot bots enable --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots disable --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots remove --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots get --channel <slack|telegram> [--bot <id>] [--json]`
-- `clisbot bots get-agent --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots set-agent --channel <slack|telegram> [--bot <id>] --agent <id>`
-- `clisbot bots clear-agent --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots get-default --channel <slack|telegram>`
-- `clisbot bots set-default --channel <slack|telegram> --bot <id>`
-- `clisbot bots get-credentials-source --channel <slack|telegram> [--bot <id>]`
+- `clisbot bots enable --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots disable --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots remove --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots get --channel <slack|telegram|zalo-bot> [--bot <id>] [--json]`
+- `clisbot bots get-agent --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots set-agent --channel <slack|telegram|zalo-bot> [--bot <id>] --agent <id>`
+- `clisbot bots clear-agent --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots get-default --channel <slack|telegram|zalo-bot>`
+- `clisbot bots set-default --channel <slack|telegram|zalo-bot> --bot <id>`
+- `clisbot bots get-credentials-source --channel <slack|telegram|zalo-bot> [--bot <id>]`
 - `clisbot bots set-credentials --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
+- `clisbot bots set-credentials --channel zalo-bot [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
 - `clisbot bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
-- `clisbot bots get-dm-policy --channel <slack|telegram> [--bot <id>]`
-- `clisbot bots set-dm-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
+- `clisbot bots get-dm-policy --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots set-dm-policy --channel <slack|telegram|zalo-bot> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
 
 Token aliases:
 
 - Slack app token: `--app-token`, `--slack-app-token`
 - Slack bot token: `--bot-token`, `--slack-bot-token`
 - Telegram bot token: `--bot-token`, `--telegram-bot-token`
+- Zalo Bot token: `--bot-token`, `--zalo-bot-token`
 
 Important behavior:
 
@@ -181,11 +185,14 @@ Examples:
 - one Telegram group under one Telegram bot
 - one Telegram topic inside one Telegram group under one Telegram bot
 - one Telegram DM fallback or one specific Telegram DM peer under one Telegram bot
+- one Zalo group under one Zalo Bot
+- one Zalo DM fallback or one specific Zalo DM peer under one Zalo Bot
 
 Notes:
 
 - a Slack thread inside a channel uses the parent channel route
 - a Telegram topic is its own route because topics are explicit sub-surfaces inside a group
+- Zalo Bot has no topic sub-surface model in the current provider
 
 Route ids:
 
@@ -198,6 +205,10 @@ Route ids:
 - Shared default fine-grain route: `group:*`
 - Telegram direct message fallback: `dm:*`
 - Telegram specific DM peer: `dm:1276408333`
+- Zalo group: `group:group-123`
+- Shared default fine-grain route: `group:*`
+- Zalo direct message fallback: `dm:*`
+- Zalo specific DM peer: `dm:aaa741c34d8fa4d1fd9e`
 
 Notes:
 
@@ -209,40 +220,41 @@ Notes:
 
 Core commands:
 
-- `clisbot routes list [--channel <slack|telegram>] [--bot <id>] [--json]`
+- `clisbot routes list [--channel <slack|telegram|zalo-bot>] [--bot <id>] [--json]`
 - `clisbot routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
-- `clisbot routes enable --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes disable --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes remove --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes get --channel <slack|telegram> <route-id> [--bot <id>] [--json]`
-- `clisbot routes get-agent --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-agent --channel <slack|telegram> <route-id> [--bot <id>] --agent <id>`
-- `clisbot routes clear-agent --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes get-policy --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-policy --channel <slack|telegram> <route-id> [--bot <id>] --policy <...>`
-- `clisbot routes get-require-mention --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-require-mention --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>`
-- `clisbot routes get-allow-bots --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-allow-bots --channel <slack|telegram> <route-id> [--bot <id>] --value <true|false>`
-- `clisbot routes add-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes remove-allow-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes add-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes remove-block-user --channel <slack|telegram> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes get-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-follow-up-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <auto|mention-only|paused>`
-- `clisbot routes get-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-follow-up-ttl --channel <slack|telegram> <route-id> [--bot <id>] --minutes <n>`
-- `clisbot routes get-response-mode --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-response-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <capture-pane|message-tool>`
-- `clisbot routes clear-response-mode --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes get-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]`
-- `clisbot routes set-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>] --mode <queue|steer>`
-- `clisbot routes clear-additional-message-mode --channel <slack|telegram> <route-id> [--bot <id>]`
+- `clisbot routes add --channel zalo-bot <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
+- `clisbot routes enable --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes disable --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes remove --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes get --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] [--json]`
+- `clisbot routes get-agent --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-agent --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --agent <id>`
+- `clisbot routes clear-agent --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes get-policy --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-policy --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --policy <...>`
+- `clisbot routes get-require-mention --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-require-mention --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --value <true|false>`
+- `clisbot routes get-allow-bots --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-allow-bots --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --value <true|false>`
+- `clisbot routes add-allow-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes remove-allow-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes add-block-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes remove-block-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes get-follow-up-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-follow-up-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --mode <auto|mention-only|paused>`
+- `clisbot routes get-follow-up-ttl --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-follow-up-ttl --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --minutes <n>`
+- `clisbot routes get-response-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-response-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --mode <capture-pane|message-tool>`
+- `clisbot routes clear-response-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes get-additional-message-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes set-additional-message-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --mode <queue|steer>`
+- `clisbot routes clear-additional-message-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
 
 Policy rules:
 
-- for Slack public channels, Slack groups, Telegram groups, and Telegram topics, route policy is one of:
+- for Slack public channels, Slack groups, Telegram groups, Telegram topics, and Zalo groups, route policy is one of:
   - `disabled`
   - `allowlist`
   - `open`
@@ -281,6 +293,8 @@ How to add or block users:
 - Slack DM block: `clisbot routes add-block-user --channel slack dm:* --bot <bot-id> --user U123ABC456`
 - Telegram DM allow: `clisbot routes add-allow-user --channel telegram dm:* --bot <bot-id> --user 1276408333`
 - Telegram DM block: `clisbot routes add-block-user --channel telegram dm:* --bot <bot-id> --user 1276408333`
+- Zalo DM allow: `clisbot routes add-allow-user --channel zalo-bot dm:* --bot <bot-id> --user aaa741c34d8fa4d1fd9e`
+- Zalo DM block: `clisbot routes add-block-user --channel zalo-bot dm:* --bot <bot-id> --user aaa741c34d8fa4d1fd9e`
 - Shared default allow: `clisbot routes add-allow-user --channel slack group:* --bot <bot-id> --user U_OWNER`
 - Shared default block: `clisbot routes add-block-user --channel telegram group:* --bot <bot-id> --user 1276408333`
 - `group:*` writes to the default sender rule for all admitted groups under that bot, stored as `groups["*"]`
@@ -296,6 +310,7 @@ Examples:
 - `clisbot routes add --channel slack dm:U_OWNER --bot support`
 - `clisbot routes add --channel telegram group:-1001234567890`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot support --require-mention false`
+- `clisbot routes add --channel zalo-bot group:group-123 --bot default --require-mention true`
 - `clisbot routes set-agent --channel slack group:C_GENERAL --agent product`
 - `clisbot routes set-require-mention --channel telegram topic:-1001234567890:42 --value false`
 - `clisbot routes set-allow-bots --channel telegram group:-1001234567890 --bot alerts --value true`
@@ -485,10 +500,10 @@ Important behavior:
 
 ## Pairing
 
-- `clisbot pairing list <slack|telegram> [--json]`
-- `clisbot pairing approve <slack|telegram> <code>`
-- `clisbot pairing reject <slack|telegram> <code>`
-- `clisbot pairing clear <slack|telegram>`
+- `clisbot pairing list <slack|telegram|zalo-bot> [--json]`
+- `clisbot pairing approve <slack|telegram|zalo-bot> <code>`
+- `clisbot pairing reject <slack|telegram|zalo-bot> <code>`
+- `clisbot pairing clear <slack|telegram|zalo-bot>`
 
 Important behavior:
 

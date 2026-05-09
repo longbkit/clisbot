@@ -64,6 +64,10 @@ export function normalizeAuthPrincipal(principal: string) {
     return `telegram:${userId.trim()}`;
   }
 
+  if (platform === "zalo-bot") {
+    return `zalo-bot:${userId.trim()}`;
+  }
+
   return `${platform}:${userId.trim()}`;
 }
 
@@ -81,7 +85,11 @@ export function resolveAuthPrincipal(identity: ChannelIdentity) {
     return normalizeAuthPrincipal(`slack:${senderId}`);
   }
 
-  return normalizeAuthPrincipal(`telegram:${senderId}`);
+  if (identity.platform === "telegram") {
+    return normalizeAuthPrincipal(`telegram:${senderId}`);
+  }
+
+  return normalizeAuthPrincipal(`zalo-bot:${senderId}`);
 }
 
 function findExplicitRole(

@@ -95,31 +95,42 @@ function appendChannelNextStepLines(
   const telegramEnabled = summary.channelSummaries.some((channel) =>
     channel.channel === "telegram" && channel.enabled
   );
-  const hasEnabledChannel = slackEnabled || telegramEnabled;
+  const zaloBotEnabled = summary.channelSummaries.some((channel) =>
+    channel.channel === "zalo-bot" && channel.enabled
+  );
+  const hasEnabledChannel = slackEnabled || telegramEnabled || zaloBotEnabled;
 
   if (!hasEnabledChannel) {
     lines.push(
-      `${prefix}- run ${renderCliCommand("bots add --channel <slack|telegram> ...", { inline: true })} for the first provider bot you want to expose`,
+      `${prefix}- run ${renderCliCommand("bots add --channel <slack|telegram|zalo-bot> ...", { inline: true })} for the first provider bot you want to expose`,
     );
     return;
   }
 
-  if (telegramEnabled && slackEnabled) {
-    lines.push(`${prefix}- DM the Telegram or Slack bot first to confirm it responds normally`);
+  const enabledLabels = [
+    telegramEnabled ? "Telegram" : null,
+    slackEnabled ? "Slack" : null,
+    zaloBotEnabled ? "Zalo Bot" : null,
+  ].filter(Boolean);
+
+  if (enabledLabels.length > 1) {
+    lines.push(`${prefix}- DM one enabled bot first to confirm it responds normally (${enabledLabels.join(", ")})`);
   } else if (telegramEnabled) {
     lines.push(`${prefix}- DM the Telegram bot first to confirm it responds normally`);
+  } else if (zaloBotEnabled) {
+    lines.push(`${prefix}- DM the Zalo Bot first to confirm it responds normally`);
   } else {
     lines.push(`${prefix}- DM the Slack bot first to confirm it responds normally`);
   }
 
   lines.push(
-    `${prefix}- after DM works, add the bot to the target Slack channel or Telegram group/topic`,
+    `${prefix}- after DM works, add the bot to the target Slack channel, Telegram group/topic, or Zalo group`,
   );
   lines.push(
-    `${prefix}- add the route with ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })} or ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}; that route uses the agent currently assigned to that bot by default`,
+    `${prefix}- add the route with ${renderCliCommand("routes add --channel slack group:<channelId> --bot default", { inline: true })}, ${renderCliCommand("routes add --channel telegram group:<chatId> --bot default", { inline: true })}, or ${renderCliCommand("routes add --channel zalo-bot group:<chatId> --bot default", { inline: true })}; that route uses the agent currently assigned to that bot by default`,
   );
   lines.push(
-    `${prefix}- only if you want a different agent there than the one currently assigned to that bot by default, bind it with ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })} or ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}`,
+    `${prefix}- only if you want a different agent there than the one currently assigned to that bot by default, bind it with ${renderCliCommand("routes set-agent --channel slack group:<channelId> --bot default --agent <id>", { inline: true })}, ${renderCliCommand("routes set-agent --channel telegram group:<chatId> --bot default --agent <id>", { inline: true })}, or ${renderCliCommand("routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>", { inline: true })}`,
   );
 
   if (telegramEnabled) {
@@ -131,6 +142,12 @@ function appendChannelNextStepLines(
   if (slackEnabled) {
     lines.push(
       `${prefix}- Slack: mention \`@<botname> \\start\` in the target channel to verify mention flow`,
+    );
+  }
+
+  if (zaloBotEnabled) {
+    lines.push(
+      `${prefix}- Zalo Bot: DM the bot for pairing flow first, then mention it in the target group to verify trigger flow`,
     );
   }
 }
@@ -354,6 +371,27 @@ function appendChannelSetupNote(
     return;
   }
 
+  if (channel.channel === "zalo-bot") {
+    lines.push(`${prefix}  - zalo-bot: no explicit group routes are configured yet`);
+    lines.push(
+      `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
+    );
+    lines.push(`${prefix}    sharedDefault: ${channel.sharedDefaultPolicy ?? "n/a"}`);
+    lines.push(
+      `${prefix}    add group: ${renderCliCommand("routes add --channel zalo-bot group:<chatId> --bot default", { inline: true })}`,
+    );
+    lines.push(
+      `${prefix}    route uses the agent currently assigned to that bot by default`,
+    );
+    lines.push(
+      `${prefix}    optional agent override if that route should use a different agent than the one currently assigned to that bot by default: ${renderCliCommand("routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>", { inline: true })}`,
+    );
+    lines.push(
+      `${prefix}    adjust later: ${renderPrivilegedChatHint(summary, "run in-chat commands here")}`,
+    );
+    return;
+  }
+
   lines.push(`${prefix}  - slack: no explicit channel or group routes are configured yet`);
   lines.push(
     `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
@@ -415,11 +453,16 @@ function appendBootstrapGuidance(lines: string[], summary: RuntimeOperatorSummar
       telegramEnabled: summary.channelSummaries.some((channel) =>
         channel.channel === "telegram" && channel.enabled
       ),
+      zaloBotEnabled: summary.channelSummaries.some((channel) =>
+        channel.channel === "zalo-bot" && channel.enabled
+      ),
       ownerConfigured: hasConfiguredPrivilegedPrincipal(summary),
       ownerClaimWindowMinutes: summary.ownerSummary.ownerClaimWindowMinutes,
       slackDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "slack")
         ?.directMessagesPolicy,
       telegramDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "telegram")
+        ?.directMessagesPolicy,
+      zaloBotDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "zalo-bot")
         ?.directMessagesPolicy,
       conditionalOnly: true,
     }),
@@ -478,11 +521,14 @@ export function renderStartSummary(summary: RuntimeOperatorSummary) {
     ...renderPairingSetupHelpLines("", {
       slackEnabled: summary.channelSummaries.some((channel) => channel.channel === "slack" && channel.enabled),
       telegramEnabled: summary.channelSummaries.some((channel) => channel.channel === "telegram" && channel.enabled),
+      zaloBotEnabled: summary.channelSummaries.some((channel) => channel.channel === "zalo-bot" && channel.enabled),
       ownerConfigured: hasConfiguredPrivilegedPrincipal(summary),
       ownerClaimWindowMinutes: summary.ownerSummary.ownerClaimWindowMinutes,
       slackDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "slack")
         ?.directMessagesPolicy,
       telegramDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "telegram")
+        ?.directMessagesPolicy,
+      zaloBotDirectMessagesPolicy: summary.channelSummaries.find((channel) => channel.channel === "zalo-bot")
         ?.directMessagesPolicy,
       conditionalOnly: true,
     }),

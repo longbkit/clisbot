@@ -78,6 +78,36 @@ Routes live under that bot.
         "directMessages": {},
         "groups": {}
       }
+    },
+    "zaloBot": {
+      "defaults": {
+        "enabled": true,
+        "defaultBotId": "default",
+        "mode": "polling",
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
+        "directMessages": {
+          "*": {
+            "enabled": true,
+            "policy": "pairing"
+          }
+        },
+        "groups": {
+          "*": {
+            "enabled": true,
+            "policy": "open"
+          }
+        }
+      },
+      "default": {
+        "botToken": "${ZALO_BOT_TOKEN}",
+        "agentId": "default",
+        "mode": "polling",
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
+        "directMessages": {},
+        "groups": {}
+      }
     }
   }
 }
@@ -90,6 +120,7 @@ Routes live under that bot.
 - `dmPolicy` is a quick alias for the wildcard DM default
 - Slack `channelPolicy` and `groupPolicy` control shared-surface admission
 - Telegram `groupPolicy` controls Telegram group admission
+- Zalo Bot `groupPolicy` controls group admission
 - `groups["*"].policy` controls the default sender policy inside admitted groups
 - `disabled` means silent, even for owner/admin
 
@@ -101,19 +132,24 @@ Routes live under that bot.
 - exact DM routes may carry admission config as well as behavior overrides
 - bot-level defaults answer "what usually happens under this bot"; exact routes answer "what is special for this one surface"
 - exact group/channel/topic routes should omit `policy` when they should inherit `groups["*"].policy`
+- Zalo Bot has no topic/thread model, so operator routing stays at `dm:<id>` or `group:<id>`
 
 ## Common Commands
 
 ```bash
 clisbot bots list
 clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist
+clisbot bots add --channel zalo-bot --bot default --bot-token ZALO_BOT_TOKEN --persist
 clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist
 clisbot bots set-agent --channel slack --bot default --agent support
 clisbot bots set-default --channel telegram --bot alerts
+clisbot bots set-default --channel zalo-bot --bot default
 clisbot bots get-credentials-source --channel slack --bot default
 clisbot bots set-dm-policy --channel telegram --bot default --policy pairing
+clisbot bots set-dm-policy --channel zalo-bot --bot default --policy pairing
 clisbot bots set-group-policy --channel slack --bot default --policy allowlist
 clisbot routes set-policy --channel slack group:C1234567890 --bot default --policy allowlist
+clisbot routes add --channel zalo-bot group:<chatId> --bot default
 ```
 
 ## Credential Sources
@@ -139,9 +175,18 @@ After first run:
 
 - use `clisbot bots ...` for credentials and fallback agent changes
 - use `clisbot routes ...` for DM, group, and topic admission
+- for `zalo-bot`, use polling mode; webhook mode is reserved for later
+
+## Canonical Token Files
+
+- Slack app token: `~/.clisbot/credentials/slack/<botId>/app-token`
+- Slack bot token: `~/.clisbot/credentials/slack/<botId>/bot-token`
+- Telegram bot token: `~/.clisbot/credentials/telegram/<botId>/bot-token`
+- Zalo Bot token: `~/.clisbot/credentials/zalo-bot/<botId>/bot-token`
 
 ## Related Docs
 
 - [Routes](channels.md)
 - [CLI Commands](cli-commands.md)
+- [Zalo Bot Setup](zalo-bot-setup.md)
 - [Surface Policy Shape Standardization And 0.1.43 Compatibility](../tasks/features/configuration/2026-04-24-surface-policy-shape-standardization-and-0.1.43-compatibility.md)

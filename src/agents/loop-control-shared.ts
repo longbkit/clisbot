@@ -23,7 +23,7 @@ function createLoopId() {
 }
 
 export function buildStoredLoopSender(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "zalo-bot";
   providerId: string;
   displayName?: string;
   handle?: string;

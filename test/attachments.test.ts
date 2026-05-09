@@ -2,10 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { downloadRemoteBuffer } from "../src/agents/attachments/download.ts";
 import { prependAttachmentMentions } from "../src/agents/attachments/prompt.ts";
 import { saveWorkspaceAttachment } from "../src/agents/attachments/storage.ts";
 import { resolveSlackAttachmentPaths } from "../src/channels/slack/attachments.ts";
 import { resolveTelegramAttachmentPaths } from "../src/channels/telegram/attachments.ts";
+import { resolveZaloBotAttachmentPaths } from "../src/channels/zalo-bot/attachments.ts";
 
 describe("attachment prompt shaping", () => {
   test("prepends attachment mentions before normal text", () => {
@@ -94,6 +96,26 @@ describe("workspace attachment storage", () => {
     });
 
     expect(filePath.endsWith("telegram-voice.oga")).toBe(true);
+  });
+});
+
+describe("remote attachment downloads", () => {
+  test("rejects empty download bodies", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = ((async () =>
+      new Response(null, {
+        status: 200,
+      })) as unknown) as typeof fetch;
+
+    try {
+      await expect(
+        downloadRemoteBuffer({
+          url: "https://example.com/empty",
+        }),
+      ).rejects.toThrow("attachment download returned empty body");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
@@ -271,6 +293,96 @@ describe("slack attachment hydration", () => {
 
       expect(paths).toEqual([]);
       expect(historyCalls).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("zalo-bot attachment downloads", () => {
+  test("downloads image attachments and keeps a usable image extension", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-zalo-bot-attachments-"));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = ((async () =>
+      new Response(Buffer.from("zalo-image"), {
+        status: 200,
+        headers: {
+          "content-type": "image/jpeg",
+        },
+      })) as unknown) as typeof fetch;
+
+    try {
+      const paths = await resolveZaloBotAttachmentPaths({
+        message: {
+          message_id: "msg-1",
+          from: {
+            id: "user-1",
+          },
+          chat: {
+            id: "user-1",
+            chat_type: "PRIVATE",
+          },
+          date: 1,
+          photo_url: "https://example.com/photo-without-extension",
+        },
+        workspacePath: tempDir,
+        sessionKey: "agent:default:zalo-bot:dm:user-1",
+        messageId: "msg-1",
+      });
+
+      expect(paths).toHaveLength(1);
+      expect(paths[0]?.endsWith("photo-without-extension.jpg")).toBe(true);
+      expect(prependAttachmentMentions("", paths)).toBe(`@${paths[0]}`);
+      expect(await Bun.file(paths[0]!).text()).toBe("zalo-image");
+    } finally {
+      globalThis.fetch = originalFetch;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("retries image downloads when Zalo first returns an empty body", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-zalo-bot-attachments-"));
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = ((async () => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response(null, {
+          status: 200,
+        });
+      }
+
+      return new Response(Buffer.from("zalo-image"), {
+        status: 200,
+        headers: {
+          "content-type": "image/jpeg",
+        },
+      });
+    }) as unknown) as typeof fetch;
+
+    try {
+      const paths = await resolveZaloBotAttachmentPaths({
+        message: {
+          message_id: "msg-2",
+          from: {
+            id: "user-1",
+          },
+          chat: {
+            id: "user-1",
+            chat_type: "PRIVATE",
+          },
+          date: 1,
+          photo_url: "https://example.com/photo-without-extension",
+        },
+        workspacePath: tempDir,
+        sessionKey: "agent:default:zalo-bot:dm:user-1",
+        messageId: "msg-2",
+      });
+
+      expect(calls).toBe(2);
+      expect(paths).toHaveLength(1);
+      expect(await Bun.file(paths[0]!).text()).toBe("zalo-image");
     } finally {
       globalThis.fetch = originalFetch;
       rmSync(tempDir, { recursive: true, force: true });

@@ -17,6 +17,8 @@ import {
   resolveSlackDirectMessageConfig,
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
+  resolveZaloBotConfig,
+  resolveZaloBotDirectMessageConfig,
 } from "../config/channel-bots.ts";
 import { resolveSharedGroupsWildcardRoute } from "../config/group-routes.ts";
 import { getAgentEntry, type LoadedConfig } from "../config/load-config.ts";
@@ -37,7 +39,7 @@ export type SurfaceNotificationRegistration = SurfaceNotificationTarget & {
 };
 
 export type SurfaceNotificationTarget = {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "zalo-bot";
   botId?: string;
   accountId?: string;
 };
@@ -263,7 +265,10 @@ export class SurfaceRuntime {
     });
   }
 
-  private getSurfaceNotificationHandlerKey(platform: "slack" | "telegram", botId?: string) {
+  private getSurfaceNotificationHandlerKey(
+    platform: "slack" | "telegram" | "zalo-bot",
+    botId?: string,
+  ) {
     return `${platform}:${botId?.trim() || "default"}`;
   }
 
@@ -283,8 +288,13 @@ export class SurfaceRuntime {
           this.loadedConfig.raw.bots.slack,
           resolveChannelIdentityBotId(identity),
         )
-      : resolveTelegramBotConfig(
+      : identity.platform === "telegram"
+        ? resolveTelegramBotConfig(
           this.loadedConfig.raw.bots.telegram,
+          resolveChannelIdentityBotId(identity),
+        )
+        : resolveZaloBotConfig(
+          this.loadedConfig.raw.bots.zaloBot,
           resolveChannelIdentityBotId(identity),
         );
   }
@@ -293,7 +303,10 @@ export class SurfaceRuntime {
     if (identity.platform === "slack") {
       return this.resolveSlackSurfaceNotifications(identity);
     }
-    return this.resolveTelegramSurfaceNotifications(identity);
+    if (identity.platform === "telegram") {
+      return this.resolveTelegramSurfaceNotifications(identity);
+    }
+    return this.resolveZaloBotSurfaceNotifications(identity);
   }
 
   private resolveSlackSurfaceNotifications(identity: ChannelIdentity): SurfaceNotificationsConfig {
@@ -363,6 +376,32 @@ export class SurfaceRuntime {
       };
     }
     return resolved;
+  }
+
+  private resolveZaloBotSurfaceNotifications(identity: ChannelIdentity): SurfaceNotificationsConfig {
+    const channelConfig = resolveZaloBotConfig(
+      this.loadedConfig.raw.bots.zaloBot,
+      resolveChannelIdentityBotId(identity),
+    );
+    const resolved: SurfaceNotificationsConfig = {
+      queueStart: channelConfig.surfaceNotifications?.queueStart ?? "brief",
+      loopStart: channelConfig.surfaceNotifications?.loopStart ?? "brief",
+    };
+    if (identity.conversationKind === "dm") {
+      const directMessageConfig = resolveZaloBotDirectMessageConfig(
+        channelConfig,
+        identity.senderId,
+      );
+      return {
+        ...resolved,
+        ...(directMessageConfig?.surfaceNotifications ?? {}),
+      };
+    }
+    const route = channelConfig.groups[identity.chatId?.trim() ?? ""];
+    return {
+      ...resolved,
+      ...(route?.surfaceNotifications ?? {}),
+    };
   }
 
   private buildLoopChannelIdentity(loop: StoredLoop): ChannelIdentity {

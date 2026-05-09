@@ -71,6 +71,7 @@ describe("queues cli", () => {
     const help = renderQueuesHelp();
 
     expect(help).toContain("queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333");
+    expect(help).toContain("queues create --channel zalo-bot --target dm:user-123 --sender zalo-bot:user-123 review inbox");
     expect(help).toContain("control.queue.maxPendingItemsPerSession");
     expect(help).toContain("create requires explicit --channel/--target addressing plus --sender");
     expect(help).not.toContain("--session-key");
@@ -239,7 +240,7 @@ describe("queues cli", () => {
       "review",
       "queue",
     ])).rejects.toThrow(
-      "Queue creation requires --sender <principal>, for example --sender telegram:1276408333 or --sender slack:U1234567890.",
+      "Queue creation requires --sender <principal>, for example --sender telegram:1276408333, --sender slack:U1234567890, or --sender zalo-bot:user-123.",
     );
 
     const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, unknown>;
@@ -312,6 +313,53 @@ describe("queues cli", () => {
     const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
     expect(store["agent:default:telegram:group:-1001:topic:4335"].queues).toBeUndefined();
     expect(store["agent:default:main"].queues).toBeUndefined();
+  });
+
+  test("creates a scoped zalo-bot DM queue item", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-zalo-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    const config = buildConfig({
+      socketPath: join(tempDir, "clisbot.sock"),
+      storePath,
+      workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+    });
+    config.bots.telegram.defaults.enabled = false;
+    config.bots.zaloBot.defaults.enabled = true;
+    config.bots.zaloBot.default.directMessages["*"] = {
+      enabled: true,
+      policy: "open",
+      allowUsers: [],
+      blockUsers: [],
+      requireMention: false,
+      allowBots: false,
+      agentId: "default",
+    };
+    writeFileSync(process.env.CLISBOT_CONFIG_PATH, JSON.stringify(config, null, 2));
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+
+    await runQueuesCli([
+      "create",
+      "--channel",
+      "zalo-bot",
+      "--target",
+      "dm:user-123",
+      "--sender",
+      "zalo-bot:user-123",
+      "review",
+      "zalo",
+      "queue",
+    ], noQueueNotification);
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    const item = store["agent:default:zalo-bot:dm:user-123"].queues[0];
+    expect(item.promptText).toBe("review zalo queue");
+    expect(item.surfaceBinding).toMatchObject({
+      platform: "zalo-bot",
+      conversationKind: "dm",
+      chatId: "user-123",
+    });
+    expect(item.sender.senderId).toBe("zalo-bot:user-123");
   });
 
   test("create rejects --surface before persisting", async () => {

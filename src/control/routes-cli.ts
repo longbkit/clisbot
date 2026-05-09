@@ -8,6 +8,7 @@ import type {
   BotRouteConfig,
   ClisbotConfig,
   TelegramBotConfig,
+  ZaloBotConfig,
 } from "../config/schema.ts";
 import {
   createDirectMessageBehaviorOverride,
@@ -25,11 +26,12 @@ import {
 } from "../config/route-contract.ts";
 import { renderRoutesHelp } from "./routes-cli-help.ts";
 
-type Provider = "slack" | "telegram";
+type Provider = "slack" | "telegram" | "zalo-bot";
 type RouteNode =
   | BotRouteConfig
   | TelegramBotConfig["groups"][string]
-  | TelegramBotConfig["groups"][string]["topics"][string];
+  | TelegramBotConfig["groups"][string]["topics"][string]
+  | ZaloBotConfig["groups"][string];
 
 type ParsedRouteId =
   | {
@@ -48,7 +50,14 @@ type ParsedRouteId =
       topicId?: string;
     }
   | {
-      provider: "slack" | "telegram";
+      provider: "zalo-bot";
+      routeId: string;
+      storage: "groups";
+      key: string;
+      kind: "group";
+    }
+  | {
+      provider: "slack" | "telegram" | "zalo-bot";
       routeId: string;
       storage: "directMessages";
       key: string;
@@ -147,7 +156,7 @@ function validateRoutePolicy(parsed: ParsedRouteId, policy: string | undefined) 
 
 function parseProvider(args: string[]) {
   const channel = parseOptionValue(args, "--channel");
-  if (channel === "slack" || channel === "telegram") {
+  if (channel === "slack" || channel === "telegram" || channel === "zalo-bot") {
     return channel;
   }
   throw new Error(renderRoutesHelp());
@@ -158,7 +167,7 @@ function parseOptionalProvider(args: string[]) {
   if (channel === undefined) {
     return undefined;
   }
-  if (channel === "slack" || channel === "telegram") {
+  if (channel === "slack" || channel === "telegram" || channel === "zalo-bot") {
     return channel;
   }
   throw new Error(renderRoutesHelp());
@@ -180,6 +189,14 @@ function ensureTelegramBot(config: ClisbotConfig, botId: string) {
   const bot = config.bots.telegram[botId];
   if (!bot) {
     throw new Error(`Unknown Telegram bot: ${botId}`);
+  }
+  return bot;
+}
+
+function ensureZaloBot(config: ClisbotConfig, botId: string) {
+  const bot = config.bots.zaloBot[botId];
+  if (!bot) {
+    throw new Error(`Unknown Zalo Bot: ${botId}`);
   }
   return bot;
 }
@@ -235,6 +252,9 @@ function parseRouteId(provider: Provider, raw: string | undefined): ParsedRouteI
 
   if (provider === "slack") {
     throw new Error(`Slack route ids must use ${renderSlackRouteIdSyntax()}.`);
+  }
+  if (provider === "zalo-bot") {
+    throw new Error("Zalo Bot route ids must use `dm:<id>`, `dm:*`, `group:<chatId>`, or `group:*`.");
   }
   throw new Error(`Telegram route ids must use ${renderTelegramRouteIdSyntax()}.`);
 }
@@ -294,6 +314,26 @@ function getOrCreateRoute(
 ): RouteNode | undefined {
   if (provider === "slack") {
     const bot = ensureSlackBot(config, botId);
+    if (parsed.storage === "directMessages") {
+      if (!bot.directMessages[parsed.key] && options.create) {
+        const createdRoute = createDirectMessageRoute(
+          config,
+          provider,
+          botId,
+          options.policy,
+        );
+        bot.directMessages[parsed.key] = createdRoute;
+      }
+      return bot.directMessages[parsed.key];
+    }
+    if (!bot.groups[parsed.key] && options.create) {
+      bot.groups[parsed.key] = createBaseRoute(parsed.kind, options.policy);
+    }
+    return bot.groups[parsed.key];
+  }
+
+  if (provider === "zalo-bot") {
+    const bot = ensureZaloBot(config, botId);
     if (parsed.storage === "directMessages") {
       if (!bot.directMessages[parsed.key] && options.create) {
         const createdRoute = createDirectMessageRoute(
@@ -465,6 +505,40 @@ async function listRoutes(args: string[]) {
     }
   }
 
+  if (provider === undefined || provider === "zalo-bot") {
+    for (const [botId, bot] of Object.entries(config.bots.zaloBot)) {
+      if (botId === "defaults" || (botIdFilter && botId !== botIdFilter)) {
+        continue;
+      }
+      for (const [key, route] of Object.entries(bot.groups ?? {})) {
+        rows.push({
+          channel: "zalo-bot",
+          botId,
+          routeId: renderRouteId({
+            provider: "zalo-bot",
+            storage: "groups",
+            key,
+          }),
+          kind: key === "*" ? "shared" : "group",
+          route,
+        });
+      }
+      for (const [key, route] of Object.entries(bot.directMessages ?? {})) {
+        rows.push({
+          channel: "zalo-bot",
+          botId,
+          routeId: renderRouteId({
+            provider: "zalo-bot",
+            storage: "directMessages",
+            key,
+          }),
+          kind: "dm",
+          route,
+        });
+      }
+    }
+  }
+
   if (printJson) {
     console.log(JSON.stringify(rows, null, 2));
     return;
@@ -562,12 +636,19 @@ async function removeRoute(args: string[]) {
     } else {
       delete bot.groups[parsed.key];
     }
-  } else {
+  } else if (provider === "telegram") {
     const bot = ensureTelegramBot(config, botId);
     if (parsed.storage === "directMessages") {
       delete bot.directMessages[parsed.key];
     } else if (parsed.kind === "topic" && parsed.topicId) {
       delete bot.groups[parsed.key]?.topics?.[parsed.topicId];
+    } else {
+      delete bot.groups[parsed.key];
+    }
+  } else {
+    const bot = ensureZaloBot(config, botId);
+    if (parsed.storage === "directMessages") {
+      delete bot.directMessages[parsed.key];
     } else {
       delete bot.groups[parsed.key];
     }
@@ -680,7 +761,11 @@ async function getSetClearRouteField(args: string[], action: string) {
     await writeEditableConfig(configPath, config);
     console.log(`cleared additionalMessageMode for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-timezone") {
-    const bot = provider === "slack" ? ensureSlackBot(config, botId) : ensureTelegramBot(config, botId);
+    const bot = provider === "slack"
+      ? ensureSlackBot(config, botId)
+      : provider === "telegram"
+        ? ensureTelegramBot(config, botId)
+        : ensureZaloBot(config, botId);
     const agentId = route.agentId ?? bot.agentId ?? config.agents.defaults.defaultAgentId;
     const resolved = resolveConfigTimezone({
       config,

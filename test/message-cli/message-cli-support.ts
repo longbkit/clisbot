@@ -2,6 +2,8 @@ import { resolveSlackConversationRoute } from "../../src/channels/slack/route-co
 import { resolveSlackConversationTarget } from "../../src/channels/slack/session-routing.ts";
 import { resolveTelegramConversationRoute } from "../../src/channels/telegram/route-config.ts";
 import { resolveTelegramConversationTarget } from "../../src/channels/telegram/session-routing.ts";
+import { resolveZaloBotConversationRoute } from "../../src/channels/zalo-bot/route-config.ts";
+import { resolveZaloBotConversationTarget } from "../../src/channels/zalo-bot/session-routing.ts";
 import type { ChannelPlugin } from "../../src/channels/channel-plugin.ts";
 import type { ParsedMessageCommand } from "../../src/channels/message-command.ts";
 import type { LoadConfigOptions, LoadedConfig } from "../../src/config/load-config.ts";
@@ -87,6 +89,24 @@ export function createRawConfig(): LoadedConfig["raw"] {
     },
   };
   delete config.bots.telegram.default;
+  config.bots.zaloBot.defaults.enabled = true;
+  config.bots.zaloBot.defaults.defaultBotId = "default";
+  config.bots.zaloBot.default = {
+    ...config.bots.zaloBot.default,
+    enabled: true,
+    name: "default",
+    directMessages: {},
+    groups: {
+      "group-1": {
+        enabled: true,
+        policy: "open",
+        requireMention: true,
+        allowBots: false,
+        allowUsers: [],
+        blockUsers: [],
+      },
+    },
+  };
   return {
     ...config,
     session: {
@@ -331,6 +351,87 @@ export function createDependencies() {
                   ? "dm"
                   : "group",
             topicId: Number.isFinite(topicId) ? topicId : undefined,
+          });
+        },
+      },
+      {
+        id: "zalo-bot",
+        isEnabled: () => true,
+        listBots: () => [],
+        createRuntimeService: () => {
+          throw new Error("not used in message cli tests");
+        },
+        renderHealthSummary: () => "unused",
+        renderActiveHealthSummary: () => "unused",
+        markStartupFailure: async () => undefined,
+        runMessageCommand: async (_loadedConfig: any, command: ParsedMessageCommand) => {
+          const params =
+            command.action === "read" || command.action === "reactions" || command.action === "search"
+              ? command.action
+              : {
+                  botToken: "zalo-bot-test",
+                  target: command.target!,
+                  threadId: command.threadId,
+                  replyTo: command.replyTo,
+                  message: command.message,
+                  media: command.media,
+                  messageId: command.messageId,
+                  emoji: command.emoji,
+                  remove: command.remove,
+                  limit: command.limit,
+                  query: command.query,
+                  pollQuestion: command.pollQuestion,
+                  pollOptions: command.pollOptions,
+                  forceDocument: command.forceDocument,
+                  silent: command.silent,
+                  inputFormat: command.inputFormat,
+                  renderMode: command.renderMode,
+                  progress: command.progress,
+                  final: command.final,
+                };
+          calls.push({
+            provider: "zalo-bot",
+            action:
+              command.action === "read" || command.action === "reactions" || command.action === "search"
+                ? "unsupported"
+                : command.action,
+            params,
+          });
+          return {
+            botId: command.account ?? "default",
+            result:
+              command.action === "read" || command.action === "reactions" || command.action === "search"
+                ? { ok: false, action: command.action }
+                : command.action === "send"
+                  ? { ok: true, provider: "zalo-bot", action: "send" }
+                  : { ok: true },
+          };
+        },
+        resolveMessageReplyTarget: ({ loadedConfig, command, botId }) => {
+          if (!command.target) {
+            return null;
+          }
+          const chatId = command.target.trim();
+          if (!chatId) {
+            return null;
+          }
+          const resolved = resolveZaloBotConversationRoute({
+            loadedConfig,
+            chatType: chatId.startsWith("group") ? "GROUP" : "PRIVATE",
+            chatId,
+            senderId: chatId.startsWith("group") ? undefined : chatId,
+            botId,
+          });
+          if (!resolved.route) {
+            return null;
+          }
+          return resolveZaloBotConversationTarget({
+            loadedConfig,
+            agentId: resolved.route.agentId,
+            botId,
+            chatId,
+            userId: resolved.conversationKind === "dm" ? chatId : undefined,
+            conversationKind: resolved.conversationKind,
           });
         },
       },

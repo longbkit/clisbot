@@ -26,7 +26,7 @@ import { resolveLoopCliContext, type LoopCliContext } from "./loop-cli-context.t
 import { hasFlag, parseOptionValue } from "./loop-cli-addressing.ts";
 
 type QueueCliAddressing = {
-  channel?: "slack" | "telegram";
+  channel?: "slack" | "telegram" | "zalo-bot";
   target?: string;
   threadId?: string;
   topicId?: string;
@@ -101,8 +101,8 @@ function parseQueueCliAddressing(args: string[]): QueueCliAddressing {
     throw new Error("Queue commands use --channel/--target addressing; --surface and --session-key are not supported.");
   }
   const channel = parseOptionValue(args, "--channel");
-  if (channel && channel !== "slack" && channel !== "telegram") {
-    throw new Error("--channel must be `slack` or `telegram`.");
+  if (channel && channel !== "slack" && channel !== "telegram" && channel !== "zalo-bot") {
+    throw new Error("--channel must be `slack`, `telegram`, or `zalo-bot`.");
   }
   const addressing = {
     channel: channel as QueueCliAddressing["channel"],
@@ -117,6 +117,9 @@ function parseQueueCliAddressing(args: string[]): QueueCliAddressing {
   }
   if (addressing.channel === "slack" && addressing.topicId) {
     throw new Error("Slack queue commands use `--thread-id`, not `--topic-id`.");
+  }
+  if (addressing.channel === "zalo-bot" && (addressing.threadId || addressing.topicId)) {
+    throw new Error("Zalo Bot queue commands do not use `--thread-id` or `--topic-id`.");
   }
   return normalizeTelegramTarget(addressing);
 }
@@ -159,13 +162,13 @@ function parseQueueSender(args: string[], addressing: QueueCliAddressing): Store
   const sender = parseOptionValue(args, QUEUE_SENDER_FLAG)?.trim();
   if (!sender) {
     throw new Error(
-      `Queue creation requires ${QUEUE_SENDER_FLAG} <principal>, for example ${QUEUE_SENDER_FLAG} telegram:1276408333 or ${QUEUE_SENDER_FLAG} slack:U1234567890.`,
+      `Queue creation requires ${QUEUE_SENDER_FLAG} <principal>, for example ${QUEUE_SENDER_FLAG} telegram:1276408333, ${QUEUE_SENDER_FLAG} slack:U1234567890, or ${QUEUE_SENDER_FLAG} zalo-bot:user-123.`,
     );
   }
   const [platform, ...providerParts] = sender.split(":");
   const providerId = providerParts.join(":").trim();
-  if ((platform !== "slack" && platform !== "telegram") || !providerId) {
-    throw new Error("--sender must be a principal like telegram:<id> or slack:<user-id>.");
+  if ((platform !== "slack" && platform !== "telegram" && platform !== "zalo-bot") || !providerId) {
+    throw new Error("--sender must be a principal like telegram:<id>, slack:<user-id>, or zalo-bot:<user-id>.");
   }
   if (addressing.channel && platform !== addressing.channel) {
     throw new Error(`--sender platform must match --channel ${addressing.channel}.`);
@@ -449,10 +452,11 @@ export function renderQueuesHelp() {
     "clisbot queues",
     "",
     "Usage:",
-    `  ${renderCliCommand("queues list [--channel <slack|telegram> --target <route>]")}`,
-    `  ${renderCliCommand("queues status [--channel <slack|telegram> --target <route>]")}`,
+    `  ${renderCliCommand("queues list [--channel <slack|telegram|zalo-bot> --target <route>]")}`,
+    `  ${renderCliCommand("queues status [--channel <slack|telegram|zalo-bot> --target <route>]")}`,
     `  ${renderCliCommand("queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333 review backlog")}`,
-    `  ${renderCliCommand("queues clear --channel <slack|telegram> --target <route>")}`,
+    `  ${renderCliCommand("queues create --channel zalo-bot --target dm:user-123 --sender zalo-bot:user-123 review inbox")}`,
+    `  ${renderCliCommand("queues clear --channel <slack|telegram|zalo-bot> --target <route>")}`,
     `  ${renderCliCommand("queues clear --all")}`,
     "",
     "Notes:",

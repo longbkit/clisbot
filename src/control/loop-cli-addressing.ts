@@ -1,5 +1,5 @@
 export type LoopCliAddressing = {
-  channel?: "slack" | "telegram";
+  channel?: "slack" | "telegram" | "zalo-bot";
   target?: string;
   threadId?: string;
   topicId?: string;
@@ -65,8 +65,8 @@ export function parseAddressing(args: string[]): LoopCliAddressing {
     throw new Error("Loop commands use --channel/--target addressing; --surface and --session-key are not supported.");
   }
   const channel = parseOptionValue(args, "--channel");
-  if (channel && channel !== "slack" && channel !== "telegram") {
-    throw new Error("--channel must be `slack` or `telegram`.");
+  if (channel && channel !== "slack" && channel !== "telegram" && channel !== "zalo-bot") {
+    throw new Error("--channel must be `slack`, `telegram`, or `zalo-bot`.");
   }
 
   const threadId = parseOptionValue(args, "--thread-id");
@@ -77,6 +77,9 @@ export function parseAddressing(args: string[]): LoopCliAddressing {
 
   if (channel === "slack" && topicId) {
     throw new Error("Slack loop commands use `--thread-id`, not `--topic-id`.");
+  }
+  if (channel === "zalo-bot" && (threadId || topicId)) {
+    throw new Error("Zalo Bot loop commands do not use `--thread-id` or `--topic-id`.");
   }
 
   return {

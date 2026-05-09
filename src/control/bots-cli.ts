@@ -7,14 +7,18 @@ import { ensureBotDirectMessageWildcardRoute } from "../config/direct-message-ro
 import {
   describeSlackCredentialSource,
   describeTelegramCredentialSource,
+  describeZaloBotCredentialSource,
   getConfigReloadMtimeMs,
   parseTokenInput,
   persistSlackCredential,
   persistTelegramCredential,
+  persistZaloBotCredential,
   setSlackRuntimeCredential,
   setTelegramRuntimeCredential,
+  setZaloBotRuntimeCredential,
   clearSlackRuntimeCredential,
   clearTelegramRuntimeCredential,
+  clearZaloBotRuntimeCredential,
 } from "../config/channel-credentials.ts";
 import { RuntimeHealthStore } from "./runtime-health-store.ts";
 import { getRuntimeStatus } from "./runtime-process.ts";
@@ -22,7 +26,7 @@ import { getDefaultRuntimeCredentialsPath } from "../shared/paths.ts";
 import { addAgentToEditableConfig } from "./agents-cli.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
-type Provider = "slack" | "telegram";
+type Provider = "slack" | "telegram" | "zalo-bot";
 
 type BotsCliDependencies = {
   getRuntimeStatus: typeof getRuntimeStatus;
@@ -109,26 +113,28 @@ function renderBotsHelp() {
     "Usage:",
     `  ${renderCliCommand("bots --help")}`,
     `  ${renderCliCommand("bots help")}`,
-    `  ${renderCliCommand("bots list [--channel <slack|telegram>] [--json]")}`,
+    `  ${renderCliCommand("bots list [--channel <slack|telegram|zalo-bot>] [--json]")}`,
     `  ${renderCliCommand("bots add --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]")}`,
+    `  ${renderCliCommand("bots add --channel zalo-bot [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]")}`,
     `  ${renderCliCommand("bots add --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]")}`,
-    `  ${renderCliCommand("bots get --channel <slack|telegram> [--bot <id>] [--json]")}`,
-    `  ${renderCliCommand("bots enable --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots disable --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots remove --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots get-default --channel <slack|telegram>")}`,
-    `  ${renderCliCommand("bots set-default --channel <slack|telegram> --bot <id>")}`,
-    `  ${renderCliCommand("bots get-agent --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots set-agent --channel <slack|telegram> [--bot <id>] --agent <id>")}`,
-    `  ${renderCliCommand("bots clear-agent --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots get-timezone --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots set-timezone --channel <slack|telegram> [--bot <id>] <iana-timezone>")}`,
-    `  ${renderCliCommand("bots clear-timezone --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots get-credentials-source --channel <slack|telegram> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots get --channel <slack|telegram|zalo-bot> [--bot <id>] [--json]")}`,
+    `  ${renderCliCommand("bots enable --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots disable --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots remove --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots get-default --channel <slack|telegram|zalo-bot>")}`,
+    `  ${renderCliCommand("bots set-default --channel <slack|telegram|zalo-bot> --bot <id>")}`,
+    `  ${renderCliCommand("bots get-agent --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-agent --channel <slack|telegram|zalo-bot> [--bot <id>] --agent <id>")}`,
+    `  ${renderCliCommand("bots clear-agent --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots get-timezone --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-timezone --channel <slack|telegram|zalo-bot> [--bot <id>] <iana-timezone>")}`,
+    `  ${renderCliCommand("bots clear-timezone --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots get-credentials-source --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
     `  ${renderCliCommand("bots set-credentials --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]")}`,
+    `  ${renderCliCommand("bots set-credentials --channel zalo-bot [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]")}`,
     `  ${renderCliCommand("bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]")}`,
-    `  ${renderCliCommand("bots get-dm-policy --channel <slack|telegram> [--bot <id>]")}`,
-    `  ${renderCliCommand("bots set-dm-policy --channel <slack|telegram> [--bot <id>] --policy <disabled|pairing|allowlist|open>")}`,
+    `  ${renderCliCommand("bots get-dm-policy --channel <slack|telegram|zalo-bot> [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-dm-policy --channel <slack|telegram|zalo-bot> [--bot <id>] --policy <disabled|pairing|allowlist|open>")}`,
     "",
     "Notes:",
     "  - `add` creates only; if the bot already exists, use `set-agent`, `set-credentials`, or another `set-<key>` command",
@@ -143,7 +149,7 @@ function renderBotsHelp() {
 
 function parseProvider(args: string[]) {
   const channel = parseOptionValue(args, "--channel");
-  if (channel === "slack" || channel === "telegram") {
+  if (channel === "slack" || channel === "telegram" || channel === "zalo-bot") {
     return channel;
   }
   throw new Error(renderBotsHelp());
@@ -180,6 +186,11 @@ function getTelegramBots(config: ClisbotConfig) {
   return bots;
 }
 
+function getZaloBotBots(config: ClisbotConfig) {
+  const { defaults, ...bots } = config.bots.zaloBot;
+  return bots;
+}
+
 function listEnabledBotIds(bots: Record<string, { enabled?: boolean }>) {
   return Object.entries(bots)
     .filter(([, bot]) => bot.enabled !== false)
@@ -199,15 +210,27 @@ function reconcileProviderDefaults(config: ClisbotConfig, provider: Provider) {
     }
     return;
   }
-
-  const enabledBotIds = listEnabledBotIds(getTelegramBots(config));
-  config.bots.telegram.defaults.enabled = enabledBotIds.length > 0;
-  if (enabledBotIds.length === 0) {
-    config.bots.telegram.defaults.defaultBotId = "default";
+  if (provider === "telegram") {
+    const enabledBotIds = listEnabledBotIds(getTelegramBots(config));
+    config.bots.telegram.defaults.enabled = enabledBotIds.length > 0;
+    if (enabledBotIds.length === 0) {
+      config.bots.telegram.defaults.defaultBotId = "default";
+      return;
+    }
+    if (!enabledBotIds.includes(config.bots.telegram.defaults.defaultBotId)) {
+      config.bots.telegram.defaults.defaultBotId = enabledBotIds[0]!;
+    }
     return;
   }
-  if (!enabledBotIds.includes(config.bots.telegram.defaults.defaultBotId)) {
-    config.bots.telegram.defaults.defaultBotId = enabledBotIds[0]!;
+
+  const enabledBotIds = listEnabledBotIds(getZaloBotBots(config));
+  config.bots.zaloBot.defaults.enabled = enabledBotIds.length > 0;
+  if (enabledBotIds.length === 0) {
+    config.bots.zaloBot.defaults.defaultBotId = "default";
+    return;
+  }
+  if (!enabledBotIds.includes(config.bots.zaloBot.defaults.defaultBotId)) {
+    config.bots.zaloBot.defaults.defaultBotId = enabledBotIds[0]!;
   }
 }
 
@@ -265,9 +288,9 @@ async function maybeCreateBotAgent(
 }
 
 function summarizeBotConfig(provider: Provider, botId: string, bot: Record<string, unknown>) {
-  if (provider === "slack") {
+  if (provider !== "telegram") {
     return {
-      channel: "slack",
+      channel: provider,
       botId,
       enabled: bot.enabled !== false,
       agentId: typeof bot.agentId === "string" ? bot.agentId : undefined,
@@ -319,6 +342,11 @@ async function listBots(args: string[]) {
           summarizeBotConfig("telegram", botId, bot)
         )
       : []),
+    ...(provider === undefined || provider === "zalo-bot"
+      ? Object.entries(getZaloBotBots(config)).map(([botId, bot]) =>
+          summarizeBotConfig("zalo-bot", botId, bot)
+        )
+      : []),
   ];
 
   if (printJson) {
@@ -350,7 +378,11 @@ async function addOrSetBotCredentials(
   const runtimeStatus = await deps.getRuntimeStatus();
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
 
-  const exists = provider === "slack" ? botId in getSlackBots(config) : botId in getTelegramBots(config);
+  const exists = provider === "slack"
+    ? botId in getSlackBots(config)
+    : provider === "telegram"
+      ? botId in getTelegramBots(config)
+      : botId in getZaloBotBots(config);
   if (action === "add" && exists) {
     throw new Error(
       `Bot already exists: ${provider}/${botId}. Use ${renderCliCommand("bots set-agent ...", { inline: true })}, ${renderCliCommand("bots set-credentials ...", { inline: true })}, or another \`set-<key>\` command.`,
@@ -367,17 +399,24 @@ async function addOrSetBotCredentials(
     ensureAgentExists(refreshed.config, nextAgentId);
   }
 
-  if (provider === "telegram") {
+  if (provider === "telegram" || provider === "zalo-bot") {
     const token = parseTokenInput(
-      parseAliasedOptionValue(args, ["--bot-token", "--telegram-bot-token"], "telegram bot token") ?? "",
+      parseAliasedOptionValue(
+        args,
+        provider === "telegram"
+          ? ["--bot-token", "--telegram-bot-token"]
+          : ["--bot-token", "--zalo-bot-token"],
+        provider === "telegram" ? "telegram bot token" : "zalo-bot token",
+      ) ?? "",
     );
 
     if (token.kind === "mem" && !persist && !runtimeStatus.running) {
-      throw new Error("Raw telegram bot token input without --persist requires a running clisbot runtime.");
+      throw new Error(`Raw ${provider} bot token input without --persist requires a running clisbot runtime.`);
     }
 
-    const existing = config.bots.telegram[botId];
-    config.bots.telegram[botId] = token.kind === "env"
+    const providerConfig = provider === "telegram" ? config.bots.telegram : config.bots.zaloBot;
+    const existing = providerConfig[botId];
+    providerConfig[botId] = token.kind === "env"
       ? {
           ...existing,
           enabled: true,
@@ -397,18 +436,28 @@ async function addOrSetBotCredentials(
 
     let persisted = token.kind === "env" ? "env" : "mem";
     if (token.kind === "mem") {
-      setTelegramRuntimeCredential({ botId, botToken: token.secret });
+      if (provider === "telegram") {
+        setTelegramRuntimeCredential({ botId, botToken: token.secret });
+      } else {
+        setZaloBotRuntimeCredential({ botId, botToken: token.secret });
+      }
     }
     if (persist && token.kind === "mem") {
-      persistTelegramCredential({ botId, botToken: token.secret });
-      clearTelegramRuntimeCredential({ botId });
+      if (provider === "telegram") {
+        persistTelegramCredential({ botId, botToken: token.secret });
+        clearTelegramRuntimeCredential({ botId });
+      } else {
+        persistZaloBotCredential({ botId, botToken: token.secret });
+        clearZaloBotRuntimeCredential({ botId });
+      }
       persisted = "tokenFile";
     }
 
-    if (!config.bots.telegram.defaults.defaultBotId || config.bots.telegram.defaults.defaultBotId === "default") {
-      config.bots.telegram.defaults.defaultBotId = botId;
+    const defaults = provider === "telegram" ? config.bots.telegram.defaults : config.bots.zaloBot.defaults;
+    if (!defaults.defaultBotId || defaults.defaultBotId === "default") {
+      defaults.defaultBotId = botId;
     }
-    reconcileProviderDefaults(config, "telegram");
+    reconcileProviderDefaults(config, provider);
     await writeEditableConfig(configPath, config);
 
     let runtime = "not-running";
@@ -416,7 +465,7 @@ async function addOrSetBotCredentials(
       runtime = await waitForReloadResult(configPath, deps) === "success" ? "started" : "failed";
     }
 
-    console.log(`${action === "add" ? "Added" : "Updated"} telegram/${botId}, persisted=${persisted}, runtime=${runtime}`);
+    console.log(`${action === "add" ? "Added" : "Updated"} ${provider}/${botId}, persisted=${persisted}, runtime=${runtime}`);
     console.log(`config: ${configPath}`);
     return;
   }
@@ -492,7 +541,11 @@ async function addOrSetBotCredentials(
 }
 
 function getProviderBot(config: ClisbotConfig, provider: Provider, botId: string) {
-  return provider === "slack" ? config.bots.slack[botId] : config.bots.telegram[botId];
+  return provider === "slack"
+    ? config.bots.slack[botId]
+    : provider === "telegram"
+      ? config.bots.telegram[botId]
+      : config.bots.zaloBot[botId];
 }
 
 function ensureProviderBot(config: ClisbotConfig, provider: Provider, botId: string) {
@@ -542,8 +595,10 @@ async function removeBot(args: string[]) {
 
   if (provider === "slack") {
     delete config.bots.slack[botId];
-  } else {
+  } else if (provider === "telegram") {
     delete config.bots.telegram[botId];
+  } else {
+    delete config.bots.zaloBot[botId];
   }
   reconcileProviderDefaults(config, provider);
   await writeEditableConfig(configPath, config);
@@ -558,7 +613,9 @@ async function getOrSetDefaultBot(args: string[], action: "get-default" | "set-d
   if (action === "get-default") {
     const botId = provider === "slack"
       ? config.bots.slack.defaults.defaultBotId
-      : config.bots.telegram.defaults.defaultBotId;
+      : provider === "telegram"
+        ? config.bots.telegram.defaults.defaultBotId
+        : config.bots.zaloBot.defaults.defaultBotId;
     console.log(`${provider} default bot: ${botId}`);
     console.log(`config: ${configPath}`);
     return;
@@ -571,8 +628,10 @@ async function getOrSetDefaultBot(args: string[], action: "get-default" | "set-d
   ensureProviderBot(config, provider, botId);
   if (provider === "slack") {
     config.bots.slack.defaults.defaultBotId = botId;
-  } else {
+  } else if (provider === "telegram") {
     config.bots.telegram.defaults.defaultBotId = botId;
+  } else {
+    config.bots.zaloBot.defaults.defaultBotId = botId;
   }
   reconcileProviderDefaults(config, provider);
   await writeEditableConfig(configPath, config);
@@ -678,7 +737,9 @@ async function getCredentialSource(args: string[]) {
   ensureProviderBot(config, provider, botId);
   const source = provider === "slack"
     ? describeSlackCredentialSource({ config: config.bots.slack, botId })
-    : describeTelegramCredentialSource({ config: config.bots.telegram, botId });
+    : provider === "telegram"
+      ? describeTelegramCredentialSource({ config: config.bots.telegram, botId })
+      : describeZaloBotCredentialSource({ config: config.bots.zaloBot, botId });
   console.log(`${provider}/${botId} credentials: ${source.detail}`);
   console.log(`config: ${configPath}`);
 }

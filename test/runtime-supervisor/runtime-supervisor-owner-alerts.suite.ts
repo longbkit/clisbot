@@ -6,6 +6,7 @@ import { RuntimeSupervisor } from "../../src/control/runtime-supervisor.ts";
 import { RuntimeHealthStore } from "../../src/control/runtime-health-store.ts";
 import type { ChannelPlugin } from "../../src/channels/channel-plugin.ts";
 import { createLoadedConfigAt } from "./runtime-supervisor-support.ts";
+import { sendOwnerAlert } from "../../src/control/owner-alerts.ts";
 
 describe("RuntimeSupervisor owner alerts", () => {
   let tempDir = "";
@@ -185,6 +186,53 @@ describe("RuntimeSupervisor owner alerts", () => {
     await Bun.sleep(80);
 
     expect(sentMessages).toHaveLength(0);
+  });
+
+  test("can deliver owner alerts to a zalo-bot owner principal", async () => {
+    const sentCommands: Array<{ channel: string; target?: string; account?: string; message?: string }> = [];
+    const loadedConfig = createLoadedConfigAt("/tmp/clisbot-owner-alerts-zalo.json");
+    loadedConfig.raw.app.auth.roles.owner.users = ["zalo-bot:user-123"];
+    const plugins: ChannelPlugin[] = [
+      {
+        id: "zalo-bot",
+        isEnabled: () => true,
+        listBots: () => [{ botId: "default", config: {} }],
+        createRuntimeService: () => ({
+          start: async () => undefined,
+          stop: async () => undefined,
+        }),
+        renderHealthSummary: () => "",
+        renderActiveHealthSummary: () => "",
+        markStartupFailure: async () => undefined,
+        resolveMessageReplyTarget: () => null,
+        runMessageCommand: async (_loadedConfig, command) => {
+          sentCommands.push({
+            channel: command.channel,
+            target: command.target,
+            account: command.account,
+            message: command.message,
+          });
+          return { botId: "default", result: { ok: true } };
+        },
+      },
+    ];
+
+    const result = await sendOwnerAlert({
+      loadedConfig,
+      message: "zalo-bot channel alert",
+      listChannelPlugins: () => plugins,
+    });
+
+    expect(result.failed).toEqual([]);
+    expect(result.delivered).toEqual(["zalo-bot:user-123 via zalo-bot/default"]);
+    expect(sentCommands).toEqual([
+      {
+        channel: "zalo-bot",
+        target: "user-123",
+        account: "default",
+        message: "zalo-bot channel alert",
+      },
+    ]);
   });
 
   test("keeps resolved alerts correct even when the bot id contains separators", async () => {

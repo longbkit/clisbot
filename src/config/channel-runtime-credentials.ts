@@ -12,6 +12,7 @@ import {
   getCanonicalSlackAppTokenPath,
   getCanonicalSlackBotTokenPath,
   getCanonicalTelegramBotTokenPath,
+  getCanonicalZaloBotTokenPath,
   type RuntimeCredentialDocument,
 } from "./channel-credentials-shared.ts";
 import {
@@ -134,6 +135,21 @@ export function setTelegramRuntimeCredential(params: {
   writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
 }
 
+export function setZaloBotRuntimeCredential(params: {
+  botId?: string;
+  accountId?: string;
+  botToken: string;
+  runtimeCredentialsPath?: string;
+}) {
+  const botId = resolveRuntimeBotId(params);
+  const document = getRuntimeCredentialDocument(params.runtimeCredentialsPath);
+  document["zalo-bot"] ??= {};
+  document["zalo-bot"][botId] = {
+    botToken: params.botToken.trim(),
+  };
+  writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
+}
+
 export function setSlackRuntimeCredential(params: {
   botId?: string;
   accountId?: string;
@@ -164,6 +180,19 @@ export function clearTelegramRuntimeCredential(params: {
   writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
 }
 
+export function clearZaloBotRuntimeCredential(params: {
+  botId?: string;
+  accountId?: string;
+  runtimeCredentialsPath?: string;
+}) {
+  const botId = resolveRuntimeBotId(params);
+  const document = getRuntimeCredentialDocument(params.runtimeCredentialsPath);
+  if (document["zalo-bot"]) {
+    delete document["zalo-bot"][botId];
+  }
+  writeRuntimeCredentialDocument(document, params.runtimeCredentialsPath);
+}
+
 export function clearSlackRuntimeCredential(params: {
   botId?: string;
   accountId?: string;
@@ -186,6 +215,19 @@ export function persistTelegramCredential(params: {
   const botId = resolveRuntimeBotId(params);
   ensureCanonicalCredentialArtifacts(params.env);
   const path = getCanonicalTelegramBotTokenPath(botId, params.env);
+  writeSecretFile(path, params.botToken);
+  return path;
+}
+
+export function persistZaloBotCredential(params: {
+  botId?: string;
+  accountId?: string;
+  botToken: string;
+  env?: NodeJS.ProcessEnv;
+}) {
+  const botId = resolveRuntimeBotId(params);
+  ensureCanonicalCredentialArtifacts(params.env);
+  const path = getCanonicalZaloBotTokenPath(botId, params.env);
   writeSecretFile(path, params.botToken);
   return path;
 }

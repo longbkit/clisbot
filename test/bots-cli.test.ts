@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeEditableConfig } from "../src/config/config-file.ts";
 import { getCanonicalTelegramBotTokenPath } from "../src/config/channel-credentials.ts";
+import { getCanonicalZaloBotTokenPath } from "../src/config/channel-credentials.ts";
 import { clisbotConfigSchema } from "../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/template.ts";
 import { runBotsCli } from "../src/control/bots-cli.ts";
@@ -112,6 +113,56 @@ describe("bots cli", () => {
       ),
     ).rejects.toThrow(
       `Use ${renderCliCommand("bots set-agent ...", { inline: true })}, ${renderCliCommand("bots set-credentials ...", { inline: true })}`,
+    );
+  });
+
+  test("adds a persisted zalo-bot bot without writing raw token into config", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+
+    const output: string[] = [];
+    console.log = (value?: unknown) => {
+      output.push(String(value ?? ""));
+    };
+
+    await runBotsCli(
+      [
+        "add",
+        "--channel",
+        "zalo-bot",
+        "--bot",
+        "zalo-main",
+        "--bot-token",
+        "123456:zalo-bot-token",
+        "--agent",
+        "support",
+        "--persist",
+      ],
+      {
+        getRuntimeStatus: async () => ({
+          running: false,
+          configPath: process.env.CLISBOT_CONFIG_PATH!,
+          pidPath: join(tempDir, "state", "clisbot.pid"),
+          logPath: join(tempDir, "state", "clisbot.log"),
+          tmuxSocketPath: join(tempDir, "state", "clisbot.sock"),
+        }),
+      } as any,
+    );
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.zaloBot["zalo-main"].credentialType).toBe("tokenFile");
+    expect(rawConfig.bots.zaloBot["zalo-main"].botToken ?? "").toBe("");
+    expect(rawConfig.bots.zaloBot["zalo-main"].agentId).toBe("support");
+    expect(rawConfig.bots.zaloBot.defaults.defaultBotId).toBe("zalo-main");
+    expect(readFileSync(getCanonicalZaloBotTokenPath("zalo-main"), "utf8").trim()).toBe(
+      "123456:zalo-bot-token",
+    );
+    expect(output.join("\n")).toContain(
+      "Added zalo-bot/zalo-main, persisted=tokenFile, runtime=not-running",
     );
   });
 

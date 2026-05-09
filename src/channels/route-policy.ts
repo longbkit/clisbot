@@ -68,7 +68,7 @@ type SurfaceRouteConfig = {
 
 type BuildSurfaceRouteParams = {
   loadedConfig: LoadedConfig;
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "zalo-bot";
   channelConfig: SurfaceRouteConfig;
   route?: SurfaceRouteOverride | null;
   policy: "open" | "allowlist";

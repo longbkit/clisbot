@@ -101,3 +101,16 @@ export function enableTelegramTopicRoute(
   };
   return config;
 }
+
+export function enableZaloBotDirectMessages(config: ReturnType<typeof buildConfig>) {
+  config.bots.zaloBot.defaults.enabled = true;
+  config.bots.zaloBot.default.directMessages["*"] = {
+    enabled: true,
+    policy: "open",
+    requireMention: false,
+    allowBots: false,
+    allowUsers: [],
+    blockUsers: [],
+  };
+  return config;
+}

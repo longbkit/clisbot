@@ -1,5 +1,5 @@
 export type ChannelIdentity = {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "zalo-bot";
   botId?: string;
   accountId?: string;
   conversationKind: "dm" | "channel" | "group" | "topic";

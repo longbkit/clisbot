@@ -311,3 +311,7 @@ If `clisbot` wants a clean Zalo strategy, the high-level decision should be:
 
 - [Zalo Bot, Zalo OA, And Zalo Personal Channel Strategy](../../tasks/features/channels/2026-04-18-zalo-bot-oa-and-personal-channel-strategy.md)
 - [Vietnam Channel Launch Package](../../tasks/features/channels/2026-04-13-vietnam-channel-launch-package.md)
+
+Related research follow-up:
+
+- [Telegram, Zalo Bot, zca-js, And Discord Channel Interface Matrix](./2026-05-08-telegram-zalo-discord-channel-interface-matrix.md)

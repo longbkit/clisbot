@@ -542,9 +542,9 @@ function shouldDropDeliveryReportLine(line: string) {
   const normalized = trimmed.replace(/^(?::eight_spoked_asterisk:|[-*•◦·✽✶⏺])\s+/, "");
 
   return (
-    /^(?:I|We)\s+(?:have\s+)?(?:sent|posted|delivered)\b.*\b(?:slack|telegram)\b/i.test(normalized) ||
-    /^(?:Sent|Posted|Delivered)\b.*\b(?:to|via)\s+(?:Slack|Telegram)\b/i.test(normalized) ||
-    /^Đã gửi\b.*\b(?:Slack|Telegram)\b/i.test(normalized) ||
+    /^(?:I|We)\s+(?:have\s+)?(?:sent|posted|delivered)\b.*\b(?:slack|telegram|zalo(?:\s+bot|-bot)?)\b/i.test(normalized) ||
+    /^(?:Sent|Posted|Delivered)\b.*\b(?:to|via)\s+(?:Slack|Telegram|Zalo(?:\s+Bot|-Bot)?)\b/i.test(normalized) ||
+    /^Đã gửi\b.*\b(?:Slack|Telegram|Zalo(?:\s+Bot|-Bot)?)\b/i.test(normalized) ||
     /^(?:Sent|Posted|Delivered)\.?$/i.test(normalized) ||
     /^Waited for background terminal\.?$/i.test(normalized)
   );

@@ -21,3 +21,4 @@ They should be used for ad hoc validation and later automation across Slack firs
 
 - [Slack Routing And Follow-Up Tests](slack-routing-and-follow-up.md)
 - [Rendering And Command Tests](rendering-and-command-tests.md)
+- [Zalo Bot Channel MVP](zalo-bot-channel-mvp.md)

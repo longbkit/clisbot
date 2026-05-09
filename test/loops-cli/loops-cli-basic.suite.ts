@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { clisbotConfigSchema } from "../../src/config/schema.ts";
 import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
 import { renderLoopsHelp, runLoopsCli } from "../../src/control/loops-cli.ts";
-import { buildConfig, enableSlackChannelRoute, enableSlackDirectMessages, enableTelegramTopicRoute } from "./loops-cli-support.ts";
+import { buildConfig, enableSlackChannelRoute, enableSlackDirectMessages, enableTelegramTopicRoute, enableZaloBotDirectMessages } from "./loops-cli-support.ts";
 
 describe("loops cli", () => {
   let tempDir = "";
@@ -40,6 +40,7 @@ describe("loops cli", () => {
     const help = renderLoopsHelp();
 
     expect(help).toContain("clisbot loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI");
+    expect(help).toContain("clisbot loops create --channel zalo-bot --target dm:user-123 --sender zalo-bot:user-123 5m check inbox");
     expect(help).toContain("clisbot loops create --help");
     expect(help).toContain("clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI");
     expect(help).toContain("clisbot loops --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog");
@@ -70,6 +71,50 @@ describe("loops cli", () => {
     expect(help).toContain("--loop-start <none|brief|full>");
     expect(help).toContain("--progress <count>");
     expect(help).toContain("create without `--sender` fails by design");
+  });
+
+  test("creates a zalo-bot DM loop with an explicit sender principal", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-zalo-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        enableZaloBotDirectMessages(
+          buildConfig({
+            socketPath: join(tempDir, "clisbot.sock"),
+            storePath,
+            workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+          }),
+        ),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+
+    await runLoopsCli([
+      "create",
+      "--channel",
+      "zalo-bot",
+      "--target",
+      "dm:user-123",
+      "--sender",
+      "zalo-bot:user-123",
+      "5m",
+      "check",
+      "inbox",
+    ]);
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    const session = Object.values(store).find(
+      (entry: any) => entry?.sessionKey?.includes("zalo-bot:dm:user-123"),
+    ) as any;
+    expect(session?.sessionKey).toContain("zalo-bot:dm:user-123");
+    expect(session.loops).toHaveLength(1);
+    expect(session.loops[0].promptText).toBe("check inbox");
+    expect(session.loops[0].sender.senderId).toBe("zalo-bot:user-123");
   });
 
   test("first wall-clock loop requires --confirm before persisting", async () => {

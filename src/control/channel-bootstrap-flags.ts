@@ -15,15 +15,22 @@ export type ParsedTelegramBotFlags = {
   botToken?: ParsedTokenInput;
 };
 
+export type ParsedZaloBotFlags = {
+  botId: string;
+  botToken?: ParsedTokenInput;
+};
+
 export type ParsedBootstrapFlags = {
   cliTool?: AgentCliToolId;
   bootstrap?: AgentBootstrapMode;
   persist: boolean;
   slackBots: ParsedSlackBotFlags[];
   telegramBots: ParsedTelegramBotFlags[];
+  zaloBotBots: ParsedZaloBotFlags[];
   sawCredentialFlags: boolean;
   sawSlackFlags: boolean;
   sawTelegramFlags: boolean;
+  sawZaloBotFlags: boolean;
   literalWarnings: string[];
 };
 
@@ -74,6 +81,18 @@ function getOrCreateTelegramBot(
   return bot;
 }
 
+function getOrCreateZaloBot(
+  bots: ParsedZaloBotFlags[],
+  botId: string,
+) {
+  let bot = bots.find((entry) => entry.botId === botId);
+  if (!bot) {
+    bot = { botId };
+    bots.push(bot);
+  }
+  return bot;
+}
+
 function ensureUniqueBot(bots: Array<{ botId: string }>, botId: string, flagName: string) {
   if (bots.some((entry) => entry.botId === botId)) {
     throw new Error(`Duplicate ${flagName} ${botId}`);
@@ -97,17 +116,26 @@ function validateTelegramBot(bot: ParsedTelegramBotFlags) {
   }
 }
 
+function validateZaloBot(bot: ParsedZaloBotFlags) {
+  if (!bot.botToken) {
+    throw new Error(`Zalo Bot ${bot.botId} requires a bot token`);
+  }
+}
+
 export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
   const slackBots: ParsedSlackBotFlags[] = [];
   const telegramBots: ParsedTelegramBotFlags[] = [];
+  const zaloBotBots: ParsedZaloBotFlags[] = [];
   let currentSlackBotId: string | undefined;
   let currentTelegramBotId: string | undefined;
+  let currentZaloBotId: string | undefined;
   let cliTool: AgentCliToolId | undefined;
   let bootstrap: AgentBootstrapMode | undefined;
   let persist = false;
   let sawCredentialFlags = false;
   let sawSlackFlags = false;
   let sawTelegramFlags = false;
+  let sawZaloBotFlags = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -143,6 +171,15 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
       index += 1;
       continue;
     }
+    if (arg === "--zalo-bot-account") {
+      const botId = parseOptionValue(args, arg, index);
+      ensureUniqueBot(zaloBotBots, botId, "--zalo-bot-account");
+      currentZaloBotId = botId;
+      getOrCreateZaloBot(zaloBotBots, botId);
+      sawZaloBotFlags = true;
+      index += 1;
+      continue;
+    }
     if (arg === "--slack-app-token") {
       const token = parseTokenInput(parseOptionValue(args, arg, index));
       const bot = getOrCreateSlackBot(slackBots, currentSlackBotId ?? "default");
@@ -173,6 +210,18 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
       index += 1;
       continue;
     }
+    if (arg === "--zalo-bot-token") {
+      const token = parseTokenInput(parseOptionValue(args, arg, index));
+      const bot = getOrCreateZaloBot(
+        zaloBotBots,
+        currentZaloBotId ?? "default",
+      );
+      bot.botToken = token;
+      sawCredentialFlags = true;
+      sawZaloBotFlags = true;
+      index += 1;
+      continue;
+    }
 
     throw new Error(`Unknown option for start/init: ${arg}`);
   }
@@ -183,6 +232,9 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
   for (const bot of telegramBots) {
     validateTelegramBot(bot);
   }
+  for (const bot of zaloBotBots) {
+    validateZaloBot(bot);
+  }
 
   return {
     cliTool,
@@ -190,9 +242,11 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     persist,
     slackBots,
     telegramBots,
+    zaloBotBots,
     sawCredentialFlags,
     sawSlackFlags,
     sawTelegramFlags,
+    sawZaloBotFlags,
     literalWarnings: [],
   };
 }
@@ -202,6 +256,7 @@ export function hasLiteralBootstrapCredentials(flags: ParsedBootstrapFlags) {
     flags.slackBots.some(
       (bot) => isLiteralToken(bot.appToken) || isLiteralToken(bot.botToken),
     ) ||
-    flags.telegramBots.some((bot) => isLiteralToken(bot.botToken))
+    flags.telegramBots.some((bot) => isLiteralToken(bot.botToken)) ||
+    flags.zaloBotBots.some((bot) => isLiteralToken(bot.botToken))
   );
 }

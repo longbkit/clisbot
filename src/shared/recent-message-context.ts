@@ -6,7 +6,7 @@ export type StoredRecentConversationMessage = {
   senderId?: string;
   senderName?: string;
   senderHandle?: string;
-  platform?: "slack" | "telegram";
+  platform?: "slack" | "telegram" | "zalo-bot";
 };
 
 export type StoredRecentConversationState = {

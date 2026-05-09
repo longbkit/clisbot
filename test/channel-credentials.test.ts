@@ -170,6 +170,7 @@ describe("channel credentials", () => {
             },
           },
         ],
+        zaloBotBots: [],
       },
       { firstRun: true },
     );

@@ -78,5 +78,5 @@ The goal is to convert the existing architecture and workflow intent into a skil
 - [Task Docs](../../README.md)
 - [clisbot Backlog](../../backlog.md)
 - [Overview](../../../overview/README.md)
-- [AI Agent Operating Preferences](../../../workflow/ai-agent-operating-preferences.md)
+- [Agent Rules Review Draft](../../../workflow/agent-rules-review-draft.md)
 - [Decision And Struggle Patterns](../../../workflow/decision-and-struggle-patterns.md)

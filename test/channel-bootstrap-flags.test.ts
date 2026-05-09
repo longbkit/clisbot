@@ -64,25 +64,51 @@ describe("parseBootstrapFlags", () => {
       "ops",
       "--telegram-bot-token",
       "123:literal",
+      "--zalo-bot-account",
+      "sales",
+      "--zalo-bot-token",
+      "zalo-literal",
     ]);
 
     expect(parsed.literalWarnings).toEqual([]);
     expect(parsed.slackBots[0]?.appToken?.kind).toBe("mem");
     expect(parsed.slackBots[0]?.botToken?.kind).toBe("mem");
     expect(parsed.telegramBots[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.zaloBotBots[0]?.botToken?.kind).toBe("mem");
   });
 
   test("detects literal bootstrap credentials independently of warning output", () => {
     const raw = parseBootstrapFlags([
-      "--telegram-bot-token",
-      "123:literal",
+      "--zalo-bot-token",
+      "zalo-literal",
     ]);
     const envOnly = parseBootstrapFlags([
-      "--telegram-bot-token",
-      "TELEGRAM_BOT_TOKEN",
+      "--zalo-bot-token",
+      "ZALO_BOT_TOKEN",
     ]);
 
     expect(hasLiteralBootstrapCredentials(raw)).toBe(true);
     expect(hasLiteralBootstrapCredentials(envOnly)).toBe(false);
+  });
+
+  test("parses named zalo-bot accounts", () => {
+    const parsed = parseBootstrapFlags([
+      "--zalo-bot-account",
+      "ops",
+      "--zalo-bot-token",
+      "${CUSTOM_ZALO_BOT_TOKEN}",
+    ]);
+
+    expect(parsed.zaloBotBots).toEqual([
+      {
+        botId: "ops",
+        botToken: {
+          kind: "env",
+          placeholder: "${CUSTOM_ZALO_BOT_TOKEN}",
+          envName: "CUSTOM_ZALO_BOT_TOKEN",
+        },
+      },
+    ]);
+    expect(parsed.sawZaloBotFlags).toBe(true);
   });
 });

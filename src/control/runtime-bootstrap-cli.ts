@@ -70,6 +70,7 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
     `  ${renderCliCommand(`${commandName} [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]`)}`,
     "                   [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
     "                   [--telegram-account <id> --telegram-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
+    "                   [--zalo-bot-account <id> --zalo-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
     "",
     "Behavior:",
     `  - ${behavior}`,
@@ -87,6 +88,7 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
     "",
     "Examples:",
     `  ${renderCliCommand(`${commandName} --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN`)}`,
+    `  ${renderCliCommand(`${commandName} --cli codex --bot-type personal --zalo-bot-token ZALO_BOT_TOKEN`)}`,
     `  ${renderCliCommand(`${commandName} --cli codex --bot-type team --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN`)}`,
     `  ${renderCliCommand(`${commandName} --cli gemini --bot-type personal --telegram-bot-token \"$TELEGRAM_BOT_TOKEN\" --persist`)}`,
     "",
@@ -165,6 +167,11 @@ function getMemBootstrapBotIds(bootstrapFlags: ParsedBootstrapFlags) {
         .filter((bot) => bot.botToken?.kind === "mem")
         .map((bot) => bot.botId),
     ),
+    "zalo-bot": new Set(
+      bootstrapFlags.zaloBotBots
+        .filter((bot) => bot.botToken?.kind === "mem")
+        .map((bot) => bot.botId),
+    ),
   };
 }
 
@@ -191,6 +198,7 @@ async function applyBootstrapStateToConfig(params: {
     {
       slackBots: bootstrapFlags.slackBots,
       telegramBots: bootstrapFlags.telegramBots,
+      zaloBotBots: bootstrapFlags.zaloBotBots,
     },
     { firstRun },
   );
@@ -205,6 +213,7 @@ async function applyBootstrapStateToConfig(params: {
         {
           slackBots: bootstrapFlags.slackBots,
           telegramBots: bootstrapFlags.telegramBots,
+          zaloBotBots: bootstrapFlags.zaloBotBots,
         },
         runtimeCredentialsPath,
       )
@@ -456,6 +465,7 @@ export async function start(args: string[] = []) {
     {
       slackBots: state.bootstrapFlags.slackBots,
       telegramBots: state.bootstrapFlags.telegramBots,
+      zaloBotBots: state.bootstrapFlags.zaloBotBots,
     },
     process.env,
   );

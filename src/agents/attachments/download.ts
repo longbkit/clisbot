@@ -24,6 +24,9 @@ export async function downloadRemoteBuffer(params: {
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.byteLength === 0) {
+    throw new Error("attachment download returned empty body");
+  }
   if (buffer.byteLength > maxBytes) {
     throw new Error(`attachment exceeds ${maxBytes} bytes`);
   }

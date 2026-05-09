@@ -39,6 +39,7 @@ describe("message cli", () => {
     expect(logs[0]).toContain("--render <native|none|html|mrkdwn|blocks>");
     expect(logs[0]).toContain("--topic-id <telegram-topic-id>");
     expect(logs[0]).toContain("Telegram topic id");
+    expect(logs[0]).toContain("Zalo Bot `--target` is the string chat id");
     expect(logs[0]).toContain("Render Rules:");
     expect(logs[0]).toContain("Final payload must stay under 4096 chars");
     expect(logs[0]).toContain("Prefer text under 4000 chars");
@@ -233,7 +234,92 @@ describe("message cli", () => {
 
     await expect(
       runMessageCli(["send", "--channel", "discord", "--target", "general"], deps),
-    ).rejects.toThrow("--channel <slack|telegram> is required");
+    ).rejects.toThrow("--channel <slack|telegram|zalo-bot> is required");
+  });
+
+  test("routes zalo-bot send through the resolved bot config", async () => {
+    const { deps, logs, calls, replyTargets } = createDependencies();
+
+    await runMessageCli([
+      "send",
+      "--channel",
+      "zalo-bot",
+      "--account",
+      "default",
+      "--target",
+      "user-123",
+      "--message",
+      "hello zalo",
+      "--json",
+    ], deps);
+
+    expect(calls).toContainEqual({
+      provider: "zalo-bot",
+      action: "send",
+      params: {
+        botToken: "zalo-bot-test",
+        target: "user-123",
+        threadId: undefined,
+        replyTo: undefined,
+        message: "hello zalo",
+        media: undefined,
+        messageId: undefined,
+        emoji: undefined,
+        remove: false,
+        limit: undefined,
+        query: undefined,
+        pollQuestion: undefined,
+        pollOptions: [],
+        forceDocument: false,
+        silent: false,
+        inputFormat: "md",
+        renderMode: "native",
+        progress: false,
+        final: false,
+      },
+    });
+    expect(logs).toEqual([
+      JSON.stringify({ ok: true, provider: "zalo-bot", action: "send" }, null, 2),
+    ]);
+    expect((replyTargets[0]?.target as { sessionKey?: string } | undefined)?.sessionKey).toBe(
+      "agent:default:zalo-bot:dm:user-123",
+    );
+  });
+
+  test("rejects thread-id for zalo-bot message commands", async () => {
+    const { deps } = createDependencies();
+
+    await expect(
+      runMessageCli([
+        "send",
+        "--channel",
+        "zalo-bot",
+        "--target",
+        "user-123",
+        "--thread-id",
+        "abc",
+        "--message",
+        "hello",
+      ], deps),
+    ).rejects.toThrow("Zalo Bot message commands do not support --thread-id or --topic-id.");
+  });
+
+  test("rejects topic-id for zalo-bot message commands", async () => {
+    const { deps } = createDependencies();
+
+    await expect(
+      runMessageCli([
+        "send",
+        "--channel",
+        "zalo-bot",
+        "--target",
+        "user-123",
+        "--topic-id",
+        "42",
+        "--message",
+        "hello",
+      ], deps),
+    ).rejects.toThrow("Zalo Bot message commands do not support --thread-id or --topic-id.");
   });
 
   test("does not stamp follow-up state for non-reply history actions", async () => {

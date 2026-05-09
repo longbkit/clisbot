@@ -72,6 +72,7 @@ Channels is where those surfaces live.
 
 ## Related Feature Docs
 
+- [Channel Integration Playbook](channel-integration-playbook.md)
 - [Message Actions And Bot Routing](message-actions-and-channel-accounts.md)
 - [Message Command Formatting And Render Modes](message-command-formatting-and-render-modes.md)
 - [Agent Progress Reply Wrapper And Prompt](agent-progress-reply-wrapper-and-prompt.md)

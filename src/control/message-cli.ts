@@ -70,7 +70,7 @@ function parseAliasedOptionValue(args: string[], preferredName: string, aliasNam
   return preferredValues.at(-1) ?? aliasValues.at(-1);
 }
 
-function parseThreadingOptions(args: string[], channel: "slack" | "telegram") {
+function parseThreadingOptions(args: string[], channel: "slack" | "telegram" | "zalo-bot") {
   const threadId = parseOptionValue(args, "--thread-id");
   const topicId = parseOptionValue(args, "--topic-id");
   if (threadId && topicId) {
@@ -81,6 +81,9 @@ function parseThreadingOptions(args: string[], channel: "slack" | "telegram") {
   }
   if (channel === "telegram" && threadId) {
     throw new Error("Telegram message commands use `--topic-id`, not `--thread-id`.");
+  }
+  if (channel === "zalo-bot" && (threadId || topicId)) {
+    throw new Error("Zalo Bot message commands do not support --thread-id or --topic-id.");
   }
   return channel === "telegram" ? topicId : threadId;
 }
@@ -132,8 +135,8 @@ function parseMessageCommand(args: string[]): ParsedMessageCommand | null {
   const action = rawAction as MessageAction;
   const rest = args.slice(1);
   const channel = parseOptionValue(rest, "--channel");
-  if (channel !== "slack" && channel !== "telegram") {
-    throw new Error("--channel <slack|telegram> is required");
+  if (channel !== "slack" && channel !== "telegram" && channel !== "zalo-bot") {
+    throw new Error("--channel <slack|telegram|zalo-bot> is required");
   }
 
   return {
@@ -168,17 +171,17 @@ export function renderMessageHelp() {
     renderCliCommand("message"),
     "",
     "Usage:",
-    `  ${renderCliCommand("message send --channel <slack|telegram> --target <dest> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>] [--file <path-or-url>] [--reply-to <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--force-document] [--silent] [--progress|--final]")}`,
-    `  ${renderCliCommand("message poll --channel <slack|telegram> --target <dest> --poll-question <text> --poll-option <value> [--poll-option <value>] [--account <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--silent]")}`,
-    `  ${renderCliCommand("message react --channel <slack|telegram> --target <dest> --message-id <id> --emoji <emoji> [--account <id>] [--remove]")}`,
-    `  ${renderCliCommand("message reactions --channel <slack|telegram> --target <dest> --message-id <id> [--account <id>]")}`,
-    `  ${renderCliCommand("message read --channel <slack|telegram> --target <dest> [--account <id>] [--limit <n>]")}`,
-    `  ${renderCliCommand("message edit --channel <slack|telegram> --target <dest> --message-id <id> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>]")}`,
-    `  ${renderCliCommand("message delete --channel <slack|telegram> --target <dest> --message-id <id> [--account <id>]")}`,
-    `  ${renderCliCommand("message pin --channel <slack|telegram> --target <dest> --message-id <id> [--account <id>]")}`,
-    `  ${renderCliCommand("message unpin --channel <slack|telegram> --target <dest> [--message-id <id>] [--account <id>]")}`,
-    `  ${renderCliCommand("message pins --channel <slack|telegram> --target <dest> [--account <id>]")}`,
-    `  ${renderCliCommand("message search --channel <slack|telegram> --target <dest> --query <text> [--account <id>] [--limit <n>]")}`,
+    `  ${renderCliCommand("message send --channel <slack|telegram|zalo-bot> --target <dest> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>] [--file <path-or-url>] [--reply-to <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--force-document] [--silent] [--progress|--final]")}`,
+    `  ${renderCliCommand("message poll --channel <slack|telegram|zalo-bot> --target <dest> --poll-question <text> --poll-option <value> [--poll-option <value>] [--account <id>] [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--silent]")}`,
+    `  ${renderCliCommand("message react --channel <slack|telegram|zalo-bot> --target <dest> --message-id <id> --emoji <emoji> [--account <id>] [--remove]")}`,
+    `  ${renderCliCommand("message reactions --channel <slack|telegram|zalo-bot> --target <dest> --message-id <id> [--account <id>]")}`,
+    `  ${renderCliCommand("message read --channel <slack|telegram|zalo-bot> --target <dest> [--account <id>] [--limit <n>]")}`,
+    `  ${renderCliCommand("message edit --channel <slack|telegram|zalo-bot> --target <dest> --message-id <id> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>]")}`,
+    `  ${renderCliCommand("message delete --channel <slack|telegram|zalo-bot> --target <dest> --message-id <id> [--account <id>]")}`,
+    `  ${renderCliCommand("message pin --channel <slack|telegram|zalo-bot> --target <dest> --message-id <id> [--account <id>]")}`,
+    `  ${renderCliCommand("message unpin --channel <slack|telegram|zalo-bot> --target <dest> [--message-id <id>] [--account <id>]")}`,
+    `  ${renderCliCommand("message pins --channel <slack|telegram|zalo-bot> --target <dest> [--account <id>]")}`,
+    `  ${renderCliCommand("message search --channel <slack|telegram|zalo-bot> --target <dest> --query <text> [--account <id>] [--limit <n>]")}`,
     "",
     "Send/Edit Content Options:",
     "  --message <text>              Inline message body",
@@ -195,6 +198,7 @@ export function renderMessageHelp() {
     "  native                        Channel-owned default rendering",
     "                                - Telegram: Markdown/plain -> safe HTML",
     "                                - Slack: Markdown/plain -> mrkdwn",
+    "                                - Zalo Bot: Markdown/plain -> readable plain text",
     "  none                          Content is already destination-native",
     "                                - Telegram: use with --input html",
     "                                - Slack: use with --input mrkdwn or blocks",
@@ -214,6 +218,7 @@ export function renderMessageHelp() {
     "Targets:",
     `  Slack accepts ${renderSlackTargetSyntax()}`,
     "  Telegram `--target` is the numeric chat id",
+    "  Zalo Bot `--target` is the string chat id",
     "",
     "Examples:",
     `  ${renderCliCommand("message send --channel telegram --target -1001234567890 --topic-id 42 --message \"## Status\"")}`,

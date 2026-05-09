@@ -3,6 +3,7 @@ import type {
   ClisbotConfig,
   SlackBotConfig,
   TelegramBotConfig,
+  ZaloBotConfig,
 } from "./schema.ts";
 import { extractEnvReferenceName, normalizeEnvReference } from "../shared/env-references.ts";
 import { getDefaultCredentialsDir } from "../shared/paths.ts";
@@ -11,12 +12,15 @@ const TOKEN_ENV_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 
 export type SlackPersistentBotConfig = SlackBotConfig;
 export type TelegramPersistentBotConfig = TelegramBotConfig;
+export type ZaloBotPersistentBotConfig = ZaloBotConfig;
 export type SlackPersistentAccountConfig = SlackPersistentBotConfig;
 export type TelegramPersistentAccountConfig = TelegramPersistentBotConfig;
+export type ZaloBotPersistentAccountConfig = ZaloBotPersistentBotConfig;
 
 export type RuntimeCredentialDocument = {
   slack?: Record<string, { appToken?: string; botToken?: string }>;
   telegram?: Record<string, { botToken?: string }>;
+  "zalo-bot"?: Record<string, { botToken?: string }>;
 };
 
 export type ParsedTokenInput =
@@ -63,6 +67,12 @@ export type ResolvedTelegramCredential = {
   source: ResolvedCredentialSource;
 };
 
+export type ResolvedZaloBotCredential = {
+  botId: string;
+  botToken: string;
+  source: ResolvedCredentialSource;
+};
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -85,6 +95,13 @@ export function getSlackBotsRecord(
 
 export function getTelegramBotsRecord(
   config: ClisbotConfig["bots"]["telegram"],
+) {
+  const { defaults, ...bots } = config;
+  return bots;
+}
+
+export function getZaloBotBotsRecord(
+  config: ClisbotConfig["bots"]["zaloBot"],
 ) {
   const { defaults, ...bots } = config;
   return bots;
@@ -136,6 +153,10 @@ export function getTelegramMemEnvName(botId: string) {
   return `CLISBOT_MEM_TELEGRAM__${normalizeBotEnvSegment(botId)}__BOT_TOKEN`;
 }
 
+export function getZaloBotMemEnvName(botId: string) {
+  return `CLISBOT_MEM_ZALO_BOT__${normalizeBotEnvSegment(botId)}__BOT_TOKEN`;
+}
+
 export function getSlackMemAppEnvName(botId: string) {
   return `CLISBOT_MEM_SLACK__${normalizeBotEnvSegment(botId)}__APP_TOKEN`;
 }
@@ -153,6 +174,13 @@ export function getTelegramBotConfig(
   botId: string,
 ) {
   return getTelegramBotsRecord(config)[botId] as TelegramPersistentBotConfig | undefined;
+}
+
+export function getZaloBotConfig(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  botId: string,
+) {
+  return getZaloBotBotsRecord(config)[botId] as ZaloBotPersistentBotConfig | undefined;
 }
 
 export function getSlackBotConfig(
@@ -181,6 +209,14 @@ export function getTelegramEnvReference(
   botId: string,
 ) {
   const bot = getTelegramBotConfig(config, botId);
+  return trimString(bot?.botToken);
+}
+
+export function getZaloBotEnvReference(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  botId: string,
+) {
+  const bot = getZaloBotConfig(config, botId);
   return trimString(bot?.botToken);
 }
 
@@ -226,6 +262,16 @@ export function getCredentialSkipPaths(parsed: unknown) {
     }
   }
 
+  const zaloBot = isRecord(bots.zaloBot) ? bots.zaloBot : undefined;
+  if (zaloBot) {
+    for (const [botId, bot] of Object.entries(zaloBot)) {
+      if (botId === "defaults" || !isRecord(bot)) {
+        continue;
+      }
+      skipPaths.push(`bots.zaloBot.${botId}.botToken`);
+    }
+  }
+
   return skipPaths;
 }
 
@@ -264,6 +310,13 @@ export function getCanonicalTelegramBotTokenPath(
   env: NodeJS.ProcessEnv = process.env,
 ) {
   return join(getDefaultCredentialsDir(env), "telegram", botId, "bot-token");
+}
+
+export function getCanonicalZaloBotTokenPath(
+  botId: string,
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  return join(getDefaultCredentialsDir(env), "zalo-bot", botId, "bot-token");
 }
 
 export function getCanonicalSlackAppTokenPath(

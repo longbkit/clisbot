@@ -45,6 +45,7 @@ async function seedConfig(configPath: string) {
       renderDefaultConfigTemplate({
         slackEnabled: true,
         telegramEnabled: true,
+        zaloBotEnabled: true,
       }),
     ),
   );
@@ -62,7 +63,7 @@ describe("pairing cli", () => {
     const text = lines.join("\n");
     expect(text).toContain("clisbot pairing");
     expect(text).toContain("clisbot pairing help");
-    expect(text).toContain("clisbot pairing clear <slack|telegram>");
+    expect(text).toContain("clisbot pairing clear <slack|telegram|zalo-bot>");
   });
 
   test("lists pending requests as text", async () => {
@@ -148,6 +149,33 @@ describe("pairing cli", () => {
       const updatedConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
       expect(updatedConfig.bots.telegram.support.directMessages["*"].allowUsers).toEqual(["123456"]);
       expect(updatedConfig.bots.telegram.default.directMessages["*"].allowUsers).toEqual([]);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("approves a pending zalo-bot code into zalo-bot DM allowUsers", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-pairing-cli-"));
+    try {
+      previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+      process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+      await seedConfig(process.env.CLISBOT_CONFIG_PATH);
+      const created = await upsertChannelPairingRequest({
+        channel: "zalo-bot",
+        id: "123456",
+        botId: "default",
+        baseDir: tempDir,
+      });
+
+      await withPairingDir(tempDir, async () => {
+        await runPairingCli(["approve", "zalo-bot", created.code], {
+          log: () => {},
+        });
+      });
+
+      const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+      expect(rawConfig.bots.zaloBot.default.directMessages["*"].allowUsers).toEqual(["123456"]);
+      expect(rawConfig.bots.telegram.default.directMessages["*"].allowUsers).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

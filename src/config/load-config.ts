@@ -105,7 +105,7 @@ export type LoadedConfig = {
 };
 
 export type LoadConfigOptions = {
-  materializeChannels?: Array<"slack" | "telegram">;
+  materializeChannels?: Array<"slack" | "telegram" | "zalo-bot">;
 };
 
 export async function loadConfig(

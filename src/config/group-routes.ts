@@ -3,13 +3,14 @@ import type {
   ClisbotConfig,
   SlackBotConfig,
   TelegramBotConfig,
+  ZaloBotConfig,
 } from "./schema.ts";
 
 type GroupRouteOwner<TGroupRoute = unknown> = {
   groups: Record<string, TGroupRoute>;
 };
 
-type Provider = "slack" | "telegram";
+type Provider = "slack" | "telegram" | "zalo-bot";
 
 export const SHARED_GROUPS_WILDCARD_ROUTE_ID = "*";
 const LEGACY_SHARED_GROUPS_WILDCARD_ROUTE_IDS = ["groups:*", "group:*"];
@@ -202,6 +203,12 @@ export function createTelegramGroupRouteShell(
   } satisfies TelegramBotConfig["groups"][string];
 }
 
+export function createZaloBotGroupRouteShell(
+  policy: BotRouteConfig["policy"] = "open",
+) {
+  return createSlackGroupRouteShell(policy) satisfies ZaloBotConfig["groups"][string];
+}
+
 function ensureDefaultGroupWildcardRoute<TGroupRoute extends Record<string, unknown>>(params: {
   owner: GroupRouteOwner<TGroupRoute>;
   createRoute: () => TGroupRoute;
@@ -241,6 +248,11 @@ export function normalizeConfigGroupRoutes(config: ClisbotConfig) {
     providerConfig: config.bots.telegram,
     createRoute: () => createTelegramGroupRouteShell(),
   });
+  normalizeProviderGroupRoutes({
+    provider: "zalo-bot",
+    providerConfig: config.bots.zaloBot,
+    createRoute: () => createZaloBotGroupRouteShell(),
+  });
 
   ensureDefaultGroupWildcardRoute({
     owner: config.bots.slack.defaults,
@@ -249,6 +261,10 @@ export function normalizeConfigGroupRoutes(config: ClisbotConfig) {
   ensureDefaultGroupWildcardRoute({
     owner: config.bots.telegram.defaults,
     createRoute: () => createTelegramGroupRouteShell(),
+  });
+  ensureDefaultGroupWildcardRoute({
+    owner: config.bots.zaloBot.defaults,
+    createRoute: () => createZaloBotGroupRouteShell(),
   });
 
   return config;

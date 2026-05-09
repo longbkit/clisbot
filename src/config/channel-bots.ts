@@ -8,6 +8,8 @@ import type {
   SurfaceNotificationsConfig,
   TelegramBotConfig,
   TelegramProviderDefaultsConfig,
+  ZaloBotConfig,
+  ZaloBotProviderDefaultsConfig,
 } from "./schema.ts";
 import {
   resolveDirectMessageWildcardRoute,
@@ -25,8 +27,13 @@ export type TelegramBotCredentialConfig = {
   botToken: string;
 };
 
+export type ZaloBotCredentialConfig = {
+  botToken: string;
+};
+
 export type SlackAccountConfig = SlackBotCredentialConfig;
 export type TelegramAccountConfig = TelegramBotCredentialConfig;
+export type ZaloBotAccountConfig = ZaloBotCredentialConfig;
 
 export type ResolvedSlackBotConfig = Omit<SlackBotConfig, "directMessages" | "groups"> &
   SlackProviderDefaultsConfig & {
@@ -42,6 +49,14 @@ export type ResolvedTelegramBotConfig = Omit<TelegramBotConfig, "directMessages"
     id: string;
     directMessages: Record<string, BotRouteConfig>;
     groups: Record<string, TelegramBotConfig["groups"][string]>;
+    botToken: string;
+  };
+
+export type ResolvedZaloBotConfig = Omit<ZaloBotConfig, "directMessages" | "groups"> &
+  ZaloBotProviderDefaultsConfig & {
+    id: string;
+    directMessages: Record<string, BotRouteConfig>;
+    groups: Record<string, BotRouteConfig>;
     botToken: string;
   };
 
@@ -244,6 +259,13 @@ function getTelegramBotsRecord(
   return bots;
 }
 
+function getZaloBotBotsRecord(
+  config: ClisbotConfig["bots"]["zaloBot"],
+) {
+  const { defaults, ...bots } = config;
+  return bots;
+}
+
 function getConfiguredDefaultBotId(params: {
   defaultBotId?: string;
   bots: Record<string, unknown>;
@@ -281,6 +303,16 @@ export function resolveTelegramBotId(
   });
 }
 
+export function resolveZaloBotId(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  botId?: string | null,
+) {
+  return normalizeBotId(botId) ?? getConfiguredDefaultBotId({
+    defaultBotId: config.defaults.defaultBotId,
+    bots: getZaloBotBotsRecord(config),
+  });
+}
+
 export function resolveSlackAccountId(
   config: ClisbotConfig["bots"]["slack"],
   accountId?: string | null,
@@ -293,6 +325,13 @@ export function resolveTelegramAccountId(
   accountId?: string | null,
 ) {
   return resolveTelegramBotId(config, accountId);
+}
+
+export function resolveZaloBotAccountId(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  accountId?: string | null,
+) {
+  return resolveZaloBotId(config, accountId);
 }
 
 export function getSlackBotRecord(
@@ -309,6 +348,13 @@ export function getTelegramBotRecord(
   return getTelegramBotsRecord(config)[botId] as TelegramBotConfig | undefined;
 }
 
+export function getZaloBotRecord(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  botId: string,
+) {
+  return getZaloBotBotsRecord(config)[botId] as ZaloBotConfig | undefined;
+}
+
 export function getSlackBotConfig(
   config: ClisbotConfig["bots"]["slack"],
   accountId: string,
@@ -321,6 +367,13 @@ export function getTelegramBotConfig(
   accountId: string,
 ) {
   return getTelegramBotRecord(config, accountId);
+}
+
+export function getZaloBotConfig(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  accountId: string,
+) {
+  return getZaloBotRecord(config, accountId);
 }
 
 export function resolveSlackBotConfig(
@@ -432,6 +485,60 @@ export function resolveTelegramBotConfig(
   };
 }
 
+export function resolveZaloBotConfig(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  botId?: string | null,
+): ResolvedZaloBotConfig {
+  const resolvedBotId = resolveZaloBotId(config, botId);
+  const providerDefaults = config.defaults;
+  const botConfig = getZaloBotRecord(config, resolvedBotId);
+  if (!botConfig) {
+    throw new Error(`Unknown Zalo Bot: ${resolvedBotId}`);
+  }
+
+  return {
+    ...providerDefaults,
+    ...botConfig,
+    id: resolvedBotId,
+    commandPrefixes: {
+      slash:
+        botConfig.commandPrefixes?.slash ??
+        providerDefaults.commandPrefixes.slash,
+      bash:
+        botConfig.commandPrefixes?.bash ??
+        providerDefaults.commandPrefixes.bash,
+    },
+    surfaceNotifications: {
+      queueStart:
+        botConfig.surfaceNotifications?.queueStart ??
+        providerDefaults.surfaceNotifications?.queueStart ??
+        "brief",
+      loopStart:
+        botConfig.surfaceNotifications?.loopStart ??
+        providerDefaults.surfaceNotifications?.loopStart ??
+        "brief",
+    },
+    followUp: {
+      mode: botConfig.followUp?.mode ?? providerDefaults.followUp.mode,
+      participationTtlSec:
+        botConfig.followUp?.participationTtlSec ??
+        providerDefaults.followUp.participationTtlSec,
+      participationTtlMin:
+        botConfig.followUp?.participationTtlMin ??
+        providerDefaults.followUp.participationTtlMin,
+    },
+    directMessages: {
+      ...cloneSlackRoutes(providerDefaults.directMessages),
+      ...cloneSlackRoutes(botConfig.directMessages ?? {}),
+    },
+    groups: mergeSlackRoutes(
+      providerDefaults.groups,
+      botConfig.groups ?? {},
+    ),
+    botToken: botConfig.botToken?.trim() ?? "",
+  };
+}
+
 export function resolveSlackDirectMessageConfig(
   config: ResolvedSlackBotConfig,
   userId?: string | null,
@@ -458,6 +565,21 @@ export function resolveSlackDirectMessageAdmissionConfig(
 
 export function resolveTelegramDirectMessageAdmissionConfig(
   config: ResolvedTelegramBotConfig,
+) {
+  return resolveDirectMessageWildcardRoute(config.directMessages);
+}
+
+export function resolveZaloBotDirectMessageConfig(
+  config: ResolvedZaloBotConfig,
+  senderId?: string | number | null,
+) {
+  return resolveEffectiveDirectMessageRoute(config.directMessages, senderId, {
+    exactAdmissionMode: "explicit",
+  });
+}
+
+export function resolveZaloBotDirectMessageAdmissionConfig(
+  config: ResolvedZaloBotConfig,
 ) {
   return resolveDirectMessageWildcardRoute(config.directMessages);
 }
@@ -497,6 +619,23 @@ export function resolveTelegramBotCredentials(
   throw new Error(`Unknown Telegram bot: ${resolved.id}`);
 }
 
+export function resolveZaloBotCredentials(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  botId?: string | null,
+): { botId: string; config: ZaloBotCredentialConfig } {
+  const resolved = resolveZaloBotConfig(config, botId);
+  if (resolved.botToken) {
+    return {
+      botId: resolved.id,
+      config: {
+        botToken: resolved.botToken,
+      },
+    };
+  }
+
+  throw new Error(`Unknown Zalo Bot: ${resolved.id}`);
+}
+
 export function resolveSlackAccountConfig(
   config: ClisbotConfig["bots"]["slack"],
   accountId?: string | null,
@@ -513,6 +652,17 @@ export function resolveTelegramAccountConfig(
   accountId?: string | null,
 ): { accountId: string; config: TelegramBotCredentialConfig } {
   const resolved = resolveTelegramBotCredentials(config, accountId);
+  return {
+    accountId: resolved.botId,
+    config: resolved.config,
+  };
+}
+
+export function resolveZaloBotAccountConfig(
+  config: ClisbotConfig["bots"]["zaloBot"],
+  accountId?: string | null,
+): { accountId: string; config: ZaloBotCredentialConfig } {
+  const resolved = resolveZaloBotCredentials(config, accountId);
   return {
     accountId: resolved.botId,
     config: resolved.config,
@@ -554,6 +704,23 @@ export function listTelegramBots(
     .filter(({ config }) => config.botToken.trim());
 }
 
+export function listZaloBotBots(
+  config: ClisbotConfig["bots"]["zaloBot"],
+): Array<{ botId: string; config: ZaloBotCredentialConfig }> {
+  return Object.entries(getZaloBotBotsRecord(config))
+    .filter(([, bot]) => bot.enabled !== false)
+    .map(([botId]) => {
+      const resolved = resolveZaloBotConfig(config, botId);
+      return {
+        botId,
+        config: {
+          botToken: resolved.botToken,
+        },
+      };
+    })
+    .filter(({ config }) => config.botToken.trim());
+}
+
 export function listSlackAccounts(
   config: ClisbotConfig["bots"]["slack"],
 ): Array<{ accountId: string; config: SlackBotCredentialConfig }> {
@@ -567,6 +734,15 @@ export function listTelegramAccounts(
   config: ClisbotConfig["bots"]["telegram"],
 ): Array<{ accountId: string; config: TelegramBotCredentialConfig }> {
   return listTelegramBots(config).map((entry) => ({
+    accountId: entry.botId,
+    config: entry.config,
+  }));
+}
+
+export function listZaloBotAccounts(
+  config: ClisbotConfig["bots"]["zaloBot"],
+): Array<{ accountId: string; config: ZaloBotCredentialConfig }> {
+  return listZaloBotBots(config).map((entry) => ({
     accountId: entry.botId,
     config: entry.config,
   }));

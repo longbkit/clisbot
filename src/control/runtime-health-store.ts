@@ -3,7 +3,7 @@ import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 import { ensureDir, getDefaultRuntimeHealthPath } from "../shared/paths.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
-export type RuntimeChannel = "slack" | "telegram";
+export type RuntimeChannel = "slack" | "telegram" | "zalo-bot";
 export type RuntimeChannelConnection =
   | "disabled"
   | "stopped"
@@ -115,6 +115,18 @@ function summarizeTelegramHealthError(error: unknown) {
   };
 }
 
+function summarizeZaloBotHealthError(error: unknown) {
+  return {
+    summary: "Zalo Bot channel failed to start.",
+    detail: normalizeErrorMessage(error),
+    actions: [
+      "verify `bots.zaloBot.<botId>.botToken` resolves to the intended bot token",
+      "confirm no other Zalo Bot instance is polling the same token when mode is `polling`",
+      `run ${renderCliCommand("logs", { inline: true })} again after restarting to confirm the startup error is gone`,
+    ],
+  };
+}
+
 export class RuntimeHealthStore {
   constructor(private readonly filePath = getDefaultRuntimeHealthPath()) {}
 
@@ -200,6 +212,17 @@ export class RuntimeHealthStore {
     const diagnostic = summarizeTelegramHealthError(error);
     await this.setChannel({
       channel: "telegram",
+      connection: "failed",
+      summary: diagnostic.summary,
+      detail: diagnostic.detail,
+      actions: diagnostic.actions,
+    });
+  }
+
+  async markZaloBotFailure(error: unknown) {
+    const diagnostic = summarizeZaloBotHealthError(error);
+    await this.setChannel({
+      channel: "zalo-bot",
       connection: "failed",
       summary: diagnostic.summary,
       detail: diagnostic.detail,

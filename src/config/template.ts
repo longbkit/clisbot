@@ -15,9 +15,11 @@ import { CURRENT_SCHEMA_VERSION } from "./config-migration.ts";
 type DefaultChannelBootstrapOptions = {
   slackEnabled?: boolean;
   telegramEnabled?: boolean;
+  zaloBotEnabled?: boolean;
   slackAppTokenRef?: string;
   slackBotTokenRef?: string;
   telegramBotTokenRef?: string;
+  zaloBotTokenRef?: string;
 };
 
 function renderEnvReference(name: string, override?: string) {
@@ -27,6 +29,7 @@ function renderEnvReference(name: string, override?: string) {
 export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOptions = {}) {
   const slackEnabled = options.slackEnabled === true;
   const telegramEnabled = options.telegramEnabled === true;
+  const zaloBotEnabled = options.zaloBotEnabled === true;
   const tmuxSocketPath = collapseHomePath(getDefaultTmuxSocketPath());
   const sessionStorePath = collapseHomePath(getDefaultSessionStorePath());
   const workspaceTemplate = collapseHomePath(getDefaultWorkspaceTemplate());
@@ -239,6 +242,71 @@ export function renderDefaultConfigTemplate(options: DefaultChannelBootstrapOpti
             enabled: telegramEnabled,
             name: "default",
             botToken: renderEnvReference("TELEGRAM_BOT_TOKEN", options.telegramBotTokenRef),
+            dmPolicy: "pairing",
+            groupPolicy: "allowlist",
+            directMessages: {},
+            groups: {},
+          },
+        },
+        zaloBot: {
+          defaults: {
+            enabled: zaloBotEnabled,
+            defaultBotId: "default",
+            mode: "polling",
+            allowBots: false,
+            dmPolicy: "pairing",
+            groupPolicy: "allowlist",
+            agentPrompt: {
+              enabled: true,
+              maxProgressMessages: 3,
+              requireFinalResponse: true,
+            },
+            directMessages: {
+              "*": {
+                enabled: true,
+                requireMention: false,
+                policy: "pairing",
+                allowUsers: [],
+                blockUsers: [],
+                allowBots: false,
+              },
+            },
+            groups: {
+              "*": {
+                enabled: true,
+                requireMention: true,
+                policy: "open",
+                allowUsers: [],
+                blockUsers: [],
+                allowBots: false,
+              },
+            },
+            commandPrefixes: {
+              slash: ["::", "\\"],
+              bash: ["!"],
+            },
+            streaming: "off",
+            response: "final",
+            responseMode: "message-tool",
+            additionalMessageMode: "steer",
+            surfaceNotifications: {
+              queueStart: "brief",
+              loopStart: "brief",
+            },
+            verbose: "minimal",
+            followUp: {
+              mode: "auto",
+              participationTtlMin: 5,
+            },
+            polling: {
+              timeoutSeconds: 20,
+              retryDelayMs: 1000,
+            },
+          },
+          default: {
+            enabled: zaloBotEnabled,
+            name: "default",
+            botToken: renderEnvReference("ZALO_BOT_TOKEN", options.zaloBotTokenRef),
             dmPolicy: "pairing",
             groupPolicy: "allowlist",
             directMessages: {},

@@ -18,6 +18,8 @@ import {
   resolveSlackDirectMessageConfig,
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
+  resolveZaloBotConfig,
+  resolveZaloBotDirectMessageConfig,
 } from "../config/channel-bots.ts";
 import { resolveSharedGroupsWildcardRoute } from "../config/group-routes.ts";
 import { isSharedGroupsWildcardRouteId } from "../config/group-routes.ts";
@@ -63,7 +65,7 @@ export type AgentOperatorSummary = {
 };
 
 export type ChannelOperatorSummary = {
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "zalo-bot";
   enabled: boolean;
   connection: RuntimeChannelConnection;
   defaultAgentId: string;
@@ -155,6 +157,15 @@ function countSlackSurfaces(loadedConfig: LoadedConfig) {
     }, 0);
 }
 
+function countZaloBotSurfaces(loadedConfig: LoadedConfig) {
+  return Object.entries(loadedConfig.raw.bots.zaloBot)
+    .filter(([botId]) => botId !== "defaults")
+    .reduce((total, [, bot]) => {
+      const groups = "groups" in bot ? bot.groups ?? {} : {};
+      return total + Object.keys(groups).filter((groupId) => !isSharedGroupsWildcardRouteId(groupId)).length;
+    }, 0);
+}
+
 async function getRunnerSessions(loadedConfig: LoadedConfig) {
   try {
     return await listRunnerSessions(loadedConfig);
@@ -186,8 +197,13 @@ export async function getRuntimeOperatorSummary(params: {
     loadedConfig.raw.bots.telegram,
     loadedConfig.raw.bots.telegram.defaults.defaultBotId,
   );
+  const defaultZaloBot = resolveZaloBotConfig(
+    loadedConfig.raw.bots.zaloBot,
+    loadedConfig.raw.bots.zaloBot.defaults.defaultBotId,
+  );
   const defaultSlackDmConfig = resolveSlackDirectMessageConfig(defaultSlackBot);
   const defaultTelegramDmConfig = resolveTelegramDirectMessageConfig(defaultTelegramBot);
+  const defaultZaloBotDmConfig = resolveZaloBotDirectMessageConfig(defaultZaloBot);
 
   const agentSummaries = loadedConfig.raw.agents.list.map((entry) => {
     const resolved = new AgentService(loadedConfig).getResolvedAgentConfig(entry.id);
@@ -223,6 +239,11 @@ export async function getRuntimeOperatorSummary(params: {
     enabled: loadedConfig.raw.bots.telegram.defaults.enabled,
     runtimeRunning: params.runtimeRunning,
     recordedConnection: runtimeHealth.channels.telegram?.connection,
+  });
+  const zaloBotConnection = deriveChannelConnection({
+    enabled: loadedConfig.raw.bots.zaloBot.defaults.enabled,
+    runtimeRunning: params.runtimeRunning,
+    recordedConnection: runtimeHealth.channels["zalo-bot"]?.connection,
   });
 
   const channelSummaries = [
@@ -280,6 +301,33 @@ export async function getRuntimeOperatorSummary(params: {
       healthInstances: runtimeHealth.channels.telegram?.instances ?? [],
       healthUpdatedAt: runtimeHealth.channels.telegram?.updatedAt,
     },
+    {
+      channel: "zalo-bot" as const,
+      enabled: loadedConfig.raw.bots.zaloBot.defaults.enabled,
+      connection: zaloBotConnection,
+      defaultAgentId:
+        defaultZaloBot.agentId ?? loadedConfig.raw.agents.defaults.defaultAgentId,
+      streaming: defaultZaloBot.streaming,
+      response: defaultZaloBot.response,
+      responseMode: defaultZaloBot.responseMode,
+      additionalMessageMode: defaultZaloBot.additionalMessageMode,
+      configuredSurfaceCount: countZaloBotSurfaces(loadedConfig),
+      directMessagesEnabled: defaultZaloBotDmConfig?.enabled !== false,
+      directMessagesPolicy: defaultZaloBotDmConfig?.policy ?? "disabled",
+      sharedDefaultPolicy:
+        resolveSharedGroupsWildcardRoute(defaultZaloBot.groups)?.policy,
+      lastActivityAt: activities.channels["zalo-bot"]?.updatedAt,
+      lastActivityAgentId: activities.channels["zalo-bot"]?.agentId,
+      healthSummary: deriveHealthSummary({
+        channel: "zalo-bot",
+        connection: zaloBotConnection,
+        recordedSummary: runtimeHealth.channels["zalo-bot"]?.summary,
+      }),
+      healthDetail: runtimeHealth.channels["zalo-bot"]?.detail,
+      healthActions: runtimeHealth.channels["zalo-bot"]?.actions ?? [],
+      healthInstances: runtimeHealth.channels["zalo-bot"]?.instances ?? [],
+      healthUpdatedAt: runtimeHealth.channels["zalo-bot"]?.updatedAt,
+    },
   ] satisfies ChannelOperatorSummary[];
 
   const timezone = resolveConfigTimezone({ config: loadedConfig.raw });
@@ -329,7 +377,7 @@ function deriveChannelConnection(params: {
 }
 
 function deriveHealthSummary(params: {
-  channel: "slack" | "telegram";
+  channel: "slack" | "telegram" | "zalo-bot";
   connection: RuntimeChannelConnection;
   recordedSummary?: string;
 }) {
@@ -337,7 +385,11 @@ function deriveHealthSummary(params: {
     return params.recordedSummary;
   }
 
-  const label = params.channel === "slack" ? "Slack" : "Telegram";
+  const label = params.channel === "slack"
+    ? "Slack"
+    : params.channel === "telegram"
+      ? "Telegram"
+      : "Zalo Bot";
   switch (params.connection) {
     case "disabled":
       return `${label} channel is disabled in config.`;

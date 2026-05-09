@@ -45,9 +45,13 @@ function senderIdFromIdentity(identity: ChannelIdentity) {
   if (!providerId) {
     return undefined;
   }
-  return identity.platform === "slack"
-    ? `slack:${providerId.toUpperCase()}`
-    : `telegram:${providerId}`;
+  if (identity.platform === "slack") {
+    return `slack:${providerId.toUpperCase()}`;
+  }
+  if (identity.platform === "zalo-bot") {
+    return `zalo-bot:${providerId}`;
+  }
+  return `telegram:${providerId}`;
 }
 
 function buildPermissionCheckCommand(params: {
@@ -115,6 +119,16 @@ function buildSlackSurface(identity: ChannelIdentity): SurfacePromptContext["sur
   };
 }
 
+function buildZaloBotSurface(identity: ChannelIdentity): SurfacePromptContext["surface"] {
+  const kind = identity.conversationKind === "dm" ? "dm" : "group";
+  return {
+    surfaceId: `zalo-bot:${kind}:${identity.chatId ?? ""}`,
+    providerId: identity.chatId,
+    kind,
+    displayName: identity.chatName,
+  };
+}
+
 export function buildSurfacePromptContext(params: {
   identity: ChannelIdentity;
   agentId?: string;
@@ -135,7 +149,9 @@ export function buildSurfacePromptContext(params: {
       : undefined,
     surface: params.identity.platform === "slack"
       ? buildSlackSurface(params.identity)
-      : buildTelegramSurface(params.identity),
+      : params.identity.platform === "zalo-bot"
+        ? buildZaloBotSurface(params.identity)
+        : buildTelegramSurface(params.identity),
     permissionCheckCommand: buildPermissionCheckCommand({
       senderId,
       agentId: params.agentId,
@@ -167,7 +183,11 @@ export function renderSurfacePromptText(surface: SurfacePromptContext["surface"]
     return "unavailable";
   }
 
-  const platform = surface.surfaceId.startsWith("slack:") ? "Slack" : "Telegram";
+  const platform = surface.surfaceId.startsWith("slack:")
+    ? "Slack"
+    : surface.surfaceId.startsWith("zalo-bot:")
+      ? "Zalo Bot"
+      : "Telegram";
   if (surface.parent) {
     const parentKind = surface.parent.surfaceId.includes(":group:") ? "group" : "channel";
     const childKind = surface.surfaceId.includes(":thread:") ? "thread" : surface.kind;

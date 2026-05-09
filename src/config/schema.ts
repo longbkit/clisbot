@@ -346,6 +346,38 @@ const telegramBotSchema = z.object({
   }).optional(),
 });
 
+const zaloBotSchema = z.object({
+  enabled: z.boolean().default(true),
+  name: z.string().optional(),
+  agentId: z.string().optional(),
+  credentialType: credentialTypeSchema.optional(),
+  botToken: z.string().optional(),
+  tokenFile: z.string().optional(),
+  mode: z.enum(["polling", "webhook"]).optional(),
+  webhookUrl: z.string().optional(),
+  webhookSecret: z.string().optional(),
+  webhookPath: z.string().optional(),
+  allowBots: z.boolean().optional(),
+  dmPolicy: dmPolicySchema.optional(),
+  groupPolicy: conversationPolicySchema.optional(),
+  agentPrompt: agentPromptSchema.optional(),
+  commandPrefixes: commandPrefixesOverrideSchema.optional(),
+  streaming: streamingSchema.optional(),
+  response: responseSchema.optional(),
+  responseMode: responseModeSchema.optional(),
+  additionalMessageMode: additionalMessageModeSchema.optional(),
+  surfaceNotifications: surfaceNotificationsOverrideSchema.optional(),
+  verbose: verboseSchema.optional(),
+  followUp: followUpOverrideSchema.optional(),
+  timezone: timezoneSchema.optional(),
+  directMessages: z.record(z.string(), botRouteSchema).default({}),
+  groups: z.record(z.string(), botRouteSchema).default({}),
+  polling: z.object({
+    timeoutSeconds: z.number().int().positive().default(20),
+    retryDelayMs: z.number().int().positive().default(1000),
+  }).optional(),
+});
+
 const telegramProviderDefaultsSchema = z.object({
   enabled: z.boolean().default(false),
   defaultBotId: z.string().min(1).default("default"),
@@ -375,6 +407,44 @@ const telegramProviderDefaultsSchema = z.object({
   timezone: timezoneSchema.optional(),
   directMessages: z.record(z.string(), botRouteSchema).default({}),
   groups: z.record(z.string(), telegramGroupRouteSchema).default({}),
+  polling: z.object({
+    timeoutSeconds: z.number().int().positive().default(20),
+    retryDelayMs: z.number().int().positive().default(1000),
+  }).default({
+    timeoutSeconds: 20,
+    retryDelayMs: 1000,
+  }),
+});
+
+const zaloBotProviderDefaultsSchema = z.object({
+  enabled: z.boolean().default(false),
+  defaultBotId: z.string().min(1).default("default"),
+  mode: z.enum(["polling", "webhook"]).default("polling"),
+  allowBots: z.boolean().default(false),
+  dmPolicy: dmPolicySchema.default("pairing"),
+  groupPolicy: conversationPolicySchema.default("allowlist"),
+  agentPrompt: agentPromptSchema.default({
+    enabled: true,
+    maxProgressMessages: 3,
+    requireFinalResponse: true,
+  }),
+  commandPrefixes: commandPrefixesSchema.default({
+    slash: ["::", "\\"],
+    bash: ["!"],
+  }),
+  streaming: streamingSchema.default("off"),
+  response: responseSchema.default("final"),
+  responseMode: responseModeSchema.default("message-tool"),
+  additionalMessageMode: additionalMessageModeSchema.default("steer"),
+  surfaceNotifications: surfaceNotificationsSchema.optional(),
+  verbose: verboseSchema.default("minimal"),
+  followUp: followUpSchema.default({
+    mode: "auto",
+    participationTtlMin: 5,
+  }),
+  timezone: timezoneSchema.optional(),
+  directMessages: z.record(z.string(), botRouteSchema).default({}),
+  groups: z.record(z.string(), botRouteSchema).default({}),
   polling: z.object({
     timeoutSeconds: z.number().int().positive().default(20),
     retryDelayMs: z.number().int().positive().default(1000),
@@ -517,6 +587,59 @@ const telegramBotsSchema = z.object({
     },
   }),
 }).catchall(telegramBotSchema);
+
+const zaloBotBotsSchema = z.object({
+  defaults: zaloBotProviderDefaultsSchema.default({
+    enabled: false,
+    defaultBotId: "default",
+    mode: "polling",
+    allowBots: false,
+    dmPolicy: "pairing",
+    groupPolicy: "allowlist",
+    agentPrompt: {
+      enabled: true,
+      maxProgressMessages: 3,
+      requireFinalResponse: true,
+    },
+    commandPrefixes: {
+      slash: ["::", "\\"],
+      bash: ["!"],
+    },
+    streaming: "off",
+    response: "final",
+    responseMode: "message-tool",
+    additionalMessageMode: "steer",
+    verbose: "minimal",
+    followUp: {
+      mode: "auto",
+      participationTtlMin: 5,
+    },
+    directMessages: {
+      "*": {
+        enabled: true,
+        requireMention: false,
+        policy: "pairing",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    },
+    groups: {
+      "*": {
+        enabled: true,
+        requireMention: true,
+        policy: "open",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    },
+    polling: {
+      timeoutSeconds: 20,
+      retryDelayMs: 1000,
+    },
+  }),
+}).catchall(zaloBotSchema);
 
 const appControlConfigReloadSchema = z.object({
   watch: z.boolean().default(false),
@@ -1067,6 +1190,118 @@ export const clisbotConfigSchema = z.object({
         },
       },
     } as any),
+    zaloBot: z.object({
+      defaults: zaloBotProviderDefaultsSchema.default({
+        enabled: false,
+        defaultBotId: "default",
+        mode: "polling",
+        allowBots: false,
+        dmPolicy: "pairing",
+        groupPolicy: "allowlist",
+        agentPrompt: {
+          enabled: true,
+          maxProgressMessages: 3,
+          requireFinalResponse: true,
+        },
+        commandPrefixes: {
+          slash: ["::", "\\"],
+          bash: ["!"],
+        },
+        streaming: "off",
+        response: "final",
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        verbose: "minimal",
+        followUp: {
+          mode: "auto",
+          participationTtlMin: 5,
+        },
+        directMessages: {
+          "*": {
+            enabled: true,
+            requireMention: false,
+            policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        groups: {
+          "*": {
+            enabled: true,
+            requireMention: true,
+            policy: "open",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        polling: {
+          timeoutSeconds: 20,
+          retryDelayMs: 1000,
+        },
+      }),
+    }).catchall(zaloBotSchema).default({
+      defaults: {
+        enabled: false,
+        defaultBotId: "default",
+        mode: "polling",
+        allowBots: false,
+        dmPolicy: "pairing",
+        groupPolicy: "allowlist",
+        agentPrompt: {
+          enabled: true,
+          maxProgressMessages: 3,
+          requireFinalResponse: true,
+        },
+        commandPrefixes: {
+          slash: ["::", "\\"],
+          bash: ["!"],
+        },
+        streaming: "off",
+        response: "final",
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        verbose: "minimal",
+        followUp: {
+          mode: "auto",
+          participationTtlMin: 5,
+        },
+        directMessages: {
+          "*": {
+            enabled: true,
+            requireMention: false,
+            policy: "pairing",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        groups: {
+          "*": {
+            enabled: true,
+            requireMention: true,
+            policy: "open",
+            allowUsers: [],
+            blockUsers: [],
+            allowBots: false,
+          },
+        },
+        polling: {
+          timeoutSeconds: 20,
+          retryDelayMs: 1000,
+        },
+      },
+      default: {
+        enabled: false,
+        name: "default",
+        botToken: "${ZALO_BOT_TOKEN}",
+        dmPolicy: "pairing",
+        groupPolicy: "allowlist",
+        directMessages: {},
+        groups: {},
+      },
+    } as any),
   }),
   agents: z.object({
     defaults: agentsDefaultsSchema.default({
@@ -1353,3 +1588,5 @@ export type SlackBotConfig = z.infer<typeof slackBotSchema>;
 export type SlackProviderDefaultsConfig = z.infer<typeof slackProviderDefaultsSchema>;
 export type TelegramBotConfig = z.infer<typeof telegramBotSchema>;
 export type TelegramProviderDefaultsConfig = z.infer<typeof telegramProviderDefaultsSchema>;
+export type ZaloBotConfig = z.infer<typeof zaloBotSchema>;
+export type ZaloBotProviderDefaultsConfig = z.infer<typeof zaloBotProviderDefaultsSchema>;

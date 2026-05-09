@@ -23,6 +23,7 @@ Related pages:
 - [Claude CLI Guide](claude-cli.md)
 - [Gemini CLI Guide](gemini-cli.md)
 - [Telegram Bot Setup](telegram-setup.md)
+- [Zalo Bot Setup](zalo-bot-setup.md)
 - [Slack App Setup](slack-setup.md)
 - [Slash Commands](slash-commands.md)
 - [Native CLI Commands](native-cli-commands.md)
@@ -151,9 +152,9 @@ clisbot status
 Important distinction:
 
 - `clisbot start` seeds `~/.clisbot/clisbot.json` automatically if it does not exist
-- `clisbot start` requires Slack or Telegram token references before it bootstraps anything
+- `clisbot start` requires Slack, Telegram, or Zalo Bot token references before it bootstraps anything
 - when no agents exist yet, `start` requires both `--cli` and `--bot-type` to create the first `default` agent
-- `--slack-app-token`, `--slack-bot-token`, and `--telegram-bot-token` accept either bare env names like `CUSTOM_SLACK_APP_TOKEN` or placeholder form like `${CUSTOM_SLACK_APP_TOKEN}`
+- `--slack-app-token`, `--slack-bot-token`, `--telegram-bot-token`, and `--zalo-bot-token` accept either bare env names like `CUSTOM_SLACK_APP_TOKEN` or placeholder form like `${CUSTOM_SLACK_APP_TOKEN}`
 - `clisbot start` prints which token refs or credential sources it is using for the channels you requested
 - existing enabled channel token refs are validated before the detached runtime is spawned
 - fresh bootstrap enables only the channels and bots you named explicitly with flags
@@ -232,6 +233,7 @@ Most-used commands:
 
 - `clisbot bots list`
 - `clisbot bots add --channel telegram --bot default --bot-token TELEGRAM_BOT_TOKEN --persist`
+- `clisbot bots add --channel zalo-bot --bot default --bot-token ZALO_BOT_TOKEN --persist`
 - `clisbot bots add --channel slack --bot default --app-token SLACK_APP_TOKEN --bot-token SLACK_BOT_TOKEN --persist`
 - `clisbot bots set-agent --channel telegram --bot default --agent support`
 - `clisbot bots set-default --channel slack --bot ops`
@@ -240,7 +242,7 @@ Most-used commands:
 
 ## Routes CLI
 
-Use `clisbot routes ...` to admit specific Slack or Telegram surfaces under a bot.
+Use `clisbot routes ...` to admit specific Slack, Telegram, or Zalo Bot surfaces under a bot.
 
 Focused help:
 
@@ -256,6 +258,7 @@ Most-used commands:
 - `clisbot routes add --channel telegram group:-1001234567890 --bot default`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot default`
 - `clisbot routes add --channel telegram dm:* --bot default`
+- `clisbot routes add --channel zalo-bot group:<chatId> --bot default`
 - `clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support`
 - `clisbot routes set-require-mention --channel telegram group:-1001234567890 --bot default --value false`
 - `clisbot routes set-response-mode --channel slack group:C1234567890 --bot default --mode message-tool`

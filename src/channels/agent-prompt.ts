@@ -89,11 +89,21 @@ export const TELEGRAM_REPLY_COMMAND_BASE = `{{command}} message send \\
   --render native \\
 `;
 
+export const ZALO_BOT_REPLY_COMMAND_BASE = `{{command}} message send \\
+  --channel zalo-bot \\
+{{account_clause}}  --target {{chat_id}} \\
+  --input md \\
+  --render native \\
+`;
+
 export const SLACK_REPLY_STYLE_HINT =
   "Put readable hierarchical Markdown in the --message body.\nFor clickable links, use canonical URLs and do not wrap them in backticks.\nKeep each paragraph, list, or code block under 2500 chars.";
 
 export const TELEGRAM_REPLY_STYLE_HINT =
   "Put readable hierarchical Markdown in the --message body.\nFor clickable links, use canonical URLs and do not wrap them in backticks.\nKeep the Markdown body under 3000 chars.";
+
+export const ZALO_BOT_REPLY_STYLE_HINT =
+  "Zalo Bot does not support Markdown rendering. Use plain text with clear structure, especially for longer replies.\nFor clickable links, use canonical URLs and do not wrap them in backticks.\nKeep the message body under 3000 chars.";
 
 export const ACCOUNT_CLAUSE = "  --account {{account_id}} \\\n";
 export const EMPTY_ACCOUNT_CLAUSE = "";
@@ -277,9 +287,13 @@ function renderMessagePromptParts(params: {
 }
 
 function buildReplyStyleHint(identity: ChannelIdentity) {
-  return identity.platform === "slack"
-    ? SLACK_REPLY_STYLE_HINT
-    : TELEGRAM_REPLY_STYLE_HINT;
+  if (identity.platform === "slack") {
+    return SLACK_REPLY_STYLE_HINT;
+  }
+  if (identity.platform === "zalo-bot") {
+    return ZALO_BOT_REPLY_STYLE_HINT;
+  }
+  return TELEGRAM_REPLY_STYLE_HINT;
 }
 
 function renderConfigurationGuidance() {
@@ -332,6 +346,18 @@ function buildReplyCommandBase(params: {
           thread_ts: params.identity.threadTs,
         })
         : EMPTY_THREAD_CLAUSE,
+    });
+  }
+
+  if (params.identity.platform === "zalo-bot") {
+    return renderTemplate(ZALO_BOT_REPLY_COMMAND_BASE, {
+      command: params.command,
+      account_clause: botId
+        ? renderTemplate(ACCOUNT_CLAUSE, {
+          account_id: botId,
+        })
+        : EMPTY_ACCOUNT_CLAUSE,
+      chat_id: params.identity.chatId ?? "",
     });
   }
 

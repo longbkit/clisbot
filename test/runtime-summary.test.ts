@@ -167,13 +167,13 @@ describe("runtime summaries", () => {
     expect(text).toContain("routes=none");
     expect(text).toContain("telegram: no explicit group or topic routes are configured yet");
     expect(startText).toContain("telegram: no explicit group or topic routes are configured yet");
-    expect(startText).toContain("DM the Telegram or Slack bot first to confirm it responds normally");
-    expect(startText).toContain("after DM works, add the bot to the target Slack channel or Telegram group/topic");
+    expect(startText).toContain("DM one enabled bot first to confirm it responds normally (Telegram, Slack)");
+    expect(startText).toContain("after DM works, add the bot to the target Slack channel, Telegram group/topic, or Zalo group");
     expect(startText).toContain(
-      "add the route with `clisbot routes add --channel slack group:<channelId> --bot default` or `clisbot routes add --channel telegram group:<chatId> --bot default`; that route uses the agent currently assigned to that bot by default",
+      "add the route with `clisbot routes add --channel slack group:<channelId> --bot default`, `clisbot routes add --channel telegram group:<chatId> --bot default`, or `clisbot routes add --channel zalo-bot group:<chatId> --bot default`; that route uses the agent currently assigned to that bot by default",
     );
     expect(startText).toContain(
-      "only if you want a different agent there than the one currently assigned to that bot by default, bind it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>` or `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`",
+      "only if you want a different agent there than the one currently assigned to that bot by default, bind it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`, `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`, or `clisbot routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>`",
     );
     expect(startText).toContain(
       "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",
@@ -182,7 +182,7 @@ describe("runtime summaries", () => {
       "Slack: mention `@<botname> \\start` in the target channel to verify mention flow",
     );
     expect(startText).toContain(
-      "Send a direct message (DM) to the Telegram or Slack bot. Send `/start` or `hi` to receive a pairing code.",
+      "Send a direct message (DM) to an enabled bot (Telegram, Slack). Send `/start` or `hi` to receive a pairing code.",
     );
     expect(startText).toContain("Auth onboarding:");
     expect(startText).toContain("Telegram groups or topics can use `/whoami` before routing, while DMs with pairing must pair first");
@@ -196,6 +196,42 @@ describe("runtime summaries", () => {
     expect(startText).toContain("If no owner is configured yet, the first DM user during the first 30 minutes becomes app owner automatically.");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
+  });
+
+  test("includes zalo-bot in status and start summaries when enabled", async () => {
+    delete process.env.CLISBOT_HOME;
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = clisbotConfigSchema.parse(
+      JSON.parse(
+        renderDefaultConfigTemplate({
+          slackEnabled: false,
+          telegramEnabled: false,
+          zaloBotEnabled: true,
+        }),
+      ),
+    );
+    config.agents.list = [{ id: "default", cli: "codex" }];
+    config.bots.zaloBot.defaults.enabled = true;
+    config.bots.zaloBot.default.enabled = true;
+    config.bots.zaloBot.default.credentialType = "tokenFile";
+    config.bots.zaloBot.default.botToken = "";
+    await writeEditableConfig(configPath, config);
+
+    const summary = await getRuntimeOperatorSummary({
+      configPath,
+      runtimeRunning: false,
+    });
+    const statusText = renderStatusSummary(summary);
+    const startText = renderStartSummary(summary);
+
+    expect(statusText).toContain("zalo-bot enabled=yes");
+    expect(statusText).toContain("zalo-bot: no explicit group routes are configured yet");
+    expect(startText).toContain("DM the Zalo Bot first to confirm it responds normally");
+    expect(startText).toContain("routes add --channel zalo-bot group:<chatId> --bot default");
+    expect(startText).toContain("routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>");
+    expect(startText).toContain("Zalo Bot: DM the bot for pairing flow first, then mention it in the target group to verify trigger flow");
+    expect(startText).toContain("clisbot pairing approve zalo-bot <code>");
   });
 
   test("clears lost persisted active runs before operator status output", async () => {
@@ -435,7 +471,7 @@ describe("runtime summaries", () => {
     );
     expect(startText).toContain("Next steps after bootstrap:");
     expect(startText).toContain(
-      "run `clisbot bots add --channel <slack|telegram> ...` for the first provider bot you want to expose",
+      "run `clisbot bots add --channel <slack|telegram|zalo-bot> ...` for the first provider bot you want to expose",
     );
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");

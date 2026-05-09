@@ -13,7 +13,7 @@ export type ChannelRenderedMessageState = {
 };
 
 export function buildRenderedMessageState(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "zalo-bot";
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   snapshot: string;
   queuePosition?: number;
@@ -45,7 +45,7 @@ export function buildRenderedMessageState(params: {
 }
 
 export function renderPlatformInteraction(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "zalo-bot";
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
   maxChars: number;
@@ -54,7 +54,7 @@ export function renderPlatformInteraction(params: {
   allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
-  return params.platform === "telegram"
+  return params.platform === "telegram" || params.platform === "zalo-bot"
     ? renderTelegramInteraction(params)
     : renderSlackInteraction(params);
 }

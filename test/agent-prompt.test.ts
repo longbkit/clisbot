@@ -163,6 +163,51 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("`clisbot auth get-permissions --sender telegram:123 --agent default --json`");
   });
 
+  test("renders a Zalo Bot DM reply command", () => {
+    previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
+    previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;
+    process.env.CLISBOT_WRAPPER_PATH = "/tmp/clisbot-wrapper";
+    process.env.CLISBOT_PROMPT_COMMAND = "/tmp/clis";
+
+    const prompt = buildAgentPromptText({
+      text: "describe the image",
+      identity: {
+        platform: "zalo-bot",
+        conversationKind: "dm",
+        senderId: "aaa741c34d8fa4d1fd9e",
+        senderName: "The Longbkit",
+        chatId: "aaa741c34d8fa4d1fd9e",
+      },
+      config: {
+        enabled: true,
+        maxProgressMessages: 2,
+        requireFinalResponse: true,
+      },
+      responseMode: "message-tool",
+      streaming: "all",
+      agentId: "default",
+      time: "2026-05-09T06:00:18.000Z",
+    });
+
+    expect(prompt).toContain("/tmp/clis message send \\");
+    expect(prompt).toContain("  --channel zalo-bot \\");
+    expect(prompt).toContain("  --target aaa741c34d8fa4d1fd9e \\");
+    expect(prompt).not.toContain("  --channel telegram \\");
+    expect(prompt).not.toContain("  --topic-id ");
+    expect(prompt).toContain("  --input md \\");
+    expect(prompt).toContain("  --render native \\");
+    expect(prompt).toContain("  --final|progress \\");
+    expect(prompt).toContain(
+      "Zalo Bot does not support Markdown rendering. Use plain text with clear structure, especially for longer replies.",
+    );
+    expect(prompt).toContain(
+      "For clickable links, use canonical URLs and do not wrap them in backticks.",
+    );
+    expect(prompt).toContain("Keep the message body under 3000 chars.");
+    expect(prompt).toContain("- sender: The Longbkit [zalo-bot:aaa741c34d8fa4d1fd9e]");
+    expect(prompt).toContain("`clisbot auth get-permissions --sender zalo-bot:aaa741c34d8fa4d1fd9e --agent default --json`");
+  });
+
   test("returns the raw text when the prompt envelope is disabled", () => {
     const prompt = buildAgentPromptText({
       text: "plain text",

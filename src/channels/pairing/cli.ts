@@ -31,10 +31,10 @@ function resolveConfigPath(env: NodeJS.ProcessEnv = process.env) {
 
 function parseChannel(raw: string | undefined): PairingChannel {
   const value = raw?.trim().toLowerCase();
-  if (value === "slack" || value === "telegram") {
+  if (value === "slack" || value === "telegram" || value === "zalo-bot") {
     return value;
   }
-  throw new Error("Channel required: slack | telegram");
+  throw new Error("Channel required: slack | telegram | zalo-bot");
 }
 
 function resolveApprovedBotId(
@@ -61,10 +61,10 @@ function renderPairingCliHelp() {
     "Usage:",
     `  ${renderCliCommand("pairing --help")}`,
     `  ${renderCliCommand("pairing help")}`,
-    `  ${renderCliCommand("pairing list <slack|telegram> [--json]")}`,
-    `  ${renderCliCommand("pairing approve <slack|telegram> <code>")}`,
-    `  ${renderCliCommand("pairing reject <slack|telegram> <code>")}`,
-    `  ${renderCliCommand("pairing clear <slack|telegram>")}`,
+    `  ${renderCliCommand("pairing list <slack|telegram|zalo-bot> [--json]")}`,
+    `  ${renderCliCommand("pairing approve <slack|telegram|zalo-bot> <code>")}`,
+    `  ${renderCliCommand("pairing reject <slack|telegram|zalo-bot> <code>")}`,
+    `  ${renderCliCommand("pairing clear <slack|telegram|zalo-bot>")}`,
     "",
     "Notes:",
     "  - `list` shows pending pairing requests for one channel only",
@@ -114,7 +114,9 @@ export async function runPairingCli(args: string[], writer: PairingCliWriter = c
     const configuredBotIds =
       channel === "slack"
         ? Object.keys(config.bots.slack).filter((botId) => botId !== "defaults")
-        : Object.keys(config.bots.telegram).filter((botId) => botId !== "defaults");
+        : channel === "telegram"
+          ? Object.keys(config.bots.telegram).filter((botId) => botId !== "defaults")
+          : Object.keys(config.bots.zaloBot).filter((botId) => botId !== "defaults");
     const botId = resolveApprovedBotId(channel, configuredBotIds, approved.botId);
     const wildcardRoute = ensureBotDirectMessageWildcardRoute(config, channel, botId);
     const normalizedUser = normalizeAllowEntry(channel, approved.id);

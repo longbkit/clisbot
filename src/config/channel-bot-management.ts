@@ -2,22 +2,28 @@ import type { ClisbotConfig } from "./schema.ts";
 import type {
   ParsedSlackBotFlags,
   ParsedTelegramBotFlags,
+  ParsedZaloBotFlags,
 } from "../control/channel-bootstrap-flags.ts";
 import {
   clearSlackRuntimeCredential,
   clearTelegramRuntimeCredential,
+  clearZaloBotRuntimeCredential,
   getSlackMemAppEnvName,
   getSlackMemBotEnvName,
   getTelegramMemEnvName,
+  getZaloBotMemEnvName,
   persistSlackCredential,
   persistTelegramCredential,
+  persistZaloBotCredential,
   setSlackRuntimeCredential,
   setTelegramRuntimeCredential,
+  setZaloBotRuntimeCredential,
 } from "./channel-credentials.ts";
 
 export type ChannelBootstrapBots = {
   slackBots: ParsedSlackBotFlags[];
   telegramBots: ParsedTelegramBotFlags[];
+  zaloBotBots: ParsedZaloBotFlags[];
 };
 
 function getFirstBotId(bots: Array<{ botId: string }>) {
@@ -40,6 +46,11 @@ function getTelegramBots(config: ClisbotConfig) {
   return bots;
 }
 
+function getZaloBotBots(config: ClisbotConfig) {
+  const { defaults, ...bots } = config.bots.zaloBot;
+  return bots;
+}
+
 function createSlackBotShell(botId: string): ClisbotConfig["bots"]["slack"][string] {
   return {
     enabled: false,
@@ -55,6 +66,18 @@ function createSlackBotShell(botId: string): ClisbotConfig["bots"]["slack"][stri
 }
 
 function createTelegramBotShell(botId: string): ClisbotConfig["bots"]["telegram"][string] {
+  return {
+    enabled: false,
+    name: botId,
+    dmPolicy: "pairing",
+    groupPolicy: "allowlist",
+    botToken: "",
+    directMessages: {},
+    groups: {},
+  };
+}
+
+function createZaloBotShell(botId: string): ClisbotConfig["bots"]["zaloBot"][string] {
   return {
     enabled: false,
     name: botId,
@@ -93,6 +116,21 @@ function reconcileTelegramConfiguredBots(config: ClisbotConfig) {
     !enabledBotIds.includes(config.bots.telegram.defaults.defaultBotId)
   ) {
     config.bots.telegram.defaults.defaultBotId = enabledBotIds[0];
+  }
+}
+
+function reconcileZaloBotConfiguredBots(config: ClisbotConfig) {
+  const enabledBotIds = getEnabledBotIds(getZaloBotBots(config));
+  if (enabledBotIds.length === 0) {
+    config.bots.zaloBot.defaults.enabled = false;
+    return;
+  }
+
+  if (
+    !config.bots.zaloBot.defaults.defaultBotId ||
+    !enabledBotIds.includes(config.bots.zaloBot.defaults.defaultBotId)
+  ) {
+    config.bots.zaloBot.defaults.defaultBotId = enabledBotIds[0];
   }
 }
 
@@ -145,6 +183,29 @@ function applyTelegramBotConfig(
       };
 }
 
+function applyZaloBotConfig(
+  config: ClisbotConfig,
+  bot: ParsedZaloBotFlags,
+) {
+  if (!bot.botToken) {
+    throw new Error(`Zalo Bot ${bot.botId} is incomplete`);
+  }
+
+  const existing = config.bots.zaloBot[bot.botId] ?? createZaloBotShell(bot.botId);
+  config.bots.zaloBot[bot.botId] = bot.botToken.kind === "env"
+    ? {
+        ...existing,
+        enabled: true,
+        botToken: bot.botToken.placeholder,
+      }
+    : {
+        ...existing,
+        enabled: true,
+        credentialType: "mem",
+        botToken: "",
+      };
+}
+
 export function buildBootstrapRuntimeMemEnv(
   bots: ChannelBootstrapBots,
   env: NodeJS.ProcessEnv = process.env,
@@ -166,16 +227,24 @@ export function buildBootstrapRuntimeMemEnv(
     extraEnv[getSlackMemBotEnvName(bot.botId)] = bot.botToken.secret;
   }
 
+  for (const bot of bots.zaloBotBots) {
+    if (bot.botToken?.kind !== "mem") {
+      continue;
+    }
+    extraEnv[getZaloBotMemEnvName(bot.botId)] = bot.botToken.secret;
+  }
+
   return extraEnv;
 }
 
 export function deactivateExpiredMemBots(
   config: ClisbotConfig,
-  activeMemBots: Partial<Record<"slack" | "telegram", Set<string>>> = {},
+  activeMemBots: Partial<Record<"slack" | "telegram" | "zalo-bot", Set<string>>> = {},
 ) {
   const summaries: string[] = [];
   const activeSlackMemBots = activeMemBots.slack ?? new Set<string>();
   const activeTelegramMemBots = activeMemBots.telegram ?? new Set<string>();
+  const activeZaloBotMemBots = activeMemBots["zalo-bot"] ?? new Set<string>();
 
   for (const [botId, bot] of Object.entries(getSlackBots(config))) {
     if (bot.credentialType !== "mem" || activeSlackMemBots.has(botId)) {
@@ -197,8 +266,19 @@ export function deactivateExpiredMemBots(
     bot.enabled = false;
   }
 
+  for (const [botId, bot] of Object.entries(getZaloBotBots(config))) {
+    if (bot.credentialType !== "mem" || activeZaloBotMemBots.has(botId)) {
+      continue;
+    }
+    if (bot.enabled !== false) {
+      summaries.push(`Disabled expired zalo-bot/${botId} (credentialType=mem).`);
+    }
+    bot.enabled = false;
+  }
+
   reconcileSlackConfiguredBots(config);
   reconcileTelegramConfiguredBots(config);
+  reconcileZaloBotConfiguredBots(config);
 
   return summaries;
 }
@@ -224,6 +304,13 @@ export function applyBootstrapBotsToConfig(
     }
     config.bots.telegram.default = createTelegramBotShell("default");
     config.bots.telegram.defaults.defaultBotId = getFirstBotId(bots.telegramBots);
+
+    config.bots.zaloBot.defaults.enabled = bots.zaloBotBots.length > 0;
+    for (const botId of Object.keys(getZaloBotBots(config))) {
+      delete config.bots.zaloBot[botId];
+    }
+    config.bots.zaloBot.default = createZaloBotShell("default");
+    config.bots.zaloBot.defaults.defaultBotId = getFirstBotId(bots.zaloBotBots);
   }
 
   if (bots.slackBots.length > 0) {
@@ -246,6 +333,17 @@ export function applyBootstrapBotsToConfig(
       applyTelegramBotConfig(config, bot);
     }
     reconcileTelegramConfiguredBots(config);
+  }
+
+  if (bots.zaloBotBots.length > 0) {
+    config.bots.zaloBot.defaults.enabled = true;
+    if (!config.bots.zaloBot.defaults.defaultBotId) {
+      config.bots.zaloBot.defaults.defaultBotId = getFirstBotId(bots.zaloBotBots);
+    }
+    for (const bot of bots.zaloBotBots) {
+      applyZaloBotConfig(config, bot);
+    }
+    reconcileZaloBotConfiguredBots(config);
   }
 }
 
@@ -270,6 +368,17 @@ export function stageBootstrapRuntimeCredentials(
       continue;
     }
     setTelegramRuntimeCredential({
+      botId: bot.botId,
+      botToken: bot.botToken.secret,
+      runtimeCredentialsPath,
+    });
+  }
+
+  for (const bot of bots.zaloBotBots) {
+    if (bot.botToken?.kind !== "mem") {
+      continue;
+    }
+    setZaloBotRuntimeCredential({
       botId: bot.botId,
       botToken: bot.botToken.secret,
       runtimeCredentialsPath,
@@ -331,8 +440,31 @@ export function persistBootstrapMemBotCredentials(
     summaries.push(`Persisted telegram/${bot.botId} to credential file.`);
   }
 
+  for (const bot of bots.zaloBotBots) {
+    if (bot.botToken?.kind !== "mem") {
+      continue;
+    }
+    persistZaloBotCredential({
+      botId: bot.botId,
+      botToken: bot.botToken.secret,
+    });
+    config.bots.zaloBot[bot.botId] = {
+      ...(config.bots.zaloBot[bot.botId] ?? {}),
+      enabled: true,
+      credentialType: "tokenFile",
+      botToken: "",
+      tokenFile: undefined,
+    };
+    clearZaloBotRuntimeCredential({
+      botId: bot.botId,
+      runtimeCredentialsPath,
+    });
+    summaries.push(`Persisted zalo-bot/${bot.botId} to credential file.`);
+  }
+
   reconcileSlackConfiguredBots(config);
   reconcileTelegramConfiguredBots(config);
+  reconcileZaloBotConfiguredBots(config);
 
   return summaries;
 }

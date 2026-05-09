@@ -9,6 +9,7 @@ import {
   SHARED_GROUPS_WILDCARD_ROUTE_ID,
   createSlackGroupRouteShell,
   createTelegramGroupRouteShell,
+  createZaloBotGroupRouteShell,
   normalizeSharedGroupRouteId,
 } from "./group-routes.ts";
 import { migrateLegacyConfigShape } from "./legacy-config-migration.ts";
@@ -16,7 +17,7 @@ import { migrateLegacyConfigShape } from "./legacy-config-migration.ts";
 export const CURRENT_SCHEMA_VERSION = "0.1.50";
 const LEGACY_CONFIG_UPGRADE_MAX_SCHEMA_VERSION = "0.1.44";
 
-type Provider = "slack" | "telegram";
+type Provider = "slack" | "telegram" | "zalo-bot";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -199,7 +200,9 @@ function normalizeGroups(params: {
     }
     const routeShell: Record<string, unknown> = params.provider === "telegram"
       ? createTelegramGroupRouteShell("open")
-      : createSlackGroupRouteShell("open");
+      : params.provider === "zalo-bot"
+        ? createZaloBotGroupRouteShell("open")
+        : createSlackGroupRouteShell("open");
     if (routeId !== SHARED_GROUPS_WILDCARD_ROUTE_ID && !Object.hasOwn(rawRoute, "policy")) {
       delete routeShell.policy;
     }

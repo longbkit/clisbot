@@ -10,7 +10,7 @@ function parseOwnerPrincipal(principal: string) {
 
   const [platform, userId] = trimmed.split(":", 2);
   if (
-    (platform !== "slack" && platform !== "telegram") ||
+    (platform !== "slack" && platform !== "telegram" && platform !== "zalo-bot") ||
     !userId?.trim()
   ) {
     return null;
@@ -23,7 +23,7 @@ function parseOwnerPrincipal(principal: string) {
 }
 
 function buildOwnerAlertCommand(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "zalo-bot";
   botId: string;
   userId: string;
   message: string;
@@ -68,7 +68,7 @@ export async function sendOwnerAlert(params: {
   const delivered: string[] = [];
   const failed: Array<{ principal: string; detail: string }> = [];
 
-  for (const platform of ["slack", "telegram"] as const) {
+  for (const platform of ["slack", "telegram", "zalo-bot"] as const) {
     const principals = dedupe(params.loadedConfig.raw.app.auth.roles.owner?.users ?? []);
     const ownerIds = principals
       .map(parseOwnerPrincipal)
