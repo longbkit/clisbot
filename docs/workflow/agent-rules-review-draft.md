@@ -1,4 +1,4 @@
-# AI Agent Operating Preferences
+# Agent Rules Review Draft
 
 ## Status
 
@@ -6,9 +6,11 @@ Working review draft.
 
 This page captures durable operating preferences learned from real `clisbot` work. It is intentionally placed in `docs/workflow/` as a reviewable step before promoting selected rules into `AGENTS.md`.
 
-Related workflow note:
+Related workflow notes:
 
 - [Decision And Struggle Patterns](decision-and-struggle-patterns.md)
+- [Channel Planning And Review Should Use One Owner Per Decision And One Reason To Change](../lessons/2026-05-09-channel-planning-and-review-should-use-one-owner-per-decision-and-one-reason-to-change.md)
+- [AI Review Checklist](ai-review-checklist.md)
 
 ## Why This Exists
 
@@ -83,6 +85,19 @@ Avoid:
 
 If compatibility is needed for already released users, make it explicit as migration, not hidden fallback.
 
+### 5a. Use named boundary lenses for channel and architecture-sensitive work
+
+When work touches channels, shared control flow, config binding, or auth-style identity rules, explicitly apply:
+
+- `Robert C. Martin lens`: one dominant reason to change per module
+- `Martin Fowler lens`: one canonical owner per cross-cutting decision; duplicate decision paths are a stronger smell than duplicate lines
+
+This means the agent should not only ask whether code works, but also:
+
+- whether one file now mixes transport, policy, config binding, and syntax ownership
+- whether the same decision was re-implemented in another branch or layer
+- whether a new provider added another local branch where a shared seam should exist
+
 ### 6. Treat compatibility as a release safety mechanism
 
 When a release has real installed users, compatibility is not optional polish.
@@ -119,20 +134,31 @@ If an implementation makes a decision about defaults, precedence, migration, den
 
 Do not let security-sensitive decisions exist only in code.
 
-## Review Checklist
+### 9. Name duplicated decisions early
 
-Before implementing broad config, auth, channel, route, runtime, or release work:
+When repeated channel work exposes the same decision in several places, report that as a first-class finding even if the current slice still works.
 
-1. What source of truth did I inspect?
-2. What boundary owns the problem?
-3. What is current released behavior?
-4. What is target behavior?
-5. What user-facing surface could become misleading?
-6. What naming or concept could drift?
-7. What compatibility or migration path is required?
-8. What docs, help text, tests, and release notes must move with the code?
-9. What implicit decision should be reported explicitly?
-10. Is this ready for `AGENTS.md`, or should it stay as workflow guidance?
+Examples:
+
+- principal normalization
+- target parsing
+- route binding
+- behavior-config binding
+- processing-indicator lifecycle
+
+Do not reduce those to "cleanup later" notes without naming the missing owner seam.
+
+## How To Use This Draft
+
+Use this file when a workflow rule looks durable enough to outlive one task, but is not yet ready to be promoted into `AGENTS.md`.
+
+Use [AI Review Checklist](ai-review-checklist.md) for concrete review loops.
+
+Use this draft for:
+
+- durable repo-work preferences
+- candidate operating rules
+- rules that may later become hard `AGENTS.md` guidance
 
 ## Candidate `AGENTS.md` Additions
 

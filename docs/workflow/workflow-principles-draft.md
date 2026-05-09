@@ -1,10 +1,14 @@
-# Brainstorm And Ideas
+# Workflow Principles Draft
 
 ## Status
 
 Working draft.
 
-This page captures workflow ideas that are directionally strong but not yet locked as stable repo contract.
+This page captures workflow principles that are directionally strong but not yet locked as stable repo contract.
+
+Related lesson:
+
+- [Channel Planning And Review Should Use One Owner Per Decision And One Reason To Change](../lessons/2026-05-09-channel-planning-and-review-should-use-one-owner-per-decision-and-one-reason-to-change.md)
 
 ## 1. Shortest-Review-First North Star
 
@@ -43,83 +47,27 @@ Rationale:
 - CLI surfaces that look acceptable only after explanation are already carrying too much friction
 - architecture that leaks concepts, duplicates concepts, or blurs ownership will later corrupt both docs and code
 
-## 3. Repeating Review Loop Checklist
+## 3. Review Loops Should Converge On Clarity
 
 One useful direction is a reusable combo skill, prompt, or checklist that AI walks repeatedly until convergence.
 
-Suggested checklist order:
+The owner for the concrete review checklist is:
 
-### Naming
+- [AI Review Checklist](ai-review-checklist.md)
 
-Review:
+For channel-heavy or architecture-sensitive work, that review loop should explicitly use these named lenses:
 
-- convention consistency
-- prefix and suffix consistency
-- form consistency across config, CLI, docs, and code
-- short but obvious naming
-- reuse of existing names instead of near-duplicates
-
-Special rule:
-
-- periodically group similar names together
-- treat those clusters as high-leak refactor candidates
-- similar names often signal duplicate logic, duplicate concept, or wrong concept boundaries
-
-### Size and shape
-
-Review:
-
-- file size
-- function size
-- nested logic depth
-- surface area that feels larger than the actual concept
-
-### Mental model
-
-Review:
-
-- is the concept understandable without implementation trivia
-- is architecture separated cleanly from implementation detail
-- is the same concept described with one name and one owner
-
-### User flow
-
-Review:
-
-- first-run flow
-- debugging flow
-- upgrade flow
-- normal chat flow
-- operator recovery flow
-
-### Security
-
-Review:
-
-- dangerous exposure
-- trust boundaries
-- mutation surfaces
-- hidden privilege paths
-
-### Stability
-
-Review:
-
-- truthful state
-- recovery behavior
-- blast radius
-- channel or runner isolation
-- upgrade safety
-
-### Dangerous fallback
-
-Review:
-
-- whether a fallback hides real product or architecture problems
-- whether the fallback makes behavior harder to reason about later
-- whether the fallback helps short term but deepens long-term coupling
+- `Robert C. Martin lens`: one dominant reason to change per module
+- `Martin Fowler lens`: one canonical owner per decision; duplicate decision paths are a stronger smell than duplicate lines
 
 The loop should keep going until the artifact is genuinely clearer, not only "acceptable enough to move on".
+
+For channel work, "clearer" should include:
+
+- easier operator mental model
+- thinner provider adapters
+- fewer duplicated decision paths
+- more obvious owner boundaries
 
 ## 4. Task Readiness Before Execution
 
@@ -142,6 +90,7 @@ These agents should be judged by:
 - bounded scope
 - reviewability
 - correct contract and ownership
+- whether cross-channel decisions already have one named owner before coding starts
 
 ### Task-execution flow
 
@@ -154,7 +103,7 @@ This flow should assume:
 - DoD is already concrete
 - validation expectations are already explicit
 
-## 5. Reduce AI Laziness During Execution
+## 5. Execution Should Converge, Not Stop At First Local Success
 
 Ready tasks still need execution discipline.
 
@@ -189,3 +138,4 @@ This brainstorming could later become:
 - how much of the review loop should be encoded in prompts versus docs versus skills
 - whether readiness should be a named backlog status with stricter admission rules
 - how much queue or loop automation should be built into the repo versus left to operator flow
+- whether the Robert C. Martin lens and Martin Fowler lens should become a default workflow gate for all channel and workflow-sensitive review passes

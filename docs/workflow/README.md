@@ -14,10 +14,10 @@ This folder should capture:
 ## Current Files
 
 - [audit-program.md](audit-program.md): operating policy for recurring audits, audit-to-task handoff, and the boundary between `features`, `research`, `audits`, and `tasks`
-- [brainstorm-and-ideas.md](brainstorm-and-ideas.md): current brainstorming notes for shortest-review-first output, review-loop checklists, and task-readiness specialization
-- [code-review-checklist.md](code-review-checklist.md): short high-leverage checklist for looping AI code review until naming, mental model, user flow, and risk issues are cleaned up
+- [workflow-principles-draft.md](workflow-principles-draft.md): draft workflow north stars for shortest-review-first output, user-near review order, task-readiness shaping, and convergence discipline
+- [ai-review-checklist.md](ai-review-checklist.md): short high-leverage checklist for looping AI review until naming, mental model, decision ownership, user flow, and risk issues are cleaned up
 - [working-prompts.md](working-prompts.md): reusable prompts that are showing good results in real `clisbot` workflow loops
-- [ai-agent-operating-preferences.md](ai-agent-operating-preferences.md): review draft of durable AI-agent operating preferences learned from real `clisbot` work, intended as a staging point before selected rules move into `AGENTS.md`
+- [agent-rules-review-draft.md](agent-rules-review-draft.md): review draft of durable AI-agent operating rules learned from real `clisbot` work before selected rules are promoted into `AGENTS.md`
 - [decision-and-struggle-patterns.md](decision-and-struggle-patterns.md): review draft of decision patterns and recurring AI struggle patterns to prevent repeated mistakes before selected rules move into `AGENTS.md`
 
 ## Current Direction
@@ -30,6 +30,14 @@ The current workflow direction is:
 - durable repo-work preferences should be captured in `docs/workflow/` first when they need human review before becoming hard `AGENTS.md` rules
 - repeated human corrections should be distilled into decision and struggle patterns, not treated as one-off feedback
 - recurring audits should generate evidence in `docs/audits/` and feed follow-up work into `docs/tasks/` without replacing stable feature truth in `docs/features/`
+
+Current owner split:
+
+- `workflow-principles-draft.md` owns workflow direction and shaping heuristics
+- `ai-review-checklist.md` owns the reusable review loop
+- `agent-rules-review-draft.md` owns candidate durable operating rules before `AGENTS.md`
+- `working-prompts.md` owns concrete prompts that are proving useful in practice
+- `decision-and-struggle-patterns.md` owns recurring failure modes and decision-style corrections
 
 ## Boundaries
 

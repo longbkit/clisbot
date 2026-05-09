@@ -61,3 +61,20 @@ Later, this page can grow into a small library of:
 - review-loop prompts
 - task-readiness prompts
 - convergence prompts
+
+## Prompt 2: Boundary And Decision-Ownership Review
+
+Suggested review prompt:
+
+```text
+Review this using two lenses only. First, Robert C. Martin lens: apply Clean Architecture, Clean Code, and SOLID. Does each touched module still have one dominant reason to change, and are boundaries still clean? Second, Martin Fowler lens: is any important decision duplicated across branches or layers instead of having one canonical owner? Prioritize boundary dirt, duplicated decision paths, naming drift, and user-facing confusion. Keep findings short and concrete.
+```
+
+## Why This Prompt Seems Useful
+
+This prompt helps push review toward:
+
+- boundary cleanliness instead of generic style commentary
+- duplicated decision paths instead of only duplicated lines
+- high-leverage structural findings that can drive small follow-up tasks
+- shorter review output that is easier to act on repeatedly
