@@ -6,7 +6,7 @@ Harden Codex runner startup against version drift between the intended global in
 
 ## Status
 
-In Progress
+Done
 
 ## Why
 
@@ -63,3 +63,14 @@ Latest reported failure on 2026-05-09:
 
 - [Runner Interface Standardization And Tmux Runner Hardening](2026-04-04-runner-interface-standardization-and-tmux-runner-hardening.md)
 - [Common CLI Launch Coverage And Validation](2026-04-13-common-cli-launch-coverage-and-validation.md)
+
+## Completion Note
+
+This pass is considered complete for the reported production failure:
+
+- Codex update-menu startup states are now detected separately from workspace-trust prompts
+- unattended startup auto-confirms the default Codex-owned update flow
+- temporary runner exit during Codex self-update is treated as a recoverable relaunch path
+- regression coverage now proves no-prompt, trust-prompt, and `update -> trust -> ready` startup behavior
+
+If a later issue shows that Codex path selection or stale-wrapper visibility still needs a deeper audit, that follow-up should be tracked as a separate task instead of keeping this production-fix task open.
