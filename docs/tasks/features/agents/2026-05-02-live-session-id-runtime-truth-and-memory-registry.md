@@ -111,4 +111,4 @@ active release-track task.
 
 - [Session Continuity Boundary And RunnerService Leak Cleanup](../../2026-05-02-session-continuity-boundary-and-runner-service-leak-cleanup.md)
 - [Session Runner State Machine Review](../stability/2026-04-27-session-runner-state-machine-review.md)
-- [Session Key And Session Id Continuity Decision](../../../architecture/2026-05-01-session-key-and-session-id-continuity-decision.md)
+- [Session Key And Session Id Continuity Decision](../../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)

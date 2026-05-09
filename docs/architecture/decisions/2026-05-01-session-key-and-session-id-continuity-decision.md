@@ -226,8 +226,8 @@ Recommended parameter rule:
 
 ## Related Docs
 
-- [Architecture Overview](architecture-overview.md)
-- [Runtime Architecture](runtime-architecture.md)
-- [Glossary](glossary.md)
-- [Session Identity](../features/agents/sessions.md)
-- [Session Key And Runner Session Id Audit](../audits/agents/2026-05-01-session-key-and-runner-session-id-audit.md)
+- [Architecture Overview](../architecture-overview.md)
+- [Runtime Architecture](../runtime-architecture.md)
+- [Glossary](../glossary.md)
+- [Session Identity](../../features/agents/sessions.md)
+- [Session Key And Runner Session Id Audit](../../audits/agents/2026-05-01-session-key-and-runner-session-id-audit.md)

@@ -91,6 +91,8 @@ Use the repo doc systems consistently:
 - `docs/research/<feature>/` is for source-driven analysis that is not yet stable contract
 - `docs/features/non-functionals/` is for cross-cutting quality work
 - `docs/lessons/` is for reusable lessons from repeated feedback, delivery struggles, or durable operator preferences
+- When architecture changes or architecture clarification is made, add or update a record in `docs/architecture/decisions/` that preserves prior decisions, includes context, problem, considered options, final decision, and rationale, and explicitly cross-links any later decision that supersedes or conflicts with an earlier one instead of erasing history.
+- When a feature-level or implementation-detail decision needs the same treatment, record it in `docs/features/<feature>/decisions/` with the same structure and the same explicit cross-linking rule for superseded or conflicting local decisions.
 - keep task docs brief when they mostly track research work; link to `docs/research/` instead of duplicating analysis
 - keep task docs in the task workflow and feature docs in the feature workflow
 

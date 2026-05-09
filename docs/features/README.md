@@ -32,6 +32,8 @@ Suggested structure:
     feature-tables.md
     channels/
       README.md
+      decisions/
+        README.md
     auth/
       README.md
     agents/
@@ -73,6 +75,7 @@ Use `docs/features/` for:
 - current feature state
 - dependencies between features
 - feature-level references to task folders
+- feature-local decision folders when the decision belongs to one feature instead of the repository architecture
 
 Use `docs/tasks/` for:
 
@@ -87,6 +90,14 @@ Use `docs/features/<feature-name>/` for:
 
 - the canonical top-level systems in the product model
 - stable system groupings readers would recognize
+
+Use `docs/architecture/decisions/` instead when the decision is repository-level, cross-feature, or mainly about system ownership boundaries.
+
+Use `docs/features/<feature-name>/decisions/` when the topic is local to that feature, such as:
+
+- end-user behavior choices
+- feature-specific implementation detail
+- local tradeoffs that do not redefine repository-level architecture
 
 Use `docs/features/non-functionals/` for:
 

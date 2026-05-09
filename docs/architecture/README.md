@@ -13,7 +13,8 @@ This section is the stable entry point for repository-level architecture rules.
 - [Transcript Presentation And Streaming](transcript-presentation-and-streaming.md)
 - [Glossary](glossary.md)
 - [Model Taxonomy And Boundaries](model-taxonomy-and-boundaries.md)
-- [Session Key And Session Id Continuity Decision](2026-05-01-session-key-and-session-id-continuity-decision.md)
+- [Architecture Design Decisions](decisions/README.md)
+- [Session Key And Session Id Continuity Decision](decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 
 ## What Belongs Here
 
@@ -24,6 +25,7 @@ Use `docs/architecture/` for documents that define system shape and implementati
 - routing, state, persistence, and data-flow decisions
 - model taxonomy, invariants, and allowed boundary crossings
 - cross-cutting engineering rules that should guide many features
+- repository-level architecture decision records, including ownership-boundary decisions
 
 ## What Does Not Belong Here
 
@@ -38,3 +40,5 @@ Do not use this folder for:
 - project-goal summaries that belong in `docs/overview/`
 
 Those belong in `docs/tasks/` or `docs/features/`.
+
+Feature-local decisions should usually live under `docs/features/<feature>/decisions/`.

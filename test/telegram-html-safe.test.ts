@@ -14,11 +14,11 @@ describe("renderTelegramHtmlSafeFromMarkdown", () => {
 
   test("auto-links plain safe urls in normal text", () => {
     const rendered = renderTelegramHtmlSafeFromMarkdown(
-      "Doc: http://sandbox:6419/docs/architecture/2026-05-01-session-key-and-session-id-continuity-decision.md",
+      "Doc: http://sandbox:6419/docs/architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md",
     );
 
     expect(rendered).toBe(
-      'Doc: <a href="http://sandbox:6419/docs/architecture/2026-05-01-session-key-and-session-id-continuity-decision.md">http://sandbox:6419/docs/architecture/2026-05-01-session-key-and-session-id-continuity-decision.md</a>',
+      'Doc: <a href="http://sandbox:6419/docs/architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md">http://sandbox:6419/docs/architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md</a>',
     );
   });
 

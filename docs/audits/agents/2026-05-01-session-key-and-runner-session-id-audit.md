@@ -105,7 +105,7 @@ continuity ownership into runners.
 
 Stable architecture decision:
 
-- [Session Key And Session Id Continuity Decision](../../architecture/2026-05-01-session-key-and-session-id-continuity-decision.md)
+- [Session Key And Session Id Continuity Decision](../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 
 Current conclusion:
 

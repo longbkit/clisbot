@@ -294,6 +294,6 @@ To avoid refactor drift, touch files in this order:
 ## Related Docs
 
 - [Runtime Architecture](../architecture/runtime-architecture.md)
-- [Session Key And Session Id Continuity Decision](../architecture/2026-05-01-session-key-and-session-id-continuity-decision.md)
+- [Session Key And Session Id Continuity Decision](../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 - [Session Key And Runner Session Id Audit](../audits/agents/2026-05-01-session-key-and-runner-session-id-audit.md)
 - [Session Runner Boundary Simplification And Validation](2026-04-15-session-runner-boundary-simplification-and-validation.md)

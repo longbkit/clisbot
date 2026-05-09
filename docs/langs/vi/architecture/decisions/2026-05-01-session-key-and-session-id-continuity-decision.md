@@ -1,4 +1,4 @@
-[English](../../../architecture/2026-05-01-session-key-and-session-id-continuity-decision.md) | [Tiếng Việt](./2026-05-01-session-key-and-session-id-continuity-decision.md)
+[English](../../../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md) | [Tiếng Việt](./2026-05-01-session-key-and-session-id-continuity-decision.md)
 
 # Quyết định continuity giữa session key và session id
 
@@ -213,8 +213,8 @@ Quy tắc nên áp cho parameter:
 
 ## Tài liệu liên quan
 
-- [Tổng quan kiến trúc](./architecture-overview.md)
-- [Kiến trúc runtime](./runtime-architecture.md)
-- [Bảng thuật ngữ kiến trúc](./glossary.md)
-- [Định danh session](../features/agents/sessions.md)
-- [Audit về session key và runner session id](../../../audits/agents/2026-05-01-session-key-and-runner-session-id-audit.md)
+- [Tổng quan kiến trúc](../architecture-overview.md)
+- [Kiến trúc runtime](../runtime-architecture.md)
+- [Bảng thuật ngữ kiến trúc](../glossary.md)
+- [Định danh session](../../../features/agents/sessions.md)
+- [Audit về session key và runner session id](../../../../audits/agents/2026-05-01-session-key-and-runner-session-id-audit.md)

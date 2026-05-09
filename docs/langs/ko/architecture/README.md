@@ -29,7 +29,8 @@
 - [transcript 표현과 streaming](../../../architecture/transcript-presentation-and-streaming.md)
 - [용어집](../../../architecture/glossary.md)
 - [모델 분류와 경계](../../../architecture/model-taxonomy-and-boundaries.md)
-- [session key와 session id 연속성 결정](../../../architecture/2026-05-01-session-key-and-session-id-continuity-decision.md)
+- [architecture design decision records](../../../architecture/decisions/README.md)
+- [session key와 session id 연속성 결정](../../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 
 ## 여기에 들어가야 하는 것
 
@@ -39,6 +40,7 @@
 - 장기적으로 유지되어야 하는 구현 제약
 - routing, state, persistence, ownership 결정
 - 여러 기능에 동시에 영향을 주는 공통 규칙
+- 저장해 두어야 하는 저장소 전역 아키텍처 결정과 ownership-boundary 결정
 
 ## 여기에 넣지 말아야 하는 것
 
@@ -48,3 +50,5 @@
 - 세부 구현 이력
 
 이런 내용은 `docs/tasks/` 또는 `docs/features/` 쪽이 더 맞습니다.
+
+한 feature 안에만 머무는 결정은 보통 `docs/features/<feature>/decisions/` 쪽이 더 맞습니다.

@@ -29,7 +29,8 @@
 - [Transcript Presentation And Streaming](../../../architecture/transcript-presentation-and-streaming.md)
 - [Glossary](../../../architecture/glossary.md)
 - [Model Taxonomy And Boundaries](../../../architecture/model-taxonomy-and-boundaries.md)
-- [Session Key And Session Id Continuity Decision](../../../architecture/2026-05-01-session-key-and-session-id-continuity-decision.md)
+- [Architecture Design Decisions](../../../architecture/decisions/README.md)
+- [Session Key And Session Id Continuity Decision](../../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 
 ## 这里应该放什么
 
@@ -39,6 +40,7 @@
 - 长期稳定的实现约束
 - 路由、状态、持久化、归属边界相关决策
 - 会影响多个功能区的共通规则
+- 需要长期保留的仓库级架构决策与 ownership boundary 决策
 
 ## 不应该放什么
 
@@ -50,3 +52,5 @@
 - 具体交付历史
 
 这些更应该放在 `docs/tasks/` 或 `docs/features/`。
+
+如果决策只属于单个 feature，通常应该放在 `docs/features/<feature>/decisions/`。
