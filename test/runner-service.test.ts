@@ -55,6 +55,7 @@ describe("RunnerService new session handling", () => {
         persistedSessionId = params.sessionId;
       },
     };
+    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => {
       submitCount += 1;
     };
@@ -103,6 +104,7 @@ describe("RunnerService new session handling", () => {
         throw new Error("disk full");
       },
     };
+    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => undefined;
     (runner as any).captureNewSessionIdentityAfterTrigger = async () =>
       "22222222-2222-2222-2222-222222222222";
@@ -151,6 +153,7 @@ describe("RunnerService new session handling", () => {
         persistedSessionId = params.sessionId;
       },
     };
+    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => {
       throw new TmuxSubmitUnconfirmedError();
     };
@@ -191,6 +194,7 @@ describe("RunnerService new session handling", () => {
       }),
       setActive: async () => undefined,
     };
+    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => {
       throw new TmuxSubmitUnconfirmedError();
     };
@@ -230,7 +234,7 @@ describe("RunnerService startup session identity handling", () => {
       warned = String(message ?? "");
     };
     try {
-      (runner as any).acceptWorkspaceTrustPromptIfPresent = async () => undefined;
+      (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
       (runner as any).verifySessionReady = async () => undefined;
       (runner as any).persistStoredSessionId = async () => {
         throw new Error("disk full");

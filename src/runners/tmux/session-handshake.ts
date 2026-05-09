@@ -83,15 +83,18 @@ export async function submitTmuxSessionInput(params: {
   trustPrompt?: {
     captureLines: number;
     startupDelayMs: number;
+    trustWorkspace?: boolean;
   };
   timingContext?: LatencyDebugContext;
 }) {
   if (params.trustPrompt) {
-    await acceptTmuxTrustPromptIfPresent({
+    await acceptTmuxStartupContinuePromptIfPresent({
       tmux: params.tmux,
       sessionName: params.sessionName,
       captureLines: params.trustPrompt.captureLines,
       startupDelayMs: params.trustPrompt.startupDelayMs,
+      trustWorkspace: params.trustPrompt.trustWorkspace,
+      waitForAppearance: false,
     });
   }
   const prePasteState = await params.tmux.getPaneState(params.sessionName);
@@ -167,11 +170,12 @@ export async function captureTmuxSessionIdentity(params: {
   // This function only captures the runner-side sessionId from fresh status
   // output inside the tmux pane. It does not decide whether that id should be
   // persisted as storedSessionId; that boundary stays in RunnerService.
-  await acceptTmuxTrustPromptIfPresent({
+  await acceptTmuxStartupContinuePromptIfPresent({
     tmux: params.tmux,
     sessionName: params.sessionName,
     captureLines: params.captureLines,
     startupDelayMs: params.timeoutMs,
+    trustWorkspace: true,
   });
   let statusSubmission = await submitTmuxSessionInput({
     tmux: params.tmux,
@@ -198,11 +202,12 @@ export async function captureTmuxSessionIdentity(params: {
       }
       throw error;
     }
-    if (tmuxPaneHasTrustPrompt(snapshot)) {
-      await acceptTrustPrompt({
+    if (tmuxPaneHasStartupContinuePrompt(snapshot, { trustWorkspace: true })) {
+      await acceptStartupContinuePrompt({
         tmux: params.tmux,
         sessionName: params.sessionName,
         captureLines: params.captureLines,
+        trustWorkspace: true,
       });
       deadline = Date.now() + params.timeoutMs;
       statusSubmission = await submitTmuxSessionInput({
@@ -276,13 +281,18 @@ function extractSessionIdFromCaptureCandidates(candidates: string[], pattern: st
   return null;
 }
 
-export async function acceptTmuxTrustPromptIfPresent(params: {
+export async function acceptTmuxStartupContinuePromptIfPresent(params: {
   tmux: TmuxClient;
   sessionName: string;
   captureLines: number;
   startupDelayMs: number;
+  trustWorkspace?: boolean;
+  waitForAppearance?: boolean;
 }) {
-  const deadline = Date.now() + Math.max(TRUST_PROMPT_MAX_WAIT_MS, params.startupDelayMs);
+  const waitForAppearance = params.waitForAppearance ?? true;
+  const deadline = waitForAppearance
+    ? Date.now() + Math.max(TRUST_PROMPT_MAX_WAIT_MS, params.startupDelayMs)
+    : Date.now();
 
   while (Date.now() <= deadline) {
     let snapshot = "";
@@ -301,20 +311,39 @@ export async function acceptTmuxTrustPromptIfPresent(params: {
       throw error;
     }
     if (!snapshot) {
+      if (!waitForAppearance) {
+        return;
+      }
       await sleep(TRUST_PROMPT_POLL_INTERVAL_MS);
       continue;
     }
 
-    if (!tmuxPaneHasTrustPrompt(snapshot)) {
+    if (!tmuxPaneHasStartupContinuePrompt(snapshot, {
+      trustWorkspace: params.trustWorkspace,
+    })) {
       return;
     }
 
-    await acceptTrustPrompt({
+    await acceptStartupContinuePrompt({
       tmux: params.tmux,
       sessionName: params.sessionName,
       captureLines: params.captureLines,
+      trustWorkspace: params.trustWorkspace,
     });
   }
+}
+
+export async function acceptTmuxTrustPromptIfPresent(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  captureLines: number;
+  startupDelayMs: number;
+}) {
+  await acceptTmuxStartupContinuePromptIfPresent({
+    ...params,
+    trustWorkspace: true,
+    waitForAppearance: true,
+  });
 }
 
 export async function waitForTmuxSessionBootstrap(params: {
@@ -355,11 +384,14 @@ export async function waitForTmuxSessionBootstrap(params: {
     }
     if (snapshot) {
       lastSnapshot = snapshot;
-      if (params.trustWorkspace && tmuxPaneHasTrustPrompt(snapshot)) {
-        await acceptTrustPrompt({
+      if (tmuxPaneHasStartupContinuePrompt(snapshot, {
+        trustWorkspace: params.trustWorkspace,
+      })) {
+        await acceptStartupContinuePrompt({
           tmux: params.tmux,
           sessionName: params.sessionName,
           captureLines: params.captureLines,
+          trustWorkspace: params.trustWorkspace,
         });
         await sleep(SESSION_BOOTSTRAP_POLL_INTERVAL_MS);
         continue;
@@ -392,10 +424,11 @@ export async function waitForTmuxSessionBootstrap(params: {
   };
 }
 
-async function acceptTrustPrompt(params: {
+async function acceptStartupContinuePrompt(params: {
   tmux: TmuxClient;
   sessionName: string;
   captureLines: number;
+  trustWorkspace?: boolean;
 }) {
   await params.tmux.sendKey(params.sessionName, "Enter");
 
@@ -416,7 +449,12 @@ async function acceptTrustPrompt(params: {
       }
       throw error;
     }
-    if (!snapshot || tmuxPaneHasTrustPrompt(snapshot)) {
+    if (
+      !snapshot ||
+      tmuxPaneHasStartupContinuePrompt(snapshot, {
+        trustWorkspace: params.trustWorkspace,
+      })
+    ) {
       continue;
     }
 
@@ -764,6 +802,15 @@ function looksLikeGeminiTrustPrompt(snapshot: string) {
   );
 }
 
+function looksLikeCodexUpdatePrompt(snapshot: string) {
+  return (
+    snapshot.includes("Update available!") &&
+    snapshot.includes("@openai/codex") &&
+    snapshot.includes("Release notes:") &&
+    snapshot.includes("Press enter to continue")
+  );
+}
+
 const TRUST_PROMPT_ACTIVE_TAIL_LINES = 24;
 const TRUST_OPTION_LINE_PATTERN = /^[›❯]\s*\d+\.\s/i;
 const INTERACTIVE_PROMPT_LINE_PATTERN = /^[›❯]\s*(?!\d+\.\s).+/;
@@ -777,17 +824,18 @@ function extractActiveTrustPromptRegion(snapshot: string) {
   return lines.slice(-TRUST_PROMPT_ACTIVE_TAIL_LINES).join("\n");
 }
 
-function findLastTrustPromptLineIndex(lines: string[]) {
+function findLastStartupContinuePromptLineIndex(lines: string[]) {
   let lastIndex = -1;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]?.trim() ?? "";
     if (
       line.includes("Do you trust the contents of this directory?") ||
-      line.includes("Press enter to continue") ||
       line.includes("Quick safety check:") ||
       line.includes("Enter to confirm · Esc to cancel") ||
       line.includes("Do you trust the files in this folder?") ||
-      line.includes("Trust folder (default)")
+      line.includes("Trust folder (default)") ||
+      line.includes("Update available!") ||
+      line.includes("Skip until next version")
     ) {
       lastIndex = index;
     }
@@ -824,7 +872,7 @@ function hasLaterInteractivePrompt(lines: string[], afterIndex: number) {
 export function tmuxPaneHasTrustPrompt(snapshot: string) {
   const activeRegion = extractActiveTrustPromptRegion(snapshot);
   const activeLines = trimBlankLines(splitNormalizedLines(activeRegion));
-  const lastTrustPromptLineIndex = findLastTrustPromptLineIndex(activeLines);
+  const lastTrustPromptLineIndex = findLastStartupContinuePromptLineIndex(activeLines);
   if (lastTrustPromptLineIndex < 0) {
     return false;
   }
@@ -835,10 +883,35 @@ export function tmuxPaneHasTrustPrompt(snapshot: string) {
 
   return (
     activeRegion.includes("Do you trust the contents of this directory?") ||
-    activeRegion.includes("Press enter to continue") ||
     looksLikeClaudeTrustPrompt(activeRegion) ||
     looksLikeGeminiTrustPrompt(activeRegion)
   );
+}
+
+export function tmuxPaneHasCodexUpdatePrompt(snapshot: string) {
+  const activeRegion = extractActiveTrustPromptRegion(snapshot);
+  const activeLines = trimBlankLines(splitNormalizedLines(activeRegion));
+  const lastPromptLineIndex = findLastStartupContinuePromptLineIndex(activeLines);
+  if (lastPromptLineIndex < 0) {
+    return false;
+  }
+
+  if (hasLaterInteractivePrompt(activeLines, lastPromptLineIndex)) {
+    return false;
+  }
+
+  return looksLikeCodexUpdatePrompt(activeRegion);
+}
+
+export function tmuxPaneHasStartupContinuePrompt(
+  snapshot: string,
+  options: { trustWorkspace?: boolean } = {},
+) {
+  if (tmuxPaneHasCodexUpdatePrompt(snapshot)) {
+    return true;
+  }
+
+  return options.trustWorkspace !== false && tmuxPaneHasTrustPrompt(snapshot);
 }
 
 function shouldWaitForVisiblePaste(text: string) {

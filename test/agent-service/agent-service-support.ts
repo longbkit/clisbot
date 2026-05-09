@@ -19,6 +19,13 @@ import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 export const RUNNER_GENERATED_ID = "11111111-1111-1111-1111-111111111111";
 export const ROTATED_RUNNER_ID = "22222222-2222-2222-2222-222222222222";
 
+type FakeStartupPromptVariant = "codex" | "claude" | "gemini" | "codex-update";
+
+type FakeStartupPromptStep = {
+  captureCount: number;
+  variant: FakeStartupPromptVariant;
+};
+
 export type FakeSession = {
   command: string;
   pendingInput: string;
@@ -29,8 +36,9 @@ export type FakeSession = {
   historySize: number;
   longRunning: boolean;
   longRunningStep: number;
+  startupPromptScript?: FakeStartupPromptStep[];
   trustPromptOnCapture?: number;
-  trustPromptVariant?: "codex" | "claude" | "gemini";
+  trustPromptVariant?: FakeStartupPromptVariant;
   ignoreEnterCount?: number;
   noServerAfterTrustDismiss?: boolean;
   failWithNoServerOnNextCapture?: boolean;
@@ -55,9 +63,10 @@ export class FakeTmuxClient {
   private readonly noServerOnCaptureSessionIds = new Set<string>();
   private readonly duplicateOnNewSession = new Set<string>();
   private readonly resumeCaptureScripts = new Map<string, string[]>();
+  private readonly queuedStartupPromptScripts: FakeStartupPromptStep[][] = [];
   private serverRunning = true;
   private nextTrustPromptCaptureCount: number | null = null;
-  private nextTrustPromptVariant: "codex" | "claude" | "gemini" = "codex";
+  private nextTrustPromptVariant: FakeStartupPromptVariant = "codex";
   private nextNoServerAfterTrustDismiss = false;
   private readonly ignoreEnterCounts = new Map<string, number>();
   private nextStatusResponseMode:
@@ -93,10 +102,19 @@ export class FakeTmuxClient {
 
   setTrustPromptOnNextSessionCapture(
     captureCount: number,
-    variant: "codex" | "claude" | "gemini" = "codex",
+    variant: FakeStartupPromptVariant = "codex",
   ) {
     this.nextTrustPromptCaptureCount = captureCount;
     this.nextTrustPromptVariant = variant;
+  }
+
+  queueStartupPromptScriptForNextSession(script: FakeStartupPromptStep[]) {
+    this.queuedStartupPromptScripts.push(
+      script.map((step) => ({
+        captureCount: step.captureCount,
+        variant: step.variant,
+      })),
+    );
   }
 
   setNoServerAfterTrustDismissOnNextSession() {
@@ -172,6 +190,10 @@ export class FakeTmuxClient {
     const scriptedCaptureOutputs = params.command.includes("resume ")
       ? [...(this.resumeCaptureScripts.get(sessionId) ?? [])]
       : undefined;
+    const startupPromptScript = this.queuedStartupPromptScripts.shift()?.map((step) => ({
+      captureCount: step.captureCount,
+      variant: step.variant,
+    }));
     const initialSnapshot = resumedWithScript
       ? `READY ${sessionId}\nRECOVER ${sessionId}\n› ready`
       : `READY ${sessionId}\n› ready`;
@@ -188,6 +210,7 @@ export class FakeTmuxClient {
         historySize: 0,
         longRunning: false,
         longRunningStep: 0,
+        startupPromptScript,
         trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
         trustPromptVariant: this.nextTrustPromptVariant,
         ignoreEnterCount: this.ignoreEnterCounts.get(params.sessionName) ?? 0,
@@ -223,6 +246,7 @@ export class FakeTmuxClient {
       historySize: 0,
       longRunning: false,
       longRunningStep: 0,
+      startupPromptScript,
       trustPromptOnCapture: this.nextTrustPromptCaptureCount ?? undefined,
       trustPromptVariant: this.nextTrustPromptVariant,
       ignoreEnterCount: this.ignoreEnterCounts.get(params.sessionName) ?? 0,
@@ -349,29 +373,20 @@ export class FakeTmuxClient {
       this.serverRunning = false;
       throw new Error("no server running on /tmp/clisbot.sock");
     }
+    if ((session.startupPromptScript?.length ?? 0) > 0) {
+      const step = session.startupPromptScript?.[0];
+      if (step) {
+        if (step.captureCount <= 0) {
+          session.snapshot = this.renderStartupPromptVariant(step.variant);
+          session.startupPromptScript?.shift();
+        } else {
+          step.captureCount -= 1;
+        }
+      }
+    }
     if (session.trustPromptOnCapture != null) {
       if (session.trustPromptOnCapture <= 0) {
-      session.snapshot =
-          session.trustPromptVariant === "claude"
-            ? [
-                "Quick safety check:",
-                "❯ 1. Yes, I trust this folder",
-                "  2. No, exit",
-                "Enter to confirm · Esc to cancel",
-              ].join("\n")
-            : session.trustPromptVariant === "gemini"
-              ? [
-                  "Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.",
-                  "",
-                  "Do you trust the files in this folder?",
-                  "",
-                  "Trusting a folder allows Gemini CLI to load its local configurations, including custom commands, hooks, MCP servers, agent skills, and settings. These configurations could execute code on your behalf or change the behavior of the CLI.",
-                  "",
-                  "1. Trust folder (default)",
-                  "2. Trust parent folder (workspaces)",
-                  "3. Don't trust",
-                ].join("\n")
-            : "Do you trust the contents of this directory?\nPress enter to continue";
+        session.snapshot = this.renderStartupPromptVariant(session.trustPromptVariant ?? "codex");
         session.trustPromptOnCapture = undefined;
       } else {
         session.trustPromptOnCapture -= 1;
@@ -442,6 +457,41 @@ export class FakeTmuxClient {
 
   private appendPendingPrompt(snapshot: string, text: string) {
     return `${this.stripPendingPrompt(snapshot, text)}\n> ${text}`;
+  }
+
+  private renderStartupPromptVariant(variant: FakeStartupPromptVariant) {
+    return variant === "claude"
+      ? [
+          "Quick safety check:",
+          "❯ 1. Yes, I trust this folder",
+          "  2. No, exit",
+          "Enter to confirm · Esc to cancel",
+        ].join("\n")
+      : variant === "gemini"
+        ? [
+            "Skipping project agents due to untrusted folder. To enable, ensure that the project root is trusted.",
+            "",
+            "Do you trust the files in this folder?",
+            "",
+            "Trusting a folder allows Gemini CLI to load its local configurations, including custom commands, hooks, MCP servers, agent skills, and settings. These configurations could execute code on your behalf or change the behavior of the CLI.",
+            "",
+            "1. Trust folder (default)",
+            "2. Trust parent folder (workspaces)",
+            "3. Don't trust",
+          ].join("\n")
+        : variant === "codex-update"
+          ? [
+              "✨ Update available! 0.129.0 → 0.130.0",
+              "",
+              "Release notes: https://github.com/openai/codex/releases/latest",
+              "",
+              "› 1. Update now (runs `npm install -g @openai/codex`)",
+              "  2. Skip",
+              "  3. Skip until next version",
+              "",
+              "Press enter to continue",
+            ].join("\n")
+          : "Do you trust the contents of this directory?\nPress enter to continue";
   }
 
   private writeExitRecord(command: string, sessionName: string, exitCode: number) {

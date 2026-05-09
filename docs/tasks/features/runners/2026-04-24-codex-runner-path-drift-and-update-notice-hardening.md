@@ -2,11 +2,11 @@
 
 ## Summary
 
-Harden Codex runner startup against version drift between the intended global install and stale wrapper or workaround binaries, and make unattended startup reject upgrade-notice states instead of hanging or pretending the session is ready.
+Harden Codex runner startup against version drift between the intended global install and stale wrapper or workaround binaries, and make unattended startup handle the built-in Codex update menu truthfully instead of hanging, failing early, or pretending the session is ready.
 
 ## Status
 
-Planned
+In Progress
 
 ## Why
 
@@ -21,18 +21,27 @@ That creates a bad unattended startup mode:
 - the pane is no longer in a truthful ready state for routed prompt submission
 - startup can fail, stall, or look flaky depending on how the notice interacts with readiness detection
 
+Latest reported failure on 2026-05-09:
+
+- Codex showed the interactive update menu with default `Update now`
+- clisbot later failed the run with `Runner session "<name>" disappeared during startup.`
+- expected behavior is to auto-confirm the default Codex-owned update flow, tolerate the temporary runner exit if Codex restarts itself, and relaunch until a real prompt is visible
+
 ## Scope
 
 - audit Codex binary resolution order for runner startup and make the precedence explicit
 - detect and surface when the chosen Codex path is a stale wrapper or workaround instead of the intended official global install
 - define whether clisbot should prefer a verified global Codex binary over repo-local or home-local workaround shims by default
-- add readiness blocking for update-notice or upgrade-required startup states so unattended sessions do not continue as if ready
+- add startup handling for the interactive Codex update menu:
+  - detect the active update prompt separately from workspace-trust prompts
+  - auto-confirm the default `Update now` path during unattended startup
+  - treat a temporary runner exit during that update path as a bounded recoverable startup transition
 - make runner status or diagnostics expose the resolved Codex binary path and version clearly enough for operators to spot drift
 - add regression coverage for stale-wrapper selection and upgrade-notice startup gating
 
 ## Non-Goals
 
-- auto-upgrading Codex for the operator
+- inventing a separate package-manager upgrade flow outside Codex's own startup menu
 - silently rewriting arbitrary user PATH state without an explicit contract
 - treating every banner or welcome screen as a fatal startup blocker
 
@@ -40,8 +49,8 @@ That creates a bad unattended startup mode:
 
 - runner startup resolves Codex through a documented, testable path-selection rule
 - stale workaround binaries cannot silently win over the intended official Codex install without explicit operator visibility
-- update-notice startup states are detected and reported truthfully instead of being treated as ready
-- unattended startup either reaches a real ready prompt or fails with a concrete remediation path
+- Codex update-menu startup states are detected truthfully and do not get treated as ready
+- unattended startup either reaches a real ready prompt after the Codex-owned update path or fails with a concrete remediation path
 
 ## Current Observed Failure
 

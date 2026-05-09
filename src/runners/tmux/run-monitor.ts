@@ -15,7 +15,7 @@ import {
 } from "../../shared/transcript.ts";
 import type { TmuxClient } from "./client.ts";
 import {
-  acceptTmuxTrustPromptIfPresent,
+  acceptTmuxStartupContinuePromptIfPresent,
   submitTmuxSessionInput,
 } from "./session-handshake.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
@@ -94,14 +94,14 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
   let noOutputThresholdLogged = false;
 
   if (params.prompt) {
-    if (params.trustWorkspace) {
-      await acceptTmuxTrustPromptIfPresent({
-        tmux: params.tmux,
-        sessionName: params.sessionName,
-        captureLines: params.captureLines,
-        startupDelayMs: params.startupDelayMs ?? 0,
-      });
-    }
+    await acceptTmuxStartupContinuePromptIfPresent({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      captureLines: params.captureLines,
+      startupDelayMs: params.startupDelayMs ?? 0,
+      trustWorkspace: params.trustWorkspace,
+      waitForAppearance: params.trustWorkspace === true,
+    });
     logLatencyDebug("tmux-submit-start", params.timingContext, {
       sessionName: params.sessionName,
       promptSubmitDelayMs: params.promptSubmitDelayMs,
@@ -111,6 +111,11 @@ export async function monitorTmuxRun(params: TmuxRunMonitorParams) {
       sessionName: params.sessionName,
       text: params.prompt,
       promptSubmitDelayMs: params.promptSubmitDelayMs,
+      trustPrompt: {
+        captureLines: params.captureLines,
+        startupDelayMs: params.startupDelayMs ?? 0,
+        trustWorkspace: params.trustWorkspace,
+      },
       timingContext: params.timingContext,
     });
     if (

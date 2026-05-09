@@ -18,6 +18,7 @@ It has the best current operator stability of the supported launch trio.
 - startup readiness is still more heuristic than explicit
 - interrupt confirmation is still best-effort
 - `/status` output drift can still affect some compatibility heuristics
+- when Codex surfaces its built-in update menu during startup, `clisbot` should auto-confirm the default update path and relaunch the runner; if that still fails, inspect `clisbot logs` for the runner exit record
 
 ## Operator Recommendation
 

@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 import {
+  acceptTmuxStartupContinuePromptIfPresent,
   captureTmuxSessionIdentity,
   acceptTmuxTrustPromptIfPresent,
   submitTmuxSessionInput,
   TmuxBootstrapSessionLostError,
+  tmuxPaneHasCodexUpdatePrompt,
   tmuxPaneHasTrustPrompt,
   waitForTmuxSessionBootstrap,
 } from "../../src/runners/tmux/session-handshake.ts";
@@ -375,6 +377,47 @@ describe("tmux runner latency behavior", () => {
     });
 
     expect(captureCount).toBe(1);
+  });
+
+  test("acceptTmuxStartupContinuePromptIfPresent accepts a Codex update prompt even when trustWorkspace is false", async () => {
+    let captureCount = 0;
+    let enterCount = 0;
+    const updatePrompt = [
+      "✨ Update available! 0.129.0 → 0.130.0",
+      "",
+      "Release notes: https://github.com/openai/codex/releases/latest",
+      "",
+      "› 1. Update now (runs `npm install -g @openai/codex`)",
+      "  2. Skip",
+      "  3. Skip until next version",
+      "",
+      "Press enter to continue",
+    ].join("\n");
+    const fakeTmux = {
+      async capturePane() {
+        captureCount += 1;
+        return captureCount === 1 ? updatePrompt : "READY";
+      },
+      async sendKey(_sessionName: string, key: string) {
+        if (key === "Enter") {
+          enterCount += 1;
+        }
+      },
+    } as unknown as TmuxClient;
+
+    expect(tmuxPaneHasCodexUpdatePrompt(updatePrompt)).toBe(true);
+    expect(tmuxPaneHasTrustPrompt(updatePrompt)).toBe(false);
+
+    await acceptTmuxStartupContinuePromptIfPresent({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      captureLines: 80,
+      startupDelayMs: 500,
+      trustWorkspace: false,
+    });
+
+    expect(enterCount).toBe(1);
+    expect(captureCount).toBe(3);
   });
 
 });
