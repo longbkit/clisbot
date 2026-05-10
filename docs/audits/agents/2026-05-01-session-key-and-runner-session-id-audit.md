@@ -1915,9 +1915,9 @@ Optional later:
 | File | Why It Matters | Direction |
 | --- | --- | --- |
 | `docs/features/agents/sessions.md` | Canonical session model and runner input contract. | Keep aligned with the accepted decision record. |
-| `docs/architecture/model-taxonomy-and-boundaries.md` | Canonical owner and boundary guidance for cross-layer models. | Check that the mapping move still preserves the repo boundary rules. |
+| `docs/architecture/domain-language.md` | Canonical language and boundary guidance for cross-layer models. | Check that the mapping move still preserves the repo boundary rules. |
 | `docs/architecture/runtime-architecture.md` | Runtime owner map between channels, agents, and runners. | Keep broad session continuity in agents and describe runner mechanics as capability, not mapping owner. |
-| `docs/architecture/glossary.md` | Shared meaning of `sessionKey` and `sessionId`. | Keep terms stable. |
+| `docs/architecture/domain-language.md` | Shared meaning of `sessionKey` and `sessionId`. | Keep terms stable. |
 | `src/channels/slack/session-routing.ts` | Slack `sessionKey` resolution. | Keep `sessionKey`-only default. |
 | `src/channels/telegram/session-routing.ts` | Telegram `sessionKey` resolution. | Keep `sessionKey`-only default. |
 | `src/channels/interaction-processing.ts` | Channel-to-runner handoff. | Keep exact `sessionId` use out of normal chat flow. |

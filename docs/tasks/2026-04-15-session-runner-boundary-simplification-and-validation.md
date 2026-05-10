@@ -198,7 +198,7 @@ Historical note:
 
 - [Architecture Overview](../architecture/architecture-overview.md)
 - [Runtime Architecture](../architecture/runtime-architecture.md)
-- [Model Taxonomy And Boundaries](../architecture/model-taxonomy-and-boundaries.md)
+- [Domain Language](../architecture/domain-language.md)
 - [Agents Feature](../features/agents/README.md)
 - [Session Identity](../features/agents/sessions.md)
 - [Runners Feature](../features/runners/README.md)

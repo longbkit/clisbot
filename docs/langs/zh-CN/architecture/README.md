@@ -19,7 +19,7 @@
 - [Architecture Overview（英文原文）](../../../architecture/architecture-overview.md)
 - [对话场景架构（英文原文）](../../../architecture/surface-architecture.md)
 - [Runtime Architecture（英文原文）](../../../architecture/runtime-architecture.md)
-- [Model Taxonomy And Boundaries（英文原文）](../../../architecture/model-taxonomy-and-boundaries.md)
+- [Domain Language（英文原文）](../../../architecture/domain-language.md)
 
 ## 当前核心文档
 
@@ -27,8 +27,7 @@
 - [对话场景架构](../../../architecture/surface-architecture.md)
 - [Runtime Architecture](../../../architecture/runtime-architecture.md)
 - [Transcript Presentation And Streaming](../../../architecture/transcript-presentation-and-streaming.md)
-- [Glossary](../../../architecture/glossary.md)
-- [Model Taxonomy And Boundaries](../../../architecture/model-taxonomy-and-boundaries.md)
+- [Domain Language](../../../architecture/domain-language.md)
 - [Architecture Design Decisions](../../../architecture/decisions/README.md)
 - [Session Key And Session Id Continuity Decision](../../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 

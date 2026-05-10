@@ -80,6 +80,7 @@ docs/langs/
 - A localized folder is not "done" just because its `README.md` exists. Track coverage file by file against the real source tree.
 - Use the language glossary in `_translations/glossary.md` as the preferred wording source for repeated product terms.
 - Treat `_translations/glossary.md` as wording ownership and `_translations/status.md` as coverage ownership for that language.
+- `_translations/glossary.md` is a translation wording owner only. Architecture language ownership lives separately in `docs/architecture/domain-language.md`.
 - Keep localized landing pages natural and readable for native speakers; do not echo prompt wording or awkward literal translation.
 - When a source document does not have a localized counterpart yet, link the English original clearly instead of pretending the localized version is complete.
 - When only a landing page is localized, say that explicitly so readers do not assume the child docs are already mirrored in that language.

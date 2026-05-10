@@ -330,14 +330,14 @@ Keep one prompt renderer input object for the main prompt contract.
 
 Naming rule:
 
-- Follow the shared [Glossary](../../../architecture/glossary.md) for canonical terms.
+- Follow the shared [Domain Language](../../../architecture/domain-language.md) for canonical terms.
 - `principal`: canonical clisbot auth identity format for users/identities in auth commands, for example `telegram:1276408333` or `slack:U123`.
 - `senderId`: field name used when a `principal` is specifically the sender of the current message, queue item, steering input, or loop.
 - `surfaceId`: canonical clisbot surface identity, for example `telegram:topic:-1003455688247:4335`.
 - `providerId`: raw provider-local id, for example Slack channel `C123`, Telegram chat `-100...`, or Telegram topic `4335`.
 - `displayName`: human-readable name from provider/config, for example `workspace - clisbot`, `clisbot-streaming`, or `The Longbkit`. It is not a command target and must not contain CLI target syntax.
 - `prompt display text`: rendered by the prompt builder from identity plus display names. Do not store this as `label` in directory records.
-- `cliTarget`: command-facing target syntax, for example `group:-100...` or `topic:-100...:4335`. Keep this in delivery/CLI code, not in the directory display record.
+- CLI target syntax such as `group:-100...` or `topic:-100...:4335` stays in delivery/CLI code, not in the directory display record.
 
 ```ts
 type SurfacePromptContext = {
@@ -583,7 +583,7 @@ No separate hand-written prompt wrapper for steering, queue, or loop.
 - [Agent Progress Reply Wrapper And Prompt](2026-04-09-agent-progress-reply-wrapper-and-prompt.md)
 - [Streaming-Off Truthfulness For Queued And Loop Delivery](2026-04-14-streaming-off-truthfulness-for-queued-and-loop-delivery.md)
 - [Timezone Config CLI And Loop Resolution](../configuration/2026-04-26-timezone-config-cli-and-loop-resolution.md)
-- [Glossary](../../../architecture/glossary.md)
+- [Domain Language](../../../architecture/domain-language.md)
 
 ## Brief Approaches Considered
 

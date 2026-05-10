@@ -1,5 +1,9 @@
 # Architecture v0.2
 
+## Status
+
+Historical exploratory pass only. This folder is not part of the current architecture contract unless a current architecture entry doc links to it explicitly.
+
 This folder is a clean-slate architecture exercise driven only by:
 
 - `docs/overview/human-requirements.md`

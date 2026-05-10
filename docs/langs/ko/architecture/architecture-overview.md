@@ -14,7 +14,7 @@
 
 - [표면 아키텍처](../../../architecture/surface-architecture.md)
 - [런타임 아키텍처](../../../architecture/runtime-architecture.md)
-- [모델 분류와 경계](../../../architecture/model-taxonomy-and-boundaries.md)
+- [도메인 언어](../../../architecture/domain-language.md)
 
 이 개요와 상세 아키텍처 문서가 어긋나면, 상세 문서가 우선합니다.
 
@@ -203,4 +203,4 @@ tmux pane id, tmux window id, 그 밖의 일시적인 runner artifact를 agents 
 
 - 사용자와 운영자 surface 규칙은 [surface-architecture.md](../../../architecture/surface-architecture.md)에서 다룹니다.
 - agents, runner, persistence, runtime contract 규칙은 [runtime-architecture.md](../../../architecture/runtime-architecture.md)에서 다룹니다.
-- 모델 소유권, lifecycle, naming boundary는 [model-taxonomy-and-boundaries.md](../../../architecture/model-taxonomy-and-boundaries.md)에서 다룹니다.
+- canonical vocabulary, 모델 소유권, lifecycle, naming boundary는 [domain-language.md](../../../architecture/domain-language.md)에서 다룹니다.

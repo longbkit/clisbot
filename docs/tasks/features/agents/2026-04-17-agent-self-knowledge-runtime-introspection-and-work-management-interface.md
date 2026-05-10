@@ -165,5 +165,5 @@ Examples of possible backends:
 - [Agents Feature](../../../features/agents/README.md)
 - [Control Feature](../../../features/control/README.md)
 - [Configuration Feature](../../../features/configuration/README.md)
-- [Model Taxonomy And Boundaries](../../../architecture/model-taxonomy-and-boundaries.md)
+- [Domain Language](../../../architecture/domain-language.md)
 - [Conversation Follow-Up Policy And Runtime Control API](2026-04-05-conversation-follow-up-policy-and-runtime-control-api.md)

@@ -19,7 +19,7 @@
 - [아키텍처 개요](./architecture-overview.md)
 - [표면 아키텍처](../../../architecture/surface-architecture.md)
 - [런타임 아키텍처](../../../architecture/runtime-architecture.md)
-- [모델 분류와 경계](../../../architecture/model-taxonomy-and-boundaries.md)
+- [도메인 언어](../../../architecture/domain-language.md)
 
 ## 현재 핵심 문서
 
@@ -27,8 +27,7 @@
 - [표면 아키텍처](../../../architecture/surface-architecture.md)
 - [런타임 아키텍처](../../../architecture/runtime-architecture.md)
 - [transcript 표현과 streaming](../../../architecture/transcript-presentation-and-streaming.md)
-- [용어집](../../../architecture/glossary.md)
-- [모델 분류와 경계](../../../architecture/model-taxonomy-and-boundaries.md)
+- [도메인 언어](../../../architecture/domain-language.md)
 - [architecture design decision records](../../../architecture/decisions/README.md)
 - [session key와 session id 연속성 결정](../../../architecture/decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 

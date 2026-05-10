@@ -215,6 +215,6 @@ Quy tắc nên áp cho parameter:
 
 - [Tổng quan kiến trúc](../architecture-overview.md)
 - [Kiến trúc runtime](../runtime-architecture.md)
-- [Bảng thuật ngữ kiến trúc](../glossary.md)
+- [Ngôn ngữ miền](../domain-language.md)
 - [Định danh session](../../../features/agents/sessions.md)
 - [Audit về session key và runner session id](../../../../audits/agents/2026-05-01-session-key-and-runner-session-id-audit.md)

@@ -7,7 +7,7 @@ The stable implementation contract lives in:
 - `docs/architecture/architecture-overview.md`
 - `docs/architecture/surface-architecture.md`
 - `docs/architecture/runtime-architecture.md`
-- `docs/architecture/model-taxonomy-and-boundaries.md`
+- `docs/architecture/domain-language.md`
 
 If implementation conflicts with those docs:
 1. stop
@@ -104,7 +104,7 @@ Follow these defaults unless the user explicitly asks for a different tradeoff:
 - DRY: prefer one shared implementation path over parallel wrappers or duplicated mutations
 - backend-facing models must stay resource-oriented and revision-aware
 - do not leak transient runtime state into persistence contracts
-- use `docs/architecture/model-taxonomy-and-boundaries.md` for model naming, ownership, lifecycle, and mapping boundaries
+- use `docs/architecture/domain-language.md` for canonical vocabulary, model naming, ownership, lifecycle, and mapping boundaries
 - do not introduce aggregate or backend-for-frontend endpoints unless the simpler resource model is documented as insufficient
 - document intentional architecture exceptions before implementing them
 

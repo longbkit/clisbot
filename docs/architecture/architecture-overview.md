@@ -12,7 +12,7 @@ Read this file as the map, then use the detail docs for the actual contract:
 
 - [Surface Architecture](surface-architecture.md)
 - [Runtime Architecture](runtime-architecture.md)
-- [Model Taxonomy And Boundaries](model-taxonomy-and-boundaries.md)
+- [Domain Language](domain-language.md)
 
 If this overview and a detailed architecture doc diverge, the detailed doc wins.
 
@@ -203,4 +203,4 @@ If these systems blur together:
 
 - Use [surface-architecture.md](surface-architecture.md) for user-facing and operator-facing surface rules.
 - Use [runtime-architecture.md](runtime-architecture.md) for agents, runner, persistence, and runtime contract rules.
-- Use [model-taxonomy-and-boundaries.md](model-taxonomy-and-boundaries.md) for model ownership, lifecycle, and naming boundaries.
+- Use [domain-language.md](domain-language.md) for canonical vocabulary, model ownership, lifecycle, and naming boundaries.
