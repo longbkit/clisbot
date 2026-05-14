@@ -37,9 +37,9 @@ Direct CLI overrides such as `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, and `CLI
 
 ## npm Publish
 
-Current preferred publish flow is the same attached operator flow that already succeeded for `clisbot@0.1.22`.
+Current preferred publish flow is the attached operator flow documented in `AGENTS.md`.
 
-For full beta/stable release sequencing, release notes, migration notes, GitHub Releases, and tag handling, read [`release-process.md`](release-process.md) first.
+For full beta/stable release sequencing, release notes, migration notes, GitHub Releases, and tag handling, use the `release-clisbot` skill. [`release-process.md`](release-process.md) only points to that canonical workflow.
 
 Use this npm auth and publish discipline unless the operator explicitly asks for something else:
 

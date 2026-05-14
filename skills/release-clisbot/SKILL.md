@@ -1,6 +1,6 @@
 ---
 name: release-clisbot
-description: Release clisbot safely to npm and GitHub. Use when Codex is asked to prepare, validate, bump, publish, tag, or document a clisbot beta release such as 0.1.53-beta.1 or 0.1.53-beta.2, or an official stable/latest release such as 0.1.53, including release notes, migration notes, GitHub release notes, npm dist-tags, and post-publish verification.
+description: Release clisbot safely to npm and GitHub. Use when Codex is asked to prepare, validate, bump, publish, tag, or document a clisbot beta release, next beta release, or official stable/latest release, including release notes, migration notes, GitHub release notes, npm dist-tags, and post-publish verification.
 ---
 
 # Release Clisbot
@@ -11,9 +11,9 @@ with package name `clisbot` and the repo `AGENTS.md`.
 
 ## Hard Rules
 
-- Never use `npm publish --otp`, `npm login --otp`, or any OTP fallback.
 - Run `npm login` and `npm publish --access public` in an attached session.
 - If npm returns a browser approval URL, send that exact URL to the operator and continue the same attached session after approval.
+- Never use `npm publish --otp`, `npm login --otp`, or any OTP fallback.
 - If npm returns `EOTP` or demands OTP instead of browser approval, stop and ask; do not invent a manual OTP path.
 - Do not publish until version, docs, release notes, migration decision, gates, and package dry-run are aligned.
 - If any release path, version, tag, or migration requirement is unclear, ask before publishing.
@@ -27,7 +27,7 @@ with package name `clisbot` and the repo `AGENTS.md`.
    test "$(node -p "require('./package.json').name")" = "clisbot"
    ```
 
-2. Read `AGENTS.md`, `docs/development/README.md`, and `docs/development/release-process.md`.
+2. Read `AGENTS.md` and `docs/development/README.md`.
 3. Inspect `git status --short`, `package.json`, `CHANGELOG.md`, `docs/releases/README.md`, `docs/releases/upcoming.md`, `docs/migrations/index.md`, and the latest `docs/updates/releases/*-release-guide.md`.
 4. Decide the release lane: first beta, next beta, or official stable/latest.
 5. Confirm there are no unrelated uncommitted changes that should be excluded from the release.
@@ -38,15 +38,13 @@ with package name `clisbot` and the repo `AGENTS.md`.
 Use SemVer prerelease syntax with a hyphen.
 
 ```text
-0.1.52 < 0.1.53-beta.1 < 0.1.53-beta.2 < 0.1.53
+X.Y.Z-beta.1 < X.Y.Z-beta.2 < X.Y.Z
 ```
 
-Do not use `0.1.53.beta.1`.
-
-First beta, for example `0.1.53-beta.1`:
+First beta:
 
 ```bash
-VERSION=0.1.53-beta.1
+VERSION=X.Y.Z-beta.1
 npm version "$VERSION" --no-git-tag-version
 npm login
 npm publish --access public --tag beta
@@ -54,10 +52,10 @@ npm view clisbot@beta version
 npm view clisbot dist-tags
 ```
 
-Next beta after fixes, for example `0.1.53-beta.2`:
+Next beta after fixes:
 
 ```bash
-VERSION=0.1.53-beta.2
+VERSION=X.Y.Z-beta.2
 npm version "$VERSION" --no-git-tag-version
 npm login
 npm publish --access public --tag beta
@@ -65,10 +63,10 @@ npm view clisbot@beta version
 npm view clisbot dist-tags
 ```
 
-Stable/latest, for example `0.1.53`:
+Stable/latest:
 
 ```bash
-VERSION=0.1.53
+VERSION=X.Y.Z
 npm version "$VERSION" --no-git-tag-version
 npm login
 npm publish --access public
@@ -111,6 +109,6 @@ If runtime, channel, migration, startup, queue, loop, or prompt behavior changed
 After publish verification:
 
 1. Commit the release docs/version change with a clear message.
-2. Create a git tag that matches the npm version, for example `v0.1.53-beta.1` or `v0.1.53`.
+2. Create a git tag that matches the npm version, for example `v$VERSION`.
 3. Push branch and tags only after the publish and verification facts are correct.
 4. Create the GitHub Release from the matching tag. Use prerelease=true for beta tags and latest=true only for stable.
