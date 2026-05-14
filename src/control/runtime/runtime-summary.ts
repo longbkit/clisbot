@@ -159,6 +159,7 @@ async function getRunnerSessions(loadedConfig: LoadedConfig) {
 }
 
 function buildChannelSummary(params: ChannelSummaryParams) {
+  const health = params.enabled ? params.health : undefined;
   return {
     channel: params.channel,
     enabled: params.enabled,
@@ -177,12 +178,12 @@ function buildChannelSummary(params: ChannelSummaryParams) {
     healthSummary: deriveHealthSummary({
       channel: params.channel,
       connection: params.connection,
-      recordedSummary: params.health?.summary,
+      recordedSummary: health?.summary,
     }),
-    healthDetail: params.health?.detail,
-    healthActions: params.health?.actions ?? [],
-    healthInstances: params.health?.instances ?? [],
-    healthUpdatedAt: params.health?.updatedAt,
+    healthDetail: health?.detail,
+    healthActions: health?.actions ?? [],
+    healthInstances: health?.instances ?? [],
+    healthUpdatedAt: health?.updatedAt,
   } satisfies ChannelOperatorSummary;
 }
 

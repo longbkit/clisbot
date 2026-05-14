@@ -1,7 +1,4 @@
-import {
-  resolveSlackBotConfig,
-  resolveSlackDirectMessageConfig,
-} from "./config.ts";
+import { resolveSlackBotConfig } from "./config.ts";
 import { describeChannelCredentialSource } from "../../config/channels/channel-credentials.ts";
 import { resolveSharedGroupsWildcardRoute } from "../../config/channels/group-routes.ts";
 import { renderCliCommand } from "../../control/commands/cli-name.ts";
@@ -12,6 +9,8 @@ import {
   deriveConfiguredChannelConnection,
   getBootstrapBotToken,
   renderExplicitBootstrapFlags,
+  resolveRuntimeSummaryDefaultBot,
+  resolveRuntimeSummaryDirectMessageConfig,
 } from "../integration/operator-inventory.ts";
 
 const SLACK_TOKEN_DOC_URL = "https://api.slack.com/apps";
@@ -75,11 +74,11 @@ export const slackChannelOperatorInventory: ChannelOperatorInventory = {
     order: 20,
     buildInput: ({ loadedConfig, runtimeRunning, activities, runtimeHealth }) => {
       const enabled = loadedConfig.raw.bots.slack.defaults.enabled;
-      const defaultBot = resolveSlackBotConfig(
-        loadedConfig.raw.bots.slack,
-        loadedConfig.raw.bots.slack.defaults.defaultBotId,
-      );
-      const defaultDmConfig = resolveSlackDirectMessageConfig(defaultBot);
+      const defaultBot = resolveRuntimeSummaryDefaultBot({
+        providerConfig: loadedConfig.raw.bots.slack,
+        resolveBotConfig: (botId) => resolveSlackBotConfig(loadedConfig.raw.bots.slack, botId),
+      });
+      const defaultDmConfig = resolveRuntimeSummaryDirectMessageConfig(defaultBot);
       return {
         channel: "slack",
         enabled,

@@ -1,7 +1,4 @@
-import {
-  resolveZaloBotConfig,
-  resolveZaloBotDirectMessageConfig,
-} from "./config.ts";
+import { resolveZaloBotConfig } from "./config.ts";
 import { describeChannelCredentialSource } from "../../config/channels/channel-credentials.ts";
 import { resolveSharedGroupsWildcardRoute } from "../../config/channels/group-routes.ts";
 import { renderCliCommand } from "../../control/commands/cli-name.ts";
@@ -12,6 +9,8 @@ import {
   deriveConfiguredChannelConnection,
   getBootstrapBotToken,
   renderExplicitBootstrapFlags,
+  resolveRuntimeSummaryDefaultBot,
+  resolveRuntimeSummaryDirectMessageConfig,
 } from "../integration/operator-inventory.ts";
 
 export const zaloBotChannelOperatorInventory: ChannelOperatorInventory = {
@@ -60,11 +59,11 @@ export const zaloBotChannelOperatorInventory: ChannelOperatorInventory = {
     order: 30,
     buildInput: ({ loadedConfig, runtimeRunning, activities, runtimeHealth }) => {
       const enabled = loadedConfig.raw.bots.zaloBot.defaults.enabled;
-      const defaultBot = resolveZaloBotConfig(
-        loadedConfig.raw.bots.zaloBot,
-        loadedConfig.raw.bots.zaloBot.defaults.defaultBotId,
-      );
-      const defaultDmConfig = resolveZaloBotDirectMessageConfig(defaultBot);
+      const defaultBot = resolveRuntimeSummaryDefaultBot({
+        providerConfig: loadedConfig.raw.bots.zaloBot,
+        resolveBotConfig: (botId) => resolveZaloBotConfig(loadedConfig.raw.bots.zaloBot, botId),
+      });
+      const defaultDmConfig = resolveRuntimeSummaryDirectMessageConfig(defaultBot);
       return {
         channel: "zalo-bot",
         enabled,

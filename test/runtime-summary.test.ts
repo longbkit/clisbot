@@ -118,6 +118,92 @@ describe("runtime summaries", () => {
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock attach -t <session-name>");
   });
 
+  test("renders disabled provider summaries when legacy configs omit provider bot records", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
+    const cases = [
+      {
+        channel: "slack",
+        botKey: "slack",
+        staleSummary: "stale Slack health",
+      },
+      {
+        channel: "telegram",
+        botKey: "telegram",
+        staleSummary: "stale Telegram health",
+      },
+      {
+        channel: "zalo-bot",
+        botKey: "zaloBot",
+        staleSummary: "stale Zalo Bot health",
+      },
+    ] as const;
+
+    for (const item of cases) {
+      const configPath = join(tempDir, `${item.channel}.json`);
+      const healthPath = join(tempDir, `${item.channel}-health.json`);
+      const config = JSON.parse(
+        renderDefaultConfigTemplate({
+          channels: {
+            slack: { enabled: false },
+            telegram: { enabled: false },
+            "zalo-bot": { enabled: false },
+          },
+        }),
+      );
+      delete config.bots[item.botKey];
+      config.agents.list = [{ id: "default", cli: "codex" }];
+      writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+      const healthStore = new RuntimeHealthStore(healthPath);
+      await healthStore.setChannel({
+        channel: item.channel,
+        connection: "active",
+        summary: item.staleSummary,
+      });
+
+      const summary = await getRuntimeOperatorSummary({
+        configPath,
+        runtimeRunning: true,
+        healthPath,
+      });
+      const text = renderStatusSummary(summary);
+
+      expect(text).toContain(`${item.channel} enabled=no`);
+      expect(text).not.toContain(item.staleSummary);
+    }
+  });
+
+  test("fails loudly when an enabled provider omits its default bot record", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
+    const cases = [
+      { channel: "slack", botKey: "slack", error: "Unknown Slack bot: default" },
+      { channel: "telegram", botKey: "telegram", error: "Unknown Telegram bot: default" },
+      { channel: "zalo-bot", botKey: "zaloBot", error: "Unknown Zalo Bot bot: default" },
+    ] as const;
+
+    for (const item of cases) {
+      const configPath = join(tempDir, `${item.channel}-enabled.json`);
+      const config = JSON.parse(
+        renderDefaultConfigTemplate({
+          channels: {
+            slack: { enabled: false },
+            telegram: { enabled: false },
+            "zalo-bot": { enabled: false },
+            [item.channel]: { enabled: true },
+          },
+        }),
+      );
+      delete config.bots[item.botKey].default;
+      config.agents.list = [{ id: "default", cli: "codex" }];
+      writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+      await expect(getRuntimeOperatorSummary({
+        configPath,
+        runtimeRunning: true,
+      })).rejects.toThrow(item.error);
+    }
+  });
+
   test("renders channel setup commands with the active CLI name", async () => {
     setRenderedCliName("clisbot-dev");
     process.env.CLISBOT_HOME = "~/.clisbot-dev";

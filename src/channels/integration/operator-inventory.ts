@@ -6,6 +6,11 @@ import { isSharedGroupsWildcardRouteId } from "../../config/channels/group-route
 import type { ChannelId } from "./channel-surface-contract.ts";
 import { describeEnvReference } from "../../config/env/env-references.ts";
 import type { ChannelBootstrapTokenField } from "./channel-plugin.ts";
+import {
+  resolveChannelDirectMessageConfig,
+  type ResolvedChannelBotConfig,
+} from "../../config/channels/channel-bot-resolution.ts";
+import type { ChannelProviderConfig } from "../../config/channels/channel-config-shapes.ts";
 
 export type ChannelStartupAvailability = Record<ChannelId, boolean>;
 
@@ -163,4 +168,60 @@ export function deriveConfiguredChannelConnection(params: {
     return "stopped" as const;
   }
   return params.recordedConnection ?? "active";
+}
+
+export function resolveRuntimeSummaryDefaultBot<TBot extends ResolvedChannelBotConfig>(
+  params: {
+    providerConfig: ChannelProviderConfig;
+    resolveBotConfig: (botId: string) => TBot;
+  },
+): ResolvedChannelBotConfig {
+  const defaultBotId = params.providerConfig.defaults.defaultBotId || "default";
+  const hasDefaultBot = Object.prototype.hasOwnProperty.call(
+    params.providerConfig,
+    defaultBotId,
+  );
+  if (params.providerConfig.defaults.enabled || hasDefaultBot) {
+    return params.resolveBotConfig(defaultBotId);
+  }
+
+  return {
+    id: defaultBotId,
+    enabled: false,
+    allowBots: params.providerConfig.defaults.allowBots,
+    dmPolicy: params.providerConfig.defaults.dmPolicy,
+    groupPolicy: params.providerConfig.defaults.groupPolicy,
+    agentPrompt: params.providerConfig.defaults.agentPrompt,
+    commandPrefixes: params.providerConfig.defaults.commandPrefixes,
+    streaming: params.providerConfig.defaults.streaming,
+    response: params.providerConfig.defaults.response,
+    responseMode: params.providerConfig.defaults.responseMode,
+    additionalMessageMode: params.providerConfig.defaults.additionalMessageMode,
+    surfaceNotifications: resolveRuntimeSummarySurfaceNotifications(
+      params.providerConfig.defaults.surfaceNotifications,
+    ),
+    verbose: params.providerConfig.defaults.verbose,
+    followUp: params.providerConfig.defaults.followUp,
+    timezone: params.providerConfig.defaults.timezone,
+    directMessages: params.providerConfig.defaults.directMessages,
+    groups: params.providerConfig.defaults.groups,
+  };
+}
+
+function resolveRuntimeSummarySurfaceNotifications(
+  value: ChannelProviderConfig["defaults"]["surfaceNotifications"],
+) {
+  if (!value?.queueStart || !value.loopStart) {
+    return undefined;
+  }
+  return {
+    queueStart: value.queueStart,
+    loopStart: value.loopStart,
+  };
+}
+
+export function resolveRuntimeSummaryDirectMessageConfig(
+  botConfig: ResolvedChannelBotConfig,
+) {
+  return resolveChannelDirectMessageConfig(botConfig);
 }
