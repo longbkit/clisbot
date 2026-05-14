@@ -74,12 +74,14 @@ Ví dụ:
 - recurring interval loop và wall-clock loop tạo từ CLI được persist trước vào routed session entry
 - CLI creation nhận cùng các family expression như `/loop`: interval, forced interval, times/count, và wall-clock schedule
 - recurring interval và wall-clock creation cũng nhận override nâng cao `--loop-start <none|brief|full>`
-- count/times loop không nhận `--loop-start` vì chúng chạy ngay trong CLI thay vì tạo recurring scheduled tick
+- count/times loop không nhận `--loop-start` vì chúng giữ chỗ queue ngay thay vì tạo recurring scheduled tick
 - nếu chưa từng có wall-clock loop nào được tạo thành công, lần create đầu sẽ trả `confirmation_required` và chưa persist loop
 - output ở trạng thái chờ xác nhận phải gồm schedule đề xuất, timezone đã resolve, next run, và exact retry command kèm `--confirm`
 - runtime đang chạy sẽ định kỳ reconcile persisted loop state, nên có thể nhặt các recurring loop mới mà operator tạo mà không cần restart
 - nếu runtime đang dừng, recurring loop tạo từ CLI sẽ có hiệu lực ở lần `clisbot start` sau
-- one-shot count loop vẫn chạy đồng bộ trong CLI; durable queue thuộc về `clisbot queues`, không phải count mode của loop
+- one-shot count loop giữ chỗ toàn bộ iteration ngay thành durable queue
+  item trong routed session, rồi runtime drain qua cùng ordered queue path như
+  `clisbot queues`
 - cancel chỉ xóa loop khỏi persisted session state và scheduler state; nó không interrupt một iteration đã bắt đầu
 
 ### Shared rendering

@@ -1,9 +1,4 @@
 import {
-  AgentService,
-  ActiveRunInProgressError,
-  type AgentSessionTarget,
-} from "../../agents/runtime/agent-service.ts";
-import {
   buildStoredLoopSender,
   createStoredCalendarLoop,
   createStoredIntervalLoop,
@@ -13,6 +8,7 @@ import {
   validateLoopInterval,
 } from "../../agents/loops/loop-definition.ts";
 import type { IntervalLoopStatus } from "../../agents/loops/loop-state.ts";
+import { createStoredQueueItem } from "../../agents/queue/queue-state.ts";
 import { buildStoredSurfaceBinding } from "../../agents/routing/surface-binding.ts";
 import {
   LOOP_APP_FLAG,
@@ -60,11 +56,11 @@ import {
   selectScopedLoopsForAddressing,
 } from "./loop-cli-targeting.ts";
 import { renderCliCommand } from "./cli-name.ts";
-import { sleep } from "../../infra/process.ts";
+import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
+import { resolvePrincipalAuth } from "../../auth/resolve.ts";
 
 export { renderLoopsHelp } from "./loops-cli-rendering.ts";
 
-const LOOP_BUSY_RETRY_MS = 250;
 const LOOP_CONFIRM_FLAG = "--confirm";
 const LOOP_PROGRESS_FLAG = "--progress";
 const LOOP_SENDER_FLAG = "--sender";
@@ -310,67 +306,65 @@ async function cancelScopedLoops(
   await cancelOneScopedLoop(state, context, sessionLoops, targetLoopId);
 }
 
-async function waitForSessionIdle(agentService: AgentService, target: AgentSessionTarget) {
-  while (true) {
-    try {
-      const runtime = await agentService.getSessionRuntime(target);
-      if (runtime.state !== "running") {
-        return;
-      }
-    } catch {
-      return;
-    }
-    await sleep(LOOP_BUSY_RETRY_MS);
-  }
+function createCountLoopQueueItem(params: {
+  state: LoadedLoopControlState;
+  request: LoopCreateRequest;
+  promptText: string;
+}) {
+  return createStoredQueueItem({
+    promptText: params.promptText,
+    protectedControlMutationRule: resolveProtectedControlMutationRule(
+      params.state,
+      params.request.context.sessionTarget.agentId,
+      params.request.creator,
+    ),
+    promptSummary: summarizeLoopPrompt(
+      params.request.resolvedPrompt.text,
+      params.request.resolvedPrompt.maintenancePrompt,
+    ),
+    createdBy: params.request.creator.providerId,
+    sender: params.request.creator,
+    surfaceBinding: buildStoredSurfaceBinding({
+      ...params.request.context.identity,
+      botId: params.request.context.botId,
+    }),
+  });
 }
 
-async function executeCountLoop(params: {
-  state: LoadedLoopControlState;
-  context: LoopCliContext;
-  promptText: string;
-  count: number;
-  maintenancePrompt: boolean;
-  progressMessages?: number;
-}) {
-  const agentService = new AgentService(params.state.loadedConfig);
-  const builtPrompt = params.context.buildLoopPromptText(
-    params.promptText,
-    params.progressMessages == null
+async function createCountLoopQueueItems(
+  state: LoadedLoopControlState,
+  request: LoopCreateRequest,
+  count: number,
+) {
+  const context = request.deliveryContext ?? request.context;
+  const builtPrompt = context.buildLoopPromptText(
+    request.resolvedPrompt.text,
+    request.progressMessages == null
       ? undefined
       : {
-          maxProgressMessagesOverride: params.progressMessages,
+          maxProgressMessagesOverride: request.progressMessages,
         },
   );
+
+  for (let index = 0; index < count; index += 1) {
+    await state.sessionState.setQueuedItem(
+      request.resolvedTarget,
+      createCountLoopQueueItem({
+        request,
+        state,
+        promptText: builtPrompt,
+      }),
+    );
+  }
+
   console.log(
     renderLoopStartedMessage({
       mode: "times",
-      count: params.count,
-      maintenancePrompt: params.maintenancePrompt,
+      count,
+      maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
     }),
   );
-
-  try {
-    for (let index = 0; index < params.count; index += 1) {
-      while (true) {
-        await waitForSessionIdle(agentService, params.context.sessionTarget);
-        try {
-          await agentService.enqueuePrompt(params.context.sessionTarget, builtPrompt, {
-            onUpdate: () => undefined,
-          }).result;
-          break;
-        } catch (error) {
-          if (!(error instanceof ActiveRunInProgressError)) {
-            throw error;
-          }
-          await sleep(LOOP_BUSY_RETRY_MS);
-        }
-      }
-    }
-  } finally {
-    await agentService.stop();
-  }
-
-  console.log(`Completed ${params.count} iteration${params.count === 1 ? "" : "s"}.`);
+  console.log(`Queued ${count} iteration${count === 1 ? "" : "s"} for \`${context.sessionTarget.sessionKey}\`.`);
 }
 
 function stripConfirmFlag(args: string[]) {
@@ -627,9 +621,17 @@ function buildRecurringLoopCreateBase(
   }));
 }
 
-function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
+function buildRecurringLoopPromptMetadata(
+  state: LoadedLoopControlState,
+  request: LoopCreateRequest,
+) {
   return {
     promptText: request.resolvedPrompt.text,
+    protectedControlMutationRule: resolveProtectedControlMutationRule(
+      state,
+      request.context.sessionTarget.agentId,
+      request.creator,
+    ),
     promptSummary: summarizeLoopPrompt(
       request.resolvedPrompt.text,
       request.resolvedPrompt.maintenancePrompt,
@@ -644,6 +646,19 @@ function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
     sender: request.creator,
     surfaceBinding: buildLoopSurfaceBinding(request),
   };
+}
+
+function resolveProtectedControlMutationRule(
+  state: LoadedLoopControlState,
+  agentId: string,
+  sender: LoopCreator,
+) {
+  const auth = resolvePrincipalAuth({
+    config: state.loadedConfig.raw,
+    agentId,
+    principal: sender.senderId,
+  });
+  return auth.mayManageProtectedResources ? undefined : DEFAULT_PROTECTED_CONTROL_RULE;
 }
 
 function buildRecurringLoopFirstRunNote(mode: "interval" | "calendar", runtimeRunning: boolean) {
@@ -662,7 +677,7 @@ async function createCalendarLoop(base: LoopCreateBase) {
     return false;
   }
 
-  const metadata = buildRecurringLoopPromptMetadata(base.request);
+  const metadata = buildRecurringLoopPromptMetadata(base.state, base.request);
   const timezone = resolveConfigTimezone({
     config: base.state.loadedConfig.raw,
     agentId: base.request.context.sessionTarget.agentId,
@@ -748,7 +763,7 @@ async function createIntervalLoop(base: LoopCreateBase) {
   }
 
   const validation = requireValidIntervalLoop(parsed);
-  const metadata = buildRecurringLoopPromptMetadata(base.request);
+  const metadata = buildRecurringLoopPromptMetadata(base.state, base.request);
   const loop = createStoredIntervalLoop({
     ...metadata,
     intervalMs: parsed.intervalMs,
@@ -801,14 +816,7 @@ async function createLoop(
     options.explicitCreateSubcommand ?? false,
   );
   if (request.parsed.mode === "times") {
-    await executeCountLoop({
-      state,
-      context: request.deliveryContext ?? request.context,
-      promptText: request.resolvedPrompt.text,
-      count: request.parsed.count,
-      maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
-      progressMessages: request.progressMessages,
-    });
+    await createCountLoopQueueItems(state, request, request.parsed.count);
     return;
   }
   if (

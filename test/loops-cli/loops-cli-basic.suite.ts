@@ -7,6 +7,7 @@ import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
 import { renderLoopsHelp, runLoopsCli } from "../../src/control/commands/loops-cli.ts";
 import { setRenderedCliName } from "../../src/control/commands/cli-name.ts";
 import { buildConfig, enableSlackChannelRoute, enableSlackDirectMessages, enableTelegramTopicRoute, enableZaloBotDirectMessages } from "./loops-cli-support.ts";
+import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../src/auth/defaults.ts";
 
 describe("loops cli", () => {
   let tempDir = "";
@@ -282,6 +283,84 @@ describe("loops cli", () => {
 
     const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, unknown>;
     expect(Object.keys(store)).toHaveLength(0);
+  });
+
+  test("count loops persist queued iterations immediately", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-count-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        enableTelegramTopicRoute(
+          buildConfig({
+            socketPath: join(tempDir, "clisbot.sock"),
+            storePath,
+            workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+          }),
+          "-1001",
+          "42",
+        ),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      storePath,
+      JSON.stringify(
+        {
+          "agent:default:telegram:group:-1001:topic:42": {
+            agentId: "default",
+            sessionKey: "agent:default:telegram:group:-1001:topic:42",
+            workspacePath: join(tempDir, "workspaces", "default"),
+            runnerCommand: "codex",
+            runtime: { state: "running", startedAt: 1 },
+            updatedAt: 1,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runLoopsCli([
+      "create",
+      "--channel",
+      "telegram",
+      "--target",
+      "topic:-1001:42",
+      "--sender",
+      "telegram:1276408333",
+      "--progress",
+      "0",
+      "3",
+      "answer",
+      "random",
+      "questions",
+    ]);
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    const session = store["agent:default:telegram:group:-1001:topic:42"];
+    expect(session?.runtime?.state).toBe("running");
+    expect(session?.queues).toHaveLength(3);
+    expect(session.queues.map((item: any) => item.status)).toEqual([
+      "pending",
+      "pending",
+      "pending",
+    ]);
+    expect(session.queues[0].promptText).toContain("answer random questions");
+    expect(session.queues[0].protectedControlMutationRule).toBe(
+      DEFAULT_PROTECTED_CONTROL_RULE,
+    );
+    expect(session.queues[0].sender.senderId).toBe("telegram:1276408333");
+    expect(logs.join("\n")).toContain("Started loop for 3 iterations.");
+    expect(logs.join("\n")).toContain("Queued 3 iterations for `agent:default:telegram:group:-1001:topic:42`.");
   });
 
   test("list and status render the same active loop inventory", async () => {

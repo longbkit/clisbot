@@ -116,7 +116,7 @@ export function renderLoopsHelp(channel?: MessageChannel) {
     "  - if runtime is stopped, recurring loops activate on the next `clisbot start`",
     "  - global `cancel --all` clears the whole app; scoped `cancel --all` clears one routed session",
     `  - \`cancel --all ${LOOP_APP_FLAG}\` is accepted only with a scoped session target, matching \`/loop cancel --all ${LOOP_APP_FLAG}\``,
-    "  - one-shot count loops run synchronously in the CLI; durable one-shot prompts use `clisbot queues`",
+    "  - one-shot count loops reserve all iterations immediately as durable queue items for the routed session",
     "  - wall-clock loop timezone resolves from `--timezone`, route/topic, agent, bot, app timezone, then legacy defaults, then host",
     "  - calendar loops freeze the resolved effective timezone at creation time; if timing looks wrong, run `clisbot timezone get` first and inspect agent or route timezone only for scoped overrides",
   ].join("\n");
@@ -154,6 +154,7 @@ export function renderLoopsCreateHelp(channel?: MessageChannel) {
     "  - the `--sender` platform must match `--channel`",
     "  - recurring CLI-created loops persist creator metadata into the session store",
     "  - CLI-created loop prompts inherit the normal clisbot prompt config unless `--progress <count>` is provided",
+    "  - count/times loops reserve their iterations immediately as durable queue items and do not create recurring loop records",
   ].join("\n");
 }
 

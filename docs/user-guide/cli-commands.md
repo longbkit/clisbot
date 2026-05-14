@@ -555,7 +555,7 @@ Examples:
 - advanced recurring loop creation also accepts `--loop-start <none|brief|full>` to override the default scheduled start notification behavior for that one loop; omit it to keep the route default
 - loop creation also accepts `--progress <count>` to override injected agent progress-message instructions for that loop only; omit it to keep the normal `clisbot.json` prompt policy, use `0` to disable progress updates, or use a positive count to cap them
 - omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
-- count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
+- count/times loops reserve all iterations immediately as durable queue items for the routed session; recurring loops are persisted for the runtime scheduler
 - the first wall-clock loop create attempt returns confirmation-required output and does not persist a loop until rerun with `--confirm`
 - AI agents should inspect `clisbot loops --help --channel <current-channel>` for schedule, loop, or reminder requests and follow the CLI output instead of guessing loop state
 

@@ -557,7 +557,7 @@ Ví dụ:
 - recurring loop nâng cao còn chấp nhận `--loop-start <none|brief|full>` để override start notification cho đúng loop đó; bỏ qua để dùng mặc định của route
 - khi tạo loop, bạn cũng có thể dùng `--progress <count>` để override riêng phần hướng dẫn progress message cho agent của đúng loop đó; bỏ qua để giữ policy prompt bình thường trong `clisbot.json`, dùng `0` để tắt progress update, hoặc dùng số dương để giới hạn số lần gửi
 - bỏ prompt body để load `LOOP.md` từ target workspace cho maintenance loop
-- count/times loop hiện chạy đồng bộ ngay trong CLI process; recurring loop được persist cho runtime scheduler
+- count/times loop giữ chỗ toàn bộ iteration ngay thành durable queue item cho routed session; recurring loop được persist cho runtime scheduler
 - lần đầu tạo wall-clock loop sẽ trả về output yêu cầu xác nhận và chưa persist loop cho tới khi chạy lại với `--confirm`
 - với các yêu cầu schedule, loop, hoặc reminder do AI agent xử lý, agent nên xem `clisbot loops --help --channel <current-channel>` và đi theo output thật của CLI thay vì đoán loop state
 

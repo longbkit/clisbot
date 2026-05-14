@@ -148,7 +148,7 @@ They should stay separate from end-user channel behavior.
 
 ### Expected Results
 
-- the command runs three iterations synchronously inside the CLI process
+- the command reserves three pending queue items immediately for the routed session
 - no recurring persisted loop record is left behind for that count loop
 - the expression parser and prompt resolution still match channel `/loop`
 

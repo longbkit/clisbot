@@ -6,18 +6,20 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-`v0.1.53-beta.3` is the third beta for the channel/control/config/agents
+`v0.1.53-beta.4` is the fourth beta for the channel/control/config/agents
 boundary cleanup and release-workflow hardening after `v0.1.52`. It fixes a
 beta.1 runtime status regression for legacy configs that do not yet contain
 disabled provider bot records for every built-in channel, and removes
-release-only recovery guidance from update help.
+release-only recovery guidance from update help. It also fixes a CLI count-loop
+regression where `clisbot loops create ... 3 ...` waited for the target session
+to become idle instead of reserving queue items immediately.
 
 ## Operator Impact
 
 - Required action: beta testers should install from the `beta` npm dist-tag.
-- Behavior users should notice: no intended user-facing command behavior change;
-  CLI help, slash command help, queue, loop, and live Slack paths were
-  regression-tested after the refactor.
+- Behavior users should notice: CLI count/times loops now match chat `/loop`
+  behavior by reserving all iterations as durable queue items immediately,
+  including when the target session is already running.
 - Compatibility notes: no manual config migration is required for this beta.
 - Known risks: broad internal file moves may still expose stale import or package
   layout issues in environments not covered by the local/live test matrix.
@@ -40,6 +42,9 @@ release-only recovery guidance from update help.
 - Removed release/publish recovery guidance from `clisbot update --help`; update
   help now stays scoped to install/update target choice, docs, install flow, and
   verification.
+- Fixed CLI count/times loops so `clisbot loops create ... 3 ...` no longer
+  waits for target-session idleness and instead persists every requested
+  iteration as a pending queue item.
 
 ## Non-Functional Changes
 
@@ -50,10 +55,14 @@ release-only recovery guidance from update help.
   Slack, Telegram, and Zalo Bot runtime summaries.
 - Added regression coverage that update help does not mention publish recovery,
   npm login, EOTP, or `--otp`.
+- Added regression coverage that CLI count loops persist queued iterations
+  immediately even when the target session runtime is already `running`.
+- Updated loop CLI help and user/docs test expectations so future agents see
+  the queue-reservation contract instead of the removed synchronous CLI model.
 
 ## Update Notes
 
-- Update path: `0.1.52` -> `0.1.53-beta.3`
+- Update path: `0.1.52` -> `0.1.53-beta.4`
 - Manual action: none
 - Risk level: medium because this is a broad refactor beta
 - Automatic config update: no new schema migration is introduced by this beta
@@ -66,6 +75,9 @@ release-only recovery guidance from update help.
   same class of mistake across built-in providers.
 - `0.1.53-beta.3`: removes stale publish recovery text from
   `clisbot update --help`.
+- `0.1.53-beta.4`: fixes CLI count/times loop creation to reserve durable
+  queue items immediately instead of waiting for the target session to become
+  idle.
 
 ## Validation
 
@@ -73,6 +85,7 @@ release-only recovery guidance from update help.
 - `bun run build`
 - `git diff --check`
 - `npm publish --dry-run --access public`
+- Targeted CLI/channel loop regression tests for count-loop queue reservation.
 - Live Slack queue, loop, slash command, help, and message E2E were validated
   during the refactor test matrix.
 

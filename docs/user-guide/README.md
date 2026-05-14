@@ -380,7 +380,7 @@ Important behavior:
 - `cancel --all` is app-wide when no routed target is given
 - scoped `cancel --all` clears one routed session and scoped `cancel --all --app` clears the whole app
 - if runtime is already running, it reconciles new recurring loops from persistence; if runtime is stopped, those loops activate on the next start
-- count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
+- count/times loops reserve all iterations immediately as durable queue items for the routed session; recurring loops are persisted for the runtime scheduler
 - loop state is read from `session.storePath`, which defaults to `~/.clisbot/state/sessions.json`
 - if `CLISBOT_HOME` is set, the default session store becomes `<CLISBOT_HOME>/state/sessions.json`
 - the runtime scheduler re-checks persisted loop state before each scheduled tick, so cancelling through the CLI suppresses future runs without adding a separate control socket

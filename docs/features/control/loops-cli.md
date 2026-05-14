@@ -77,7 +77,7 @@ Examples:
 - recurring interval and wall-clock loops created from the CLI are persisted first into the routed session entry
 - CLI creation accepts the same loop expression families as `/loop`: interval, forced interval, times/count, and calendar wall-clock schedules
 - recurring interval and wall-clock CLI creation also accepts advanced `--loop-start <none|brief|full>` override syntax; if omitted, the route default still applies
-- count/times loops do not accept `--loop-start` because they run immediately in the CLI instead of creating recurring scheduled ticks
+- count/times loops do not accept `--loop-start` because they reserve immediate queue work instead of creating recurring scheduled ticks
 - CLI creation requires `--sender <principal>` and persists creator metadata on recurring loops
 - if no wall-clock loop has been created successfully yet, the first wall-clock create command returns `confirmation_required` and does not persist a loop
 - the confirmation-required output includes the proposed schedule, resolved timezone, next run, and the exact retry command with `--confirm`
@@ -85,8 +85,9 @@ Examples:
 - AI agents should not infer first-loop state; they should run the loops CLI and follow the confirmation output exactly
 - the live runtime periodically reconciles persisted loop state, so a running service can pick up new operator-created recurring loops without a restart
 - if runtime is stopped, recurring CLI-created loops activate on the next `clisbot start`
-- one-shot count loops still run synchronously inside the CLI; durable queue
-  support belongs to `clisbot queues`, not loop count mode
+- one-shot count loops reserve all iterations immediately as durable queue
+  items on the routed session, then the runtime drains them through the same
+  ordered queue path as `clisbot queues`
 - `clisbot loops cancel <id>` removes the matching loop record from persisted session state
 - `clisbot loops cancel --all` clears all persisted loop records across all sessions
 - runtime loop state updates use compare-on-write semantics, so a stale in-memory loop update cannot recreate a loop that the CLI already cancelled
