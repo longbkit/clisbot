@@ -43,36 +43,40 @@ Use SemVer prerelease syntax with a hyphen.
 
 Do not use `0.1.53.beta.1`.
 
-First beta:
+First beta, for example `0.1.53-beta.1`:
 
 ```bash
-npm version 0.1.53-beta.1 --no-git-tag-version
+VERSION=0.1.53-beta.1
+npm version "$VERSION" --no-git-tag-version
 npm login
 npm publish --access public --tag beta
 npm view clisbot@beta version
 npm view clisbot dist-tags
 ```
 
-Next beta after fixes:
+Next beta after fixes, for example `0.1.53-beta.2`:
 
 ```bash
-npm version 0.1.53-beta.2 --no-git-tag-version
+VERSION=0.1.53-beta.2
+npm version "$VERSION" --no-git-tag-version
 npm login
 npm publish --access public --tag beta
 npm view clisbot@beta version
 npm view clisbot dist-tags
 ```
 
-Stable/latest:
+Stable/latest, for example `0.1.53`:
 
 ```bash
-npm version 0.1.53 --no-git-tag-version
+VERSION=0.1.53
+npm version "$VERSION" --no-git-tag-version
 npm login
 npm publish --access public
 npm view clisbot version
 npm view clisbot dist-tags
 ```
 
+Always set `VERSION` to the intended release version before copying a lane.
 `--no-git-tag-version` intentionally updates `package.json` and lockfile without creating an automatic git commit or tag. Commit and tag only after validation and publish state are known.
 
 ## Release Documents
