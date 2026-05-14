@@ -37,48 +37,10 @@ Direct CLI overrides such as `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, and `CLI
 
 ## npm Publish
 
-Current preferred publish flow is the attached operator flow documented in `AGENTS.md`.
+Use the `release-clisbot` skill for beta/stable release sequencing, npm auth,
+release notes, migration notes, GitHub Releases, tags, validation, and
+post-publish checks.
 
-For full beta/stable release sequencing, release notes, migration notes, GitHub Releases, and tag handling, use the `release-clisbot` skill. [`release-process.md`](release-process.md) only points to that canonical workflow.
-
-Use this npm auth and publish discipline unless the operator explicitly asks for something else:
-
-1. authenticate first:
-
-```bash
-npm login
-```
-
-2. publish the current package publicly:
-
-```bash
-npm publish --access public
-```
-
-For beta releases, the publish command is:
-
-```bash
-npm publish --access public --tag beta
-```
-
-Remote operator flow:
-
-- if the assistant is operating the repo remotely for the operator, the assistant should run `npm login` or `npm publish --access public` directly in an attached session
-- if npm returns a browser approval URL such as `https://www.npmjs.com/auth/cli/...`, the assistant should send that exact link to the operator and wait for approval
-- after the operator approves in the browser, the assistant should continue the same attached session instead of switching to a separate manual flow
-- never rewrite the documented command into an OTP-only variant
-- never run `npm publish --otp`, `npm login --otp`, or any OTP fallback; if npm returns `EOTP` instead of a browser approval flow, stop and ask the operator how to proceed
-
-Notes:
-
-- do not skip the explicit `npm login` step if auth might be stale
-- keep the login or publish process attached so the operator can complete npm approval or browser confirmation if npm asks for it
-- if a publish mistake needs cleanup, publish the corrected version or tag first, then run `npm deprecate`
-- for `npm deprecate`, start from `npm login` in an attached session; if the write command still returns `EOTP`, stop and ask rather than adding `--otp`
-- after publish, verify the live version with:
-
-```bash
-npm view clisbot version
-```
-
-- the package that gets published is the local repo state at publish time, not automatically `origin/main`
+This page intentionally does not repeat release commands. `AGENTS.md` owns the
+repo command baseline, and [`release-process.md`](release-process.md) points to
+the canonical release skill.
