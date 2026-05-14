@@ -37,13 +37,15 @@ describe("update cli", () => {
     expect(help).toContain("https://raw.githubusercontent.com/longbkit/clisbot/main/docs/updates/README.md");
     expect(help).toContain("https://github.com/longbkit/clisbot/tree/main/docs");
     expect(help).toContain("If Manual action: required, follow its runbook. If none, continue.");
-    expect(help).toContain("Use for target choice, install flow, verification, and wrong-publish recovery.");
+    expect(help).toContain("Use for target choice, install flow, and verification.");
     expect(help).toContain("Use for the canonical version map and full version notes.");
     expect(help).toContain("Use for shorter catch-up notes: what changed, what to try, and what to watch.");
     expect(help).toContain("If needed, fetch or clone docs and inspect relevant files.");
-    expect(help).toContain("If a version was published by mistake, publish the corrected target or tag first.");
-    expect(help).toContain("Then deprecate the wrong version.");
-    expect(help).toContain("If the write command still returns EOTP, ask the operator for a current OTP");
+    expect(help).not.toContain("Recovery:");
+    expect(help).not.toContain("version was published by mistake");
+    expect(help).not.toContain("npm login");
+    expect(help).not.toContain("EOTP");
+    expect(help).not.toContain("--otp");
   });
 
   test("prints the guide for help action", async () => {

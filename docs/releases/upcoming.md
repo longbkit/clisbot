@@ -6,10 +6,11 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-`v0.1.53-beta.2` is the second beta for the channel/control/config/agents
+`v0.1.53-beta.3` is the third beta for the channel/control/config/agents
 boundary cleanup and release-workflow hardening after `v0.1.52`. It fixes a
 beta.1 runtime status regression for legacy configs that do not yet contain
-disabled provider bot records for every built-in channel.
+disabled provider bot records for every built-in channel, and removes
+release-only recovery guidance from update help.
 
 ## Operator Impact
 
@@ -36,6 +37,9 @@ disabled provider bot records for every built-in channel.
   fails loudly when its configured default bot record is missing.
 - Suppressed stale channel health details for disabled channels so old runtime
   metadata does not make a disabled provider look active.
+- Removed release/publish recovery guidance from `clisbot update --help`; update
+  help now stays scoped to install/update target choice, docs, install flow, and
+  verification.
 
 ## Non-Functional Changes
 
@@ -44,10 +48,12 @@ disabled provider bot records for every built-in channel.
 - Kept release docs pointer-only where they previously duplicated npm commands.
 - Added regression coverage for disabled/missing provider bot records across
   Slack, Telegram, and Zalo Bot runtime summaries.
+- Added regression coverage that update help does not mention publish recovery,
+  npm login, EOTP, or `--otp`.
 
 ## Update Notes
 
-- Update path: `0.1.52` -> `0.1.53-beta.2`
+- Update path: `0.1.52` -> `0.1.53-beta.3`
 - Manual action: none
 - Risk level: medium because this is a broad refactor beta
 - Automatic config update: no new schema migration is introduced by this beta
@@ -58,6 +64,8 @@ disabled provider bot records for every built-in channel.
 - `0.1.53-beta.2`: fixes runtime `status` summary rendering for legacy configs
   that omit disabled provider bot records, and adds regression coverage for the
   same class of mistake across built-in providers.
+- `0.1.53-beta.3`: removes stale publish recovery text from
+  `clisbot update --help`.
 
 ## Validation
 
