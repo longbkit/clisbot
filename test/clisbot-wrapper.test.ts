@@ -93,4 +93,13 @@ describe("clisbot wrapper", () => {
     expect(script).toContain("/tmp/clisbot/dist/main.js");
     expect(script).not.toContain("/tmp/clisbot/main.js");
   });
+
+  test("source wrapper points at src/main.ts after control folder refactors", () => {
+    const script = renderClisbotWrapperScript({
+      moduleUrl: "file:///tmp/clisbot/src/control/commands/clisbot-wrapper.ts",
+    });
+
+    expect(script).toContain("/tmp/clisbot/src/main.ts");
+    expect(script).not.toContain("/tmp/clisbot/src/control/main.ts");
+  });
 });

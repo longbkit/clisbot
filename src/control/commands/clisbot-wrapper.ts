@@ -31,7 +31,7 @@ function getClisbotMainScriptPath(moduleUrl = import.meta.url) {
     return fileURLToPath(moduleUrl);
   }
 
-  return fileURLToPath(new URL("../main.ts", moduleUrl));
+  return fileURLToPath(new URL("../../main.ts", moduleUrl));
 }
 
 function isPackagedRuntime(moduleUrl = import.meta.url) {

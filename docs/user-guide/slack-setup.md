@@ -20,7 +20,8 @@ This guide assumes `clisbot` is already installed and you can run `clisbot start
 After this guide, you should be able to:
 
 1. DM the Slack bot
-2. approve DM pairing
+2. claim the first owner in a fresh install, or approve DM pairing when an
+   owner already exists
 3. invite the bot into a Slack channel
 4. route that channel into `clisbot`
 5. test mention flow and thread follow-up
@@ -58,11 +59,13 @@ clisbot start \
 Then:
 
 1. DM the bot in Slack
-2. approve the pairing code with `clisbot pairing approve slack <CODE>`
-3. invite the bot to a Slack channel
-4. add that route with `clisbot routes add --channel slack group:<channelId> --bot default`
-5. only if that channel should use a different agent than the one currently assigned to that bot by default, override it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
-6. test `@clisbot hello`
+2. if this is a fresh install with no owner, confirm the first-owner claim reply
+3. if an owner already exists and the DM user is not an owner/admin, approve the
+   pairing code with `clisbot pairing approve slack <CODE>`
+4. invite the bot to a Slack channel
+5. add that route with `clisbot routes add --channel slack group:<channelId> --bot default`
+6. only if that channel should use a different agent than the one currently assigned to that bot by default, override it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
+7. test `@clisbot hello`
 
 The rest of this page explains each step in detail.
 
@@ -183,8 +186,11 @@ By default, Slack DMs use pairing mode.
 Expected flow:
 
 1. you send a DM
-2. the bot replies with a pairing code
-3. you approve that code locally
+2. if no owner is configured yet and you are inside the owner claim window, the
+   bot replies that first-owner claim is complete
+3. otherwise, if you are not already an owner/admin, the bot replies with a
+   pairing code
+4. you approve that code locally
 
 Approve the DM:
 
@@ -299,14 +305,16 @@ Use this order:
 
 1. run `clisbot status`
 2. DM the bot
-3. approve pairing with `clisbot pairing approve slack <CODE>`
+3. on a fresh no-owner install, verify the first-owner claim reply; otherwise
+   approve pairing with `clisbot pairing approve slack <CODE>`
 4. verify DM reply works
 5. invite the bot into the target Slack channel
 6. add the route with `clisbot routes add --channel slack group:<channelId> --bot default`
 7. only if that channel should use a different agent than the one currently assigned to that bot by default, run `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`
 8. send `@clisbot hello`
 9. open the bot reply thread
-10. send one plain follow-up reply in that same thread
+10. send one plain follow-up reply in that same thread from a real Slack user,
+    not from an automation app that posts with a `bot_id`
 
 Good test prompts:
 
