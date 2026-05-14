@@ -27,21 +27,10 @@ clisbot status
 버전, health, manual action, 유용한 release highlight 보고
 ```
 
-## 잘못 배포한 버전 복구
+## 범위
 
-실수로 버전을 publish했다면:
-
-1. 먼저 올바른 target이나 tag를 publish해서 npm이 올바른 빌드를 가리키게 함
-2. 그다음 잘못된 버전을 deprecate
-3. `npm login`은 attached session에서 시작
-4. npm이 browser approval URL을 내놓으면, 같은 session을 열린 채 유지한 뒤 승인 후 계속 진행
-5. `--otp`로 우회하지 말고, 원래 browser / interactive 승인 흐름을 그대로 유지
-
-예시:
-
-```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.50-beta.10 instead."
-```
+이 가이드는 install/update 전용입니다. release, publish, deprecate workflow는
+이 문서의 범위가 아니며, 해당 작업에는 repo release workflow를 사용합니다.
 
 ## 어떤 문서를 읽어야 하나
 

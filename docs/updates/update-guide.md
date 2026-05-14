@@ -25,21 +25,10 @@ clisbot status
 report version, health, manual action, and useful release highlights
 ```
 
-## Wrong Publish Recovery
+## Scope
 
-If a version was published by mistake:
-
-1. publish the corrected target or tag first so npm points users at the right build
-2. deprecate the wrong version after that
-3. start with `npm login` in an attached session
-4. if npm returns a browser approval URL, keep that same session open and continue it after approval
-5. do not switch to `--otp`; keep the normal browser or interactive approval flow and stop if that flow cannot complete
-
-Example:
-
-```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.50-beta.10 instead."
-```
+This guide is install/update only. Release, publish, and deprecation workflows
+are outside this document; use the repo release workflow for those tasks.
 
 ## Release Reading
 

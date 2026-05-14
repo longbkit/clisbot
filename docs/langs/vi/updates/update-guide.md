@@ -27,21 +27,11 @@ clisbot status
 báo lại version, health, manual action, và các release highlight hữu ích
 ```
 
-## Khôi phục khi publish nhầm
+## Phạm vi
 
-Nếu một version bị publish nhầm:
-
-1. hãy publish target hoặc tag đúng trước để npm trỏ người dùng về đúng build
-2. sau đó mới deprecate version sai
-3. bắt đầu bằng `npm login` trong một attached session
-4. nếu npm trả về URL duyệt trên trình duyệt, hãy giữ nguyên session đó và tiếp tục ngay trên chính session đó sau khi duyệt xong
-5. không chuyển sang `--otp`; hãy giữ luồng duyệt qua trình duyệt hoặc luồng tương tác bình thường, và dừng nếu luồng đó không thể hoàn tất
-
-Ví dụ:
-
-```text
-npm deprecate clisbot@0.1.46-beta.1 "Published by mistake. Use clisbot@0.1.50-beta.10 instead."
-```
+Guide này chỉ dành cho install/update. Các workflow release, publish, và
+deprecate nằm ngoài tài liệu này; hãy dùng release workflow của repo cho các
+tác vụ đó.
 
 ## Đọc release
 
