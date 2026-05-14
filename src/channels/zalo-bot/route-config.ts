@@ -1,8 +1,8 @@
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   resolveZaloBotConfig,
   resolveZaloBotDirectMessageConfig,
-} from "../../config/channel-bots.ts";
+} from "./config.ts";
 import {
   buildSurfaceRoute,
   isSurfaceRouteEnabled,
@@ -10,7 +10,7 @@ import {
   type ResolvedSurfaceRouteStatus,
   type SurfaceRoute,
   type SurfaceRouteOverride,
-} from "../route-policy.ts";
+} from "../config/route-policy.ts";
 import { type ZaloBotConversationKind } from "./session-routing.ts";
 
 export type ZaloBotRoute = SurfaceRoute;

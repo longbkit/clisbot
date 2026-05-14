@@ -161,7 +161,7 @@ Mục tiêu là:
 Kiến trúc đã chấp nhận hiện rõ ràng hơn code shape hiện tại.
 
 Code hiện vẫn làm rò một phần continuity work vào
-`src/agents/runner-service.ts`, gồm:
+`src/agents/runtime/runner-service.ts`, gồm:
 
 - mint explicit `sessionId` cho explicit-id launch path
 - đọc continuity đã lưu trực tiếp trước các quyết định startup hoặc recovery

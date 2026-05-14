@@ -10,9 +10,9 @@ related:
   - docs/tests/features/channels/README.md
   - docs/user-guide/README.md
   - docs/user-guide/agent-progress-replies.md
-  - src/control/channels-cli.ts
-  - src/control/agents-cli.ts
-  - src/control/message-cli.ts
+  - src/control/commands/channels-cli.ts
+  - src/control/commands/agents-cli.ts
+  - src/control/commands/message-cli.ts
 ---
 
 ## Context

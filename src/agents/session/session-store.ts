@@ -1,0 +1,119 @@
+import type { StoredFollowUpState } from "../commands/follow-up-policy.ts";
+import type { StoredLoop } from "../loops/loop-state.ts";
+import type { StoredQueueItem } from "../queue/queue-state.ts";
+import type { StoredSessionRuntime } from "./run-observation.ts";
+import type { StoredRecentConversationState } from "../routing/recent-message-context.ts";
+import { dirname } from "node:path";
+import { randomUUID } from "node:crypto";
+import { rename } from "node:fs/promises";
+import { fileExists, readTextFile, writeTextFile } from "../../infra/fs.ts";
+import { ensureDir } from "../../infra/paths.ts";
+
+export type StoredSessionEntry = {
+  agentId: string;
+  sessionKey: string;
+  sessionId?: string;
+  workspacePath: string;
+  runnerCommand: string;
+  lastAdmittedPromptAt?: number;
+  followUp?: StoredFollowUpState;
+  runtime?: StoredSessionRuntime;
+  loops?: StoredLoop[];
+  intervalLoops?: StoredLoop[];
+  queues?: StoredQueueItem[];
+  recentConversation?: StoredRecentConversationState;
+  updatedAt: number;
+};
+
+type SessionStoreShape = Record<string, StoredSessionEntry>;
+
+export class SessionStore {
+  private static readonly pathLocks = new Map<string, Promise<void>>();
+
+  constructor(private readonly storePath: string) {}
+
+  async list(): Promise<StoredSessionEntry[]> {
+    return this.withPathLock(async () => {
+      const store = await this.readStore();
+      return Object.values(store);
+    });
+  }
+
+  async get(sessionKey: string): Promise<StoredSessionEntry | null> {
+    return this.withPathLock(async () => {
+      const store = await this.readStore();
+      return store[sessionKey] ?? null;
+    });
+  }
+
+  async put(entry: StoredSessionEntry) {
+    return this.withPathLock(async () => {
+      const store = await this.readStore();
+      store[entry.sessionKey] = entry;
+      await this.writeStore(store);
+      return entry;
+    });
+  }
+
+  async update(
+    sessionKey: string,
+    updater: (entry: StoredSessionEntry | null) => StoredSessionEntry | null,
+  ) {
+    return this.withPathLock(async () => {
+      const store = await this.readStore();
+      const next = updater(store[sessionKey] ?? null);
+      if (next) {
+        store[sessionKey] = next;
+      } else {
+        delete store[sessionKey];
+      }
+      await this.writeStore(store);
+      return next;
+    });
+  }
+
+  private async withPathLock<T>(work: () => Promise<T>): Promise<T> {
+    const previous = SessionStore.pathLocks.get(this.storePath) ?? Promise.resolve();
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const lockPromise = previous.then(() => next);
+    SessionStore.pathLocks.set(this.storePath, lockPromise);
+
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+      if (SessionStore.pathLocks.get(this.storePath) === lockPromise) {
+        SessionStore.pathLocks.delete(this.storePath);
+      }
+    }
+  }
+
+  private async readStore(): Promise<SessionStoreShape> {
+    if (!(await fileExists(this.storePath))) {
+      return {};
+    }
+
+    const text = await readTextFile(this.storePath);
+    if (!text.trim()) {
+      return {};
+    }
+
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return parsed as SessionStoreShape;
+  }
+
+  private async writeStore(store: SessionStoreShape) {
+    await ensureDir(dirname(this.storePath));
+    const tempPath = `${this.storePath}.${process.pid}.${randomUUID()}.tmp`;
+    await writeTextFile(tempPath, JSON.stringify(store, null, 2));
+    await rename(tempPath, this.storePath);
+  }
+}

@@ -62,7 +62,7 @@ Current continuity split:
 
 File-level split:
 
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - higher-level runner adapter called by `SessionService`
   - should decide backend actions, not continuity rules
 - `src/runners/tmux/*`

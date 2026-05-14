@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveSlackConversationRoute } from "../src/channels/slack/route-config.ts";
 import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { runRoutesCli } from "../src/control/routes-cli.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import { loadConfigWithoutEnvResolution } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { runRoutesCli } from "../src/control/commands/routes-cli.ts";
 
 describe("shared route audience e2e", () => {
   let tempDir = "";
@@ -28,8 +28,10 @@ describe("shared route audience e2e", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: true,
-          telegramEnabled: true,
+          channels: {
+            slack: { enabled: true },
+            telegram: { enabled: true },
+          },
         }),
       ),
     );

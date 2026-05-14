@@ -229,8 +229,8 @@ The proposal is easy to review because it answers:
 
 Expected primary touch points:
 
-- [agent-prompt.ts](/home/node/projects/clisbot/src/channels/agent-prompt.ts)
-- [interaction-processing.ts](/home/node/projects/clisbot/src/channels/interaction-processing.ts)
+- [agent-prompt.ts](/home/node/projects/clisbot/src/channels/message/agent-prompt.ts)
+- [interaction-processing.ts](/home/node/projects/clisbot/src/channels/message/interaction-processing.ts)
 
 The implementation should avoid spreading template logic everywhere else.
 

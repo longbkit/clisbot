@@ -10,15 +10,15 @@ import {
   deriveInteractionText,
   deriveRunningInteractionText,
   extractFinalAnswer,
-  extractSlackIncrement,
-  mergeSlackStreamBodies,
-  renderSlackInteraction,
-  renderSlackSnapshot,
-  renderTelegramInteraction,
-  selectSlackCompletionBody,
-  selectSlackSnapshotBody,
+  extractRenderedIncrement,
+  mergeRenderedStreamBodies,
+  renderMarkdownInteraction,
+  renderChannelSnapshot,
+  renderPlainInteraction,
+  selectCompletedInteractionBody,
+  selectSnapshotInteractionBody,
   truncateHead,
-} from "../../src/shared/transcript.ts";
+} from "../../src/runners/transcript/index.ts";
 
 describe("snapshot shaping", () => {
   test("returns a bounded tail excerpt for an initial snapshot while preserving the full snapshot", () => {

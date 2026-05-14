@@ -1,133 +1,41 @@
+import type {
+  ChannelPairingAccessContract,
+  DirectMessagePolicy,
+  PairingAccessSubject,
+} from "./access-contract.ts";
 import type { PairingChannel } from "./store.ts";
+import { CHANNEL_PAIRING_ACCESS_CONTRACTS } from "../integration/channel-installation-inventory.ts";
 
-export type DirectMessagePolicy = "open" | "pairing" | "allowlist" | "disabled";
-
-function normalizePrefixedEntry(entry: string, prefixes: string[]) {
-  const trimmed = entry.trim();
-  for (const prefix of prefixes) {
-    if (trimmed.toLowerCase().startsWith(prefix)) {
-      return trimmed.slice(prefix.length).trim();
-    }
+function requirePairingAccessContract(channel: PairingChannel) {
+  const contract = CHANNEL_PAIRING_ACCESS_CONTRACTS.find((entry) => entry.channel === channel);
+  if (!contract) {
+    throw new Error(`Unsupported channel pairing access contract: ${channel}`);
   }
-  return trimmed;
+  return contract;
 }
 
 export function normalizeAllowEntry(channel: PairingChannel, entry: string) {
-  const trimmed = entry.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  if (channel === "slack") {
-    return normalizePrefixedEntry(trimmed, ["slack:", "user:"]).toUpperCase();
-  }
-
-  const prefixes = channel === "telegram"
-    ? ["telegram:", "tg:", "user:"]
-    : ["zalo-bot:"];
-  const stripped = normalizePrefixedEntry(trimmed, prefixes);
-  if (!stripped) {
-    return "";
-  }
-  if (stripped.startsWith("@")) {
-    return stripped.toLowerCase();
-  }
-  if (/^-?\d+$/.test(stripped)) {
-    return stripped;
-  }
-  return `@${stripped.toLowerCase()}`;
+  return requirePairingAccessContract(channel).normalizeAllowEntry(entry);
 }
 
-export function isSlackSenderAllowed(params: {
+export function isChannelSenderAllowed(params: {
+  channel: PairingChannel;
   allowFrom: string[];
-  userId: string;
+  subject: PairingAccessSubject;
 }) {
-  const normalizedUserId = params.userId.trim().toUpperCase();
-  if (!normalizedUserId) {
-    return false;
-  }
-
-  return params.allowFrom
-    .map((entry) => normalizeAllowEntry("slack", entry))
-    .includes(normalizedUserId);
+  return requirePairingAccessContract(params.channel).isSenderAllowed(params);
 }
 
-export function isSlackSenderBlocked(params: {
+export function isChannelSenderBlocked(params: {
+  channel: PairingChannel;
   blockFrom: string[];
-  userId: string;
+  subject: PairingAccessSubject;
 }) {
-  return isSlackSenderAllowed({
+  return isChannelSenderAllowed({
+    channel: params.channel,
     allowFrom: params.blockFrom,
-    userId: params.userId,
+    subject: params.subject,
   });
 }
 
-export function isTelegramSenderAllowed(params: {
-  allowFrom: string[];
-  userId?: string;
-  username?: string;
-}) {
-  const userId = params.userId?.trim() ?? "";
-  const username = params.username?.trim() ? `@${params.username.trim().replace(/^@+/, "").toLowerCase()}` : "";
-  const normalizedAllowFrom = params.allowFrom
-    .map((entry) => normalizeAllowEntry("telegram", entry))
-    .filter(Boolean);
-
-  if (userId && normalizedAllowFrom.includes(userId)) {
-    return true;
-  }
-
-  if (username && normalizedAllowFrom.includes(username)) {
-    return true;
-  }
-
-  return false;
-}
-
-export function isTelegramSenderBlocked(params: {
-  blockFrom: string[];
-  userId?: string;
-  username?: string;
-}) {
-  return isTelegramSenderAllowed({
-    allowFrom: params.blockFrom,
-    userId: params.userId,
-    username: params.username,
-  });
-}
-
-export function isZaloBotSenderAllowed(params: {
-  allowFrom: string[];
-  userId?: string;
-  username?: string;
-}) {
-  const userId = params.userId?.trim() ?? "";
-  const username = params.username?.trim()
-    ? `@${params.username.trim().replace(/^@+/, "").toLowerCase()}`
-    : "";
-  const normalizedAllowFrom = params.allowFrom
-    .map((entry) => normalizeAllowEntry("zalo-bot", entry))
-    .filter(Boolean);
-
-  if (userId && normalizedAllowFrom.includes(userId)) {
-    return true;
-  }
-
-  if (username && normalizedAllowFrom.includes(username)) {
-    return true;
-  }
-
-  return false;
-}
-
-export function isZaloBotSenderBlocked(params: {
-  blockFrom: string[];
-  userId?: string;
-  username?: string;
-}) {
-  return isZaloBotSenderAllowed({
-    allowFrom: params.blockFrom,
-    userId: params.userId,
-    username: params.username,
-  });
-}
+export type { DirectMessagePolicy, PairingAccessSubject };

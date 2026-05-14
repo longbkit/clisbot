@@ -170,16 +170,16 @@ Existing channel plugin utilities for reply-target resolution are a good seam to
 
 Most relevant current paths:
 
-- `src/channels/interaction-processing.ts`
+- `src/channels/message/interaction-processing.ts`
   - `executePromptDelivery(...)`
   - queue-by-mode handoff
   - `/loop <count>` repeated dispatch
-- `src/agents/agent-service.ts`
+- `src/agents/runtime/agent-service.ts`
   - managed loop creation
   - managed loop tick execution
-- `src/channels/agent-prompt.ts`
+- `src/channels/message/agent-prompt.ts`
   - current wrapper depends on `responseMode` but not on `streaming`
-- `src/agents/loop-state.ts`
+- `src/agents/loops/loop-state.ts`
   - persisted loop shape currently stores `promptText` as executed text
 
 Current suspicious mismatches:

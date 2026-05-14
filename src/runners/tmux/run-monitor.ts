@@ -1,4 +1,4 @@
-import { sleep } from "../../shared/process.ts";
+import { sleep } from "../../infra/process.ts";
 import {
   appendInteractionText,
   deriveBoundedRunningRewritePreview,
@@ -12,13 +12,13 @@ import {
   normalizePaneText,
   splitNormalizedLines,
   isActiveTimerStatusLine,
-} from "../../shared/transcript.ts";
+} from "../transcript/index.ts";
 import type { TmuxClient } from "./client.ts";
 import {
   acceptTmuxStartupContinuePromptIfPresent,
   submitTmuxSessionInput,
 } from "./session-handshake.ts";
-import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
+import { logLatencyDebug, type LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
 
 const FIRST_OUTPUT_POLL_INTERVAL_MS = 250;
 const RUNNING_REWRITE_PREVIEW_MAX_LINES = 8;

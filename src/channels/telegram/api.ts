@@ -1,4 +1,4 @@
-import { sleep } from "../../shared/process.ts";
+import { sleep } from "../../infra/process.ts";
 
 export class TelegramApiError extends Error {
   constructor(

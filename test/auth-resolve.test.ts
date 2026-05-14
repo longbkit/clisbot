@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { resolveChannelAuth } from "../src/auth/resolve.ts";
-import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function createConfig(): ClisbotConfig {
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));

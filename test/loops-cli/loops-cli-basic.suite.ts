@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clisbotConfigSchema } from "../../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
-import { renderLoopsHelp, runLoopsCli } from "../../src/control/loops-cli.ts";
+import { clisbotConfigSchema } from "../../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
+import { renderLoopsHelp, runLoopsCli } from "../../src/control/commands/loops-cli.ts";
+import { setRenderedCliName } from "../../src/control/commands/cli-name.ts";
 import { buildConfig, enableSlackChannelRoute, enableSlackDirectMessages, enableTelegramTopicRoute, enableZaloBotDirectMessages } from "./loops-cli-support.ts";
 
 describe("loops cli", () => {
@@ -19,6 +20,7 @@ describe("loops cli", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
     previousFetch = globalThis.fetch;
     previousSlackAppToken = process.env.SLACK_APP_TOKEN;
     previousSlackBotToken = process.env.SLACK_BOT_TOKEN;
@@ -27,6 +29,7 @@ describe("loops cli", () => {
   afterEach(() => {
     process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     process.env.SLACK_APP_TOKEN = previousSlackAppToken;
     process.env.SLACK_BOT_TOKEN = previousSlackBotToken;
     globalThis.fetch = previousFetch;
@@ -42,19 +45,34 @@ describe("loops cli", () => {
     expect(help).toContain("clisbot loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI");
     expect(help).toContain("clisbot loops create --channel zalo-bot --target dm:user-123 --sender zalo-bot:user-123 5m check inbox");
     expect(help).toContain("clisbot loops create --help");
-    expect(help).toContain("clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI");
-    expect(help).toContain("clisbot loops --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog");
+    expect(help).toContain("clisbot loops --channel telegram --target group:-1001234567890 --topic-id 42 --sender telegram:1276408333 5m");
     expect(help).toContain("clisbot loops cancel --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --all");
-    expect(help).toContain("Slack `--target` accepts `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids");
-    expect(help).toContain("use `--thread-id` for an existing Slack thread ts");
-    expect(help).toContain("use `--topic-id` for a Telegram topic id");
-    expect(help).toContain("`--new-thread` is Slack-only and creates a fresh thread anchor before the loop starts");
+    expect(help).toContain("use clisbot loops --help --channel <channel-name> or clisbot loops create --help --channel <channel-name> for channel-specific target syntax and loop extensions");
+    expect(help).toContain("channel child-surface flags are owned by each channel plugin");
+    expect(help).toContain("clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI");
     expect(help).toContain("forced interval: `1m --force check CI` or `check CI every 1m --force`");
     expect(help).toContain("times: `3 check CI` or `check CI 3 times`");
     expect(help).toContain("omit the prompt to load `LOOP.md` from the target workspace");
     expect(help).toContain("`--sender <principal>` is required when creating loops");
     expect(help).toContain("`--progress <count>` overrides loop progress-message injection");
     expect(help).toContain("first wall-clock loop returns `confirmation_required`");
+  });
+
+  test("slack-scoped overview help exposes the slack-only new-thread extension", async () => {
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runLoopsCli(["--help", "--channel", "slack"]);
+
+    const help = logs.join("\n");
+    expect(help).toContain("Slack-specific extension:");
+    expect(help).toContain("Slack `--target` accepts `group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids");
+    expect(help).toContain("`--new-thread` asks Slack to provision a fresh managed child thread before the loop is persisted");
+    expect(help).toContain("clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI");
+    expect(help).not.toContain("--topic-id 42");
+    expect(help).not.toContain("zalo-bot:user-123");
   });
 
   test("create help documents required creator metadata", async () => {
@@ -71,6 +89,64 @@ describe("loops cli", () => {
     expect(help).toContain("--loop-start <none|brief|full>");
     expect(help).toContain("--progress <count>");
     expect(help).toContain("create without `--sender` fails by design");
+  });
+
+  test("slack-scoped create help exposes the slack-only new-thread extension", async () => {
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runLoopsCli(["create", "--help", "--channel", "slack"]);
+
+    const help = logs.join("\n");
+    expect(help).toContain("Slack-specific extension:");
+    expect(help).toContain("use `--thread-id` for an existing Slack thread ts");
+    expect(help).toContain("clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox");
+    expect(help).not.toContain("--topic-id 42");
+  });
+
+  test("slack new-thread is rejected outside loop creation", async () => {
+    await expect(
+      runLoopsCli([
+        "status",
+        "--channel",
+        "slack",
+        "--target",
+        "group:C1",
+        "--new-thread",
+      ]),
+    ).rejects.toThrow("`--new-thread` only applies when creating a new child surface.");
+  });
+
+  test("slack new-thread requires slack channel and parent target", async () => {
+    await expect(
+      runLoopsCli([
+        "create",
+        "--new-thread",
+        "--sender",
+        "slack:U123",
+        "5m",
+        "check",
+        "ci",
+      ]),
+    ).rejects.toThrow("`--new-thread` requires `--channel slack` and a parent `--target`.");
+  });
+
+  test("loop commands reject passing both --bot and --account aliases", async () => {
+    await expect(
+      runLoopsCli([
+        "status",
+        "--channel",
+        "slack",
+        "--target",
+        "group:C1",
+        "--bot",
+        "work",
+        "--account",
+        "legacy",
+      ]),
+    ).rejects.toThrow("--bot and --account are aliases; use only one");
   });
 
   test("creates a zalo-bot DM loop with an explicit sender principal", async () => {

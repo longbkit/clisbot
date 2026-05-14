@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { commandExists, runCommand, sleep } from "../../shared/process.ts";
+import { commandExists, runCommand, sleep } from "../../infra/process.ts";
 
 const MAIN_WINDOW_NAME = "main";
 const TMUX_NOT_FOUND_CODE = "ENOENT";

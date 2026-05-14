@@ -256,8 +256,8 @@ Rule hành vi phase 1:
 
 Các điểm triển khai chính:
 
-- [agent-prompt.ts](/home/node/projects/clisbot/src/channels/agent-prompt.ts)
-- [interaction-processing.ts](/home/node/projects/clisbot/src/channels/interaction-processing.ts)
+- [agent-prompt.ts](/home/node/projects/clisbot/src/channels/message/agent-prompt.ts)
+- [interaction-processing.ts](/home/node/projects/clisbot/src/channels/message/interaction-processing.ts)
 
 Phần lớn thay đổi nên tập trung vào:
 

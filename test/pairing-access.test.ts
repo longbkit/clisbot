@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  isSlackSenderAllowed,
-  isTelegramSenderAllowed,
-  isZaloBotSenderAllowed,
+  isChannelSenderAllowed,
   normalizeAllowEntry,
 } from "../src/channels/pairing/access.ts";
 
@@ -15,15 +13,21 @@ describe("pairing access helpers", () => {
 
   test("matches Slack user ids against config and store allowlists", () => {
     expect(
-      isSlackSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "slack",
         allowFrom: ["slack:U123", "U999"],
-        userId: "u123",
+        subject: {
+          userId: "u123",
+        },
       }),
     ).toBe(true);
     expect(
-      isSlackSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "slack",
         allowFrom: ["U999"],
-        userId: "U123",
+        subject: {
+          userId: "U123",
+        },
       }),
     ).toBe(false);
   });
@@ -37,24 +41,33 @@ describe("pairing access helpers", () => {
 
   test("matches Telegram by id or username", () => {
     expect(
-      isTelegramSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "telegram",
         allowFrom: ["123456"],
-        userId: "123456",
-        username: "alice",
+        subject: {
+          userId: "123456",
+          username: "alice",
+        },
       }),
     ).toBe(true);
     expect(
-      isTelegramSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "telegram",
         allowFrom: ["@alice"],
-        userId: "999999",
-        username: "Alice",
+        subject: {
+          userId: "999999",
+          username: "Alice",
+        },
       }),
     ).toBe(true);
     expect(
-      isTelegramSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "telegram",
         allowFrom: ["@bob"],
-        userId: "999999",
-        username: "Alice",
+        subject: {
+          userId: "999999",
+          username: "Alice",
+        },
       }),
     ).toBe(false);
   });
@@ -68,40 +81,55 @@ describe("pairing access helpers", () => {
 
   test("matches Zalo Bot by id or handle", () => {
     expect(
-      isZaloBotSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "zalo-bot",
         allowFrom: ["123456"],
-        userId: "123456",
-        username: "alice",
+        subject: {
+          userId: "123456",
+          username: "alice",
+        },
       }),
     ).toBe(true);
     expect(
-      isZaloBotSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "zalo-bot",
         allowFrom: ["@alice"],
-        userId: "999999",
-        username: "Alice",
+        subject: {
+          userId: "999999",
+          username: "Alice",
+        },
       }),
     ).toBe(true);
     expect(
-      isZaloBotSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "zalo-bot",
         allowFrom: ["@bob"],
-        userId: "999999",
-        username: "Alice",
+        subject: {
+          userId: "999999",
+          username: "Alice",
+        },
       }),
     ).toBe(false);
   });
 
   test("does not accept legacy generic aliases for Zalo Bot allowlist entries", () => {
     expect(
-      isZaloBotSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "zalo-bot",
         allowFrom: ["zalo:@alice"],
-        userId: "999999",
-        username: "Alice",
+        subject: {
+          userId: "999999",
+          username: "Alice",
+        },
       }),
     ).toBe(false);
     expect(
-      isZaloBotSenderAllowed({
+      isChannelSenderAllowed({
+        channel: "zalo-bot",
         allowFrom: ["user:123456"],
-        userId: "123456",
+        subject: {
+          userId: "123456",
+        },
       }),
     ).toBe(false);
   });

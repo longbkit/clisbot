@@ -592,11 +592,11 @@
       <div class="flow-list">
         <div class="flow">
           <strong>Normal Prompt Flow</strong>
-          <div class="chain">src/channels/interaction-processing.ts &gt; executePromptDelivery &gt; src/agents/agent-service.ts &gt; AgentService.enqueuePrompt &gt; src/agents/session-service.ts &gt; SessionService.executePrompt &gt; SessionService.startRunMonitor &gt; src/runners/tmux/run-monitor.ts &gt; monitorTmuxRun &gt; src/runners/tmux/session-handshake.ts &gt; submitTmuxSessionInput</div>
+          <div class="chain">src/channels/message/interaction-processing.ts &gt; executePromptDelivery &gt; src/agents/runtime/agent-service.ts &gt; AgentService.enqueuePrompt &gt; src/agents/session/session-service.ts &gt; SessionService.executePrompt &gt; SessionService.startRunMonitor &gt; src/runners/tmux/run-monitor.ts &gt; monitorTmuxRun &gt; src/runners/tmux/session-handshake.ts &gt; submitTmuxSessionInput</div>
         </div>
         <div class="flow">
           <strong>Steer / Direct Inject Flow</strong>
-          <div class="chain">src/channels/interaction-processing.ts &gt; processChannelInteraction steer branches &gt; src/agents/agent-service.ts &gt; AgentService.submitSessionInput &gt; src/agents/runner-service.ts &gt; RunnerService.submitSessionInput &gt; src/runners/tmux/session-handshake.ts &gt; submitTmuxSessionInput</div>
+          <div class="chain">src/channels/message/interaction-processing.ts &gt; processChannelInteraction steer branches &gt; src/agents/runtime/agent-service.ts &gt; AgentService.submitSessionInput &gt; src/agents/runtime/runner-service.ts &gt; RunnerService.submitSessionInput &gt; src/runners/tmux/session-handshake.ts &gt; submitTmuxSessionInput</div>
         </div>
         <div class="flow">
           <strong>Observer / Preview Flow</strong>
@@ -687,357 +687,357 @@
   <script>
     const rows = [
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery",
         level: 1,
         description: "Channel-facing orchestrator for queueing a prompt, rendering preview or settlement, wiring observer updates, and reconciling message-tool vs pane-managed delivery.",
         concerns: ["channel delivery", "observer bridge", "prompt admission", "surface settlement"],
-        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction"],
+        calledBy: ["src/channels/message/interaction-processing.ts > processChannelInteraction"],
         calls: [
-          "src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply",
-          "src/channels/interaction-processing.ts > executePromptDelivery > renderResponseText",
-          "src/channels/interaction-processing.ts > executePromptDelivery > clearResponseText",
-          "src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
-          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
-          "src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor",
-          "src/channels/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply",
-          "src/channels/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
-          "src/channels/interaction-processing.ts > executePromptDelivery > buildInitialPlaceholderText",
-          "src/agents/agent-service.ts > AgentService.enqueuePrompt"
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > recordVisibleReply",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > clearResponseText",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > buildInitialPlaceholderText",
+          "src/agents/runtime/agent-service.ts > AgentService.enqueuePrompt"
         ],
         tags: ["high complexity", "mixed responsibility", "observer split", "delivery policy"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > recordVisibleReply",
         level: 2,
         description: "Marks reply or final visibility in persisted state so later message-tool or preview logic can reason about what already became visible.",
         concerns: ["state write", "reply truth"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery"],
-        calls: ["src/agents/agent-service.ts > AgentService.recordConversationReply"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery"],
+        calls: ["src/agents/runtime/agent-service.ts > AgentService.recordConversationReply"],
         tags: ["state sink", "reply marker"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > renderResponseText",
         level: 2,
         description: "Posts first visible chunk or reconciles an existing visible chunk chain in-place.",
         concerns: ["rendering", "preview update"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
         calls: ["callback > postText", "callback > reconcileText"],
         tags: ["render helper"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > clearResponseText",
         level: 2,
         description: "Clears current preview and resets rendered-state bookkeeping before message-tool handoff.",
         concerns: ["preview cleanup"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview"],
         calls: ["callback > reconcileText"],
         tags: ["preview helper", "cleanup"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > handoffMessageToolPreview",
         level: 2,
         description: "Stops pane-driven preview from continuing once message-tool output boundary is seen.",
         concerns: ["message-tool handoff", "preview ownership"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
-        calls: ["src/channels/interaction-processing.ts > executePromptDelivery > clearResponseText"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/channels/message/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: ["src/channels/message/interaction-processing.ts > executePromptDelivery > clearResponseText"],
         tags: ["mixed responsibility", "handoff"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > getMessageToolRuntimeSignals",
         level: 2,
         description: "Reads persisted runtime timestamps for message-tool replies and finals so channel preview can decide when to stop.",
         concerns: ["runtime query", "message-tool coordination"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor", "src/channels/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
-        calls: ["src/agents/agent-service.ts > AgentService.getSessionRuntime"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor", "src/channels/message/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calls: ["src/agents/runtime/agent-service.ts > AgentService.getSessionRuntime"],
         tags: ["state read", "observer split"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > ensureMessageToolPreviewMonitor",
         level: 2,
         description: "Spawns polling loop to detect when message-tool output has already taken over, then clears pane preview.",
         concerns: ["background polling", "preview ownership"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
         calls: [
-          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
-          "src/channels/interaction-processing.ts > executePromptDelivery > hasMessageToolReplyBoundary",
-          "src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
-          "src/shared/process.ts > sleep"
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > hasMessageToolReplyBoundary",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
+          "src/infra/process.ts > sleep"
         ],
         tags: ["background monitor", "warn"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > waitForMessageToolFinalReply",
         level: 2,
         description: "Grace-window poll for a tool-final marker before allowing pane-derived completion fallback.",
         concerns: ["final reply truth", "message-tool coordination"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery"],
         calls: [
-          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
-          "src/shared/process.ts > sleep"
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/infra/process.ts > sleep"
         ],
         tags: ["truth gate", "warn"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > maybeRenderQueueStartNotification",
         level: 2,
         description: "Decides whether queue-start notification should render now, defer into preview, or be skipped.",
         concerns: ["queue preview", "surface notification"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/channels/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
         calls: [
-          "src/channels/interaction-processing.ts > executePromptDelivery > renderResponseText",
-          "src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply"
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > recordVisibleReply"
         ],
         tags: ["preview helper"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > buildInitialPlaceholderText",
         level: 2,
         description: "Builds initial queued or running placeholder before the first observer update lands.",
         concerns: ["preview bootstrap"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery"],
         calls: ["shared render helpers > renderQueueStartNotification / renderPlatformInteraction"],
         tags: ["preview helper"]
       },
       {
-        file: "src/channels/interaction-processing.ts",
+        file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery > enqueuePrompt.onUpdate callback",
         level: 3,
         description: "Channel-side observer callback that filters visibility, updates preview, handles queue-start rendering, and reacts to message-tool takeover.",
         concerns: ["observer delivery", "surface suppression", "preview race"],
-        calledBy: ["src/agents/session-service.ts > SessionService.notifyRunObservers > observer.onUpdate"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.notifyRunObservers > observer.onUpdate"],
         calls: [
-          "src/channels/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
-          "src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
-          "src/channels/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
-          "src/channels/interaction-processing.ts > executePromptDelivery > renderResponseText",
-          "src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply",
-          "src/channels/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor"
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > recordVisibleReply",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor"
         ],
         tags: ["high complexity", "observer split", "surface policy"]
       },
       {
-        file: "src/agents/agent-service.ts",
+        file: "src/agents/runtime/agent-service.ts",
         function: "AgentService.enqueuePrompt",
         level: 1,
         description: "Queue admission point for a normal prompt. Wraps SessionService.executePrompt in the job queue and provides the observer wiring used by channel delivery.",
         concerns: ["queue admission", "prompt entry"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery", "src/agents/agent-service.ts > runIntervalLoopIteration"],
-        calls: ["job queue > AgentJobQueue.enqueue", "src/agents/session-service.ts > SessionService.executePrompt"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/agents/runtime/agent-service.ts > runIntervalLoopIteration"],
+        calls: ["job queue > AgentJobQueue.enqueue", "src/agents/session/session-service.ts > SessionService.executePrompt"],
         tags: ["owner surface"]
       },
       {
-        file: "src/agents/agent-service.ts",
+        file: "src/agents/runtime/agent-service.ts",
         function: "AgentService.submitSessionInput",
         level: 1,
         description: "Direct session injection path used by steer-style flows. Name sounds generic but it does not create a new active run.",
         concerns: ["steer injection", "naming drift"],
-        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction steer branches"],
-        calls: ["src/agents/runner-service.ts > RunnerService.submitSessionInput"],
+        calledBy: ["src/channels/message/interaction-processing.ts > processChannelInteraction steer branches"],
+        calls: ["src/agents/runtime/runner-service.ts > RunnerService.submitSessionInput"],
         tags: ["confusing name", "duplicate submit path", "warn"]
       },
       {
-        file: "src/agents/agent-service.ts",
+        file: "src/agents/runtime/agent-service.ts",
         function: "AgentService.hasActiveRun",
         level: 1,
         description: "Thin owner query used by channel logic before allowing steer or attach-like behaviors.",
         concerns: ["active-run query"],
-        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction"],
-        calls: ["src/agents/session-service.ts > SessionService.hasActiveRun"],
+        calledBy: ["src/channels/message/interaction-processing.ts > processChannelInteraction"],
+        calls: ["src/agents/session/session-service.ts > SessionService.hasActiveRun"],
         tags: ["query"]
       },
       {
-        file: "src/agents/agent-service.ts",
+        file: "src/agents/runtime/agent-service.ts",
         function: "AgentService.canSteerActiveRun",
         level: 1,
         description: "Asks SessionService whether the current active run already finished startup and is allowed to accept injected input.",
         concerns: ["steer gate"],
-        calledBy: ["src/channels/interaction-processing.ts > processChannelInteraction"],
-        calls: ["src/agents/session-service.ts > SessionService.canSteerActiveRun"],
+        calledBy: ["src/channels/message/interaction-processing.ts > processChannelInteraction"],
+        calls: ["src/agents/session/session-service.ts > SessionService.canSteerActiveRun"],
         tags: ["query"]
       },
       {
-        file: "src/agents/agent-service.ts",
+        file: "src/agents/runtime/agent-service.ts",
         function: "AgentService.recordConversationReply",
         level: 1,
         description: "Writes reply or final visibility markers into persisted session state.",
         concerns: ["state write", "surface truth"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > recordVisibleReply"],
-        calls: ["src/agents/session-state.ts > AgentSessionState.recordConversationReply"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery > recordVisibleReply"],
+        calls: ["src/agents/session/session-state.ts > AgentSessionState.recordConversationReply"],
         tags: ["state sink"]
       },
       {
-        file: "src/agents/agent-service.ts",
+        file: "src/agents/runtime/agent-service.ts",
         function: "AgentService.getSessionRuntime",
         level: 1,
         description: "Reads persisted runtime info so channel preview or tooling can reason about active session markers.",
         concerns: ["runtime read"],
-        calledBy: ["src/channels/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals"],
-        calls: ["src/agents/session-state.ts > AgentSessionState.getSessionRuntime"],
+        calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals"],
+        calls: ["src/agents/session/session-state.ts > AgentSessionState.getSessionRuntime"],
         tags: ["state read"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.recoverPersistedRuns",
         level: 1,
         description: "Rebuilds in-memory active-runs map from persisted runtime entries and immediately reattaches monitoring.",
         concerns: ["runtime recovery", "startup truth"],
-        calledBy: ["src/agents/agent-service.ts > createSessionService startup path"],
+        calledBy: ["src/agents/runtime/agent-service.ts > createSessionService startup path"],
         calls: [
-          "src/agents/session-state.ts > AgentSessionState.listEntries",
+          "src/agents/session/session-state.ts > AgentSessionState.listEntries",
           "tmux client > hasSession / capturePane",
-          "src/shared/transcript-delta.ts > deriveInteractionText",
-          "src/agents/session-service.ts > createDeferred",
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-service.ts > SessionService.startRunMonitor",
-          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime"
+          "src/runners/transcript/transcript-delta.ts > deriveInteractionText",
+          "src/agents/session/session-service.ts > createDeferred",
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-service.ts > SessionService.startRunMonitor",
+          "src/agents/session/session-state.ts > AgentSessionState.setSessionRuntime"
         ],
         tags: ["high complexity", "startup recovery", "state owner"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.executePrompt",
         level: 1,
         description: "Owns active-run admission, creates provisional run state, starts runner readiness, persists running state, and launches monitoring.",
         concerns: ["run admission", "lifecycle start", "state write"],
-        calledBy: ["src/agents/agent-service.ts > AgentService.enqueuePrompt"],
+        calledBy: ["src/agents/runtime/agent-service.ts > AgentService.enqueuePrompt"],
         calls: [
-          "src/agents/session-state.ts > AgentSessionState.getEntry",
-          "src/agents/session-service.ts > createDeferred",
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/runner-service.ts > RunnerService.ensureRunnerReady",
-          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
-          "src/agents/session-service.ts > SessionService.startRunMonitor",
-          "src/agents/session-service.ts > SessionService.failActiveRun"
+          "src/agents/session/session-state.ts > AgentSessionState.getEntry",
+          "src/agents/session/session-service.ts > createDeferred",
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/runtime/runner-service.ts > RunnerService.ensureRunnerReady",
+          "src/agents/session/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session/session-service.ts > SessionService.startRunMonitor",
+          "src/agents/session/session-service.ts > SessionService.failActiveRun"
         ],
         tags: ["owner surface", "high complexity"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.observeRun",
         level: 1,
         description: "Registers observer on active run or falls back to transcript capture when no active run exists.",
         concerns: ["observer attach", "transcript fallback"],
-        calledBy: ["src/agents/agent-service.ts > AgentService.observeRun"],
-        calls: ["src/agents/runner-service.ts > RunnerService.captureTranscript"],
+        calledBy: ["src/agents/runtime/agent-service.ts > AgentService.observeRun"],
+        calls: ["src/agents/runtime/runner-service.ts > RunnerService.captureTranscript"],
         tags: ["observer"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.createRunUpdate",
         level: 2,
         description: "Normalizes all run updates into a single payload shape that both observer delivery and terminal settlement consume.",
         concerns: ["update shape", "state payload"],
         calledBy: [
-          "src/agents/session-service.ts > SessionService.recoverPersistedRuns",
-          "src/agents/session-service.ts > SessionService.executePrompt",
-          "src/agents/session-service.ts > SessionService.notifyRecoveryStep",
-          "src/agents/session-service.ts > SessionService.failActiveRun",
-          "src/agents/session-service.ts > SessionService.recoverLostMidRun",
-          "src/agents/session-service.ts > SessionService.startRunMonitor > callbacks"
+          "src/agents/session/session-service.ts > SessionService.recoverPersistedRuns",
+          "src/agents/session/session-service.ts > SessionService.executePrompt",
+          "src/agents/session/session-service.ts > SessionService.notifyRecoveryStep",
+          "src/agents/session/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session/session-service.ts > SessionService.recoverLostMidRun",
+          "src/agents/session/session-service.ts > SessionService.startRunMonitor > callbacks"
         ],
         calls: [],
         tags: ["shared payload", "warn"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.notifyRunObservers",
         level: 2,
         description: "Dispatches updates to live or polling observers, applies retryable delivery policy, and can detach observers on failure.",
         concerns: ["observer policy", "delivery retry", "latest update truth"],
         calledBy: [
-          "src/agents/session-service.ts > SessionService.notifyRecoveryStep",
-          "src/agents/session-service.ts > SessionService.finishActiveRun",
-          "src/agents/session-service.ts > SessionService.failActiveRun",
-          "src/agents/session-service.ts > SessionService.recoverLostMidRun",
-          "src/agents/session-service.ts > SessionService.startRunMonitor > onRunning callback"
+          "src/agents/session/session-service.ts > SessionService.notifyRecoveryStep",
+          "src/agents/session/session-service.ts > SessionService.finishActiveRun",
+          "src/agents/session/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session/session-service.ts > SessionService.recoverLostMidRun",
+          "src/agents/session/session-service.ts > SessionService.startRunMonitor > onRunning callback"
         ],
         calls: [
           "run-observation.ts > isTerminalRunStatus",
-          "src/agents/session-service.ts > isRetryableObserverDeliveryError",
+          "src/agents/session/session-service.ts > isRetryableObserverDeliveryError",
           "callback > observer.onUpdate",
-          "src/agents/session-service.ts > formatObserverError"
+          "src/agents/session/session-service.ts > formatObserverError"
         ],
         tags: ["observer owner", "high complexity"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.finishActiveRun",
         level: 2,
         description: "Terminal idle transition for completed or timeout updates. Clears active run after notifying observers and resolving the initial result.",
         concerns: ["terminal settlement", "idle transition"],
-        calledBy: ["src/agents/session-service.ts > SessionService.startRunMonitor > onCompleted callback", "src/agents/session-service.ts > SessionService.startRunMonitor > onTimeout callback"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.startRunMonitor > onCompleted callback", "src/agents/session/session-service.ts > SessionService.startRunMonitor > onTimeout callback"],
         calls: [
-          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
-          "src/agents/session-service.ts > SessionService.notifyRunObservers"
+          "src/agents/session/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session/session-service.ts > SessionService.notifyRunObservers"
         ],
         tags: ["state sink", "truth risk", "warn"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.failActiveRun",
         level: 2,
         description: "Error settlement path that marks runtime idle, sends error update, rejects the deferred initial result, and drops active run bookkeeping.",
         concerns: ["error settlement", "idle transition"],
-        calledBy: ["src/agents/session-service.ts > SessionService.executePrompt", "src/agents/session-service.ts > SessionService.recoverLostMidRun", "src/agents/session-service.ts > SessionService.startRunMonitor"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.executePrompt", "src/agents/session/session-service.ts > SessionService.recoverLostMidRun", "src/agents/session/session-service.ts > SessionService.startRunMonitor"],
         calls: [
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
-          "src/agents/session-service.ts > SessionService.notifyRunObservers"
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session/session-service.ts > SessionService.notifyRunObservers"
         ],
         tags: ["state sink", "error path"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.recoverLostMidRun",
         level: 2,
         description: "Recovery coordinator for mid-run session loss. Tries reopen, then restart, and decides whether current run can continue or must fail truthfully.",
         concerns: ["mid-run recovery", "retry budget", "ownership"],
-        calledBy: ["src/agents/session-service.ts > SessionService.startRunMonitor"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.startRunMonitor"],
         calls: [
-          "src/agents/runner-service.ts > RunnerService.canRecoverMidRun",
-          "src/agents/session-service.ts > SessionService.notifyRecoveryStep",
-          "src/agents/runner-service.ts > RunnerService.reopenRunContext",
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-service.ts > SessionService.notifyRunObservers",
-          "src/agents/session-service.ts > SessionService.startRunMonitor",
-          "src/agents/runner-service.ts > RunnerService.startFreshSession",
-          "src/agents/runner-service.ts > RunnerService.mapRunError",
-          "src/agents/session-service.ts > SessionService.failActiveRun",
-          "src/agents/session-service.ts > SessionService.recoverLostMidRun"
+          "src/agents/runtime/runner-service.ts > RunnerService.canRecoverMidRun",
+          "src/agents/session/session-service.ts > SessionService.notifyRecoveryStep",
+          "src/agents/runtime/runner-service.ts > RunnerService.reopenRunContext",
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-service.ts > SessionService.notifyRunObservers",
+          "src/agents/session/session-service.ts > SessionService.startRunMonitor",
+          "src/agents/runtime/runner-service.ts > RunnerService.startFreshSession",
+          "src/agents/runtime/runner-service.ts > RunnerService.mapRunError",
+          "src/agents/session/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session/session-service.ts > SessionService.recoverLostMidRun"
         ],
         tags: ["high complexity", "recovery", "owner logic"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.startRunMonitor",
         level: 2,
         description: "Bridges lifecycle state to monitor callbacks. This is the glue point where monitor facts become running, detached, completed, timeout, or recovery behavior.",
         concerns: ["monitor bridge", "lifecycle owner", "callback glue"],
         calledBy: [
-          "src/agents/session-service.ts > SessionService.recoverPersistedRuns",
-          "src/agents/session-service.ts > SessionService.executePrompt",
-          "src/agents/session-service.ts > SessionService.recoverLostMidRun"
+          "src/agents/session/session-service.ts > SessionService.recoverPersistedRuns",
+          "src/agents/session/session-service.ts > SessionService.executePrompt",
+          "src/agents/session/session-service.ts > SessionService.recoverLostMidRun"
         ],
         calls: [
           "src/runners/tmux/run-monitor.ts > monitorTmuxRun",
-          "src/agents/session-service.ts > SessionService.recoverLostMidRun",
-          "src/agents/session-service.ts > SessionService.failActiveRun",
-          "src/agents/runner-service.ts > RunnerService.mapRunError"
+          "src/agents/session/session-service.ts > SessionService.recoverLostMidRun",
+          "src/agents/session/session-service.ts > SessionService.failActiveRun",
+          "src/agents/runtime/runner-service.ts > RunnerService.mapRunError"
         ],
         tags: ["high complexity", "mixed responsibility", "central glue"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.startRunMonitor > onPromptSubmitted",
         level: 3,
         description: "Marks run as steer-ready after prompt submit is confirmed by tmux-side submit logic.",
@@ -1047,7 +1047,7 @@
         tags: ["callback", "state mutation"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.startRunMonitor > onRunning",
         level: 3,
         description: "Transforms monitor running updates into observer updates, while preserving detached note if the session already crossed the max-runtime boundary.",
@@ -1055,263 +1055,263 @@
         calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
         calls: [
           "run-recovery.ts > mergeRunSnapshot",
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-service.ts > SessionService.notifyRunObservers",
-          "src/agents/session-service.ts > SessionService.buildDetachedNote"
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-service.ts > SessionService.notifyRunObservers",
+          "src/agents/session/session-service.ts > SessionService.buildDetachedNote"
         ],
         tags: ["callback", "observer bridge"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.startRunMonitor > onDetached",
         level: 3,
         description: "Writes detached runtime state, stores a detached update, and resolves the initial result while monitoring continues in the background.",
         concerns: ["detached transition", "state write"],
         calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
         calls: [
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime"
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-state.ts > AgentSessionState.setSessionRuntime"
         ],
         tags: ["callback", "state sink"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.startRunMonitor > onCompleted",
         level: 3,
         description: "Maps completion callback into a terminal run update and idle settlement.",
         concerns: ["completed settlement"],
         calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
         calls: [
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-service.ts > SessionService.finishActiveRun"
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-service.ts > SessionService.finishActiveRun"
         ],
         tags: ["callback", "terminal"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "SessionService.startRunMonitor > onTimeout",
         level: 3,
         description: "Maps no-visible-output timeout into a terminal run update and idle settlement, even though the evidence is only monitor silence.",
         concerns: ["timeout settlement", "truth risk"],
         calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
         calls: [
-          "src/agents/session-service.ts > SessionService.createRunUpdate",
-          "src/agents/session-service.ts > SessionService.finishActiveRun"
+          "src/agents/session/session-service.ts > SessionService.createRunUpdate",
+          "src/agents/session/session-service.ts > SessionService.finishActiveRun"
         ],
         tags: ["callback", "truth risk", "warn"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "createDeferred",
         level: 2,
         description: "Creates deferred promise used as the one-shot result handle for active runs.",
         concerns: ["deferred result"],
-        calledBy: ["src/agents/session-service.ts > SessionService.recoverPersistedRuns", "src/agents/session-service.ts > SessionService.executePrompt"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.recoverPersistedRuns", "src/agents/session/session-service.ts > SessionService.executePrompt"],
         calls: [],
         tags: ["utility"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "isRetryableObserverDeliveryError",
         level: 3,
         description: "Heuristic retry classifier for observer delivery failures based on nested error codes or network-like messages.",
         concerns: ["observer retry heuristic"],
-        calledBy: ["src/agents/session-service.ts > SessionService.notifyRunObservers"],
-        calls: ["src/agents/session-service.ts > listObserverErrorCodes"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.notifyRunObservers"],
+        calls: ["src/agents/session/session-service.ts > listObserverErrorCodes"],
         tags: ["heuristic", "observer"]
       },
       {
-        file: "src/agents/session-service.ts",
+        file: "src/agents/session/session-service.ts",
         function: "listObserverErrorCodes",
         level: 4,
         description: "Recursively walks nested error shapes to collect codes for observer retry classification.",
         concerns: ["error inspection"],
-        calledBy: ["src/agents/session-service.ts > isRetryableObserverDeliveryError"],
+        calledBy: ["src/agents/session/session-service.ts > isRetryableObserverDeliveryError"],
         calls: [],
         tags: ["deep helper"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.ensureSessionReady",
         level: 1,
         description: "Owns session reuse, new tmux session startup, resume command construction, bootstrap wait, retry-after-startup-fault, and state touch for session identity.",
         concerns: ["startup owner", "resume policy", "session creation"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureRunnerReady", "src/agents/runner-service.ts > RunnerService.ensureShellPane", "src/agents/runner-service.ts > RunnerService.startFreshSession"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.ensureRunnerReady", "src/agents/runtime/runner-service.ts > RunnerService.ensureShellPane", "src/agents/runtime/runner-service.ts > RunnerService.startFreshSession"],
         calls: [
           "wrapper helpers > ensureClisbotWrapper / ensureRunnerExitRecordDir / buildRunnerLaunchCommand / clearRunnerExitRecord",
-          "src/agents/runner-service.ts > RunnerService.buildRunnerArgs",
-          "src/agents/runner-service.ts > RunnerService.syncSessionIdentity",
+          "src/agents/runtime/runner-service.ts > RunnerService.buildRunnerArgs",
+          "src/agents/runtime/runner-service.ts > RunnerService.syncSessionIdentity",
           "src/runners/tmux/session-handshake.ts > waitForTmuxSessionBootstrap",
-          "src/agents/runner-service.ts > RunnerService.abortUnreadySession",
-          "src/agents/runner-service.ts > RunnerService.finalizeSessionStartup",
-          "src/agents/runner-service.ts > RunnerService.retryAfterStartupFault",
-          "src/agents/runner-service.ts > RunnerService.mapSessionError",
+          "src/agents/runtime/runner-service.ts > RunnerService.abortUnreadySession",
+          "src/agents/runtime/runner-service.ts > RunnerService.finalizeSessionStartup",
+          "src/agents/runtime/runner-service.ts > RunnerService.retryAfterStartupFault",
+          "src/agents/runtime/runner-service.ts > RunnerService.mapSessionError",
           "tmux client > isServerRunning / hasSession / newSession"
         ],
         tags: ["high complexity", "owner surface", "startup truth"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.ensureRunnerReady",
         level: 1,
         description: "Builds on ensureSessionReady, then captures the pane snapshot that SessionService treats as the baseline before prompt submission.",
         concerns: ["pre-submit readiness", "baseline capture"],
-        calledBy: ["src/agents/session-service.ts > SessionService.executePrompt", "src/agents/runner-service.ts > RunnerService.reopenRunContext"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.executePrompt", "src/agents/runtime/runner-service.ts > RunnerService.reopenRunContext"],
         calls: [
-          "src/agents/runner-service.ts > RunnerService.ensureSessionReady",
-          "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
-          "src/agents/runner-service.ts > RunnerService.retryRunnerRestartPreservingSessionId",
-          "src/agents/runner-service.ts > RunnerService.mapSessionError"
+          "src/agents/runtime/runner-service.ts > RunnerService.ensureSessionReady",
+          "src/agents/runtime/runner-service.ts > RunnerService.captureSessionSnapshot",
+          "src/agents/runtime/runner-service.ts > RunnerService.retryRunnerRestartPreservingSessionId",
+          "src/agents/runtime/runner-service.ts > RunnerService.mapSessionError"
         ],
         tags: ["owner surface", "warn"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.submitSessionInput",
         level: 1,
         description: "Direct injection path into an existing tmux session. Updates session state touch but does not create new run lifecycle bookkeeping.",
         concerns: ["steer injection", "naming drift"],
-        calledBy: ["src/agents/agent-service.ts > AgentService.submitSessionInput"],
+        calledBy: ["src/agents/runtime/agent-service.ts > AgentService.submitSessionInput"],
         calls: [
           "tmux client > hasSession",
           "src/runners/tmux/session-handshake.ts > submitTmuxSessionInput",
-          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry"
+          "src/agents/session/session-state.ts > AgentSessionState.touchSessionEntry"
         ],
         tags: ["duplicate submit path", "confusing name", "warn"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.captureTranscript",
         level: 1,
         description: "Returns normalized pane snapshot for a session if tmux session still exists, otherwise returns an empty transcript.",
         concerns: ["transcript read"],
-        calledBy: ["src/agents/session-service.ts > SessionService.observeRun", "src/agents/agent-service.ts > AgentService.captureTranscript"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.observeRun", "src/agents/runtime/agent-service.ts > AgentService.captureTranscript"],
         calls: [
           "tmux client > hasSession / capturePane",
-          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
-          "src/shared/transcript-normalization.ts > normalizePaneText"
+          "src/agents/session/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/runners/transcript/transcript-normalization.ts > normalizePaneText"
         ],
         tags: ["read path"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.interruptSession",
         level: 1,
         description: "Best-effort interrupt path that writes idle runtime immediately, then tries Escape and short sleep.",
         concerns: ["stop truth", "state write before proof"],
-        calledBy: ["src/agents/agent-service.ts > AgentService.interruptSession"],
+        calledBy: ["src/agents/runtime/agent-service.ts > AgentService.interruptSession"],
         calls: [
           "tmux client > hasSession / sendKey",
-          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
-          "src/shared/process.ts > sleep"
+          "src/agents/session/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/infra/process.ts > sleep"
         ],
         tags: ["truth risk", "warn", "state sink"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.reopenRunContext",
         level: 1,
         description: "Recovery entry for reopening same conversation context when stored session ID and resume command mode are available.",
         concerns: ["recovery entry", "resume policy"],
-        calledBy: ["src/agents/session-service.ts > SessionService.recoverLostMidRun"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.recoverLostMidRun"],
         calls: [
-          "src/agents/session-state.ts > AgentSessionState.getEntry",
-          "src/agents/runner-service.ts > RunnerService.ensureRunnerReady"
+          "src/agents/session/session-state.ts > AgentSessionState.getEntry",
+          "src/agents/runtime/runner-service.ts > RunnerService.ensureRunnerReady"
         ],
         tags: ["recovery"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.startFreshSession",
         level: 1,
         description: "Recovery fallback that kills current tmux session, clears stored session ID, and starts from a clean runner session.",
         concerns: ["fresh recovery", "state reset"],
-        calledBy: ["src/agents/session-service.ts > SessionService.recoverLostMidRun"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.recoverLostMidRun"],
         calls: [
           "tmux client > killSession",
-          "src/agents/session-state.ts > AgentSessionState.clearSessionIdEntry",
-          "src/agents/runner-service.ts > RunnerService.ensureSessionReady"
+          "src/agents/session/session-state.ts > AgentSessionState.clearSessionIdEntry",
+          "src/agents/runtime/runner-service.ts > RunnerService.ensureSessionReady"
         ],
         tags: ["recovery", "state sink"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.mapSessionError",
         level: 2,
         description: "Maps startup or runtime tmux failures into operator-facing errors with optional exit record context.",
         concerns: ["error mapping", "operator truth"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady", "src/agents/runner-service.ts > RunnerService.ensureRunnerReady", "src/agents/runner-service.ts > RunnerService.mapRunError"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.ensureSessionReady", "src/agents/runtime/runner-service.ts > RunnerService.ensureRunnerReady", "src/agents/runtime/runner-service.ts > RunnerService.mapRunError"],
         calls: [
           "wrapper helpers > readRunnerExitRecord",
-          "src/agents/runner-service.ts > isRecoverableStartupSessionLoss",
-          "src/agents/runner-service.ts > isTransientTmuxTargetError",
-          "src/agents/runner-service.ts > summarizeSnapshot"
+          "src/agents/runtime/runner-service.ts > isRecoverableStartupSessionLoss",
+          "src/agents/runtime/runner-service.ts > isTransientTmuxTargetError",
+          "src/agents/runtime/runner-service.ts > summarizeSnapshot"
         ],
         tags: ["error policy"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.syncSessionIdentity",
         level: 2,
         description: "Persists known session ID if already stored, or attempts to capture one with cooldown so status-command capture does not spam.",
         concerns: ["session identity", "state write"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady", "src/agents/runner-service.ts > RunnerService.finalizeSessionStartup"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.ensureSessionReady", "src/agents/runtime/runner-service.ts > RunnerService.finalizeSessionStartup"],
         calls: [
-          "src/agents/session-state.ts > AgentSessionState.getEntry",
-          "src/agents/runner-service.ts > RunnerService.captureSessionIdentity",
-          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry"
+          "src/agents/session/session-state.ts > AgentSessionState.getEntry",
+          "src/agents/runtime/runner-service.ts > RunnerService.captureSessionIdentity",
+          "src/agents/session/session-state.ts > AgentSessionState.touchSessionEntry"
         ],
         tags: ["identity", "state sink"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.captureSessionIdentity",
         level: 3,
         description: "Runs configured status-command capture path when runner supports extracting a durable session ID from the pane.",
         concerns: ["status-command capture"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.syncSessionIdentity"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.syncSessionIdentity"],
         calls: ["src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity"],
         tags: ["identity"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.verifySessionReady",
         level: 2,
         description: "Stronger startup verification after bootstrap wait: server exists, session exists, pane capture works, trust prompt is handled, and transient target errors are retried.",
         concerns: ["startup verification", "truth gate"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.finalizeSessionStartup"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.finalizeSessionStartup"],
         calls: [
           "tmux client > isServerRunning / hasSession",
-          "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
+          "src/agents/runtime/runner-service.ts > RunnerService.captureSessionSnapshot",
           "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
-          "src/agents/runner-service.ts > RunnerService.dismissVisibleTrustPrompt",
-          "src/shared/process.ts > sleep"
+          "src/agents/runtime/runner-service.ts > RunnerService.dismissVisibleTrustPrompt",
+          "src/infra/process.ts > sleep"
         ],
         tags: ["truth gate", "warn"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.finalizeSessionStartup",
         level: 2,
         description: "Final post-bootstrap startup path. Dismisses trust prompt, verifies readiness, and persists session ID or sync result.",
         concerns: ["startup finalization", "state write"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.ensureSessionReady"],
         calls: [
-          "src/agents/runner-service.ts > RunnerService.dismissTrustPrompt",
-          "src/agents/runner-service.ts > RunnerService.verifySessionReady",
-          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
-          "src/agents/runner-service.ts > RunnerService.syncSessionIdentity"
+          "src/agents/runtime/runner-service.ts > RunnerService.dismissTrustPrompt",
+          "src/agents/runtime/runner-service.ts > RunnerService.verifySessionReady",
+          "src/agents/session/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/agents/runtime/runner-service.ts > RunnerService.syncSessionIdentity"
         ],
         tags: ["startup owner"]
       },
       {
-        file: "src/agents/runner-service.ts",
+        file: "src/agents/runtime/runner-service.ts",
         function: "RunnerService.captureSessionSnapshot",
         level: 2,
         description: "Thin normalized pane capture helper reused by readiness and initial baseline capture paths.",
         concerns: ["pane snapshot"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.verifySessionReady", "src/agents/runner-service.ts > RunnerService.ensureRunnerReady"],
-        calls: ["tmux client > capturePane", "src/shared/transcript-normalization.ts > normalizePaneText"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.verifySessionReady", "src/agents/runtime/runner-service.ts > RunnerService.ensureRunnerReady"],
+        calls: ["tmux client > capturePane", "src/runners/transcript/transcript-normalization.ts > normalizePaneText"],
         tags: ["read helper"]
       },
       {
@@ -1320,17 +1320,17 @@
         level: 1,
         description: "Polling monitor that optionally submits prompt, captures pane, derives meaningful deltas, signals running or detached states, and emits completed or timeout callbacks.",
         concerns: ["monitor facts", "prompt submit", "timeout heuristic"],
-        calledBy: ["src/agents/session-service.ts > SessionService.startRunMonitor"],
+        calledBy: ["src/agents/session/session-service.ts > SessionService.startRunMonitor"],
         calls: [
           "src/runners/tmux/session-handshake.ts > submitTmuxSessionInput",
           "callback > onPromptSubmitted",
-          "src/shared/process.ts > sleep",
+          "src/infra/process.ts > sleep",
           "tmux client > capturePane",
-          "src/shared/transcript-normalization.ts > normalizePaneText",
-          "src/shared/transcript-delta.ts > deriveRunningInteractionText",
-          "src/shared/transcript-delta.ts > appendInteractionText",
+          "src/runners/transcript/transcript-normalization.ts > normalizePaneText",
+          "src/runners/transcript/transcript-delta.ts > deriveRunningInteractionText",
+          "src/runners/transcript/transcript-delta.ts > appendInteractionText",
           "callback > onRunning / onDetached / onCompleted / onTimeout",
-          "src/shared/transcript-delta.ts > deriveInteractionText"
+          "src/runners/transcript/transcript-delta.ts > deriveInteractionText"
         ],
         tags: ["owner boundary", "truth risk", "high complexity"]
       },
@@ -1342,7 +1342,7 @@
         concerns: ["tmux submit truth", "shared low-level primitive"],
         calledBy: [
           "src/runners/tmux/run-monitor.ts > monitorTmuxRun",
-          "src/agents/runner-service.ts > RunnerService.submitSessionInput",
+          "src/agents/runtime/runner-service.ts > RunnerService.submitSessionInput",
           "src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity"
         ],
         calls: [
@@ -1359,12 +1359,12 @@
         level: 1,
         description: "Runs status-command capture loop to find runner session ID in pane output, with trust-prompt dismissal and retryable tmux target handling.",
         concerns: ["status-command capture", "identity truth"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.captureSessionIdentity"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.captureSessionIdentity"],
         calls: [
           "src/runners/tmux/session-handshake.ts > submitTmuxSessionInput",
-          "src/shared/process.ts > sleep",
+          "src/infra/process.ts > sleep",
           "tmux client > capturePane",
-          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/transcript/transcript-normalization.ts > normalizePaneText",
           "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
           "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
           "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
@@ -1380,14 +1380,14 @@
         level: 1,
         description: "Polls pane for trust prompt and dismisses it during startup if trustWorkspace is enabled.",
         concerns: ["trust prompt handling"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.dismissVisibleTrustPrompt"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.dismissVisibleTrustPrompt"],
         calls: [
           "tmux client > capturePane",
-          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/transcript/transcript-normalization.ts > normalizePaneText",
           "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
           "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
           "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
-          "src/shared/process.ts > sleep",
+          "src/infra/process.ts > sleep",
           "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
           "src/runners/tmux/session-handshake.ts > dismissTrustPrompt"
         ],
@@ -1399,14 +1399,14 @@
         level: 1,
         description: "Startup readiness poller for new tmux session. Handles retryable target errors, trust prompt, configured blockers, and optional readyPattern match.",
         concerns: ["bootstrap wait", "readyPattern gate"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.ensureSessionReady"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.ensureSessionReady"],
         calls: [
           "tmux client > capturePane",
-          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/runners/transcript/transcript-normalization.ts > normalizePaneText",
           "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
           "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
           "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
-          "src/shared/process.ts > sleep",
+          "src/infra/process.ts > sleep",
           "src/runners/tmux/session-handshake.ts > tmuxPaneHasTrustPrompt",
           "src/runners/tmux/session-handshake.ts > dismissTrustPrompt"
         ],
@@ -1425,8 +1425,8 @@
         ],
         calls: [
           "tmux client > sendKey / capturePane",
-          "src/shared/process.ts > sleep",
-          "src/shared/transcript-normalization.ts > normalizePaneText",
+          "src/infra/process.ts > sleep",
+          "src/runners/transcript/transcript-normalization.ts > normalizePaneText",
           "src/runners/tmux/session-handshake.ts > isRetryableBootstrapTargetError",
           "src/runners/tmux/session-handshake.ts > isBootstrapSessionGoneError",
           "src/runners/tmux/session-handshake.ts > buildBootstrapSessionLostError",
@@ -1444,7 +1444,7 @@
         calls: [
           "tmux client > getPaneState",
           "src/runners/tmux/session-handshake.ts > hasPaneStateChanged",
-          "src/shared/process.ts > sleep"
+          "src/infra/process.ts > sleep"
         ],
         tags: ["submit truth"]
       },
@@ -1456,7 +1456,7 @@
         concerns: ["paste settle", "tmux truth"],
         calledBy: ["src/runners/tmux/session-handshake.ts > submitTmuxSessionInput"],
         calls: [
-          "src/shared/process.ts > sleep",
+          "src/infra/process.ts > sleep",
           "tmux client > getPaneState",
           "src/runners/tmux/session-handshake.ts > hasPaneStateChanged",
           "src/runners/tmux/session-handshake.ts > shouldWaitForVisiblePaste",
@@ -1475,7 +1475,7 @@
           "src/runners/tmux/session-handshake.ts > dismissTmuxTrustPromptIfPresent",
           "src/runners/tmux/session-handshake.ts > waitForTmuxSessionBootstrap",
           "src/runners/tmux/session-handshake.ts > dismissTrustPrompt",
-          "src/agents/runner-service.ts > RunnerService.verifySessionReady"
+          "src/agents/runtime/runner-service.ts > RunnerService.verifySessionReady"
         ],
         calls: [
           "src/runners/tmux/session-handshake.ts > looksLikeClaudeTrustPrompt",
@@ -1497,34 +1497,34 @@
         tags: ["deep helper"]
       },
       {
-        file: "src/shared/transcript-delta.ts",
+        file: "src/runners/transcript/transcript-delta.ts",
         function: "deriveRunningInteractionText",
         level: 1,
         description: "Derives meaningful running delta by cleaning previous and current pane snapshots, then extracting only appended interaction text.",
         concerns: ["meaningful output", "monitor heuristic"],
         calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun"],
         calls: [
-          "src/shared/transcript-normalization.ts > cleanInteractionSnapshot",
-          "src/shared/transcript-delta.ts > extractScrolledAppend"
+          "src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot",
+          "src/runners/transcript/transcript-delta.ts > extractScrolledAppend"
         ],
         tags: ["truth heuristic", "owner boundary"]
       },
       {
-        file: "src/shared/transcript-delta.ts",
+        file: "src/runners/transcript/transcript-delta.ts",
         function: "deriveInteractionText",
         level: 1,
         description: "More permissive interaction extractor used for detached, recovered, or initial transcript snapshots when append-only diff is insufficient.",
         concerns: ["transcript diff"],
-        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun", "src/agents/session-service.ts > SessionService.recoverPersistedRuns"],
+        calledBy: ["src/runners/tmux/run-monitor.ts > monitorTmuxRun", "src/agents/session/session-service.ts > SessionService.recoverPersistedRuns"],
         calls: [
-          "src/shared/transcript-normalization.ts > cleanInteractionSnapshot",
-          "src/shared/transcript-delta.ts > extractScrolledAppend",
-          "src/shared/transcript-delta.ts > diffText"
+          "src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot",
+          "src/runners/transcript/transcript-delta.ts > extractScrolledAppend",
+          "src/runners/transcript/transcript-delta.ts > diffText"
         ],
         tags: ["diff helper"]
       },
       {
-        file: "src/shared/transcript-delta.ts",
+        file: "src/runners/transcript/transcript-delta.ts",
         function: "appendInteractionText",
         level: 1,
         description: "Accumulates running interaction text while trimming overlap so monitor snapshots do not duplicate adjacent lines.",
@@ -1534,275 +1534,275 @@
         tags: ["diff helper"]
       },
       {
-        file: "src/shared/transcript-delta.ts",
+        file: "src/runners/transcript/transcript-delta.ts",
         function: "extractScrolledAppend",
         level: 2,
         description: "Append-only diff helper that tries strict prefix, contained previous snapshot, then suffix-window overlap scan.",
         concerns: ["append heuristic"],
-        calledBy: ["src/shared/transcript-delta.ts > deriveRunningInteractionText", "src/shared/transcript-delta.ts > deriveInteractionText"],
+        calledBy: ["src/runners/transcript/transcript-delta.ts > deriveRunningInteractionText", "src/runners/transcript/transcript-delta.ts > deriveInteractionText"],
         calls: [],
         tags: ["heuristic", "warn"]
       },
       {
-        file: "src/shared/transcript-delta.ts",
+        file: "src/runners/transcript/transcript-delta.ts",
         function: "diffText",
         level: 2,
         description: "Fallback diff when append-only extraction fails. Keeps changed block between common prefix and suffix.",
         concerns: ["fallback diff"],
-        calledBy: ["src/shared/transcript-delta.ts > deriveInteractionText"],
+        calledBy: ["src/runners/transcript/transcript-delta.ts > deriveInteractionText"],
         calls: [
-          "src/shared/transcript-normalization.ts > collapseBlankLines",
-          "src/shared/transcript-normalization.ts > trimBlankLines"
+          "src/runners/transcript/transcript-normalization.ts > collapseBlankLines",
+          "src/runners/transcript/transcript-normalization.ts > trimBlankLines"
         ],
         tags: ["diff helper"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "cleanInteractionSnapshot",
         level: 1,
         description: "Main transcript cleanup wall: identify runner family, strip prompt blocks, drop delivery and chrome noise, unwrap message blocks, unwrap soft wraps, and collapse duplicates.",
         concerns: ["normalization owner", "heuristic wall"],
         calledBy: [
-          "src/shared/transcript-delta.ts > deriveRunningInteractionText",
-          "src/shared/transcript-delta.ts > deriveInteractionText",
-          "src/shared/transcript-delta.ts > deriveMeaningfulPaneSnapshot"
+          "src/runners/transcript/transcript-delta.ts > deriveRunningInteractionText",
+          "src/runners/transcript/transcript-delta.ts > deriveInteractionText",
+          "src/runners/transcript/transcript-delta.ts > deriveMeaningfulPaneSnapshot"
         ],
         calls: [
-          "src/shared/transcript-normalization.ts > splitNormalizedLines",
-          "src/shared/transcript-normalization.ts > looksLikeCodexSnapshot / looksLikeClaudeSnapshot / looksLikeGeminiSnapshot",
-          "src/shared/transcript-normalization.ts > dropCodexPromptBlocks / dropClaudePromptBlocks / dropGeminiPromptBlocks",
-          "src/shared/transcript-normalization.ts > shouldDropDeliveryReportLine",
-          "src/shared/transcript-normalization.ts > shouldDropCodexChromeLine / shouldDropClaudeChromeLine / shouldDropGeminiChromeLine",
-          "src/shared/transcript-normalization.ts > unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks",
-          "src/shared/transcript-normalization.ts > unwrapSoftWrappedLines",
-          "src/shared/transcript-normalization.ts > trimBlankLines / collapseBlankLines / collapseAdjacentDuplicateLines"
+          "src/runners/transcript/transcript-normalization.ts > splitNormalizedLines",
+          "src/runners/transcript/transcript-normalization.ts > looksLikeCodexSnapshot / looksLikeClaudeSnapshot / looksLikeGeminiSnapshot",
+          "src/runners/transcript/transcript-normalization.ts > dropCodexPromptBlocks / dropClaudePromptBlocks / dropGeminiPromptBlocks",
+          "src/runners/transcript/transcript-normalization.ts > shouldDropDeliveryReportLine",
+          "src/runners/transcript/transcript-normalization.ts > shouldDropCodexChromeLine / shouldDropClaudeChromeLine / shouldDropGeminiChromeLine",
+          "src/runners/transcript/transcript-normalization.ts > unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks",
+          "src/runners/transcript/transcript-normalization.ts > unwrapSoftWrappedLines",
+          "src/runners/transcript/transcript-normalization.ts > trimBlankLines / collapseBlankLines / collapseAdjacentDuplicateLines"
         ],
         tags: ["high complexity", "heuristic wall", "deep stack"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "splitNormalizedLines",
         level: 2,
         description: "Splits pane text into lines only after normalizePaneText cleaned VT sequences and newline forms.",
         concerns: ["text normalization"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot", "src/shared/transcript-delta.ts > deriveMeaningfulPaneSnapshot"],
-        calls: ["src/shared/transcript-normalization.ts > normalizePaneText"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot", "src/runners/transcript/transcript-delta.ts > deriveMeaningfulPaneSnapshot"],
+        calls: ["src/runners/transcript/transcript-normalization.ts > normalizePaneText"],
         tags: ["deep helper"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "normalizePaneText",
         level: 3,
         description: "Lowest-level pane text normalizer: strips VT control characters and normalizes line endings.",
         concerns: ["pane text normalization"],
         calledBy: [
-          "src/shared/transcript-normalization.ts > splitNormalizedLines",
+          "src/runners/transcript/transcript-normalization.ts > splitNormalizedLines",
           "src/runners/tmux/run-monitor.ts > monitorTmuxRun",
-          "src/agents/runner-service.ts > RunnerService.captureSessionSnapshot",
+          "src/agents/runtime/runner-service.ts > RunnerService.captureSessionSnapshot",
           "src/runners/tmux/session-handshake.ts > captureTmuxSessionIdentity / dismissTmuxTrustPromptIfPresent / waitForTmuxSessionBootstrap / dismissTrustPrompt"
         ],
         calls: [],
         tags: ["deep helper"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "dropCodexPromptBlocks / dropClaudePromptBlocks / dropGeminiPromptBlocks",
         level: 2,
         description: "Runner-specific prompt removal before diffing. Codex and Gemini share generic block dropping, Claude uses its own skip-until-blank strategy.",
         concerns: ["prompt stripping"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
-        calls: ["src/shared/transcript-normalization.ts > dropPromptBlocks"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/runners/transcript/transcript-normalization.ts > dropPromptBlocks"],
         tags: ["deep helper", "runner-specific"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "dropPromptBlocks",
         level: 3,
         description: "Generic prompt-block stripper used by multiple runner families when prompt marker plus indented continuation should be removed.",
         concerns: ["prompt stripping primitive"],
-        calledBy: ["src/shared/transcript-normalization.ts > dropCodexPromptBlocks / dropGeminiPromptBlocks"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > dropCodexPromptBlocks / dropGeminiPromptBlocks"],
         calls: [],
         tags: ["deep helper"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "shouldDropDeliveryReportLine",
         level: 2,
         description: "Filters out bot-side delivery confirmations so monitor and transcript diffs do not treat channel send reports as model output.",
         concerns: ["delivery noise filter"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
-        calls: ["src/shared/transcript-normalization.ts > normalizeBoundaryLine"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/runners/transcript/transcript-normalization.ts > normalizeBoundaryLine"],
         tags: ["heuristic"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "shouldDropCodexChromeLine / shouldDropClaudeChromeLine / shouldDropGeminiChromeLine",
         level: 2,
         description: "Runner-family chrome and UI line filters. Huge heuristic surface and a likely drift source whenever upstream CLI text changes.",
         concerns: ["runner chrome filter", "heuristic drift"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
-        calls: ["src/shared/transcript-normalization.ts > isInterruptStatusLine", "src/shared/transcript-normalization.ts > isProgressLine"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/runners/transcript/transcript-normalization.ts > isInterruptStatusLine", "src/runners/transcript/transcript-normalization.ts > isProgressLine"],
         tags: ["high complexity", "heuristic wall", "warn"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks",
         level: 2,
         description: "Turns runner UI bullet blocks back into plain interaction text so downstream diffing is less sensitive to message container chrome.",
         concerns: ["message unwrapping"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
-        calls: ["src/shared/transcript-normalization.ts > unwrapMessageBlocks", "src/shared/transcript-normalization.ts > isProgressLine"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calls: ["src/runners/transcript/transcript-normalization.ts > unwrapMessageBlocks", "src/runners/transcript/transcript-normalization.ts > isProgressLine"],
         tags: ["deep helper", "runner-specific"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "unwrapMessageBlocks",
         level: 3,
         description: "Shared block-unwrapper that keeps indented continuation lines when they belong to a message block instead of runner chrome.",
         concerns: ["message block primitive"],
-        calledBy: ["src/shared/transcript-normalization.ts > unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > unwrapCodexMessageBlocks / unwrapClaudeMessageBlocks"],
         calls: [],
         tags: ["deep helper"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "unwrapSoftWrappedLines",
         level: 2,
         description: "Repairs line wraps introduced by terminal width, including wrapped URLs and wrapped words.",
         concerns: ["soft-wrap repair"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot"],
         calls: [
-          "src/shared/transcript-normalization.ts > stripUrlContinuationGaps",
-          "src/shared/transcript-normalization.ts > shouldJoinWrappedLine",
-          "src/shared/transcript-normalization.ts > joinWrappedLines"
+          "src/runners/transcript/transcript-normalization.ts > stripUrlContinuationGaps",
+          "src/runners/transcript/transcript-normalization.ts > shouldJoinWrappedLine",
+          "src/runners/transcript/transcript-normalization.ts > joinWrappedLines"
         ],
         tags: ["deep helper", "warn"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "stripUrlContinuationGaps",
         level: 3,
         description: "Collapses blank lines that exist only because wrapped URL fragments were split apart by terminal layout.",
         concerns: ["url wrap repair"],
-        calledBy: ["src/shared/transcript-normalization.ts > unwrapSoftWrappedLines"],
-        calls: ["src/shared/transcript-normalization.ts > looksLikeUrlContinuation"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > unwrapSoftWrappedLines"],
+        calls: ["src/runners/transcript/transcript-normalization.ts > looksLikeUrlContinuation"],
         tags: ["deep helper"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "shouldJoinWrappedLine / joinWrappedLines",
         level: 3,
         description: "Decides whether a new line is just a visual continuation of the prior line, then joins with or without spacing.",
         concerns: ["line wrap heuristic"],
-        calledBy: ["src/shared/transcript-normalization.ts > unwrapSoftWrappedLines"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > unwrapSoftWrappedLines"],
         calls: [
-          "src/shared/transcript-normalization.ts > isListOrStructuredLine",
-          "src/shared/transcript-normalization.ts > shouldJoinWrappedWord"
+          "src/runners/transcript/transcript-normalization.ts > isListOrStructuredLine",
+          "src/runners/transcript/transcript-normalization.ts > shouldJoinWrappedWord"
         ],
         tags: ["deep helper", "heuristic"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "shouldJoinWrappedWord / isListOrStructuredLine / looksLikeUrlContinuation",
         level: 4,
         description: "Leaf heuristics behind soft-wrap repair and structured-line protection.",
         concerns: ["leaf heuristic"],
         calledBy: [
-          "src/shared/transcript-normalization.ts > shouldJoinWrappedLine / joinWrappedLines",
-          "src/shared/transcript-normalization.ts > stripUrlContinuationGaps"
+          "src/runners/transcript/transcript-normalization.ts > shouldJoinWrappedLine / joinWrappedLines",
+          "src/runners/transcript/transcript-normalization.ts > stripUrlContinuationGaps"
         ],
         calls: [],
         tags: ["deep helper", "deep"]
       },
       {
-        file: "src/shared/transcript-normalization.ts",
+        file: "src/runners/transcript/transcript-normalization.ts",
         function: "collapseAdjacentDuplicateLines",
         level: 2,
         description: "Collapses adjacent duplicates after boundary normalization so repeated bullet lines do not inflate diff output.",
         concerns: ["duplicate cleanup"],
-        calledBy: ["src/shared/transcript-normalization.ts > cleanInteractionSnapshot"],
+        calledBy: ["src/runners/transcript/transcript-normalization.ts > cleanInteractionSnapshot"],
         calls: [
-          "src/shared/transcript-normalization.ts > normalizeBoundaryLine",
-          "src/shared/transcript-normalization.ts > collapseBlankLines"
+          "src/runners/transcript/transcript-normalization.ts > normalizeBoundaryLine",
+          "src/runners/transcript/transcript-normalization.ts > collapseBlankLines"
         ],
         tags: ["deep helper"]
       },
       {
-        file: "src/agents/session-state.ts",
+        file: "src/agents/session/session-state.ts",
         function: "AgentSessionState.touchSessionEntry",
         level: 1,
         description: "Generic state touch entry used by startup reuse, transcript reads, direct submit, nudge, and interrupt-like paths. Preserves most existing shape unless overridden.",
         concerns: ["generic state write", "broad reuse"],
         calledBy: [
-          "src/agents/runner-service.ts > RunnerService.syncSessionIdentity",
-          "src/agents/runner-service.ts > RunnerService.finalizeSessionStartup",
-          "src/agents/runner-service.ts > RunnerService.captureTranscript",
-          "src/agents/runner-service.ts > RunnerService.interruptSession",
-          "src/agents/runner-service.ts > RunnerService.nudgeSession",
-          "src/agents/runner-service.ts > RunnerService.submitSessionInput"
+          "src/agents/runtime/runner-service.ts > RunnerService.syncSessionIdentity",
+          "src/agents/runtime/runner-service.ts > RunnerService.finalizeSessionStartup",
+          "src/agents/runtime/runner-service.ts > RunnerService.captureTranscript",
+          "src/agents/runtime/runner-service.ts > RunnerService.interruptSession",
+          "src/agents/runtime/runner-service.ts > RunnerService.nudgeSession",
+          "src/agents/runtime/runner-service.ts > RunnerService.submitSessionInput"
         ],
-        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        calls: ["src/agents/session/session-state.ts > AgentSessionState.upsertSessionEntry"],
         tags: ["state sink", "generic helper", "warn"]
       },
       {
-        file: "src/agents/session-state.ts",
+        file: "src/agents/session/session-state.ts",
         function: "AgentSessionState.clearSessionIdEntry",
         level: 1,
         description: "Clears stored session ID and forces runtime back to idle, only for explicit fresh-session reset paths.",
         concerns: ["identity reset", "idle write"],
-        calledBy: ["src/agents/runner-service.ts > RunnerService.startFreshSession"],
-        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        calledBy: ["src/agents/runtime/runner-service.ts > RunnerService.startFreshSession"],
+        calls: ["src/agents/session/session-state.ts > AgentSessionState.upsertSessionEntry"],
         tags: ["state sink"]
       },
       {
-        file: "src/agents/session-state.ts",
+        file: "src/agents/session/session-state.ts",
         function: "AgentSessionState.setSessionRuntime",
         level: 1,
         description: "Explicit runtime-state writer for running, detached, or idle transitions.",
         concerns: ["runtime write"],
         calledBy: [
-          "src/agents/session-service.ts > SessionService.recoverPersistedRuns",
-          "src/agents/session-service.ts > SessionService.executePrompt",
-          "src/agents/session-service.ts > SessionService.finishActiveRun",
-          "src/agents/session-service.ts > SessionService.failActiveRun",
-          "src/agents/session-service.ts > SessionService.startRunMonitor > onDetached callback"
+          "src/agents/session/session-service.ts > SessionService.recoverPersistedRuns",
+          "src/agents/session/session-service.ts > SessionService.executePrompt",
+          "src/agents/session/session-service.ts > SessionService.finishActiveRun",
+          "src/agents/session/session-service.ts > SessionService.failActiveRun",
+          "src/agents/session/session-service.ts > SessionService.startRunMonitor > onDetached callback"
         ],
-        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        calls: ["src/agents/session/session-state.ts > AgentSessionState.upsertSessionEntry"],
         tags: ["state sink", "owner truth"]
       },
       {
-        file: "src/agents/session-state.ts",
+        file: "src/agents/session/session-state.ts",
         function: "AgentSessionState.getSessionRuntime",
         level: 1,
         description: "Reads persisted runtime markers such as active state, detachedAt, finalReplyAt, and message-tool timestamps.",
         concerns: ["runtime read"],
-        calledBy: ["src/agents/agent-service.ts > AgentService.getSessionRuntime"],
+        calledBy: ["src/agents/runtime/agent-service.ts > AgentService.getSessionRuntime"],
         calls: [],
         tags: ["state read"]
       },
       {
-        file: "src/agents/session-state.ts",
+        file: "src/agents/session/session-state.ts",
         function: "AgentSessionState.recordConversationReply",
         level: 1,
         description: "Persists reply timestamps for chat surfaces and message-tool finality markers. This is a second state-truth stream beside active-run state.",
         concerns: ["reply timestamps", "surface truth"],
-        calledBy: ["src/agents/agent-service.ts > AgentService.recordConversationReply"],
-        calls: ["src/agents/session-state.ts > AgentSessionState.upsertSessionEntry"],
+        calledBy: ["src/agents/runtime/agent-service.ts > AgentService.recordConversationReply"],
+        calls: ["src/agents/session/session-state.ts > AgentSessionState.upsertSessionEntry"],
         tags: ["state sink", "mixed truth", "warn"]
       },
       {
-        file: "src/agents/session-state.ts",
+        file: "src/agents/session/session-state.ts",
         function: "AgentSessionState.upsertSessionEntry",
         level: 2,
         description: "Single persistence funnel for session entry mutation. Almost all state writes eventually end here.",
         concerns: ["state persistence funnel"],
         calledBy: [
-          "src/agents/session-state.ts > AgentSessionState.touchSessionEntry",
-          "src/agents/session-state.ts > AgentSessionState.clearSessionIdEntry",
-          "src/agents/session-state.ts > AgentSessionState.setSessionRuntime",
-          "src/agents/session-state.ts > AgentSessionState.recordConversationReply"
+          "src/agents/session/session-state.ts > AgentSessionState.touchSessionEntry",
+          "src/agents/session/session-state.ts > AgentSessionState.clearSessionIdEntry",
+          "src/agents/session/session-state.ts > AgentSessionState.setSessionRuntime",
+          "src/agents/session/session-state.ts > AgentSessionState.recordConversationReply"
         ],
-        calls: ["src/agents/session-store.ts > SessionStore.update"],
+        calls: ["src/agents/session/session-store.ts > SessionStore.update"],
         tags: ["state funnel", "owner boundary"]
       }
     ];

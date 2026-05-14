@@ -1,18 +1,18 @@
 import { parseCliArgs, renderCliHelp } from "./cli.ts";
 import { runPairingCli } from "./channels/pairing/cli.ts";
-import { runAgentsCli } from "./control/agents-cli.ts";
-import { runAccountsCli } from "./control/accounts-cli.ts";
-import { runAuthCli } from "./control/auth-cli.ts";
-import { runBotsCli } from "./control/bots-cli.ts";
-import { runChannelsCli } from "./control/channels-cli.ts";
-import { runLoopsCli } from "./control/loops-cli.ts";
-import { runMessageCli } from "./control/message-cli.ts";
-import { runQueuesCli } from "./control/queues-cli.ts";
-import { runRoutesCli } from "./control/routes-cli.ts";
-import { runRunnerCli } from "./control/runner-cli.ts";
-import { runTimezoneCli } from "./control/timezone-cli.ts";
-import { runUpdateCli } from "./control/update-cli.ts";
-import { initConfig, start } from "./control/runtime-bootstrap-cli.ts";
+import { runAgentsCli } from "./control/commands/agents-cli.ts";
+import { runAccountsCli } from "./control/commands/accounts-cli.ts";
+import { runAuthCli } from "./control/commands/auth-cli.ts";
+import { runBotsCli } from "./control/commands/bots-cli.ts";
+import { runChannelsCli } from "./control/commands/channels-cli.ts";
+import { runLoopsCli } from "./control/commands/loops-cli.ts";
+import { runMessageCli } from "./control/commands/message-cli.ts";
+import { runQueuesCli } from "./control/commands/queues-cli.ts";
+import { runRoutesCli } from "./control/commands/routes-cli.ts";
+import { runRunnerCli } from "./control/runner/runner-cli.ts";
+import { runTimezoneCli } from "./control/commands/timezone-cli.ts";
+import { runUpdateCli } from "./control/commands/update-cli.ts";
+import { initConfig, start } from "./control/commands/runtime-bootstrap-cli.ts";
 import {
   logs,
   printCliError,
@@ -21,13 +21,13 @@ import {
   serveRuntimeMonitor,
   status,
   stop,
-} from "./control/runtime-management-cli.ts";
+} from "./control/commands/runtime-management-cli.ts";
 import {
   assertSupportedPlatform,
   getCliErrorExitCode,
   printCommandOutcomeBanner,
-} from "./control/runtime-cli-shared.ts";
-import { setRenderedCliName } from "./shared/cli-name.ts";
+} from "./control/commands/runtime-cli-support.ts";
+import { setRenderedCliName } from "./control/commands/cli-name.ts";
 import { getClisbotVersion } from "./version.ts";
 
 const INTERNAL_CLI_NAME_FLAG = "--internal-cli-name";

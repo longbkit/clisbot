@@ -1,5 +1,5 @@
-import { sleep } from "../../shared/process.ts";
-import { deriveInteractionText, normalizePaneText } from "../../shared/transcript.ts";
+import { sleep } from "../../infra/process.ts";
+import { deriveInteractionText, normalizePaneText } from "../transcript/index.ts";
 import type { TmuxClient } from "./client.ts";
 
 const BASH_WINDOW_NAME = "bash";

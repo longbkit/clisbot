@@ -75,10 +75,10 @@ Only starts after Stage A is reviewed.
 
 ## Cross-cutting files
 
-- `src/config/schema.ts`
+- `src/config/core/schema.ts`
   - add `bots.zaloOa.defaults`
   - add `ZaloOaConfig` schema after contract lock
-- `src/config/channel-bots.ts`
+- `src/config/channels/channel-bots.ts`
   - add `ResolvedZaloOaConfig`
   - add `ZaloOaCredentialConfig`
   - add:
@@ -86,18 +86,18 @@ Only starts after Stage A is reviewed.
     - `resolveZaloOaBotId(...)`
     - `getZaloOaRecord(...)`
     - `resolveZaloOaConfig(...)`
-- `src/config/template.ts`
+- `src/config/core/template.ts`
   - add commented `bots.zaloOa` section
-- `src/config/load-config.ts`
+- `src/config/core/load-config.ts`
   - extend runtime loading for `zalo-oa`
-- `src/channels/registry.ts`
+- `src/channels/catalog/registry.ts`
   - register `zaloOaChannelPlugin`
-- `src/control/runtime-health-store.ts`
+- `src/control/runtime/runtime-health-store.ts`
   - add `zalo-oa` channel key
   - add `markZaloOaFailure(...)`
-- `src/control/message-cli.ts`
+- `src/control/commands/message-cli.ts`
   - allow `--channel zalo-oa`
-- `src/control/bots-cli.ts`
+- `src/control/commands/bots-cli.ts`
   - allow `--channel zalo-oa`
 
 ## Provider files

@@ -1,5 +1,5 @@
-import type { AgentSlashCommand } from "../../agents/commands.ts";
-import { shouldGuideUnroutedConversation } from "../unrouted-guidance-policy.ts";
+import type { AgentSlashCommand } from "../../agents/commands/commands.ts";
+import { shouldGuideUnroutedConversation } from "../message/unrouted-guidance-policy.ts";
 import {
   hasForeignTelegramMention,
   hasTelegramBotMention,

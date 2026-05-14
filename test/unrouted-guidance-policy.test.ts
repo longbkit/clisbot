@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { shouldGuideUnroutedConversation } from "../src/channels/unrouted-guidance-policy.ts";
+import { shouldGuideUnroutedConversation } from "../src/channels/message/unrouted-guidance-policy.ts";
 
 describe("unrouted guidance policy", () => {
   test("keeps Slack-style shared surfaces mention-gated when standalone commands are unsupported", () => {

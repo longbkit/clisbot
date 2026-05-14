@@ -17,6 +17,9 @@ Historical or exploratory material may still exist under subfolders such as `v0.
 - [Architecture Design Decisions](decisions/README.md)
 - [Session Key And Session Id Continuity Decision](decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 - [Canonical Surface Concepts And Provider Capabilities](decisions/2026-05-10-canonical-surface-concepts-and-provider-capabilities.md)
+- [Shared Message Surface And Channel-Owned Custom Subtrees](decisions/2026-05-10-shared-message-surface-and-channel-owned-custom-subtrees.md)
+- [Static Built-In Channel Installation Inventory](decisions/2026-05-13-static-built-in-channel-installation-inventory.md)
+- [Owned Helper Boundaries And Infra Primitives](decisions/2026-05-13-owned-helper-boundaries-and-infra-primitives.md)
 
 ## What Belongs Here
 

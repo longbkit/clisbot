@@ -1,5 +1,5 @@
 import type { PairingChannel, PairingRequest } from "./store.ts";
-import { renderCliCommand } from "../../shared/cli-name.ts";
+import { renderCliCommand } from "../../control/commands/cli-name.ts";
 
 export function buildPairingReply(params: {
   channel: PairingChannel;

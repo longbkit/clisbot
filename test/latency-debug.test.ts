@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { isLatencyDebugEnabled, logLatencyDebug } from "../src/control/latency-debug.ts";
+import { isLatencyDebugEnabled, logLatencyDebug } from "../src/control/runtime/latency-debug.ts";
 
 describe("latency debug", () => {
   const originalEnv = process.env.CLISBOT_DEBUG_LATENCY;

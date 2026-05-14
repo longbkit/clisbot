@@ -3,7 +3,7 @@ area: runtime, channels, slack, rename
 summary: Live validation after a product rename must explicitly stop orphaned old runtimes, or both old and new services can consume the same Slack events and produce misleading duplicate behavior.
 files:
   - src/channels/slack/service.ts
-  - src/agents/runner-service.ts
+  - src/agents/runtime/runner-service.ts
   - src/runners/tmux/session-handshake.ts
 ---
 

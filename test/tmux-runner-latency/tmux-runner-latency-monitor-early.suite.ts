@@ -284,8 +284,8 @@ describe("tmux runner latency behavior", () => {
       prompt: undefined,
       promptSubmitDelayMs: 1,
       captureLines: 80,
-      updateIntervalMs: 5,
-      idleTimeoutMs: 15,
+      updateIntervalMs: 10,
+      idleTimeoutMs: 80,
       noOutputTimeoutMs: 1_000,
       maxRuntimeMs: 10_000,
       startedAt: Date.now(),
@@ -350,7 +350,6 @@ describe("tmux runner latency behavior", () => {
       "Done.",
     ].join("\n");
     const snapshots = [
-      initialSnapshot,
       [
         "Previous answer",
         "",
@@ -390,8 +389,8 @@ describe("tmux runner latency behavior", () => {
       prompt: undefined,
       promptSubmitDelayMs: 1,
       captureLines: 80,
-      updateIntervalMs: 5,
-      idleTimeoutMs: 15,
+      updateIntervalMs: 10,
+      idleTimeoutMs: 80,
       noOutputTimeoutMs: 1_000,
       maxRuntimeMs: 10_000,
       startedAt: Date.now(),

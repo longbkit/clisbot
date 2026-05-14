@@ -11,7 +11,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runAgentsCli } from "../src/control/agents-cli.ts";
+import { runAgentsCli } from "../src/control/commands/agents-cli.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("agents cli", () => {
   let tempDir = "";
@@ -22,11 +23,13 @@ describe("agents cli", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     console.log = originalLog;
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
@@ -96,6 +99,19 @@ describe("agents cli", () => {
     expect(text).toContain("`agents add` is the lower-level manual surface");
     expect(text).toContain("`agents add` without `--bot-type` is valid and does not seed any bootstrap files");
     expect(text).toContain("canonical workspace instructions live in `AGENTS.md`");
+  });
+
+  test("subcommand help renders before required argument validation", async () => {
+    const output: string[] = [];
+    console.log = ((value: string) => {
+      output.push(value);
+    }) as typeof console.log;
+
+    await runAgentsCli(["add", "--help"]);
+
+    const text = output.join("\n");
+    expect(text).toContain("clisbot agents");
+    expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini>");
   });
 
   test("team-assistant bootstrap overrides base USER.md with the team template", async () => {

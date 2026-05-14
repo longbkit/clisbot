@@ -10,7 +10,8 @@ import {
   shouldGuideUnroutedSlackEvent,
   shouldSendSlackMentionRequiredGuidance,
 } from "../src/channels/slack/feedback.ts";
-import { ProcessedEventsStore } from "../src/channels/processed-events-store.ts";
+import { ProcessedEventsStore } from "../src/channels/message/processed-events-store.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("slack feedback helpers", () => {
   let previousCliName: string | undefined;
@@ -18,10 +19,12 @@ describe("slack feedback helpers", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
   });
 
   test("treats mapped slash-style control commands as command-like", () => {

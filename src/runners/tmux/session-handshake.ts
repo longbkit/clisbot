@@ -1,6 +1,6 @@
-import { parseRunnerSessionId } from "../../agents/session-identity.ts";
-import { logLatencyDebug, type LatencyDebugContext } from "../../control/latency-debug.ts";
-import { sleep } from "../../shared/process.ts";
+import { parseRunnerSessionId } from "../../agents/session/session-identity.ts";
+import { logLatencyDebug, type LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
+import { sleep } from "../../infra/process.ts";
 import {
   deriveInteractionDiffText,
   deriveInteractionText,
@@ -8,7 +8,7 @@ import {
   normalizePaneText,
   splitNormalizedLines,
   trimBlankLines,
-} from "../../shared/transcript.ts";
+} from "../transcript/index.ts";
 import type { TmuxClient, TmuxPaneState } from "./client.ts";
 
 const TRUST_PROMPT_POLL_INTERVAL_MS = 250;
@@ -169,7 +169,8 @@ export async function captureTmuxSessionIdentity(params: {
 }) {
   // This function only captures the runner-side sessionId from fresh status
   // output inside the tmux pane. It does not decide whether that id should be
-  // persisted as storedSessionId; that boundary stays in RunnerService.
+  // persisted as storedSessionId; that boundary stays in the session-owned
+  // continuity mapping above the tmux runner helpers.
   await acceptTmuxStartupContinuePromptIfPresent({
     tmux: params.tmux,
     sessionName: params.sessionName,

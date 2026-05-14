@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { processChannelInteraction } from "../../src/channels/interaction-processing.ts";
-import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
+import { processChannelInteraction } from "../../src/channels/message/interaction-processing.ts";
+import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
 import {
   createIdentity,
   createRoute,

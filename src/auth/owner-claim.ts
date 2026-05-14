@@ -1,16 +1,16 @@
 import { statSync } from "node:fs";
 import lockfile from "proper-lockfile";
-import type { ChannelIdentity } from "../channels/channel-identity.ts";
+import type { ChannelIdentity } from "../channels/surface/channel-identity.ts";
 import {
   ensureEditableConfigFile,
   readEditableConfig,
   writeEditableConfig,
-} from "../config/config-file.ts";
-import type { ClisbotConfig } from "../config/schema.ts";
+} from "../config/core/config-file.ts";
+import type { ClisbotConfig } from "../config/core/schema.ts";
 import {
   resolveAuthPrincipal,
 } from "./resolve.ts";
-import { suppressConfigReload } from "../control/config-reload-suppression.ts";
+import { suppressConfigReload } from "../control/runtime/config-reload-suppression.ts";
 
 const OWNER_CLAIM_RUNTIME_STARTED_AT_MS = Date.now();
 const CONFIG_LOCK_OPTIONS = {

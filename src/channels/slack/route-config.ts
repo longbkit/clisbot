@@ -1,8 +1,9 @@
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   resolveSlackBotConfig,
   resolveSlackDirectMessageConfig,
-} from "../../config/channel-bots.ts";
+} from "./config.ts";
+import { resolveProvidedBotId } from "../../config/channels/channel-bot-records.ts";
 import {
   buildSurfaceRoute,
   isSurfaceRouteEnabled,
@@ -10,7 +11,7 @@ import {
   type ResolvedSurfaceRouteStatus,
   type SurfaceRoute,
   type SurfaceRouteOverride,
-} from "../route-policy.ts";
+} from "../config/route-policy.ts";
 import { type SlackConversationKind } from "./session-routing.ts";
 
 export type SlackRoute = SurfaceRoute & {
@@ -33,7 +34,7 @@ function buildRoute(loadedConfig: LoadedConfig, params: {
 }): SlackRoute {
   const slackConfig = resolveSlackBotConfig(
     loadedConfig.raw.bots.slack,
-    params.botId ?? params.accountId,
+    resolveProvidedBotId(params),
   );
   return {
     ...buildSurfaceRoute({
@@ -75,7 +76,7 @@ function resolveSharedRoute(
   botId?: string,
   accountId?: string,
 ) {
-  const resolvedBotId = botId ?? accountId;
+  const resolvedBotId = resolveProvidedBotId({ botId, accountId });
   const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
   const exactRoute = slackConfig.groups[channelId];
   const admissionStatus = resolveSharedAdmissionStatus({
@@ -115,7 +116,7 @@ function resolveDirectMessageRoute(
   botId?: string,
   accountId?: string,
 ): SlackRoute | null {
-  const resolvedBotId = botId ?? accountId;
+  const resolvedBotId = resolveProvidedBotId({ botId, accountId });
   const slackConfig = resolveSlackBotConfig(loadedConfig.raw.bots.slack, resolvedBotId);
   const route = resolveSlackDirectMessageConfig(slackConfig, userId);
   if (!isSurfaceRouteEnabled(route)) {

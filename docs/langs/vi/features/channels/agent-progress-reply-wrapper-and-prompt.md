@@ -25,7 +25,7 @@ Ngoài ra còn có:
 - inject channel context ngắn gọn và lệnh reply vào prompt gửi cho agent
 - giữ prompt guidance ngắn, có nhắc message-length theo channel và dùng `--file` làm attachment flag chung
 - giữ schedule guidance ngắn và đúng:
-  - `For schedule/loop/reminder requests, inspect clisbot loops --help and use the loops CLI.`
+  - `For schedule/loop/reminder requests, inspect clisbot loops --help --channel <current-channel> and use the loops CLI.`
 - hỗ trợ `responseMode: "message-tool"` để progress và final reply đi qua `clisbot message send`, không phải pane settlement
 - hỗ trợ `streaming` cho cả `capture-pane` lẫn `message-tool`
 - hỗ trợ `surfaceNotifications` do channel sở hữu cho queued work và loop tick

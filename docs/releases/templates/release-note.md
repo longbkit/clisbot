@@ -106,12 +106,22 @@ One short paragraph explaining the release in user/operator terms.
 
 - `vX.Y.Z-beta.N`: summarize only meaningful tester/operator-facing differences.
 
+## GitHub Release Summary
+
+- Tag:
+- npm dist-tag:
+- Prerelease:
+- Latest:
+- Short summary:
+- Migration statement:
+
 ## Validation
 
 - `bun test ...`
 - `bunx tsc --noEmit`
 - `bun run check`
 - `bun run build`
+- `npm publish --dry-run --access public`
 
 ## Links
 

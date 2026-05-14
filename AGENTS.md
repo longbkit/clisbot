@@ -46,11 +46,24 @@ When documents disagree, use this order:
 Use this ownership map before editing:
 - `src/channels`: Slack and Telegram surfaces, route handling, rendering, pairing, follow-up behavior
 - `src/agents`: durable agent state, sessions, queueing, loops, attachments, run lifecycle
+  - `runtime`: AgentService facade, runner-service bridge, bootstrap, surface-runtime delivery helpers
+  - `session`: session identity, session state/store, run observation, recovery, and SessionService
+  - `queue`: durable queue state, in-memory job queue, and managed queue controller
+  - `loops`: loop definitions, loop state, loop command parsing, and managed loop controller
+  - `commands`: agent-owned slash/chat command parsing and follow-up policy
+  - `routing`: resolved agent targets, surface bindings, and recent conversation replay context
 - `src/auth`: roles, permissions, owner claim, authorization resolution
 - `src/config`: schema, loading, credentials, templates
+  - `core`: config document/schema/template/load/migration/file IO
+  - `channels`: bot, credential, route, schema, and template contracts for channel config
+  - `env`: env reference parsing and substitution
+  - `runtime`: runtime defaults such as tool presets, durations, timezone, and monitor backoff
 - `src/control`: operator CLI, runtime lifecycle, health, status, logs, bootstrap
+  - `commands`: operator CLI command modules and shared CLI helpers
+  - `runtime`: detached process, monitor, supervisor, health, summary, reload, and owner alerts
+  - `runner`: runner debug CLI/state and runner exit diagnostics
 - `src/runners`: execution backends, currently tmux
-- `src/shared`: cross-cutting utilities
+- `src/infra`: small host/runtime primitives only, with no product concepts
 - `test/`: regression and behavior coverage
 - `docs/tests/`: readable validation scenarios when behavior needs explicit ground truth
 
@@ -67,7 +80,8 @@ Prefer these repo-standard commands:
 - package build: `bun run build`
 - publish: run `npm login`, then run exactly `npm publish --access public`
 - when `npm login`, `npm publish --access public`, or another external auth command returns a browser link, keep the process open, send the link to the user, wait for them to finish auth, then continue the same flow
-- do not switch publish auth into a manual `--otp` handoff; keep the normal interactive publish flow and hand off only the exact link or prompt the tool returns from that same live process
+- never switch publish auth into a manual `--otp` handoff; keep the normal interactive publish flow and hand off only the exact link or prompt the tool returns from that same live process
+- never run `npm publish --otp`, `npm login --otp`, or an OTP fallback; if npm returns `EOTP` instead of browser or interactive approval, stop and ask
 
 Do not invent ad hoc verification flows when one of these commands already fits.
 

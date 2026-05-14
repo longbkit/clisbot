@@ -55,7 +55,7 @@ Examples:
 - times/count loops plus `/loop status` and `/loop cancel` reject `--loop-start` because they do not create recurring scheduled ticks
 - chat `/loop` wall-clock creation persists immediately; the no-side-effect first-loop confirmation gate is for operator CLI creation
 - every chat wall-clock creation response must include the resolved timezone, next run in local time plus UTC, and the exact cancel command so the user can quickly undo and recreate if timezone is wrong
-- AI agents should inspect `clisbot loops --help` for schedule/loop/reminder requests when they need to create loops through the CLI
+- AI agents should inspect `clisbot loops --help --channel <current-channel>` for schedule/loop/reminder requests when they need to create loops through the CLI
 - interval loops receive an id and are tracked in managed state
 - managed loops stop after `control.loop.maxRunsPerLoop` attempts
 - managed loop scheduling is `skip-if-busy`, so a busy session drops that tick instead of piling a queue
@@ -139,10 +139,10 @@ Wall-clock loops also store:
 
 ### Code Paths
 
-- `src/agents/agent-service.ts`
-- `src/agents/session-state.ts`
-- `src/agents/session-store.ts`
-- `src/agents/loop-state.ts`
+- `src/agents/runtime/agent-service.ts`
+- `src/agents/session/session-state.ts`
+- `src/agents/session/session-store.ts`
+- `src/agents/loops/loop-state.ts`
 
 ## Related Docs
 

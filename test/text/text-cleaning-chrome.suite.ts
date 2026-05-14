@@ -10,18 +10,18 @@ import {
   deriveInteractionText,
   deriveRunningInteractionText,
   extractFinalAnswer,
-  extractSlackIncrement,
-  mergeSlackStreamBodies,
-  renderSlackInteraction,
-  renderSlackSnapshot,
-  renderTelegramInteraction,
-  selectSlackCompletionBody,
-  selectSlackSnapshotBody,
+  extractRenderedIncrement,
+  mergeRenderedStreamBodies,
+  renderMarkdownInteraction,
+  renderChannelSnapshot,
+  renderPlainInteraction,
+  selectCompletedInteractionBody,
+  selectSnapshotInteractionBody,
   truncateHead,
-} from "../../src/shared/transcript.ts";
+} from "../../src/runners/transcript/index.ts";
 
 describe("snapshot shaping", () => {
-  test("unwraps soft-wrapped tmux lines into cleaner Slack text", () => {
+  test("unwraps soft-wrapped tmux lines into cleaner rendered text", () => {
     const cleaned = cleanInteractionSnapshot(`
 • As of April 4, 2026, I’m not seeing a new official Google update on Gemma 4
   today. The main official launch was on April 2, 2026, and April 3 had broader

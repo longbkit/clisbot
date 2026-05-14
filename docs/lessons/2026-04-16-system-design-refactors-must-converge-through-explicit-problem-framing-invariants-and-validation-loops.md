@@ -11,9 +11,9 @@ related:
   - docs/architecture/runtime-architecture.md
   - docs/architecture/architecture-overview.md
   - docs/user-guide/runtime-operations.md
-  - src/control/runtime-monitor.ts
-  - src/control/runtime-process.ts
-  - src/control/runtime-management-cli.ts
+  - src/control/runtime/runtime-monitor.ts
+  - src/control/runtime/runtime-process.ts
+  - src/control/commands/runtime-management-cli.ts
 ---
 
 ## Context

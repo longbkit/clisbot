@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { runRunnerCli } from "../src/control/runner-cli.ts";
-import { CliCommandError } from "../src/control/runtime-cli-shared.ts";
+import { runRunnerCli } from "../src/control/runner/runner-cli.ts";
+import { CliCommandError } from "../src/control/commands/runtime-cli-support.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..");
 const BUN_COMMAND = Bun.which("bun") ?? process.execPath;
@@ -13,11 +14,13 @@ describe("runner cli", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     console.log = originalLog;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     process.exitCode = undefined;
   });
 
@@ -33,6 +36,19 @@ describe("runner cli", () => {
     expect(output).toContain("clisbot runner");
     expect(output).toContain("clisbot runner smoke --backend <codex|claude|gemini> --scenario <name>");
     expect(output).toContain("launch-trio");
+  });
+
+  test("subcommand help renders before selector validation", async () => {
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runRunnerCli(["inspect", "--help"]);
+
+    const output = logs.join("\n");
+    expect(output).toContain("clisbot runner");
+    expect(output).toContain("runner inspect <session-name>|--latest|--index <n>");
   });
 
   test("smoke --json returns a machine-readable not-implemented result and exit code 3", async () => {

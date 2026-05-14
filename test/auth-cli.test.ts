@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { runAuthCli } from "../src/control/auth-cli.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { runAuthCli } from "../src/control/commands/auth-cli.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("auth cli", () => {
   let tempDir = "";
@@ -16,15 +17,30 @@ describe("auth cli", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     console.log = originalLog;
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
     }
+  });
+
+  test("subcommand help renders before permission lookup validation", async () => {
+    const logs: string[] = [];
+    console.log = ((value?: unknown) => {
+      logs.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runAuthCli(["get-permissions", "--help"]);
+
+    const text = logs.join("\n");
+    expect(text).toContain("clisbot auth");
+    expect(text).toContain("auth get-permissions --sender <principal> --agent <id>");
   });
 
   test("adds and removes users on app roles", async () => {
@@ -213,6 +229,9 @@ describe("auth cli", () => {
     expect(output).toContain("configManage");
     expect(output).toContain("shellExecute");
     expect(output).toContain("bypass DM pairing automatically");
+    expect(output).toContain("slack:U1234567890");
+    expect(output).toContain("telegram:1276408333");
+    expect(output).toContain("zalo-bot:user-123");
   });
 
   test("rejects unknown permissions with the allowed set in the error", async () => {

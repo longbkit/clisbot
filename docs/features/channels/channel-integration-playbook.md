@@ -113,19 +113,19 @@ Those are the places where copy-paste tends to look safe while still creating th
 
 Review:
 
-- `src/config/schema.ts`
-- `src/config/channel-bots.ts`
-- `src/config/channel-credentials.ts`
-- `src/config/channel-credentials-shared.ts`
-- `src/config/channel-runtime-credentials.ts`
-- `src/config/config-migration.ts`
-- `src/config/config-upgrade.ts`
-- `src/config/config-file.ts`
-- `src/config/direct-message-routes.ts`
-- `src/config/group-routes.ts`
-- `src/config/route-contract.ts`
-- `src/config/template.ts`
-- `src/config/load-config.ts`
+- `src/config/core/schema.ts`
+- `src/config/channels/channel-bots.ts`
+- `src/config/channels/channel-credentials.ts`
+- `src/config/channels/channel-credential-input.ts`
+- `src/config/channels/channel-runtime-credentials.ts`
+- `src/config/core/config-migration.ts`
+- `src/config/core/config-upgrade.ts`
+- `src/config/core/config-file.ts`
+- `src/config/channels/direct-message-routes.ts`
+- `src/config/channels/group-routes.ts`
+- `src/config/channels/channel-route-contract.ts`
+- `src/config/core/template.ts`
+- `src/config/core/load-config.ts`
 
 Questions:
 
@@ -137,20 +137,28 @@ Questions:
 
 Review:
 
-- `src/channels/registry.ts`
-- `src/channels/channel-plugin.ts`
-- `src/channels/channel-identity.ts`
-- `src/control/runtime-health-store.ts`
-- `src/control/runtime-summary.ts`
-- `src/control/runtime-summary-rendering.ts`
-- `src/control/startup-bootstrap.ts`
-- `src/control/channel-bootstrap-flags.ts`
-- `src/control/owner-alerts.ts`
-- `src/agents/surface-runtime.ts`
+- `src/channels/catalog/registry.ts`
+- `src/channels/config/surface-config-target.ts`
+- `src/channels/integration/channel-plugin.ts`
+- `src/channels/surface/channel-identity.ts`
+- `src/control/runtime/runtime-health-store.ts`
+- `src/control/runtime/runtime-summary.ts`
+- `src/control/runtime/runtime-summary-rendering.ts`
+- `src/control/commands/startup-bootstrap.ts`
+- `src/control/commands/channel-bootstrap-flags.ts`
+- `src/control/runtime/owner-alerts.ts`
+- `src/agents/runtime/surface-runtime.ts`
 
 Questions:
 
 - did the new provider stay inside the `ChannelPlugin` seam where possible
+- did shared provider-facing seams belong under `src/channels/integration`
+  rather than leaking into config, control, or a provider folder
+- did the provider expose its runtime behavior through `plugin.ts` without
+  leaking provider-specific behavior into shared code
+- did the provider expose install-time contracts through `installation.ts` and
+  one inventory entry in
+  `src/channels/integration/channel-installation-inventory.ts`
 - did shared operator summaries stay truthful for older channels
 - did new provider guidance leak into generic Slack or Telegram paths too early
 - do alerts and status notifications still have a truthful delivery path
@@ -162,6 +170,7 @@ Review the provider folder under `src/channels/<provider>/`.
 Common owners:
 
 - `plugin.ts`
+- `config-target.ts`
 - `service.ts`
 - `message.ts`
 - `route-config.ts`
@@ -189,8 +198,8 @@ Review:
 - `src/channels/pairing/access.ts`
 - `src/channels/pairing/store.ts`
 - `src/channels/pairing/cli.ts`
-- `src/channels/follow-up-mode-config.ts`
-- `src/channels/unrouted-guidance-policy.ts`
+- `src/channels/config/follow-up-mode-config.ts`
+- `src/channels/message/unrouted-guidance-policy.ts`
 
 Questions:
 
@@ -215,30 +224,30 @@ In a thinner provider slice, some of these stay review-only.
 
 Review:
 
-- `src/control/message-cli.ts`
-- `src/control/routes-cli.ts`
-- `src/control/bots-cli.ts`
-- `src/control/loop-cli-addressing.ts`
-- `src/control/loop-cli-context.ts`
-- `src/control/queues-cli.ts`
-- `src/control/loops-cli-rendering.ts`
-- `src/control/routes-cli-help.ts`
-- `src/channels/agent-prompt.ts`
-- `src/channels/message-command.ts`
-- `src/channels/route-policy.ts`
-- `src/channels/rendering.ts`
-- `src/channels/surface-prompt-context.ts`
-- `src/channels/surface-directory.ts`
-- `src/shared/recent-message-context.ts`
-- `src/shared/transcript-normalization.ts`
+- `src/control/commands/message-cli.ts`
+- `src/control/commands/routes-cli.ts`
+- `src/control/commands/bots-cli.ts`
+- `src/control/commands/loop-cli-addressing.ts`
+- `src/control/commands/loop-cli-context.ts`
+- `src/control/commands/queues-cli.ts`
+- `src/control/commands/loops-cli-rendering.ts`
+- `src/control/commands/routes-cli-help.ts`
+- `src/channels/message/agent-prompt.ts`
+- `src/channels/message/message-command.ts`
+- `src/channels/config/route-policy.ts`
+- `src/channels/message/rendering.ts`
+- `src/channels/surface/surface-prompt-context.ts`
+- `src/channels/surface/surface-directory.ts`
+- `src/agents/routing/recent-message-context.ts`
+- `src/runners/transcript/transcript-normalization.ts`
 - `src/agents/attachments/download.ts`
 
-Review if the provider changes these shared contracts:
+Review if the provider changes these surface contracts:
 
-- `src/channels/interaction-processing.ts`
-- `src/channels/message-format.ts`
-- `src/channels/mode-config-shared.ts`
-- `src/channels/surface-notifications.ts`
+- `src/channels/message/interaction-processing.ts`
+- `src/channels/message/message-format.ts`
+- `src/channels/config/surface-mode-config.ts`
+- `src/channels/config/surface-notifications.ts`
 - `src/agents/attachments/storage.ts`
 
 Questions:

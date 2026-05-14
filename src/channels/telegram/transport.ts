@@ -1,6 +1,6 @@
 import { callTelegramApi } from "./api.ts";
 import { TelegramApiError } from "./api.ts";
-import { sleep } from "../../shared/process.ts";
+import { sleep } from "../../infra/process.ts";
 import type { TelegramWireFormat } from "./content.ts";
 
 const TELEGRAM_MIN_EDIT_INTERVAL_MS = 4000;

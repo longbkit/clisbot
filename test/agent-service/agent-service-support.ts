@@ -1,19 +1,19 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentService } from "../../src/agents/agent-service.ts";
-import { recordSurfaceDirectoryIdentity } from "../../src/channels/surface-directory.ts";
-import { ClearedQueuedTaskError } from "../../src/agents/job-queue.ts";
-import { createStoredIntervalLoop } from "../../src/agents/loop-control-shared.ts";
-import { createStoredQueueItem } from "../../src/agents/queue-state.ts";
-import { resolveAgentTarget } from "../../src/agents/resolved-target.ts";
-import { AgentSessionState } from "../../src/agents/session-state.ts";
-import { SessionStore } from "../../src/agents/session-store.ts";
-import { RunnerService } from "../../src/agents/runner-service.ts";
-import { MID_RUN_RECOVERY_CONTINUE_PROMPT } from "../../src/agents/run-recovery.ts";
-import { loadConfig, resolveSessionStorePath } from "../../src/config/load-config.ts";
-import { clisbotConfigSchema, type ClisbotConfig } from "../../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
+import { AgentService } from "../../src/agents/runtime/agent-service.ts";
+import { recordSurfaceDirectoryIdentity } from "../../src/channels/surface/surface-directory.ts";
+import { ClearedQueuedTaskError } from "../../src/agents/queue/job-queue.ts";
+import { createStoredIntervalLoop } from "../../src/agents/loops/loop-definition.ts";
+import { createStoredQueueItem } from "../../src/agents/queue/queue-state.ts";
+import { resolveAgentTarget } from "../../src/agents/routing/resolved-target.ts";
+import { AgentSessionState } from "../../src/agents/session/session-state.ts";
+import { SessionStore } from "../../src/agents/session/session-store.ts";
+import { RunnerService } from "../../src/agents/runtime/runner-service.ts";
+import { MID_RUN_RECOVERY_CONTINUE_PROMPT } from "../../src/agents/session/run-recovery.ts";
+import { loadConfig, resolveSessionStorePath } from "../../src/config/core/load-config.ts";
+import { clisbotConfigSchema, type ClisbotConfig } from "../../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 
 export const RUNNER_GENERATED_ID = "11111111-1111-1111-1111-111111111111";
@@ -584,8 +584,10 @@ export function buildConfig(params: {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: false,
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: false },
+        },
       }),
     ),
   );

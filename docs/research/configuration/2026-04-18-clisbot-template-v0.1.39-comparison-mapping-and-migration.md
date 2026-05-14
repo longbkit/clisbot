@@ -6,8 +6,8 @@ summary: Compare the shipped v0.1.0 template with the revised v0.1.39 proposal w
 related:
   - config/clisbot.json.v0.1.0.template
   - config/clisbot.json.v0.1.39.template
-  - src/config/template.ts
-  - src/config/schema.ts
+  - src/config/core/template.ts
+  - src/config/core/schema.ts
 ---
 
 # Status

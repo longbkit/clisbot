@@ -159,9 +159,9 @@ Code hiện tại đã có phần lớn sự tách bạch này:
 
 | Vị trí trong code hiện tại | State family tương ứng |
 | --- | --- |
-| `src/agents/run-observation.ts` | `SessionRuntimeState = idle | running | detached` |
-| `src/agents/run-observation.ts` | `PromptExecutionStatus = running | completed | timeout | detached | error` |
-| `src/shared/transcript-rendering.ts` | surface rendering thêm `queued` cho queue-facing message |
+| `src/agents/session/run-observation.ts` | `SessionRuntimeState = idle | running | detached` |
+| `src/agents/session/run-observation.ts` | `PromptExecutionStatus = running | completed | timeout | detached | error` |
+| `src/runners/transcript/transcript-rendering.ts` | surface rendering thêm `queued` cho queue-facing message |
 
 Điểm mismatch hiện tại đáng gọi tên:
 

@@ -1,5 +1,9 @@
-import type { ChannelIdentity } from "../channels/channel-identity.ts";
-import type { ClisbotConfig } from "../config/schema.ts";
+import type { ChannelIdentity } from "../channels/surface/channel-identity.ts";
+import {
+  buildNormalizedChannelPrincipal,
+  isKnownChannelId,
+} from "../channels/integration/channel-surface-contract-registry.ts";
+import type { ClisbotConfig } from "../config/core/schema.ts";
 
 export type ResolvedChannelAuth = {
   principal?: string;
@@ -55,20 +59,10 @@ export function normalizeAuthPrincipal(principal: string) {
   if (!platform || !userId) {
     return trimmed;
   }
-
-  if (platform === "slack") {
-    return `slack:${userId.trim().toUpperCase()}`;
+  if (!isKnownChannelId(platform)) {
+    return trimmed;
   }
-
-  if (platform === "telegram") {
-    return `telegram:${userId.trim()}`;
-  }
-
-  if (platform === "zalo-bot") {
-    return `zalo-bot:${userId.trim()}`;
-  }
-
-  return `${platform}:${userId.trim()}`;
+  return buildNormalizedChannelPrincipal(platform, userId);
 }
 
 function normalizeRoleUsers(users: string[] | undefined) {
@@ -80,16 +74,7 @@ export function resolveAuthPrincipal(identity: ChannelIdentity) {
   if (!senderId) {
     return undefined;
   }
-
-  if (identity.platform === "slack") {
-    return normalizeAuthPrincipal(`slack:${senderId}`);
-  }
-
-  if (identity.platform === "telegram") {
-    return normalizeAuthPrincipal(`telegram:${senderId}`);
-  }
-
-  return normalizeAuthPrincipal(`zalo-bot:${senderId}`);
+  return normalizeAuthPrincipal(buildNormalizedChannelPrincipal(identity.platform, senderId));
 }
 
 function findExplicitRole(

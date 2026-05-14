@@ -38,7 +38,7 @@ This file should explain the design direction and tradeoffs, not become the long
 
 ## Current Truth
 
-`src/channels/message-command.ts` still defines a flat `11`-verb surface:
+`src/channels/message/message-command.ts` still defines a flat `11`-verb surface:
 
 ```ts
 export type MessageAction =
@@ -55,7 +55,7 @@ export type MessageAction =
   | "search";
 ```
 
-`src/control/message-cli.ts` exposes the same flat verbs in CLI help.
+`src/control/commands/message-cli.ts` exposes the same flat verbs in CLI help.
 
 That flat list already hides support truth:
 
@@ -73,7 +73,7 @@ So the next design should solve two separate problems:
 
 The future surface should not lose these current operator truths already encoded in help and user-guide docs:
 
-- `docs/user-guide/cli-commands.md` and `src/control/message-cli.ts` still teach a flat `message <verb>` surface today
+- `docs/user-guide/cli-commands.md` and `src/control/commands/message-cli.ts` still teach a flat `message <verb>` surface today
 - current help still advertises the same broad `message` verb set across Slack, Telegram, and built-in `zalo-bot` even though real support depth differs sharply
 - Slack uses `--thread-id`
 - Telegram uses `--topic-id`

@@ -2,11 +2,11 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { resolveConfigTimezone } from "../src/config/timezone.ts";
-import { runTimezoneCli } from "../src/control/timezone-cli.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { resolveConfigTimezone } from "../src/config/runtime/timezone.ts";
+import { runTimezoneCli } from "../src/control/commands/timezone-cli.ts";
 
 describe("timezone cli", () => {
   let tempDir = "";
@@ -76,5 +76,19 @@ describe("timezone cli", () => {
       timezone: "Asia/Singapore",
       source: "route",
     });
+  });
+
+  test("help keeps route timezone guidance generic across channels", async () => {
+    const output: string[] = [];
+    console.log = ((value?: unknown) => {
+      output.push(String(value ?? ""));
+    }) as typeof console.log;
+
+    await runTimezoneCli(["--help"]);
+
+    expect(output.join("\n")).toContain(
+      "use route timezone when one routed surface needs different wall-clock time",
+    );
+    expect(output.join("\n")).not.toContain("Slack/Telegram surface");
   });
 });

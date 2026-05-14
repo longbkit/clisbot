@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { buildAgentPromptText, buildSteeringPromptText } from "../src/channels/agent-prompt.ts";
+import { buildAgentPromptText, buildSteeringPromptText } from "../src/channels/message/agent-prompt.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("agent prompt envelope", () => {
   let previousWrapperPath: string | undefined;
@@ -10,12 +11,14 @@ describe("agent prompt envelope", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     process.env.CLISBOT_WRAPPER_PATH = previousWrapperPath;
     process.env.CLISBOT_PROMPT_COMMAND = previousPromptCommand;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
   });
 
   test("keeps progress-capable reply instructions when streaming is enabled for the current thread", () => {
@@ -77,6 +80,12 @@ describe("agent prompt envelope", () => {
     );
     expect(prompt).toContain(
       "For clisbot install or update requests, check `clisbot update --help` first and follow it.",
+    );
+    expect(prompt).toContain(
+      "For schedule/loop/reminder requests, inspect `clisbot loops --help --channel slack` and use the loops CLI.",
+    );
+    expect(prompt).toContain(
+      "For durable queue requests, inspect `clisbot queues --help --channel slack` and use the queues CLI.",
     );
     expect(prompt).toContain(
       "Before sensitive actions or clisbot configuration changes, check permissions with `clisbot auth get-permissions --sender slack:U123 --agent default --json`.",
@@ -160,6 +169,12 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("Keep the Markdown body under 3000 chars.");
     expect(prompt).toContain("- sender: Alice Smith [telegram:123]");
     expect(prompt).toContain("- surface: Telegram group \"Release Ops\", topic \"Launch\" [telegram:topic:-1001:4]");
+    expect(prompt).toContain(
+      "For schedule/loop/reminder requests, inspect `clisbot loops --help --channel telegram` and use the loops CLI.",
+    );
+    expect(prompt).toContain(
+      "For durable queue requests, inspect `clisbot queues --help --channel telegram` and use the queues CLI.",
+    );
     expect(prompt).toContain("`clisbot auth get-permissions --sender telegram:123 --agent default --json`");
   });
 
@@ -205,6 +220,12 @@ describe("agent prompt envelope", () => {
     );
     expect(prompt).toContain("Keep the message body under 3000 chars.");
     expect(prompt).toContain("- sender: The Longbkit [zalo-bot:aaa741c34d8fa4d1fd9e]");
+    expect(prompt).toContain(
+      "For schedule/loop/reminder requests, inspect `clisbot loops --help --channel zalo-bot` and use the loops CLI.",
+    );
+    expect(prompt).toContain(
+      "For durable queue requests, inspect `clisbot queues --help --channel zalo-bot` and use the queues CLI.",
+    );
     expect(prompt).toContain("`clisbot auth get-permissions --sender zalo-bot:aaa741c34d8fa4d1fd9e --agent default --json`");
   });
 
@@ -368,6 +389,9 @@ describe("agent prompt envelope", () => {
     );
     expect(prompt).toContain(
       "For clisbot install or update requests, check `clisbot update --help` first and follow it.",
+    );
+    expect(prompt).toContain(
+      "For schedule/loop/reminder requests, inspect `clisbot loops --help --channel telegram` and use the loops CLI.",
     );
   });
 

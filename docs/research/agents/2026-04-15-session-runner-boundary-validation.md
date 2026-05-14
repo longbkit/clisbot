@@ -37,10 +37,10 @@ Validated against:
 - `docs/features/agents/README.md`
 - `docs/features/agents/sessions.md`
 - `docs/architecture/runtime-architecture.md`
-- `src/agents/session-state.ts`
-- `src/agents/session-store.ts`
-- `src/agents/resolved-target.ts`
-- `src/agents/agent-service.ts`
+- `src/agents/session/session-state.ts`
+- `src/agents/session/session-store.ts`
+- `src/agents/routing/resolved-target.ts`
+- `src/agents/runtime/agent-service.ts`
 
 Current truth:
 
@@ -59,7 +59,7 @@ Validated against:
 
 - `docs/features/runners/README.md`
 - `docs/architecture/runtime-architecture.md`
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
 - `src/runners/tmux/client.ts`
 - `src/runners/tmux/session-handshake.ts`
 - `src/runners/tmux/run-monitor.ts`
@@ -79,9 +79,9 @@ Validated against:
 
 - `docs/architecture/runtime-architecture.md`
 - `docs/features/agents/README.md`
-- `src/agents/session-service.ts`
-- `src/agents/run-observation.ts`
-- `src/channels/processing-indicator.ts`
+- `src/agents/session/session-service.ts`
+- `src/agents/session/run-observation.ts`
+- `src/channels/message/processing-indicator.ts`
 
 Current truth:
 
@@ -100,10 +100,10 @@ Validated against:
 
 - `docs/features/agents/README.md`
 - `docs/features/non-functionals/stability/README.md`
-- `src/agents/job-queue.ts`
-- `src/channels/interaction-processing.ts`
-- `src/agents/commands.ts`
-- `src/agents/agent-service.ts`
+- `src/agents/queue/job-queue.ts`
+- `src/channels/message/interaction-processing.ts`
+- `src/agents/commands/commands.ts`
+- `src/agents/runtime/agent-service.ts`
 
 Current truth:
 
@@ -124,8 +124,8 @@ Validated against:
 
 - `docs/features/non-functionals/stability/README.md`
 - `docs/tasks/features/stability/2026-04-15-runtime-crash-containment-and-service-self-healing.md`
-- `src/agents/session-service.ts`
-- `src/agents/runner-service.ts`
+- `src/agents/session/session-service.ts`
+- `src/agents/runtime/runner-service.ts`
 - `src/main.ts`
 
 Current truth:
@@ -170,8 +170,8 @@ Implication:
 
 Validated against:
 
-- `src/agents/runner-service.ts`
-- `src/agents/session-service.ts`
+- `src/agents/runtime/runner-service.ts`
+- `src/agents/session/session-service.ts`
 
 Current truth:
 
@@ -186,8 +186,8 @@ Implication:
 
 Validated against:
 
-- `src/agents/session-service.ts`
-- `src/agents/session-state.ts`
+- `src/agents/session/session-service.ts`
+- `src/agents/session/session-state.ts`
 
 Current truth:
 
@@ -221,10 +221,10 @@ Current truth:
 
 Validated against:
 
-- `src/agents/session-store.ts`
-- `src/agents/session-state.ts`
-- `src/agents/loop-state.ts`
-- `src/agents/run-observation.ts`
+- `src/agents/session/session-store.ts`
+- `src/agents/session/session-state.ts`
+- `src/agents/loops/loop-state.ts`
+- `src/agents/session/run-observation.ts`
 - `docs/features/agents/sessions.md`
 - `docs/architecture/runtime-architecture.md`
 - `docs/architecture/architecture-overview.md`
@@ -243,9 +243,9 @@ Implication:
 
 Validated against:
 
-- `src/agents/agent-service.ts`
-- `src/agents/session-service.ts`
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/agent-service.ts`
+- `src/agents/session/session-service.ts`
+- `src/agents/runtime/runner-service.ts`
 
 Current truth:
 
@@ -262,8 +262,8 @@ Implication:
 
 Validated against:
 
-- `src/channels/interaction-processing.ts`
-- `src/control/runtime-summary.ts`
+- `src/channels/message/interaction-processing.ts`
+- `src/control/runtime/runtime-summary.ts`
 - `test/interaction-processing/interaction-processing.test.ts`
 - `test/runtime-summary.test.ts`
 
@@ -280,11 +280,11 @@ Implication:
 
 Validated against:
 
-- `src/agents/runner-service.ts`
-- `src/agents/session-service.ts`
-- `src/shared/transcript-rendering.ts`
-- `src/config/schema.ts`
-- `src/config/template.ts`
+- `src/agents/runtime/runner-service.ts`
+- `src/agents/session/session-service.ts`
+- `src/runners/transcript/transcript-rendering.ts`
+- `src/config/core/schema.ts`
+- `src/config/core/template.ts`
 - `test/agent-service/agent-service.test.ts`
 
 Current truth:
@@ -303,9 +303,9 @@ Implication:
 
 Validated against:
 
-- `src/channels/interaction-processing.ts`
-- `src/agents/runner-service.ts`
-- `src/agents/session-service.ts`
+- `src/channels/message/interaction-processing.ts`
+- `src/agents/runtime/runner-service.ts`
+- `src/agents/session/session-service.ts`
 - `docs/features/agents/commands.md`
 
 Current truth:
@@ -323,8 +323,8 @@ Implication:
 
 Validated against:
 
-- `src/control/runtime-supervisor.ts`
-- `src/control/runtime-health-store.ts`
+- `src/control/runtime/runtime-supervisor.ts`
+- `src/control/runtime/runtime-health-store.ts`
 - `src/main.ts`
 - `test/runtime-supervisor/runtime-supervisor.test.ts`
 

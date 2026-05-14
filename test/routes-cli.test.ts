@@ -3,11 +3,12 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { runRoutesCli } from "../src/control/routes-cli.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import { loadConfigWithoutEnvResolution } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { runRoutesCli } from "../src/control/commands/routes-cli.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("routes cli", () => {
   let tempDir = "";
@@ -18,12 +19,14 @@ describe("routes cli", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     console.log = originalLog;
     process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true });
       tempDir = "";
@@ -523,11 +526,42 @@ describe("routes cli", () => {
 
     const text = lines.join("\n");
     expect(text).toContain("Canonical CLI ids are `dm:<id>`, `dm:*`, `group:<id>`, `group:*`");
-    expect(text).toContain("routes add --channel <slack|telegram|zalo-bot> <dm:*|dm:<id>>");
+    expect(text).toContain("routes add --channel <channel-name> <dm:*|dm:<id>>");
     expect(text).toContain("routes add --channel zalo-bot group:<chatId>");
+    expect(text).toContain("Supported channels: slack, telegram, zalo-bot.");
     expect(text).toContain("Shared group policy values are `disabled`, `allowlist`, and `open`.");
     expect(text).toContain("DM wildcard policy values are `disabled`, `pairing`, `allowlist`, and `open`.");
     expect(text).toContain("You are not allowed to use this bot in this group.");
     expect(text).toContain("routes add-allow-user --channel slack group:* --bot default --user U_OWNER");
+  });
+
+  test("help can scope route syntax and examples to one channel", async () => {
+    const lines: string[] = [];
+    console.log = ((line?: unknown) => {
+      lines.push(String(line ?? ""));
+    }) as typeof console.log;
+
+    await runRoutesCli(["--help", "--channel", "telegram"]);
+
+    const text = lines.join("\n");
+    expect(text).toContain("routes add --channel telegram <group:<chatId>|topic:<chatId>:<topicId>>");
+    expect(text).toContain("routes add --channel telegram group:-1001234567890 --bot alerts");
+    expect(text).toContain("routes set-timezone --channel telegram group:-1001234567890 --bot default Asia/Ho_Chi_Minh");
+    expect(text).not.toContain("routes add --channel slack group:<id>");
+    expect(text).not.toContain("routes add --channel zalo-bot group:<chatId>");
+  });
+
+  test("subcommand help renders before channel validation", async () => {
+    const lines: string[] = [];
+    console.log = ((line?: unknown) => {
+      lines.push(String(line ?? ""));
+    }) as typeof console.log;
+
+    await runRoutesCli(["add", "--help", "--channel", "telegram"]);
+
+    const text = lines.join("\n");
+    expect(text).toContain("routes add --channel telegram <group:<chatId>|topic:<chatId>:<topicId>>");
+    expect(text).toContain("routes add --channel telegram group:-1001234567890 --bot alerts");
+    expect(text).not.toContain("--channel <channel-name> is required");
   });
 });

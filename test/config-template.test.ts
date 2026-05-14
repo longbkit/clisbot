@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { readEditableConfig } from "../src/config/config-file.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { readEditableConfig } from "../src/config/core/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 describe("renderDefaultConfigTemplate", () => {
   const originalClisbotHome = process.env.CLISBOT_HOME;
@@ -67,10 +67,14 @@ describe("renderDefaultConfigTemplate", () => {
   test("can enable only the selected providers and preserve explicit env placeholders", () => {
     const config = JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: true,
-        telegramEnabled: false,
-        slackAppTokenRef: "${CUSTOM_SLACK_APP_TOKEN}",
-        slackBotTokenRef: "${CUSTOM_SLACK_BOT_TOKEN}",
+        channels: {
+          slack: {
+            enabled: true,
+            appTokenRef: "${CUSTOM_SLACK_APP_TOKEN}",
+            botTokenRef: "${CUSTOM_SLACK_BOT_TOKEN}",
+          },
+          telegram: { enabled: false },
+        },
       }),
     ) as ReturnType<typeof clisbotConfigSchema.parse>;
 
@@ -86,11 +90,17 @@ describe("renderDefaultConfigTemplate", () => {
   test("normalizes bare env names into placeholders", () => {
     const config = JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: true,
-        telegramEnabled: true,
-        slackAppTokenRef: "CUSTOM_SLACK_APP_TOKEN",
-        slackBotTokenRef: "CUSTOM_SLACK_BOT_TOKEN",
-        telegramBotTokenRef: "CUSTOM_TELEGRAM_BOT_TOKEN",
+        channels: {
+          slack: {
+            enabled: true,
+            appTokenRef: "CUSTOM_SLACK_APP_TOKEN",
+            botTokenRef: "CUSTOM_SLACK_BOT_TOKEN",
+          },
+          telegram: {
+            enabled: true,
+            botTokenRef: "CUSTOM_TELEGRAM_BOT_TOKEN",
+          },
+        },
       }),
     ) as ReturnType<typeof clisbotConfigSchema.parse>;
 

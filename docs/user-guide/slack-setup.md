@@ -204,6 +204,14 @@ Good first tests:
 - `/status`
 - `/whoami`
 
+Slack-specific loop help:
+
+- `clisbot loops --help --channel slack`
+- `clisbot loops create --help --channel slack`
+- Slack loop-only child-surface provisioning uses `--new-thread`, for example:
+  - `clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
+  - `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
+
 After the route is bound, `/whoami` is also a quick session check because it
 shows `sessionId` plus whether that value is already persisted for that
 conversation.

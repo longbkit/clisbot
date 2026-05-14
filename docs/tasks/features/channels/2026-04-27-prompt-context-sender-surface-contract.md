@@ -25,7 +25,7 @@ Done
 
 ## Previous Prompt Contract
 
-Previous normal prompt template in `src/channels/agent-prompt.ts`:
+Previous normal prompt template in `src/channels/message/agent-prompt.ts`:
 
 ```text
 <system>

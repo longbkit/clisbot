@@ -1,8 +1,9 @@
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   buildAgentMainSessionKey,
   buildAgentPeerSessionKey,
-} from "../../agents/session-key.ts";
+} from "../../agents/session/session-key.ts";
+import { resolveProvidedBotId } from "../../config/channels/channel-bot-records.ts";
 
 export type TelegramConversationKind = "dm" | "group" | "topic";
 
@@ -28,6 +29,7 @@ export function resolveTelegramConversationTarget(params: {
     agentId: params.agentId,
     mainKey: sessionConfig.mainKey,
   });
+  const botId = resolveProvidedBotId(params) ?? "default";
 
   if (params.conversationKind === "dm") {
     return {
@@ -36,7 +38,7 @@ export function resolveTelegramConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "telegram",
-        botId: params.botId ?? params.accountId ?? "default",
+        botId,
         peerKind: "dm",
         peerId: String(params.userId ?? params.chatId),
         dmScope: sessionConfig.dmScope,
@@ -57,7 +59,7 @@ export function resolveTelegramConversationTarget(params: {
       agentId: params.agentId,
       mainKey: sessionConfig.mainKey,
       channel: "telegram",
-      botId: params.botId ?? params.accountId ?? "default",
+      botId,
       peerKind: "group",
       peerId,
     }),

@@ -341,10 +341,10 @@ That means:
 
 If you are tracing implementation, read the files like this:
 
-- `src/agents/session-service.ts`
+- `src/agents/session/session-service.ts`
   - session owner
   - decides whether to keep, replace, or clear the active mapping
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - runner-facing adapter used by `SessionService`
   - should not own continuity rules, even though current code still leaks some
     of that work here

@@ -2,11 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ManagedLoopController } from "../src/agents/managed-loop-controller.ts";
-import { AgentSessionState } from "../src/agents/session-state.ts";
-import { SessionStore } from "../src/agents/session-store.ts";
-import type { ResolvedAgentTarget } from "../src/agents/resolved-target.ts";
-import { createStoredIntervalLoop } from "../src/agents/loop-control-shared.ts";
+import { ManagedLoopController } from "../src/agents/loops/managed-loop-controller.ts";
+import { AgentSessionState } from "../src/agents/session/session-state.ts";
+import { SessionStore } from "../src/agents/session/session-store.ts";
+import type { ResolvedAgentTarget } from "../src/agents/routing/resolved-target.ts";
+import { createStoredIntervalLoop } from "../src/agents/loops/loop-definition.ts";
 
 function createResolvedTarget(
   tempDir: string,

@@ -1,5 +1,5 @@
-import { clisbotConfigSchema } from "../../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
+import { clisbotConfigSchema } from "../../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
 
 export function buildConfig(params: {
   socketPath: string;

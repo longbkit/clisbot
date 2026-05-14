@@ -9,9 +9,9 @@ related:
   - docs/features/runners/README.md
   - docs/user-guide/README.md
   - docs/tasks/2026-04-08-observer-based-session-attach-detach-and-watch.md
-  - src/agents/agent-service.ts
-  - src/channels/interaction-processing.ts
-  - src/control/runtime-summary.ts
+  - src/agents/runtime/agent-service.ts
+  - src/channels/message/interaction-processing.ts
+  - src/control/runtime/runtime-summary.ts
   - src/runners/tmux/run-monitor.ts
 ---
 

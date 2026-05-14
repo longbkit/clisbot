@@ -4,7 +4,7 @@ import {
   buildAgentMainSessionKey,
   buildAgentPeerSessionKey,
   buildTmuxSessionName,
-} from "../src/agents/session-key.ts";
+} from "../src/agents/session/session-key.ts";
 
 describe("session key routing", () => {
   test("builds the main session key like OpenClaw", () => {

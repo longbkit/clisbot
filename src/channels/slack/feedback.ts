@@ -1,8 +1,8 @@
-import { parseAgentCommand, type CommandPrefixes } from "../../agents/commands.ts";
-import type { ProcessedEventsStore } from "../processed-events-store.ts";
-import { shouldGuideUnroutedConversation } from "../unrouted-guidance-policy.ts";
+import { parseAgentCommand, type CommandPrefixes } from "../../agents/commands/commands.ts";
+import type { ProcessedEventsStore } from "../message/processed-events-store.ts";
+import { shouldGuideUnroutedConversation } from "../message/unrouted-guidance-policy.ts";
 import { hasBotMention } from "./message.ts";
-import { renderCliCommand } from "../../shared/cli-name.ts";
+import { renderCliCommand } from "../../control/commands/cli-name.ts";
 
 export function isSlackCommandLikeMessage(params: {
   text: string;

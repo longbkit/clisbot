@@ -3,7 +3,7 @@ import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
   shouldReactivateFollowUpOnExplicitMention,
-} from "../src/agents/follow-up-policy.ts";
+} from "../src/agents/commands/follow-up-policy.ts";
 
 describe("follow-up policy", () => {
   test("uses the runtime override when present", () => {

@@ -7,9 +7,9 @@ related:
   - docs/user-guide/README.md
   - docs/user-guide/channels.md
   - README.md
-  - src/control/channels-cli.ts
-  - src/control/startup-bootstrap.ts
-  - src/channels/privilege-help.ts
+  - src/control/commands/channels-cli.ts
+  - src/control/commands/startup-bootstrap.ts
+  - src/control/commands/channel-privilege-cli.ts
 ---
 
 ## Context

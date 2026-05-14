@@ -10,7 +10,7 @@
 
 ## 사실 기준
 
-- Parser와 help text: `src/agents/commands.ts`
+- Parser와 help text: `src/agents/commands/commands.ts`
 - canonical help renderer: `renderAgentControlSlashHelp()`
 
 이 페이지와 runtime이 다르면 runtime이 기준입니다.

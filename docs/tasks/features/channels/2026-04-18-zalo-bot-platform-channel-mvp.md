@@ -114,11 +114,11 @@ Per-bot fields should include:
 
 ## Cross-cutting files
 
-- `src/config/schema.ts`
+- `src/config/core/schema.ts`
   - add `bots.zaloBot.defaults`
   - add `ZaloBotConfig` schema
   - add route defaults and webhook settings
-- `src/config/channel-bots.ts`
+- `src/config/channels/channel-bots.ts`
   - add `ResolvedZaloBotConfig`
   - add `ZaloBotCredentialConfig`
   - add:
@@ -127,22 +127,22 @@ Per-bot fields should include:
     - `getZaloBotRecord(...)`
     - `resolveZaloBotConfig(...)`
     - `resolveZaloBotDirectMessageConfig(...)`
-- `src/config/template.ts`
+- `src/config/core/template.ts`
   - add commented `bots.zaloBot` template
-- `src/config/load-config.ts`
+- `src/config/core/load-config.ts`
   - extend `materializeChannels` and runtime loading to include `zalo-bot`
-- `src/channels/channel-plugin.ts`
+- `src/channels/integration/channel-plugin.ts`
   - extend runtime channel typing if needed for `zalo-bot`
-- `src/channels/registry.ts`
+- `src/channels/catalog/registry.ts`
   - register `zaloBotChannelPlugin`
-- `src/control/runtime-health-store.ts`
+- `src/control/runtime/runtime-health-store.ts`
   - add `zalo-bot` channel key
   - add `markZaloBotFailure(...)`
   - add Zalo-specific startup diagnostics
-- `src/control/message-cli.ts`
+- `src/control/commands/message-cli.ts`
   - allow `--channel zalo-bot`
   - update help and examples
-- `src/control/bots-cli.ts`
+- `src/control/commands/bots-cli.ts`
   - allow `--channel zalo-bot`
   - support add/get/set-default/set-credentials/get-dm-policy/get-group-policy
 

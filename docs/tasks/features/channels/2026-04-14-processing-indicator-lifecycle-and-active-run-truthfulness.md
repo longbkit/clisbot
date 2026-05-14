@@ -58,7 +58,7 @@ This creates a false idle signal while the active run continues.
 
 Most suspicious code paths:
 
-- `src/channels/interaction-processing.ts`
+- `src/channels/message/interaction-processing.ts`
   - implicit steering path for busy sessions
   - explicit `/steer` path
 - `src/channels/telegram/service.ts`

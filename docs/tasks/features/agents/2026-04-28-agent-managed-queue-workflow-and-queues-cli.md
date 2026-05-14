@@ -414,7 +414,7 @@ self-continuation tool.
 
 ### 3. Control CLI
 
-- add `src/control/queues-cli.ts`
+- add `src/control/commands/queues-cli.ts`
 - reuse route/session addressing helpers from loops where DRY
 - support scoped `list` and `status` with `--channel --target` filters
 - require `--sender` for cross-session queue creation

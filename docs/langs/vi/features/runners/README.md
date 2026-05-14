@@ -16,7 +16,7 @@ Boundary rule ngắn:
 
 Điểm dễ nhầm cần tránh:
 
-- `src/agents/runner-service.ts` là runner-facing adapter mà `SessionService` đang gọi hiện nay
+- `src/agents/runtime/runner-service.ts` là runner-facing adapter mà `SessionService` đang gọi hiện nay
 - `src/runners/tmux/*` là lower-level backend code mà adapter đó dùng
 - không cái nào trong hai nơi này nên quyết định việc active mapping có bị set, clear, hay rotate hay không
 

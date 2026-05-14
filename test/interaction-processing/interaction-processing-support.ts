@@ -1,6 +1,7 @@
 import { afterEach, beforeEach } from "bun:test";
-import type { ChannelInteractionIdentity, ChannelInteractionRoute } from "../../src/channels/interaction-processing.ts";
-import type { AgentSessionTarget } from "../../src/agents/agent-service.ts";
+import type { ChannelInteractionIdentity, ChannelInteractionRoute } from "../../src/channels/message/interaction-processing.ts";
+import type { AgentSessionTarget } from "../../src/agents/runtime/agent-service.ts";
+import { setRenderedCliName } from "../../src/control/commands/cli-name.ts";
 
 export function registerCliNameIsolation() {
   let previousCliName: string | undefined;
@@ -8,10 +9,12 @@ export function registerCliNameIsolation() {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
   });
 }
 

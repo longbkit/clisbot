@@ -59,7 +59,7 @@ Current routed flow is:
 The ownership split is structurally correct.
 
 - Slack and Telegram resolve route and surface-local conversation targeting
-- canonical `sessionKey` builders still live in `src/agents/session-key.ts`
+- canonical `sessionKey` builders still live in `src/agents/session/session-key.ts`
 - runner-specific session-id operations still depend on `RunnerService`, not the channel layer
 
 This is the right high-level boundary.
@@ -67,7 +67,7 @@ This is the right high-level boundary.
 ### Finding 2
 
 `RunnerService` is architecturally backend-owned, but the current file still
-lives under `src/agents/runner-service.ts`.
+lives under `src/agents/runtime/runner-service.ts`.
 
 That does not break runtime behavior by itself, but it weakens the repo's
 navigation truth because the architecture says the backend owner is the runner

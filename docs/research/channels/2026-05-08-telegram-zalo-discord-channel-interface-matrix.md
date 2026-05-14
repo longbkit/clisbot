@@ -31,7 +31,7 @@ Naming note:
 
 The most important evidence-backed conclusions remain:
 
-- current `clisbot` exposes `11` flat message verbs from `src/control/message-cli.ts`
+- current `clisbot` exposes `11` flat message verbs from `src/control/commands/message-cli.ts`
 - Slack is not `11/11 native`
   - `poll` is a compatibility shim
   - `search` is a local filter over recent history
@@ -55,9 +55,9 @@ The most important evidence-backed conclusions remain:
 
 ### clisbot current code
 
-- `src/channels/message-command.ts`
+- `src/channels/message/message-command.ts`
   - defines the flat `MessageAction` union with `11` verbs
-- `src/control/message-cli.ts`
+- `src/control/commands/message-cli.ts`
   - renders those `11` verbs in help
   - hard-codes `--thread-id` for Slack and `--topic-id` for Telegram
 - `src/channels/slack/message-actions.ts`

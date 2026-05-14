@@ -92,28 +92,28 @@ Add a new root:
 
 ## Cross-cutting files
 
-- `src/config/schema.ts`
+- `src/config/core/schema.ts`
   - add `bots.zaloPersonal.defaults`
   - add backend/profile config
-- `src/config/channel-bots.ts`
+- `src/config/channels/channel-bots.ts`
   - add `ResolvedZaloPersonalConfig`
   - add:
     - `listZaloPersonalBots(...)`
     - `resolveZaloPersonalBotId(...)`
     - `getZaloPersonalRecord(...)`
     - `resolveZaloPersonalConfig(...)`
-- `src/config/template.ts`
+- `src/config/core/template.ts`
   - add `bots.zaloPersonal` template section
-- `src/config/load-config.ts`
+- `src/config/core/load-config.ts`
   - extend runtime loading for `zalo-personal`
-- `src/channels/registry.ts`
+- `src/channels/catalog/registry.ts`
   - register `zaloPersonalChannelPlugin`
-- `src/control/runtime-health-store.ts`
+- `src/control/runtime/runtime-health-store.ts`
   - add `zalo-personal` channel key
   - add `markZaloPersonalFailure(...)`
-- `src/control/message-cli.ts`
+- `src/control/commands/message-cli.ts`
   - allow `--channel zalo-personal`
-- `src/control/bots-cli.ts`
+- `src/control/commands/bots-cli.ts`
   - allow `--channel zalo-personal`
   - if login flow needs CLI support, add a dedicated login/status sub-surface
 

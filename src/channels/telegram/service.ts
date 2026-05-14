@@ -1,23 +1,23 @@
-import { AgentService } from "../../agents/agent-service.ts";
+import { AgentService } from "../../agents/runtime/agent-service.ts";
 import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
-} from "../../agents/follow-up-policy.ts";
-import { parseAgentCommand } from "../../agents/commands.ts";
+} from "../../agents/commands/follow-up-policy.ts";
+import { parseAgentCommand } from "../../agents/commands/commands.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
-import { processChannelInteraction } from "../interaction-processing.ts";
-import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
+import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
-  isTelegramSenderAllowed,
-  isTelegramSenderBlocked,
+  isChannelSenderAllowed,
+  isChannelSenderBlocked,
 } from "../pairing/access.ts";
 import { buildPairingReplyFromRequest } from "../pairing/messages.ts";
 import {
   upsertChannelPairingRequest,
 } from "../pairing/store.ts";
-import { ProcessedEventsStore } from "../processed-events-store.ts";
-import { ActivityStore } from "../../control/activity-store.ts";
-import { renderCliCommand } from "../../shared/cli-name.ts";
+import { ProcessedEventsStore } from "../message/processed-events-store.ts";
+import { ActivityStore } from "../../control/runtime/activity-store.ts";
+import { renderCliCommand } from "../../control/commands/cli-name.ts";
 import {
   callTelegramApi,
   isTelegramPollingConflict,
@@ -50,33 +50,33 @@ import {
 } from "./transport.ts";
 import { resolveTelegramMessageContent } from "./content.ts";
 import { resolveTelegramAttachmentPaths } from "./attachments.ts";
-import { sleep } from "../../shared/process.ts";
-import type { TelegramBotCredentialConfig } from "../../config/channel-bots.ts";
+import { sleep } from "../../infra/process.ts";
+import type { TelegramBotCredentialConfig } from "./config.ts";
 import {
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageAdmissionConfig,
-} from "../../config/channel-bots.ts";
-import type { ResolvedTelegramBotConfig } from "../../config/channel-bots.ts";
-import { buildAgentPromptText } from "../agent-prompt.ts";
+} from "./config.ts";
+import type { ResolvedTelegramBotConfig } from "./config.ts";
+import { buildAgentPromptText } from "../message/agent-prompt.ts";
 import {
   buildSurfacePromptContextWithDirectory,
   recordSurfaceDirectoryIdentity,
-} from "../surface-directory.ts";
-import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
-import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
+} from "../surface/surface-directory.ts";
+import { buildMentionOnlyFollowUpPrompt } from "../config/mention-follow-up.ts";
+import { prependRecentConversationContext } from "../../agents/routing/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
 import {
   claimFirstOwnerFromDirectMessage,
   renderFirstOwnerClaimMessage,
 } from "../../auth/owner-claim.ts";
-import { logLatencyDebug } from "../../control/latency-debug.ts";
+import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
 import { beginTelegramTypingHeartbeat } from "./typing.ts";
-import { buildTokenHint } from "../runtime-identity.ts";
-import { ConversationProcessingIndicatorCoordinator } from "../processing-indicator.ts";
-import type { ChannelRuntimeLifecycleEvent } from "../channel-plugin.ts";
-import { renderGroupRouteAccessDeniedMessage } from "../route-policy.ts";
+import { buildTokenHint } from "../integration/channel-runtime-identity.ts";
+import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
+import type { ChannelRuntimeLifecycleEvent } from "../integration/channel-plugin.ts";
+import { renderGroupRouteAccessDeniedMessage } from "../config/route-policy.ts";
 
 type TelegramGetMeResult = {
   id: number;
@@ -559,10 +559,13 @@ export class TelegramPollingService {
           : undefined;
       if (
         senderId &&
-        isTelegramSenderBlocked({
+        isChannelSenderBlocked({
+          channel: "telegram",
           blockFrom: route.blockUsers ?? [],
-          userId: senderId,
-          username: senderUsername,
+          subject: {
+            userId: senderId,
+            username: senderUsername,
+          },
         })
       ) {
         await this.processedEventsStore.markCompleted(eventId);
@@ -575,10 +578,13 @@ export class TelegramPollingService {
           route.policy === "allowlist" ||
           (route.allowUsers?.length ?? 0) > 0
         ) &&
-        !isTelegramSenderAllowed({
+        !isChannelSenderAllowed({
+          channel: "telegram",
           allowFrom: route.allowUsers ?? [],
-          userId: senderId,
-          username: senderUsername,
+          subject: {
+            userId: senderId,
+            username: senderUsername,
+          },
         })
       ) {
         try {
@@ -657,20 +663,26 @@ export class TelegramPollingService {
         identity: dmIdentity,
       });
 
-      if (isTelegramSenderBlocked({
+      if (isChannelSenderBlocked({
+        channel: "telegram",
         blockFrom: directMessages.blockUsers ?? [],
-        userId: senderId,
-        username: senderUsername,
+        subject: {
+          userId: senderId,
+          username: senderUsername,
+        },
       })) {
         await this.processedEventsStore.markCompleted(eventId);
         return;
       }
 
       if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
-        const allowed = isTelegramSenderAllowed({
+        const allowed = isChannelSenderAllowed({
+          channel: "telegram",
           allowFrom: directMessages.allowUsers ?? [],
-          userId: senderId,
-          username: senderUsername,
+          subject: {
+            userId: senderId,
+            username: senderUsername,
+          },
         });
         if (!allowed) {
           if (directMessages.policy === "pairing") {

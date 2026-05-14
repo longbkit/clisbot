@@ -54,7 +54,7 @@ Start from what you want to do.
 
 ## Common Flags
 
-- `--channel <slack|telegram|zalo-bot>`
+- `--channel <channel-name>`
 - `--bot <id>`
 - `--agent <id>`
 - `--json`
@@ -126,25 +126,25 @@ A bot can define:
 
 Core commands:
 
-- `clisbot bots list [--channel <slack|telegram|zalo-bot>] [--json]`
+- `clisbot bots list [--channel <channel-name>] [--json]`
 - `clisbot bots add --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
 - `clisbot bots add --channel zalo-bot [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
 - `clisbot bots add --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`
-- `clisbot bots enable --channel <slack|telegram|zalo-bot> [--bot <id>]`
-- `clisbot bots disable --channel <slack|telegram|zalo-bot> [--bot <id>]`
-- `clisbot bots remove --channel <slack|telegram|zalo-bot> [--bot <id>]`
-- `clisbot bots get --channel <slack|telegram|zalo-bot> [--bot <id>] [--json]`
-- `clisbot bots get-agent --channel <slack|telegram|zalo-bot> [--bot <id>]`
-- `clisbot bots set-agent --channel <slack|telegram|zalo-bot> [--bot <id>] --agent <id>`
-- `clisbot bots clear-agent --channel <slack|telegram|zalo-bot> [--bot <id>]`
-- `clisbot bots get-default --channel <slack|telegram|zalo-bot>`
-- `clisbot bots set-default --channel <slack|telegram|zalo-bot> --bot <id>`
-- `clisbot bots get-credentials-source --channel <slack|telegram|zalo-bot> [--bot <id>]`
+- `clisbot bots enable --channel <channel-name> [--bot <id>]`
+- `clisbot bots disable --channel <channel-name> [--bot <id>]`
+- `clisbot bots remove --channel <channel-name> [--bot <id>]`
+- `clisbot bots get --channel <channel-name> [--bot <id>] [--json]`
+- `clisbot bots get-agent --channel <channel-name> [--bot <id>]`
+- `clisbot bots set-agent --channel <channel-name> [--bot <id>] --agent <id>`
+- `clisbot bots clear-agent --channel <channel-name> [--bot <id>]`
+- `clisbot bots get-default --channel <channel-name>`
+- `clisbot bots set-default --channel <channel-name> --bot <id>`
+- `clisbot bots get-credentials-source --channel <channel-name> [--bot <id>]`
 - `clisbot bots set-credentials --channel telegram [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
 - `clisbot bots set-credentials --channel zalo-bot [--bot <id>] --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
 - `clisbot bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
-- `clisbot bots get-dm-policy --channel <slack|telegram|zalo-bot> [--bot <id>]`
-- `clisbot bots set-dm-policy --channel <slack|telegram|zalo-bot> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
+- `clisbot bots get-dm-policy --channel <channel-name> [--bot <id>]`
+- `clisbot bots set-dm-policy --channel <channel-name> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
 
 Token aliases:
 
@@ -217,40 +217,41 @@ Notes:
 - legacy shorthand `*`, old `groups:*`, and Slack `channel:<id>` input are still accepted for compatibility
 - canonical operator naming still treats `group:<id>` as the preferred multi-user route id across providers
 - `group:*` is the bot default multi-user sender policy node and should be updated, not treated as removable
+- `clisbot routes --help --channel <channel-name>` prints channel-scoped route syntax and examples
 
 Core commands:
 
-- `clisbot routes list [--channel <slack|telegram|zalo-bot>] [--bot <id>] [--json]`
+- `clisbot routes list [--channel <channel-name>] [--bot <id>] [--json]`
 - `clisbot routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes add --channel zalo-bot <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
-- `clisbot routes enable --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes disable --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes remove --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes get --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] [--json]`
-- `clisbot routes get-agent --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-agent --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --agent <id>`
-- `clisbot routes clear-agent --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes get-policy --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-policy --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --policy <...>`
-- `clisbot routes get-require-mention --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-require-mention --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --value <true|false>`
-- `clisbot routes get-allow-bots --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-allow-bots --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --value <true|false>`
-- `clisbot routes add-allow-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes remove-allow-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes add-block-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes remove-block-user --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --user <principal>`
-- `clisbot routes get-follow-up-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-follow-up-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --mode <auto|mention-only|paused>`
-- `clisbot routes get-follow-up-ttl --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-follow-up-ttl --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --minutes <n>`
-- `clisbot routes get-response-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-response-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --mode <capture-pane|message-tool>`
-- `clisbot routes clear-response-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes get-additional-message-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
-- `clisbot routes set-additional-message-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>] --mode <queue|steer>`
-- `clisbot routes clear-additional-message-mode --channel <slack|telegram|zalo-bot> <route-id> [--bot <id>]`
+- `clisbot routes enable --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes disable --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes remove --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes get --channel <channel-name> <route-id> [--bot <id>] [--json]`
+- `clisbot routes get-agent --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-agent --channel <channel-name> <route-id> [--bot <id>] --agent <id>`
+- `clisbot routes clear-agent --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes get-policy --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-policy --channel <channel-name> <route-id> [--bot <id>] --policy <...>`
+- `clisbot routes get-require-mention --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-require-mention --channel <channel-name> <route-id> [--bot <id>] --value <true|false>`
+- `clisbot routes get-allow-bots --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-allow-bots --channel <channel-name> <route-id> [--bot <id>] --value <true|false>`
+- `clisbot routes add-allow-user --channel <channel-name> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes remove-allow-user --channel <channel-name> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes add-block-user --channel <channel-name> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes remove-block-user --channel <channel-name> <route-id> [--bot <id>] --user <principal>`
+- `clisbot routes get-follow-up-mode --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-follow-up-mode --channel <channel-name> <route-id> [--bot <id>] --mode <auto|mention-only|paused>`
+- `clisbot routes get-follow-up-ttl --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-follow-up-ttl --channel <channel-name> <route-id> [--bot <id>] --minutes <n>`
+- `clisbot routes get-response-mode --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-response-mode --channel <channel-name> <route-id> [--bot <id>] --mode <capture-pane|message-tool>`
+- `clisbot routes clear-response-mode --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes get-additional-message-mode --channel <channel-name> <route-id> [--bot <id>]`
+- `clisbot routes set-additional-message-mode --channel <channel-name> <route-id> [--bot <id>] --mode <queue|steer>`
+- `clisbot routes clear-additional-message-mode --channel <channel-name> <route-id> [--bot <id>]`
 
 Policy rules:
 
@@ -413,6 +414,7 @@ Important behavior:
 - `clisbot message unpin ...`
 - `clisbot message pins ...`
 - `clisbot message search ...`
+- `clisbot message custom ...`
 
 Quick guide:
 
@@ -422,6 +424,7 @@ Quick guide:
 - use `read` or `search` to inspect message history
 - use `pin`, `unpin`, or `pins` for pinned messages
 - use `poll` to create a poll
+- use `custom` when one channel exposes a public message-domain subtree that does not belong in the shared stable action list yet
 
 Required vs optional:
 
@@ -434,6 +437,10 @@ Required vs optional:
 Important behavior:
 
 - `--account` chooses which bot account sends or edits the message; if omitted, the provider default bot is used
+- `clisbot message --help --channel <channel-name>` prints channel-scoped target syntax, render hints, examples, and support boundaries
+- `message custom <subtree...>` is one shared gateway with channel-owned grammar after `custom`
+- `message custom` is intentionally not one provider-neutral mini-language; inspect the selected channel help before using it
+- shared message actions are capability-gated before provider dispatch, so unsupported channel/action pairs fail fast
 - `--target` is the destination:
   - Slack uses destination ids such as channels, groups, or DM destinations
   - Telegram uses the numeric chat id
@@ -500,10 +507,10 @@ Important behavior:
 
 ## Pairing
 
-- `clisbot pairing list <slack|telegram|zalo-bot> [--json]`
-- `clisbot pairing approve <slack|telegram|zalo-bot> <code>`
-- `clisbot pairing reject <slack|telegram|zalo-bot> <code>`
-- `clisbot pairing clear <slack|telegram|zalo-bot>`
+- `clisbot pairing list <channel-name> [--json]`
+- `clisbot pairing approve <channel-name> <code>`
+- `clisbot pairing reject <channel-name> <code>`
+- `clisbot pairing clear <channel-name>`
 
 Important behavior:
 
@@ -518,8 +525,6 @@ Important behavior:
 - `clisbot loops status`
 - `clisbot loops status --channel slack --target group:C1234567890 --thread-id 1712345678.123456`
 - `clisbot loops create --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
 - `clisbot loops --channel telegram --target group:-1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
 - `clisbot loops --channel slack --target group:C1234567890 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog`
 - `clisbot loops cancel <id>`
@@ -534,8 +539,8 @@ Targeting:
 - `--thread-id` means an existing Slack thread ts
 - `--topic-id` means a Telegram topic id
 - omitting the sub-surface flag targets the parent Slack channel/group/DM or Telegram chat
-- `--new-thread` is Slack-only and creates a fresh thread anchor before the loop starts
-- `--sender <principal>` is required for loop creation and records the human creator as `slack:<user-id>` or `telegram:<user-id>`
+- use `clisbot loops --help --channel <channel-name>` or `clisbot loops create --help --channel <channel-name>` for channel-specific loop extensions
+- `--sender <principal>` is required for loop creation and records the human creator as `slack:<user-id>`, `telegram:<user-id>`, or `zalo-bot:<user-id>`
 - `--sender-name <name>` and `--sender-handle <handle>` optionally store readable creator context for scheduled prompts
 - in Telegram forum groups, omitting `--topic-id` targets the parent chat surface; sends then follow Telegram's normal no-`message_thread_id` behavior, which is the General topic when that forum has one
 
@@ -552,7 +557,7 @@ Examples:
 - omit the prompt body to load `LOOP.md` from the target workspace for maintenance loops
 - count/times loops run synchronously in the CLI process today; recurring loops are persisted for the runtime scheduler
 - the first wall-clock loop create attempt returns confirmation-required output and does not persist a loop until rerun with `--confirm`
-- AI agents should inspect `clisbot loops --help` for schedule, loop, or reminder requests and follow the CLI output instead of guessing loop state
+- AI agents should inspect `clisbot loops --help --channel <current-channel>` for schedule, loop, or reminder requests and follow the CLI output instead of guessing loop state
 
 ## Queues
 
@@ -577,6 +582,8 @@ Important behavior:
   persistence, for example `Queued: 2 ahead. Prompt: ...`
 - `--current` is not supported
 - use `--channel/--target` for scoped inspection, creation, and clearing
+- use `clisbot queues --help --channel <current-channel>` when AI agents need
+  channel-specific durable queue targeting instead of guessing provider syntax
 - queued prompts are stored under `StoredSessionEntry.queues` in `session.storePath`
 - stored queue items are the canonical queue inventory; the live runtime
   hydrates them into the same ordered drain used by `/queue`, so ordering,

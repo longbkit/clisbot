@@ -7,7 +7,7 @@ import {
   buildRunnerLaunchCommand,
   getRunnerExitRecordPath,
   readRunnerExitRecord,
-} from "../src/control/runner-exit-diagnostics.ts";
+} from "../src/control/runner/runner-exit-diagnostics.ts";
 
 describe("runner exit diagnostics", () => {
   test("writes an exit record when the runner command exits", async () => {

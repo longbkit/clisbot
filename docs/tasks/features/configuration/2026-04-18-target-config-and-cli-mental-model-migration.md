@@ -78,8 +78,8 @@ Always judge follow-up work against the same north star:
 - the latest convergence verification reran the entire repo test suite and typecheck after this cleanup: `bun test` is green at `546 pass, 0 fail`, and `bunx tsc --noEmit` is green
 - the deeper conversation-identity seam is now cleaner too: channel identity, session-target builders, route resolution, loop surface binding, agent prompt reply scaffolding, and Slack or Telegram runtime services now use `botId` on their main internal path instead of carrying `accountId` as the live noun
 - canonical internal config module names are now bot-oriented too:
-  - `src/config/channel-bots.ts` is now the main implementation file for Slack and Telegram bot config helpers
-  - `src/config/channel-bot-management.ts` is now the main implementation file for bootstrap bot mutation helpers
+  - `src/config/channels/channel-bots.ts` is now the main implementation file for Slack and Telegram bot config helpers
+  - `src/config/channels/channel-bot-management.ts` is now the main implementation file for bootstrap bot mutation helpers
 - the temporary shim files at the older `channel-accounts.ts` and `channel-account-management.ts` paths have now been removed entirely after the remaining internal and test imports were migrated
 - internal Slack and Telegram runtime services now carry `botCredentials` and bot-credential types on their main path instead of `accountConfig`
 - binding helpers now accept `botId` as the canonical internal field while still tolerating `accountId` where the public binding contract still uses it

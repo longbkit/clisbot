@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { writeFileBuffer } from "../../shared/fs.ts";
-import { ensureDir, sanitizeSessionName } from "../../shared/paths.ts";
+import { writeFileBuffer } from "../../infra/fs.ts";
+import { ensureDir, sanitizeSessionName } from "../../infra/paths.ts";
 
 const CONTENT_TYPE_EXTENSION_MAP: Record<string, string> = {
   "application/json": ".json",

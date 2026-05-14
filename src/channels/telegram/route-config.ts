@@ -1,9 +1,10 @@
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   resolveTelegramBotConfig,
   resolveTelegramDirectMessageConfig,
-} from "../../config/channel-bots.ts";
-import type { TelegramBotConfig } from "../../config/schema.ts";
+} from "./config.ts";
+import { resolveProvidedBotId } from "../../config/channels/channel-bot-records.ts";
+import type { ChannelGroupRoute } from "../../config/channels/channel-config-shapes.ts";
 import {
   buildSurfaceRoute,
   isSurfaceRouteEnabled,
@@ -11,7 +12,7 @@ import {
   type ResolvedSurfaceRouteStatus,
   type SurfaceRoute,
   type SurfaceRouteOverride,
-} from "../route-policy.ts";
+} from "../config/route-policy.ts";
 import { type TelegramConversationKind } from "./session-routing.ts";
 
 export type TelegramRoute = SurfaceRoute;
@@ -35,7 +36,7 @@ function buildRoute(
 ): TelegramRoute {
   const telegramConfig = resolveTelegramBotConfig(
     loadedConfig.raw.bots.telegram,
-    params.botId ?? params.accountId,
+    resolveProvidedBotId(params),
   );
   return buildSurfaceRoute({
     loadedConfig,
@@ -48,8 +49,8 @@ function buildRoute(
 }
 
 function mergeTelegramGroupRoute(
-  base: TelegramBotConfig["groups"][string] | undefined,
-  override: TelegramBotConfig["groups"][string] | undefined,
+  base: ChannelGroupRoute | undefined,
+  override: ChannelGroupRoute | undefined,
 ) {
   const merged = mergeSurfaceRouteOverride(base, override);
   if (!merged) {
@@ -70,7 +71,7 @@ function mergeTelegramGroupRoute(
         )!,
       ]),
     ),
-  } satisfies TelegramBotConfig["groups"][string];
+  } satisfies ChannelGroupRoute;
 }
 
 function resolveSharedRouteStatus(route: TelegramRouteOverride | undefined) {
@@ -82,7 +83,7 @@ function resolveSharedRouteStatus(route: TelegramRouteOverride | undefined) {
 
 function resolveSharedAdmissionStatus(params: {
   policy?: "disabled" | "allowlist" | "open";
-  exactRoute?: TelegramBotConfig["groups"][string];
+  exactRoute?: ChannelGroupRoute;
 }) {
   if (params.policy === "disabled") {
     return "disabled" as const;
@@ -100,7 +101,7 @@ function resolveGroupRoute(
   botId?: string,
   accountId?: string,
 ) {
-  const resolvedBotId = botId ?? accountId;
+  const resolvedBotId = resolveProvidedBotId({ botId, accountId });
   const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, resolvedBotId);
   const exactRoute = telegramConfig.groups[String(chatId)];
   const admissionStatus = resolveSharedAdmissionStatus({
@@ -148,7 +149,7 @@ function resolveDirectMessageRoute(
   botId?: string,
   accountId?: string,
 ) {
-  const resolvedBotId = botId ?? accountId;
+  const resolvedBotId = resolveProvidedBotId({ botId, accountId });
   const telegramConfig = resolveTelegramBotConfig(loadedConfig.raw.bots.telegram, resolvedBotId);
   const route = resolveTelegramDirectMessageConfig(telegramConfig, senderId);
   if (!isSurfaceRouteEnabled(route)) {

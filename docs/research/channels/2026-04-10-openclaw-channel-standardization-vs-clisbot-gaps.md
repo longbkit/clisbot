@@ -53,7 +53,7 @@ This is the correct shape for a multi-channel system.
 
 `clisbot` already has one important shared seam:
 
-- `src/channels/interaction-processing.ts`
+- `src/channels/message/interaction-processing.ts`
 
 But it does not yet have a first-class channel plugin contract or adapter stack comparable to OpenClaw’s channel architecture.
 
@@ -271,10 +271,10 @@ Meaning:
 
 What is already shared:
 
-- common interaction settlement and command handling in `src/channels/interaction-processing.ts`
+- common interaction settlement and command handling in `src/channels/message/interaction-processing.ts`
 - common pairing store and pairing helpers in `src/channels/pairing/*`
-- common rendering in `src/channels/rendering.ts`
-- common response-mode and additional-message-mode config writers in `src/channels/response-mode-config.ts` and `src/channels/additional-message-mode-config.ts`
+- common rendering in `src/channels/message/rendering.ts`
+- common response-mode and additional-message-mode config writers in `src/channels/config/response-mode-config.ts` and `src/channels/config/additional-message-mode-config.ts`
 
 What is still mostly per-channel:
 
@@ -402,7 +402,7 @@ Effect:
 
 ### Gap 6. Shared interaction core is too late in the pipeline
 
-`src/channels/interaction-processing.ts` is good, but it starts after each provider has already:
+`src/channels/message/interaction-processing.ts` is good, but it starts after each provider has already:
 
 - parsed inbound platform payloads
 - resolved route

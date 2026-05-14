@@ -1,10 +1,21 @@
-import { REPO_HELP_HINT, USER_GUIDE_DOC_PATH } from "./control/startup-bootstrap.ts";
+import { REPO_HELP_HINT, USER_GUIDE_DOC_PATH } from "./control/commands/startup-bootstrap.ts";
 import {
   DEFAULT_CLISBOT_CLI_NAME,
   getRenderedCliName,
   renderCliCommand,
-} from "./shared/cli-name.ts";
-import { collapseHomePath, getDefaultConfigPath } from "./shared/paths.ts";
+} from "./control/commands/cli-name.ts";
+import {
+  renderBootstrapExampleCommands,
+  renderBootstrapUsageLines,
+} from "./channels/catalog/registry.ts";
+import {
+  executeCommandTree,
+  renderCommandTreeCommandLines,
+  renderCommandTreeUsageLines,
+  type CommandTreeSpec,
+} from "./control/commands/command-tree.ts";
+import { renderChannelNamePlaceholder } from "./channels/catalog/registry.ts";
+import { collapseHomePath, getDefaultConfigPath } from "./infra/paths.ts";
 import { getClisbotVersion } from "./version.ts";
 
 export type ParsedCliCommand =
@@ -32,161 +43,238 @@ export type ParsedCliCommand =
   | { name: "serve-foreground" }
   | { name: "serve-monitor" };
 
-export function parseCliArgs(argv: string[]): ParsedCliCommand {
-  const args = argv.slice(2);
-  const command = args[0];
-
-  if (!command || command === "help" || command === "--help" || command === "-h") {
-    return { name: "help" };
-  }
-
-  if (command === "version" || command === "--version" || command === "-v") {
-    return { name: "version" };
-  }
-
-  if (command === "start") {
-    return {
+const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
+  onEmpty: () => ({ name: "help" }),
+  nodes: [
+    {
+      name: "help",
+      aliases: ["--help", "-h"],
+      hiddenInHelp: true,
+      handler: () => ({ name: "help" }),
+    },
+    {
+      name: "version",
+      aliases: ["--version", "-v"],
+      summary: "Show the installed clisbot version.",
+      usage: ["version"],
+      helpLines: ["  --version, -v      Show the installed clisbot version."],
+      handler: () => ({ name: "version" }),
+    },
+    {
       name: "start",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "restart") {
-    return { name: "restart" };
-  }
-
-  if (command === "stop") {
-    return {
+      summary: "Seed __CONFIG_PATH__ if missing, apply explicit bot bootstrap intent, and start clisbot in the background.",
+      usage: ["start [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]"],
+      helpLines: [
+        "                     See `start --help` for bootstrap-focused flags and examples.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "start", args: [...passthroughArgs] }),
+    },
+    {
+      name: "restart",
+      summary: "Stop the running clisbot process, then start it again.",
+      usage: ["restart"],
+      handler: () => ({ name: "restart" }),
+    },
+    {
       name: "stop",
-      hard: args.includes("--hard"),
-    };
-  }
-
-  if (command === "status") {
-    return { name: "status" };
-  }
-
-  if (command === "logs") {
-    return {
+      summary: "Stop the running clisbot process.",
+      usage: ["stop [--hard]"],
+      helpLines: [
+        "  stop --hard        Stop clisbot and kill all tmux sessions on the configured clisbot socket.",
+      ],
+      options: [{ key: "hard", flags: ["--hard"], kind: "flag" }],
+      handler: ({ options }) => ({ name: "stop", hard: Boolean(options.hard) }),
+    },
+    {
+      name: "status",
+      summary: "Show runtime process, config, log, tmux socket status, and recent runner sessions.",
+      usage: ["status"],
+      handler: () => ({ name: "status" }),
+    },
+    {
       name: "logs",
-      lines: parseLineCount(args.slice(1)),
-    };
-  }
-
-  if (command === "update") {
-    return {
+      summary: "Print the most recent clisbot log lines.",
+      usage: ["logs [--lines N]"],
+      options: [{ key: "lines", flags: ["--lines", "-n"] }],
+      handler: ({ options }) => ({ name: "logs", lines: normalizeLineCount(options.lines) }),
+    },
+    {
       name: "update",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "timezone") {
-    return {
+      summary: "Print the update guide and release/migration doc links.",
+      usage: ["update --help"],
+      helpLines: [
+        "                     See `update --help` before asking an agent to update clisbot.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "update", args: [...passthroughArgs] }),
+    },
+    {
       name: "timezone",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "bots") {
-    return {
+      summary: "Manage the app-wide wall-clock timezone used by schedules and loops.",
+      usage: ["timezone <get|set|clear|doctor>"],
+      helpLines: ["                     See `timezone --help` for override guidance."],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "timezone", args: [...passthroughArgs] }),
+    },
+    {
       name: "bots",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "routes") {
-    return {
+      summary: "Manage provider bot identities, credentials, and bot-level fallback settings.",
+      usage: ["bots <subcommand>"],
+      helpLines: [
+        "                     list|add|get|enable|disable|remove|get-default|set-default",
+        "                     get-agent|set-agent|clear-agent",
+        "                     get-credentials-source|set-credentials",
+        "                     get-dm-policy|set-dm-policy",
+        "                     See `bots --help` for examples and credential behavior.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "bots", args: [...passthroughArgs] }),
+    },
+    {
       name: "routes",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "channels") {
-    return {
+      summary: "Manage admitted inbound surfaces under each bot.",
+      usage: ["routes <subcommand>"],
+      helpLines: [
+        "                     list|add|get|enable|disable|remove",
+        "                     get-agent|set-agent|clear-agent",
+        "                     get-policy|set-policy",
+        "                     get-require-mention|set-require-mention",
+        "                     get-allow-bots|set-allow-bots",
+        "                     add/remove allow-user|block-user",
+        "                     get/set follow-up mode and ttl",
+        "                     get/set/clear response mode and additional-message mode",
+        "                     See `routes --help` for route ids and examples.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "routes", args: [...passthroughArgs] }),
+    },
+    {
       name: "channels",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "accounts") {
-    return {
+      hiddenInHelp: true,
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "channels", args: [...passthroughArgs] }),
+    },
+    {
       name: "accounts",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "loops") {
-    return {
+      hiddenInHelp: true,
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "accounts", args: [...passthroughArgs] }),
+    },
+    {
       name: "loops",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "queues") {
-    return {
+      summary: "Create, inspect, or cancel managed loops with routed session context or app-wide inventory views.",
+      usage: ["loops <subcommand>"],
+      helpLines: [
+        "                     list|status",
+        `                     create --channel ${renderChannelNamePlaceholder()} --target <route> [channel child-surface flags] <expression>`,
+        "                     cancel <id>|--all",
+        "                     scoped list/status/cancel also accept --channel/--target plus channel child-surface flags",
+        "                     `--target` selects the routed surface; child-surface flags are channel-specific",
+        "                     Use __LOOPS_CHANNEL_HELP__ for channel-specific loop extensions.",
+        "                     See `loops --help` for slash-compatible expressions and examples.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "loops", args: [...passthroughArgs] }),
+    },
+    {
       name: "queues",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "message") {
-    return {
+      summary: "Create, inspect, or clear durable queued prompts without interrupting running work.",
+      usage: ["queues <subcommand>"],
+      helpLines: [
+        "                     list|status|create|clear",
+        `                     create --channel ${renderChannelNamePlaceholder()} --target <route> --sender <principal> <prompt>`,
+        "                     list shows pending only; status includes pending and running.",
+        "                     See `queues --help` for scoped queue examples.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "queues", args: [...passthroughArgs] }),
+    },
+    {
       name: "message",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "agents") {
-    return {
+      summary: "Run provider message actions such as send, react, read, edit, delete, and pins.",
+      usage: ["message <subcommand>"],
+      helpLines: ["                     See `message --help` for channel-specific syntax."],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "message", args: [...passthroughArgs] }),
+    },
+    {
       name: "agents",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "auth") {
-    return {
+      summary: "Manage configured agents, workspaces, bootstrap files, and per-agent mode overrides.",
+      usage: ["agents <subcommand>"],
+      helpLines: [
+        "                     See `agents --help` for focused add/bootstrap help.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "agents", args: [...passthroughArgs] }),
+    },
+    {
       name: "auth",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "runner") {
-    return {
+      summary: "Manage app and agent auth roles, principals, and permissions in config. See `auth --help`.",
+      usage: ["auth <subcommand>"],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "auth", args: [...passthroughArgs] }),
+    },
+    {
       name: "runner",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "watch" || command === "inspect") {
-    return {
-      name: "runner",
-      args: [command, ...args.slice(1)],
-    };
-  }
-
-  if (command === "pairing") {
-    return {
+      summary: "Inspect tmux-backed runner sessions and validate runner smoke contracts.",
+      usage: ["runner <subcommand>"],
+      helpLines: [
+        "                     list|inspect <session-name>|inspect --latest|inspect --index <n>|watch <session-name>|watch --latest|watch --next|watch --index <n>|smoke ...",
+        "                     See `runner --help` for operator debug and smoke details.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "runner", args: [...passthroughArgs] }),
+    },
+    {
+      name: "watch",
+      hiddenInCommandList: true,
+      usage: ["watch <session-name>|--latest|--index <n>"],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "runner", args: ["watch", ...passthroughArgs] }),
+    },
+    {
+      name: "inspect",
+      hiddenInCommandList: true,
+      usage: ["inspect <session-name>|--latest|--index <n>"],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({
+        name: "runner",
+        args: ["inspect", ...passthroughArgs],
+      }),
+    },
+    {
       name: "pairing",
-      args: args.slice(1),
-    };
-  }
-
-  if (command === "init") {
-    return {
+      summary: "Run the pairing control CLI. See `pairing --help`.",
+      usage: ["pairing <subcommand>"],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "pairing", args: [...passthroughArgs] }),
+    },
+    {
       name: "init",
-      args: args.slice(1),
-    };
-  }
+      summary: "Seed __CONFIG_PATH__ and optionally create the first agent without starting clisbot.",
+      usage: ["init [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]"],
+      helpLines: [
+        "                     See `init --help` for bootstrap-focused flags and examples.",
+      ],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "init", args: [...passthroughArgs] }),
+    },
+    {
+      name: "serve-foreground",
+      hiddenInHelp: true,
+      handler: () => ({ name: "serve-foreground" }),
+    },
+    {
+      name: "serve-monitor",
+      hiddenInHelp: true,
+      handler: () => ({ name: "serve-monitor" }),
+    },
+  ],
+};
 
-  if (command === "serve-foreground") {
-    return { name: "serve-foreground" };
-  }
-
-  if (command === "serve-monitor") {
-    return { name: "serve-monitor" };
-  }
-
-  throw new Error(`Unknown command: ${command}`);
+export function parseCliArgs(argv: string[]): ParsedCliCommand {
+  return executeCommandTree(argv.slice(2), ROOT_COMMAND_TREE);
 }
 
 export function renderCliHelp() {
@@ -202,10 +290,7 @@ export function renderCliHelp() {
     "Fastest start:",
     "  1. Choose the channels you want to bootstrap explicitly.",
     "  2. Run one of these commands:",
-    `     ${renderCliCommand("start --cli codex --bot-type personal --telegram-bot-token TELEGRAM_BOT_TOKEN")}`,
-    `     ${renderCliCommand("start --cli codex --bot-type personal --zalo-bot-token ZALO_BOT_TOKEN")}`,
-    `     ${renderCliCommand("start --cli codex --bot-type personal --telegram-bot-token \"$TELEGRAM_BOT_TOKEN\" --persist")}`,
-    `     ${renderCliCommand("start --cli codex --bot-type team --slack-app-token SLACK_APP_TOKEN --slack-bot-token SLACK_BOT_TOKEN")}`,
+    ...renderBootstrapExampleCommands("start").map((command) => `     ${command}`),
     `  3. Use ${renderCliCommand("status", { inline: true })} to see runtime state and the most recent runner sessions.`,
     `     Use ${renderCliCommand("watch --latest", { inline: true })} when you want to jump straight into the newest live pane.`,
     "",
@@ -226,94 +311,17 @@ export function renderCliHelp() {
     "",
     "Working hints:",
     `  Add extra workspaces with ${renderCliCommand("agents add <id> --cli <codex|claude|gemini>", { inline: true })}, then point traffic with ${renderCliCommand("bots set-agent ...", { inline: true })} or ${renderCliCommand("routes set-agent ...", { inline: true })}.`,
-    `  For shared Slack/Telegram surfaces, the usual flow is ${renderCliCommand("routes add ...", { inline: true })} -> ${renderCliCommand("routes set-agent ...", { inline: true })} -> optional follow-up or allowlist tuning.`,
-    `  For Zalo Bot, the same bot/bootstrap model applies, but routed shared surfaces use ${renderCliCommand("routes add --channel zalo-bot ...", { inline: true })}.`,
+    `  For routed shared surfaces, the usual flow is ${renderCliCommand("routes add ...", { inline: true })} -> ${renderCliCommand("routes set-agent ...", { inline: true })} -> optional follow-up or allowlist tuning.`,
     `  For fast runner debugging, start with ${renderCliCommand("runner list", { inline: true })} and ${renderCliCommand("watch --latest", { inline: true })}.`,
     "",
     "Usage:",
-    `  ${renderCliCommand("start [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]")}`,
-    "               [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
-    "               [--telegram-account <id> --telegram-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
-    "               [--zalo-bot-account <id> --zalo-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
-    `  ${renderCliCommand("restart")}`,
-    `  ${renderCliCommand("stop [--hard]")}`,
-    `  ${renderCliCommand("status")}`,
-    `  ${renderCliCommand("version")}`,
-    `  ${renderCliCommand("logs [--lines N]")}`,
-    `  ${renderCliCommand("update --help")}`,
-    `  ${renderCliCommand("timezone <get|set|clear|doctor>")}`,
-    `  ${renderCliCommand("bots <subcommand>")}`,
-    `  ${renderCliCommand("routes <subcommand>")}`,
-    `  ${renderCliCommand("loops <subcommand>")}`,
-    `  ${renderCliCommand("queues <subcommand>")}`,
-    `  ${renderCliCommand("message <subcommand>")}`,
-    `  ${renderCliCommand("agents <subcommand>")}`,
-    `  ${renderCliCommand("auth <subcommand>")}`,
-    `  ${renderCliCommand("runner <subcommand>")}`,
-    `  ${renderCliCommand("watch <session-name>|--latest|--index <n>")}`,
-    `  ${renderCliCommand("inspect <session-name>|--latest|--index <n>")}`,
-    `  ${renderCliCommand("pairing <subcommand>")}`,
-    `  ${renderCliCommand("init [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]")}`,
-    "              [--slack-account <id> --slack-app-token <ENV_NAME|${ENV_NAME}|literal> --slack-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
-    "              [--telegram-account <id> --telegram-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
-    "              [--zalo-bot-account <id> --zalo-bot-token <ENV_NAME|${ENV_NAME}|literal>]...",
+    ...renderRootUsageLines(),
     ...(cliName === DEFAULT_CLISBOT_CLI_NAME ? ["  clis <same-command>"] : []),
     `  ${renderCliCommand("--help")}`,
     "",
     "Commands:",
-    `  start              Seed ${configPath} if missing, apply explicit bot bootstrap intent, and start clisbot in the background.`,
-    `                     See ${renderCliCommand("start --help", { inline: true })} for bootstrap-focused flags and examples.`,
-    "  restart            Stop the running clisbot process, then start it again.",
-    "  stop               Stop the running clisbot process.",
-    "  stop --hard        Stop clisbot and kill all tmux sessions on the configured clisbot socket.",
-    "  status             Show runtime process, config, log, tmux socket status, and recent runner sessions.",
-    "  version            Show the installed clisbot version.",
-    "  logs               Print the most recent clisbot log lines.",
-    "  update             Print the update guide and release/migration doc links.",
-    `                     See ${renderCliCommand("update --help", { inline: true })} before asking an agent to update clisbot.`,
-    "  timezone           Manage the app-wide wall-clock timezone used by schedules and loops.",
-    `                     See ${renderCliCommand("timezone --help", { inline: true })} for override guidance.`,
-    "  bots               Manage provider bot identities, credentials, and bot-level fallback settings.",
-    "                     list|add|get|enable|disable|remove|get-default|set-default",
-    "                     get-agent|set-agent|clear-agent",
-    "                     get-credentials-source|set-credentials",
-    "                     get-dm-policy|set-dm-policy",
-    `                     See ${renderCliCommand("bots --help", { inline: true })} for examples and credential behavior.`,
-    "  routes             Manage admitted inbound surfaces under each bot.",
-    "                     list|add|get|enable|disable|remove",
-    "                     get-agent|set-agent|clear-agent",
-    "                     get-policy|set-policy",
-    "                     get-require-mention|set-require-mention",
-    "                     get-allow-bots|set-allow-bots",
-    "                     add/remove allow-user|block-user",
-    "                     get/set follow-up mode and ttl",
-    "                     get/set/clear response mode and additional-message mode",
-    `                     See ${renderCliCommand("routes --help", { inline: true })} for route ids and examples.`,
-    "  loops              Create, inspect, or cancel managed loops with routed session context or app-wide inventory views.",
-    "                     list|status",
-    "                     create --channel <slack|telegram|zalo-bot> --target <route> [--thread-id <slack-thread-ts>] [--topic-id <telegram-topic-id>] [--new-thread] <expression>",
-    "                     cancel <id>|--all",
-    "                     scoped list/status/cancel also accept --channel/--target/--thread-id/--topic-id",
-    "                     `--target` selects the routed surface; use `--thread-id` for Slack threads, `--topic-id` for Telegram topics",
-    `                     See ${renderCliCommand("loops --help", { inline: true })} for slash-compatible expressions and examples.`,
-    "  queues             Create, inspect, or clear durable queued prompts without interrupting running work.",
-    "                     list|status|create|clear",
-    "                     create --channel <slack|telegram|zalo-bot> --target <route> --sender <principal> <prompt>",
-    "                     list shows pending only; status includes pending and running.",
-    `                     See ${renderCliCommand("queues --help", { inline: true })} for scoped queue examples.`,
-    "  message            Run provider message actions such as send, react, read, edit, delete, and pins.",
-    `                     See ${renderCliCommand("message --help", { inline: true })} for channel-specific syntax.`,
-    "  agents             Manage configured agents, workspaces, bootstrap files, and per-agent mode overrides.",
-    `                     See ${renderCliCommand("agents --help", { inline: true })} for focused add/bootstrap help.`,
-    `  auth               Manage app and agent auth roles, principals, and permissions in config. See ${renderCliCommand("auth --help", { inline: true })}.`,
-    "  runner             Inspect tmux-backed runner sessions and validate runner smoke contracts.",
-    "                     list|inspect <session-name>|inspect --latest|inspect --index <n>|watch <session-name>|watch --latest|watch --next|watch --index <n>|smoke ...",
-    `                     See ${renderCliCommand("runner --help", { inline: true })} for operator debug and smoke details.`,
+    ...renderRootCommandLines(configPath),
     `  runner shortcuts   ${renderCliCommand("watch --latest", { inline: true })} and ${renderCliCommand("inspect --latest", { inline: true })} are shorthand for runner debug commands.`,
-    `  pairing            Run the pairing control CLI. See ${renderCliCommand("pairing --help", { inline: true })}.`,
-    `  init               Seed ${configPath} and optionally create the first agent without starting clisbot.`,
-    `                     See ${renderCliCommand("init --help", { inline: true })} for bootstrap-focused flags and examples.`,
-    "  --version, -v      Show the installed clisbot version.",
     "  --help             Show this help text.",
     "",
     ...(cliName === DEFAULT_CLISBOT_CLI_NAME
@@ -338,18 +346,55 @@ export function renderCliHelp() {
   return lines.join("\n");
 }
 
-function parseLineCount(args: string[]) {
-  const defaultLines = 200;
-  const index = args.findIndex((arg) => arg === "--lines" || arg === "-n");
-  if (index === -1) {
-    return defaultLines;
+function renderRootUsageLines() {
+  const usageLines = renderCommandTreeUsageLines(ROOT_COMMAND_TREE, getRenderedCliName());
+  const lines: string[] = [];
+  for (const line of usageLines) {
+    lines.push(line);
+    if (line.includes("start [--cli")) {
+      lines.push(...renderBootstrapUsageLines("               "));
+    }
+    if (line.includes("init [--cli")) {
+      lines.push(...renderBootstrapUsageLines("              "));
+    }
   }
+  return lines;
+}
 
-  const rawValue = args[index + 1];
-  const parsed = Number.parseInt(rawValue ?? "", 10);
+function renderRootCommandLines(configPath: string) {
+  return renderCommandTreeCommandLines(ROOT_COMMAND_TREE, (line) =>
+    line
+      .replaceAll("__CONFIG_PATH__", configPath)
+      .replace("`start --help`", renderCliCommand("start --help", { inline: true }))
+      .replace("`update --help`", renderCliCommand("update --help", { inline: true }))
+      .replace("`timezone --help`", renderCliCommand("timezone --help", { inline: true }))
+      .replace("`bots --help`", renderCliCommand("bots --help", { inline: true }))
+      .replace("`routes --help`", renderCliCommand("routes --help", { inline: true }))
+      .replace("`loops --help`", renderCliCommand("loops --help", { inline: true }))
+      .replace(
+        "__LOOPS_CHANNEL_HELP__",
+        renderCliCommand(`loops --help --channel ${renderChannelNamePlaceholder()}`, {
+          inline: true,
+        }),
+      )
+      .replace("`queues --help`", renderCliCommand("queues --help", { inline: true }))
+      .replace("`message --help`", renderCliCommand("message --help", { inline: true }))
+      .replace("`agents --help`", renderCliCommand("agents --help", { inline: true }))
+      .replace("`auth --help`", renderCliCommand("auth --help", { inline: true }))
+      .replace("`runner --help`", renderCliCommand("runner --help", { inline: true }))
+      .replace("`pairing --help`", renderCliCommand("pairing --help", { inline: true }))
+      .replace("`init --help`", renderCliCommand("init --help", { inline: true })),
+  );
+}
+
+function normalizeLineCount(value: unknown) {
+  if (value === undefined) {
+    return 200;
+  }
+  const rawValue = String(value);
+  const parsed = Number.parseInt(rawValue, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`Invalid line count: ${rawValue ?? ""}`);
+    throw new Error(`Invalid line count: ${rawValue}`);
   }
-
   return parsed;
 }

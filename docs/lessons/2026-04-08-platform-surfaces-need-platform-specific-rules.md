@@ -6,8 +6,8 @@ summary: Shared channel logic should stay shared only at the policy level; rende
 related:
   - docs/features/channels/README.md
   - docs/user-guide/channels.md
-  - src/channels/rendering.ts
-  - src/channels/interaction-processing.ts
+  - src/channels/message/rendering.ts
+  - src/channels/message/interaction-processing.ts
   - src/channels/slack/service.ts
   - src/channels/telegram/service.ts
 ---

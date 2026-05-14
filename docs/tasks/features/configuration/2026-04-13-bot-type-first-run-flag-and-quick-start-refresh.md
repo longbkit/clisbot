@@ -50,9 +50,9 @@ The public surface should optimize for:
 
 ## Implementation Notes
 
-- `src/control/channel-bootstrap-flags.ts` normalizes `--bot-type personal|team` into the existing internal bootstrap modes and rejects legacy aliases.
-- `src/control/agents-cli.ts` uses the same `--bot-type` parser so `start`, `init`, `agents add`, and `agents bootstrap` share one contract.
-- `src/main.ts`, `src/control/runtime-summary.ts`, and `src/control/startup-bootstrap.ts` present only `--bot-type` in operator guidance.
+- `src/control/commands/channel-bootstrap-flags.ts` normalizes `--bot-type personal|team` into the existing internal bootstrap modes and rejects legacy aliases.
+- `src/control/commands/agents-cli.ts` uses the same `--bot-type` parser so `start`, `init`, `agents add`, and `agents bootstrap` share one contract.
+- `src/main.ts`, `src/control/runtime/runtime-summary.ts`, and `src/control/commands/startup-bootstrap.ts` present only `--bot-type` in operator guidance.
 - visible quick-start docs now lead with:
   - Telegram first
   - inline token first

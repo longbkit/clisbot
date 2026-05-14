@@ -10,19 +10,19 @@ import {
   deriveInteractionText,
   deriveRunningInteractionText,
   extractFinalAnswer,
-  extractSlackIncrement,
-  mergeSlackStreamBodies,
-  renderSlackInteraction,
-  renderSlackSnapshot,
-  renderTelegramInteraction,
-  selectSlackCompletionBody,
-  selectSlackSnapshotBody,
+  extractRenderedIncrement,
+  mergeRenderedStreamBodies,
+  renderMarkdownInteraction,
+  renderChannelSnapshot,
+  renderPlainInteraction,
+  selectCompletedInteractionBody,
+  selectSnapshotInteractionBody,
   truncateHead,
-} from "../../src/shared/transcript.ts";
+} from "../../src/runners/transcript/index.ts";
 
 describe("snapshot shaping", () => {
   test("renders metadata and truncated snapshot", () => {
-    const rendered = renderSlackSnapshot({
+    const rendered = renderChannelSnapshot({
       agentId: "default",
       sessionName: "default",
       workspacePath: "/tmp/workspace",
@@ -37,9 +37,9 @@ describe("snapshot shaping", () => {
     expect(rendered.length).toBeLessThan(4300);
   });
 
-  test("renders chat-first Slack interaction text without metadata", () => {
+  test("renders chat-first markdown interaction text without metadata", () => {
     expect(
-      renderSlackInteraction({
+      renderMarkdownInteraction({
         status: "queued",
         content: "",
         maxChars: 200,
@@ -48,7 +48,7 @@ describe("snapshot shaping", () => {
     ).toBe("_Queued: 2 ahead._");
 
     expect(
-      renderSlackInteraction({
+      renderMarkdownInteraction({
         status: "running",
         content: "Thinking...\nFound the issue.",
         maxChars: 200,
@@ -56,7 +56,7 @@ describe("snapshot shaping", () => {
     ).toBe("Thinking...\nFound the issue.");
 
     expect(
-      renderTelegramInteraction({
+      renderPlainInteraction({
         status: "running",
         content: "Thinking...\nFound the issue.",
         maxChars: 200,
@@ -64,7 +64,7 @@ describe("snapshot shaping", () => {
     ).toBe("Thinking...\nFound the issue.");
 
     expect(
-      renderTelegramInteraction({
+      renderPlainInteraction({
         status: "running",
         content: "Thinking...\nWorking... (2m 4s • esc to interrupt)",
         maxChars: 200,
@@ -72,7 +72,7 @@ describe("snapshot shaping", () => {
     ).toBe("Thinking...\nWorking... (2m 4s • esc to interrupt)");
 
     expect(
-      renderSlackInteraction({
+      renderMarkdownInteraction({
         status: "detached",
         content: "Still working through the repository.",
         maxChars: 200,
@@ -87,7 +87,7 @@ describe("snapshot shaping", () => {
 
   test("does not append a second generic error footer when the body already starts with Error", () => {
     expect(
-      renderSlackInteraction({
+      renderMarkdownInteraction({
         status: "error",
         content: "Error: Runtime stopped before the active run finished startup.",
         maxChars: 200,
@@ -95,7 +95,7 @@ describe("snapshot shaping", () => {
     ).toBe("Error: Runtime stopped before the active run finished startup.");
 
     expect(
-      renderTelegramInteraction({
+      renderPlainInteraction({
         status: "error",
         content: "Error: Runtime stopped before the active run finished startup.",
         maxChars: 200,
@@ -105,7 +105,7 @@ describe("snapshot shaping", () => {
 
   test("renders concise unlabeled errors as a single Error line", () => {
     expect(
-      renderSlackInteraction({
+      renderMarkdownInteraction({
         status: "error",
         content: "Runtime stopped before the active run finished startup.",
         maxChars: 200,
@@ -113,7 +113,7 @@ describe("snapshot shaping", () => {
     ).toBe("Error: Runtime stopped before the active run finished startup.");
 
     expect(
-      renderTelegramInteraction({
+      renderPlainInteraction({
         status: "error",
         content: "Runtime stopped before the active run finished startup.",
         maxChars: 200,
@@ -123,7 +123,7 @@ describe("snapshot shaping", () => {
 
   test("keeps detached note transcript-free when transcript inspection is disabled", () => {
     expect(
-      renderSlackInteraction({
+      renderMarkdownInteraction({
         status: "detached",
         content: "Still working through the repository.",
         maxChars: 200,
@@ -245,7 +245,7 @@ Next, I can inspect the source tree or run tests.
 Scanning candidate files.
 
 src/index.ts
-src/shared/transcript.ts
+src/runners/transcript/index.ts
 docs/features/runners/README.md
 
 The duplicate came from settlement merging rather than tmux capture.
@@ -255,7 +255,7 @@ The duplicate came from settlement merging rather than tmux capture.
   });
 
   test("completed interaction truncation preserves the beginning of the final answer", () => {
-    const rendered = renderSlackInteraction({
+    const rendered = renderMarkdownInteraction({
       status: "completed",
       content: `
 • Searching the web
@@ -278,7 +278,7 @@ What changed today vs. yesterday
   });
 
   test("completed interaction can preserve streamed content when response policy is all", () => {
-    const rendered = renderSlackInteraction({
+    const rendered = renderMarkdownInteraction({
       status: "completed",
       content: [
         "• Searching the web",
@@ -296,7 +296,7 @@ What changed today vs. yesterday
   });
 
   test("completed interaction strips a codex single-line assistant bullet in final mode", () => {
-    const rendered = renderSlackInteraction({
+    const rendered = renderMarkdownInteraction({
       status: "completed",
       content: "• PONG",
       maxChars: 200,
@@ -307,7 +307,7 @@ What changed today vs. yesterday
   });
 
   test("completed interaction drops delivery report lines before the final answer", () => {
-    const rendered = renderSlackInteraction({
+    const rendered = renderMarkdownInteraction({
       status: "completed",
       content: [
         "Đã gửi câu trả lời vào Slack.",
@@ -329,7 +329,7 @@ What changed today vs. yesterday
   });
 
   test("completed interaction keeps only the last short queued answer block", () => {
-    const rendered = renderSlackInteraction({
+    const rendered = renderMarkdownInteraction({
       status: "completed",
       content: [
         "• Waited for background terminal",
@@ -375,11 +375,11 @@ What changed today vs. yesterday
       "• PONG",
     ].join("\n");
 
-    expect(extractSlackIncrement(previous, current)).toBe("• PONG");
+    expect(extractRenderedIncrement(previous, current)).toBe("• PONG");
   });
 
   test("returns only the final delta when response policy keeps streamed replies", () => {
-    const completion = selectSlackCompletionBody({
+    const completion = selectCompletedInteractionBody({
       previousBody: [
         "• Searching the web",
         "",
@@ -403,7 +403,7 @@ What changed today vs. yesterday
   });
 
   test("extracts normalized line deltas when progress markers change", () => {
-    const delta = extractSlackIncrement(
+    const delta = extractRenderedIncrement(
       [
         "* Recombobulating...",
         "",
@@ -422,7 +422,7 @@ What changed today vs. yesterday
   });
 
   test("merges streamed bodies without duplicating the boundary line when indentation differs", () => {
-    const merged = mergeSlackStreamBodies(
+    const merged = mergeRenderedStreamBodies(
       [
         "Searched https://vnexpress.net/doi-sim-sang-dien-thoai-moi-phai-xac-thuc-khuon-mat-5058317.html",
         "",
@@ -447,7 +447,7 @@ What changed today vs. yesterday
   });
 
   test("merges repeated progress updates without accumulating duplicate lines", () => {
-    const merged = mergeSlackStreamBodies(
+    const merged = mergeRenderedStreamBodies(
       [
         "* Recombobulating...",
         "",
@@ -464,7 +464,7 @@ What changed today vs. yesterday
   });
 
   test("dedupes repeated progress lines even when the first streamed delta is already noisy", () => {
-    const merged = mergeSlackStreamBodies(
+    const merged = mergeRenderedStreamBodies(
       "",
       [
         "Creating",
@@ -479,7 +479,7 @@ What changed today vs. yesterday
   });
 
   test("dedupes claude progress markers that use the ✽ glyph", () => {
-    const merged = mergeSlackStreamBodies(
+    const merged = mergeRenderedStreamBodies(
       "Quantumizing",
       [
         "✽ Quantumizing",
@@ -492,7 +492,7 @@ What changed today vs. yesterday
   });
 
   test("suppresses completion replay when the final body was already streamed", () => {
-    const completion = selectSlackCompletionBody({
+    const completion = selectCompletedInteractionBody({
       previousBody: [
         "# Codebase Overview",
         "",
@@ -510,7 +510,7 @@ What changed today vs. yesterday
   });
 
   test("keeps the full final body when response policy is final", () => {
-    const completion = selectSlackCompletionBody({
+    const completion = selectCompletedInteractionBody({
       previousBody: "• Searching the web",
       finalBody: [
         "# Codebase Overview",
@@ -526,7 +526,7 @@ What changed today vs. yesterday
   });
 
   test("keeps only the newly appended body while running", () => {
-    const body = selectSlackSnapshotBody({
+    const body = selectSnapshotInteractionBody({
       status: "running",
       initialSnapshot: "line 1\nline 2",
       snapshot: "line 1\nline 2\nline 3",
@@ -537,7 +537,7 @@ What changed today vs. yesterday
   });
 
   test("reuses the last meaningful body when completion adds no new content", () => {
-    const body = selectSlackSnapshotBody({
+    const body = selectSnapshotInteractionBody({
       status: "completed",
       initialSnapshot: "line 1\nline 2\nline 3",
       snapshot: "line 1\nline 2\nline 3",

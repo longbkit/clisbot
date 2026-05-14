@@ -201,11 +201,11 @@ Crash path:
 
 Highest-risk current paths:
 
-- `src/config/config-file.ts`
+- `src/config/core/config-file.ts`
   - plain overwrite, no atomic replace, no stale-snapshot protection
-- `src/channels/processed-events-store.ts`
+- `src/channels/message/processed-events-store.ts`
   - whole-document cache plus overwrite, easy lost-update risk
-- `src/config/channel-runtime-credentials.ts`
+- `src/config/channels/channel-runtime-credentials.ts`
   - secret-bearing file, still plain sync overwrite
 
 Important mixed-discipline signal:

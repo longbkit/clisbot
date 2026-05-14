@@ -5,9 +5,9 @@ area: configuration, control, channels
 summary: When a CLI path only needs one channel, the fix should usually narrow credential materialization to that channel instead of introducing a new config-loading mode or changing shared helper contracts.
 related:
   - ../features/configuration/start-bootstrap-and-credential-persistence.md
-  - ../../src/config/load-config.ts
-  - ../../src/config/channel-credentials.ts
-  - ../../src/control/message-cli.ts
+  - ../../src/config/core/load-config.ts
+  - ../../src/config/channels/channel-credentials.ts
+  - ../../src/control/commands/message-cli.ts
 ---
 
 # Fix Channel-Scope Bugs By Narrowing Materialization, Not Changing Global Loader Semantics

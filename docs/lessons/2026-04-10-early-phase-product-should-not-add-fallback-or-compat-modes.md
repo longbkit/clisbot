@@ -7,8 +7,8 @@ related:
   - docs/lessons/2026-04-08-new-products-should-not-carry-legacy-surface-compat.md
   - docs/research/channels/2026-04-10-slack-latency-and-stability-audit.md
   - docs/tasks/features/channels/2026-04-04-slack-channel-mvp-validation-and-hardening.md
-  - src/channels/agent-prompt.ts
-  - src/agents/runner-service.ts
+  - src/channels/message/agent-prompt.ts
+  - src/agents/runtime/runner-service.ts
 ---
 
 ## Context

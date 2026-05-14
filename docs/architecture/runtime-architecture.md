@@ -43,11 +43,12 @@ Current implementation gap:
 
 - the target ownership split above is the architecture contract
 - current code is not fully converged yet
-- `src/agents/runner-service.ts` still mixes backend execution work with some
+- `src/agents/runtime/runner-service.ts` still mixes backend execution work with some
   `SessionService`-owned responsibilities such as:
-  - minting explicit `sessionId` values for explicit-id launch paths
-  - reading current stored `sessionId` continuity directly from session state
-  - writing or clearing stored `sessionId` continuity through generic session-entry helpers
+  - deciding explicit `sessionId` creation for explicit-id launch paths through
+    the current `SessionMapping` helper
+  - mutating active `sessionId` continuity through `SessionMapping` instead of a
+    `SessionService`-owned API
   - deciding some continuity changes directly during retry, restart, and
     `/new` flows
 - that means `RunnerService` is currently a mixed-owner implementation, even

@@ -1,8 +1,8 @@
-import { SessionService } from "../../src/agents/session-service.ts";
-import type { AgentSessionState } from "../../src/agents/session-state.ts";
-import type { ResolvedAgentTarget } from "../../src/agents/resolved-target.ts";
-import type { RunObserver, RunUpdate } from "../../src/agents/run-observation.ts";
-import type { RunnerService } from "../../src/agents/runner-service.ts";
+import { SessionService } from "../../src/agents/session/session-service.ts";
+import type { AgentSessionState } from "../../src/agents/session/session-state.ts";
+import type { ResolvedAgentTarget } from "../../src/agents/routing/resolved-target.ts";
+import type { RunObserver, RunUpdate } from "../../src/agents/session/run-observation.ts";
+import type { RunnerService } from "../../src/agents/runtime/runner-service.ts";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 
 export function createResolvedTarget(): ResolvedAgentTarget {

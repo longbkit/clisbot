@@ -185,7 +185,7 @@ tmux pane id, tmux window id, 그 밖의 일시적인 runner artifact를 agents 
 
 현재 코드는 아직 이 분리에 완전히 수렴하지는 않았습니다.
 
-- `src/agents/runner-service.ts`에 오늘도 `RunnerService` 구현이 남아 있습니다.
+- `src/agents/runtime/runner-service.ts`에 오늘도 `RunnerService` 구현이 남아 있습니다.
 - 그 파일 안에는 아직 `SessionService`가 소유해야 할 continuity 작업도 일부 남아 있습니다.
 - 위 owner map은 현재 코드가 완전히 정리됐다는 주장이라기보다, 지향해야 할 아키텍처 목표로 읽어야 합니다.
 

@@ -10,17 +10,19 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ActivityStore } from "../src/control/activity-store.ts";
-import { RuntimeHealthStore } from "../src/control/runtime-health-store.ts";
+import { ActivityStore } from "../src/control/runtime/activity-store.ts";
+import { describeSlackStartupFailure } from "../src/channels/slack/startup-failure.ts";
+import { RuntimeHealthStore } from "../src/control/runtime/runtime-health-store.ts";
 import {
   getRuntimeOperatorSummary,
   renderStartSummary,
   renderStatusSummary,
   type RuntimeOperatorSummary,
-} from "../src/control/runtime-summary.ts";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+} from "../src/control/runtime/runtime-summary.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("runtime summaries", () => {
   let tempDir = "";
@@ -33,6 +35,7 @@ describe("runtime summaries", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
   });
 
   afterEach(() => {
@@ -40,6 +43,7 @@ describe("runtime summaries", () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     process.env.CLISBOT_HOME = originalClisbotHome;
     process.env.SLACK_APP_TOKEN = originalSlackAppToken;
     process.env.SLACK_BOT_TOKEN = originalSlackBotToken;
@@ -55,8 +59,10 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: true,
-          telegramEnabled: true,
+          channels: {
+            slack: { enabled: true },
+            telegram: { enabled: true },
+          },
         }),
       ),
     );
@@ -84,8 +90,10 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: false,
-          telegramEnabled: true,
+          channels: {
+            slack: { enabled: false },
+            telegram: { enabled: true },
+          },
         }),
       ),
     );
@@ -110,6 +118,36 @@ describe("runtime summaries", () => {
     expect(text).toContain("tmux -S ~/.clisbot-dev/state/clisbot.sock attach -t <session-name>");
   });
 
+  test("renders channel setup commands with the active CLI name", async () => {
+    setRenderedCliName("clisbot-dev");
+    process.env.CLISBOT_HOME = "~/.clisbot-dev";
+    process.env.TELEGRAM_BOT_TOKEN = "telegram";
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = clisbotConfigSchema.parse(
+      JSON.parse(
+        renderDefaultConfigTemplate({
+          channels: {
+            slack: { enabled: false },
+            telegram: { enabled: true },
+          },
+        }),
+      ),
+    );
+    config.agents.list = [{ id: "default", cli: "codex" }];
+    await writeEditableConfig(configPath, config);
+
+    const summary = await getRuntimeOperatorSummary({
+      configPath,
+      runtimeRunning: false,
+    });
+    const text = renderStatusSummary(summary);
+
+    expect(text).toContain("add group: `clisbot-dev routes add --channel telegram group:<chatId> --bot default`");
+    expect(text).toContain("clisbot-dev routes set-agent --channel telegram group:<chatId> --bot default --agent <id>");
+    expect(text).not.toContain("add group: `clisbot routes add --channel telegram group:<chatId> --bot default`");
+  });
+
   test("renders agent and channel activity in status output", async () => {
     delete process.env.CLISBOT_HOME;
     process.env.SLACK_APP_TOKEN = "app";
@@ -120,8 +158,10 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: true,
-          telegramEnabled: true,
+          channels: {
+            slack: { enabled: true },
+            telegram: { enabled: true },
+          },
         }),
       ),
     );
@@ -168,13 +208,13 @@ describe("runtime summaries", () => {
     expect(text).toContain("telegram: no explicit group or topic routes are configured yet");
     expect(startText).toContain("telegram: no explicit group or topic routes are configured yet");
     expect(startText).toContain("DM one enabled bot first to confirm it responds normally (Telegram, Slack)");
-    expect(startText).toContain("after DM works, add the bot to the target Slack channel, Telegram group/topic, or Zalo group");
-    expect(startText).toContain(
-      "add the route with `clisbot routes add --channel slack group:<channelId> --bot default`, `clisbot routes add --channel telegram group:<chatId> --bot default`, or `clisbot routes add --channel zalo-bot group:<chatId> --bot default`; that route uses the agent currently assigned to that bot by default",
-    );
-    expect(startText).toContain(
-      "only if you want a different agent there than the one currently assigned to that bot by default, bind it with `clisbot routes set-agent --channel slack group:<channelId> --bot default --agent <id>`, `clisbot routes set-agent --channel telegram group:<chatId> --bot default --agent <id>`, or `clisbot routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>`",
-    );
+    expect(startText).toContain("after DM works, add the bot to the target routed multi-user surface");
+    expect(startText).toContain("then add the route on the channel you want to expose:");
+    expect(startText).toContain("Telegram: add group: `clisbot routes add --channel telegram group:<chatId> --bot default`");
+    expect(startText).toContain("Telegram: add topic: `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default`");
+    expect(startText).toContain("Slack: add group: `clisbot routes add --channel slack group:<channelId> --bot default`");
+    expect(startText).toContain("each route uses the agent currently assigned to that bot by default");
+    expect(startText).toContain("only if one route should use a different agent, bind it with the matching `clisbot routes set-agent ...` command for that channel");
     expect(startText).toContain(
       "Telegram: send `/start` in the target DM, group, or topic to get onboarding or pairing guidance",
     );
@@ -182,10 +222,13 @@ describe("runtime summaries", () => {
       "Slack: mention `@<botname> \\start` in the target channel to verify mention flow",
     );
     expect(startText).toContain(
-      "Send a direct message (DM) to an enabled bot (Telegram, Slack). Send `/start` or `hi` to receive a pairing code.",
+      "Send a direct message (DM) to the Telegram bot. Send `/start` or `hi` to receive a pairing code.",
+    );
+    expect(startText).toContain(
+      "Send a direct message (DM) to the Slack bot. Say `hi` to receive a pairing code.",
     );
     expect(startText).toContain("Auth onboarding:");
-    expect(startText).toContain("Telegram groups or topics can use `/whoami` before routing, while DMs with pairing must pair first");
+    expect(startText).toContain("if DM pairing is enabled for that channel, pair first before expecting DM access");
     expect(startText).toContain("the first DM user during the first 30 minutes becomes app owner automatically");
     expect(startText).toContain("clisbot auth add-user app --role <owner|admin> --user <principal>");
     expect(startText).toContain("clisbot auth add-permission ...");
@@ -205,9 +248,11 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: false,
-          telegramEnabled: false,
-          zaloBotEnabled: true,
+          channels: {
+            slack: { enabled: false },
+            telegram: { enabled: false },
+            "zalo-bot": { enabled: true },
+          },
         }),
       ),
     );
@@ -241,8 +286,10 @@ describe("runtime summaries", () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-runtime-summary-"));
     const configPath = join(tempDir, "clisbot.json");
     const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate({
-      slackEnabled: true,
-      telegramEnabled: false,
+      channels: {
+        slack: { enabled: true },
+        telegram: { enabled: false },
+      },
     })));
     config.agents.list = [
       {
@@ -471,7 +518,7 @@ describe("runtime summaries", () => {
     );
     expect(startText).toContain("Next steps after bootstrap:");
     expect(startText).toContain(
-      "run `clisbot bots add --channel <slack|telegram|zalo-bot> ...` for the first provider bot you want to expose",
+      "run `clisbot bots add --channel <channel-name> ...` for the first provider bot you want to expose",
     );
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock list-sessions");
     expect(startText).toContain("tmux -S ~/.clisbot/state/clisbot.sock attach -t <session-name>");
@@ -488,8 +535,10 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: true,
-          telegramEnabled: true,
+          channels: {
+            slack: { enabled: true },
+            telegram: { enabled: true },
+          },
         }),
       ),
     );
@@ -523,8 +572,10 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: true,
-          telegramEnabled: false,
+          channels: {
+            slack: { enabled: true },
+            telegram: { enabled: false },
+          },
         }),
       ),
     );
@@ -538,7 +589,13 @@ describe("runtime summaries", () => {
     await writeEditableConfig(configPath, config);
 
     const healthStore = new RuntimeHealthStore(healthPath);
-    await healthStore.markSlackFailure(new Error("Socket Mode app token rejected: xapp token missing `connections:write`"));
+    await healthStore.markFailure({
+      channel: "slack",
+      error: new Error("Socket Mode app token rejected: xapp token missing `connections:write`"),
+      diagnostic: describeSlackStartupFailure(
+        new Error("Socket Mode app token rejected: xapp token missing `connections:write`"),
+      ),
+    });
 
     const summary = await getRuntimeOperatorSummary({
       configPath,
@@ -562,8 +619,10 @@ describe("runtime summaries", () => {
     const config = clisbotConfigSchema.parse(
       JSON.parse(
         renderDefaultConfigTemplate({
-          slackEnabled: true,
-          telegramEnabled: false,
+          channels: {
+            slack: { enabled: true },
+            telegram: { enabled: false },
+          },
         }),
       ),
     );

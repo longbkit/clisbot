@@ -22,6 +22,8 @@ Create a migration runbook only when at least one field below is not safe/automa
 - `Rollback`
 - `Intermediate version`
 
+For every release, still update or verify [`index.md`](index.md) so operators and agents can answer the migration question without inventing a runbook.
+
 ## Current Manual Migrations
 
 No current stable update requires a manual migration runbook.

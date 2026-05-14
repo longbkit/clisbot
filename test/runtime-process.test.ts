@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
+  ensureConfigFile,
   getProcessLiveness,
   getRuntimeStatus,
   type ProcessLiveness,
@@ -10,9 +11,9 @@ import {
   readRuntimePid,
   startDetachedRuntime,
   stopDetachedRuntime,
-} from "../src/control/runtime-process.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+} from "../src/control/runtime/runtime-process.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 const tempDirs: string[] = [];
 const originalClisbotConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -42,8 +43,10 @@ function createConfig() {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: true,
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: true },
+        },
       }),
     ),
   );
@@ -75,6 +78,27 @@ describe("readRuntimeLog", () => {
 });
 
 describe("runtime path defaults", () => {
+  test("ensureConfigFile preserves Zalo bootstrap options in the first generated template", async () => {
+    const dir = createTempDir();
+    const configPath = join(dir, "clisbot.json");
+
+    const result = await ensureConfigFile(configPath, {
+      channels: {
+        "zalo-bot": {
+          enabled: true,
+          botTokenRef: "CUSTOM_ZALO_BOT_TOKEN",
+        },
+      },
+    });
+
+    const config = clisbotConfigSchema.parse(JSON.parse(readFileSync(configPath, "utf8")));
+
+    expect(result.created).toBe(true);
+    expect(config.bots.zaloBot.defaults.enabled).toBe(true);
+    expect(config.bots.zaloBot.default.enabled).toBe(true);
+    expect(config.bots.zaloBot.default.botToken).toBe("${CUSTOM_ZALO_BOT_TOKEN}");
+  });
+
   test("uses CLISBOT_* env vars when explicit paths are omitted", async () => {
     const dir = createTempDir();
     const configPath = join(dir, "custom-config.json");

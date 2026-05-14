@@ -1,4 +1,4 @@
-import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message/message-command.ts";
 
 function normalizeLineEndings(text: string) {
   return text.replaceAll("\r\n", "\n").replaceAll("\r", "\n");

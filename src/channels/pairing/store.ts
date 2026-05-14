@@ -2,9 +2,10 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import lockfile from "proper-lockfile";
-import { DEFAULT_PAIRING_DIR, ensureDir } from "../../shared/paths.ts";
+import type { ChannelId } from "../integration/channel-surface-contract.ts";
+import { DEFAULT_PAIRING_DIR, ensureDir } from "../../infra/paths.ts";
 
-export type PairingChannel = "slack" | "telegram" | "zalo-bot";
+export type PairingChannel = ChannelId;
 
 export type PairingRequest = {
   id: string;

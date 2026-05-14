@@ -13,8 +13,6 @@ Examples:
 - `clisbot loops status`
 - `clisbot loops status --channel slack --target group:C123 --thread-id 1712345678.123456`
 - `clisbot loops create --channel slack --target group:C123 --thread-id 1712345678.123456 --sender slack:U1234567890 every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target group:C123 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
-- `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
 - `clisbot loops --channel telegram --target group:-1001234567890 --topic-id 42 --sender telegram:1276408333 5m check CI`
 - `clisbot loops --channel slack --target group:C123 --thread-id 1712345678.123456 --sender slack:U1234567890 3 review backlog`
 - `clisbot loops cancel abc123`
@@ -30,8 +28,8 @@ Examples:
 - `--thread-id` narrows a Slack route to one existing thread ts
 - `--topic-id` narrows a Telegram route to one topic id
 - omitting the sub-surface flag means the parent surface itself: Slack channel/group/DM or Telegram chat
-- `--new-thread` is Slack-only and creates a fresh thread anchor in the target channel/group/DM before the loop starts
-- `--sender <principal>` is required for loop creation and records the human creator as `slack:<user-id>` or `telegram:<user-id>`
+- use `clisbot loops --help --channel <channel-name>` or `clisbot loops create --help --channel <channel-name>` for channel-specific loop extensions
+- `--sender <principal>` is required for loop creation and records the human creator as `slack:<user-id>`, `telegram:<user-id>`, or `zalo-bot:<user-id>`
 - `--sender-name <name>` and `--sender-handle <handle>` optionally store readable creator context for scheduled prompts
 - for Telegram forum groups, omitting `--topic-id` targets the parent chat surface; sends then follow Telegram's normal no-`message_thread_id` behavior, which is the General topic when that forum has one
 

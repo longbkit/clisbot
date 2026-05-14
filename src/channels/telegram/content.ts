@@ -1,4 +1,4 @@
-import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message/message-command.ts";
 import { renderTelegramHtmlSafeFromMarkdown } from "./html-safe.ts";
 
 export type TelegramWireFormat = "text" | "html";

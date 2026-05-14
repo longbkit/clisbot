@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { callTelegramApi } from "./api.ts";
 import { TelegramApiError } from "./api.ts";
 import { resolveTelegramMessageContent } from "./content.ts";
-import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message/message-command.ts";
 
 export type TelegramMessageActionParams = {
   botToken: string;

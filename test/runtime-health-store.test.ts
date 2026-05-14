@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RuntimeHealthStore } from "../src/control/runtime-health-store.ts";
+import { RuntimeHealthStore } from "../src/control/runtime/runtime-health-store.ts";
 
 describe("runtime health store", () => {
   test("normalizes legacy health instances that still store accountId", async () => {

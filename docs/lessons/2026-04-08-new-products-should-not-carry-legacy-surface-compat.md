@@ -6,8 +6,8 @@ summary: When the product is still new, prefer one clean naming and config surfa
 related:
   - docs/features/configuration/README.md
   - docs/architecture/architecture-overview.md
-  - src/config/schema.ts
-  - src/config/template.ts
+  - src/config/core/schema.ts
+  - src/config/core/template.ts
   - README.md
 ---
 

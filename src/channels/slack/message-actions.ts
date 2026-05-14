@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { webApi as slackWebApi } from "@slack/bolt";
 import { deleteSlackMessage, postSlackText } from "./transport.ts";
 import { resolveSlackMessageContent } from "./content.ts";
-import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message/message-command.ts";
 import { normalizeSlackSurfaceTarget } from "./target-normalization.ts";
 
 const { WebClient } = slackWebApi;

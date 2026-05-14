@@ -2,11 +2,11 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
-import { loadConfig } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { listRunnerSessions } from "../src/control/runner-debug-state.ts";
+import { resolveAgentTarget } from "../src/agents/routing/resolved-target.ts";
+import { loadConfig } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { listRunnerSessions } from "../src/control/runner/runner-debug-state.ts";
 import { TmuxClient } from "../src/runners/tmux/client.ts";
 
 describe("listRunnerSessions", () => {

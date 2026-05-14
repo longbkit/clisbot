@@ -81,7 +81,7 @@ Truthfulness note:
 
 - the owner model above is the architecture target
 - current code still keeps `RunnerService` implemented in
-  `src/agents/runner-service.ts`
+  `src/agents/runtime/runner-service.ts`
 - the later continuity-boundary cleanup should finish semantic ownership first;
   file relocation, if still wanted after that, is a separate cleanup choice
 

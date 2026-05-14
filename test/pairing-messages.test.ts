@@ -4,16 +4,19 @@ import {
   buildPairingQueueFullReply,
   buildPairingReplyFromRequest,
 } from "../src/channels/pairing/messages.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 let previousCliName: string | undefined;
 
 beforeEach(() => {
   previousCliName = process.env.CLISBOT_CLI_NAME;
   delete process.env.CLISBOT_CLI_NAME;
+  setRenderedCliName();
 });
 
 afterEach(() => {
   process.env.CLISBOT_CLI_NAME = previousCliName;
+  setRenderedCliName(previousCliName);
 });
 
 describe("buildPairingReply", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { formatTimestampedLogMessage } from "../src/shared/logging.ts";
+import { formatTimestampedLogMessage } from "../src/infra/logging.ts";
 
 describe("runtime logging", () => {
   test("prefixes a single-line log with an ISO timestamp", () => {

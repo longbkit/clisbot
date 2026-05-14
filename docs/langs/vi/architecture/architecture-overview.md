@@ -184,7 +184,7 @@ Tên runtime hiện tại nên phản ánh rõ cách chia đó:
 
 Code hiện tại vẫn chưa hội tụ hoàn toàn theo ranh giới đó:
 
-- `src/agents/runner-service.ts` hiện vẫn chứa implementation của `RunnerService`
+- `src/agents/runtime/runner-service.ts` hiện vẫn chứa implementation của `RunnerService`
 - file đó vẫn còn mang một phần continuity work vốn nên thuộc `SessionService`
 - hãy xem sơ đồ owner ở trên là target architecture, không phải khẳng định rằng file placement và continuity boundary đã sạch hết
 

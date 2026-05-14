@@ -1,23 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
-import type { LoadedConfig } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import type { LoadedConfig } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 import {
   getConfiguredRuntimeMonitorRestartBudget,
   getRuntimeMonitorRestartPlan,
   normalizeRuntimeMonitorRestartBackoff,
-} from "../src/config/runtime-monitor-backoff.ts";
-import { serveMonitor, type RuntimeMonitorState } from "../src/control/runtime-monitor.ts";
-import type { ChannelPlugin } from "../src/channels/channel-plugin.ts";
+} from "../src/config/runtime/runtime-monitor-backoff.ts";
+import { serveMonitor, type RuntimeMonitorState } from "../src/control/runtime/runtime-monitor.ts";
+import type { ChannelPlugin } from "../src/channels/integration/channel-plugin.ts";
 
 function createLoadedConfig(): LoadedConfig {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: true,
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: true },
+        },
       }),
     ),
   );
@@ -145,6 +147,11 @@ describe("serveMonitor", () => {
 
     const plugin: ChannelPlugin = {
       id: "telegram",
+      capabilities: {
+        surfaceKinds: ["dm", "group", "topic"],
+        messageActions: ["send"],
+        supportsMessageCustomSubtree: false,
+      },
       isEnabled: () => true,
       listBots: () => [{ botId: "alerts", config: {} }],
       createRuntimeService: () => {
@@ -152,11 +159,11 @@ describe("serveMonitor", () => {
       },
       renderHealthSummary: () => "unused",
       renderActiveHealthSummary: () => "unused",
-      markStartupFailure: async () => undefined,
       runMessageCommand: async (_loadedConfig, command) => {
         sentMessages.push(command.message ?? "");
         return { botId: command.account ?? "alerts", result: { ok: true } };
       },
+      resolveMessageSurface: () => null,
       resolveMessageReplyTarget: () => null,
     };
 

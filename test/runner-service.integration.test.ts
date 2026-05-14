@@ -2,13 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSessionState } from "../src/agents/session-state.ts";
-import { SessionStore } from "../src/agents/session-store.ts";
-import { RunnerService } from "../src/agents/runner-service.ts";
-import { resolveAgentTarget } from "../src/agents/resolved-target.ts";
-import { loadConfig, resolveSessionStorePath } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { AgentSessionState } from "../src/agents/session/session-state.ts";
+import { SessionMapping } from "../src/agents/session/session-mapping.ts";
+import { SessionStore } from "../src/agents/session/session-store.ts";
+import { RunnerService } from "../src/agents/runtime/runner-service.ts";
+import { resolveAgentTarget } from "../src/agents/routing/resolved-target.ts";
+import { loadConfig, resolveSessionStorePath } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 import { TmuxClient } from "../src/runners/tmux/client.ts";
 
 const tempDirs: string[] = [];
@@ -133,8 +134,8 @@ describe("RunnerService integration", () => {
     const runner = new RunnerService(
       loaded,
       tmux,
-      new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),
       (target) => resolveAgentTarget(loaded, target),
+      new SessionMapping(new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded)))),
     );
 
     const resolved = await runner.ensureSessionReady(missingSessionTarget);
@@ -192,8 +193,8 @@ describe("RunnerService integration", () => {
     const runner = new RunnerService(
       loaded,
       tmux,
-      new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded))),
       (target) => resolveAgentTarget(loaded, target),
+      new SessionMapping(new AgentSessionState(new SessionStore(resolveSessionStorePath(loaded)))),
     );
 
     const resolved = await runner.ensureSessionReady(firstTarget);

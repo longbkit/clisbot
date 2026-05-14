@@ -12,7 +12,7 @@ Planned
 
 `clisbot` already has one shared lifecycle coordinator for processing indicators:
 
-- `src/channels/processing-indicator.ts`
+- `src/channels/message/processing-indicator.ts`
 
 But the channel-specific adapter layer is still inconsistent:
 

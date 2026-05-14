@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildMentionOnlyFollowUpPrompt } from "../src/channels/mention-follow-up.ts";
+import { buildMentionOnlyFollowUpPrompt } from "../src/channels/config/mention-follow-up.ts";
 
 describe("mention-only follow-up prompt", () => {
   test("uses the short context-driven fallback for mention-only messages", () => {

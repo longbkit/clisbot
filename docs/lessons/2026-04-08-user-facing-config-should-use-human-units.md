@@ -7,9 +7,9 @@ related:
   - docs/features/configuration/README.md
   - docs/user-guide/README.md
   - config/clisbot.json.v0.1.0.template
-  - src/config/schema.ts
-  - src/config/load-config.ts
-  - src/config/duration.ts
+  - src/config/core/schema.ts
+  - src/config/core/load-config.ts
+  - src/config/runtime/duration.ts
 ---
 
 ## Context

@@ -47,6 +47,13 @@ Channel responsibilities:
 - recognize explicit transcript request commands for that surface when supported
 - stream updates in a way that makes sense for the surface
 
+Shared message-surface rule:
+
+- `clisbot message <action> --channel ...` is the shared stable message surface
+- `clisbot message custom ... --channel ...` is a channel-owned public subtree behind one shared gateway
+- the shared layer should dispatch that subtree by channel, not force one provider-neutral grammar inside it
+- channel plugins may expose both shared message actions and custom message subtrees when that is the cleaner product shape
+
 Channel failure boundary:
 
 - channel transport failures must stay surface-local
@@ -73,6 +80,35 @@ When live rendering fails temporarily:
 - the channel may miss intermediate updates
 - the channel should recover on later successful delivery when practical
 - the architecture prefers degraded user-visible delivery over process death or false run failure
+
+## Custom Message Subtrees
+
+The shared `message` CLI may expose a public extension gateway:
+
+- `clisbot message custom ... --channel ...`
+
+That gateway exists to keep provider-specific message capabilities public without forcing them into the shared stable action list too early.
+
+Ownership split:
+
+- shared layer owns the gateway and channel dispatch contract
+- channel plugin owns the subtree grammar and semantics after `custom`
+
+Reuse rule:
+
+- do not require one shared subtree grammar
+- do require one shared subtree toolkit so channel-defined command trees can reuse help rendering, validation, parsing, examples, and consistent errors
+
+Recommended implementation direction:
+
+- channel defines a declarative-first custom command tree spec
+- shared layer walks that spec to provide reusable CLI mechanics
+- handler execution stays provider-owned
+
+Domain guardrail:
+
+- keep `message custom` inside the message domain
+- if a workflow no longer belongs to the message domain, it needs a different architecture home
 
 ## Control
 

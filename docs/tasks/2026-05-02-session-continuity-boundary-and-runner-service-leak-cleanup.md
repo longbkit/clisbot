@@ -8,7 +8,7 @@ Close the remaining gap between the accepted architecture and the current code:
   `SessionService`
 - keep backend launch or capture or resume mechanics in runner code
 - remove continuity mutation and explicit-id minting leakage from
-  `src/agents/runner-service.ts`
+  `src/agents/runtime/runner-service.ts`
 
 ## Simple Mental Model
 
@@ -49,7 +49,7 @@ live-session-id registry is not being carried as a `0.1.50` release blocker.
 
 ## Implemented
 
-- added `src/agents/session-mapping.ts` as the session-owned continuity seam
+- added `src/agents/session/session-mapping.ts` as the session-owned continuity seam
 - kept `createSessionId()` and moved its effective ownership behind that
   agents-layer seam
 - renamed runner-side parsing toward `parseRunnerSessionId()`
@@ -90,10 +90,10 @@ live-session-id registry is not being carried as a `0.1.50` release blocker.
 
 Use this when reading code so you do not mix the layers:
 
-- `src/agents/session-service.ts`
+- `src/agents/session/session-service.ts`
   - conversation owner
   - decides whether to keep, replace, or clear the active mapping
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - runner-facing adapter used by `SessionService`
   - should perform backend work, not continuity decisions
 - `src/runners/tmux/*`
@@ -188,7 +188,7 @@ The desired behavior is:
    - read surfaces should also report whether that value is already persisted
 5. keep `src/runners/tmux/*` unchanged except for any signature cleanup needed
    to accept clearer runner inputs
-6. do not combine this slice with a file move from `src/agents/runner-service.ts`
+6. do not combine this slice with a file move from `src/agents/runtime/runner-service.ts`
    into `src/runners/` unless the semantic cleanup is already done
 
 ## Naming Cleanup Map
@@ -259,18 +259,18 @@ If implementing this in the smallest safe order, do it like this:
 
 To avoid refactor drift, touch files in this order:
 
-1. `src/agents/session-identity.ts`
+1. `src/agents/session/session-identity.ts`
    - clarify explicit-id vs parse naming
-2. `src/agents/session-service.ts`
+2. `src/agents/session/session-service.ts`
    - add the semantic continuity seam owned by the session layer
-3. `src/agents/session-state.ts`
+3. `src/agents/session/session-state.ts`
    - support that seam with narrower internal helpers if needed
-4. `src/agents/session-service.ts` and active-run memory
+4. `src/agents/session/session-service.ts` and active-run memory
    - expose runtime-memory session-id diagnostics when a live run knows them
-5. `src/agents/runner-service.ts`
+5. `src/agents/runtime/runner-service.ts`
    - switch call sites from generic helpers to the continuity seam
-6. `src/agents/agent-service.ts`, `src/control/runner-debug-state.ts`,
-   `src/control/runner-cli.ts`, and chat status rendering
+6. `src/agents/runtime/agent-service.ts`, `src/control/runner/runner-debug-state.ts`,
+   `src/control/runner/runner-cli.ts`, and chat status rendering
    - apply runtime-first read precedence and persistence annotation
 7. targeted tests
 8. docs sync only after the code shape settles

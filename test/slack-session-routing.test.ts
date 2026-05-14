@@ -2,16 +2,18 @@ import { describe, expect, test } from "bun:test";
 import { resolveSlackConversationRoute } from "../src/channels/slack/route-config.ts";
 import { resolveSlackConversationTarget } from "../src/channels/slack/session-routing.ts";
 import { normalizeSlackSurfaceTarget } from "../src/channels/slack/target-normalization.ts";
-import type { LoadedConfig } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import type { LoadedConfig } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function createLoadedConfig(): LoadedConfig {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: true,
-        telegramEnabled: false,
+        channels: {
+          slack: { enabled: true },
+          telegram: { enabled: false },
+        },
       }),
     ),
   );

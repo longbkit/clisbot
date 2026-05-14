@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSessionState } from "../src/agents/session-state.ts";
-import { SessionStore } from "../src/agents/session-store.ts";
-import { createStoredQueueItem } from "../src/agents/queue-state.ts";
-import type { ResolvedAgentTarget } from "../src/agents/resolved-target.ts";
+import { AgentSessionState } from "../src/agents/session/session-state.ts";
+import { SessionStore } from "../src/agents/session/session-store.ts";
+import { createStoredQueueItem } from "../src/agents/queue/queue-state.ts";
+import type { ResolvedAgentTarget } from "../src/agents/routing/resolved-target.ts";
 
 function createResolvedTarget(tempDir: string): ResolvedAgentTarget {
   return {

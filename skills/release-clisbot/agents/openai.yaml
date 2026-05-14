@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release clisbot"
+  short_description: "Release clisbot beta and stable npm packages safely."
+  default_prompt: "Use release-clisbot to prepare, validate, publish, tag, and document a clisbot beta or stable release."

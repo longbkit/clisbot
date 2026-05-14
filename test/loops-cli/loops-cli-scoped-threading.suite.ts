@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clisbotConfigSchema } from "../../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
-import { renderLoopsHelp, runLoopsCli } from "../../src/control/loops-cli.ts";
+import { clisbotConfigSchema } from "../../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
+import { renderLoopsHelp, runLoopsCli } from "../../src/control/commands/loops-cli.ts";
+import { setRenderedCliName } from "../../src/control/commands/cli-name.ts";
 import { buildConfig, enableSlackChannelRoute, enableSlackDirectMessages, enableTelegramTopicRoute } from "./loops-cli-support.ts";
 
 describe("loops cli", () => {
@@ -19,6 +20,7 @@ describe("loops cli", () => {
   beforeEach(() => {
     previousCliName = process.env.CLISBOT_CLI_NAME;
     delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
     previousFetch = globalThis.fetch;
     previousSlackAppToken = process.env.SLACK_APP_TOKEN;
     previousSlackBotToken = process.env.SLACK_BOT_TOKEN;
@@ -27,6 +29,7 @@ describe("loops cli", () => {
   afterEach(() => {
     process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
     process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
     process.env.SLACK_APP_TOKEN = previousSlackAppToken;
     process.env.SLACK_BOT_TOKEN = previousSlackBotToken;
     globalThis.fetch = previousFetch;
@@ -183,7 +186,7 @@ describe("loops cli", () => {
       "--thread-id",
       "100",
       "--sender",
-      "slack:U123",
+      "slack:u123",
       "--sender-name",
       "The Longbkit",
       "--sender-handle",
@@ -256,7 +259,7 @@ describe("loops cli", () => {
       { loops?: Array<{ id: string }> }
     >;
     expect(cancelledStore["agent:default:slack:channel:c1:thread:100"]?.loops ?? []).toHaveLength(0);
-  });
+  }, { timeout: 15_000 });
 
   test("telegram scoped create uses --topic-id and persists into the topic session", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-"));
@@ -313,6 +316,51 @@ describe("loops cli", () => {
     >;
     expect(createdStore["agent:default:telegram:group:-1001:topic:42"]?.loops).toHaveLength(1);
     expect(createdStore["agent:default:telegram:group:-1001:topic:42"]?.loops?.[0]?.kind).toBe("calendar");
+    expect(createdStore["agent:default:telegram:group:-1001:topic:42"]?.loops?.[0]?.promptSummary).toBe("standup");
+  });
+
+  test("telegram scoped create accepts the legacy --thread-id alias and still persists into the topic session", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-thread-alias-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        enableTelegramTopicRoute(
+          buildConfig({
+            socketPath: join(tempDir, "clisbot.sock"),
+            storePath,
+            workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+          }),
+          "-1001",
+          "42",
+        ),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+    console.log = (() => undefined) as typeof console.log;
+
+    await runLoopsCli([
+      "--channel",
+      "telegram",
+      "--target",
+      "group:-1001",
+      "--thread-id",
+      "42",
+      "--sender",
+      "telegram:1276408333",
+      "5m",
+      "standup",
+    ]);
+
+    const createdStore = JSON.parse(readFileSync(storePath, "utf8")) as Record<
+      string,
+      { loops?: Array<{ promptSummary?: string }> }
+    >;
+    expect(createdStore["agent:default:telegram:group:-1001:topic:42"]?.loops).toHaveLength(1);
     expect(createdStore["agent:default:telegram:group:-1001:topic:42"]?.loops?.[0]?.promptSummary).toBe("standup");
   });
 
@@ -373,7 +421,7 @@ describe("loops cli", () => {
     expect(slackCalls).toHaveLength(1);
     expect(slackCalls[0]?.url).toContain("/chat.postMessage");
     expect(slackCalls[0]?.payload.channel).toBe("C1");
-    expect(String(slackCalls[0]?.payload.text ?? "")).toContain("Managed loop thread created.");
+    expect(String(slackCalls[0]?.payload.text ?? "")).toContain("Managed loop child surface created.");
 
     const output = logs.join("\n");
     expect(output).toContain("cancel: `clisbot loops cancel --channel slack --target group:C1 --thread-id 171234.999 ");

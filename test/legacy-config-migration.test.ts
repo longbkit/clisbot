@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
+import { loadConfigWithoutEnvResolution } from "../src/config/core/load-config.ts";
 
 describe("legacy config migration", () => {
   let tempDir = "";
@@ -159,5 +159,50 @@ describe("legacy config migration", () => {
     ]);
     expect(loaded.raw.agents.list[0]?.cli).toBe("codex");
     expect(loaded.raw.agents.list[0]?.bootstrap?.botType).toBe("team-assistant");
+  });
+
+  test("uses the first legacy account as default bot when no explicit default account is configured", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = {
+      meta: {
+        schemaVersion: "0.1.44",
+      },
+      bots: {
+        defaults: {},
+        slack: {
+          defaults: {},
+        },
+        telegram: {
+          defaults: {},
+        },
+        zaloBot: {
+          defaults: {},
+        },
+      },
+      channels: {
+        slack: {
+          accounts: {
+            ops: {
+              appToken: "${SLACK_APP_TOKEN}",
+              botToken: "${SLACK_BOT_TOKEN}",
+            },
+          },
+          channels: {
+            C07U0LDK6ER: {
+              agentId: "default",
+            },
+          },
+        },
+      },
+    };
+
+    await Bun.write(configPath, JSON.stringify(config));
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+
+    expect(loaded.raw.bots.slack.defaults.defaultBotId).toBe("ops");
+    expect(loaded.raw.bots.slack.ops?.appToken).toBe("${SLACK_APP_TOKEN}");
+    expect(loaded.raw.bots.slack.ops?.groups.C07U0LDK6ER?.agentId).toBe("default");
+    expect("default" in loaded.raw.bots.slack).toBe(false);
   });
 });

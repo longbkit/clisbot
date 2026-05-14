@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   renderLoopStartNotification,
   renderQueueStartNotification,
-} from "../src/channels/surface-notifications.ts";
+} from "../src/channels/config/surface-notifications.ts";
 
 describe("surface notifications", () => {
   test("renders queue-start notification modes", () => {

@@ -6,8 +6,8 @@ summary: Live Slack and tmux validation should separate real product rendering b
 related:
   - docs/features/channels/README.md
   - docs/tests/features/channels/README.md
-  - src/shared/transcript-normalization.ts
-  - src/shared/transcript-rendering.ts
+  - src/runners/transcript/transcript-normalization.ts
+  - src/runners/transcript/transcript-rendering.ts
   - src/channels/slack/service.ts
   - test/text/text.test.ts
 ---

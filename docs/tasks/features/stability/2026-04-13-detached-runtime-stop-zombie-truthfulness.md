@@ -41,7 +41,7 @@ On POSIX, that returns success for zombie or defunct processes too, so the syste
 
 ## Implementation
 
-- added an explicit `ProcessLiveness` model in `src/control/runtime-process.ts`
+- added an explicit `ProcessLiveness` model in `src/control/runtime/runtime-process.ts`
 - kept `kill(pid, 0)` as the fast existence gate
 - on POSIX, added richer state probing:
   - Linux prefers `/proc/<pid>/stat`

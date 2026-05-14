@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { AgentJobQueue, ClearedQueuedTaskError } from "../src/agents/job-queue.ts";
+import { AgentJobQueue, ClearedQueuedTaskError } from "../src/agents/queue/job-queue.ts";
 
 describe("AgentJobQueue", () => {
   test("runs jobs serially per key", async () => {

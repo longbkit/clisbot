@@ -1,5 +1,6 @@
-import { readEditableConfig, writeEditableConfig } from "../../config/config-file.ts";
-import { ensureBotDirectMessageWildcardRoute } from "../../config/direct-message-routes.ts";
+import { readEditableConfig, writeEditableConfig } from "../../config/core/config-file.ts";
+import { listConfiguredChannelBotIds } from "../../config/channels/channel-bots.ts";
+import { ensureBotDirectMessageWildcardRoute } from "../../config/channels/direct-message-routes.ts";
 import { normalizeAllowEntry } from "./access.ts";
 import { renderPairingRequests } from "./messages.ts";
 import {
@@ -9,7 +10,12 @@ import {
   rejectChannelPairingCode,
   type PairingChannel,
 } from "./store.ts";
-import { renderCliCommand } from "../../shared/cli-name.ts";
+import { renderCliCommand } from "../../control/commands/cli-name.ts";
+import {
+  parseRegisteredChannelOrThrow,
+  renderChannelNamePlaceholder,
+  renderSupportedChannelsNote,
+} from "../catalog/registry.ts";
 
 type PairingCliWriter = {
   log: (line: string) => void;
@@ -30,11 +36,7 @@ function resolveConfigPath(env: NodeJS.ProcessEnv = process.env) {
 }
 
 function parseChannel(raw: string | undefined): PairingChannel {
-  const value = raw?.trim().toLowerCase();
-  if (value === "slack" || value === "telegram" || value === "zalo-bot") {
-    return value;
-  }
-  throw new Error("Channel required: slack | telegram | zalo-bot");
+  return parseRegisteredChannelOrThrow(raw, "channel") as PairingChannel;
 }
 
 function resolveApprovedBotId(
@@ -61,16 +63,17 @@ function renderPairingCliHelp() {
     "Usage:",
     `  ${renderCliCommand("pairing --help")}`,
     `  ${renderCliCommand("pairing help")}`,
-    `  ${renderCliCommand("pairing list <slack|telegram|zalo-bot> [--json]")}`,
-    `  ${renderCliCommand("pairing approve <slack|telegram|zalo-bot> <code>")}`,
-    `  ${renderCliCommand("pairing reject <slack|telegram|zalo-bot> <code>")}`,
-    `  ${renderCliCommand("pairing clear <slack|telegram|zalo-bot>")}`,
+    `  ${renderCliCommand(`pairing list ${renderChannelNamePlaceholder()} [--json]`)}`,
+    `  ${renderCliCommand(`pairing approve ${renderChannelNamePlaceholder()} <code>`)}`,
+    `  ${renderCliCommand(`pairing reject ${renderChannelNamePlaceholder()} <code>`)}`,
+    `  ${renderCliCommand(`pairing clear ${renderChannelNamePlaceholder()}`)}`,
     "",
     "Notes:",
     "  - `list` shows pending pairing requests for one channel only",
     "  - `approve` moves that sender into the requesting bot's DM allowUsers list",
     "  - `reject` removes one pending request without allowlisting the sender",
     "  - `clear` drops every pending request for that channel when the queue needs a reset",
+    `  - ${renderSupportedChannelsNote()}`,
   ].join("\n");
 }
 
@@ -111,12 +114,7 @@ export async function runPairingCli(args: string[], writer: PairingCliWriter = c
       throw new Error(`No pending pairing request found for code: ${code}`);
     }
     const { config, configPath } = await readEditableConfig(resolveConfigPath());
-    const configuredBotIds =
-      channel === "slack"
-        ? Object.keys(config.bots.slack).filter((botId) => botId !== "defaults")
-        : channel === "telegram"
-          ? Object.keys(config.bots.telegram).filter((botId) => botId !== "defaults")
-          : Object.keys(config.bots.zaloBot).filter((botId) => botId !== "defaults");
+    const configuredBotIds = listConfiguredChannelBotIds(config, channel);
     const botId = resolveApprovedBotId(channel, configuredBotIds, approved.botId);
     const wildcardRoute = ensureBotDirectMessageWildcardRoute(config, channel, botId);
     const normalizedUser = normalizeAllowEntry(channel, approved.id);

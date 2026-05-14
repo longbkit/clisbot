@@ -6,7 +6,7 @@ import {
   applyBootstrapTemplate,
   getBootstrapWorkspaceState,
   resolveTemplateRoot,
-} from "../src/agents/bootstrap.ts";
+} from "../src/agents/runtime/bootstrap.ts";
 
 describe("bootstrap template root resolution", () => {
   test("resolves repo layout from src/agents", () => {

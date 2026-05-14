@@ -6,10 +6,10 @@ import {
   processChannelInteraction,
   type ChannelInteractionIdentity,
   type ChannelInteractionRoute,
-} from "../../src/channels/interaction-processing.ts";
-import type { AgentSessionTarget } from "../../src/agents/agent-service.ts";
-import { renderDefaultConfigTemplate } from "../../src/config/template.ts";
-import { sleep } from "../../src/shared/process.ts";
+} from "../../src/channels/message/interaction-processing.ts";
+import type { AgentSessionTarget } from "../../src/agents/runtime/agent-service.ts";
+import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
+import { sleep } from "../../src/infra/process.ts";
 import {
   createIdentity,
   createRoute,

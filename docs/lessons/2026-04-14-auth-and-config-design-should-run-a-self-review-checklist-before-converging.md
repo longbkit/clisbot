@@ -8,8 +8,8 @@ related:
   - docs/tasks/features/auth/2026-04-14-app-and-agent-authorization-and-owner-claim.md
   - docs/tasks/features/control/2026-04-14-auth-aware-cli-mutation-enforcement-and-runner-command-guardrails.md
   - docs/user-guide/auth-and-roles.md
-  - src/channels/agent-prompt.ts
-  - src/channels/interaction-processing.ts
+  - src/channels/message/agent-prompt.ts
+  - src/channels/message/interaction-processing.ts
 ---
 
 ## Context

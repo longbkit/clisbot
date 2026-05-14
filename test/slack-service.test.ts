@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { SlackSocketService } from "../src/channels/slack/service.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function createLoadedConfig() {
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));

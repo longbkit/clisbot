@@ -1,11 +1,21 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { renderUpdateHelp, runUpdateCli } from "../src/control/update-cli.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { renderUpdateHelp, runUpdateCli } from "../src/control/commands/update-cli.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("update cli", () => {
   const originalLog = console.log;
+  let previousCliName: string | undefined;
+
+  beforeEach(() => {
+    previousCliName = process.env.CLISBOT_CLI_NAME;
+    delete process.env.CLISBOT_CLI_NAME;
+    setRenderedCliName();
+  });
 
   afterEach(() => {
     console.log = originalLog;
+    process.env.CLISBOT_CLI_NAME = previousCliName;
+    setRenderedCliName(previousCliName);
   });
 
   test("renders the update guide", () => {

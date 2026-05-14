@@ -1,8 +1,9 @@
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   buildAgentMainSessionKey,
   buildAgentPeerSessionKey,
-} from "../../agents/session-key.ts";
+} from "../../agents/session/session-key.ts";
+import { resolveProvidedBotId } from "../../config/channels/channel-bot-records.ts";
 
 export type ZaloBotConversationKind = "dm" | "group";
 
@@ -20,6 +21,7 @@ export function resolveZaloBotConversationTarget(params: {
     agentId: params.agentId,
     mainKey: sessionConfig.mainKey,
   });
+  const botId = resolveProvidedBotId(params) ?? "default";
 
   if (params.conversationKind === "dm") {
     return {
@@ -28,7 +30,7 @@ export function resolveZaloBotConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "zalo-bot",
-        botId: params.botId ?? params.accountId ?? "default",
+        botId,
         peerKind: "dm",
         peerId: params.userId ?? params.chatId,
         dmScope: sessionConfig.dmScope,
@@ -44,7 +46,7 @@ export function resolveZaloBotConversationTarget(params: {
       agentId: params.agentId,
       mainKey: sessionConfig.mainKey,
       channel: "zalo-bot",
-      botId: params.botId ?? params.accountId ?? "default",
+      botId,
       peerKind: "group",
       peerId: params.chatId,
     }),

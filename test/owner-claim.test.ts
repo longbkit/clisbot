@@ -9,9 +9,9 @@ import {
   renderFirstOwnerClaimMessage,
   resetOwnerClaimRuntimeForTests,
 } from "../src/auth/owner-claim.ts";
-import { readEditableConfig, writeEditableConfig } from "../src/config/config-file.ts";
-import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { readEditableConfig, writeEditableConfig } from "../src/config/core/config-file.ts";
+import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function createConfig(): ClisbotConfig {
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));

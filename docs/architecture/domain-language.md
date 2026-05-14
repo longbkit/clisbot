@@ -58,6 +58,84 @@ _Owner_: Agents own schedule state; channels supply surface context for delivery
 **steering**: A new user message injected while a run is still active.  
 _Owner_: Channels detect it; agents or runners submit it to the active run.
 
+**custom message subtree**: A channel-owned public CLI subtree behind `clisbot message custom ...`. It stays inside the message domain, but its grammar after `custom` is owned by the selected channel plugin rather than the shared `message` surface.
+_Owner_: Shared layer owns the gateway and dispatch contract; channel plugins own subtree grammar and semantics.
+
+**channel message lifecycle**: The channel-owned path for one inbound or
+scheduled message: parse channel-aware commands, build the agent prompt
+envelope, coordinate interaction delivery, render chat-first output, and apply
+message-local guidance such as processing indicators or unrouted onboarding.
+_Owner_: Channels.
+
+**channel integration seam**: The boundary where a built-in channel exposes the
+metadata and dispatch points that shared systems need, such as capabilities,
+config targets, pairing access, credential shape, route shape, schema shape,
+template defaults, startup behavior, message actions, and operator inventory.
+It is integration metadata and behavior dispatch, not provider implementation.
+_Owner_: Channels.
+
+**channel runtime plugin**: The runtime part of the channel integration seam.
+It exposes start or stop behavior, message actions, reply target resolution,
+surface-specific control context, and channel-owned CLI extensions.
+_Owner_: Channels.
+
+**channel installation**: The install-time part of the channel integration
+seam. It groups the provider-owned installation contracts consumed by
+configuration, pairing, credentials, schema, templates, routes, and legacy
+migration. It is static for built-in channels today; it is not a runtime plugin
+loader.
+_Owner_: Channels.
+
+Channel folder language:
+
+- `src/channels/integration`: channel integration seam and static inventories
+  consumed by shared systems. This is where provider-owned contracts are
+  collected; it is not where provider transport or message handling lives.
+- `src/channels/message`: channel-owned message lifecycle helpers: prompt
+  envelope, interaction processing, rendering, message CLI dispatch, processing
+  indicators, and processed-event dedupe.
+- `src/channels/surface`: surface identity and surface-context projection:
+  canonical surface labels, directory records, and prompt-context assembly. It
+  does not own runtime plugin startup or message dedupe.
+
+Control folder language:
+
+- `src/control/commands`: operator CLI command modules and CLI-only helpers.
+  These files parse arguments, render help, call owner systems, and print
+  operator-facing output.
+- `src/control/runtime`: detached runtime lifecycle, monitor, supervisor,
+  health store, runtime summaries, config reload suppression, and owner alerts.
+  These files own process and operator-runtime truth, not chat UX.
+- `src/control/runner`: runner debug command support and runner exit
+  diagnostics. This is operator visibility into runner state, not runner
+  mechanics.
+
+Configuration folder language:
+
+- `src/config/core`: config document shape, schema, template, load,
+  migration, upgrade, persisted-file IO, and bindings.
+- `src/config/channels`: channel bot, credential, route, schema, and template
+  contracts consumed by the config system. This is channel-aware config wiring,
+  not provider runtime implementation.
+- `src/config/env`: env reference parsing and config env substitution.
+- `src/config/runtime`: runtime defaults and config value helpers such as tool
+  presets, durations, timezone, and monitor backoff.
+
+Agents folder language:
+
+- `src/agents/runtime`: AgentService facade, RunnerService bridge,
+  agent-bootstrap helpers, and SurfaceRuntime delivery helpers.
+- `src/agents/session`: session identity, session key, session state/store,
+  run observation, recovery prompts, session mapping, and SessionService.
+- `src/agents/queue`: durable queue model, in-memory job queue, and managed
+  queue reconciliation.
+- `src/agents/loops`: loop command parsing, loop definitions, loop state, and
+  managed loop reconciliation.
+- `src/agents/commands`: agent-owned slash/chat command parsing and follow-up
+  policy.
+- `src/agents/routing`: resolved agent targets, surface bindings, and recent
+  conversation replay context.
+
 ### Identity
 
 **principal**: Canonical clisbot auth identity string for a user or identity that can receive roles or permissions.  
@@ -95,7 +173,7 @@ Rules:
 ### Surface
 
 **surfaceId**: Canonical clisbot surface identity.  
-_Avoid_: human display text, CLI target syntax
+_Avoid_: human display text, unresolved or compatibility CLI target syntax
 
 **surfaceKind**: Canonical shared surface shape.  
 _Avoid_: provider-local type names unless they are being mapped
@@ -109,12 +187,27 @@ _Avoid_: stored directory fields, CLI target
 **provider capability**: Truth about which canonical concepts one provider variant supports.  
 _Avoid_: pretending every provider supports the full shared vocabulary
 
+**surface context**: A prompt or rendering projection of sender and surface
+metadata for one message, including display text and permission guidance. It is
+not canonical storage.
+_Owner_: Channels.
+
+**surface record**: Durable surface or sender metadata stored so later queued,
+looped, or resumed work can rebuild useful surface context without storing
+formatted prompt text.
+_Owner_: Channels.
+
 Surface rules:
 
 - `dm`, `group`, and `topic` are the canonical shared surface concepts.
 - Provider-local labels such as Slack `channel` stay inside provider adapters and map into canonical concepts.
 - `topic` is a child surface of `group`, not a top-level peer concept.
 - Unsupported concepts do not need fake persisted shape just to mirror the full shared vocabulary.
+- Public CLI target syntax may converge toward canonical `surfaceId` over time, but they are not automatically the same in every current flow.
+- Current CLI target syntax may still be:
+  - an unresolved selector, for example Slack `dm:U123` before it resolves to the real DM channel such as `slack:dm:D456`
+  - a compatibility or convenience alias, for example raw `C123`, `group:C123`, or legacy `channel:C123`
+  - a split child-surface tuple, for example Telegram `--target -100... --topic-id 42` or Slack `--target group:C123 --thread-id 171...`
 
 ### Update And Release
 
@@ -169,6 +262,7 @@ Use `update` in public CLI help, folder names, release docs, and operator-facing
 ## Flagged Ambiguities
 
 - `target` is too generic to stand alone as a core concept. It only says "points somewhere", not what relation or domain it belongs to.
+- `surfaceId` is canonical surface identity, not automatically the same thing as current raw CLI `--target` input. Today some CLI forms are selectors, aliases, or multi-field tuples that must resolve into one canonical surface first.
 - `binding` also should not stand alone. Use domain-qualified terms such as `bot binding` or `session binding`.
 - `scope` is a different control dimension from `binding`; do not mix the two into one concept name.
 - `group` is the canonical shared concept. Do not leak provider-local nouns such as Slack `channel`, and do not promote `supergroup` into shared vocabulary.

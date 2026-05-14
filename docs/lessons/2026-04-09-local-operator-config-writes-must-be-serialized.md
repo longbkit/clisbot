@@ -6,9 +6,9 @@ summary: Operator CLI commands that mutate local config must behave as a single-
 related:
   - docs/features/configuration/README.md
   - docs/features/control/README.md
-  - src/config/config-file.ts
-  - src/control/channel-privilege-cli.ts
-  - src/control/channels-cli.ts
+  - src/config/core/config-file.ts
+  - src/control/commands/channel-privilege-cli.ts
+  - src/control/commands/channels-cli.ts
 ---
 
 ## Context

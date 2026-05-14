@@ -6,8 +6,8 @@ summary: When adjusting prompt templates, first show the current wording and a p
 related:
   - docs/features/channels/prompt-templates.md
   - docs/tasks/features/channels/2026-04-13-prompt-templates-and-overrides.md
-  - src/channels/agent-prompt.ts
-  - src/channels/interaction-processing.ts
+  - src/channels/message/agent-prompt.ts
+  - src/channels/message/interaction-processing.ts
   - test/agent-prompt.test.ts
   - test/interaction-processing/interaction-processing.test.ts
 ---

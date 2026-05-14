@@ -10,7 +10,7 @@ Planned
 
 ## Why
 
-`src/channels/follow-up-mode-config.ts` currently shows one repeated pattern three times:
+`src/channels/config/follow-up-mode-config.ts` currently shows one repeated pattern three times:
 
 - resolve the provider bot record
 - decide whether the target is bot-wide or route-scoped
@@ -51,7 +51,7 @@ The same binding problem is likely to recur for:
 
 ## Current Duplication
 
-Current duplicated areas in `src/channels/follow-up-mode-config.ts` include:
+Current duplicated areas in `src/channels/config/follow-up-mode-config.ts` include:
 
 - bot record lookup by provider and bot id
 - `scope === "all"` binding

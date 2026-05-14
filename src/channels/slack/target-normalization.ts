@@ -5,6 +5,10 @@ export type SlackSurfaceTarget = {
   userId?: string;
 };
 
+export function renderSlackTargetSyntax() {
+  return "`group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids";
+}
+
 function requireSlackTargetId(value: string, prefix: "dm" | "user") {
   const normalized = value.trim();
   if (!normalized) {

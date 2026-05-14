@@ -35,11 +35,11 @@ Look here first:
 
 | Area | Primary Files / Functions | Why This Is High Risk |
 | --- | --- | --- |
-| Startup capture | `src/agents/runner-service.ts`:`ensureSessionReady()`, `finalizeSessionStartup()`, `retryMissingStoredSessionIdAfterStartup()` | Fresh startup can succeed while capture or persistence still misses or persists the wrong id. |
-| Reuse existing tmux | `src/agents/runner-service.ts`:`syncStoredSessionIdForResolvedTarget()` | Existing stored id can be trusted too early, or cooldown can refresh metadata without fixing identity. |
-| Generic write seam | `src/agents/session-state.ts`:`touchSessionEntry()`, `clearSessionIdEntry()`, `upsertSessionEntry()` | Mapping writes still go through broad generic helpers, so bind vs clear vs refresh is hard to see. |
-| Diagnostics read surfaces | `src/agents/agent-service.ts`:`getSessionDiagnostics()`, `src/control/runner-cli.ts` | Current shipped behavior now shows `sessionId` plus persistence annotation without probing every live pane, but it still does not maintain a separate always-live memory registry outside active-run context. |
-| Cleanup / sunset | `src/agents/runner-service.ts`:`runSessionCleanup()` | Cleanup freshness uses broad metadata recency and can race startup or capture flows. |
+| Startup capture | `src/agents/runtime/runner-service.ts`:`ensureSessionReady()`, `finalizeSessionStartup()`, `retryMissingStoredSessionIdAfterStartup()` | Fresh startup can succeed while capture or persistence still misses or persists the wrong id. |
+| Reuse existing tmux | `src/agents/runtime/runner-service.ts`:`syncStoredSessionIdForResolvedTarget()` | Existing stored id can be trusted too early, or cooldown can refresh metadata without fixing identity. |
+| Generic write seam | `src/agents/session/session-state.ts`:`touchSessionEntry()`, `clearSessionIdEntry()`, `upsertSessionEntry()` | Mapping writes still go through broad generic helpers, so bind vs clear vs refresh is hard to see. |
+| Diagnostics read surfaces | `src/agents/runtime/agent-service.ts`:`getSessionDiagnostics()`, `src/control/runner/runner-cli.ts` | Current shipped behavior now shows `sessionId` plus persistence annotation without probing every live pane, but it still does not maintain a separate always-live memory registry outside active-run context. |
+| Cleanup / sunset | `src/agents/runtime/runner-service.ts`:`runSessionCleanup()` | Cleanup freshness uses broad metadata recency and can race startup or capture flows. |
 
 Non-primary suspects:
 
@@ -195,12 +195,12 @@ The sections below add that missing layer.
 | --- | --- | --- |
 | `src/channels/slack/session-routing.ts` | Builds `sessionKey` for Slack DM or group or channel or thread. | Channels |
 | `src/channels/telegram/session-routing.ts` | Builds `sessionKey` for Telegram DM or group or topic. | Channels |
-| `src/channels/interaction-processing.ts` | Sends `agentId` and `sessionKey` into execution. | Channels |
-| `src/agents/runner-service.ts` | Creates explicit ids, captures runner-created ids, chooses resume commands, and still mutates continuity state directly. | Hybrid today; should narrow toward backend execution only |
+| `src/channels/message/interaction-processing.ts` | Sends `agentId` and `sessionKey` into execution. | Channels |
+| `src/agents/runtime/runner-service.ts` | Creates explicit ids, captures runner-created ids, chooses resume commands, and still mutates continuity state directly. | Hybrid today; should narrow toward backend execution only |
 | `src/runners/tmux/session-handshake.ts` | tmux-specific capture logic. | Runner code |
-| `src/agents/session-state.ts` | Still writes and clears `sessionId` through generic session-entry helpers. | Mixed today |
-| `src/agents/session-store.ts` | Writes `sessions.json` with atomic temp-file rename. | Shared storage layer |
-| `src/control/runner-cli.ts`, `/whoami`, `/status` | Read stored `sessionId` for diagnostics. | Control and chat read surfaces |
+| `src/agents/session/session-state.ts` | Still writes and clears `sessionId` through generic session-entry helpers. | Mixed today |
+| `src/agents/session/session-store.ts` | Writes `sessions.json` with atomic temp-file rename. | Shared storage layer |
+| `src/control/runner/runner-cli.ts`, `/whoami`, `/status` | Read stored `sessionId` for diagnostics. | Control and chat read surfaces |
 
 Current file:
 
@@ -242,7 +242,7 @@ this audit.
 
 `sessionId` continuity is currently touched by these real paths:
 
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - `ensureSessionReady()`
     - decides whether startup uses an existing stored `sessionId`
     - generates an explicit `sessionId` when a backend supports caller-supplied
@@ -262,7 +262,7 @@ this audit.
     - sends `/new` or `/clear`, captures the rotated id, and overwrites the
       active mapping for the same `sessionKey`
 
-- `src/agents/session-state.ts`
+- `src/agents/session/session-state.ts`
   - `touchSessionEntry()`
     - generic write path that may also carry `sessionId`
   - `clearSessionIdEntry()`
@@ -271,7 +271,7 @@ this audit.
     - shared full-entry rewrite path used by follow-up, queue, loop, runtime,
       and recent-conversation updates as well as `sessionId` mutation
 
-- `src/agents/session-store.ts`
+- `src/agents/session/session-store.ts`
   - persists one JSON object keyed by `sessionKey`
   - has no semantic mapping API; it only stores the rewritten session entry
 
@@ -298,17 +298,17 @@ And should keep these responsibilities in runner code:
 - surface truthful backend failure when a requested resume or explicit-id path
   is not supported
 
-- `src/channels/interaction-processing.ts`
+- `src/channels/message/interaction-processing.ts`
   - normal chat path sends `agentId` + `sessionKey`
   - `/new` is the only user-visible explicit mapping mutation today
   - `/whoami` and `/status` expose stored `sessionId` diagnostically
 
-- `src/agents/commands.ts`
+- `src/agents/commands/commands.ts`
   - documents `/new`
   - does not yet expose `/sessions list`, `/sessions status`, or
     `/sessions resume <id>`
 
-- `src/control/runner-cli.ts`
+- `src/control/runner/runner-cli.ts`
   - reads stored `sessionId` for diagnostics only
   - does not provide mapping-specific operator actions
 
@@ -412,14 +412,14 @@ code call into it, instead of moving more policy into runners.
 
 | File | Current Gap | Why It Matters |
 | --- | --- | --- |
-| `src/agents/session-state.ts` | No dedicated mapping API; `sessionId` mutation is mixed with generic full-entry updates. | Makes future `/sessions resume <id>` or workspace rebind harder to implement truthfully. |
-| `src/agents/session-store.ts` | No mapping-specific read helper or reverse lookup helper. | Future explicit resume will otherwise scan ad hoc in several places. |
-| `src/agents/runner-service.ts` | Runner code both performs backend session-id mechanics and decides several continuity mutations directly. | Boundary is mostly right, but API clarity is still weak. |
-| `src/agents/session-identity.ts` | the file currently mixes session-owned explicit-id minting and runner-output parsing too closely. | Makes it harder to see which layer owns explicit-id minting versus runner-native parsing. |
+| `src/agents/session/session-state.ts` | No dedicated mapping API; `sessionId` mutation is mixed with generic full-entry updates. | Makes future `/sessions resume <id>` or workspace rebind harder to implement truthfully. |
+| `src/agents/session/session-store.ts` | No mapping-specific read helper or reverse lookup helper. | Future explicit resume will otherwise scan ad hoc in several places. |
+| `src/agents/runtime/runner-service.ts` | Runner code both performs backend session-id mechanics and decides several continuity mutations directly. | Boundary is mostly right, but API clarity is still weak. |
+| `src/agents/session/session-identity.ts` | the file currently mixes session-owned explicit-id minting and runner-output parsing too closely. | Makes it harder to see which layer owns explicit-id minting versus runner-native parsing. |
 | `src/runners/tmux/session-handshake.ts` | tmux-specific capture helper is truthful, but the naming family above it is still inconsistent. | Makes top-level seam versus backend-private helper harder to distinguish quickly. |
-| `src/channels/interaction-processing.ts` | `/new` exists, but no explicit resume-by-id surface exists. | User-controlled remap is not actually shipped yet. |
-| `src/agents/commands.ts` | Help and parser do not model session-management commands beyond `/new`. | Public contract is incomplete versus the intended mental model. |
-| `src/control/runner-cli.ts` | Diagnostic only; no mapping-oriented inspect or resume flow. | Operators lack a truthful mapping-focused surface for future debugging or admin intervention. |
+| `src/channels/message/interaction-processing.ts` | `/new` exists, but no explicit resume-by-id surface exists. | User-controlled remap is not actually shipped yet. |
+| `src/agents/commands/commands.ts` | Help and parser do not model session-management commands beyond `/new`. | Public contract is incomplete versus the intended mental model. |
+| `src/control/runner/runner-cli.ts` | Diagnostic only; no mapping-oriented inspect or resume flow. | Operators lack a truthful mapping-focused surface for future debugging or admin intervention. |
 | `test/agent-service/agent-service.test.ts` | Strong coverage for `/new`, startup capture, resume retry, and fresh/fallback paths. Missing explicit rebind tests. | The hardest future feature has no test harness yet. |
 | `test/interaction-processing/interaction-processing.test.ts` | Covers `/new`, `/status`, `/whoami`. Missing end-to-end user-control tests for session remap. | Public continuity contract is not yet guarded. |
 
@@ -858,7 +858,7 @@ in current code, with file or function and one concrete failure mode per path.
 
 Primary code:
 
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - `ensureSessionReady()`
   - `finalizeSessionStartup()`
   - `retryMissingStoredSessionIdAfterStartup()`
@@ -877,8 +877,8 @@ Code path:
 
 Exact locations:
 
-- `src/agents/runner-service.ts:525-549`
-- `src/agents/runner-service.ts:619-639`
+- `src/agents/runtime/runner-service.ts:525-549`
+- `src/agents/runtime/runner-service.ts:619-639`
 
 Failure mode:
 
@@ -903,8 +903,8 @@ Code path:
 
 Exact locations:
 
-- `src/agents/runner-service.ts:642-649`
-- `src/agents/runner-service.ts:652-677`
+- `src/agents/runtime/runner-service.ts:642-649`
+- `src/agents/runtime/runner-service.ts:652-677`
 
 Failure mode:
 
@@ -943,7 +943,7 @@ debugging surfaces.
 
 Primary code:
 
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - `ensureSessionReady()`
   - `syncStoredSessionIdForResolvedTarget()`
 
@@ -958,8 +958,8 @@ Code path:
 
 Exact locations:
 
-- `src/agents/runner-service.ts:192-199`
-- `src/agents/runner-service.ts:504-518`
+- `src/agents/runtime/runner-service.ts:192-199`
+- `src/agents/runtime/runner-service.ts:504-518`
 
 Failure mode:
 
@@ -982,8 +982,8 @@ Code path:
 
 Exact locations:
 
-- `src/agents/runner-service.ts:202-206`
-- `src/agents/session-state.ts:55-72`
+- `src/agents/runtime/runner-service.ts:202-206`
+- `src/agents/session/session-state.ts:55-72`
 
 Failure mode:
 
@@ -1005,9 +1005,9 @@ Code path:
 
 Exact locations:
 
-- `src/agents/runner-service.ts:193-226`
-- `src/agents/session-state.ts:556-576`
-- `src/agents/session-store.ts:58-72`
+- `src/agents/runtime/runner-service.ts:193-226`
+- `src/agents/session/session-state.ts:556-576`
+- `src/agents/session/session-store.ts:58-72`
 
 Failure mode:
 
@@ -1022,20 +1022,20 @@ between read and write.
 
 Primary code:
 
-- `src/agents/agent-service.ts`
+- `src/agents/runtime/agent-service.ts`
   - `getSessionDiagnostics()`
-- `src/control/runner-debug-state.ts`
+- `src/control/runner/runner-debug-state.ts`
   - `buildRunnerSessionMetadata()`
   - `listRunnerSessions()`
-- `src/control/runner-cli.ts`
+- `src/control/runner/runner-cli.ts`
 
 #### Confirmed limitation: diagnostics report stored truth only
 
 Exact locations:
 
-- `src/agents/agent-service.ts:254-262`
-- `src/control/runner-debug-state.ts:18-42`
-- `src/control/runner-cli.ts`
+- `src/agents/runtime/agent-service.ts:254-262`
+- `src/control/runner/runner-debug-state.ts:18-42`
+- `src/control/runner/runner-cli.ts`
 
 Failure mode:
 
@@ -1056,9 +1056,9 @@ Code path:
 
 Exact locations:
 
-- `src/control/runner-debug-state.ts:28-42`
-- `src/agents/session-state.ts:55-72`
-- `src/agents/session-state.ts:556-576`
+- `src/control/runner/runner-debug-state.ts:28-42`
+- `src/agents/session/session-state.ts:55-72`
+- `src/agents/session/session-state.ts:556-576`
 
 Failure mode:
 
@@ -1073,11 +1073,11 @@ This is a diagnosis trap more than a core persistence bug, but it matters.
 
 Primary code:
 
-- `src/agents/session-state.ts`
+- `src/agents/session/session-state.ts`
   - `touchSessionEntry()`
   - `clearSessionIdEntry()`
   - `upsertSessionEntry()`
-- `src/agents/session-store.ts`
+- `src/agents/session/session-store.ts`
   - `update()`
   - `touch()`
 
@@ -1085,7 +1085,7 @@ Primary code:
 
 Exact locations:
 
-- `src/agents/session-state.ts:55-72`
+- `src/agents/session/session-state.ts:55-72`
 
 Failure mode:
 
@@ -1100,7 +1100,7 @@ This is why naming cleanup here is not cosmetic.
 
 Exact locations:
 
-- `src/agents/session-state.ts:560-576`
+- `src/agents/session/session-state.ts:560-576`
 
 Failure mode:
 
@@ -1116,8 +1116,8 @@ makes current mapping writes harder to audit.
 
 Exact locations:
 
-- `src/agents/session-store.ts:30-31`
-- `src/agents/session-store.ts:104-120`
+- `src/agents/session/session-store.ts:30-31`
+- `src/agents/session/session-store.ts:104-120`
 
 Failure mode:
 
@@ -1132,7 +1132,7 @@ operation is possible.
 
 Exact locations:
 
-- `src/agents/session-store.ts` before this cleanup
+- `src/agents/session/session-store.ts` before this cleanup
 
 Failure mode:
 
@@ -1146,16 +1146,16 @@ This helper should not exist. It has now been removed to reduce seam sprawl.
 
 Primary code:
 
-- `src/agents/runner-service.ts`
+- `src/agents/runtime/runner-service.ts`
   - `runSessionCleanup()`
 
 #### Confirmed hole: cleanup uses broad `updatedAt`, not identity-aware freshness
 
 Exact locations:
 
-- `src/agents/runner-service.ts:437-474`
-- `src/agents/session-state.ts:55-72`
-- `src/agents/session-state.ts:556-576`
+- `src/agents/runtime/runner-service.ts:437-474`
+- `src/agents/session/session-state.ts:55-72`
+- `src/agents/session/session-state.ts:556-576`
 
 Failure mode:
 
@@ -1174,9 +1174,9 @@ So cleanup freshness and continuity freshness are currently conflated.
 
 Exact locations:
 
-- `src/agents/runner-service.ts:437-474`
-- `src/agents/runner-service.ts:480-649`
-- `src/agents/runner-service.ts:807-827`
+- `src/agents/runtime/runner-service.ts:437-474`
+- `src/agents/runtime/runner-service.ts:480-649`
+- `src/agents/runtime/runner-service.ts:807-827`
 
 Failure mode:
 
@@ -1192,7 +1192,7 @@ flows today.
 
 Exact locations:
 
-- `src/agents/runner-service.ts:470-473`
+- `src/agents/runtime/runner-service.ts:470-473`
 
 Failure mode:
 
@@ -1598,8 +1598,8 @@ This is the missing product behavior behind the new docs.
 
 Minimal task shape:
 
-- parser and help in `src/agents/commands.ts`
-- command execution in `src/channels/interaction-processing.ts`
+- parser and help in `src/agents/commands/commands.ts`
+- command execution in `src/channels/message/interaction-processing.ts`
 - auth check before rebinding
 - session-layer lookup by `sessionId`
 - explicit rebind of current `sessionKey` to that target `sessionId`
@@ -1920,13 +1920,13 @@ Optional later:
 | `docs/architecture/domain-language.md` | Shared meaning of `sessionKey` and `sessionId`. | Keep terms stable. |
 | `src/channels/slack/session-routing.ts` | Slack `sessionKey` resolution. | Keep `sessionKey`-only default. |
 | `src/channels/telegram/session-routing.ts` | Telegram `sessionKey` resolution. | Keep `sessionKey`-only default. |
-| `src/channels/interaction-processing.ts` | Channel-to-runner handoff. | Keep exact `sessionId` use out of normal chat flow. |
-| `src/agents/runner-service.ts` | Current launch or capture or resume owner. | Keep it as backend-specific capability owner. |
-| `src/agents/session-identity.ts` | Current generic explicit-id and parse helpers. | Split naming so explicit-id creation is session-side and parsing is runner-side. |
-| `src/agents/session-state.ts` | Current mixed session entry mutation layer. | Narrow generic helper use around `sessionId` mapping as part of follow-up code work. |
-| `src/agents/session-store.ts` | Current physical persistence file writer. | Keep as storage engine in phase 1. |
+| `src/channels/message/interaction-processing.ts` | Channel-to-runner handoff. | Keep exact `sessionId` use out of normal chat flow. |
+| `src/agents/runtime/runner-service.ts` | Current launch or capture or resume owner. | Keep it as backend-specific capability owner. |
+| `src/agents/session/session-identity.ts` | Current generic explicit-id and parse helpers. | Split naming so explicit-id creation is session-side and parsing is runner-side. |
+| `src/agents/session/session-state.ts` | Current mixed session entry mutation layer. | Narrow generic helper use around `sessionId` mapping as part of follow-up code work. |
+| `src/agents/session/session-store.ts` | Current physical persistence file writer. | Keep as storage engine in phase 1. |
 | `src/runners/tmux/session-handshake.ts` | Current backend-private tmux capture implementation. | Keep backend-private and nest it under a clearer runner seam. |
-| `src/control/runner-cli.ts` | Operator session diagnostics. | Later show exact mapping and rebinding truthfully. |
+| `src/control/runner/runner-cli.ts` | Operator session diagnostics. | Later show exact mapping and rebinding truthfully. |
 
 ## Rollout
 

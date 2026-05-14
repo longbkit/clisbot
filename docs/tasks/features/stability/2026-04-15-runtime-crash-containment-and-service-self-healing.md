@@ -54,8 +54,8 @@ That part is now implemented:
 
 Relevant code:
 
-- `src/control/runtime-management-cli.ts`
-- `src/control/runtime-monitor.ts`
+- `src/control/commands/runtime-management-cli.ts`
+- `src/control/runtime/runtime-monitor.ts`
 
 ### 2. Session cleanup rejection containment was the original gap, and is now shipped
 
@@ -72,9 +72,9 @@ That path is now contained:
 
 Relevant code:
 
-- `src/agents/agent-service.ts`
-- `src/agents/runner-service.ts`
-- `src/agents/session-store.ts`
+- `src/agents/runtime/agent-service.ts`
+- `src/agents/runtime/runner-service.ts`
+- `src/agents/session/session-store.ts`
 
 ### 3. Telegram post-start polling failure was the original gap, and is now shipped
 
@@ -93,7 +93,7 @@ That specific path is now much better:
 Relevant code:
 
 - `src/channels/telegram/service.ts`
-- `src/control/runtime-supervisor.ts`
+- `src/control/runtime/runtime-supervisor.ts`
 
 ### 4. Post-start lifecycle reporting now exists, but only part of the wider problem is solved
 
@@ -112,8 +112,8 @@ But this area is still only partially hardened:
 
 Relevant code:
 
-- `src/control/runtime-supervisor.ts`
-- `src/channels/channel-plugin.ts`
+- `src/control/runtime/runtime-supervisor.ts`
+- `src/channels/integration/channel-plugin.ts`
 - `src/channels/slack/service.ts`
 - `src/channels/telegram/service.ts`
 
@@ -135,9 +135,9 @@ This means the task is not blocked on zero progress here. It is blocked on finis
 
 Relevant code:
 
-- `src/control/runtime-health-store.ts`
-- `src/agents/session-store.ts`
-- `src/shared/fs.ts`
+- `src/control/runtime/runtime-health-store.ts`
+- `src/agents/session/session-store.ts`
+- `src/infra/fs.ts`
 
 ### 6. In-flight runner-session loss now has bounded recovery, but terminal rendering still needs cleanup
 
@@ -176,11 +176,11 @@ Resilience requirement:
 
 Relevant code:
 
-- `src/agents/session-service.ts`
-- `src/agents/runner-service.ts`
-- `src/shared/transcript-rendering.ts`
-- `src/config/schema.ts`
-- `src/config/template.ts`
+- `src/agents/session/session-service.ts`
+- `src/agents/runtime/runner-service.ts`
+- `src/runners/transcript/transcript-rendering.ts`
+- `src/config/core/schema.ts`
+- `src/config/core/template.ts`
 
 ### 7. Runtime startup still has too much blast radius at the channel or account boundary
 
@@ -200,7 +200,7 @@ Practical consequence:
 
 Relevant code:
 
-- `src/control/runtime-supervisor.ts`
+- `src/control/runtime/runtime-supervisor.ts`
 
 ### 8. Runtime health remains too coarse at channel level, not account or service level
 
@@ -217,8 +217,8 @@ Practical consequence:
 
 Relevant code:
 
-- `src/control/runtime-health-store.ts`
-- `src/control/runtime-supervisor.ts`
+- `src/control/runtime/runtime-health-store.ts`
+- `src/control/runtime/runtime-supervisor.ts`
 
 ### 9. Process-level fatal policy is now bounded by monitor restart, but still not true in-place self-healing
 
@@ -240,8 +240,8 @@ Practical consequence:
 
 Relevant code:
 
-- `src/control/runtime-management-cli.ts`
-- `src/control/runtime-monitor.ts`
+- `src/control/commands/runtime-management-cli.ts`
+- `src/control/runtime/runtime-monitor.ts`
 
 ## Current Implementation Progress
 
@@ -457,8 +457,8 @@ Use this as the current fix-order checklist.
 - Owner:
   `SessionService` calling `RunnerService`
 - Affected files:
-  - `src/agents/session-service.ts`
-  - `src/agents/runner-service.ts`
+  - `src/agents/session/session-service.ts`
+  - `src/agents/runtime/runner-service.ts`
 - Tests needed:
   - persisted active run with missing tmux session
   - persisted active run with missing tmux server
@@ -478,9 +478,9 @@ Use this as the current fix-order checklist.
 - Owner:
   agents plus channels surface text
 - Affected files:
-  - `src/channels/interaction-processing.ts`
-  - `src/agents/runner-service.ts`
-  - `src/agents/session-service.ts`
+  - `src/channels/message/interaction-processing.ts`
+  - `src/agents/runtime/runner-service.ts`
+  - `src/agents/session/session-service.ts`
   - `docs/features/agents/commands.md`
 - Tests needed:
   - stop when no active run exists but tmux session still exists
@@ -498,9 +498,9 @@ Use this as the current fix-order checklist.
 - Owner:
   `SessionService` plus `RunnerService`
 - Affected files:
-  - `src/agents/session-service.ts`
-  - `src/agents/runner-service.ts`
-  - `src/shared/transcript-rendering.ts`
+  - `src/agents/session/session-service.ts`
+  - `src/agents/runtime/runner-service.ts`
+  - `src/runners/transcript/transcript-rendering.ts`
 - Tests needed:
   - successful same-context recovery after one disappearance
   - fresh-session fallback without prompt replay
@@ -517,7 +517,7 @@ Use this as the current fix-order checklist.
 - Owner:
   control and channel runtime boundary
 - Affected files:
-  - `src/control/runtime-supervisor.ts`
+  - `src/control/runtime/runtime-supervisor.ts`
   - channel plugin implementations
 - Tests needed:
   - one failed account and one healthy account in the same channel
@@ -534,8 +534,8 @@ Use this as the current fix-order checklist.
 - Owner:
   control
 - Affected files:
-  - `src/control/runtime-health-store.ts`
-  - `src/control/runtime-supervisor.ts`
+  - `src/control/runtime/runtime-health-store.ts`
+  - `src/control/runtime/runtime-supervisor.ts`
   - operator health rendering paths
 - Tests needed:
   - one account failed, sibling account active
@@ -556,7 +556,7 @@ Use this as the current fix-order checklist.
   main runtime and control supervisor
 - Affected files:
   - `src/main.ts`
-  - `src/control/runtime-supervisor.ts`
+  - `src/control/runtime/runtime-supervisor.ts`
   - runtime health docs
 - Tests needed:
   - recoverable fatal-like event path

@@ -4,7 +4,7 @@ import {
   collectRecentConversationReplayMessages,
   markRecentConversationProcessed,
   prependRecentConversationContext,
-} from "../src/shared/recent-message-context.ts";
+} from "../src/agents/routing/recent-message-context.ts";
 
 describe("recent conversation context", () => {
   test("keeps only the latest five messages", () => {

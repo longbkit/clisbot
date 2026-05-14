@@ -9,23 +9,26 @@ import {
   resolveTelegramMessageTopicId,
   TelegramPollingService,
 } from "../src/channels/telegram/service.ts";
-import { resolveTelegramBotConfig } from "../src/config/channel-bots.ts";
+import { resolveTelegramBotConfig } from "../src/channels/telegram/config.ts";
 import type { TelegramUpdate } from "../src/channels/telegram/message.ts";
-import { ProcessedEventsStore } from "../src/channels/processed-events-store.ts";
-import type { LoadedConfig } from "../src/config/load-config.ts";
-import { ActivityStore } from "../src/control/activity-store.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { ProcessedEventsStore } from "../src/channels/message/processed-events-store.ts";
+import type { LoadedConfig } from "../src/config/core/load-config.ts";
+import { ActivityStore } from "../src/control/runtime/activity-store.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 let previousCliName: string | undefined;
 
 beforeEach(() => {
   previousCliName = process.env.CLISBOT_CLI_NAME;
   delete process.env.CLISBOT_CLI_NAME;
+  setRenderedCliName();
 });
 
 afterEach(() => {
   process.env.CLISBOT_CLI_NAME = previousCliName;
+  setRenderedCliName(previousCliName);
 });
 
 function makeUpdate(updateId: number): TelegramUpdate {
@@ -49,8 +52,10 @@ function createTelegramConfig() {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: true,
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: true },
+        },
       }),
     ),
   );
@@ -89,8 +94,10 @@ function createLoadedConfig(): LoadedConfig {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: true,
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: true },
+        },
       }),
     ),
   );

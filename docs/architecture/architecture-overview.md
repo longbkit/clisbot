@@ -29,6 +29,11 @@ Keep the system split into six explicit product systems:
 
 That boundary is the main architecture rule for the repository.
 
+`src/infra` is the only non-product infra layer. It may hold small
+host/runtime primitives such as filesystem helpers, path defaults, process
+helpers, and runtime logging. Product concepts do not belong there; they should
+live under the system that owns their behavior.
+
 ## Top-Level Diagram
 
 ```text
@@ -183,7 +188,7 @@ Current runtime naming should reflect that split clearly:
 
 Current code is not fully converged on that split yet:
 
-- `src/agents/runner-service.ts` still holds the `RunnerService`
+- `src/agents/runtime/runner-service.ts` still holds the `RunnerService`
   implementation today
 - that file still carries some `SessionService`-owned continuity work
 - treat the owner map above as the architecture target, not as a claim that

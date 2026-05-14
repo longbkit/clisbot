@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { getCanonicalTelegramBotTokenPath } from "../src/config/channel-credentials.ts";
-import { getCanonicalZaloBotTokenPath } from "../src/config/channel-credentials.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
-import { runBotsCli } from "../src/control/bots-cli.ts";
-import { renderCliCommand } from "../src/shared/cli-name.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import {
+  resolveChannelCredentialFilePath,
+} from "../src/config/channels/channel-credential-contract.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
+import { runBotsCli } from "../src/control/commands/bots-cli.ts";
+import { renderCliCommand } from "../src/control/commands/cli-name.ts";
 
 describe("bots cli", () => {
   let tempDir = "";
@@ -31,6 +32,18 @@ describe("bots cli", () => {
     config.agents.list = agentIds.map((id) => ({ id }));
     await writeEditableConfig(process.env.CLISBOT_CONFIG_PATH!, config);
   }
+
+  test("subcommand help prints guidance without requiring bot args", async () => {
+    const output: string[] = [];
+    console.log = (value?: unknown) => {
+      output.push(String(value ?? ""));
+    };
+
+    await runBotsCli(["add", "--help"]);
+
+    expect(output.join("\n")).toContain("Usage:");
+    expect(output.join("\n")).toContain("bots add --channel telegram");
+  });
 
   test("adds a persisted telegram bot without writing raw token into config", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
@@ -74,7 +87,11 @@ describe("bots cli", () => {
     expect(rawConfig.bots.telegram.alerts.botToken ?? "").toBe("");
     expect(rawConfig.bots.telegram.alerts.agentId).toBe("support");
     expect(rawConfig.bots.telegram.defaults.defaultBotId).toBe("alerts");
-    expect(readFileSync(getCanonicalTelegramBotTokenPath("alerts"), "utf8").trim()).toBe(
+    expect(readFileSync(resolveChannelCredentialFilePath({
+      channel: "telegram",
+      botId: "alerts",
+      field: "botToken",
+    }), "utf8").trim()).toBe(
       "123456:telegram-dev-token",
     );
     expect(output.join("\n")).toContain(
@@ -158,11 +175,79 @@ describe("bots cli", () => {
     expect(rawConfig.bots.zaloBot["zalo-main"].botToken ?? "").toBe("");
     expect(rawConfig.bots.zaloBot["zalo-main"].agentId).toBe("support");
     expect(rawConfig.bots.zaloBot.defaults.defaultBotId).toBe("zalo-main");
-    expect(readFileSync(getCanonicalZaloBotTokenPath("zalo-main"), "utf8").trim()).toBe(
+    expect(readFileSync(resolveChannelCredentialFilePath({
+      channel: "zalo-bot",
+      botId: "zalo-main",
+      field: "botToken",
+    }), "utf8").trim()).toBe(
       "123456:zalo-bot-token",
     );
     expect(output.join("\n")).toContain(
       "Added zalo-bot/zalo-main, persisted=tokenFile, runtime=not-running",
+    );
+  });
+
+  test("adds a persisted slack bot without writing raw tokens into config", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+
+    const output: string[] = [];
+    console.log = (value?: unknown) => {
+      output.push(String(value ?? ""));
+    };
+
+    await runBotsCli(
+      [
+        "add",
+        "--channel",
+        "slack",
+        "--bot",
+        "ops",
+        "--app-token",
+        "xapp-slack-app-token",
+        "--bot-token",
+        "xoxb-slack-bot-token",
+        "--agent",
+        "support",
+        "--persist",
+      ],
+      {
+        getRuntimeStatus: async () => ({
+          running: false,
+          configPath: process.env.CLISBOT_CONFIG_PATH!,
+          pidPath: join(tempDir, "state", "clisbot.pid"),
+          logPath: join(tempDir, "state", "clisbot.log"),
+          tmuxSocketPath: join(tempDir, "state", "clisbot.sock"),
+        }),
+      } as any,
+    );
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.slack.ops.credentialType).toBe("tokenFile");
+    expect(rawConfig.bots.slack.ops.appToken ?? "").toBe("");
+    expect(rawConfig.bots.slack.ops.botToken ?? "").toBe("");
+    expect(rawConfig.bots.slack.ops.agentId).toBe("support");
+    expect(rawConfig.bots.slack.defaults.defaultBotId).toBe("ops");
+    expect(readFileSync(resolveChannelCredentialFilePath({
+      channel: "slack",
+      botId: "ops",
+      field: "appToken",
+    }), "utf8").trim()).toBe(
+      "xapp-slack-app-token",
+    );
+    expect(readFileSync(resolveChannelCredentialFilePath({
+      channel: "slack",
+      botId: "ops",
+      field: "botToken",
+    }), "utf8").trim()).toBe(
+      "xoxb-slack-bot-token",
+    );
+    expect(output.join("\n")).toContain(
+      "Added slack/ops, persisted=tokenFile, runtime=not-running",
     );
   });
 
@@ -214,5 +299,52 @@ describe("bots cli", () => {
     await runBotsCli(["clear-timezone", "--channel", "telegram", "--bot", "default"]);
     rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
     expect(rawConfig.bots.telegram.default.timezone).toBeUndefined();
+  });
+
+  test("list counts telegram group, topic, and dm routes through config-owned summaries", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+
+    const config = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    config.bots.telegram.default.groups = {
+      "-1001": {
+        enabled: true,
+        topics: {
+          "10": { enabled: true },
+          "11": { enabled: true },
+        },
+      },
+      "-1002": {
+        enabled: true,
+        topics: {},
+      },
+    };
+    config.bots.telegram.default.directMessages = {
+      "1276408333": {
+        enabled: true,
+      },
+    };
+    writeFileSync(process.env.CLISBOT_CONFIG_PATH!, `${JSON.stringify(config, null, 2)}\n`);
+
+    const output: string[] = [];
+    console.log = (value?: unknown) => {
+      output.push(String(value ?? ""));
+    };
+
+    await runBotsCli(["list", "--channel", "telegram", "--json"]);
+
+    const parsed = JSON.parse(output.join("\n"));
+    expect(parsed).toEqual([
+      expect.objectContaining({
+        channel: "telegram",
+        botId: "default",
+        enabled: false,
+        routeCount: 7,
+      }),
+    ]);
   });
 });

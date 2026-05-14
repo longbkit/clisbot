@@ -206,6 +206,14 @@ Những test đầu tiên tốt:
 - `/status`
 - `/whoami`
 
+Help loop dành riêng cho Slack:
+
+- `clisbot loops --help --channel slack`
+- `clisbot loops create --help --channel slack`
+- extension provision child surface chỉ dành cho Slack dùng `--new-thread`, ví dụ:
+  - `clisbot loops create --channel slack --target group:C1234567890 --new-thread --sender slack:U1234567890 every day at 07:00 check CI`
+  - `clisbot loops create --channel slack --target dm:U1234567890 --new-thread --sender slack:U1234567890 every day at 09:00 check inbox`
+
 Sau khi route được bind, `/whoami` cũng là cách kiểm tra session nhanh vì nó cho thấy `sessionId` cùng trạng thái giá trị đó đã persist hay chưa cho cuộc hội thoại này.
 
 ## Bước 6: thêm bot vào public channel

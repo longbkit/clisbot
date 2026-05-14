@@ -164,7 +164,7 @@ This keeps the system aligned with the actual operator mental model:
 The accepted architecture is clearer than the current code shape.
 
 Current code still leaks part of continuity work into
-`src/agents/runner-service.ts`, including:
+`src/agents/runtime/runner-service.ts`, including:
 
 - minting explicit `sessionId` values for explicit-id launch paths
 - reading stored continuity directly before startup or recovery decisions

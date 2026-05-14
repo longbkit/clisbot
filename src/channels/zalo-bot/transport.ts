@@ -3,7 +3,7 @@ import {
   sendZaloBotPhoto,
 } from "./api.ts";
 import { resolveZaloBotMessageContent } from "./content.ts";
-import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message/message-command.ts";
 
 export type ZaloBotPostedMessageChunk = {
   text: string;

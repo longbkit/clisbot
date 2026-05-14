@@ -3,13 +3,14 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runPairingCli } from "../src/channels/pairing/cli.ts";
-import { writeEditableConfig } from "../src/config/config-file.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { writeEditableConfig } from "../src/config/core/config-file.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 import {
   listChannelPairingRequests,
   upsertChannelPairingRequest,
 } from "../src/channels/pairing/store.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 let previousCliName: string | undefined;
 let previousConfigPath: string | undefined;
@@ -17,10 +18,12 @@ let previousConfigPath: string | undefined;
 beforeEach(() => {
   previousCliName = process.env.CLISBOT_CLI_NAME;
   delete process.env.CLISBOT_CLI_NAME;
+  setRenderedCliName();
 });
 
 afterEach(() => {
   process.env.CLISBOT_CLI_NAME = previousCliName;
+  setRenderedCliName(previousCliName);
   process.env.CLISBOT_CONFIG_PATH = previousConfigPath;
 });
 
@@ -43,9 +46,11 @@ async function seedConfig(configPath: string) {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: true,
-        telegramEnabled: true,
-        zaloBotEnabled: true,
+        channels: {
+          slack: { enabled: true },
+          telegram: { enabled: true },
+          "zalo-bot": { enabled: true },
+        },
       }),
     ),
   );
@@ -63,7 +68,8 @@ describe("pairing cli", () => {
     const text = lines.join("\n");
     expect(text).toContain("clisbot pairing");
     expect(text).toContain("clisbot pairing help");
-    expect(text).toContain("clisbot pairing clear <slack|telegram|zalo-bot>");
+    expect(text).toContain("clisbot pairing clear <channel-name>");
+    expect(text).toContain("Supported channels: slack, telegram, zalo-bot.");
   });
 
   test("lists pending requests as text", async () => {

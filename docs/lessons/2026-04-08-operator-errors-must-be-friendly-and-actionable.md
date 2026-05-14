@@ -6,10 +6,10 @@ summary: Startup and runtime failures should render as operator guidance with th
 related:
   - docs/user-guide/README.md
   - src/main.ts
-  - src/control/operator-errors.ts
-  - src/control/runtime-process.ts
-  - src/control/runtime-supervisor.ts
-  - src/config/env-substitution.ts
+  - src/control/commands/operator-errors.ts
+  - src/control/runtime/runtime-process.ts
+  - src/control/runtime/runtime-supervisor.ts
+  - src/config/env/env-substitution.ts
 ---
 
 ## Context

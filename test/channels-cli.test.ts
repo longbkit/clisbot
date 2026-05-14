@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { runChannelsCli } from "../src/control/channels-cli.ts";
+import { runChannelsCli } from "../src/control/commands/channels-cli.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 let previousCliName: string | undefined;
 
 beforeEach(() => {
   previousCliName = process.env.CLISBOT_CLI_NAME;
   delete process.env.CLISBOT_CLI_NAME;
+  setRenderedCliName();
 });
 
 afterEach(() => {
   process.env.CLISBOT_CLI_NAME = previousCliName;
+  setRenderedCliName(previousCliName);
 });
 
 describe("channels cli", () => {

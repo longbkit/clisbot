@@ -48,7 +48,7 @@ Use this sequence every time:
 4. verify installed-package behavior when packaging-sensitive code changed
 5. run the real publish with OTP ready
 
-If 2FA is enabled, treat the OTP as part of the release checklist, not as an afterthought.
+If 2FA is enabled, keep the normal `npm login` / browser or interactive approval flow attached. Do not switch to `--otp`.
 
 ## Applied Here
 
@@ -57,4 +57,6 @@ This lesson was applied by:
 - validating the scoped package on npm before publish
 - dry-running package publish before real publish
 - fixing bundled template path resolution before the next publish attempt
-- standardizing the final operator instruction to `npm publish --access public --otp=<code>`
+- standardizing the final operator instruction to `npm login`, then `npm publish --access public` in the same attached flow
+
+Superseded note: earlier drafts mentioned `--otp`; current repo policy forbids OTP fallback because it repeatedly caused failed remote release handoffs.

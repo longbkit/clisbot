@@ -1,30 +1,30 @@
-import { AgentService } from "../../agents/agent-service.ts";
+import { AgentService } from "../../agents/runtime/agent-service.ts";
 import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
-} from "../../agents/follow-up-policy.ts";
+} from "../../agents/commands/follow-up-policy.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
-import { parseAgentCommand } from "../../agents/commands.ts";
-import { processChannelInteraction } from "../interaction-processing.ts";
-import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
+import { parseAgentCommand } from "../../agents/commands/commands.ts";
+import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
-  isSlackSenderAllowed,
-  isSlackSenderBlocked,
+  isChannelSenderAllowed,
+  isChannelSenderBlocked,
 } from "../pairing/access.ts";
 import { buildPairingReplyFromRequest } from "../pairing/messages.ts";
 import {
   upsertChannelPairingRequest,
 } from "../pairing/store.ts";
-import { ProcessedEventsStore } from "../processed-events-store.ts";
-import { ActivityStore } from "../../control/activity-store.ts";
-import { renderChannelInteraction } from "../../shared/transcript.ts";
-import { buildAgentPromptText } from "../agent-prompt.ts";
+import { ProcessedEventsStore } from "../message/processed-events-store.ts";
+import { ActivityStore } from "../../control/runtime/activity-store.ts";
+import { renderChannelInteraction } from "../../runners/transcript/index.ts";
+import { buildAgentPromptText } from "../message/agent-prompt.ts";
 import {
   buildSurfacePromptContextWithDirectory,
   recordSurfaceDirectoryIdentity,
-} from "../surface-directory.ts";
-import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
-import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
+} from "../surface/surface-directory.ts";
+import { buildMentionOnlyFollowUpPrompt } from "../config/mention-follow-up.ts";
+import { prependRecentConversationContext } from "../../agents/routing/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
 import {
@@ -43,7 +43,7 @@ import {
   clearSlackAssistantThreadStatus,
   setSlackAssistantThreadStatus,
 } from "./assistant-status.ts";
-import { ConversationProcessingIndicatorCoordinator } from "../processing-indicator.ts";
+import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
 import { activateSlackProcessingDecoration } from "./processing-decoration.ts";
 import { App } from "./bolt-compat.ts";
 import {
@@ -76,14 +76,14 @@ import {
   reconcileSlackText,
   type SlackPostedMessageChunk,
 } from "./transport.ts";
-import type { SlackBotCredentialConfig } from "../../config/channel-bots.ts";
+import type { SlackBotCredentialConfig } from "./config.ts";
 import {
   resolveSlackBotConfig,
   resolveSlackDirectMessageAdmissionConfig,
-} from "../../config/channel-bots.ts";
-import { logLatencyDebug } from "../../control/latency-debug.ts";
-import { buildTokenHint } from "../runtime-identity.ts";
-import { renderGroupRouteAccessDeniedMessage } from "../route-policy.ts";
+} from "./config.ts";
+import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
+import { buildTokenHint } from "../integration/channel-runtime-identity.ts";
+import { renderGroupRouteAccessDeniedMessage } from "../config/route-policy.ts";
 
 type SlackAppType = InstanceType<typeof App>;
 type SlackThreadTsCacheEntry = {
@@ -416,9 +416,10 @@ export class SlackSocketService {
           : undefined;
       if (
         senderId &&
-        isSlackSenderBlocked({
+        isChannelSenderBlocked({
+          channel: "slack",
           blockFrom: params.route.blockUsers ?? [],
-          userId: senderId,
+          subject: { userId: senderId },
         })
       ) {
         debugSlackEvent("drop-shared-blocked", { eventId, senderId });
@@ -432,9 +433,10 @@ export class SlackSocketService {
           params.route.policy === "allowlist" ||
           (params.route.allowUsers?.length ?? 0) > 0
         ) &&
-        !isSlackSenderAllowed({
+        !isChannelSenderAllowed({
+          channel: "slack",
           allowFrom: params.route.allowUsers ?? [],
-          userId: senderId,
+          subject: { userId: senderId },
         })
       ) {
         const explicitlyAddressed =
@@ -514,9 +516,10 @@ export class SlackSocketService {
         identity: dmIdentity,
       });
 
-      if (isSlackSenderBlocked({
+      if (isChannelSenderBlocked({
+        channel: "slack",
         blockFrom: dmConfig.blockUsers ?? [],
-        userId: directUserId,
+        subject: { userId: directUserId },
       })) {
         debugSlackEvent("drop-dm-blocked", { eventId, directUserId });
         await this.processedEventsStore.markCompleted(eventId);
@@ -524,9 +527,10 @@ export class SlackSocketService {
       }
 
       if (dmConfig.policy !== "open" && !auth.mayBypassPairing) {
-        const allowed = isSlackSenderAllowed({
+        const allowed = isChannelSenderAllowed({
+          channel: "slack",
           allowFrom: dmConfig.allowUsers ?? [],
-          userId: directUserId,
+          subject: { userId: directUserId },
         });
         if (!allowed) {
           if (dmConfig.policy === "pairing") {

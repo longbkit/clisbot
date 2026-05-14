@@ -1,4 +1,4 @@
-import { renderCliCommand } from "../../shared/cli-name.ts";
+import { renderCliCommand } from "../../control/commands/cli-name.ts";
 
 export function renderTelegramRouteChoiceMessage(params: {
   chatId: number | string;

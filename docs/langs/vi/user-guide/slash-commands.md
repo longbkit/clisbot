@@ -10,7 +10,7 @@ Trang này là bản tổng quan chuẩn cho các lệnh ở ngữ cảnh chat v
 
 ## Nguồn sự thật
 
-- Parser và help text: `src/agents/commands.ts`
+- Parser và help text: `src/agents/commands/commands.ts`
 - Bộ render help chuẩn: `renderAgentControlSlashHelp()`
 
 Nếu trang này và runtime có lúc lệch nhau, runtime là nguồn đúng hơn.

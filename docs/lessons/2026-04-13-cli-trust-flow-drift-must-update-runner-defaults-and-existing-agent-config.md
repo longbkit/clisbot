@@ -6,8 +6,8 @@ summary: When a CLI adds or changes a first-start trust flow, clisbot must updat
 related:
   - docs/architecture/runtime-architecture.md
   - docs/features/runners/gemini-cli.md
-  - src/config/agent-tool-presets.ts
-  - src/agents/runner-service.ts
+  - src/config/runtime/agent-tool-presets.ts
+  - src/agents/runtime/runner-service.ts
   - src/runners/tmux/session-handshake.ts
   - test/agent-service/agent-service.test.ts
   - test/tmux-runner-latency/tmux-runner-latency.test.ts

@@ -1,41 +1,41 @@
-import { AgentService } from "../../agents/agent-service.ts";
+import { AgentService } from "../../agents/runtime/agent-service.ts";
 import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
-} from "../../agents/follow-up-policy.ts";
-import { processChannelInteraction } from "../interaction-processing.ts";
-import { getAgentEntry, type LoadedConfig } from "../../config/load-config.ts";
+} from "../../agents/commands/follow-up-policy.ts";
+import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
-  isZaloBotSenderAllowed,
-  isZaloBotSenderBlocked,
+  isChannelSenderAllowed,
+  isChannelSenderBlocked,
 } from "../pairing/access.ts";
 import { buildPairingReplyFromRequest } from "../pairing/messages.ts";
 import { upsertChannelPairingRequest } from "../pairing/store.ts";
-import { ProcessedEventsStore } from "../processed-events-store.ts";
-import { ActivityStore } from "../../control/activity-store.ts";
-import type { ZaloBotCredentialConfig } from "../../config/channel-bots.ts";
+import { ProcessedEventsStore } from "../message/processed-events-store.ts";
+import { ActivityStore } from "../../control/runtime/activity-store.ts";
+import type { ZaloBotCredentialConfig } from "./config.ts";
 import {
   resolveZaloBotConfig,
   resolveZaloBotDirectMessageAdmissionConfig,
-} from "../../config/channel-bots.ts";
+} from "./config.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
-import { buildAgentPromptText } from "../agent-prompt.ts";
+import { buildAgentPromptText } from "../message/agent-prompt.ts";
 import {
   buildSurfacePromptContextWithDirectory,
   recordSurfaceDirectoryIdentity,
-} from "../surface-directory.ts";
-import { prependRecentConversationContext } from "../../shared/recent-message-context.ts";
+} from "../surface/surface-directory.ts";
+import { prependRecentConversationContext } from "../../agents/routing/recent-message-context.ts";
 import { DEFAULT_PROTECTED_CONTROL_RULE } from "../../auth/defaults.ts";
 import { resolveChannelAuth } from "../../auth/resolve.ts";
 import {
   claimFirstOwnerFromDirectMessage,
   renderFirstOwnerClaimMessage,
 } from "../../auth/owner-claim.ts";
-import { logLatencyDebug } from "../../control/latency-debug.ts";
-import { renderGroupRouteAccessDeniedMessage } from "../route-policy.ts";
-import type { ChannelRuntimeLifecycleEvent } from "../channel-plugin.ts";
-import { ConversationProcessingIndicatorCoordinator } from "../processing-indicator.ts";
-import { buildMentionOnlyFollowUpPrompt } from "../mention-follow-up.ts";
+import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
+import { renderGroupRouteAccessDeniedMessage } from "../config/route-policy.ts";
+import type { ChannelRuntimeLifecycleEvent } from "../integration/channel-plugin.ts";
+import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
+import { buildMentionOnlyFollowUpPrompt } from "../config/mention-follow-up.ts";
 import {
   ZaloBotApiError,
   getZaloBotMe,
@@ -174,10 +174,13 @@ export class ZaloBotPollingService {
     const senderId = message.from.id.trim();
     const senderName = message.from.display_name?.trim() || message.from.name?.trim();
     const senderHandle = senderName?.replace(/\s+/g, "").toLowerCase();
-    if (isZaloBotSenderBlocked({
+    if (isChannelSenderBlocked({
+      channel: "zalo-bot",
       blockFrom: route.blockUsers ?? [],
-      userId: senderId,
-      username: senderHandle,
+      subject: {
+        userId: senderId,
+        username: senderHandle,
+      },
     })) {
       return;
     }
@@ -217,10 +220,13 @@ export class ZaloBotPollingService {
       if (
         !sharedAuth.mayBypassSharedSenderPolicy &&
         (route.policy === "allowlist" || (route.allowUsers?.length ?? 0) > 0) &&
-        !isZaloBotSenderAllowed({
+        !isChannelSenderAllowed({
+          channel: "zalo-bot",
           allowFrom: route.allowUsers ?? [],
-          userId: senderId,
-          username: senderHandle,
+          subject: {
+            userId: senderId,
+            username: senderHandle,
+          },
         })
       ) {
         await postZaloBotText({
@@ -283,10 +289,13 @@ export class ZaloBotPollingService {
         },
       });
       if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
-        const allowed = isZaloBotSenderAllowed({
+        const allowed = isChannelSenderAllowed({
+          channel: "zalo-bot",
           allowFrom: directMessages.allowUsers ?? [],
-          userId: senderId,
-          username: senderHandle,
+          subject: {
+            userId: senderId,
+            username: senderHandle,
+          },
         });
         if (!allowed) {
           if (directMessages.policy === "pairing") {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseAgentCommand } from "../src/agents/commands.ts";
+import { parseAgentCommand } from "../src/agents/commands/commands.ts";
 import {
   resolveTelegramUnroutedGuidanceMode,
   resolveTelegramUnroutedGuidanceModeForEvent,

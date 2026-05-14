@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentSessionTarget } from "../src/agents/agent-service.ts";
-import type { RunObserver } from "../src/agents/run-observation.ts";
+import type { AgentSessionTarget } from "../src/agents/runtime/agent-service.ts";
+import type { RunObserver } from "../src/agents/session/run-observation.ts";
 import {
   ConversationProcessingIndicatorCoordinator,
   waitForProcessingIndicatorLifecycle,
-} from "../src/channels/processing-indicator.ts";
+} from "../src/channels/message/processing-indicator.ts";
 
 function createTarget(): AgentSessionTarget {
   return {

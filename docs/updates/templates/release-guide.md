@@ -22,6 +22,13 @@ Date: YYYY-MM-DD
 
 - ...
 
+## GitHub Release
+
+- Tag:
+- Prerelease/latest:
+- Canonical release note:
+- Migration index:
+
 ## Links
 
 - Release note:

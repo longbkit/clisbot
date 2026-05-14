@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { restart } from "../src/control/runtime-management-cli.ts";
-import type { RuntimeStatus } from "../src/control/runtime-process.ts";
+import { restart } from "../src/control/commands/runtime-management-cli.ts";
+import type { RuntimeStatus } from "../src/control/runtime/runtime-process.ts";
 
 const originalClisbotConfigPath = process.env.CLISBOT_CONFIG_PATH;
 

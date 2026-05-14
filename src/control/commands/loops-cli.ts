@@ -1,0 +1,919 @@
+import {
+  AgentService,
+  ActiveRunInProgressError,
+  type AgentSessionTarget,
+} from "../../agents/runtime/agent-service.ts";
+import {
+  buildStoredLoopSender,
+  createStoredCalendarLoop,
+  createStoredIntervalLoop,
+  renderLoopStartedMessage,
+  resolveLoopPromptText,
+  summarizeLoopPrompt,
+  validateLoopInterval,
+} from "../../agents/loops/loop-definition.ts";
+import type { IntervalLoopStatus } from "../../agents/loops/loop-state.ts";
+import { buildStoredSurfaceBinding } from "../../agents/routing/surface-binding.ts";
+import {
+  LOOP_APP_FLAG,
+  computeNextCalendarLoopRunAtMs,
+  formatCalendarLoopSchedule,
+  parseLoopSlashCommand,
+  type ParsedLoopSlashCommand,
+} from "../../agents/loops/loop-command.ts";
+import { resolveAgentTarget } from "../../agents/routing/resolved-target.ts";
+import { AgentSessionState } from "../../agents/session/session-state.ts";
+import { SessionStore } from "../../agents/session/session-store.ts";
+import { ensureEditableConfigFile } from "../../config/core/config-file.ts";
+import {
+  loadConfigWithoutEnvResolution,
+  resolveSessionStorePath,
+} from "../../config/core/load-config.ts";
+import { parseTimezone, resolveConfigTimezone } from "../../config/runtime/timezone.ts";
+import { getRuntimeStatus } from "../runtime/runtime-process.ts";
+import { resolveLoopCliContext } from "./loop-cli-context.ts";
+import {
+  hasFlag,
+  hasLoopContext,
+  parseAddressing,
+  parseOptionValue,
+  stripLoopContextArgs,
+  type LoopCliAddressing,
+} from "./loop-cli-addressing.ts";
+import {
+  renderLoopInventory,
+  renderLoopsCreateHelp,
+  renderLoopsHelp,
+  renderLoopStoreSummary,
+  renderScopedCommand,
+  renderScopedLoopStatus,
+} from "./loops-cli-rendering.ts";
+import {
+  isRegisteredChannelId,
+  renderSenderPrincipalExamples,
+} from "../../channels/catalog/registry.ts";
+import { normalizeChannelUserId } from "../../channels/integration/channel-surface-contract-registry.ts";
+import {
+  getScopedLoopCounts,
+  prepareLoopCreateAddressing,
+  removeScopedLoopsById,
+  selectScopedLoopsForAddressing,
+} from "./loop-cli-targeting.ts";
+import { renderCliCommand } from "./cli-name.ts";
+import { sleep } from "../../infra/process.ts";
+
+export { renderLoopsHelp } from "./loops-cli-rendering.ts";
+
+const LOOP_BUSY_RETRY_MS = 250;
+const LOOP_CONFIRM_FLAG = "--confirm";
+const LOOP_PROGRESS_FLAG = "--progress";
+const LOOP_SENDER_FLAG = "--sender";
+const LOOP_SENDER_NAME_FLAG = "--sender-name";
+const LOOP_SENDER_HANDLE_FLAG = "--sender-handle";
+
+type LoadedLoopControlState = Awaited<ReturnType<typeof loadLoopControlState>>;
+type LoopCliContext = ReturnType<typeof resolveLoopCliContext>;
+type LoopPromptResolution = Awaited<ReturnType<typeof resolveLoopPromptText>>;
+type LoopCreator = NonNullable<ReturnType<typeof buildStoredLoopSender>>;
+type LoopCreateRequest = {
+  addressing: LoopCliAddressing;
+  context: LoopCliContext;
+  deliveryContext?: LoopCliContext;
+  creator: LoopCreator;
+  parsed: ParsedLoopSlashCommand;
+  resolvedPrompt: LoopPromptResolution;
+  resolvedTarget: ReturnType<typeof resolveAgentTarget>;
+  maxRunsPerLoop: number;
+  maxActiveLoops: number;
+  expression: string;
+  confirm: boolean;
+  loopTimezone?: string;
+  progressMessages?: number;
+};
+type LoopCounts = {
+  sessionLoopCount: number;
+  globalLoopCount: number;
+};
+type LoopCreateBase = {
+  state: LoadedLoopControlState;
+  request: LoopCreateRequest;
+  cancelCommand: string;
+  runtimeRunning: boolean;
+};
+
+function getEditableConfigPath() {
+  return process.env.CLISBOT_CONFIG_PATH;
+}
+
+function getSessionState(sessionStorePath: string) {
+  return new AgentSessionState(new SessionStore(sessionStorePath));
+}
+
+async function loadLoopControlState() {
+  const configPath = await ensureEditableConfigFile(getEditableConfigPath());
+  const loadedConfig = await loadConfigWithoutEnvResolution(configPath);
+  const sessionStorePath = resolveSessionStorePath(loadedConfig);
+  return {
+    loadedConfig,
+    configPath: loadedConfig.configPath,
+    sessionStorePath,
+    sessionState: getSessionState(sessionStorePath),
+  };
+}
+
+function requireLoopContext(addressing: LoopCliAddressing) {
+  if (!addressing.channel || !addressing.target) {
+    throw new Error("--channel and --target are required for scoped loop commands.");
+  }
+}
+
+function resolveScopedLoopContext(
+  state: LoadedLoopControlState,
+  addressing: LoopCliAddressing,
+) {
+  requireLoopContext(addressing);
+  return resolveLoopCliContext({
+    loadedConfig: state.loadedConfig,
+    channel: addressing.channel!,
+    target: addressing.target!,
+    childSurface: addressing.childSurface,
+    botId: addressing.botId,
+  });
+}
+
+async function listLoops(
+  state: LoadedLoopControlState,
+  commandLabel: "list" | "status",
+  addressing: LoopCliAddressing,
+) {
+  if (addressing.channel || addressing.target) {
+    await showScopedLoopInventory(state, addressing, commandLabel);
+    return;
+  }
+  const loops = await state.sessionState.listIntervalLoops();
+  console.log(
+    renderLoopInventory({
+      commandLabel,
+      configPath: state.configPath,
+      sessionStorePath: state.sessionStorePath,
+      loops,
+    }),
+  );
+}
+
+async function showScopedLoopInventory(
+  state: LoadedLoopControlState,
+  addressing: LoopCliAddressing,
+  commandLabel: "list" | "status",
+) {
+  const context = resolveScopedLoopContext(state, addressing);
+  const sessionLoops = selectScopedLoopsForAddressing(
+    context,
+    addressing,
+    await state.sessionState.listIntervalLoops({
+      sessionKey: context.sessionTarget.sessionKey,
+    }),
+  );
+  const globalLoopCount = (await state.sessionState.listIntervalLoops()).length;
+  console.log(
+    renderScopedLoopStatus({
+      commandLabel: renderScopedCommand(`loops ${commandLabel}`, addressing),
+      configPath: state.configPath,
+      sessionStorePath: state.sessionStorePath,
+      sessionKey: context.sessionTarget.sessionKey,
+      sessionLoops,
+      globalLoopCount,
+    }),
+  );
+}
+
+async function cancelLoopById(state: LoadedLoopControlState, loopId: string) {
+  const cancelled = await state.sessionState.removeIntervalLoopById(loopId);
+  const remaining = await state.sessionState.listIntervalLoops();
+  console.log(
+    [
+      cancelled
+        ? `Cancelled loop \`${loopId}\`.`
+        : `No active loop found with id \`${loopId}\`.`,
+      ...renderLoopStoreSummary(state.sessionStorePath, remaining.length),
+    ].join("\n"),
+  );
+}
+
+async function cancelAllLoops(state: LoadedLoopControlState) {
+  const cancelled = await state.sessionState.clearAllIntervalLoops();
+  const remaining = await state.sessionState.listIntervalLoops();
+  console.log(
+    [
+      cancelled > 0
+        ? `Cancelled ${cancelled} active loop${cancelled === 1 ? "" : "s"} across the whole app.`
+        : "No active loops to cancel across the whole app.",
+      ...renderLoopStoreSummary(state.sessionStorePath, remaining.length),
+    ].join("\n"),
+  );
+}
+
+function resolveScopedLoopCancelId(args: string[], sessionLoops: IntervalLoopStatus[]) {
+  const explicitLoopId = stripLoopContextArgs(args.slice(1))
+    .find((token) => token && token !== "--all" && token !== LOOP_APP_FLAG);
+  return explicitLoopId || (sessionLoops.length === 1 ? sessionLoops[0]?.id : undefined);
+}
+
+async function cancelAllScopedLoops(
+  state: LoadedLoopControlState,
+  context: LoopCliContext,
+  sessionLoops: IntervalLoopStatus[],
+) {
+  if (sessionLoops.length > 0) {
+    await removeScopedLoopsById(
+      {
+        loadedConfig: state.loadedConfig,
+        sessionState: state.sessionState,
+        context,
+        loopIds: sessionLoops.map((loop) => loop.id),
+      },
+    );
+  }
+  const remaining = await state.sessionState.listIntervalLoops();
+  console.log(
+    [
+      sessionLoops.length > 0
+        ? `Cancelled ${sessionLoops.length} active loop${sessionLoops.length === 1 ? "" : "s"} for this session.`
+        : "No active loops to cancel for this session.",
+      ...renderLoopStoreSummary(state.sessionStorePath, remaining.length),
+    ].join("\n"),
+  );
+}
+
+async function cancelOneScopedLoop(
+  state: LoadedLoopControlState,
+  context: LoopCliContext,
+  sessionLoops: IntervalLoopStatus[],
+  targetLoopId: string,
+) {
+  await removeScopedLoopsById({
+    loadedConfig: state.loadedConfig,
+    sessionState: state.sessionState,
+    context,
+    loopIds: [targetLoopId],
+  });
+  const remaining = await state.sessionState.listIntervalLoops();
+  console.log(
+    [
+      sessionLoops.some((loop) => loop.id === targetLoopId)
+        ? `Cancelled loop \`${targetLoopId}\`.`
+        : `No active loop found with id \`${targetLoopId}\`.`,
+      ...renderLoopStoreSummary(state.sessionStorePath, remaining.length),
+    ].join("\n"),
+  );
+}
+
+async function cancelScopedLoops(
+  state: LoadedLoopControlState,
+  args: string[],
+  addressing: LoopCliAddressing,
+) {
+  const context = resolveScopedLoopContext(state, addressing);
+  const all = hasFlag(args, "--all");
+  const app = hasFlag(args, LOOP_APP_FLAG);
+  if (app && !all) {
+    throw new Error(`\`${LOOP_APP_FLAG}\` only works with \`cancel --all\`.`);
+  }
+
+  if (all && app) {
+    await cancelAllLoops(state);
+    return;
+  }
+
+  const sessionLoops = selectScopedLoopsForAddressing(
+    context,
+    addressing,
+    await state.sessionState.listIntervalLoops({
+      sessionKey: context.sessionTarget.sessionKey,
+    }),
+  );
+  if (all) {
+    await cancelAllScopedLoops(state, context, sessionLoops);
+    return;
+  }
+
+  const targetLoopId = resolveScopedLoopCancelId(args, sessionLoops);
+  if (!targetLoopId) {
+    console.log(
+      sessionLoops.length === 0
+        ? "No active loops to cancel for this session."
+        : `Multiple active loops exist for this session. Use ${renderCliCommand("loops cancel --channel <...> --target <...> <id>", { inline: true })} or ${renderCliCommand("loops cancel --channel <...> --target <...> --all", { inline: true })}.`,
+    );
+    return;
+  }
+
+  await cancelOneScopedLoop(state, context, sessionLoops, targetLoopId);
+}
+
+async function waitForSessionIdle(agentService: AgentService, target: AgentSessionTarget) {
+  while (true) {
+    try {
+      const runtime = await agentService.getSessionRuntime(target);
+      if (runtime.state !== "running") {
+        return;
+      }
+    } catch {
+      return;
+    }
+    await sleep(LOOP_BUSY_RETRY_MS);
+  }
+}
+
+async function executeCountLoop(params: {
+  state: LoadedLoopControlState;
+  context: LoopCliContext;
+  promptText: string;
+  count: number;
+  maintenancePrompt: boolean;
+  progressMessages?: number;
+}) {
+  const agentService = new AgentService(params.state.loadedConfig);
+  const builtPrompt = params.context.buildLoopPromptText(
+    params.promptText,
+    params.progressMessages == null
+      ? undefined
+      : {
+          maxProgressMessagesOverride: params.progressMessages,
+        },
+  );
+  console.log(
+    renderLoopStartedMessage({
+      mode: "times",
+      count: params.count,
+      maintenancePrompt: params.maintenancePrompt,
+    }),
+  );
+
+  try {
+    for (let index = 0; index < params.count; index += 1) {
+      while (true) {
+        await waitForSessionIdle(agentService, params.context.sessionTarget);
+        try {
+          await agentService.enqueuePrompt(params.context.sessionTarget, builtPrompt, {
+            onUpdate: () => undefined,
+          }).result;
+          break;
+        } catch (error) {
+          if (!(error instanceof ActiveRunInProgressError)) {
+            throw error;
+          }
+          await sleep(LOOP_BUSY_RETRY_MS);
+        }
+      }
+    }
+  } finally {
+    await agentService.stop();
+  }
+
+  console.log(`Completed ${params.count} iteration${params.count === 1 ? "" : "s"}.`);
+}
+
+function stripConfirmFlag(args: string[]) {
+  return args.filter((arg) => arg !== LOOP_CONFIRM_FLAG);
+}
+
+function stripLoopCreatorArgs(args: string[]) {
+  const remaining: string[] = [];
+  const creatorFlags = new Set([
+    LOOP_SENDER_FLAG,
+    LOOP_SENDER_NAME_FLAG,
+    LOOP_SENDER_HANDLE_FLAG,
+  ]);
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (current === "--") {
+      remaining.push(...args.slice(index));
+      break;
+    }
+    if (creatorFlags.has(current)) {
+      index += 1;
+      continue;
+    }
+    remaining.push(current);
+  }
+  return remaining;
+}
+
+function parseLoopProgress(args: string[]) {
+  const raw = parseOptionValue(args, LOOP_PROGRESS_FLAG);
+  if (raw == null) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || String(parsed) !== raw.trim() || parsed < 0) {
+    throw new Error(`${LOOP_PROGRESS_FLAG} must be a non-negative integer.`);
+  }
+  return parsed;
+}
+
+function stripLoopProgressArgs(args: string[]) {
+  const remaining: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const current = args[index];
+    if (current === "--") {
+      remaining.push(...args.slice(index));
+      break;
+    }
+    if (current === LOOP_PROGRESS_FLAG) {
+      index += 1;
+      continue;
+    }
+    remaining.push(current);
+  }
+  return remaining;
+}
+
+function parseCreateExpression(rawArgs: string[], explicitCreateSubcommand: boolean) {
+  const expressionArgs = stripLoopContextArgs(
+    stripLoopCreatorArgs(
+      stripLoopProgressArgs(
+        stripConfirmFlag(explicitCreateSubcommand ? rawArgs.slice(1) : rawArgs),
+      ),
+    ),
+  );
+  const expression = expressionArgs.join(" ").trim();
+  if (!expression) {
+    throw new Error("Loop creation requires an interval, count, or schedule expression.");
+  }
+  return expression;
+}
+
+function parseCreateCommand(expression: string) {
+  const parsed = parseLoopSlashCommand(expression);
+  if ("error" in parsed) {
+    throw new Error(parsed.error);
+  }
+  return parsed;
+}
+
+function parseLoopTimezone(args: string[]) {
+  const timezone = parseOptionValue(args, "--timezone");
+  if (!timezone) {
+    return undefined;
+  }
+  return parseTimezone(timezone, "--timezone");
+}
+
+function parseLoopCreator(args: string[], addressing: LoopCliAddressing): LoopCreator {
+  const sender = parseOptionValue(args, LOOP_SENDER_FLAG)?.trim();
+  if (!sender) {
+    throw new Error(
+      `Loop creation requires ${LOOP_SENDER_FLAG} <principal>, for example ${LOOP_SENDER_FLAG} ${renderSenderPrincipalExamples(addressing.channel ? [addressing.channel] : undefined).replaceAll(", ", `, ${LOOP_SENDER_FLAG} `)}.`,
+    );
+  }
+  const [platform, ...providerParts] = sender.split(":");
+  const providerId = providerParts.join(":").trim();
+  if (!isRegisteredChannelId(platform) || !providerId) {
+    throw new Error(`${LOOP_SENDER_FLAG} must be a principal like ${renderSenderPrincipalExamples(addressing.channel ? [addressing.channel] : undefined)}.`);
+  }
+  if (addressing.channel && platform !== addressing.channel) {
+    throw new Error(`${LOOP_SENDER_FLAG} platform must match --channel ${addressing.channel}.`);
+  }
+  const creator = buildStoredLoopSender({
+    platform,
+    providerId: normalizeChannelUserId(platform, providerId),
+    displayName: parseOptionValue(args, LOOP_SENDER_NAME_FLAG),
+    handle: parseOptionValue(args, LOOP_SENDER_HANDLE_FLAG),
+  });
+  if (!creator) {
+    throw new Error(`${LOOP_SENDER_FLAG} must include a non-empty provider id.`);
+  }
+  return creator;
+}
+
+function quoteLoopCliValue(value: string) {
+  if (/^[A-Za-z0-9_@.:/-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function renderLoopCreatorArgs(creator: LoopCreator) {
+  return [
+    `${LOOP_SENDER_FLAG} ${quoteLoopCliValue(creator.senderId ?? creator.providerId ?? "")}`,
+    creator.displayName
+      ? `${LOOP_SENDER_NAME_FLAG} ${quoteLoopCliValue(creator.displayName)}`
+      : undefined,
+    creator.handle
+      ? `${LOOP_SENDER_HANDLE_FLAG} ${quoteLoopCliValue(creator.handle)}`
+      : undefined,
+  ].filter(Boolean).join(" ");
+}
+
+async function enforceLoopCreateLimits(
+  state: LoadedLoopControlState,
+  parsed: ParsedLoopSlashCommand,
+  maxRunsPerLoop: number,
+  maxActiveLoops: number,
+) {
+  const globalLoops = await state.sessionState.listIntervalLoops();
+  if (parsed.mode !== "times" && globalLoops.length >= maxActiveLoops) {
+    throw new Error(
+      `Active loop count exceeds the configured max of \`${maxActiveLoops}\`. Cancel an existing loop first.`,
+    );
+  }
+  if (parsed.mode === "times" && parsed.count > maxRunsPerLoop) {
+    throw new Error(`Loop count exceeds the configured max of \`${maxRunsPerLoop}\`.`);
+  }
+}
+
+function requireValidIntervalLoop(parsed: Extract<ParsedLoopSlashCommand, { mode: "interval" }>) {
+  const validation = validateLoopInterval({
+    intervalMs: parsed.intervalMs,
+    force: parsed.force,
+  });
+  if (validation.error) {
+    throw new Error(validation.error);
+  }
+  return validation;
+}
+
+async function resolveLoopCreateRequest(
+  state: LoadedLoopControlState,
+  rawArgs: string[],
+  explicitCreateSubcommand: boolean,
+): Promise<LoopCreateRequest> {
+  const confirm = hasFlag(rawArgs, LOOP_CONFIRM_FLAG);
+  const loopTimezone = parseLoopTimezone(rawArgs);
+  const progressMessages = parseLoopProgress(rawArgs);
+  const expression = parseCreateExpression(rawArgs, explicitCreateSubcommand);
+  const parsed = parseCreateCommand(expression);
+  let addressing = parseAddressing(rawArgs, "create");
+  const creator = parseLoopCreator(rawArgs, addressing);
+  const loopConfig = state.loadedConfig.raw.control.loop;
+  const maxRunsPerLoop = loopConfig.maxRunsPerLoop ?? loopConfig.maxTimes ?? 50;
+  const maxActiveLoops = loopConfig.maxActiveLoops ?? 10;
+  await enforceLoopCreateLimits(state, parsed, maxRunsPerLoop, maxActiveLoops);
+  const provisionalContext = resolveScopedLoopContext(state, addressing);
+  const provisionalResolvedTarget = resolveAgentTarget(
+    state.loadedConfig,
+    provisionalContext.sessionTarget,
+  );
+  const resolvedPrompt = await resolveLoopPromptText({
+    workspacePath: provisionalResolvedTarget.workspacePath,
+    promptText: parsed.promptText,
+  });
+  if (parsed.mode === "calendar" && !confirm && !(await hasSuccessfulCalendarLoop(state))) {
+    return {
+      addressing,
+      context: provisionalContext,
+      creator,
+      parsed,
+      resolvedPrompt,
+      resolvedTarget: provisionalResolvedTarget,
+      maxRunsPerLoop,
+      maxActiveLoops,
+      expression,
+      confirm,
+      loopTimezone,
+      progressMessages,
+    };
+  }
+  const preparedAddressing = await prepareLoopCreateAddressing({
+    loadedConfig: state.loadedConfig,
+    addressing,
+    parsed,
+    resolvedPrompt,
+  });
+  addressing = preparedAddressing.addressing;
+  const context = resolveScopedLoopContext(state, addressing);
+  const deliveryContext =
+    preparedAddressing.deliveryTarget && preparedAddressing.deliveryTarget !== context.target
+      ? resolveScopedLoopContext(state, {
+          ...addressing,
+          target: preparedAddressing.deliveryTarget,
+        })
+      : undefined;
+  const resolvedTarget = resolveAgentTarget(state.loadedConfig, context.sessionTarget);
+  return {
+    addressing,
+    context,
+    deliveryContext,
+    creator,
+    parsed,
+    resolvedPrompt,
+    resolvedTarget,
+    maxRunsPerLoop,
+    maxActiveLoops,
+    expression,
+    confirm,
+    loopTimezone,
+    progressMessages,
+  };
+}
+
+function buildLoopSurfaceBinding(request: LoopCreateRequest) {
+  const context = request.deliveryContext ?? request.context;
+  return buildStoredSurfaceBinding({
+    ...context.identity,
+    botId: context.botId,
+  });
+}
+
+function buildRecurringLoopCreateBase(
+  state: LoadedLoopControlState,
+  request: LoopCreateRequest,
+): Promise<LoopCreateBase> {
+  return getRuntimeStatus().then((runtimeStatus) => ({
+    state,
+    request,
+    cancelCommand: renderScopedCommand("loops cancel", request.addressing),
+    runtimeRunning: runtimeStatus.running,
+  }));
+}
+
+function buildRecurringLoopPromptMetadata(request: LoopCreateRequest) {
+  return {
+    promptText: request.resolvedPrompt.text,
+    promptSummary: summarizeLoopPrompt(
+      request.resolvedPrompt.text,
+      request.resolvedPrompt.maintenancePrompt,
+    ),
+    promptSource: request.resolvedPrompt.maintenancePrompt
+      ? ("LOOP.md" as const)
+      : ("custom" as const),
+    progressMessages: request.progressMessages,
+    loopStart: request.parsed.mode === "times" ? undefined : request.parsed.loopStart,
+    maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
+    createdBy: request.creator.providerId,
+    sender: request.creator,
+    surfaceBinding: buildLoopSurfaceBinding(request),
+  };
+}
+
+function buildRecurringLoopFirstRunNote(mode: "interval" | "calendar", runtimeRunning: boolean) {
+  if (!runtimeRunning) {
+    return "Runtime is not running, so this loop activates on the next `clisbot start`.";
+  }
+  if (mode === "interval") {
+    return "The first run starts after the runtime reconciles this new loop.";
+  }
+  return undefined;
+}
+
+async function createCalendarLoop(base: LoopCreateBase) {
+  const parsed = base.request.parsed;
+  if (parsed.mode !== "calendar") {
+    return false;
+  }
+
+  const metadata = buildRecurringLoopPromptMetadata(base.request);
+  const timezone = resolveConfigTimezone({
+    config: base.state.loadedConfig.raw,
+    agentId: base.request.context.sessionTarget.agentId,
+    routeTimezone: base.request.context.route.timezone,
+    botTimezone: base.request.context.route.botTimezone,
+    loopTimezone: base.request.loopTimezone,
+  }).timezone;
+  const loop = createStoredCalendarLoop({
+    ...metadata,
+    cadence: parsed.cadence,
+    dayOfWeek: parsed.dayOfWeek,
+    localTime: parsed.localTime,
+    hour: parsed.hour,
+    minute: parsed.minute,
+    timezone,
+    maxRuns: base.request.maxRunsPerLoop,
+  });
+  await base.state.sessionState.setIntervalLoop(base.request.resolvedTarget, loop);
+  const counts = await getScopedLoopCounts({
+    sessionState: base.state.sessionState,
+    sessionKey: base.request.context.sessionTarget.sessionKey,
+    context: base.request.context,
+    addressing: base.request.addressing,
+  });
+  console.log(
+    renderLoopStartedMessage({
+      mode: "calendar",
+      scheduleText: formatCalendarLoopSchedule(parsed),
+      timezone: loop.timezone,
+      nextRunAt: loop.nextRunAt,
+      maintenancePrompt: metadata.maintenancePrompt,
+      loopId: loop.id,
+      maxRuns: loop.maxRuns,
+      cancelCommand: base.cancelCommand,
+      firstRunNote: buildRecurringLoopFirstRunNote("calendar", base.runtimeRunning),
+      ...counts,
+    }),
+  );
+  return true;
+}
+
+async function hasSuccessfulCalendarLoop(state: LoadedLoopControlState) {
+  return (await state.sessionState.listIntervalLoops()).some((loop) => loop.kind === "calendar");
+}
+
+function renderCalendarConfirmation(params: {
+  request: LoopCreateRequest;
+  timezone: string;
+}) {
+  const parsed = params.request.parsed;
+  if (parsed.mode !== "calendar") {
+    return "";
+  }
+  const nextRunAt = computeNextCalendarLoopRunAtMs({
+    cadence: parsed.cadence,
+    dayOfWeek: parsed.dayOfWeek,
+    hour: parsed.hour,
+    minute: parsed.minute,
+    timezone: params.timezone,
+    nowMs: Date.now(),
+  });
+  const timezoneClause = params.request.loopTimezone ? ` --timezone ${params.request.loopTimezone}` : "";
+  const senderClause = ` ${renderLoopCreatorArgs(params.request.creator)}`;
+  const retryCommand = `${renderScopedCommand("loops create", params.request.addressing)}${senderClause}${timezoneClause} ${params.request.expression} ${LOOP_CONFIRM_FLAG}`;
+  return [
+    "confirmation_required: first wall-clock loop",
+    `proposed schedule: ${formatCalendarLoopSchedule(parsed)}`,
+    `timezone: ${params.timezone}`,
+    nextRunAt ? `next run: ${new Date(nextRunAt).toISOString()}` : "next run: unknown",
+    "",
+    "Confirm this timezone and schedule before creating the first wall-clock loop.",
+    `If timezone is wrong, set it first with ${renderCliCommand("timezone set <iana-timezone>", { inline: true })}.`,
+    "",
+    "If correct, rerun with:",
+    retryCommand,
+  ].join("\n");
+}
+
+async function createIntervalLoop(base: LoopCreateBase) {
+  const parsed = base.request.parsed;
+  if (parsed.mode !== "interval") {
+    return;
+  }
+
+  const validation = requireValidIntervalLoop(parsed);
+  const metadata = buildRecurringLoopPromptMetadata(base.request);
+  const loop = createStoredIntervalLoop({
+    ...metadata,
+    intervalMs: parsed.intervalMs,
+    maxRuns: base.request.maxRunsPerLoop,
+    force: parsed.force,
+  });
+  await base.state.sessionState.setIntervalLoop(base.request.resolvedTarget, loop);
+  const counts = await getScopedLoopCounts({
+    sessionState: base.state.sessionState,
+    sessionKey: base.request.context.sessionTarget.sessionKey,
+    context: base.request.context,
+    addressing: base.request.addressing,
+  });
+  console.log(
+    renderLoopStartedMessage({
+      mode: "interval",
+      intervalMs: parsed.intervalMs,
+      maintenancePrompt: metadata.maintenancePrompt,
+      loopId: loop.id,
+      maxRuns: loop.maxRuns,
+      warning: validation.warning,
+      cancelCommand: base.cancelCommand,
+      firstRunNote: buildRecurringLoopFirstRunNote("interval", base.runtimeRunning),
+      ...counts,
+    }),
+  );
+}
+
+async function createRecurringLoop(
+  state: LoadedLoopControlState,
+  request: LoopCreateRequest,
+) {
+  const base = await buildRecurringLoopCreateBase(state, request);
+  if (await createCalendarLoop(base)) {
+    return;
+  }
+  await createIntervalLoop(base);
+}
+
+async function createLoop(
+  state: LoadedLoopControlState,
+  rawArgs: string[],
+  options: {
+    explicitCreateSubcommand?: boolean;
+  } = {},
+) {
+  const request = await resolveLoopCreateRequest(
+    state,
+    rawArgs,
+    options.explicitCreateSubcommand ?? false,
+  );
+  if (request.parsed.mode === "times") {
+    await executeCountLoop({
+      state,
+      context: request.deliveryContext ?? request.context,
+      promptText: request.resolvedPrompt.text,
+      count: request.parsed.count,
+      maintenancePrompt: request.resolvedPrompt.maintenancePrompt,
+      progressMessages: request.progressMessages,
+    });
+    return;
+  }
+  if (
+    request.parsed.mode === "calendar" &&
+    !request.confirm &&
+    !(await hasSuccessfulCalendarLoop(state))
+  ) {
+    const timezone = resolveConfigTimezone({
+      config: state.loadedConfig.raw,
+      agentId: request.context.sessionTarget.agentId,
+      routeTimezone: request.context.route.timezone,
+      botTimezone: request.context.route.botTimezone,
+      loopTimezone: request.loopTimezone,
+    }).timezone;
+    console.log(renderCalendarConfirmation({ request, timezone }));
+    return;
+  }
+  await createRecurringLoop(state, request);
+}
+
+async function runCancelSubcommand(
+  state: LoadedLoopControlState,
+  args: string[],
+  addressing: LoopCliAddressing,
+) {
+  if (addressing.provisionChildSurface) {
+    throw new Error("Provisioning a new child surface only applies when creating a loop.");
+  }
+  if (addressing.channel || addressing.target) {
+    await cancelScopedLoops(state, args, addressing);
+    return;
+  }
+  if (args[1] === "--all") {
+    await cancelAllLoops(state);
+    return;
+  }
+  const loopId = args[1]?.trim();
+  if (!loopId) {
+    throw new Error(
+      `Usage: ${renderCliCommand("loops cancel <id>")} | ${renderCliCommand("loops cancel --all")}`,
+    );
+  }
+  await cancelLoopById(state, loopId);
+}
+
+async function runStatusSubcommand(
+  state: LoadedLoopControlState,
+  addressing: LoopCliAddressing,
+) {
+  if (addressing.provisionChildSurface) {
+    throw new Error("Provisioning a new child surface only applies when creating a loop.");
+  }
+  if (addressing.channel || addressing.target) {
+    await showScopedLoopInventory(state, addressing, "status");
+    return;
+  }
+  await listLoops(state, "status", addressing);
+}
+
+export async function runLoopsCli(args: string[]) {
+  const subcommand = args[0];
+  const helpIntent =
+    subcommand === "create" ? "create" : !subcommand || subcommand === "--help" || subcommand === "-h" || subcommand === "help"
+      ? "help"
+      : subcommand === "list" || subcommand === "status" || subcommand === "cancel"
+        ? subcommand
+        : hasLoopContext(args)
+          ? "create"
+          : "help";
+  const addressing = parseAddressing(args, helpIntent);
+  if (!subcommand || subcommand === "--help" || subcommand === "-h" || subcommand === "help") {
+    console.log(renderLoopsHelp(addressing.channel));
+    return;
+  }
+  if (subcommand === "create" && (hasFlag(args, "--help") || hasFlag(args, "-h"))) {
+    console.log(renderLoopsCreateHelp(addressing.channel));
+    return;
+  }
+
+  const state = await loadLoopControlState();
+
+  if (subcommand === "list") {
+    await listLoops(state, "list", addressing);
+    return;
+  }
+
+  if (subcommand === "status") {
+    await runStatusSubcommand(state, addressing);
+    return;
+  }
+
+  if (subcommand === "cancel") {
+    await runCancelSubcommand(state, args, addressing);
+    return;
+  }
+
+  if (subcommand === "create") {
+    await createLoop(state, args, { explicitCreateSubcommand: true });
+    return;
+  }
+
+  if (hasLoopContext(args)) {
+    await createLoop(state, args);
+    return;
+  }
+
+  throw new Error(renderLoopsHelp());
+}

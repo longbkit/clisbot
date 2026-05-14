@@ -64,7 +64,7 @@ Ví dụ:
   - timezone đã resolve
   - thời điểm chạy kế tiếp theo local time và UTC
   - câu lệnh cancel chính xác
-- agent nên inspect `clisbot loops --help` khi cần xử lý yêu cầu schedule hay reminder
+- agent nên inspect `clisbot loops --help --channel <current-channel>` khi cần xử lý yêu cầu schedule hay reminder
 - interval loop có `id` và được track trong managed state
 - managed loop dừng sau `control.loop.maxRunsPerLoop` lần attempt
 - managed loop dùng `skip-if-busy`, nên nếu session đang bận thì tick đó bị bỏ, không xếp chồng hàng đợi

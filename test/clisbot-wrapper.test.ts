@@ -7,8 +7,8 @@ import {
   getClisbotPromptCommand,
   getClisbotWrapperPath,
   renderClisbotWrapperScript,
-} from "../src/control/clisbot-wrapper.ts";
-import { setRenderedCliName } from "../src/shared/cli-name.ts";
+} from "../src/control/commands/clisbot-wrapper.ts";
+import { setRenderedCliName } from "../src/control/commands/cli-name.ts";
 
 describe("clisbot wrapper", () => {
   let tempDir = "";

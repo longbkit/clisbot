@@ -27,7 +27,7 @@ Ví dụ:
 - `--thread-id` thu hẹp một Slack route về đúng một thread ts
 - `--topic-id` thu hẹp một Telegram route về đúng một topic id
 - bỏ qua sub-surface flag nghĩa là target vào parent surface
-- `--new-thread` chỉ dành cho Slack và sẽ tạo fresh thread anchor trước khi loop bắt đầu
+- dùng `clisbot loops --help --channel <channel-name>` hoặc `clisbot loops create --help --channel <channel-name>` để xem extension dành riêng cho từng channel
 - `--sender <principal>` là bắt buộc khi tạo loop
 - `--sender-name <name>` và `--sender-handle <handle>` là metadata đọc cho người, có thể lưu thêm cho scheduled prompt
 

@@ -157,9 +157,9 @@ Current code already contains most of this split:
 
 | Current code location | Current state family |
 | --- | --- |
-| `src/agents/run-observation.ts` | `SessionRuntimeState = idle | running | detached` |
-| `src/agents/run-observation.ts` | `PromptExecutionStatus = running | completed | timeout | detached | error` |
-| `src/shared/transcript-rendering.ts` | surface rendering adds `queued` for queue-facing messages |
+| `src/agents/session/run-observation.ts` | `SessionRuntimeState = idle | running | detached` |
+| `src/agents/session/run-observation.ts` | `PromptExecutionStatus = running | completed | timeout | detached | error` |
+| `src/runners/transcript/transcript-rendering.ts` | surface rendering adds `queued` for queue-facing messages |
 
 Current mismatch worth naming:
 

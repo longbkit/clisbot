@@ -15,7 +15,7 @@ Short boundary rule:
 
 Common confusion to avoid:
 
-- `src/agents/runner-service.ts` is the runner-facing adapter that
+- `src/agents/runtime/runner-service.ts` is the runner-facing adapter that
   `SessionService` calls today
 - `src/runners/tmux/*` is lower-level backend code used by that adapter
 - neither of those should decide whether the active mapping is set, cleared, or

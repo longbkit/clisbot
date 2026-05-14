@@ -294,8 +294,8 @@ That is what makes both product review and operator debugging practical.
 
 Main expected implementation touch points:
 
-- [agent-prompt.ts](/home/node/projects/clisbot/src/channels/agent-prompt.ts)
-- [interaction-processing.ts](/home/node/projects/clisbot/src/channels/interaction-processing.ts)
+- [agent-prompt.ts](/home/node/projects/clisbot/src/channels/message/agent-prompt.ts)
+- [interaction-processing.ts](/home/node/projects/clisbot/src/channels/message/interaction-processing.ts)
 
 The runtime should concentrate most changes into:
 

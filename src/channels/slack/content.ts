@@ -1,4 +1,4 @@
-import type { MessageInputFormat, MessageRenderMode } from "../message-command.ts";
+import type { MessageInputFormat, MessageRenderMode } from "../message/message-command.ts";
 
 export type SlackBlock = Record<string, unknown>;
 type SlackTableCell = Record<string, unknown>;

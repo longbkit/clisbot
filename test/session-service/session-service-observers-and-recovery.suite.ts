@@ -2,16 +2,16 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import {
   ActiveRunInProgressError,
   SessionService,
-} from "../../src/agents/session-service.ts";
+} from "../../src/agents/session/session-service.ts";
 import {
   buildRunRecoveryNote,
   MID_RUN_RECOVERY_CONTINUE_PROMPT,
   MID_RUN_RECOVERY_MAX_ATTEMPTS,
-} from "../../src/agents/run-recovery.ts";
-import type { AgentSessionState } from "../../src/agents/session-state.ts";
-import type { ResolvedAgentTarget } from "../../src/agents/resolved-target.ts";
-import type { RunnerService } from "../../src/agents/runner-service.ts";
-import type { RunObserver, RunUpdate } from "../../src/agents/run-observation.ts";
+} from "../../src/agents/session/run-recovery.ts";
+import type { AgentSessionState } from "../../src/agents/session/session-state.ts";
+import type { ResolvedAgentTarget } from "../../src/agents/routing/resolved-target.ts";
+import type { RunnerService } from "../../src/agents/runtime/runner-service.ts";
+import type { RunObserver, RunUpdate } from "../../src/agents/session/run-observation.ts";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 import { createManager, createResolvedTarget, createRun, createUpdate } from "./session-service-support.ts";
 

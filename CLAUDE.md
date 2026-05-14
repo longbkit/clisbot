@@ -48,7 +48,7 @@ Use this ownership map before editing:
 - `src/config`: schema, loading, credentials, templates
 - `src/control`: operator CLI, runtime lifecycle, health, status, logs, bootstrap
 - `src/runners`: execution backends, currently tmux
-- `src/shared`: cross-cutting utilities
+- `src/infra`: small host/runtime primitives only, with no product concepts
 - `test/`: regression and behavior coverage
 - `docs/tests/`: readable validation scenarios when behavior needs explicit ground truth
 

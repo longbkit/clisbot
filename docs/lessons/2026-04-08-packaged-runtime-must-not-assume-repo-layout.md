@@ -4,7 +4,7 @@ date: 2026-04-08
 area: packaging, runtime, agents
 summary: Code that works from the repo tree can still fail after npm packaging if it assumes src-relative file layout. Bundled runtime paths must be resolved against both dev and packaged layouts, then tested explicitly.
 related:
-  - src/agents/bootstrap.ts
+  - src/agents/runtime/bootstrap.ts
   - test/bootstrap.test.ts
   - package.json
 ---
@@ -48,7 +48,7 @@ Before shipping code that reads bundled assets:
 
 This lesson was applied by:
 
-- replacing the single hard-coded template root assumption in `src/agents/bootstrap.ts`
+- replacing the single hard-coded template root assumption in `src/agents/runtime/bootstrap.ts`
 - resolving both repo layout and packaged `dist` layout
 - adding `test/bootstrap.test.ts`
 - validating the built package from a fake `node_modules/clisbot` tree with isolated `HOME`

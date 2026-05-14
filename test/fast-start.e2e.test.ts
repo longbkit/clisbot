@@ -3,11 +3,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  getCanonicalTelegramBotTokenPath,
-  getCanonicalZaloBotTokenPath,
-} from "../src/config/channel-credentials.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+  resolveChannelCredentialFilePath,
+} from "../src/config/channels/channel-credential-contract.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 describe("fast start e2e", () => {
   let tempDir = "";
@@ -66,9 +65,14 @@ describe("fast start e2e", () => {
     expect(config.bots.telegram.default.enabled).toBe(true);
     expect(config.bots.telegram.default.credentialType).toBe("tokenFile");
     expect(config.bots.telegram.default.botToken ?? "").toBe("");
-    expect(readFileSync(getCanonicalTelegramBotTokenPath("default", {
-      ...process.env,
-      CLISBOT_HOME: tempDir,
+    expect(readFileSync(resolveChannelCredentialFilePath({
+      channel: "telegram",
+      botId: "default",
+      field: "botToken",
+      env: {
+        ...process.env,
+        CLISBOT_HOME: tempDir,
+      },
     }), "utf8").trim()).toBe("123456:telegram-dev-token");
     expect(stdout).toContain("Persisted telegram/default");
   }, 15000);
@@ -112,9 +116,14 @@ describe("fast start e2e", () => {
     expect(config.bots.zaloBot.default.enabled).toBe(true);
     expect(config.bots.zaloBot.default.credentialType).toBe("tokenFile");
     expect(config.bots.zaloBot.default.botToken ?? "").toBe("");
-    expect(readFileSync(getCanonicalZaloBotTokenPath("default", {
-      ...process.env,
-      CLISBOT_HOME: tempDir,
+    expect(readFileSync(resolveChannelCredentialFilePath({
+      channel: "zalo-bot",
+      botId: "default",
+      field: "botToken",
+      env: {
+        ...process.env,
+        CLISBOT_HOME: tempDir,
+      },
     }), "utf8").trim()).toBe("zalo-dev-token");
     expect(stdout).toContain("Persisted zalo-bot/default");
   }, 15000);

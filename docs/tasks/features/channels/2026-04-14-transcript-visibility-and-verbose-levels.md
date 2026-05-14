@@ -48,10 +48,10 @@ This feature keeps the architecture cleaner:
 
 ## Implementation Notes
 
-- `src/config/schema.ts` owns the persisted shape
-- `src/channels/route-policy.ts` resolves inheritance
-- `src/channels/interaction-processing.ts` gates `/transcript`
-- `src/shared/transcript-rendering.ts` must not assume transcript visibility on detached notes
+- `src/config/core/schema.ts` owns the persisted shape
+- `src/channels/config/route-policy.ts` resolves inheritance
+- `src/channels/message/interaction-processing.ts` gates `/transcript`
+- `src/runners/transcript/transcript-rendering.ts` must not assume transcript visibility on detached notes
 - `customer-support` remains backlog-only as the later bot type that can seed safer defaults like `verbose: "off"`
 
 ## Validation

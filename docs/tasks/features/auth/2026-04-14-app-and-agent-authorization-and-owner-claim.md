@@ -181,8 +181,8 @@ Phase 1 rule:
 
 ## Implementation Notes
 
-- `src/config/schema.ts` defines the new auth shape
-- `src/control/auth-cli.ts` is the operator mutation surface for auth today
+- `src/config/core/schema.ts` defines the new auth shape
+- `src/control/commands/auth-cli.ts` is the operator mutation surface for auth today
 - config templates should seed `member` as the default role
 - any `privilegeCommands` key should fail config loading
 - prompt rendering should inject the protected rule after normal template resolution

@@ -3,19 +3,21 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentService } from "../src/agents/agent-service.ts";
+import { AgentService } from "../src/agents/runtime/agent-service.ts";
 import { resolveTelegramConversationRoute } from "../src/channels/telegram/route-config.ts";
-import { INTERACTIVE_CLI_STARTUP_DELAY_MS } from "../src/config/agent-tool-presets.ts";
-import { readEditableConfig, writeEditableConfig } from "../src/config/config-file.ts";
-import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/load-config.ts";
-import { resolveSlackBotConfig } from "../src/config/channel-bots.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import { INTERACTIVE_CLI_STARTUP_DELAY_MS } from "../src/config/runtime/agent-tool-presets.ts";
+import { readEditableConfig, writeEditableConfig } from "../src/config/core/config-file.ts";
+import { loadConfig, loadConfigWithoutEnvResolution } from "../src/config/core/load-config.ts";
+import { resolveSlackBotConfig } from "../src/channels/slack/config.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function buildTemplateConfig() {
   return JSON.parse(
     renderDefaultConfigTemplate({
-      slackEnabled: true,
-      telegramEnabled: true,
+      channels: {
+        slack: { enabled: true },
+        telegram: { enabled: true },
+      },
     }),
   ) as Record<string, any>;
 }
@@ -312,6 +314,7 @@ describe("loadConfig", () => {
     delete config.bots.slack.default.groupPolicy;
     delete config.bots.slack.default.channelPolicy;
     delete config.bots.telegram.default.groupPolicy;
+    delete config.bots.zaloBot.default.groupPolicy;
     config.bots.slack.default.groups = {
       C1234567890: {
         enabled: true,
@@ -338,6 +341,15 @@ describe("loadConfig", () => {
         },
       },
     };
+    config.bots.zaloBot.default.groups = {
+      "group-123": {
+        enabled: true,
+        requireMention: false,
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    };
 
     await Bun.write(configPath, JSON.stringify(config));
 
@@ -350,8 +362,11 @@ describe("loadConfig", () => {
     expect(loaded.raw.bots.telegram.default.groups["*"]?.policy).toBe("open");
     expect(loaded.raw.bots.telegram.default.groups["-1001234567890"]?.policy).toBeUndefined();
     expect(
-      loaded.raw.bots.telegram.default.groups["-1001234567890"]?.topics["42"]?.policy,
+      loaded.raw.bots.telegram.default.groups["-1001234567890"]?.topics?.["42"]?.policy,
     ).toBeUndefined();
+    expect(loaded.raw.bots.zaloBot.default.groupPolicy).toBe("allowlist");
+    expect(loaded.raw.bots.zaloBot.default.groups["*"]?.policy).toBe("open");
+    expect(loaded.raw.bots.zaloBot.default.groups["group-123"]?.policy).toBeUndefined();
 
     const resolved = resolveTelegramConversationRoute({
       loadedConfig: loaded,
@@ -376,6 +391,7 @@ describe("loadConfig", () => {
     config.bots.defaults.timezone = "Asia/Ho_Chi_Minh";
     config.bots.slack.defaults.timezone = "America/Los_Angeles";
     config.bots.telegram.defaults.timezone = "Asia/Singapore";
+    config.bots.zaloBot.defaults.timezone = "Asia/Bangkok";
     config.bots.telegram.default.timezone = "Asia/Tokyo";
 
     await Bun.write(configPath, JSON.stringify(config));
@@ -389,9 +405,11 @@ describe("loadConfig", () => {
     expect(loaded.raw.bots.defaults.timezone).toBeUndefined();
     expect(loaded.raw.bots.slack.defaults.timezone).toBeUndefined();
     expect(loaded.raw.bots.telegram.defaults.timezone).toBeUndefined();
+    expect(loaded.raw.bots.zaloBot.defaults.timezone).toBeUndefined();
     expect(loaded.raw.bots.telegram.default.timezone).toBe("Asia/Tokyo");
     expect(rewrittenConfig.app.timezone).toBe("Asia/Ho_Chi_Minh");
     expect(rewrittenConfig.bots.telegram.default.timezone).toBe("Asia/Tokyo");
+    expect(rewrittenConfig.bots.zaloBot.defaults.timezone).toBeUndefined();
     expect(backups).toHaveLength(1);
     expect(backups[0]).toContain("clisbot.json.0.1.44.");
   });

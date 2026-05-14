@@ -7,11 +7,11 @@ related:
   - config/clisbot.json.template
   - config/clisbot.json.v0.1.0.template
   - config/clisbot.json.v0.1.39.template
-  - src/config/schema.ts
-  - src/config/load-config.ts
-  - src/control/accounts-cli.ts
-  - src/control/channels-cli.ts
-  - src/control/agents-cli.ts
+  - src/config/core/schema.ts
+  - src/config/core/load-config.ts
+  - src/control/commands/accounts-cli.ts
+  - src/control/commands/channels-cli.ts
+  - src/control/commands/agents-cli.ts
 ---
 
 # Goal
@@ -79,7 +79,7 @@ North star:
   - `test/bots-cli.test.ts`
   - `test/routes-cli.test.ts`
   - `test/runtime-summary.test.ts`
-  - `test/mode-config-shared.test.ts`
+  - `test/surface-mode-config.test.ts`
   - `test/telegram-route-config.test.ts`
   - `test/telegram-service.test.ts`
   - `test/slack-feedback.test.ts`
@@ -187,59 +187,59 @@ without learning a different naming model for each surface.
 
 These files define or materialize the current old shape:
 
-- `src/config/schema.ts`
-- `src/config/template.ts`
-- `src/config/load-config.ts`
-- `src/config/config-file.ts`
-- `src/config/duration.ts`
-- `src/config/env-substitution.ts`
+- `src/config/core/schema.ts`
+- `src/config/core/template.ts`
+- `src/config/core/load-config.ts`
+- `src/config/core/config-file.ts`
+- `src/config/runtime/duration.ts`
+- `src/config/env/env-substitution.ts`
 
 ## Bot Credential And Bootstrap Writers
 
-- `src/config/channel-bot-management.ts`
-- `src/config/channel-bots.ts`
-- `src/config/channel-credentials.ts`
-- `src/config/channel-credentials-shared.ts`
-- `src/config/channel-runtime-credentials.ts`
-- `src/control/channel-bootstrap-flags.ts`
-- `src/control/runtime-bootstrap-cli.ts`
+- `src/config/channels/channel-bot-management.ts`
+- `src/config/channels/channel-bots.ts`
+- `src/config/channels/channel-credentials.ts`
+- `src/config/channels/channel-credential-input.ts`
+- `src/config/channels/channel-runtime-credentials.ts`
+- `src/control/commands/channel-bootstrap-flags.ts`
+- `src/control/commands/runtime-bootstrap-cli.ts`
 
 ## Fallback Binding Logic
 
-- `src/config/bindings.ts`
-- `src/control/channels-cli.ts`
-- `src/control/agents-cli.ts`
+- `src/config/core/bindings.ts`
+- `src/control/commands/channels-cli.ts`
+- `src/control/commands/agents-cli.ts`
 - any runtime route resolver still calling `resolveTopLevelBoundAgentId`
 
 ## Operator Read Surfaces
 
-- `src/control/runtime-summary.ts`
-- `src/control/runtime-summary-rendering.ts`
-- `src/control/runtime-health-store.ts`
-- `src/control/startup-bootstrap.ts`
+- `src/control/runtime/runtime-summary.ts`
+- `src/control/runtime/runtime-summary-rendering.ts`
+- `src/control/runtime/runtime-health-store.ts`
+- `src/control/commands/startup-bootstrap.ts`
 - `src/cli.ts`
 
 # Files That Still Read Or Write Old Canonical Paths
 
 ## Must Change In The First Implementation Wave
 
-- `src/config/schema.ts`
-- `src/config/template.ts`
-- `src/config/load-config.ts`
-- `src/config/channel-bot-management.ts`
-- `src/config/channel-credentials.ts`
-- `src/config/channel-credentials-shared.ts`
-- `src/config/channel-bots.ts`
-- `src/config/bindings.ts`
-- `src/control/channel-bootstrap-flags.ts`
-- `src/control/runtime-bootstrap-cli.ts`
-- `src/control/accounts-cli.ts`
-- `src/control/channels-cli.ts`
+- `src/config/core/schema.ts`
+- `src/config/core/template.ts`
+- `src/config/core/load-config.ts`
+- `src/config/channels/channel-bot-management.ts`
+- `src/config/channels/channel-credentials.ts`
+- `src/config/channels/channel-credential-input.ts`
+- `src/config/channels/channel-bots.ts`
+- `src/config/core/bindings.ts`
+- `src/control/commands/channel-bootstrap-flags.ts`
+- `src/control/commands/runtime-bootstrap-cli.ts`
+- `src/control/commands/accounts-cli.ts`
+- `src/control/commands/channels-cli.ts`
 - `src/control/channels-cli-rendering.ts`
-- `src/control/agents-cli.ts`
-- `src/control/runtime-summary.ts`
-- `src/control/runtime-health-store.ts`
-- `src/control/startup-bootstrap.ts`
+- `src/control/commands/agents-cli.ts`
+- `src/control/runtime/runtime-summary.ts`
+- `src/control/runtime/runtime-health-store.ts`
+- `src/control/commands/startup-bootstrap.ts`
 - `src/cli.ts`
 
 ## Must Review Before Claiming Migration Complete
@@ -247,7 +247,7 @@ These files define or materialize the current old shape:
 - `src/channels/slack/*`
 - `src/channels/telegram/*`
 - `src/agents/*` route resolution entrypoints
-- `src/control/message-cli.ts`
+- `src/control/commands/message-cli.ts`
 - tests that assert exact config JSON shape
 - docs that still teach `channels`, `accounts`, or `bindings` as the product model
 
@@ -420,8 +420,8 @@ Affected runtime files that prove this:
 
 - `src/channels/slack/route-config.ts`
 - `src/channels/telegram/route-config.ts`
-- `src/channels/route-policy.ts`
-- `src/config/bindings.ts`
+- `src/channels/config/route-policy.ts`
+- `src/config/core/bindings.ts`
 
 Migration consequence:
 
@@ -461,14 +461,14 @@ Slack uses two credentials per bot. Telegram uses one. A shape cleanup must not 
 
 # Immediate Next Implementation Order
 
-1. `src/config/schema.ts`
-2. `src/config/load-config.ts`
-3. `src/config/template.ts`
+1. `src/config/core/schema.ts`
+2. `src/config/core/load-config.ts`
+3. `src/config/core/template.ts`
 4. `src/config/channel-credentials*.ts`
-5. `src/config/channel-bot-management.ts`
-6. `src/control/runtime-bootstrap-cli.ts`
-7. `src/control/accounts-cli.ts` -> target `bots` surface
-8. `src/control/channels-cli.ts` -> target `routes` surface
-9. `src/control/agents-cli.ts` routing cleanup
+5. `src/config/channels/channel-bot-management.ts`
+6. `src/control/commands/runtime-bootstrap-cli.ts`
+7. `src/control/commands/accounts-cli.ts` -> target `bots` surface
+8. `src/control/commands/channels-cli.ts` -> target `routes` surface
+9. `src/control/commands/agents-cli.ts` routing cleanup
 10. `src/control/runtime-summary*.ts`
 11. CLI help, docs, tests

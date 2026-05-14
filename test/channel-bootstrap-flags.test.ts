@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   hasLiteralBootstrapCredentials,
   parseBootstrapFlags,
-} from "../src/control/channel-bootstrap-flags.ts";
+} from "../src/control/commands/channel-bootstrap-flags.ts";
 
 describe("parseBootstrapFlags", () => {
   test("maps --bot-type personal to the internal bootstrap mode", () => {
@@ -17,8 +17,8 @@ describe("parseBootstrapFlags", () => {
 
     expect(parsed.cliTool).toBe("gemini");
     expect(parsed.bootstrap).toBe("personal-assistant");
-    expect(parsed.telegramBots[0]?.botId).toBe("default");
-    expect(parsed.telegramBots[0]?.botToken?.kind).toBe("env");
+    expect(parsed.bots.telegram[0]?.botId).toBe("default");
+    expect(parsed.bots.telegram[0]?.botToken?.kind).toBe("env");
   });
 
   test("maps --bot-type team to the internal bootstrap mode", () => {
@@ -71,10 +71,10 @@ describe("parseBootstrapFlags", () => {
     ]);
 
     expect(parsed.literalWarnings).toEqual([]);
-    expect(parsed.slackBots[0]?.appToken?.kind).toBe("mem");
-    expect(parsed.slackBots[0]?.botToken?.kind).toBe("mem");
-    expect(parsed.telegramBots[0]?.botToken?.kind).toBe("mem");
-    expect(parsed.zaloBotBots[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.bots.slack[0]?.appToken?.kind).toBe("mem");
+    expect(parsed.bots.slack[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.bots.telegram[0]?.botToken?.kind).toBe("mem");
+    expect(parsed.bots["zalo-bot"][0]?.botToken?.kind).toBe("mem");
   });
 
   test("detects literal bootstrap credentials independently of warning output", () => {
@@ -99,7 +99,7 @@ describe("parseBootstrapFlags", () => {
       "${CUSTOM_ZALO_BOT_TOKEN}",
     ]);
 
-    expect(parsed.zaloBotBots).toEqual([
+    expect(parsed.bots["zalo-bot"]).toEqual([
       {
         botId: "ops",
         botToken: {
@@ -109,6 +109,6 @@ describe("parseBootstrapFlags", () => {
         },
       },
     ]);
-    expect(parsed.sawZaloBotFlags).toBe(true);
+    expect(parsed.sawChannels["zalo-bot"]).toBe(true);
   });
 });

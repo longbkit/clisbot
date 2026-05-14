@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { MissingEnvVarError, resolveConfigEnvVars } from "../src/config/env-substitution.ts";
+import { MissingEnvVarError, resolveConfigEnvVars } from "../src/config/env/env-substitution.ts";
 
 describe("resolveConfigEnvVars", () => {
   test("substitutes nested env placeholders", () => {

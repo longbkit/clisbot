@@ -1,17 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import { resolveZaloBotConversationRoute } from "../src/channels/zalo-bot/route-config.ts";
 import { resolveZaloBotConversationTarget } from "../src/channels/zalo-bot/session-routing.ts";
-import type { LoadedConfig } from "../src/config/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/template.ts";
+import type { LoadedConfig } from "../src/config/core/load-config.ts";
+import { clisbotConfigSchema } from "../src/config/core/schema.ts";
+import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function createLoadedConfig(): LoadedConfig {
   const config = clisbotConfigSchema.parse(
     JSON.parse(
       renderDefaultConfigTemplate({
-        slackEnabled: false,
-        telegramEnabled: false,
-        zaloBotEnabled: true,
+        channels: {
+          slack: { enabled: false },
+          telegram: { enabled: false },
+          "zalo-bot": { enabled: true },
+        },
       }),
     ),
   );

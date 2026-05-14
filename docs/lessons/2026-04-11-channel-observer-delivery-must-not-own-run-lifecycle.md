@@ -51,7 +51,7 @@ For active-run observers:
 - `docs/architecture/runtime-architecture.md`
 - `docs/architecture/surface-architecture.md`
 - `docs/architecture/transcript-presentation-and-streaming.md`
-- `src/agents/session-service.ts`
+- `src/agents/session/session-service.ts`
 
 ## Reuse
 

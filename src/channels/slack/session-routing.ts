@@ -1,9 +1,10 @@
-import { type LoadedConfig } from "../../config/load-config.ts";
+import { type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   appendThreadSessionKey,
   buildAgentMainSessionKey,
   buildAgentPeerSessionKey,
-} from "../../agents/session-key.ts";
+} from "../../agents/session/session-key.ts";
+import { resolveProvidedBotId } from "../../config/channels/channel-bot-records.ts";
 
 export type SlackConversationTarget = {
   agentId: string;
@@ -32,6 +33,7 @@ export function resolveSlackConversationTarget(params: {
     agentId: params.agentId,
     mainKey: sessionConfig.mainKey,
   });
+  const botId = resolveProvidedBotId(params) ?? "default";
 
   if (params.conversationKind === "dm") {
     return {
@@ -40,7 +42,7 @@ export function resolveSlackConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "slack",
-        botId: params.botId ?? params.accountId ?? "default",
+        botId,
         peerKind: "dm",
         peerId: params.userId ?? params.channelId,
         dmScope: sessionConfig.dmScope,
@@ -57,7 +59,7 @@ export function resolveSlackConversationTarget(params: {
         agentId: params.agentId,
         mainKey: sessionConfig.mainKey,
         channel: "slack",
-        botId: params.botId ?? params.accountId ?? "default",
+        botId,
         peerKind: "group",
         peerId: params.channelId,
       }),
@@ -69,7 +71,7 @@ export function resolveSlackConversationTarget(params: {
     agentId: params.agentId,
     mainKey: sessionConfig.mainKey,
     channel: "slack",
-    botId: params.botId ?? params.accountId ?? "default",
+    botId,
     peerKind: "channel",
     peerId: params.channelId,
   });

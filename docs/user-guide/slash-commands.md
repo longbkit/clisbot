@@ -8,7 +8,7 @@ This page is the canonical overview for chat-surface commands and a quick refere
 
 ## Source Of Truth
 
-- Parser and help text: `src/agents/commands.ts`
+- Parser and help text: `src/agents/commands/commands.ts`
 - Canonical help renderer: `renderAgentControlSlashHelp()`
 
 If this page and runtime ever disagree, runtime wins.
