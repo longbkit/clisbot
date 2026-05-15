@@ -295,7 +295,10 @@ export class ZaloBotPollingService {
       overrideMode: followUpState.overrideMode,
     });
     const bypassMention =
-      rawText.startsWith("::") || rawText.startsWith("\\") || rawText.startsWith("!");
+      rawText.startsWith("/") ||
+      rawText.startsWith("::") ||
+      rawText.startsWith("\\") ||
+      rawText.startsWith("!");
     const wasMentioned =
       explicitMention ||
       bypassMention ||
