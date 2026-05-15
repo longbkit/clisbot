@@ -3,7 +3,10 @@ import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
 } from "../../agents/commands/follow-up-policy.ts";
-import { parseAgentCommand } from "../../agents/commands/commands.ts";
+import {
+  isAgentCommandLikeMessage,
+  parseAgentCommand,
+} from "../../agents/commands/commands.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
@@ -731,7 +734,9 @@ export class TelegramPollingService {
       defaultMode: route.followUp.mode,
       overrideMode: followUpState.overrideMode,
     });
-    const bypassMention = rawText.startsWith("/") || rawText.startsWith("!");
+    const bypassMention = isAgentCommandLikeMessage(rawText, {
+      commandPrefixes: route.commandPrefixes,
+    });
     const wasMentioned =
       explicitMention ||
       bypassMention ||

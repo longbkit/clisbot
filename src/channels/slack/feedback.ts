@@ -1,4 +1,7 @@
-import { parseAgentCommand, type CommandPrefixes } from "../../agents/commands/commands.ts";
+import {
+  isAgentCommandLikeMessage,
+  type CommandPrefixes,
+} from "../../agents/commands/commands.ts";
 import type { ProcessedEventsStore } from "../message/processed-events-store.ts";
 import { shouldGuideUnroutedConversation } from "../message/unrouted-guidance-policy.ts";
 import { hasBotMention } from "./message.ts";
@@ -19,12 +22,9 @@ export function isSlackCommandLikeMessage(params: {
     return true;
   }
 
-  return (
-    parseAgentCommand(normalized, {
-      botUsername: params.botUsername,
-      commandPrefixes: params.commandPrefixes,
-    }) !== null
-  );
+  return isAgentCommandLikeMessage(normalized, {
+    commandPrefixes: params.commandPrefixes,
+  });
 }
 
 export function renderSlackRouteChoiceMessage(params: {

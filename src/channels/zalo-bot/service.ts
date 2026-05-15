@@ -3,6 +3,7 @@ import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
 } from "../../agents/commands/follow-up-policy.ts";
+import { isAgentCommandLikeMessage } from "../../agents/commands/commands.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
@@ -294,11 +295,9 @@ export class ZaloBotPollingService {
       defaultMode: route.followUp.mode,
       overrideMode: followUpState.overrideMode,
     });
-    const bypassMention =
-      rawText.startsWith("/") ||
-      rawText.startsWith("::") ||
-      rawText.startsWith("\\") ||
-      rawText.startsWith("!");
+    const bypassMention = isAgentCommandLikeMessage(rawText, {
+      commandPrefixes: route.commandPrefixes,
+    });
     const wasMentioned =
       explicitMention ||
       bypassMention ||

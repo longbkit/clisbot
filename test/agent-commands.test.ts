@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { parseAgentCommand } from "../src/agents/commands/commands.ts";
+import {
+  isAgentCommandLikeMessage,
+  parseAgentCommand,
+} from "../src/agents/commands/commands.ts";
 
 describe("parseAgentCommand", () => {
   test("parses start as a reserved control slash command", () => {
@@ -173,6 +176,20 @@ describe("parseAgentCommand", () => {
       type: "queue",
       text: "follow up after the current run",
     });
+  });
+
+  test("classifies command-like messages through the shared command prefixes", () => {
+    expect(isAgentCommandLikeMessage("/queue follow up")).toBe(true);
+    expect(isAgentCommandLikeMessage("\\q follow up")).toBe(true);
+    expect(isAgentCommandLikeMessage("::status")).toBe(true);
+    expect(isAgentCommandLikeMessage("!pwd")).toBe(true);
+    expect(isAgentCommandLikeMessage("plain follow up")).toBe(false);
+    expect(isAgentCommandLikeMessage("~status", {
+      commandPrefixes: {
+        slash: ["~"],
+        bash: ["$"],
+      },
+    })).toBe(true);
   });
 
   test("parses queue and steer shortcuts plus queue admin commands", () => {

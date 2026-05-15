@@ -17,6 +17,11 @@ export type CommandPrefixes = {
   bash: string[];
 };
 
+const DEFAULT_COMMAND_PREFIXES: CommandPrefixes = {
+  slash: ["::", "\\"],
+  bash: ["!"],
+};
+
 export type AgentControlSlashCommandName =
   | "start"
   | "status"
@@ -182,10 +187,7 @@ export function parseAgentCommand(
   } = {},
 ): AgentSlashCommand {
   const normalized = text.trim();
-  const commandPrefixes = options.commandPrefixes ?? {
-    slash: ["::", "\\"],
-    bash: ["!"],
-  };
+  const commandPrefixes = options.commandPrefixes ?? DEFAULT_COMMAND_PREFIXES;
   const bashPrefix = findMatchingPrefix(normalized, commandPrefixes.bash);
   if (bashPrefix) {
     const command = normalized.slice(bashPrefix.length).trim();
@@ -545,6 +547,24 @@ export function parseAgentCommand(
     type: "native",
     text: normalized,
   };
+}
+
+export function isAgentCommandLikeMessage(
+  text: string,
+  options: {
+    commandPrefixes?: CommandPrefixes;
+  } = {},
+) {
+  const normalized = text.trim();
+  if (!normalized) {
+    return false;
+  }
+  const commandPrefixes = options.commandPrefixes ?? DEFAULT_COMMAND_PREFIXES;
+  return Boolean(findMatchingPrefix(normalized, [
+    "/",
+    ...commandPrefixes.slash,
+    ...commandPrefixes.bash,
+  ]));
 }
 
 function findMatchingPrefix(text: string, prefixes: string[]) {
