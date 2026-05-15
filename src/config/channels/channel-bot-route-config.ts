@@ -234,9 +234,3 @@ export function resolveDirectMessageConfig<TConfig extends {
     exactAdmissionMode: "explicit",
   });
 }
-
-export function resolveDirectMessageAdmissionConfig<TConfig extends {
-  directMessages: Record<string, BotRouteConfig>;
-}>(config: TConfig) {
-  return resolveDirectMessageWildcardRoute(config.directMessages);
-}

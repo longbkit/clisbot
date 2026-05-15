@@ -79,7 +79,7 @@ import {
 import type { SlackBotCredentialConfig } from "./config.ts";
 import {
   resolveSlackBotConfig,
-  resolveSlackDirectMessageAdmissionConfig,
+  resolveSlackDirectMessageConfig,
 } from "./config.ts";
 import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 import { buildTokenHint } from "../integration/channel-runtime-identity.ts";
@@ -235,7 +235,7 @@ export class SlackSocketService {
   }
 
   private getDirectMessageConfig(userId?: string) {
-    return resolveSlackDirectMessageAdmissionConfig(this.getBotConfig());
+    return resolveSlackDirectMessageConfig(this.getBotConfig(), userId);
   }
 
   private getSlackMaxChars(agentId: string) {
@@ -463,7 +463,7 @@ export class SlackSocketService {
 
     if (params.conversationKind === "dm") {
       const directUserId =
-        typeof event.user === "string" ? event.user.trim() : "";
+        typeof event.user === "string" ? event.user.trim().toUpperCase() : "";
       const dmConfig = this.getDirectMessageConfig(directUserId);
       const dmIdentity = {
         platform: "slack" as const,
@@ -471,7 +471,7 @@ export class SlackSocketService {
         senderId: directUserId || undefined,
         channelId,
       };
-      if (!directUserId || dmConfig.policy === "disabled") {
+      if (!directUserId || !dmConfig || dmConfig.policy === "disabled") {
         debugSlackEvent("drop-dm-disabled", { eventId, directUserId });
         await this.processedEventsStore.markCompleted(eventId);
         return;

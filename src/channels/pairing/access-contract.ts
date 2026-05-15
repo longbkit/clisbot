@@ -4,12 +4,12 @@ export type DirectMessagePolicy = "open" | "pairing" | "allowlist" | "disabled";
 
 export type PairingAccessSubject = {
   userId?: string;
-  username?: string;
 };
 
 export type ChannelPairingAccessContract = {
   channel: ChannelId;
   normalizeAllowEntry(entry: string): string;
+  normalizeApprovedPairingId(id: string): string;
   isSenderAllowed(params: {
     allowFrom: string[];
     subject: PairingAccessSubject;
@@ -24,12 +24,4 @@ export function normalizePrefixedEntry(entry: string, prefixes: readonly string[
     }
   }
   return trimmed;
-}
-
-export function normalizeLowercaseHandle(value: string | undefined) {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return "";
-  }
-  return `@${trimmed.replace(/^@+/, "").toLowerCase()}`;
 }

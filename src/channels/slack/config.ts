@@ -2,7 +2,6 @@ import type { ClisbotConfig } from "../../config/core/schema.ts";
 import {
   listEnabledChannelProviderBotIds,
   mergeStandardChannelGroupRoutes,
-  resolveChannelDirectMessageAdmissionConfig,
   resolveChannelDirectMessageConfig,
   resolveChannelProviderBotId,
   resolveChannelProviderBotConfig,
@@ -95,12 +94,6 @@ export function resolveSlackDirectMessageConfig(
   userId?: string | null,
 ) {
   return resolveChannelDirectMessageConfig(config, userId);
-}
-
-export function resolveSlackDirectMessageAdmissionConfig(
-  config: ResolvedSlackBotConfig,
-) {
-  return resolveChannelDirectMessageAdmissionConfig(config);
 }
 
 export function resolveSlackBotCredentials(

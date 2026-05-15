@@ -25,6 +25,8 @@ Use it in this order:
 3. use the integration checklist while coding and reviewing
 4. close with the validation and done criteria
 
+For channel work that touches shared seams, use a queue-workflow review pass before calling it done. The current pass must still finish the edit and validation; queued passes are for breadth, artifact architecture, and DRY/KISS review, not a substitute for doing the work now.
+
 Use `docs/architecture/surface-architecture.md` and `docs/architecture/runtime-architecture.md` for stable architecture rules, `docs/features/channels/README.md` for feature shape, task docs for one concrete rollout, and research docs for provider evidence or quirks.
 
 ## Provider Truth Inventory
@@ -45,6 +47,10 @@ At minimum, answer these questions:
 - whether the provider is polling-first, webhook-first, socket-first, or supports a mixed transport model
 - what the real rate limits, message length limits, and retry hints are
 - what the canonical sender principal should be for auth and pairing
+- whether a provider user id can be numeric, long hex, mixed alphanumeric, or handle-like text
+- which raw provider user id must be copied into `allowUsers` and `blockUsers`
+- whether the provider exposes a first-class handle or username field; if it does not, do not synthesize one from display name, id shape, mention text, profile URL, or any other non-handle field
+- whether handles/usernames exist for display only; they must not authorize unless a future explicit identity-linking feature is designed separately
 - whether the provider exposes a truthful sender display name and enough recent-message metadata for prompt context or replay
 - what the canonical operator target syntax should be for DM and shared surfaces
 
@@ -67,11 +73,14 @@ Use this order unless the provider forces a different dependency:
 - bot resolution and default bot selection
 - runtime loading and channel registration
 - channel identity, surface prompt context, and sender-directory mapping
+- principal, provider id, display name, and handle capture, with provider id as the only access-control identity
+- handle capture must be field-truthful: store it only from a provider-owned handle/username field, otherwise leave it empty
 
 ### 3. Land inbound runtime truth
 
 - provider service, event parsing, dedupe, and startup validation
 - route resolution, admission, follow-up, and session routing
+- DM admission with the effective sender-specific route, not only wildcard admission
 - attachment intake, workspace file staging, and recent-message context
 - provider-owned trigger rules such as mention or reply gates
 
@@ -91,6 +100,7 @@ Use this order unless the provider forces a different dependency:
 - user-guide setup doc
 - feature/test docs for ground-truth validation
 - targeted automated coverage for the touched contracts
+- channel-integration playbook or lessons updates when a new seam, trap, or regression is found
 
 Do not mark the channel done from startup success alone.
 
@@ -108,6 +118,21 @@ Review these hotspots first when a new provider looks "similar enough" to an exi
 - routed and unrouted command UX
 
 Those are the places where copy-paste tends to look safe while still creating the next regression.
+
+Current shared seam snapshot:
+
+The built-in channel model is a static integration seam, not a dynamic plugin loader.
+
+Each built-in channel should expose:
+
+- `src/channels/<provider>/plugin.ts` for runtime behavior and operator inventory
+- `src/channels/<provider>/installation.ts` for install-time contracts
+- one inventory entry through `src/channels/integration/channel-installation-inventory.ts`
+- a surface contract with `normalizeUserId`
+- a pairing access contract with both `normalizeAllowEntry` and `normalizeApprovedPairingId`
+- config target, credential, bot, route, schema, template, and legacy-migration contracts when the provider participates in those systems
+
+Shared code should consume these seams instead of branching on provider names in config, control, auth, or agent runtime code. A provider-specific branch in shared code is a design smell unless the architecture doc already names it as an exception.
 
 ### Config and credentials
 
@@ -196,15 +221,24 @@ Review:
 
 - `src/auth/resolve.ts`
 - `src/channels/pairing/access.ts`
+- `src/channels/pairing/access-contract.ts`
 - `src/channels/pairing/store.ts`
 - `src/channels/pairing/cli.ts`
+- `src/channels/<provider>/pairing-access.ts`
 - `src/channels/config/follow-up-mode-config.ts`
 - `src/channels/message/unrouted-guidance-policy.ts`
 
 Questions:
 
 - is the auth principal canonical and scoped to the provider family
-- are pairing aliases intentionally supported, or accidentally inherited
+- are pairing and access checks based only on raw provider user ids, with no handle or username alias matching
+- is `normalizeApprovedPairingId` explicitly defined from provider-originated pending pairing ids
+- is `normalizeAllowEntry` explicitly defined for operator-entered raw provider ids in allowlist and blocklist text
+- are handle, mention, display name, and compatibility alias inputs rejected or ignored for authorization
+- are display-derived handles impossible, both in access checks and in prompt/recent-message metadata
+- does service-level DM pairing enforcement read the sender-specific effective DM route, not a wildcard-only admission helper meant for status or setup summaries
+- after `pairing approve`, does the next DM from the same sender avoid a second pairing prompt
+- if wildcard DM is `pairing`, does an exact DM route for a raw sender id still admit that sender
 - do unrouted or unpaired shared surfaces still produce truthful setup guidance such as `/start` or `/whoami`
 - did the integration force copy-paste matcher logic that should instead become a follow-up seam
 
@@ -271,7 +305,11 @@ The minimum bundle for a new channel is:
 - updates to shared channel test docs when the integration changes common behavior such as follow-up, rendering, typing, replay, or command truth
 - targeted automated tests for:
   - config and credential resolution
+  - required integration inventory coverage
+  - pairing approval id normalization and allowlist matching
   - route resolution and session routing
+  - service-level DM pairing enforcement for each existing channel when exact DM routes are allowed
+  - exact DM route admission when wildcard DM policy is `pairing`
   - message send or message action behavior
   - runtime summary or startup truth when a shared operator surface changed
 
@@ -299,7 +337,7 @@ Carry this forward:
 - write inbound attachment handling and outbound media delivery as separate contracts
 - do not say "media support" unless both sides are explicitly covered
 
-### 3. Freeze principal and target models before shared-surface work
+### 3. Freeze identity and effective DM route models before shared-surface work
 
 `zalo-bot` surfaced misses where pairing aliases, operator send, and reply-target behavior were not all using one canonical provider-scoped model.
 
@@ -307,6 +345,15 @@ Carry this forward:
 
 - freeze one principal model and one DM/shared target model early
 - reuse them in pairing, send, reply-target recording, loops, and route-facing docs
+- treat pairing approval ids as provider-originated ids, not operator-entered allowlist text
+- make `normalizeApprovedPairingId` an explicit channel decision instead of falling back to `normalizeAllowEntry`
+- define the raw provider id shape before adding the channel; handles are display metadata only and must not be access aliases
+- do not synthesize handles from display names, ids, mention text, URLs, or normalized labels; leave handle empty unless the provider exposes a real handle/username field
+- keep principal examples in `/whoami`, `auth get-permissions`, queue or loop `--sender`, and pairing guidance aligned with that model
+- resolve the effective direct-message route with the current provider sender id before enforcing `pairing`, `allowlist`, or `disabled`
+- keep wildcard-only DM admission helpers limited to operator summaries or setup guidance; channel services should not use them to decide whether a sender must pair
+- add a provider service test where wildcard DM policy is `pairing`, an exact DM route allows one sender, and the allowed sender is admitted without receiving another pairing code
+- keep shared route tests for Slack, Telegram, and new providers close enough that a provider-specific shortcut cannot silently drift
 
 ### 4. Treat duplication as an output, not as cleanup debt
 
@@ -336,10 +383,13 @@ Do not call a new channel integration done until all of these are true:
 - shared operator help does not over-promise unsupported behavior
 - shared onboarding, prompt context, replay, and transcript surfaces are still truthful
 - DM and shared-surface routing rules are covered by tests
+- pairing approval id normalization is explicitly covered by tests
+- exact DM route admission is tested against a wildcard `pairing` fallback
+- new or refactored channel docs have had a queue-workflow review pass for breadth, artifact architecture, and DRY/KISS risks
 - user-guide, task doc, test doc, and automated coverage were updated together
 - any intentional duplication or deferred standardization gap is written down as a follow-up task
 
-## Related Docs
+### Related Docs
 
 - [Channels](README.md)
 - [Surface Architecture](../../architecture/surface-architecture.md)

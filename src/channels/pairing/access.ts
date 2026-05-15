@@ -18,6 +18,10 @@ export function normalizeAllowEntry(channel: PairingChannel, entry: string) {
   return requirePairingAccessContract(channel).normalizeAllowEntry(entry);
 }
 
+export function normalizeApprovedPairingId(channel: PairingChannel, id: string) {
+  return requirePairingAccessContract(channel).normalizeApprovedPairingId(id);
+}
+
 export function isChannelSenderAllowed(params: {
   channel: PairingChannel;
   allowFrom: string[];

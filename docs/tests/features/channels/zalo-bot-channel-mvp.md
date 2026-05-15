@@ -36,7 +36,29 @@ Expected:
 
 - the second DM is admitted
 - the agent replies in the same DM
+- no second pairing code is issued for the same sender id
+- the approved `allowUsers` entry is the raw provider user id shown in the pairing reply, not `@<id>`, display name, or another handle-like rewrite
+- `@...` entries are not Zalo Bot access aliases
 - `bun run status` still shows `zalo-bot enabled=yes connection=active`
+
+Regression check:
+
+1. Use a sender id that is not purely numeric, for example a long hex-like provider id or an id containing `-`.
+2. Approve pairing.
+3. Verify the config stores that exact raw id under `bots.zaloBot.<botId>.directMessages["*"].allowUsers`.
+4. DM again and verify the message is admitted without another pairing prompt.
+
+## DM Exact Route Admission
+
+1. Keep wildcard DM policy as `pairing`.
+2. Add an exact DM route for one Zalo user id and allow that same raw id.
+3. DM the bot from that user.
+
+Expected:
+
+- the exact DM route is admitted
+- wildcard `pairing` does not override the exact route
+- no pairing code is sent for the already allowed exact-route sender
 
 ## Inbound Media
 

@@ -10,7 +10,6 @@ import {
   resolveBotCommandPrefixes,
   resolveBotFollowUp,
   resolveBotSurfaceNotifications,
-  resolveDirectMessageAdmissionConfig as resolveManagedDirectMessageAdmissionConfig,
   resolveDirectMessageConfig as resolveManagedDirectMessageConfig,
 } from "./channel-bot-route-config.ts";
 import {
@@ -151,10 +150,4 @@ export function resolveChannelDirectMessageConfig(
   senderId?: string | number | null,
 ) {
   return resolveManagedDirectMessageConfig(config, senderId);
-}
-
-export function resolveChannelDirectMessageAdmissionConfig(
-  config: ResolvedChannelBotConfig,
-) {
-  return resolveManagedDirectMessageAdmissionConfig(config);
 }

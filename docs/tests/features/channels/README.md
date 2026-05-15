@@ -22,3 +22,13 @@ They should be used for ad hoc validation and later automation across Slack firs
 - [Slack Routing And Follow-Up Tests](slack-routing-and-follow-up.md)
 - [Rendering And Command Tests](rendering-and-command-tests.md)
 - [Zalo Bot Channel MVP](zalo-bot-channel-mvp.md)
+
+## Cross-Channel Regression Checks
+
+Run these checks whenever adding a channel, refactoring pairing, or changing route resolution:
+
+- Pairing approval writes the provider-originated user id into the requesting bot's wildcard DM `allowUsers` without reinterpreting it as a handle.
+- `allowUsers` and `blockUsers` authorize raw provider user ids only; handle-style aliases, usernames, display names, and mention syntax must not authorize.
+- After `pairing approve <channel> <code>`, the same DM sender is admitted on the next message and does not receive a second pairing code.
+- If wildcard DM policy is `pairing` and an exact DM route explicitly allows a sender, the exact route wins and the sender is admitted without another pairing prompt.
+- Slack, Telegram, and the new provider all keep their principal examples truthful in `/whoami`, `auth get-permissions`, loop `--sender`, queue `--sender`, and pairing guidance.

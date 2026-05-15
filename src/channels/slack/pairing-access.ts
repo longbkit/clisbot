@@ -12,6 +12,7 @@ function normalizeSlackAllowEntry(entry: string) {
 export const slackPairingAccessContract = {
   channel: "slack",
   normalizeAllowEntry: normalizeSlackAllowEntry,
+  normalizeApprovedPairingId: normalizeSlackAllowEntry,
   isSenderAllowed: ({ allowFrom, subject }) => {
     const normalizedUserId = subject.userId?.trim().toUpperCase() ?? "";
     if (!normalizedUserId) {

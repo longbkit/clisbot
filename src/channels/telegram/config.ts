@@ -2,7 +2,6 @@ import type { ClisbotConfig } from "../../config/core/schema.ts";
 import {
   listEnabledChannelProviderBotIds,
   mergeTopicAwareChannelGroupRoutes,
-  resolveChannelDirectMessageAdmissionConfig,
   resolveChannelDirectMessageConfig,
   resolveChannelProviderBotId,
   resolveChannelProviderBotConfig,
@@ -73,12 +72,6 @@ export function resolveTelegramDirectMessageConfig(
   senderId?: string | number | null,
 ) {
   return resolveChannelDirectMessageConfig(config, senderId);
-}
-
-export function resolveTelegramDirectMessageAdmissionConfig(
-  config: ResolvedTelegramBotConfig,
-) {
-  return resolveChannelDirectMessageAdmissionConfig(config);
 }
 
 export function resolveTelegramBotCredentials(

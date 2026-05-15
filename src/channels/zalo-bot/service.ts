@@ -16,7 +16,7 @@ import { ActivityStore } from "../../control/runtime/activity-store.ts";
 import type { ZaloBotCredentialConfig } from "./config.ts";
 import {
   resolveZaloBotConfig,
-  resolveZaloBotDirectMessageAdmissionConfig,
+  resolveZaloBotDirectMessageConfig,
 } from "./config.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { buildAgentPromptText } from "../message/agent-prompt.ts";
@@ -173,13 +173,11 @@ export class ZaloBotPollingService {
 
     const senderId = message.from.id.trim();
     const senderName = message.from.display_name?.trim() || message.from.name?.trim();
-    const senderHandle = senderName?.replace(/\s+/g, "").toLowerCase();
     if (isChannelSenderBlocked({
       channel: "zalo-bot",
       blockFrom: route.blockUsers ?? [],
       subject: {
         userId: senderId,
-        username: senderHandle,
       },
     })) {
       return;
@@ -213,7 +211,6 @@ export class ZaloBotPollingService {
           conversationKind: "group",
           senderId,
           senderName,
-          senderHandle,
           chatId: message.chat.id,
         },
       });
@@ -225,7 +222,6 @@ export class ZaloBotPollingService {
           allowFrom: route.allowUsers ?? [],
           subject: {
             userId: senderId,
-            username: senderHandle,
           },
         })
       ) {
@@ -239,7 +235,7 @@ export class ZaloBotPollingService {
     }
 
     if (routeInfo.conversationKind === "dm") {
-      const directMessages = resolveZaloBotDirectMessageAdmissionConfig(this.getBotConfig());
+      const directMessages = resolveZaloBotDirectMessageConfig(this.getBotConfig(), senderId);
       if (!directMessages || directMessages.policy === "disabled") {
         return;
       }
@@ -255,7 +251,6 @@ export class ZaloBotPollingService {
             conversationKind: "dm",
             senderId,
             senderName,
-            senderHandle,
             chatId: message.chat.id,
           },
         });
@@ -284,7 +279,6 @@ export class ZaloBotPollingService {
           conversationKind: "dm",
           senderId,
           senderName,
-          senderHandle,
           chatId: message.chat.id,
         },
       });
@@ -294,7 +288,6 @@ export class ZaloBotPollingService {
           allowFrom: directMessages.allowUsers ?? [],
           subject: {
             userId: senderId,
-            username: senderHandle,
           },
         });
         if (!allowed) {
@@ -304,7 +297,6 @@ export class ZaloBotPollingService {
               id: senderId,
               botId: this.botId,
               meta: {
-                username: senderHandle,
                 firstName: senderName,
               },
             });
@@ -360,7 +352,6 @@ export class ZaloBotPollingService {
         text: textBody,
         senderId,
         senderName,
-        senderHandle,
         platform: "zalo-bot",
       });
     }
@@ -402,7 +393,6 @@ export class ZaloBotPollingService {
       conversationKind: routeInfo.conversationKind,
       senderId,
       senderName,
-      senderHandle,
       chatId: message.chat.id,
     };
     void recordSurfaceDirectoryIdentity({

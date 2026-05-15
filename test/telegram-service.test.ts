@@ -355,6 +355,61 @@ describe("TelegramPollingService shared audience enforcement", () => {
     expect(apiCalls).toEqual([]);
   });
 
+  test("uses the sender-specific DM route before asking for pairing", async () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.app.auth.roles.owner.users = ["telegram:999999"];
+    loadedConfig.raw.bots.telegram.default.directMessages["*"] = {
+      enabled: true,
+      policy: "pairing",
+      allowUsers: [],
+      blockUsers: [],
+      requireMention: false,
+      allowBots: false,
+      agentId: "default",
+    };
+    loadedConfig.raw.bots.telegram.default.directMessages["1001"] = {
+      enabled: true,
+      policy: "allowlist",
+      allowUsers: ["1001"],
+      blockUsers: [],
+      requireMention: true,
+      allowBots: false,
+      agentId: "default",
+    };
+    let followUpChecks = 0;
+
+    const apiCalls = await runTelegramServiceUpdate({
+      loadedConfig,
+      agentService: {
+        registerSurfaceNotificationHandler() {},
+        unregisterSurfaceNotificationHandler() {},
+        appendRecentConversationMessage: async () => undefined,
+        async getConversationFollowUpState() {
+          followUpChecks += 1;
+          return {};
+        },
+      },
+      update: {
+        update_id: 45,
+        message: {
+          message_id: 45,
+          text: "hello",
+          from: {
+            id: 1001,
+            username: "allowed_user",
+          },
+          chat: {
+            id: 1001,
+            type: "private",
+          },
+        },
+      },
+    });
+
+    expect(apiCalls).toEqual([]);
+    expect(followUpChecks).toBe(1);
+  });
+
   test("does not collapse a disabled topic message into the parent group route", async () => {
     const loadedConfig = createLoadedConfig();
     loadedConfig.raw.bots.telegram.default.groupPolicy = "allowlist";

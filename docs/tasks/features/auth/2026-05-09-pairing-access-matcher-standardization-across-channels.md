@@ -10,11 +10,11 @@ Planned
 
 ## Why
 
-`src/channels/pairing/access.ts` currently duplicates the same matching structure across channels:
+`src/channels/pairing/access.ts` previously duplicated the same matching structure across channels:
 
 - normalize configured allowlist entries for one channel
-- compute normalized sender id and optional handle for one inbound event
-- check whether either normalized value is present
+- compute the normalized sender provider id for one inbound event
+- check whether that provider id is present
 - duplicate block matching by delegating back into the allow matcher
 
 This is visible today in pairs such as:
@@ -29,14 +29,15 @@ The duplication is small, but it sets the wrong extension pattern:
 - every new channel is tempted to add another hand-written matcher pair
 - logic drift becomes more likely over time
 - review cost rises for changes that should be shared
+- handle or username matching can accidentally become an authorization path
 
 ## Scope
 
 - define one shared matcher model for pairing access checks
-- separate channel-specific normalization from generic id or handle matching
+- separate channel-specific entry normalization from raw provider-id matching
 - remove obvious duplication between Telegram and Zalo Bot matcher pairs
 - clarify where Slack truly differs versus where it only looks different because of current helper shape
-- keep behavior unchanged in the standardization pass
+- preserve the provider-id-only access-control contract
 
 ## Non-Goals
 
@@ -58,14 +59,14 @@ That boundary is too blurry today, so extension pressure falls onto copy-paste i
 Use a split like:
 
 - channel-specific normalization adapter
-- shared matcher function that accepts normalized candidate values
+- shared matcher function that accepts one normalized provider-id candidate
 - shared allow/block wrapper behavior
 
 Likely shape:
 
 - one helper to normalize configured entries for a given channel
-- one helper to build normalized sender candidates from runtime input
-- one helper to answer whether any candidate matches the configured set
+- one helper to normalize the runtime sender provider id
+- one helper to answer whether that provider id matches the configured set
 
 Then channel-specific wrappers, if still needed, should stay minimal.
 
@@ -74,7 +75,8 @@ Then channel-specific wrappers, if still needed, should stay minimal.
 ### 1. Freeze the matcher contract
 
 - identify the canonical matcher inputs
-- define where ids, handles, and future candidate forms belong
+- define where raw provider ids belong
+- keep handles, usernames, display names, and mention syntax outside access matching
 
 ### 2. Collapse Telegram and Zalo Bot duplication first
 

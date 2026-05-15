@@ -18,7 +18,6 @@ export {
   mergeStandardChannelGroupRoutes,
   mergeTopicAwareChannelGroupRoutes,
   requireChannelProviderBotRecord,
-  resolveChannelDirectMessageAdmissionConfig,
   resolveChannelDirectMessageConfig,
   resolveChannelProviderBotConfig,
   resolveChannelProviderBotId,

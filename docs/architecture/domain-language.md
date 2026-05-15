@@ -150,8 +150,12 @@ _Avoid_: auth principal, canonical `surfaceId`
 **displayName**: Human-readable name from provider or config.  
 _Avoid_: CLI target, auth principal, formatted prompt text
 
-**handle**: Provider username or handle without mention formatting.  
-_Avoid_: auth principal, display name, Slack mention syntax
+**handle**: Provider username or handle without mention formatting. It is
+display and prompt-context metadata only, not authorization identity.
+Slack and Telegram can expose handle-like metadata. Zalo Bot must not invent a
+handle contract unless the provider API and implementation prove a stable
+canonical handle exists.
+_Avoid_: auth principal, allowlist entry, blocklist entry, display name, Slack mention syntax
 
 **sender display text**: Prompt-rendered text assembled from sender fields.  
 _Avoid_: stored directory fields, auth principal
@@ -166,6 +170,12 @@ Rules:
 
 - Telegram principal ids are numeric user ids, not handles.
 - Slack principal ids are Slack user ids such as `U...` or `W...`, not display names or mention syntax.
+- Zalo Bot principal ids use the raw provider user id returned by the Bot API,
+  which may be numeric, long hex-like, or mixed alphanumeric text.
+- `allowUsers` and `blockUsers` store raw provider user ids only. They must not
+  match handles, usernames, display names, or mention syntax.
+- A handle change can change prompt/display text, but it must not change access
+  because access is keyed by provider id.
 - Principal strings are platform-scoped. `telegram:1276408333` and `slack:U123ABC456` are different identities unless explicitly linked later.
 - Use `principal` for auth identity values in public docs and CLI help.
 - Use `senderId` only when that principal is specifically the sender in a message context.

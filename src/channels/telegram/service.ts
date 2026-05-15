@@ -54,7 +54,7 @@ import { sleep } from "../../infra/process.ts";
 import type { TelegramBotCredentialConfig } from "./config.ts";
 import {
   resolveTelegramBotConfig,
-  resolveTelegramDirectMessageAdmissionConfig,
+  resolveTelegramDirectMessageConfig,
 } from "./config.ts";
 import type { ResolvedTelegramBotConfig } from "./config.ts";
 import { buildAgentPromptText } from "../message/agent-prompt.ts";
@@ -300,7 +300,7 @@ export class TelegramPollingService {
   }
 
   private getDirectMessageConfig(senderId?: string | number) {
-    return resolveTelegramDirectMessageAdmissionConfig(this.getBotConfig());
+    return resolveTelegramDirectMessageConfig(this.getBotConfig(), senderId);
   }
 
   async start() {
@@ -564,7 +564,6 @@ export class TelegramPollingService {
           blockFrom: route.blockUsers ?? [],
           subject: {
             userId: senderId,
-            username: senderUsername,
           },
         })
       ) {
@@ -583,7 +582,6 @@ export class TelegramPollingService {
           allowFrom: route.allowUsers ?? [],
           subject: {
             userId: senderId,
-            username: senderUsername,
           },
         })
       ) {
@@ -617,7 +615,7 @@ export class TelegramPollingService {
         senderId: senderId || undefined,
         chatId: String(message.chat.id),
       };
-      if (!senderId || directMessages.policy === "disabled") {
+      if (!senderId || !directMessages || directMessages.policy === "disabled") {
         await this.processedEventsStore.markCompleted(eventId);
         return;
       }
@@ -668,7 +666,6 @@ export class TelegramPollingService {
         blockFrom: directMessages.blockUsers ?? [],
         subject: {
           userId: senderId,
-          username: senderUsername,
         },
       })) {
         await this.processedEventsStore.markCompleted(eventId);
@@ -681,7 +678,6 @@ export class TelegramPollingService {
           allowFrom: directMessages.allowUsers ?? [],
           subject: {
             userId: senderId,
-            username: senderUsername,
           },
         });
         if (!allowed) {

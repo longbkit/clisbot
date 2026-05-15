@@ -268,7 +268,8 @@ Important details:
 In Telegram DM handling, OpenClaw does this:
 
 1. check DM policy
-2. if policy is not `open`, resolve allowlist match from sender id or username
+2. if policy is not `open`, resolve allowlist match using OpenClaw's
+   Telegram sender-id / username behavior
 3. if sender is not allowed and policy is `pairing`:
    - create or reuse a pending pairing request for the Telegram user id
    - include username and name fields in `meta`
@@ -278,6 +279,9 @@ In Telegram DM handling, OpenClaw does this:
 Important detail:
 
 - Telegram pairing explicitly stores the user id, not the chat id
+- This is OpenClaw research, not the current `clisbot` access contract.
+  `clisbot` authorizes by raw provider user id only; usernames and handles are
+  display metadata.
 
 ## Default Sources
 

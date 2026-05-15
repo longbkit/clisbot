@@ -2,7 +2,6 @@ import type { ClisbotConfig } from "../../config/core/schema.ts";
 import {
   listEnabledChannelProviderBotIds,
   mergeStandardChannelGroupRoutes,
-  resolveChannelDirectMessageAdmissionConfig,
   resolveChannelDirectMessageConfig,
   resolveChannelProviderBotId,
   resolveChannelProviderBotConfig,
@@ -83,12 +82,6 @@ export function resolveZaloBotDirectMessageConfig(
   senderId?: string | number | null,
 ) {
   return resolveChannelDirectMessageConfig(config, senderId);
-}
-
-export function resolveZaloBotDirectMessageAdmissionConfig(
-  config: ResolvedZaloBotConfig,
-) {
-  return resolveChannelDirectMessageAdmissionConfig(config);
 }
 
 export function resolveZaloBotCredentials(

@@ -1,7 +1,7 @@
 import { readEditableConfig, writeEditableConfig } from "../../config/core/config-file.ts";
 import { listConfiguredChannelBotIds } from "../../config/channels/channel-bots.ts";
 import { ensureBotDirectMessageWildcardRoute } from "../../config/channels/direct-message-routes.ts";
-import { normalizeAllowEntry } from "./access.ts";
+import { normalizeApprovedPairingId } from "./access.ts";
 import { renderPairingRequests } from "./messages.ts";
 import {
   approveChannelPairingCode,
@@ -117,7 +117,7 @@ export async function runPairingCli(args: string[], writer: PairingCliWriter = c
     const configuredBotIds = listConfiguredChannelBotIds(config, channel);
     const botId = resolveApprovedBotId(channel, configuredBotIds, approved.botId);
     const wildcardRoute = ensureBotDirectMessageWildcardRoute(config, channel, botId);
-    const normalizedUser = normalizeAllowEntry(channel, approved.id);
+    const normalizedUser = normalizeApprovedPairingId(channel, approved.id);
     const currentUsers = new Set((wildcardRoute.allowUsers ?? []).map((entry) => String(entry).trim()).filter(Boolean));
     if (normalizedUser) {
       currentUsers.add(normalizedUser);

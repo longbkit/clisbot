@@ -52,6 +52,10 @@ describe("channel installation inventory", () => {
     expect(joinChannels(CHANNEL_ROUTE_CONTRACTS)).toBe(directories.join(","));
     expect(joinChannels(CHANNEL_TEMPLATE_CONTRACTS)).toBe(directories.join(","));
 
+    for (const contract of CHANNEL_PAIRING_ACCESS_CONTRACTS) {
+      expect(typeof contract.normalizeApprovedPairingId).toBe("function");
+    }
+
     expect(listChannelPlugins()).toHaveLength(directories.length);
     expect(new Set(listChannelPlugins().map((plugin) => plugin.id)).size).toBe(directories.length);
   });
