@@ -4,7 +4,7 @@ import {
   resolveFollowUpMode,
 } from "../../agents/commands/follow-up-policy.ts";
 import {
-  isAgentCommandLikeMessage,
+  hasAgentCommandPrefix,
   parseAgentCommand,
 } from "../../agents/commands/commands.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
@@ -734,7 +734,7 @@ export class TelegramPollingService {
       defaultMode: route.followUp.mode,
       overrideMode: followUpState.overrideMode,
     });
-    const bypassMention = isAgentCommandLikeMessage(rawText, {
+    const bypassMention = hasAgentCommandPrefix(rawText, {
       commandPrefixes: route.commandPrefixes,
     });
     const wasMentioned =

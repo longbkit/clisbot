@@ -84,7 +84,7 @@ Use this order unless the provider forces a different dependency:
 - route resolution, admission, follow-up, and session routing
 - DM admission with the effective sender-specific route, not only wildcard admission
 - attachment intake, workspace file staging, and recent-message context
-- provider-owned trigger rules such as mention or reply gates, while agent slash and shortcut command detection stays on the shared agent-command seam unless the provider intentionally owns a different command grammar
+- provider-owned trigger rules such as mention or reply gates, while agent command prefix detection stays on the shared `hasAgentCommandPrefix` seam unless the provider intentionally owns a different command grammar
 
 ### 4. Land outbound and operator surfaces
 
@@ -295,7 +295,7 @@ Questions:
 - did route management reject unsupported surface families before writing config
 - did `queues` and `loops` preserve explicit target kind the same way the provider service and message command path do
 - did routed and unrouted command UX such as `/start`, `/status`, `/whoami`, and `/transcript` still tell the truth for this provider
-- did mention-gated routes still admit shared command-like messages such as `/queue`, `\q`, configured slash shortcuts, and bash shortcuts through the shared agent-command helper instead of provider-local prefix lists
+- did mention-gated routes still admit messages with shared agent command prefixes such as `/queue`, `\q`, configured slash shortcuts, and bash shortcuts through `hasAgentCommandPrefix` instead of provider-local prefix lists
 - did prompt context, sender labeling, replay, and transcript shaping stay truthful for the provider
 
 ## Validation and Doc Bundle
@@ -315,7 +315,7 @@ The minimum bundle for a new channel is:
   - pairing approval id normalization and allowlist matching
   - route resolution and session routing
   - route, queue, and loop CLI target parsing for every supported surface kind, plus reject-before-persist coverage for unsupported surface kinds
-  - service-level mention-gate coverage proving shared command-like messages reach `processChannelInteraction` when the route requires mention
+  - service-level mention-gate coverage proving messages with shared agent command prefixes reach `processChannelInteraction` when the route requires mention
   - service-level DM pairing enforcement for each existing channel when exact DM routes are allowed
   - exact DM route admission when wildcard DM policy is `pairing`
   - message send or message action behavior

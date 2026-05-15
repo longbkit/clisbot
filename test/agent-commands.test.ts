@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  isAgentCommandLikeMessage,
+  hasAgentCommandPrefix,
   parseAgentCommand,
 } from "../src/agents/commands/commands.ts";
 
@@ -178,13 +178,13 @@ describe("parseAgentCommand", () => {
     });
   });
 
-  test("classifies command-like messages through the shared command prefixes", () => {
-    expect(isAgentCommandLikeMessage("/queue follow up")).toBe(true);
-    expect(isAgentCommandLikeMessage("\\q follow up")).toBe(true);
-    expect(isAgentCommandLikeMessage("::status")).toBe(true);
-    expect(isAgentCommandLikeMessage("!pwd")).toBe(true);
-    expect(isAgentCommandLikeMessage("plain follow up")).toBe(false);
-    expect(isAgentCommandLikeMessage("~status", {
+  test("detects shared agent command prefixes", () => {
+    expect(hasAgentCommandPrefix("/queue follow up")).toBe(true);
+    expect(hasAgentCommandPrefix("\\q follow up")).toBe(true);
+    expect(hasAgentCommandPrefix("::status")).toBe(true);
+    expect(hasAgentCommandPrefix("!pwd")).toBe(true);
+    expect(hasAgentCommandPrefix("plain follow up")).toBe(false);
+    expect(hasAgentCommandPrefix("~status", {
       commandPrefixes: {
         slash: ["~"],
         bash: ["$"],

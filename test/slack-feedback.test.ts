@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  isSlackCommandLikeMessage,
+  hasSlackCommandTrigger,
   renderSlackMentionRequiredMessage,
   renderSlackRouteChoiceMessage,
   sendSlackGuidanceOnce,
@@ -27,9 +27,9 @@ describe("slack feedback helpers", () => {
     setRenderedCliName(previousCliName);
   });
 
-  test("treats mapped slash-style control commands as command-like", () => {
+  test("detects mapped slash-style control command triggers", () => {
     expect(
-      isSlackCommandLikeMessage({
+      hasSlackCommandTrigger({
         text: "\\status",
         botUsername: "clisbot",
         commandPrefixes: {
@@ -74,25 +74,25 @@ describe("slack feedback helpers", () => {
     expect(
       shouldSendSlackMentionRequiredGuidance({
         conversationKind: "channel",
-        isCommandLike: true,
+        hasCommandTrigger: true,
       }),
     ).toBe(false);
     expect(
       shouldSendSlackMentionRequiredGuidance({
         conversationKind: "group",
-        isCommandLike: true,
+        hasCommandTrigger: true,
       }),
     ).toBe(false);
     expect(
       shouldSendSlackMentionRequiredGuidance({
         conversationKind: "dm",
-        isCommandLike: true,
+        hasCommandTrigger: true,
       }),
     ).toBe(true);
     expect(
       shouldSendSlackMentionRequiredGuidance({
         conversationKind: "dm",
-        isCommandLike: false,
+        hasCommandTrigger: false,
       }),
     ).toBe(false);
   });
@@ -101,7 +101,7 @@ describe("slack feedback helpers", () => {
     expect(
       shouldGuideUnroutedSlackEvent({
         conversationKind: "channel",
-        isCommandLike: true,
+        hasCommandTrigger: true,
         wasMentioned: false,
         isBotOriginated: false,
       }),
@@ -109,7 +109,7 @@ describe("slack feedback helpers", () => {
     expect(
       shouldGuideUnroutedSlackEvent({
         conversationKind: "channel",
-        isCommandLike: true,
+        hasCommandTrigger: true,
         wasMentioned: true,
         isBotOriginated: false,
       }),
@@ -117,7 +117,7 @@ describe("slack feedback helpers", () => {
     expect(
       shouldGuideUnroutedSlackEvent({
         conversationKind: "group",
-        isCommandLike: true,
+        hasCommandTrigger: true,
         wasMentioned: false,
         isBotOriginated: false,
       }),
@@ -125,7 +125,7 @@ describe("slack feedback helpers", () => {
     expect(
       shouldGuideUnroutedSlackEvent({
         conversationKind: "dm",
-        isCommandLike: true,
+        hasCommandTrigger: true,
         wasMentioned: false,
         isBotOriginated: false,
       }),
@@ -133,7 +133,7 @@ describe("slack feedback helpers", () => {
     expect(
       shouldGuideUnroutedSlackEvent({
         conversationKind: "channel",
-        isCommandLike: true,
+        hasCommandTrigger: true,
         wasMentioned: true,
         isBotOriginated: true,
       }),

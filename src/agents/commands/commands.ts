@@ -549,7 +549,7 @@ export function parseAgentCommand(
   };
 }
 
-export function isAgentCommandLikeMessage(
+export function hasAgentCommandPrefix(
   text: string,
   options: {
     commandPrefixes?: CommandPrefixes;

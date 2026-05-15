@@ -62,7 +62,7 @@ import {
   removeConfiguredReaction,
 } from "./reactions.ts";
 import {
-  isSlackCommandLikeMessage,
+  hasSlackCommandTrigger,
   renderSlackMentionRequiredMessage,
   renderSlackRouteChoiceMessage,
   shouldSendSlackMentionRequiredGuidance,
@@ -632,7 +632,7 @@ export class SlackSocketService {
       });
     }
     if (requiresMention && !wasMentioned) {
-      const isCommandLike = isSlackCommandLikeMessage({
+      const hasCommandTrigger = hasSlackCommandTrigger({
         text: event.text ?? "",
         botUserId: this.botUserId,
         botUsername: this.botLabel,
@@ -641,7 +641,7 @@ export class SlackSocketService {
       if (
         shouldSendSlackMentionRequiredGuidance({
           conversationKind: params.conversationKind,
-          isCommandLike,
+          hasCommandTrigger,
         })
       ) {
         try {
@@ -659,7 +659,7 @@ export class SlackSocketService {
         channelId,
         requiresMention,
         explicitMention,
-        isCommandLike,
+        hasCommandTrigger,
         effectiveFollowUpMode,
       });
       await this.processedEventsStore.markCompleted(eventId);
@@ -1039,7 +1039,7 @@ export class SlackSocketService {
         }
         const shouldGuide = shouldGuideUnroutedSlackEvent({
           conversationKind: resolvedRoute.conversationKind,
-          isCommandLike: isSlackCommandLikeMessage({
+          hasCommandTrigger: hasSlackCommandTrigger({
             text: normalizedEvent.text ?? "",
             botUserId: this.botUserId,
             botUsername: this.botLabel,
