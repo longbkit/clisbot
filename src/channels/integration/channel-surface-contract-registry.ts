@@ -40,6 +40,10 @@ export function channelSupportsRouteTopics(channel: ChannelId) {
   return getChannelSurfaceContract(channel).supportsTopics;
 }
 
+export function channelSupportsRouteGroups(channel: ChannelId) {
+  return getChannelSurfaceContract(channel).supportsGroups;
+}
+
 export function isLegacyGroupRouteAlias(channel: ChannelId, kind: string) {
   return getChannelSurfaceContract(channel).legacyGroupAliases.includes(kind);
 }
@@ -48,9 +52,16 @@ export function renderCanonicalRouteIdList() {
   return "`dm:<id>`, `dm:*`, `group:<id>`, `group:*`, and `topic:<chatId>:<topicId>`";
 }
 
-export function renderLegacyCompatibleRouteInputList() {
-  const routeAliases = new Set<string>(["groups:*"]);
+export function renderLegacyCompatibleRouteInputList(channel?: ChannelId) {
+  const routeAliases = new Set<string>();
   for (const contract of CHANNEL_SURFACE_CONTRACTS) {
+    if (channel && contract.channel !== channel) {
+      continue;
+    }
+    if (!contract.supportsGroups) {
+      continue;
+    }
+    routeAliases.add("groups:*");
     for (const alias of contract.legacyGroupAliases) {
       routeAliases.add(`${alias}:<id>`);
     }

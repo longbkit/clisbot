@@ -48,6 +48,7 @@ At minimum, answer these questions:
 - what the real rate limits, message length limits, and retry hints are
 - what the canonical sender principal should be for auth and pairing
 - whether a provider user id can be numeric, long hex, mixed alphanumeric, or handle-like text
+- whether DM and group ids have overlapping shapes; if they can overlap, preserve explicit target kind such as `dm:` or `group:` instead of guessing from id prefixes or regexes
 - which raw provider user id must be copied into `allowUsers` and `blockUsers`
 - whether the provider exposes a first-class handle or username field; if it does not, do not synthesize one from display name, id shape, mention text, profile URL, or any other non-handle field
 - whether handles/usernames exist for display only; they must not authorize unless a future explicit identity-linking feature is designed separately
@@ -65,6 +66,7 @@ Use this order unless the provider forces a different dependency:
 - pick one canonical provider id
 - pick one canonical principal prefix
 - pick one canonical operator target model
+- keep the target kind as data when parsing operator targets; do not strip `dm:`, `group:`, `topic:`, or thread selectors before route/session resolution if the provider id alone cannot prove the surface kind
 - decide which compatibility aliases are justified and which should not be added
 
 ### 2. Land the config and identity layer
@@ -92,6 +94,7 @@ Use this order unless the provider forces a different dependency:
 - typing or processing indicators
 - routed and unrouted command behavior such as `/start`, `/status`, `/whoami`, and `/transcript`
 - loop, queue, and route-facing target behavior
+- explicit support flags for `dm`, `group`, and `topic` route families
 - owner alerts and surface notifications
 - status, startup, and health summaries
 
@@ -289,6 +292,8 @@ Questions:
 - did help text over-promise commands the provider does not actually support
 - did reply-style hints stay truthful for the provider render capabilities
 - did target syntax stay aligned across `message`, `routes`, `loops`, and `queues`
+- did route management reject unsupported surface families before writing config
+- did `queues` and `loops` preserve explicit target kind the same way the provider service and message command path do
 - did routed and unrouted command UX such as `/start`, `/status`, `/whoami`, and `/transcript` still tell the truth for this provider
 - did prompt context, sender labeling, replay, and transcript shaping stay truthful for the provider
 
@@ -308,6 +313,7 @@ The minimum bundle for a new channel is:
   - required integration inventory coverage
   - pairing approval id normalization and allowlist matching
   - route resolution and session routing
+  - route, queue, and loop CLI target parsing for every supported surface kind, plus reject-before-persist coverage for unsupported surface kinds
   - service-level DM pairing enforcement for each existing channel when exact DM routes are allowed
   - exact DM route admission when wildcard DM policy is `pairing`
   - message send or message action behavior
@@ -350,6 +356,7 @@ Carry this forward:
 - define the raw provider id shape before adding the channel; handles are display metadata only and must not be access aliases
 - do not synthesize handles from display names, ids, mention text, URLs, or normalized labels; leave handle empty unless the provider exposes a real handle/username field
 - keep principal examples in `/whoami`, `auth get-permissions`, queue or loop `--sender`, and pairing guidance aligned with that model
+- preserve explicit `dm:` or other target kind through control, route, queue, loop, and message-send paths; for DM-only providers such as current Zalo Bot, reject `group:<id>` before config/session persistence instead of inferring or creating the wrong route
 - resolve the effective direct-message route with the current provider sender id before enforcing `pairing`, `allowlist`, or `disabled`
 - keep wildcard-only DM admission helpers limited to operator summaries or setup guidance; channel services should not use them to decide whether a sender must pair
 - add a provider service test where wildcard DM policy is `pairing`, an exact DM route allows one sender, and the allowed sender is admitted without receiving another pairing code

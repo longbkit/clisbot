@@ -5,7 +5,6 @@ import {
   createBaseBotSchema,
   createBaseDefaults,
   createBaseDefaultsSchema,
-  createGroupDefault,
   createPollingSchema,
 } from "../config/config-schema-base.ts";
 
@@ -24,7 +23,7 @@ const zaloBotChannelSchemaContract = defineChannelSchemaContract({
       polling: pollingSchema.optional(),
     });
     const defaults = createBaseDefaults("polling", {
-      groups: createGroupDefault(),
+      groups: {},
       polling: {
         timeoutSeconds: 20,
         retryDelayMs: 1000,

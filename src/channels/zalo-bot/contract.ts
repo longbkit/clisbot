@@ -1,7 +1,8 @@
 export default {
   channel: "zalo-bot",
   interactionRenderer: "plain",
-  routeIdSyntax: "dm:<id>, dm:*, group:<chatId>, or group:*",
+  routeIdSyntax: "dm:<id> or dm:*",
+  supportsGroups: false,
   supportsTopics: false,
   legacyGroupAliases: [],
   normalizeUserId(providerUserId: string) {

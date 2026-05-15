@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { resolveZaloBotConversationRoute } from "../src/channels/zalo-bot/route-config.ts";
 import { resolveZaloBotConversationTarget } from "../src/channels/zalo-bot/session-routing.ts";
+import { resolveZaloBotSurface } from "../src/channels/zalo-bot/surface.ts";
 import type { LoadedConfig } from "../src/config/core/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/core/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
@@ -84,7 +85,22 @@ function createLoadedConfig(): LoadedConfig {
 }
 
 describe("Zalo Bot route resolution", () => {
-  test("resolves exact group overrides from parent config", () => {
+  test("preserves explicit Zalo Bot target kind instead of inferring from id shape", () => {
+    expect(resolveZaloBotSurface({ rawTarget: "group:room-123" })?.provider).toEqual({
+      chatId: "room-123",
+      chatType: "GROUP",
+    });
+    expect(resolveZaloBotSurface({ rawTarget: "dm:group-looking-user" })?.provider).toEqual({
+      chatId: "group-looking-user",
+      chatType: "PRIVATE",
+    });
+    expect(resolveZaloBotSurface({ rawTarget: "group-looking-user" })?.provider).toEqual({
+      chatId: "group-looking-user",
+      chatType: "PRIVATE",
+    });
+  });
+
+  test("does not admit Zalo Bot groups even if stale group config exists", () => {
     const resolved = resolveZaloBotConversationRoute({
       loadedConfig: createLoadedConfig(),
       chatType: "GROUP",
@@ -93,37 +109,7 @@ describe("Zalo Bot route resolution", () => {
     });
 
     expect(resolved.conversationKind).toBe("group");
-    expect(resolved.status).toBe("admitted");
-    expect(resolved.route?.agentId).toBe("claude");
-    expect(resolved.route?.requireMention).toBe(true);
-    expect(resolved.route?.verbose).toBe("off");
-    expect(resolved.route?.timezone).toBe("Asia/Ho_Chi_Minh");
-  });
-
-  test("merges wildcard group audience into exact Zalo Bot group routes", () => {
-    const resolved = resolveZaloBotConversationRoute({
-      loadedConfig: createLoadedConfig(),
-      chatType: "GROUP",
-      chatId: "group-1",
-      senderId: "user-1",
-    });
-
-    expect(resolved.route?.allowUsers).toEqual(["100", "500"]);
-    expect(resolved.route?.blockUsers).toEqual(["200", "600"]);
-  });
-
-  test("requires an exact shared route when group admission is allowlist", () => {
-    const loadedConfig = createLoadedConfig();
-    delete loadedConfig.raw.bots.zaloBot.default.groups["group-1"];
-
-    const resolved = resolveZaloBotConversationRoute({
-      loadedConfig,
-      chatType: "GROUP",
-      chatId: "group-2",
-      senderId: "user-1",
-    });
-
-    expect(resolved.status).toBe("missing");
+    expect(resolved.status).toBe("unsupported");
     expect(resolved.route).toBeNull();
   });
 

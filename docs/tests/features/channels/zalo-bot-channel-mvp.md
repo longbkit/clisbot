@@ -76,7 +76,7 @@ Expected:
 1. Send a direct operator message:
 
 ```bash
-clisbot-dev message send --channel zalo-bot --target <chatId> --message "hello"
+clisbot-dev message send --channel zalo-bot --target dm:<user-id> --message "hello"
 ```
 
 Expected:
@@ -89,27 +89,12 @@ Guard checks:
 - `--thread-id` must fail for `zalo-bot`
 - `--topic-id` must fail for `zalo-bot`
 
-## Group Route
-
-1. Add a route:
-
-```bash
-clisbot-dev routes add --channel zalo-bot group:<chatId> --bot default
-```
-
-2. Mention the bot in that group.
-
-Expected:
-
-- the group message is admitted under the configured route
-- the agent reply lands back in the same group
-
 ## Media Send
 
 1. Send a message with a remote image URL:
 
 ```bash
-clisbot-dev message send --channel zalo-bot --target <chatId> --message "hello" --file https://example.com/image.jpg
+clisbot-dev message send --channel zalo-bot --target dm:<user-id> --message "hello" --file https://example.com/image.jpg
 ```
 
 Expected:

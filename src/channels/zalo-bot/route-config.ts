@@ -6,20 +6,23 @@ import {
 import {
   buildSurfaceRoute,
   isSurfaceRouteEnabled,
-  mergeSurfaceRouteOverride,
-  type ResolvedSurfaceRouteStatus,
   type SurfaceRoute,
   type SurfaceRouteOverride,
 } from "../config/route-policy.ts";
-import { type ZaloBotConversationKind } from "./session-routing.ts";
 
 export type ZaloBotRoute = SurfaceRoute;
 
-export type ZaloBotResolvedRoute = {
-  conversationKind: ZaloBotConversationKind;
-  route: ZaloBotRoute | null;
-  status: ResolvedSurfaceRouteStatus;
-};
+export type ZaloBotResolvedRoute =
+  | {
+      conversationKind: "dm";
+      route: ZaloBotRoute | null;
+      status: "admitted" | "disabled";
+    }
+  | {
+      conversationKind: "group";
+      route: null;
+      status: "unsupported";
+    };
 
 function buildRoute(
   loadedConfig: LoadedConfig,
@@ -41,42 +44,6 @@ function buildRoute(
     policy: params.policy,
     requireMention: true,
   });
-}
-
-function resolveGroupRoute(
-  loadedConfig: LoadedConfig,
-  chatId: string,
-  botId?: string,
-) {
-  const zaloConfig = resolveZaloBotConfig(loadedConfig.raw.bots.zaloBot, botId);
-  const exactRoute = zaloConfig.groups[chatId];
-  if (zaloConfig.groupPolicy === "disabled") {
-    return { route: null, status: "disabled" as const };
-  }
-  if (zaloConfig.groupPolicy === "allowlist" && !exactRoute) {
-    return { route: null, status: "missing" as const };
-  }
-
-  const route = mergeSurfaceRouteOverride(
-    zaloConfig.groups["*"],
-    exactRoute,
-  );
-  if (!isSurfaceRouteEnabled(route)) {
-    return {
-      route: null,
-      status: route ? "disabled" as const : "missing" as const,
-    };
-  }
-  const enabledRoute = route!;
-
-  return {
-    route: buildRoute(loadedConfig, {
-      route: enabledRoute,
-      policy: enabledRoute.policy === "allowlist" ? "allowlist" : "open",
-      botId,
-    }),
-    status: "admitted" as const,
-  };
 }
 
 function resolveDirectMessageRoute(
@@ -118,14 +85,9 @@ export function resolveZaloBotConversationRoute(params: {
     };
   }
 
-  const shared = resolveGroupRoute(
-    params.loadedConfig,
-    params.chatId,
-    params.botId,
-  );
   return {
     conversationKind: "group" as const,
-    route: shared.route,
-    status: shared.status,
+    route: null,
+    status: "unsupported" as const,
   };
 }

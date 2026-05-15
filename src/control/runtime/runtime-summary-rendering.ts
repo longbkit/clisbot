@@ -376,7 +376,9 @@ function appendChannelSetupNote(
   lines.push(
     `${prefix}    dms: ${channel.directMessagesEnabled ? `enabled (${channel.directMessagesPolicy})` : "disabled"}`,
   );
-  lines.push(`${prefix}    sharedDefault: ${channel.sharedDefaultPolicy ?? "n/a"}`);
+  if (channel.sharedDefaultPolicy) {
+    lines.push(`${prefix}    sharedDefault: ${channel.sharedDefaultPolicy}`);
+  }
   for (const routeLine of guidance.addRouteLines) {
     lines.push(`${prefix}    ${routeLine}`);
   }

@@ -357,11 +357,11 @@ describe("runtime summaries", () => {
     const startText = renderStartSummary(summary);
 
     expect(statusText).toContain("zalo-bot enabled=yes");
-    expect(statusText).toContain("zalo-bot: no explicit group routes are configured yet");
+    expect(statusText).toContain("zalo-bot: no explicit DM routes are configured yet");
     expect(startText).toContain("DM the Zalo Bot first to confirm it responds normally");
-    expect(startText).toContain("routes add --channel zalo-bot group:<chatId> --bot default");
-    expect(startText).toContain("routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>");
-    expect(startText).toContain("Zalo Bot: DM the bot for pairing flow first, then mention it in the target group to verify trigger flow");
+    expect(startText).toContain("routes add --channel zalo-bot dm:<user-id> --bot default");
+    expect(startText).toContain("routes set-agent --channel zalo-bot dm:<user-id> --bot default --agent <id>");
+    expect(startText).toContain("Zalo Bot: DM the bot for pairing flow and queue/loop validation");
     expect(startText).toContain("clisbot pairing approve zalo-bot <code>");
   });
 

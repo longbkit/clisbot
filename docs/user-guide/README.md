@@ -259,7 +259,7 @@ Most-used commands:
 - `clisbot routes add --channel telegram group:-1001234567890 --bot default`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot default`
 - `clisbot routes add --channel telegram dm:* --bot default`
-- `clisbot routes add --channel zalo-bot group:<chatId> --bot default`
+- `clisbot routes add --channel zalo-bot dm:<user-id> --bot default`
 - `clisbot routes set-agent --channel slack group:C1234567890 --bot default --agent support`
 - `clisbot routes set-require-mention --channel telegram group:-1001234567890 --bot default --value false`
 - `clisbot routes set-response-mode --channel slack group:C1234567890 --bot default --mode message-tool`
@@ -267,7 +267,7 @@ Most-used commands:
 
 Important behavior:
 
-- preferred route ids are `group:<id>`, `group:*`, `topic:<chatId>:<topicId>`, and `dm:<id|*>`
+- preferred route ids are channel-scoped: Slack/Telegram shared surfaces use `group:<id>` or `group:*`, Telegram topics use `topic:<chatId>:<topicId>`, and DM-only providers such as Zalo Bot use `dm:<id|*>`
 - stored config uses raw ids plus `*` inside `directMessages` and `groups`
 - legacy Slack `channel:<id>` input is still accepted for compatibility
 - `group:*` is the default multi-user sender policy node of a bot

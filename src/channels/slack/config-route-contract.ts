@@ -4,6 +4,7 @@ export default {
   channel: "slack",
   configBotKey: "slack",
   providerLabel: "Slack",
+  supportsGroups: true,
   supportsTopics: false,
   legacyGroupPolicy: {
     read: (owner: Record<string, unknown>) => owner.channelPolicy,

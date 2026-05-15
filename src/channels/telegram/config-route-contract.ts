@@ -7,6 +7,7 @@ export default {
   channel: "telegram",
   configBotKey: "telegram",
   providerLabel: "Telegram",
+  supportsGroups: true,
   supportsTopics: true,
   createGroupRouteShell: createTopicAwareChannelGroupRouteShell,
   createTopicRouteShell: createTopicChannelRouteShell,

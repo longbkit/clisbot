@@ -135,6 +135,19 @@ export function countConfiguredBotGroupSurfaces<TBot extends { groups?: Record<s
     }, 0);
 }
 
+export function countConfiguredBotDirectMessageSurfaces<TBot extends { directMessages?: Record<string, unknown> }>(
+  providerConfig: Record<string, TBot | unknown>,
+) {
+  return Object.entries(providerConfig)
+    .filter(([botId]) => botId !== "defaults")
+    .reduce((total, [, bot]) => {
+      const directMessages = typeof bot === "object" && bot !== null && "directMessages" in bot
+        ? ((bot.directMessages as Record<string, unknown> | undefined) ?? {})
+        : {};
+      return total + Object.keys(directMessages).filter((routeId) => routeId !== "*").length;
+    }, 0);
+}
+
 export function describeBootstrapToken(
   token: ReturnType<typeof getBootstrapBotToken>,
   fallbackEnvName: string,

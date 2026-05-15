@@ -22,6 +22,7 @@ import {
 } from "./channel-route-contract.ts";
 import {
   channelSupportsRouteTopics,
+  channelSupportsRouteGroups,
   isLegacyGroupRouteAlias,
   renderChannelRouteIdSyntax,
 } from "../../channels/integration/channel-surface-contract-registry.ts";
@@ -179,7 +180,11 @@ export function parseChannelRouteId(provider: Provider, raw: string | undefined)
     throw new Error(`${renderDefaultChannelLabel(provider)} route ids must use ${renderChannelRouteIdSyntax(provider)}.`);
   }
 
-  if (routeId === "*" || routeId === "group:*" || isSharedGroupsWildcardRouteId(routeId)) {
+  const supportsGroups = channelSupportsRouteGroups(provider);
+  if (
+    supportsGroups &&
+    (routeId === "*" || routeId === "group:*" || isSharedGroupsWildcardRouteId(routeId))
+  ) {
     return {
       provider,
       routeId: "group:*",
@@ -212,6 +217,7 @@ export function parseChannelRouteId(provider: Provider, raw: string | undefined)
   }
 
   if (
+    supportsGroups &&
     (kind === "group" || isLegacyGroupRouteAlias(provider, kind ?? "")) &&
     first?.trim()
   ) {
@@ -302,30 +308,32 @@ export function listConfiguredRoutes(
     if (botIdFilter && entry.botId !== botIdFilter) {
       continue;
     }
-    for (const [key, route] of Object.entries(entry.bot.groups ?? {})) {
-      rows.push({
-        channel: entry.channel,
-        botId: entry.botId,
-        routeId: renderRouteId({ provider: entry.channel, storage: "groups", key }),
-        kind: key === getSharedGroupsWildcardRouteId() ? "shared" : "group",
-        route: route as RouteNode,
-      });
-      if (!channelSupportsRouteTopics(entry.channel)) {
-        continue;
-      }
-      for (const [topicId, topic] of Object.entries((route as ChannelGroupRoute).topics ?? {})) {
+    if (channelSupportsRouteGroups(entry.channel)) {
+      for (const [key, route] of Object.entries(entry.bot.groups ?? {})) {
         rows.push({
           channel: entry.channel,
           botId: entry.botId,
-          routeId: renderRouteId({
-            provider: entry.channel,
-            storage: "groups",
-            key,
-            topicId,
-          }),
-          kind: "topic",
-          route: topic,
+          routeId: renderRouteId({ provider: entry.channel, storage: "groups", key }),
+          kind: key === getSharedGroupsWildcardRouteId() ? "shared" : "group",
+          route: route as RouteNode,
         });
+        if (!channelSupportsRouteTopics(entry.channel)) {
+          continue;
+        }
+        for (const [topicId, topic] of Object.entries((route as ChannelGroupRoute).topics ?? {})) {
+          rows.push({
+            channel: entry.channel,
+            botId: entry.botId,
+            routeId: renderRouteId({
+              provider: entry.channel,
+              storage: "groups",
+              key,
+              topicId,
+            }),
+            kind: "topic",
+            route: topic,
+          });
+        }
       }
     }
     for (const [key, route] of Object.entries(entry.bot.directMessages ?? {})) {

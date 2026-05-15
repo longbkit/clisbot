@@ -123,4 +123,61 @@ describe("surface runtime", () => {
 
     expect(notifications).toHaveLength(0);
   });
+
+  test("notifyManagedQueueStart honors exact Zalo Bot DM notification overrides through the plugin seam", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-surface-runtime-"));
+    const loaded = createLoadedConfig(tempDir);
+    loaded.raw.bots.zaloBot.default.surfaceNotifications = {
+      queueStart: "brief",
+      loopStart: "brief",
+    };
+    loaded.raw.bots.zaloBot.default.directMessages = {
+      "*": {
+        enabled: true,
+        policy: "open",
+        allowUsers: [],
+        blockUsers: [],
+      },
+      "user-123": {
+        enabled: true,
+        policy: "open",
+        allowUsers: [],
+        blockUsers: [],
+        surfaceNotifications: {
+          queueStart: "none",
+          loopStart: "brief",
+        },
+      },
+    };
+
+    const runtime = new SurfaceRuntime(loaded);
+    const notifications: SurfaceNotificationRequest[] = [];
+    runtime.registerSurfaceNotificationHandler({
+      platform: "zalo-bot",
+      botId: "default",
+      handler: async (request) => {
+        notifications.push(request);
+      },
+    });
+
+    await runtime.notifyManagedQueueStart(
+      { agentId: "default", sessionKey: "agent:default:zalo-bot:dm:user-123" },
+      createStoredQueueItem({
+        promptText: "ping",
+        createdBy: "user-123",
+        sender: {
+          providerId: "user-123",
+          displayName: "Alice Smith",
+        },
+        surfaceBinding: {
+          platform: "zalo-bot",
+          botId: "default",
+          conversationKind: "dm",
+          chatId: "user-123",
+        },
+      }),
+    );
+
+    expect(notifications).toHaveLength(0);
+  });
 });

@@ -43,7 +43,7 @@ describe("message cli", () => {
     expect(logs[0]).toContain("--render <native|none|html|mrkdwn|blocks>");
     expect(logs[0]).toContain("[<channel child-surface flags>]");
     expect(logs[0]).toContain("Telegram topic id");
-    expect(logs[0]).toContain("Zalo Bot `--target` is the string chat id");
+    expect(logs[0]).toContain("Zalo Bot `--target` accepts `dm:<user-id>`");
     expect(logs[0]).toContain("Render Rules:");
     expect(logs[0]).toContain("Final payload must stay under 4096 chars");
     expect(logs[0]).toContain("Prefer text under 4000 chars");
@@ -61,7 +61,7 @@ describe("message cli", () => {
     expect(text).toContain("blocks: Slack only");
     expect(text).toContain("message send --channel slack --target group:C1234567890 --thread-id 1712345678.123456");
     expect(text).not.toContain("Telegram `--target` is the numeric chat id");
-    expect(text).not.toContain("Zalo Bot `--target` is the string chat id");
+    expect(text).not.toContain("Zalo Bot `--target` accepts");
   });
 
   test("subcommand help renders before channel validation", async () => {
@@ -270,7 +270,7 @@ describe("message cli", () => {
       "--account",
       "default",
       "--target",
-      "user-123",
+      "dm:user-123",
       "--message",
       "hello zalo",
       "--json",
@@ -354,7 +354,7 @@ describe("message cli", () => {
         "--channel",
         "zalo-bot",
         "--target",
-        "group-1",
+        "group:group-1",
         "--message",
         "hello",
       ], deps),

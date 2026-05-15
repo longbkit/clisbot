@@ -32,7 +32,6 @@ import {
   renderFirstOwnerClaimMessage,
 } from "../../auth/owner-claim.ts";
 import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
-import { renderGroupRouteAccessDeniedMessage } from "../config/route-policy.ts";
 import type { ChannelRuntimeLifecycleEvent } from "../integration/channel-plugin.ts";
 import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
 import { buildMentionOnlyFollowUpPrompt } from "../config/mention-follow-up.ts";
@@ -188,7 +187,7 @@ export class ZaloBotPollingService {
       agentId: route.agentId,
       botId: this.botId,
       chatId: message.chat.id,
-      userId: routeInfo.conversationKind === "dm" ? senderId : undefined,
+      userId: senderId,
       conversationKind: routeInfo.conversationKind,
     });
     const attachmentPaths = await resolveZaloBotAttachmentPaths({
@@ -201,78 +200,16 @@ export class ZaloBotPollingService {
       return;
     }
 
-    if (routeInfo.conversationKind === "group") {
-      const sharedAuth = resolveChannelAuth({
-        config: this.loadedConfig.raw,
-        agentId: route.agentId,
-        identity: {
-          platform: "zalo-bot",
-          botId: this.botId,
-          conversationKind: "group",
-          senderId,
-          senderName,
-          chatId: message.chat.id,
-        },
-      });
-      if (
-        !sharedAuth.mayBypassSharedSenderPolicy &&
-        (route.policy === "allowlist" || (route.allowUsers?.length ?? 0) > 0) &&
-        !isChannelSenderAllowed({
-          channel: "zalo-bot",
-          allowFrom: route.allowUsers ?? [],
-          subject: {
-            userId: senderId,
-          },
-        })
-      ) {
-        await postZaloBotText({
-          token: this.botCredentials.botToken,
-          chatId: message.chat.id,
-          text: renderGroupRouteAccessDeniedMessage(),
-        });
-        return;
-      }
+    const directMessages = resolveZaloBotDirectMessageConfig(this.getBotConfig(), senderId);
+    if (!directMessages || directMessages.policy === "disabled") {
+      return;
     }
 
-    if (routeInfo.conversationKind === "dm") {
-      const directMessages = resolveZaloBotDirectMessageConfig(this.getBotConfig(), senderId);
-      if (!directMessages || directMessages.policy === "disabled") {
-        return;
-      }
-
-      let ownerPrincipal: string | undefined;
-      try {
-        const claim = await claimFirstOwnerFromDirectMessage({
-          config: this.loadedConfig.raw,
-          configPath: this.loadedConfig.configPath,
-          identity: {
-            platform: "zalo-bot",
-            botId: this.botId,
-            conversationKind: "dm",
-            senderId,
-            senderName,
-            chatId: message.chat.id,
-          },
-        });
-        ownerPrincipal = claim.claimed ? claim.principal : undefined;
-      } catch (error) {
-        console.error("zalo-bot first-owner claim failed", error);
-      }
-
-      if (ownerPrincipal) {
-        await postZaloBotText({
-          token: this.botCredentials.botToken,
-          chatId: message.chat.id,
-          text: renderFirstOwnerClaimMessage({
-            principal: ownerPrincipal,
-            ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
-          }),
-        });
-      }
-
-      const auth = resolveChannelAuth({
+    let ownerPrincipal: string | undefined;
+    try {
+      const claim = await claimFirstOwnerFromDirectMessage({
         config: this.loadedConfig.raw,
-        agentId: route.agentId,
+        configPath: this.loadedConfig.configPath,
         identity: {
           platform: "zalo-bot",
           botId: this.botId,
@@ -282,40 +219,68 @@ export class ZaloBotPollingService {
           chatId: message.chat.id,
         },
       });
-      if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
-        const allowed = isChannelSenderAllowed({
-          channel: "zalo-bot",
-          allowFrom: directMessages.allowUsers ?? [],
-          subject: {
-            userId: senderId,
-          },
-        });
-        if (!allowed) {
-          if (directMessages.policy === "pairing") {
-            const pairingRequest = await upsertChannelPairingRequest({
-              channel: "zalo-bot",
-              id: senderId,
-              botId: this.botId,
-              meta: {
-                firstName: senderName,
-              },
+      ownerPrincipal = claim.claimed ? claim.principal : undefined;
+    } catch (error) {
+      console.error("zalo-bot first-owner claim failed", error);
+    }
+
+    if (ownerPrincipal) {
+      await postZaloBotText({
+        token: this.botCredentials.botToken,
+        chatId: message.chat.id,
+        text: renderFirstOwnerClaimMessage({
+          principal: ownerPrincipal,
+          ownerClaimWindowMinutes: this.loadedConfig.raw.app.auth.ownerClaimWindowMinutes,
+        }),
+      });
+    }
+
+    const identity = {
+      platform: "zalo-bot" as const,
+      botId: this.botId,
+      conversationKind: "dm" as const,
+      senderId,
+      senderName,
+      chatId: message.chat.id,
+    };
+    const auth = resolveChannelAuth({
+      config: this.loadedConfig.raw,
+      agentId: route.agentId,
+      identity,
+    });
+    if (directMessages.policy !== "open" && !auth.mayBypassPairing) {
+      const allowed = isChannelSenderAllowed({
+        channel: "zalo-bot",
+        allowFrom: directMessages.allowUsers ?? [],
+        subject: {
+          userId: senderId,
+        },
+      });
+      if (!allowed) {
+        if (directMessages.policy === "pairing") {
+          const pairingRequest = await upsertChannelPairingRequest({
+            channel: "zalo-bot",
+            id: senderId,
+            botId: this.botId,
+            meta: {
+              firstName: senderName,
+            },
+          });
+          const pairingReply = buildPairingReplyFromRequest({
+            channel: "zalo-bot",
+            idLine: `Your Zalo user id: ${senderId}`,
+            botId: this.botId,
+            pairingRequest,
+          });
+          if (pairingReply) {
+            await postZaloBotText({
+              token: this.botCredentials.botToken,
+              chatId: message.chat.id,
+              text: pairingReply,
             });
-            const pairingReply = buildPairingReplyFromRequest({
-              channel: "zalo-bot",
-              idLine: `Your Zalo user id: ${senderId}`,
-              botId: this.botId,
-              pairingRequest,
-            });
-            if (pairingReply) {
-              await postZaloBotText({
-                token: this.botCredentials.botToken,
-                chatId: message.chat.id,
-                text: pairingReply,
-              });
-            }
           }
-          return;
         }
+        return;
       }
     }
 
@@ -382,19 +347,8 @@ export class ZaloBotPollingService {
     await this.activityStore.record({
       agentId: route.agentId,
       channel: "zalo-bot",
-      surface:
-        routeInfo.conversationKind === "dm"
-          ? "dm"
-          : `group:${message.chat.id}`,
+      surface: "dm",
     });
-    const identity = {
-      platform: "zalo-bot" as const,
-      botId: this.botId,
-      conversationKind: routeInfo.conversationKind,
-      senderId,
-      senderName,
-      chatId: message.chat.id,
-    };
     void recordSurfaceDirectoryIdentity({
       stateDir: this.loadedConfig.stateDir,
       identity,
@@ -402,11 +356,6 @@ export class ZaloBotPollingService {
     const cliTool =
       getAgentEntry(this.loadedConfig, route.agentId)?.cli ??
       this.loadedConfig.raw.agents.defaults.cli;
-    const auth = resolveChannelAuth({
-      config: this.loadedConfig.raw,
-      agentId: route.agentId,
-      identity,
-    });
     const protectedControlMutationRule = auth.mayManageProtectedResources
       ? undefined
       : DEFAULT_PROTECTED_CONTROL_RULE;

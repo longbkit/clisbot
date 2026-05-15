@@ -6,7 +6,7 @@ Add one explicit target normalization seam for `zalo-bot` operator send and repl
 
 ## Status
 
-Planned
+Done
 
 ## Why
 
@@ -70,11 +70,11 @@ This is both a logic risk and a product mental-model risk.
 
 ## Validation Notes
 
-When implementation happens later, verify:
+Implemented validation covers:
 
-- `message send --channel zalo-bot` behaves consistently for DM and group targets
-- reply-target recording lands in the correct session kind
-- docs and smoke tests match the real accepted target forms
+- `message send --channel zalo-bot --target dm:<user-id>` strips the operator prefix before provider send and records the DM reply target.
+- `routes add --channel zalo-bot group:<chat-id>`, `message send --channel zalo-bot --target group:<chat-id>`, `queues create --channel zalo-bot --target group:<chat-id>`, and `loops create --channel zalo-bot --target group:<chat-id>` are rejected because current Zalo Bot is DM-only.
+- docs and smoke tests use explicit `dm:` forms for current Zalo Bot operator flows.
 
 ## Exit Criteria
 

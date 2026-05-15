@@ -151,7 +151,7 @@ describe("routes cli", () => {
     });
   });
 
-  test("adds a zalo-bot group route and allows route-local overrides", async () => {
+  test("adds a zalo-bot DM route and allows route-local overrides", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -162,7 +162,7 @@ describe("routes cli", () => {
       "add",
       "--channel",
       "zalo-bot",
-      "group:group-123",
+      "dm:user-123",
       "--bot",
       "default",
       "--policy",
@@ -172,7 +172,7 @@ describe("routes cli", () => {
       "set-response-mode",
       "--channel",
       "zalo-bot",
-      "group:group-123",
+      "dm:user-123",
       "--bot",
       "default",
       "--mode",
@@ -182,7 +182,7 @@ describe("routes cli", () => {
       "set-timezone",
       "--channel",
       "zalo-bot",
-      "group:group-123",
+      "dm:user-123",
       "--bot",
       "default",
       "Asia/Ho_Chi_Minh",
@@ -191,7 +191,7 @@ describe("routes cli", () => {
       "set-agent",
       "--channel",
       "zalo-bot",
-      "group:group-123",
+      "dm:user-123",
       "--bot",
       "default",
       "--agent",
@@ -199,9 +199,9 @@ describe("routes cli", () => {
     ]);
 
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-    expect(rawConfig.bots.zaloBot.default.groups["group-123"]).toEqual({
+    expect(rawConfig.bots.zaloBot.default.directMessages["user-123"]).toEqual({
       enabled: true,
-      requireMention: true,
+      requireMention: false,
       allowUsers: [],
       blockUsers: [],
       allowBots: false,
@@ -404,7 +404,7 @@ describe("routes cli", () => {
     expect(rawConfig.bots.telegram.default.groups["*"].blockUsers).toEqual(["1276408333"]);
   });
 
-  test("lists zalo-bot routes alongside other providers", async () => {
+  test("lists zalo-bot DM routes alongside other providers", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
@@ -415,7 +415,7 @@ describe("routes cli", () => {
       "add",
       "--channel",
       "zalo-bot",
-      "group:group-123",
+      "dm:user-123",
       "--bot",
       "default",
       "--policy",
@@ -429,7 +429,30 @@ describe("routes cli", () => {
 
     await runRoutesCli(["list", "--channel", "zalo-bot"]);
 
-    expect(output.join("\n")).toContain("zalo-bot/default/group:group-123 enabled=true");
+    expect(output.join("\n")).toContain("zalo-bot/default/dm:user-123 enabled=true");
+    expect(output.join("\n")).not.toContain("zalo-bot/default/group:");
+  });
+
+  test("rejects zalo-bot group routes before writing config", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await expect(runRoutesCli([
+      "add",
+      "--channel",
+      "zalo-bot",
+      "group:group-123",
+      "--bot",
+      "default",
+      "--policy",
+      "open",
+    ])).rejects.toThrow("Zalo Bot route ids must use dm:<id> or dm:*.");
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.zaloBot.default.groups["group-123"]).toBeUndefined();
   });
 
   test("allows exact DM routes to carry admission config in the new shape", async () => {
@@ -527,7 +550,7 @@ describe("routes cli", () => {
     const text = lines.join("\n");
     expect(text).toContain("Canonical CLI ids are `dm:<id>`, `dm:*`, `group:<id>`, `group:*`");
     expect(text).toContain("routes add --channel <channel-name> <dm:*|dm:<id>>");
-    expect(text).toContain("routes add --channel zalo-bot group:<chatId>");
+    expect(text).toContain("routes add --channel zalo-bot dm:<user-id>");
     expect(text).toContain("Supported channels: slack, telegram, zalo-bot.");
     expect(text).toContain("Shared group policy values are `disabled`, `allowlist`, and `open`.");
     expect(text).toContain("DM wildcard policy values are `disabled`, `pairing`, `allowlist`, and `open`.");
@@ -549,6 +572,24 @@ describe("routes cli", () => {
     expect(text).toContain("routes set-timezone --channel telegram group:-1001234567890 --bot default Asia/Ho_Chi_Minh");
     expect(text).not.toContain("routes add --channel slack group:<id>");
     expect(text).not.toContain("routes add --channel zalo-bot group:<chatId>");
+  });
+
+  test("help scopes zalo-bot routes to DM-only syntax", async () => {
+    const lines: string[] = [];
+    console.log = ((line?: unknown) => {
+      lines.push(String(line ?? ""));
+    }) as typeof console.log;
+
+    await runRoutesCli(["--help", "--channel", "zalo-bot"]);
+
+    const text = lines.join("\n");
+    expect(text).toContain("routes add --channel zalo-bot dm:<user-id>");
+    expect(text).toContain("Channel route ids for zalo-bot use dm:<id> or dm:*.");
+    expect(text).toContain("This channel does not support shared group routes.");
+    expect(text).not.toContain("Backward-compatible input still accepts legacy ids");
+    expect(text).not.toContain("routes add --channel zalo-bot group:*");
+    expect(text).not.toContain("routes add --channel zalo-bot group:<chatId>");
+    expect(text).not.toContain("You are not allowed to use this bot in this group.");
   });
 
   test("subcommand help renders before channel validation", async () => {

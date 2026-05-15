@@ -4,6 +4,7 @@ import { resolveTelegramConversationRoute } from "../../src/channels/telegram/ro
 import { resolveTelegramConversationTarget } from "../../src/channels/telegram/session-routing.ts";
 import { resolveZaloBotConversationRoute } from "../../src/channels/zalo-bot/route-config.ts";
 import { resolveZaloBotConversationTarget } from "../../src/channels/zalo-bot/session-routing.ts";
+import { resolveZaloBotSurface } from "../../src/channels/zalo-bot/surface.ts";
 import type { ChannelPlugin } from "../../src/channels/integration/channel-plugin.ts";
 import type { ParsedMessageCommand } from "../../src/channels/message/message-command.ts";
 import { getCommandThreadId, getCommandTopicId } from "../../src/channels/message/message-surface-helpers.ts";
@@ -449,13 +450,18 @@ export function createDependencies() {
         },
         renderHealthSummary: () => "unused",
         renderActiveHealthSummary: () => "unused",
-        runMessageCommand: async (_loadedConfig: any, command: ParsedMessageCommand) => {
+        runMessageCommand: async (_loadedConfig: any, command: ParsedMessageCommand, surface) => {
+          const resolvedSurface = resolveZaloBotSurface({
+            rawTarget: command.target,
+            childSurface: command.childSurface,
+            surface: surface?.channel === "zalo-bot" ? surface : null,
+          });
           const params =
             command.action === "read" || command.action === "reactions" || command.action === "search"
               ? command.action
               : {
                   botToken: "zalo-bot-test",
-                  target: command.target!,
+                  target: resolvedSurface?.provider.chatId ?? command.target!,
                   threadId: undefined,
                   replyTo: command.replyTo,
                   message: command.message,
@@ -493,19 +499,22 @@ export function createDependencies() {
           };
         },
         resolveMessageReplyTarget: ({ loadedConfig, command, botId, surface }) => {
-          const rawTarget = surface?.channel === "zalo-bot" ? surface.provider.chatId : command.target;
-          if (!rawTarget) {
-            return null;
-          }
-          const chatId = rawTarget.trim();
-          if (!chatId) {
+          const resolvedSurface = resolveZaloBotSurface({
+            rawTarget: command.target,
+            childSurface: command.childSurface,
+            surface: surface?.channel === "zalo-bot" ? surface : null,
+          });
+          if (!resolvedSurface) {
             return null;
           }
           const resolved = resolveZaloBotConversationRoute({
             loadedConfig,
-            chatType: chatId.startsWith("group") ? "GROUP" : "PRIVATE",
-            chatId,
-            senderId: chatId.startsWith("group") ? undefined : chatId,
+            chatType: resolvedSurface.provider.chatType,
+            chatId: resolvedSurface.provider.chatId,
+            senderId:
+              resolvedSurface.provider.chatType === "GROUP"
+                ? undefined
+                : resolvedSurface.provider.chatId,
             botId,
           });
           if (!resolved.route) {
@@ -515,27 +524,19 @@ export function createDependencies() {
             loadedConfig,
             agentId: resolved.route.agentId,
             botId,
-            chatId,
-            userId: resolved.conversationKind === "dm" ? chatId : undefined,
+            chatId: resolvedSurface.provider.chatId,
+            userId:
+              resolved.conversationKind === "dm"
+                ? resolvedSurface.provider.chatId
+                : undefined,
             conversationKind: resolved.conversationKind,
           });
         },
         resolveMessageSurface: (command) => {
-          if (!command.target) {
-            return null;
-          }
-          const chatId = command.target.trim();
-          const isGroup = chatId.startsWith("group");
-          return {
-            channel: "zalo-bot" as const,
+          return resolveZaloBotSurface({
             rawTarget: command.target,
-            surfaceKind: isGroup ? "group" : "dm",
-            surfaceId: `zalo-bot:${isGroup ? "group" : "dm"}:${chatId}`,
-            provider: {
-              chatId,
-              chatType: isGroup ? "GROUP" as const : "PRIVATE" as const,
-            },
-          };
+            childSurface: command.childSurface,
+          });
         },
       },
     ] satisfies ChannelPlugin[],

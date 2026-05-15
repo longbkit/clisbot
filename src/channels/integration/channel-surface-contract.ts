@@ -5,6 +5,7 @@ export type ChannelSurfaceContract = {
   channel: ChannelId;
   interactionRenderer: ChannelInteractionRenderer;
   routeIdSyntax: string;
+  supportsGroups: boolean;
   supportsTopics: boolean;
   legacyGroupAliases: readonly string[];
   normalizeUserId(providerUserId: string): string;

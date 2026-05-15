@@ -42,23 +42,10 @@ function resolveZaloBotTargetBinding(
   }
 
   if (kind === "group") {
-    const chatId = routeId?.trim();
-    if (!chatId) {
-      throw new Error("zalo-bot target must use group:<chatId> or dm:<id>.");
-    }
-    const route = bot.groups[chatId];
-    if (!route) {
-      throw new Error(`Route not configured yet: zalo-bot group:${chatId}. Add the route first.`);
-    }
-    return {
-      label: `zalo-bot group:${chatId}`,
-      getExactSource: () => route,
-      getFallbackSources: () => [bot],
-      ensureWritableSource: () => route,
-    };
+    throw new Error("zalo-bot targets support DM routes only; use dm:<id|*>.");
   }
 
-  throw new Error("zalo-bot target must use dm:<id|*> or group:<chatId>.");
+  throw new Error("zalo-bot target must use dm:<id|*>.");
 }
 
 export const zaloBotSurfaceConfigTargetContract = {
@@ -71,7 +58,7 @@ export const zaloBotSurfaceConfigTargetContract = {
     target:
       identity.conversationKind === "dm"
         ? `dm:${identity.senderId ?? identity.chatId ?? "*"}`
-        : `group:${identity.chatId ?? ""}`,
+        : undefined,
   }),
 } satisfies ChannelSurfaceConfigTargetContract;
 

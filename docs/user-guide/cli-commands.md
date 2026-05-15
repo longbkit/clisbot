@@ -185,8 +185,7 @@ Examples:
 - one Telegram group under one Telegram bot
 - one Telegram topic inside one Telegram group under one Telegram bot
 - one Telegram DM fallback or one specific Telegram DM peer under one Telegram bot
-- one Zalo group under one Zalo Bot
-- one Zalo DM fallback or one specific Zalo DM peer under one Zalo Bot
+- one Zalo Bot DM fallback or one specific Zalo Bot DM peer
 
 Notes:
 
@@ -205,8 +204,6 @@ Route ids:
 - Shared default fine-grain route: `group:*`
 - Telegram direct message fallback: `dm:*`
 - Telegram specific DM peer: `dm:1276408333`
-- Zalo group: `group:group-123`
-- Shared default fine-grain route: `group:*`
 - Zalo direct message fallback: `dm:*`
 - Zalo specific DM peer: `dm:aaa741c34d8fa4d1fd9e`
 
@@ -215,7 +212,7 @@ Notes:
 - canonical CLI shared wildcard route id is `group:*`
 - canonical stored wildcard key under a bot is `groups["*"]`
 - legacy shorthand `*`, old `groups:*`, and Slack `channel:<id>` input are still accepted for compatibility
-- canonical operator naming still treats `group:<id>` as the preferred multi-user route id across providers
+- canonical operator naming treats `group:<id>` as the preferred multi-user route id only for providers that support shared surfaces; Zalo Bot is DM-only
 - `group:*` is the bot default multi-user sender policy node and should be updated, not treated as removable
 - `clisbot routes --help --channel <channel-name>` prints channel-scoped route syntax and examples
 
@@ -224,7 +221,7 @@ Core commands:
 - `clisbot routes list [--channel <channel-name>] [--bot <id>] [--json]`
 - `clisbot routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
-- `clisbot routes add --channel zalo-bot <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
+- `clisbot routes add --channel zalo-bot <dm:*|dm:<id>> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes enable --channel <channel-name> <route-id> [--bot <id>]`
 - `clisbot routes disable --channel <channel-name> <route-id> [--bot <id>]`
 - `clisbot routes remove --channel <channel-name> <route-id> [--bot <id>]`
@@ -255,7 +252,7 @@ Core commands:
 
 Policy rules:
 
-- for Slack public channels, Slack groups, Telegram groups, Telegram topics, and Zalo groups, route policy is one of:
+- for Slack public channels, Slack groups, Telegram groups, and Telegram topics, route policy is one of:
   - `disabled`
   - `allowlist`
   - `open`
@@ -311,7 +308,7 @@ Examples:
 - `clisbot routes add --channel slack dm:U_OWNER --bot support`
 - `clisbot routes add --channel telegram group:-1001234567890`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot support --require-mention false`
-- `clisbot routes add --channel zalo-bot group:group-123 --bot default --require-mention true`
+- `clisbot routes add --channel zalo-bot dm:user-123 --bot default --policy open`
 - `clisbot routes set-agent --channel slack group:C_GENERAL --agent product`
 - `clisbot routes set-require-mention --channel telegram topic:-1001234567890:42 --value false`
 - `clisbot routes set-allow-bots --channel telegram group:-1001234567890 --bot alerts --value true`

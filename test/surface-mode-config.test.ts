@@ -99,7 +99,7 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
     ).toBe("steer");
   });
 
-  test("zalo-bot targets resolve dm and group mode overrides without falling back to telegram", () => {
+  test("zalo-bot targets resolve DM mode overrides without falling back to telegram", () => {
     const config = createConfig();
     config.bots.zaloBot.default.directMessages["*"] = {
       enabled: true,
@@ -108,15 +108,6 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
       blockUsers: [],
       streaming: "latest",
     };
-    config.bots.zaloBot.default.groups.g123 = {
-      enabled: true,
-      requireMention: false,
-      allowBots: true,
-      allowUsers: [],
-      blockUsers: [],
-      responseMode: "message-tool",
-    };
-
     expect(resolveConfiguredSurfaceModeTarget(config, "streaming", {
       channel: "zalo-bot",
       botId: "default",
@@ -128,14 +119,13 @@ describe("resolveConfiguredSurfaceModeTarget", () => {
       botId: "default",
       target: "dm:user-123",
     }).set("off");
-    resolveConfiguredSurfaceModeTarget(config, "responseMode", {
+
+    expect(config.bots.zaloBot.default.directMessages["user-123"]?.streaming).toBe("off");
+    expect(() => resolveConfiguredSurfaceModeTarget(config, "responseMode", {
       channel: "zalo-bot",
       botId: "default",
       target: "group:g123",
-    }).set("capture-pane");
-
-    expect(config.bots.zaloBot.default.directMessages["user-123"]?.streaming).toBe("off");
-    expect(config.bots.zaloBot.default.groups.g123?.responseMode).toBe("capture-pane");
+    })).toThrow("zalo-bot targets support DM routes only");
   });
 
   test("buildConfiguredTargetFromIdentity keeps zalo-bot surfaces on zalo-bot targets", () => {

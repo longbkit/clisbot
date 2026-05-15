@@ -85,17 +85,10 @@ Routes live under that bot.
         "defaultBotId": "default",
         "mode": "polling",
         "dmPolicy": "pairing",
-        "groupPolicy": "allowlist",
         "directMessages": {
           "*": {
             "enabled": true,
             "policy": "pairing"
-          }
-        },
-        "groups": {
-          "*": {
-            "enabled": true,
-            "policy": "open"
           }
         }
       },
@@ -104,9 +97,7 @@ Routes live under that bot.
         "agentId": "default",
         "mode": "polling",
         "dmPolicy": "pairing",
-        "groupPolicy": "allowlist",
-        "directMessages": {},
-        "groups": {}
+        "directMessages": {}
       }
     }
   }
@@ -116,11 +107,11 @@ Routes live under that bot.
 ## Important Rules
 
 - stored config uses raw ids plus `*` inside `directMessages` and `groups`
-- CLI still uses `dm:<id>` and `group:<id>`
+- CLI route ids are channel-scoped; Slack/Telegram use `group:<id>` for shared surfaces, while Zalo Bot uses DM routes only
 - `dmPolicy` is a quick alias for the wildcard DM default
 - Slack `channelPolicy` and `groupPolicy` control shared-surface admission
 - Telegram `groupPolicy` controls Telegram group admission
-- Zalo Bot `groupPolicy` controls group admission
+- Zalo Bot is DM-only in the current implementation; configure `dmPolicy` and `directMessages` for access
 - `groups["*"].policy` controls the default sender policy inside admitted groups
 - `disabled` means silent, even for owner/admin
 
@@ -132,7 +123,7 @@ Routes live under that bot.
 - exact DM routes may carry admission config as well as behavior overrides
 - bot-level defaults answer "what usually happens under this bot"; exact routes answer "what is special for this one surface"
 - exact group/channel/topic routes should omit `policy` when they should inherit `groups["*"].policy`
-- Zalo Bot has no topic/thread model, so operator routing stays at `dm:<id>` or `group:<id>`
+- Zalo Bot has no topic/thread/group routing model in the current implementation; use `dm:<id>` or `dm:*`
 
 ## Common Commands
 
@@ -149,7 +140,7 @@ clisbot bots set-dm-policy --channel telegram --bot default --policy pairing
 clisbot bots set-dm-policy --channel zalo-bot --bot default --policy pairing
 clisbot bots set-group-policy --channel slack --bot default --policy allowlist
 clisbot routes set-policy --channel slack group:C1234567890 --bot default --policy allowlist
-clisbot routes add --channel zalo-bot group:<chatId> --bot default
+clisbot routes add --channel zalo-bot dm:<user-id> --bot default
 ```
 
 ## Credential Sources

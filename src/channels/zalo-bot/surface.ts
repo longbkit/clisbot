@@ -12,6 +12,28 @@ export type ZaloBotResolvedMessageSurface = ResolvedMessageSurface<{
   channel: "zalo-bot";
 };
 
+function parseZaloBotTarget(rawTarget: string) {
+  const target = rawTarget.trim();
+  if (!target) {
+    return null;
+  }
+  const [kind, routeId] = target.split(":", 2);
+  if (kind === "dm" || kind === "group") {
+    const chatId = routeId?.trim();
+    if (!chatId) {
+      return null;
+    }
+    return {
+      chatId,
+      chatType: kind === "group" ? ("GROUP" as const) : ("PRIVATE" as const),
+    };
+  }
+  return {
+    chatId: target,
+    chatType: "PRIVATE" as const,
+  };
+}
+
 export function resolveZaloBotSurface(params: {
   rawTarget?: string;
   childSurface?: MessageChildSurfaceSelector;
@@ -24,21 +46,21 @@ export function resolveZaloBotSurface(params: {
     return null;
   }
 
-  const chatId = params.rawTarget.trim();
-  if (!chatId) {
+  const target = parseZaloBotTarget(params.rawTarget);
+  if (!target) {
     return null;
   }
 
-  const isGroup = chatId.startsWith("g");
+  const isGroup = target.chatType === "GROUP";
   return {
     channel: "zalo-bot",
     rawTarget: params.rawTarget,
     surfaceKind: isGroup ? "group" : "dm",
-    surfaceId: `zalo-bot:${isGroup ? "group" : "dm"}:${chatId}`,
+    surfaceId: `zalo-bot:${isGroup ? "group" : "dm"}:${target.chatId}`,
     childSurface: params.childSurface,
     provider: {
-      chatId,
-      chatType: isGroup ? "GROUP" : "PRIVATE",
+      chatId: target.chatId,
+      chatType: target.chatType,
     },
   };
 }

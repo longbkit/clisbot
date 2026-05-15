@@ -453,6 +453,39 @@ describe("queues cli", () => {
     expect(item.sender.senderId).toBe("zalo-bot:user-123");
   });
 
+  test("rejects zalo-bot group queue target before persisting", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-zalo-group-"));
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    const config = buildConfig({
+      socketPath: join(tempDir, "clisbot.sock"),
+      storePath,
+      workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+    });
+    config.bots.telegram.defaults.enabled = false;
+    config.bots.zaloBot.defaults.enabled = true;
+    writeFileSync(process.env.CLISBOT_CONFIG_PATH, JSON.stringify(config, null, 2));
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+
+    await expect(runQueuesCli([
+      "create",
+      "--channel",
+      "zalo-bot",
+      "--target",
+      "group:room-123",
+      "--sender",
+      "zalo-bot:user-123",
+      "review",
+      "zalo",
+      "group",
+      "queue",
+    ], noQueueNotification)).rejects.toThrow("Zalo Bot control targets support DM surfaces only.");
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    expect(store["agent:default:zalo-bot:group:room-123"]).toBeUndefined();
+    expect(store["agent:default:zalo-bot:dm:room-123"]).toBeUndefined();
+  });
+
   test("create rejects --surface before persisting", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-queues-cli-surface-create-"));
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");

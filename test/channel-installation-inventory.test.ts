@@ -55,6 +55,13 @@ describe("channel installation inventory", () => {
     for (const contract of CHANNEL_PAIRING_ACCESS_CONTRACTS) {
       expect(typeof contract.normalizeApprovedPairingId).toBe("function");
     }
+    for (const routeContract of CHANNEL_ROUTE_CONTRACTS) {
+      const surfaceContract = CHANNEL_SURFACE_CONTRACTS.find(
+        (contract) => contract.channel === routeContract.channel,
+      );
+      expect(surfaceContract?.supportsGroups).toBe(routeContract.supportsGroups);
+      expect(surfaceContract?.supportsTopics).toBe(routeContract.supportsTopics);
+    }
 
     expect(listChannelPlugins()).toHaveLength(directories.length);
     expect(new Set(listChannelPlugins().map((plugin) => plugin.id)).size).toBe(directories.length);

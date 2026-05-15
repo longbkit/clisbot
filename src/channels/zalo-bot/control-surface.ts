@@ -33,11 +33,14 @@ export function resolveZaloBotControlSurfaceContext(params: {
   botId?: string;
 }): ChannelControlSurfaceContext | null {
   const surface = resolveZaloBotSurface({
-    rawTarget: normalizeZaloBotControlTarget(params.target),
+    rawTarget: params.target,
     childSurface: params.childSurface,
   });
   if (!surface) {
     return null;
+  }
+  if (surface.provider.chatType !== "PRIVATE") {
+    throw new Error("Zalo Bot control targets support DM surfaces only.");
   }
 
   const botId = resolveZaloBotId(params.loadedConfig.raw.bots.zaloBot, params.botId);
@@ -45,7 +48,7 @@ export function resolveZaloBotControlSurfaceContext(params: {
     loadedConfig: params.loadedConfig,
     chatType: surface.provider.chatType,
     chatId: surface.provider.chatId,
-    senderId: surface.provider.chatType === "GROUP" ? undefined : surface.provider.chatId,
+    senderId: surface.provider.chatId,
     botId,
   });
   if (!routeInfo.route) {
@@ -100,17 +103,6 @@ export function resolveZaloBotControlSurfaceContext(params: {
   };
 }
 
-function normalizeZaloBotControlTarget(rawTarget: string) {
-  const target = rawTarget.trim();
-  if (target.startsWith("dm:")) {
-    return target.slice("dm:".length).trim();
-  }
-  if (target.startsWith("group:")) {
-    return target.slice("group:".length).trim();
-  }
-  return target;
-}
-
 function resolveZaloBotSurfaceNotifications(identity: ChannelIdentity, loadedConfig: LoadedConfig) {
   const botId = resolveZaloBotId(
     loadedConfig.raw.bots.zaloBot,
@@ -129,7 +121,6 @@ function resolveZaloBotSurfaceNotifications(identity: ChannelIdentity, loadedCon
   }
   return {
     ...base,
-    ...(channelConfig.groups[identity.chatId?.trim() ?? ""]?.surfaceNotifications ?? {}),
   };
 }
 

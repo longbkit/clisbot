@@ -102,36 +102,35 @@ export const zaloBotChannelPlugin: ChannelPlugin = {
     return {
       dmFirstLine: "DM the Zalo Bot first to confirm it responds normally",
       pairingCodeLine: "Send a direct message (DM) to the Zalo Bot. Send `hi` to receive a pairing code.",
-      onboardingLine:
-        "Zalo Bot: DM the bot for pairing flow first, then mention it in the target group to verify trigger flow",
-      setupMissingLine: "zalo-bot: no explicit group routes are configured yet",
+      onboardingLine: "Zalo Bot: DM the bot for pairing flow and queue/loop validation",
+      setupMissingLine: "zalo-bot: no explicit DM routes are configured yet",
       addRouteLines: [
-        `add group: ${renderCliCommand("routes add --channel zalo-bot group:<chatId> --bot default", { inline: true })}`,
+        `add DM: ${renderCliCommand("routes add --channel zalo-bot dm:<user-id> --bot default", { inline: true })}`,
       ],
       overrideLine:
-        `optional agent override if that route should use a different agent than the one currently assigned to that bot by default: ${renderCliCommand("routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>", { inline: true })}`,
+        `optional agent override if that route should use a different agent than the one currently assigned to that bot by default: ${renderCliCommand("routes set-agent --channel zalo-bot dm:<user-id> --bot default --agent <id>", { inline: true })}`,
     };
   },
   get controlHelp() {
     return {
       message: {
         targetLines: [
-          "Zalo Bot `--target` is the string chat id",
+          "Zalo Bot `--target` accepts `dm:<user-id>`; raw ids are treated as DM-compatible send targets",
         ],
         renderLines: [
           "  - Zalo Bot native: Markdown/plain -> readable plain text",
         ],
         exampleLines: [
-          `  ${renderCliCommand("message send --channel zalo-bot --target user-123 --message \"Status\"")}`,
+          `  ${renderCliCommand("message send --channel zalo-bot --target dm:user-123 --message \"Status\"")}`,
         ],
       },
       routes: {
         addSyntaxLines: [
-          `  ${renderCliCommand("routes add --channel zalo-bot group:<chatId> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
+          `  ${renderCliCommand("routes add --channel zalo-bot dm:<user-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
         ],
         exampleLines: [
-          `  ${renderCliCommand("routes add-allow-user --channel zalo-bot group:* --bot default --user 2314022953510474396")}`,
-          `  ${renderCliCommand("routes set-timezone --channel zalo-bot group:group-123 --bot default Asia/Ho_Chi_Minh")}`,
+          `  ${renderCliCommand("routes add --channel zalo-bot dm:user-123 --bot default --policy open")}`,
+          `  ${renderCliCommand("routes set-timezone --channel zalo-bot dm:user-123 --bot default Asia/Ho_Chi_Minh")}`,
         ],
       },
     };
@@ -205,7 +204,7 @@ export const zaloBotChannelPlugin: ChannelPlugin = {
   resolveControlSurfaceContext: (params) => resolveZaloBotControlSurfaceContext(params),
   resolveBoundSurfaceRuntimeContext: (params) => resolveZaloBotBoundSurfaceRuntimeContext(params),
   renderControlTargetingHelpLines: () => [
-    "  - Zalo Bot `--target` accepts `dm:<user-id>` or `group:<chat-id>`",
+    "  - Zalo Bot `--target` accepts `dm:<user-id>` for DM surfaces",
     "  - Zalo Bot does not support `--thread-id` or `--topic-id`",
     "  - `--sender <principal>` should use `zalo-bot:<user-id>`",
   ],

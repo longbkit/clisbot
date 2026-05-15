@@ -1,6 +1,8 @@
 import { renderCliCommand } from "./cli-name.ts";
 import {
+  channelSupportsRouteGroups,
   renderCanonicalRouteIdList,
+  renderChannelRouteIdSyntax,
   renderLegacyCompatibleRouteInputList,
 } from "../../channels/integration/channel-surface-contract-registry.ts";
 import {
@@ -25,6 +27,8 @@ function renderRouteExampleLines(channel?: MessageChannel) {
 
 export function renderRoutesHelp(channel?: MessageChannel) {
   const channelName = renderChannelNamePlaceholder();
+  const showGroupRoutes = !channel || channelSupportsRouteGroups(channel);
+  const legacyCompatibleRouteInputList = renderLegacyCompatibleRouteInputList(channel);
   return [
     renderCliCommand("routes"),
     "",
@@ -33,7 +37,9 @@ export function renderRoutesHelp(channel?: MessageChannel) {
     `  ${renderCliCommand("routes help")}`,
     `  ${renderCliCommand(`routes list [--channel ${channelName}] [--bot <id>] [--json]`)}`,
     `  ${renderCliCommand(`routes add --channel ${channelName} <dm:*|dm:<id>> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`)}`,
-    `  ${renderCliCommand(`routes add --channel ${channelName} group:* [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`)}`,
+    ...(showGroupRoutes
+      ? [`  ${renderCliCommand(`routes add --channel ${channelName} group:* [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`)}`]
+      : []),
     ...renderRouteAddSyntaxLines(channel),
     `  ${renderCliCommand(`routes get --channel ${channelName} <route-id> [--bot <id>] [--json]`)}`,
     `  ${renderCliCommand(`routes enable --channel ${channelName} <route-id> [--bot <id>]`)}`,
@@ -68,21 +74,33 @@ export function renderRoutesHelp(channel?: MessageChannel) {
     `  ${renderCliCommand(`routes clear-timezone --channel ${channelName} <route-id> [--bot <id>]`)}`,
     "",
     "Notes:",
-    `  - Canonical CLI ids are ${renderCanonicalRouteIdList()}.`,
+    channel
+      ? `  - Channel route ids for ${channel} use ${renderChannelRouteIdSyntax(channel)}.`
+      : `  - Canonical CLI ids are ${renderCanonicalRouteIdList()}.`,
     "  - Inside bot config, canonical stored keys are raw ids plus `*`.",
-    `  - Backward-compatible input still accepts legacy ids such as ${renderLegacyCompatibleRouteInputList()}.`,
-    "  - Shared group policy values are `disabled`, `allowlist`, and `open`.",
+    ...(legacyCompatibleRouteInputList
+      ? [`  - Backward-compatible input still accepts legacy ids such as ${legacyCompatibleRouteInputList}.`]
+      : []),
+    ...(showGroupRoutes ? ["  - Shared group policy values are `disabled`, `allowlist`, and `open`."] : []),
     "  - DM wildcard policy values are `disabled`, `pairing`, `allowlist`, and `open`.",
     `  - ${renderSupportedChannelsNote()}`,
     `  - use ${renderCliCommand(`routes --help --channel ${channelName}`)} for channel-specific route syntax and examples`,
     "  - `pairing approve <channel> <code>` writes the approved sender into the requesting bot's `dm:*` allowUsers.",
-    "  - the provider's shared multi-user admission policy controls which groups/channels/topics are admitted; `group:*` controls the default sender policy inside admitted multi-user surfaces.",
-    "  - With default group admission `allowlist`, adding `group:<id>` makes that group usable immediately by inheriting `group:*` sender policy.",
+    ...(showGroupRoutes
+      ? [
+          "  - the provider's shared multi-user admission policy controls which groups/channels/topics are admitted; `group:*` controls the default sender policy inside admitted multi-user surfaces.",
+          "  - With default group admission `allowlist`, adding `group:<id>` makes that group usable immediately by inheriting `group:*` sender policy.",
+        ]
+      : ["  - This channel does not support shared group routes."]),
     "  - `routes add` can set `--policy`, `--require-mention`, and `--allow-bots` in the same command.",
-    "  - Use `group:*` with `add-allow-user` when one user should be allowed in every admitted group under that bot.",
+    ...(showGroupRoutes ? ["  - Use `group:*` with `add-allow-user` when one user should be allowed in every admitted group under that bot."] : []),
     "  - `policy: disabled` means fully silent on that surface, including owner/admin and pairing guidance.",
-    "  - In enabled multi-user surfaces, owner/admin bypass allowlist by default, but `blockUsers` still wins.",
-    "  - If a sender is not in `allowUsers` on a multi-user route, the bot replies: `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to `allowUsers` for this surface.`",
+    ...(showGroupRoutes
+      ? [
+          "  - In enabled multi-user surfaces, owner/admin bypass allowlist by default, but `blockUsers` still wins.",
+          "  - If a sender is not in `allowUsers` on a multi-user route, the bot replies: `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to `allowUsers` for this surface.`",
+        ]
+      : []),
     "  - Use `bots set-agent ...` when the whole bot should change fallback agent; use `routes set-agent ...` only when one route needs a different agent.",
     "  - Use route timezone only when one routed surface needs different wall-clock time from the app or agent default.",
     "  - `routes get-timezone` prints the route override, effective timezone, and current local time for that surface.",

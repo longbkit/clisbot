@@ -22,6 +22,7 @@ export type ChannelRouteContract = {
   channel: ChannelId;
   configBotKey: ChannelConfigBotKey;
   providerLabel: string;
+  supportsGroups: boolean;
   supportsTopics: boolean;
   legacyGroupPolicy?: ChannelLegacyGroupPolicyAccess;
   createGroupRouteShell(policy?: BotRouteConfig["policy"]): ChannelRouteGroupConfig;
@@ -91,6 +92,10 @@ export function createChannelTopicRouteShell(
 
 export function channelSupportsTopicRoutes(channel: ChannelId) {
   return requireChannelRouteContract(channel).supportsTopics;
+}
+
+export function channelSupportsGroupRoutes(channel: ChannelId) {
+  return requireChannelRouteContract(channel).supportsGroups;
 }
 
 export function readChannelLegacyGroupPolicy(

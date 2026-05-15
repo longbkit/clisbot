@@ -1,10 +1,9 @@
 import { resolveZaloBotConfig } from "./config.ts";
 import { describeChannelCredentialSource } from "../../config/channels/channel-credentials.ts";
-import { resolveSharedGroupsWildcardRoute } from "../../config/channels/group-routes.ts";
 import { renderCliCommand } from "../../control/commands/cli-name.ts";
 import type { ChannelOperatorInventory } from "../integration/operator-inventory.ts";
 import {
-  countConfiguredBotGroupSurfaces,
+  countConfiguredBotDirectMessageSurfaces,
   describeBootstrapToken,
   deriveConfiguredChannelConnection,
   getBootstrapBotToken,
@@ -78,10 +77,9 @@ export const zaloBotChannelOperatorInventory: ChannelOperatorInventory = {
         response: defaultBot.response,
         responseMode: defaultBot.responseMode,
         additionalMessageMode: defaultBot.additionalMessageMode,
-        configuredSurfaceCount: countConfiguredBotGroupSurfaces(loadedConfig.raw.bots.zaloBot),
+        configuredSurfaceCount: countConfiguredBotDirectMessageSurfaces(loadedConfig.raw.bots.zaloBot),
         directMessagesEnabled: defaultDmConfig?.enabled !== false,
         directMessagesPolicy: defaultDmConfig?.policy ?? "disabled",
-        sharedDefaultPolicy: resolveSharedGroupsWildcardRoute(defaultBot.groups)?.policy,
         activity: activities.channels["zalo-bot"],
         health: runtimeHealth.channels["zalo-bot"],
       };

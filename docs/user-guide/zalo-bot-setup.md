@@ -15,7 +15,7 @@ It does not cover:
 
 - one bot token
 - polling-first runtime
-- DM plus group routing
+- current operator and queue/loop flows are DM-only
 - no topic or thread model
 
 Important limits today:
@@ -109,32 +109,17 @@ Expected:
 - the routed workspace receives a file under `.attachments/`
 - the agent can inspect the image through the attachment path included in the prompt
 
-## Group Flow
-
-Add the route first:
-
-```bash
-clisbot-dev routes add --channel zalo-bot group:<chatId> --bot default
-```
-
-Optional agent override:
-
-```bash
-clisbot-dev routes set-agent --channel zalo-bot group:<chatId> --bot default --agent <id>
-```
-
-Then mention the bot in that group to validate trigger flow.
-
 ## Operator Send Path
 
 Direct operator send:
 
 ```bash
-clisbot-dev message send --channel zalo-bot --target <chatId> --message "hello"
+clisbot-dev message send --channel zalo-bot --target dm:<user-id> --message "hello"
 ```
 
 Notes:
 
+- use `dm:<user-id>` for direct operator sends; raw ids are kept only as DM-compatible send targets
 - `--thread-id` is not supported
 - `--topic-id` is not supported
 - `--file /path/to/image.jpg` does not map to a native upload flow on `zalo-bot` today because the official `sendPhoto` API takes a string `photo` field, documented as an image path/URL, not a multipart upload body

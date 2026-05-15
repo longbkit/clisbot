@@ -194,6 +194,45 @@ describe("loops cli", () => {
     expect(session.loops[0].sender.senderId).toBe("zalo-bot:user-123");
   });
 
+  test("rejects zalo-bot group loop target before persisting", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-zalo-group-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    const storePath = join(tempDir, "sessions.json");
+    writeFileSync(
+      process.env.CLISBOT_CONFIG_PATH,
+      JSON.stringify(
+        enableZaloBotDirectMessages(
+          buildConfig({
+            socketPath: join(tempDir, "clisbot.sock"),
+            storePath,
+            workspaceTemplate: join(tempDir, "workspaces", "{agentId}"),
+          }),
+        ),
+        null,
+        2,
+      ),
+    );
+    writeFileSync(storePath, JSON.stringify({}, null, 2));
+
+    await expect(runLoopsCli([
+      "create",
+      "--channel",
+      "zalo-bot",
+      "--target",
+      "group:room-123",
+      "--sender",
+      "zalo-bot:user-123",
+      "5m",
+      "check",
+      "group",
+    ])).rejects.toThrow("Zalo Bot control targets support DM surfaces only.");
+
+    const store = JSON.parse(readFileSync(storePath, "utf8")) as Record<string, any>;
+    expect(store["agent:default:zalo-bot:group:room-123"]).toBeUndefined();
+    expect(store["agent:default:zalo-bot:dm:room-123"]).toBeUndefined();
+  });
+
   test("first wall-clock loop requires --confirm before persisting", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-loops-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;

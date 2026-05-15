@@ -88,10 +88,11 @@ Mọi route liên quan sẽ nằm bên dưới bot đó.
 ## Quy tắc quan trọng
 
 - config lưu trữ dùng raw id cộng với `*` bên trong `directMessages` và `groups`
-- CLI vẫn dùng `dm:<id>` và `group:<id>`
+- route id của CLI phụ thuộc theo channel; Slack/Telegram dùng `group:<id>` cho shared surface, còn Zalo Bot chỉ dùng route DM
 - `dmPolicy` là alias nhanh cho wildcard DM default
 - `channelPolicy` và `groupPolicy` của Slack quyết định admission cho ngữ cảnh chat dùng chung
 - `groupPolicy` của Telegram quyết định admission cho group Telegram
+- Zalo Bot hiện là DM-only; cấu hình access bằng `dmPolicy` và `directMessages`
 - `groups["*"].policy` quyết định sender policy mặc định bên trong các group đã được admit
 - `disabled` nghĩa là im lặng hoàn toàn, kể cả với owner/admin
 
@@ -103,6 +104,7 @@ Mọi route liên quan sẽ nằm bên dưới bot đó.
 - route DM cụ thể có thể mang cả config admission lẫn override hành vi
 - mặc định ở cấp bot trả lời câu hỏi "bình thường bot này sẽ cư xử thế nào"; route cụ thể trả lời câu hỏi "ngữ cảnh chat này khác gì"
 - route group/channel/topic cụ thể nên bỏ trống `policy` khi nó chỉ muốn kế thừa `groups["*"].policy`
+- Zalo Bot không có model topic/thread/group routing trong implementation hiện tại; dùng `dm:<id>` hoặc `dm:*`
 
 ## Các lệnh thường dùng
 

@@ -28,13 +28,20 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.telegram.defaults.enabled).toBe(false);
     expect(config.bots.telegram.defaults.dmPolicy).toBe("pairing");
     expect(config.bots.telegram.defaults.groupPolicy).toBe("allowlist");
+    expect(config.bots.zaloBot.defaults.enabled).toBe(false);
+    expect(config.bots.zaloBot.defaults.dmPolicy).toBe("pairing");
+    expect("groupPolicy" in config.bots.zaloBot.defaults).toBe(false);
     expect(config.bots.slack.default.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.bots.slack.default.botToken).toBe("${SLACK_BOT_TOKEN}");
     expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
+    expect(config.bots.zaloBot.default.botToken).toBe("${ZALO_BOT_TOKEN}");
     expect(config.bots.slack.default.directMessages).toEqual({});
     expect(config.bots.slack.default.groups).toEqual({});
     expect(config.bots.telegram.default.directMessages).toEqual({});
     expect(config.bots.telegram.default.groups).toEqual({});
+    expect(config.bots.zaloBot.default.directMessages).toEqual({});
+    expect("groupPolicy" in config.bots.zaloBot.default).toBe(false);
+    expect("groups" in config.bots.zaloBot.default).toBe(false);
     expect(config.bots.slack.defaults.groups["*"]).toEqual({
       enabled: true,
       requireMention: true,
@@ -59,6 +66,8 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.defaults.timezone).toBeUndefined();
     expect(config.bots.slack.defaults.timezone).toBeUndefined();
     expect(config.bots.telegram.defaults.timezone).toBeUndefined();
+    expect(config.bots.zaloBot.defaults.timezone).toBeUndefined();
+    expect((config.bots.zaloBot.defaults as any).groups).toBeUndefined();
     expect(text).toContain("\"channelPolicy\"");
     expect(text).toContain("\"groupPolicy\"");
     expect(text).toContain("\"dmPolicy\"");

@@ -4,6 +4,7 @@ export default {
   channel: "zalo-bot",
   configBotKey: "zaloBot",
   providerLabel: "Zalo Bot",
+  supportsGroups: false,
   supportsTopics: false,
   createGroupRouteShell: createStandardChannelGroupRouteShell,
 } as const;

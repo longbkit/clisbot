@@ -187,14 +187,13 @@ Ví dụ:
 - một Telegram group dưới một Telegram bot
 - một Telegram topic trong một Telegram group dưới một Telegram bot
 - một Telegram DM fallback hoặc một Telegram DM peer cụ thể dưới một Telegram bot
-- một Zalo group dưới một Zalo Bot
-- một Zalo DM fallback hoặc một Zalo DM peer cụ thể dưới một Zalo Bot
+- một Zalo Bot DM fallback hoặc một Zalo Bot DM peer cụ thể
 
 Ghi chú:
 
 - Slack thread bên trong channel dùng parent channel route
 - Telegram topic là route riêng vì topic là sub-surface rõ ràng bên trong group
-- Zalo Bot hiện chưa có model topic sub-surface ở provider hiện tại
+- Zalo Bot hiện là DM-only; không có group/topic/thread route
 
 Route id:
 
@@ -207,8 +206,6 @@ Route id:
 - shared default fine-grain route: `group:*`
 - Telegram direct message fallback: `dm:*`
 - Telegram specific DM peer: `dm:1276408333`
-- Zalo group: `group:group-123`
-- shared default fine-grain route: `group:*`
 - Zalo direct message fallback: `dm:*`
 - Zalo specific DM peer: `dm:aaa741c34d8fa4d1fd9e`
 
@@ -217,7 +214,7 @@ Ghi chú:
 - canonical CLI shared wildcard route id là `group:*`
 - canonical stored wildcard key dưới bot là `groups["*"]`
 - shorthand legacy `*`, dạng cũ `groups:*`, và input Slack `channel:<id>` vẫn được chấp nhận để tương thích
-- cách gọi chuẩn cho người vận hành vẫn xem `group:<id>` là multi-user route id ưu tiên trên mọi provider
+- cách gọi chuẩn cho người vận hành chỉ dùng `group:<id>` cho provider có shared surface; Zalo Bot là DM-only
 - `group:*` là node sender policy mặc định cho bot, cần được cập nhật chứ không nên coi là thứ có thể bỏ
 - `clisbot routes --help --channel <channel-name>` sẽ in route syntax và ví dụ theo đúng channel
 
@@ -226,7 +223,7 @@ Các lệnh lõi:
 - `clisbot routes list [--channel <channel-name>] [--bot <id>] [--json]`
 - `clisbot routes add --channel slack <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes add --channel telegram <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
-- `clisbot routes add --channel zalo-bot <route-id> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
+- `clisbot routes add --channel zalo-bot <dm:*|dm:<id>> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]`
 - `clisbot routes enable --channel <channel-name> <route-id> [--bot <id>]`
 - `clisbot routes disable --channel <channel-name> <route-id> [--bot <id>]`
 - `clisbot routes remove --channel <channel-name> <route-id> [--bot <id>]`
@@ -313,7 +310,7 @@ Ví dụ:
 - `clisbot routes add --channel slack dm:U_OWNER --bot support`
 - `clisbot routes add --channel telegram group:-1001234567890`
 - `clisbot routes add --channel telegram topic:-1001234567890:42 --bot support --require-mention false`
-- `clisbot routes add --channel zalo-bot group:group-123 --bot default --require-mention true`
+- `clisbot routes add --channel zalo-bot dm:user-123 --bot default --policy open`
 - `clisbot routes set-agent --channel slack group:C_GENERAL --agent product`
 - `clisbot routes set-require-mention --channel telegram topic:-1001234567890:42 --value false`
 - `clisbot routes set-allow-bots --channel telegram group:-1001234567890 --bot alerts --value true`
