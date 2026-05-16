@@ -61,10 +61,14 @@ export function renderClisbotWrapperScript(options: {
   const execPath = process.execPath;
   const mainScriptPath = getClisbotMainScriptPath(options.moduleUrl);
   const cliName = getRenderedCliName();
+  const appHome = resolveAppHomeDir();
+  const wrapperPath = getClisbotWrapperPath();
 
   return [
     "#!/usr/bin/env bash",
     "set -euo pipefail",
+    `export CLISBOT_HOME=${shellQuote(appHome)}`,
+    `export CLISBOT_WRAPPER_PATH=${shellQuote(wrapperPath)}`,
     `exec ${shellQuote(execPath)} ${shellQuote(mainScriptPath)} --internal-cli-name ${shellQuote(cliName)} "$@"`,
     "",
   ].join("\n");
