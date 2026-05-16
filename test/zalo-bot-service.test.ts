@@ -521,4 +521,52 @@ describe("ZaloBotPollingService DM pairing enforcement", () => {
     expect(queued[0]?.queueItemPrompt).toBe("review the Zalo queue path");
     expect(queued[0]?.prompt).toContain("review the Zalo queue path");
   });
+
+  test("stores slash commands as marker-only recent context", async () => {
+    const loadedConfig = createLoadedConfig();
+    const directRoute = loadedConfig.raw.bots.zaloBot.default.directMessages["user-123"]!;
+    directRoute.requireMention = false;
+    directRoute.responseMode = "message-tool";
+    directRoute.streaming = "off";
+
+    const recentMessages: Array<{ marker: string; text?: string }> = [];
+    await runZaloBotServiceUpdate({
+      loadedConfig,
+      agentService: {
+        getWorkspacePath: () => "/tmp",
+        async getConversationFollowUpState() {
+          return {};
+        },
+        async appendRecentConversationMessage(
+          _target: unknown,
+          message: { marker: string; text?: string },
+        ) {
+          recentMessages.push(message);
+        },
+        async getRecentConversationReplayMessages() {
+          return [];
+        },
+        async recordConversationReply() {},
+      },
+      update: {
+        event_name: "message.text.received",
+        message: {
+          message_id: "msg-streaming",
+          date: 1_778_831_908,
+          text: "/help",
+          from: {
+            id: "user-123",
+            display_name: "User 123",
+          },
+          chat: {
+            id: "user-123",
+            chat_type: "PRIVATE",
+          },
+        },
+      },
+    });
+
+    expect(recentMessages[0]?.marker).toBe("msg-streaming");
+    expect(recentMessages[0]?.text).toBe("");
+  });
 });

@@ -5,6 +5,7 @@ import {
 } from "../../agents/commands/follow-up-policy.ts";
 import { hasAgentCommandPrefix } from "../../agents/commands/commands.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { buildRecentConversationMessage } from "../message/recent-conversation.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   isChannelSenderAllowed,
@@ -359,13 +360,14 @@ export class ZaloBotPollingService {
     const textBody = explicitMention ? stripZaloBotMention(rawText, this.botName) : rawText;
     const recentMessageMarker = message.message_id;
     if (rawText || attachmentPaths.length > 0 || explicitMention) {
-      await this.agentService.appendRecentConversationMessage(sessionTarget, {
+      await this.agentService.appendRecentConversationMessage(sessionTarget, buildRecentConversationMessage({
         marker: recentMessageMarker,
         text: textBody,
         senderId,
         senderName,
         platform: "zalo-bot",
-      });
+        commandPrefixes: route.commandPrefixes,
+      }));
     }
     if (explicitMention && followUpState.overrideMode === "paused") {
       await this.agentService.reactivateConversationFollowUp(sessionTarget);
@@ -495,6 +497,7 @@ export class ZaloBotPollingService {
         },
         route,
         maxChars: 2000,
+        canUpdateLiveReply: false,
         timingContext,
         postText: async (nextText) => await postZaloBotText({
           token: this.botCredentials.botToken,

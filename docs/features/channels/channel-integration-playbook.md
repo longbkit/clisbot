@@ -91,9 +91,12 @@ Use this order unless the provider forces a different dependency:
 - message send path
 - reply-target recording
 - rendering or content shaping
+- live reply update capability: channels that cannot edit/delete or otherwise update a live reply must not implement shared streaming reconcile by posting duplicate progress messages
 - typing or processing indicators
 - routed and unrouted command behavior such as `/start`, `/status`, `/whoami`, and `/transcript`
 - loop, queue, and route-facing target behavior
+- queue-start notifications as standalone lifecycle messages, not editable streaming drafts
+- shared settlement behavior: a fresh `message-tool` final reply wins; without one, the normal pane-derived settlement path is the fallback
 - explicit support flags for `dm`, `group`, and `topic` route families
 - owner alerts and surface notifications
 - status, startup, and health summaries

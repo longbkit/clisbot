@@ -4,8 +4,8 @@ import {
   resolveFollowUpMode,
 } from "../../agents/commands/follow-up-policy.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
-import { parseAgentCommand } from "../../agents/commands/commands.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { buildRecentConversationMessage } from "../message/recent-conversation.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   isChannelSenderAllowed,
@@ -188,6 +188,21 @@ function waitForBackgroundSlackTask(task: Promise<unknown>) {
   });
 }
 
+function resolveSlackThreadTargetFromSessionKey(sessionKey: string) {
+  const match = /^agent:[^:]+:slack:channel:([^:]+):thread:(.+)$/.exec(sessionKey);
+  if (!match) {
+    return null;
+  }
+
+  const channel = match[1]?.trim().toUpperCase();
+  const threadTs = match[2]?.trim();
+  if (!channel || !threadTs) {
+    return null;
+  }
+
+  return { channel, threadTs };
+}
+
 export class SlackSocketService {
   private readonly app: SlackAppType;
   private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
@@ -242,6 +257,25 @@ export class SlackSocketService {
     return getTransportSlackMaxChars(
       this.agentService.getMaxMessageChars(agentId),
     );
+  }
+
+  private async clearStaleAssistantStatusesOnStart() {
+    const entries = await this.agentService.listSessionEntries();
+    const targets = new Map<string, { channel: string; threadTs: string }>();
+    for (const entry of entries) {
+      if (entry.runtime?.state !== "idle") {
+        continue;
+      }
+
+      const target = resolveSlackThreadTargetFromSessionKey(entry.sessionKey);
+      if (target) {
+        targets.set(`${target.channel}:${target.threadTs}`, target);
+      }
+    }
+
+    await Promise.all([...targets.values()].map(async (target) => {
+      await clearSlackAssistantThreadStatus(this.app.client, target);
+    }));
   }
 
   private markMessageSeen(channelId: string | undefined, ts?: string) {
@@ -618,18 +652,15 @@ export class SlackSocketService {
         userId: slackSenderId,
         channelId,
       });
-      await this.agentService.appendRecentConversationMessage(sessionTarget, {
+      await this.agentService.appendRecentConversationMessage(sessionTarget, buildRecentConversationMessage({
         marker: recentMessageMarker,
-        text: parseAgentCommand(rawText, {
-          commandPrefixes: params.route.commandPrefixes,
-        })
-          ? ""
-          : rawText,
+        text: rawText,
         senderId: slackSenderId,
         senderName: displayIdentity.senderName,
         senderHandle: displayIdentity.senderHandle,
         platform: "slack",
-      });
+        commandPrefixes: params.route.commandPrefixes,
+      }));
     }
     if (requiresMention && !wasMentioned) {
       const hasCommandTrigger = hasSlackCommandTrigger({
@@ -1093,6 +1124,7 @@ export class SlackSocketService {
     this.teamId = auth.team_id ?? "";
     this.apiAppId = (auth as { api_app_id?: string }).api_app_id ?? "";
     console.log(`slack bot user ${this.botLabel || this.botUserId} (${this.botId})`);
+    await this.clearStaleAssistantStatusesOnStart();
     this.app.error(async (error) => {
       console.error("slack app error", error);
     });

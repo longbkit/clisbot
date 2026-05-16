@@ -123,7 +123,8 @@ describe("processChannelInteraction queue and steer", () => {
 
     expect(submitCalls).toBe(0);
     expect(observedPrompt).toBe("please check one more thing");
-    expect(posted).toEqual([]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("second message stayed queued");
   });
 
   test("explicit steer command injects a steering message into the active run", async () => {
@@ -247,7 +248,7 @@ describe("processChannelInteraction queue and steer", () => {
     expect(posted[0]).toContain("Working");
   });
 
-  test("queue command forces clisbot-managed delivery even in message-tool mode", async () => {
+  test("queue command keeps message-tool delivery and falls back to pane settlement only without a tool final", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     let observedPrompt = "";
@@ -294,10 +295,11 @@ describe("processChannelInteraction queue and steer", () => {
 
     expect(observedPrompt).toBe("send the short summary after the current run");
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled.at(-1)).toContain("queued reply complete");
+    expect(posted.at(-1)).toContain("queued reply complete");
+    expect(reconciled).toEqual([]);
   });
 
-  test("queue start notifications can promote the initial queued placeholder when running begins immediately", async () => {
+  test("queue start notifications stay standalone and do not become the streaming message", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -362,7 +364,8 @@ describe("processChannelInteraction queue and steer", () => {
     });
 
     expect(posted.some((text) => text.includes("Queued: 1 ahead."))).toBe(true);
-    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(posted.some((text) => text.includes("Queued message is now running"))).toBe(true);
+    expect(reconciled.join("\n")).not.toContain("Queued message is now running");
     expect(reconciled.at(-1)).toContain("queued reply complete");
   });
 
@@ -413,10 +416,10 @@ describe("processChannelInteraction queue and steer", () => {
     });
 
     expect(observedPrompt).toBe("follow up after the active run");
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled).toHaveLength(1);
-    expect(reconciled[0]).toContain("queued mode final");
+    expect(posted[1]).toContain("queued mode final");
+    expect(reconciled).toEqual([]);
   });
 
   test("explicit queue command acknowledges queue acceptance while streaming is off", async () => {
@@ -466,10 +469,10 @@ describe("processChannelInteraction queue and steer", () => {
     });
 
     expect(observedPrompt).toBe("send the short summary after the current run");
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled).toHaveLength(1);
-    expect(reconciled[0]).toContain("queued final only");
+    expect(posted[1]).toContain("queued final only");
+    expect(reconciled).toEqual([]);
   });
 
   test("explicit queue command renders queue start immediately when the queue is empty and streaming is off", async () => {
@@ -519,14 +522,14 @@ describe("processChannelInteraction queue and steer", () => {
     });
 
     expect(observedPrompt).toBe("send the short summary now");
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued message is now running");
     expect(posted[0]).not.toContain("Queued: 0 ahead.");
-    expect(reconciled).toHaveLength(1);
-    expect(reconciled[0]).toContain("empty queue final");
+    expect(posted[1]).toContain("empty queue final");
+    expect(reconciled).toEqual([]);
   });
 
-  test("explicit queue command uses queue start as the initial preview when the queue is empty", async () => {
+  test("explicit queue command keeps queue start separate from the initial preview when the queue is empty", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -567,9 +570,10 @@ describe("processChannelInteraction queue and steer", () => {
       },
     });
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued message is now running");
     expect(posted[0]).not.toContain("Working");
+    expect(posted[1]).toContain("Working");
     expect(reconciled.at(-1)).toContain("empty queue streaming final");
   });
 
@@ -627,16 +631,17 @@ describe("processChannelInteraction queue and steer", () => {
       },
     });
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(3);
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled).toHaveLength(2);
-    expect(reconciled[0]).toContain("Queued message is now running");
-    expect(reconciled[1]).toContain("queued final after running");
+    expect(posted[1]).toContain("Queued message is now running");
+    expect(posted[2]).toContain("queued final after running");
+    expect(reconciled).toEqual([]);
   });
 
   async function runExplicitQueuedMessageToolFinalScenario(params: {
     getMessageToolFinalReplyAt: () => number | undefined;
     getQueueStartedAt?: () => number;
+    beforePromptRunStarted?: () => Promise<void> | void;
     beforeRunningUpdate?: () => void;
     beforeComplete?: () => void;
     finalSnapshot: string;
@@ -654,7 +659,8 @@ describe("processChannelInteraction queue and steer", () => {
         enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
           positionAhead: 1,
           result: (async () => {
-            await callbacks.onStart?.({
+            await params.beforePromptRunStarted?.();
+            await callbacks.onPromptRunStarted?.({
               startedAt: params.getQueueStartedAt?.() ?? Date.now(),
             });
             params.beforeRunningUpdate?.();
@@ -716,9 +722,10 @@ describe("processChannelInteraction queue and steer", () => {
       finalSnapshot: "Done.",
     });
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(posted.some((text) => text.includes("Queued message is now running"))).toBe(true);
+    expect(reconciled.join("\n")).not.toContain("Queued message is now running");
     expect(reconciled.join("\n")).not.toContain("Done");
   });
 
@@ -734,9 +741,10 @@ describe("processChannelInteraction queue and steer", () => {
       finalSnapshot: "Done.",
     });
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(posted.some((text) => text.includes("Queued message is now running"))).toBe(true);
+    expect(reconciled.join("\n")).not.toContain("Queued message is now running");
     expect(reconciled.join("\n")).not.toContain("Done");
   });
 
@@ -749,8 +757,26 @@ describe("processChannelInteraction queue and steer", () => {
     });
 
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled[0]).toContain("Queued message is now running");
-    expect(reconciled.at(-1)).toContain("pane fallback final");
+    expect(posted.some((text) => text.includes("Queued message is now running"))).toBe(true);
+    expect(reconciled.join("\n")).not.toContain("Queued message is now running");
+    expect(posted.at(-1)).toContain("pane fallback final");
+  });
+
+  test("explicit queue command ignores message-tool finals before the queued prompt starts", async () => {
+    let messageToolFinalAt: number | undefined;
+    const { posted, reconciled } = await runExplicitQueuedMessageToolFinalScenario({
+      getMessageToolFinalReplyAt: () => messageToolFinalAt,
+      beforePromptRunStarted: async () => {
+        messageToolFinalAt = Date.now();
+        await sleep(150);
+      },
+      finalSnapshot: "pane fallback after previous run final",
+    });
+
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(posted.some((text) => text.includes("Queued message is now running"))).toBe(true);
+    expect(reconciled.join("\n")).not.toContain("Queued message is now running");
+    expect(posted.at(-1)).toContain("pane fallback after previous run final");
   });
 
   test("queue start notifications can be disabled per route", async () => {
@@ -799,11 +825,11 @@ describe("processChannelInteraction queue and steer", () => {
       },
     });
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
     expect(posted[0]).toContain("Queued: 1 ahead.");
-    expect(reconciled).toHaveLength(1);
-    expect(reconciled[0]).toContain("queued final only");
-    expect(reconciled[0]).not.toContain("Queued message is now running");
+    expect(posted[1]).toContain("queued final only");
+    expect(posted.join("\n")).not.toContain("Queued message is now running");
+    expect(reconciled).toEqual([]);
   });
 
 });

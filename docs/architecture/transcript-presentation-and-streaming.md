@@ -230,6 +230,7 @@ Configuration policy should stay separate from channel transport capability:
 
 - `streaming` and `response` define content retention and settlement behavior
 - whether the channel edits one live message or appends multiple replies is a channel capability and UX decision
+- append-only channels must not pretend to reconcile live previews by posting a new message for every update; they should skip live pane preview streaming and rely on standalone lifecycle notifications plus final or fallback settlement
 
 For normal Slack chat mode today, the transport decision is fixed:
 

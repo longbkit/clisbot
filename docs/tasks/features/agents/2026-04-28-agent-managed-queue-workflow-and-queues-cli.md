@@ -158,16 +158,16 @@ the durable `StoredSessionEntry.queues` inventory becomes canonical.
 - clear keeps the currently running entry
 - clear rejects every removed pending entry with `ClearedQueuedTaskError`
 - clearing pending entries must settle waiting callers; it must not leave a
-  queued delivery promise hanging
+  queued execution promise hanging
 - the queue state is removed from memory when no entries remain and no drain is
   running
 
 ### Channel Delivery Semantics
 
-- `/queue <message>` and `\q <message>` force queued delivery for that one
+- `/queue <message>` and `\q <message>` request queued execution for that one
   message
 - when `additionalMessageMode` is `queue` and the session is busy, normal
-  follow-up messages also use queued delivery
+  follow-up messages also use queued execution
 - explicit queue messages and route-queued messages pass `queueText` separately
   from the generated prompt envelope
 - queue start notifications use `queueText` or the notification prompt summary,
@@ -178,10 +178,11 @@ the durable `StoredSessionEntry.queues` inventory becomes canonical.
   rendered and how much summary text it contains
 - streaming-off routes still need truthful final settlement and must not require
   a visible interim queued placeholder
-- message-tool routes must preserve preview handoff behavior instead of forcing
-  all queued work into pane-managed rendering
-- `forceQueuedDelivery` keeps explicit `/queue` delivery clisbot-managed even
-  when the route normally uses message-tool replies
+- message-tool routes must preserve preview handoff and final-marker
+  settlement behavior instead of forcing queued work into pane-managed
+  rendering
+- explicit `/queue` requests queued execution only; it must not force the
+  output delivery mode away from `message-tool`
 - route-queued prompt envelopes are rebuilt when the queued item starts
 
 ### Busy And Follow-Up Semantics

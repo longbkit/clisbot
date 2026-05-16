@@ -2,7 +2,7 @@
 
 ## Summary
 
-Make `streaming` govern live preview on both response modes, add `/streaming` surface control, and keep `message-tool` truthful by treating pane preview as one disposable draft instead of a second canonical reply.
+Make `streaming` govern live preview on both response modes, add `/streaming` surface control, and keep `message-tool` truthful by treating pane preview as one channel-capability-aware draft instead of a second canonical reply.
 
 ## Status
 
@@ -13,9 +13,9 @@ Done
 After this task:
 
 - `streaming` affects both `capture-pane` and `message-tool`
-- `/streaming status|on|off|latest|all` works on routed Slack and Telegram surfaces
-- `message-tool` may still show one edited live draft preview while the run is active
-- tool-owned replies can split the preview timeline without causing many concurrent live drafts
+- `/streaming status|on|off|latest|all` works on routed message surfaces
+- `message-tool` may still show one live draft preview while the run is active
+- tool-owned replies hand off the preview timeline without causing many concurrent live drafts
 - tool-final delivery no longer lets `clisbot` auto-settle a second pane-final reply in `message-tool`
 - fallback settlement reuses the draft preview when the tool path never sends a final reply
 
@@ -37,15 +37,15 @@ The desired product model is cleaner:
 
 That still leaves one hard UX problem:
 
-- if `message-tool` sends progress or final replies into the thread, pane preview can become confusing unless preview is modeled as disposable draft state instead of another canonical reply
+- if `message-tool` sends progress or final replies into the thread, pane preview can become confusing unless preview is modeled as handoff-capable draft state instead of another canonical reply
 
 ## Scope
 
-- let `message-tool` use one edited live preview draft when `streaming` is enabled
-- rotate that draft only when a tool-owned reply lands and later preview-worthy output appears
+- let `message-tool` use one live preview draft when `streaming` is enabled
+- hand off that draft when a tool-owned reply lands, then stop preview updates for that run
 - stop draft updates after a tool final
-- clean up the disposable draft on successful completion when `response: "final"`
-- keep `message-tool` final ownership strict; do not auto-settle pane output when tool-final is missing
+- clean up the draft on successful completion with `response: "final"` only where the channel supports clear/delete
+- keep `message-tool` final ownership strict when tool-final exists, and use pane-derived settlement as fallback when tool-final is missing
 - add `/streaming` slash command handling and persistence
 - update docs and regression coverage
 

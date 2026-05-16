@@ -40,9 +40,9 @@ One plausible failure mode is that a progress message or message-tool reply is b
 ## Validation Notes
 
 - Slack processing indicator stays active while only progress updates are emitted
-- Slack processing indicator stays active across message-tool progress replies until the real final reply lands
+- Slack processing indicator stays active across message-tool progress replies until the real final reply lands or the run intentionally leaves live follow mode
 - final settlement clears the indicator exactly once
-- detached runs still transition to the documented detached behavior without premature clear
+- detached sparse-follow runs clear channel-side indicators because those indicators represent live handling, not long-running background monitoring
 - Telegram behavior remains unchanged
 
 ## Exit Criteria
@@ -53,7 +53,7 @@ One plausible failure mode is that a progress message or message-tool reply is b
 
 ## Implementation Notes
 
-- Slack assistant thread status is now kept alive by the Slack runtime-owned processing decoration while the active-run lease is still alive.
+- Slack assistant thread status is now kept alive by the shared processing-indicator coordinator while the active run is in live follow mode; it clears when the run reaches terminal state or transitions to detached sparse-follow mode.
 - `message-cli` and channel plugins stay transport-only; they do not own or re-arm processing state.
 - terminal cleanup still happens through the same processing lease, so status ownership remains in one place.
 

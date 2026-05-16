@@ -2,7 +2,7 @@
 
 ## Summary
 
-Give agent sessions a stable local `clisbot` command and a channel-owned prompt envelope so Codex or Claude can send progress updates and final replies back to the current Slack or Telegram conversation while running in another workspace.
+Give agent sessions a stable local `clisbot` command and a channel-owned prompt envelope so Codex or Claude can send progress updates and final replies back to the current routed conversation while running in another workspace.
 
 ## Status
 
@@ -10,7 +10,7 @@ Done
 
 ## Outcome
 
-The channel-owned prompt envelope is implemented and now includes the compact `Message context` contract from [Prompt Context Sender And Surface Contract](2026-04-27-prompt-context-sender-surface-contract.md). The wrapper still provides the exact `clisbot message send` command for Slack and Telegram, while sender/surface context and permission guidance are rendered through the shared prompt path.
+The channel-owned prompt envelope is implemented and now includes the compact `Message context` contract from [Prompt Context Sender And Surface Contract](2026-04-27-prompt-context-sender-surface-contract.md). The wrapper provides the exact `clisbot message send` command for the routed channel, while sender/surface context and permission guidance are rendered through the shared prompt path.
 
 ## Why
 

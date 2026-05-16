@@ -5,6 +5,7 @@ import {
   markRecentConversationProcessed,
   prependRecentConversationContext,
 } from "../src/agents/routing/recent-message-context.ts";
+import { buildRecentConversationMessage } from "../src/channels/message/recent-conversation.ts";
 
 describe("recent conversation context", () => {
   test("keeps only the latest five messages", () => {
@@ -82,5 +83,31 @@ describe("recent conversation context", () => {
     expect(text).toContain("Current message:");
     expect(text).toContain("please reply now");
     expect(text).not.toContain("m1");
+  });
+
+  test("builds marker-only recent context for slash commands", () => {
+    const commandMessage = buildRecentConversationMessage({
+      marker: "m1",
+      text: "/streaming on",
+      senderId: "user-123",
+      platform: "zalo-bot",
+      commandPrefixes: {
+        slash: ["::", "\\"],
+        bash: ["!"],
+      },
+    });
+    const normalMessage = buildRecentConversationMessage({
+      marker: "m2",
+      text: "hi",
+      senderId: "user-123",
+      platform: "zalo-bot",
+      commandPrefixes: {
+        slash: ["::", "\\"],
+        bash: ["!"],
+      },
+    });
+
+    expect(commandMessage.text).toBe("");
+    expect(normalMessage.text).toBe("hi");
   });
 });

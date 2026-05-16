@@ -4,7 +4,7 @@
 
 ## Mục đích
 
-Dùng trang này khi bạn muốn kiểm tra luồng chat nơi Codex hoặc Claude gửi các cập nhật tiến độ ngắn về Slack hoặc Telegram ngay khi chúng vẫn đang làm việc.
+Dùng trang này khi bạn muốn kiểm tra luồng chat nơi Codex hoặc Claude gửi các cập nhật tiến độ ngắn về Slack, Telegram, hoặc Zalo Bot ngay khi chúng vẫn đang làm việc.
 
 ## `clisbot` làm gì
 
@@ -12,7 +12,7 @@ Luồng cục bộ cho môi trường phát triển hiện tại có ba phần:
 
 1. `clisbot` tạo một wrapper cục bộ ổn định tại `~/.clisbot/bin/clisbot`
 2. các agent session do runner khởi chạy sẽ được export sẵn đường dẫn wrapper đó lúc startup
-3. Slack và Telegram sẽ chèn một khối chỉ dẫn hệ thống ngắn, ẩn khỏi người dùng, vào prompt gửi cho agent, trong đó có lệnh trả lời chính xác cho đúng cuộc hội thoại hiện tại
+3. Slack, Telegram, và Zalo Bot sẽ chèn một khối chỉ dẫn hệ thống ngắn, ẩn khỏi người dùng, vào prompt gửi cho agent, trong đó có lệnh trả lời chính xác cho đúng cuộc hội thoại hiện tại
 
 Điều đó có nghĩa là agent có thể đang chạy trong một workspace khác mà vẫn gửi được cập nhật tiến độ bằng lệnh cục bộ của máy, không phụ thuộc vào thư mục làm việc hiện tại của nó.
 
@@ -26,7 +26,7 @@ bun run start --cli codex --bot-type team
 
 Sau đó:
 
-1. gửi một message thật từ con người vào Slack hoặc Telegram test surface đã cấu hình
+1. gửi một message thật từ con người vào Slack, Telegram, hoặc Zalo Bot test surface đã cấu hình
 2. để `clisbot` route message đó tới agent đã cấu hình
 3. prompt gửi cho agent lúc này sẽ có lệnh trả lời cục bộ chính xác cho cuộc hội thoại đó
 4. agent có thể gửi cập nhật tiến độ và phản hồi cuối qua `clisbot message send ...`
@@ -129,7 +129,7 @@ Wrapper cục bộ giải bài toán này bằng cách luôn trỏ ngược về
 
 ## Cấu hình
 
-Slack và Telegram hiện có một prompt policy block nhỏ:
+Slack, Telegram, và Zalo Bot hiện có một prompt policy block nhỏ:
 
 ```json
 "agentPrompt": {
@@ -156,7 +156,7 @@ Việc phân phối phản hồi nhìn thấy bởi người dùng được cấ
 
 - `capture-pane`: hành vi `clisbot` kiểu cũ. Channel sẽ post progress hoặc kết quả cuối dựa trên output pane đã được chuẩn hóa.
 - `message-tool`: `clisbot` vẫn capture và theo dõi runner pane cho state, nhưng cập nhật tiến độ và phản hồi cuối chuẩn tắc được kỳ vọng sẽ đi qua `clisbot message send ...` trong luồng prompt của agent.
-- `streaming` giờ ảnh hưởng tới cả hai response mode. Trong `message-tool`, nếu bật streaming thì `clisbot` có thể giữ một live draft preview tạm thời khi run còn đang hoạt động.
+- `streaming` giờ ảnh hưởng tới cả hai response mode. Trong `message-tool`, nếu bật streaming thì `clisbot` có thể giữ một live draft preview khi run còn đang hoạt động chỉ ở channel có thể update live reply. Slack và Telegram có thể edit hoặc clear draft đó; append-only channel như Zalo Bot hiện tại bỏ qua live draft preview hoàn toàn và dùng lifecycle notification độc lập cộng với final hoặc pane-fallback settlement.
 - `steer`: khi một session đang active, các message của con người đến sau sẽ được chèn thẳng vào live session đó như steering input.
 - `queue`: khi một session đang active, các message của con người đến sau sẽ xếp hàng phía sau run hiện tại và `clisbot` giải quyết lần lượt.
 - `surfaceNotifications.queueStart`: điều khiển việc queued turn có thông báo lúc thực sự bắt đầu chạy hay không.
@@ -164,16 +164,16 @@ Việc phân phối phản hồi nhìn thấy bởi người dùng được cấ
 - notification mode hiện có là `none`, `brief`, hoặc `full`, trong đó `brief` là mặc định được ship.
 - `surfaceNotifications` độc lập với `streaming`. `streaming` điều khiển preview hoặc placeholder; `surfaceNotifications` điều khiển thông báo bắt đầu chạy một cách tường minh.
 
-Dùng `message-tool` khi bạn muốn tránh duplicate reply hoặc final settlement lấy từ raw pane, nhưng vẫn muốn giữ khả năng quan sát tmux cho status, attach, watch, và logic runtime bên trong.
+Dùng `message-tool` khi bạn muốn reply từ `clisbot message send ...` của agent thắng pane-derived output, nhưng vẫn giữ khả năng quan sát tmux cho status, attach, watch, và logic runtime bên trong. Nếu không có tool final, `clisbot` fallback về pane-derived settlement bình thường để người dùng không bị mất kết quả cuối.
 
 Khi `message-tool` và streaming cùng bật, các quy tắc hiển thị ra người dùng là:
 
-- `clisbot` chỉ giữ tối đa một live draft preview đang hoạt động
-- nếu có một reply do tool sở hữu xuất hiện trong thread, draft đó sẽ đứng yên
-- nếu sau đó xuất hiện output mới xứng đáng preview, `clisbot` sẽ mở một draft mới ở phía dưới ranh giới đó
+- `clisbot` chỉ giữ tối đa một live draft preview đang hoạt động ở channel có thể update nó
+- nếu có một reply do tool sở hữu xuất hiện trong thread, draft đó được handoff và preview dừng update cho run đó
+- tool reply chỉ là progress thì chưa phải final reply; chỉ tool final mới chặn pane-derived final fallback
 - khi phản hồi cuối từ tool đã xuất hiện, draft sẽ ngừng cập nhật
-- nếu run kết thúc thành công với `response: "final"`, draft tạm sẽ bị xóa
-- nếu đường tool không bao giờ gửi phản hồi cuối, `clisbot` sẽ không tự settle từ pane output; đường tool vẫn là nguồn phản hồi chuẩn duy nhất
+- nếu run kết thúc thành công với `response: "final"`, draft tạm chỉ bị xóa ở channel có hỗ trợ clear/delete
+- nếu đường tool không bao giờ gửi phản hồi cuối, `clisbot` fallback về pane-derived settlement
 
 Dùng `additionalMessageMode: "steer"` khi bạn muốn các follow-up tự nhiên trong chat tác động ngay vào active run.
 
@@ -368,6 +368,7 @@ clisbot routes set-additional-message-mode --channel slack dm:U1234567890 --bot 
 clisbot routes set-additional-message-mode --channel telegram group:-1001234567890 --bot default --mode steer
 clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue
 clisbot routes set-additional-message-mode --channel telegram dm:123456789 --bot default --mode steer
+clisbot routes set-additional-message-mode --channel zalo-bot dm:aaa741c34d8fa4d1fd9e --bot default --mode queue
 ```
 
 Xem và cập nhật response mode ở cấp agent:
@@ -388,7 +389,7 @@ clisbot agents additional-message-mode clear --agent reviewer
 
 Các giao diện hiển thị trạng thái:
 
-- `clisbot status` cho thấy `responseMode` và `additionalMessageMode` ở cấp provider của Slack và Telegram, cùng mọi override theo agent trong agent summary
+- `clisbot status` cho thấy `responseMode` và `additionalMessageMode` ở cấp provider của Slack, Telegram, và Zalo Bot, cùng mọi override theo agent trong agent summary
 - `/status` cho thấy `responseMode`, `additionalMessageMode`, `surfaceNotifications.queueStart`, và `surfaceNotifications.loopStart` của active route trong cuộc hội thoại hiện tại
 - `/streaming status` cho thấy giá trị active route cùng với giá trị persisted của surface target hiện tại
 - `/responsemode status` cho thấy giá trị active route cùng với giá trị persisted của surface target hiện tại

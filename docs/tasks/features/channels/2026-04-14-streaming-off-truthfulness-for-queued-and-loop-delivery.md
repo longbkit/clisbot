@@ -35,7 +35,7 @@ Investigation found that this is not only a perception issue.
 
 There are at least three concrete mismatches in the current code path:
 
-- queued delivery still posts a queued placeholder in `executePromptDelivery(...)` when `paneManagedDelivery` and `positionAhead > 0`, even if `streaming` is off
+- queued execution still posts a queued placeholder in `executePromptDelivery(...)` when `paneManagedDelivery` and `positionAhead > 0`, even if `streaming` is off
 - `/loop <count>` reuses that same queued-delivery path multiple times, so later iterations can inherit the same mismatch
 - managed interval or calendar loops currently persist `promptText` after the agent prompt wrapper is already applied, then reuse that wrapped prompt later without reconsidering current surface streaming policy
 
@@ -107,7 +107,7 @@ This task should reinforce the intended ownership split instead of hiding the bu
 - `response`
 - `responseMode`
 - prompt-envelope wording that tells the agent how to reply back to the surface
-- what is or is not allowed to become visible in Slack or Telegram while a run is active
+- what is or is not allowed to become visible in the target channel while a run is active
 
 ### Agents own
 
@@ -198,7 +198,7 @@ Current suspicious mismatches:
 
 This should land before or together with the visibility fix so the bug is not masked.
 
-### 2. Fix queued delivery truthfulness under `streaming: "off"`
+### 2. Fix queued execution truthfulness under `streaming: "off"`
 
 - do not post queued placeholder or running preview messages when the effective surface policy says `streaming: "off"`
 - keep final settlement behavior intact

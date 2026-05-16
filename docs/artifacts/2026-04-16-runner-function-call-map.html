@@ -690,7 +690,7 @@
         file: "src/channels/message/interaction-processing.ts",
         function: "executePromptDelivery",
         level: 1,
-        description: "Channel-facing orchestrator for queueing a prompt, rendering preview or settlement, wiring observer updates, and reconciling message-tool vs pane-managed delivery.",
+        description: "Channel-facing orchestrator for queueing a prompt, rendering preview or settlement, wiring observer updates, and reconciling message-tool vs pane-derived settlement.",
         concerns: ["channel delivery", "observer bridge", "prompt admission", "surface settlement"],
         calledBy: ["src/channels/message/interaction-processing.ts > processChannelInteraction"],
         calls: [
@@ -701,7 +701,7 @@
           "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > ensureMessageToolPreviewMonitor",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > waitForMessageToolFinalReply",
-          "src/channels/message/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > renderPendingQueueStartNotification",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > buildInitialPlaceholderText",
           "src/agents/runtime/agent-service.ts > AgentService.enqueuePrompt"
         ],
@@ -766,7 +766,7 @@
         calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
         calls: [
           "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
-          "src/channels/message/interaction-processing.ts > executePromptDelivery > hasMessageToolReplyBoundary",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > hasToolReplySinceDraftStarted",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
           "src/infra/process.ts > sleep"
         ],
@@ -787,13 +787,13 @@
       },
       {
         file: "src/channels/message/interaction-processing.ts",
-        function: "executePromptDelivery > maybeRenderQueueStartNotification",
+        function: "executePromptDelivery > renderPendingQueueStartNotification",
         level: 2,
-        description: "Decides whether queue-start notification should render now, defer into preview, or be skipped.",
-        concerns: ["queue preview", "surface notification"],
+        description: "Posts the pending queue-start notification as a standalone surface message and clears the pending flag.",
+        concerns: ["queue lifecycle", "surface notification"],
         calledBy: ["src/channels/message/interaction-processing.ts > executePromptDelivery", "src/channels/message/interaction-processing.ts > executePromptDelivery > enqueuePrompt.onUpdate callback"],
         calls: [
-          "src/channels/message/interaction-processing.ts > executePromptDelivery > renderResponseText",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > postStandaloneReply",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > recordVisibleReply"
         ],
         tags: ["preview helper"]
@@ -816,7 +816,7 @@
         concerns: ["observer delivery", "surface suppression", "preview race"],
         calledBy: ["src/agents/session/session-service.ts > SessionService.notifyRunObservers > observer.onUpdate"],
         calls: [
-          "src/channels/message/interaction-processing.ts > executePromptDelivery > maybeRenderQueueStartNotification",
+          "src/channels/message/interaction-processing.ts > executePromptDelivery > renderPendingQueueStartNotification",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > getMessageToolRuntimeSignals",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > handoffMessageToolPreview",
           "src/channels/message/interaction-processing.ts > executePromptDelivery > renderResponseText",

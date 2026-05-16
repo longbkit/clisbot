@@ -90,7 +90,7 @@ describe("waitForProcessingIndicatorLifecycle", () => {
     expect(detachedIds).toEqual(["obs-2"]);
   });
 
-  test("keeps waiting when the active run detaches and only resolves on completion", async () => {
+  test("resolves when the active run detaches into sparse follow mode", async () => {
     let observer: Omit<RunObserver, "lastSentAt"> | undefined;
     let settled = false;
 
@@ -117,10 +117,6 @@ describe("waitForProcessingIndicatorLifecycle", () => {
     expect(settled).toBe(false);
 
     await observer?.onUpdate(createUpdate("detached"));
-    await Bun.sleep(0);
-    expect(settled).toBe(false);
-
-    await observer?.onUpdate(createUpdate("completed"));
     await task;
 
     expect(settled).toBe(true);
@@ -221,6 +217,46 @@ describe("ConversationProcessingIndicatorCoordinator", () => {
     expect(events).toEqual(["activate"]);
 
     await observer?.onUpdate(createUpdate("completed"));
+    await Bun.sleep(0);
+
+    expect(events).toEqual(["activate", "deactivate"]);
+  });
+
+  test("clears channel indicators when the active run detaches into sparse follow mode", async () => {
+    let observer: Omit<RunObserver, "lastSentAt"> | undefined;
+    const events: string[] = [];
+    const coordinator = new ConversationProcessingIndicatorCoordinator();
+    const lease = await coordinator.acquire({
+      key: "slack:C123:1",
+      activate: async () => {
+        events.push("activate");
+        return async () => {
+          events.push("deactivate");
+        };
+      },
+    });
+
+    await lease.setLifecycle({
+      agentService: {
+        hasActiveRun: () => true,
+        observeRun: async (_target: AgentSessionTarget, nextObserver: Omit<RunObserver, "lastSentAt">) => {
+          observer = nextObserver;
+          return {
+            active: true,
+            update: createUpdate("running"),
+          };
+        },
+        detachRunObserver: async () => ({ detached: true }),
+      } as any,
+      sessionTarget: createTarget(),
+      observerId: "processing:slack:C123:1",
+      lifecycle: "active-run",
+    });
+    await lease.release();
+
+    expect(events).toEqual(["activate"]);
+
+    await observer?.onUpdate(createUpdate("detached"));
     await Bun.sleep(0);
 
     expect(events).toEqual(["activate", "deactivate"]);

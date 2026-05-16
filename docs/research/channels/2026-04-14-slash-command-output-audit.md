@@ -578,7 +578,7 @@ Available values:
 - `queue`: enqueue later user messages behind the active run and settle them one by one
 
 Per-message override:
-- `/queue <message>` always uses queued delivery for that one message
+- `/queue <message>` always uses queued execution for that one message
 ```
 
 Current mutation output pattern:

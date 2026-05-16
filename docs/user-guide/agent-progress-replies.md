@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Use this page when you want to test the chatbot flow where Codex or Claude sends short progress updates back to Slack or Telegram while it is still working.
+Use this page when you want to test the chatbot flow where Codex or Claude sends short progress updates back to Slack, Telegram, or Zalo Bot while it is still working.
 
 ## What clisbot Does
 
@@ -10,7 +10,7 @@ Current local developer flow has three parts:
 
 1. `clisbot` creates a stable local wrapper at `~/.clisbot/bin/clisbot`
 2. runner-launched agent sessions get that wrapper path exported during startup
-3. Slack and Telegram prepend a short hidden system block to the agent-bound prompt with the exact reply command for the current conversation
+3. Slack, Telegram, and Zalo Bot prepend a short hidden system block to the agent-bound prompt with the exact reply command for the current conversation
 
 That means the agent can be running inside another workspace and still send progress updates with a machine-local command that does not depend on its current working directory.
 
@@ -24,7 +24,7 @@ bun run start --cli codex --bot-type team
 
 Then:
 
-1. send a real human message in the configured Slack or Telegram test surface
+1. send a real human message in the configured Slack, Telegram, or Zalo Bot test surface
 2. let clisbot route that message to the configured agent
 3. the agent prompt now includes the exact local reply command for that conversation
 4. the agent can send progress updates and the final reply through `clisbot message send ...`
@@ -127,7 +127,7 @@ The local wrapper fixes that by always pointing back to the active local `clisbo
 
 ## Config
 
-Slack and Telegram now expose a small prompt policy block:
+Slack, Telegram, and Zalo Bot now expose a small prompt policy block:
 
 ```json
 "agentPrompt": {
@@ -154,7 +154,7 @@ User-visible reply delivery is configured beside `streaming` and `response`:
 
 - `capture-pane`: existing clisbot behavior. The channel posts progress or final settlement from normalized runner output.
 - `message-tool`: clisbot still captures and observes the runner pane for state, but canonical progress and final replies are expected to happen through `clisbot message send ...` from the agent prompt flow.
-- `streaming` now affects both response modes. In `message-tool`, enabled streaming means clisbot may keep one disposable live draft preview visible while the run is active.
+- `streaming` now affects both response modes. In `message-tool`, enabled streaming means clisbot may keep one live draft preview visible while the run is active only on channels that can update a live reply. Slack and Telegram can edit or clear that draft; append-only channels such as current Zalo Bot skip live draft previews entirely and use standalone lifecycle notifications plus final or pane-fallback settlement.
 - `steer`: when a session is already active, later human messages are sent straight into that live session as steering input.
 - `queue`: when a session is already active, later human messages wait behind the current run and clisbot settles them one by one.
 - `surfaceNotifications.queueStart`: controls whether a queued turn announces when it actually starts running.
@@ -162,16 +162,16 @@ User-visible reply delivery is configured beside `streaming` and `response`:
 - notification modes are `none`, `brief`, or `full`, with `brief` as the shipped default.
 - `surfaceNotifications` is independent of `streaming`. `streaming` controls previews or placeholders; `surfaceNotifications` controls explicit start announcements.
 
-Use `message-tool` when you want to avoid duplicate replies or raw pane-derived final settlement while still keeping tmux observation available for status, attach, watch, and internal runtime logic.
+Use `message-tool` when you want the agent's `clisbot message send ...` replies to win over pane-derived output while still keeping tmux observation available for status, attach, watch, and internal runtime logic. If no tool final arrives, clisbot falls back to normal pane-derived settlement so the user is not left without a final result.
 
 When `message-tool` and streaming are both enabled, the user-visible rules are:
 
-- clisbot keeps at most one active live draft preview message
-- if a tool-owned reply lands in the thread, that draft freezes
-- if later preview-worthy output appears, clisbot opens one new draft below that boundary
+- clisbot keeps at most one active live draft preview message on channels that can update it
+- if a tool-owned reply lands in the thread, that draft is handed off and preview updates stop for that run
+- a progress-only tool reply is not a final reply; only a tool final suppresses pane-derived final fallback
 - once a tool final is seen, the draft stops updating
-- on successful completion with `response: "final"`, the disposable draft is removed
-- if the tool path never sends a final reply, clisbot does not auto-settle from pane output; the tool path remains the only canonical reply source
+- on successful completion with `response: "final"`, the disposable draft is removed only on channels that support clearing it
+- if the tool path never sends a final reply, clisbot falls back to pane-derived settlement
 
 Use `additionalMessageMode: "steer"` when you want natural chatbot follow-ups to influence the current active run immediately.
 
@@ -366,6 +366,7 @@ clisbot routes set-additional-message-mode --channel slack dm:U1234567890 --bot 
 clisbot routes set-additional-message-mode --channel telegram group:-1001234567890 --bot default --mode steer
 clisbot routes set-additional-message-mode --channel telegram topic:-1001234567890:42 --bot default --mode queue
 clisbot routes set-additional-message-mode --channel telegram dm:123456789 --bot default --mode steer
+clisbot routes set-additional-message-mode --channel zalo-bot dm:aaa741c34d8fa4d1fd9e --bot default --mode queue
 ```
 
 Agent response-mode status and updates:
@@ -386,7 +387,7 @@ clisbot agents additional-message-mode clear --agent reviewer
 
 Status surfaces:
 
-- `clisbot status` shows provider-level `responseMode` and `additionalMessageMode` for Slack and Telegram plus any per-agent overrides in the agent summary.
+- `clisbot status` shows provider-level `responseMode` and `additionalMessageMode` for Slack, Telegram, and Zalo Bot plus any per-agent overrides in the agent summary.
 - `/status` shows the active route `responseMode`, `additionalMessageMode`, `surfaceNotifications.queueStart`, and `surfaceNotifications.loopStart` for the current conversation.
 - `/streaming status` shows the active route value plus the current persisted surface target value.
 - `/responsemode status` shows the active route value plus the current persisted surface target value.

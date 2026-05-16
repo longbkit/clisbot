@@ -236,7 +236,7 @@ describe("processChannelInteraction message-tool settlement", () => {
     expect(posted).toHaveLength(0);
   });
 
-  test("does not post pane timeout settlement when message-tool mode has streaming off and no tool final arrives", async () => {
+  test("posts pane timeout settlement when message-tool mode has streaming off and no tool final arrives", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -276,7 +276,8 @@ describe("processChannelInteraction message-tool settlement", () => {
       },
     });
 
-    expect(posted).toHaveLength(0);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("timeout pane output");
     expect(reconciled).toEqual([]);
   });
 

@@ -6,23 +6,31 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-`v0.1.53-beta.4` is the fourth beta for the channel/control/config/agents
+`v0.1.53-beta.5` is the fifth beta for the channel/control/config/agents
 boundary cleanup and release-workflow hardening after `v0.1.52`. It fixes a
 beta.1 runtime status regression for legacy configs that do not yet contain
 disabled provider bot records for every built-in channel, and removes
 release-only recovery guidance from update help. It also fixes a CLI count-loop
 regression where `clisbot loops create ... 3 ...` waited for the target session
-to become idle instead of reserving queue items immediately.
+to become idle instead of reserving queue items immediately. The fifth beta
+tightens queue/message-tool settlement, channel recent-context handling,
+append-only Zalo Bot streaming truthfulness, and Slack persistent indicator
+cleanup after runtime restart or reload.
 
 ## Operator Impact
 
 - Required action: beta testers should install from the `beta` npm dist-tag.
 - Behavior users should notice: CLI count/times loops now match chat `/loop`
   behavior by reserving all iterations as durable queue items immediately,
-  including when the target session is already running.
+  including when the target session is already running. Queued and immediate
+  `message-tool` runs now share the same settlement rule: a fresh final
+  `message-tool` reply wins, and pane-derived settlement is the fallback when no
+  final tool reply arrives.
 - Compatibility notes: no manual config migration is required for this beta.
 - Known risks: broad internal file moves may still expose stale import or package
   layout issues in environments not covered by the local/live test matrix.
+  Zalo Bot remains append-only and therefore does not support live draft
+  streaming previews.
 
 ## Functional Changes
 
@@ -45,6 +53,22 @@ to become idle instead of reserving queue items immediately.
 - Fixed CLI count/times loops so `clisbot loops create ... 3 ...` no longer
   waits for target-session idleness and instead persists every requested
   iteration as a pending queue item.
+- Fixed explicit `/queue` and route-queued `message-tool` settlement so queue
+  start notifications are standalone lifecycle messages, not editable streaming
+  drafts, and final settlement follows the same fresh-final-marker rule as
+  normal prompt delivery.
+- Fixed progress-only `message-tool` replies so they do not suppress pane
+  fallback settlement unless a fresh final marker is present.
+- Fixed recent conversation replay so Slack, Telegram, and Zalo Bot all store
+  slash/control commands as marker-only entries instead of leaking prior control
+  text into the next prompt.
+- Fixed Zalo Bot live streaming truthfulness: Zalo Bot is append-only, so
+  `/streaming on`, `/streaming latest`, and `/streaming all` now report that live
+  preview streaming is unsupported instead of mutating config and duplicating
+  progress bubbles.
+- Fixed Slack processing indicators so assistant thread status clears when runs
+  detach or complete, and stale persistent Slack statuses are swept for idle
+  thread sessions when the Slack service starts after a restart or reload.
 
 ## Non-Functional Changes
 
@@ -59,10 +83,16 @@ to become idle instead of reserving queue items immediately.
   immediately even when the target session runtime is already `running`.
 - Updated loop CLI help and user/docs test expectations so future agents see
   the queue-reservation contract instead of the removed synchronous CLI model.
+- Added cross-channel regression coverage for queue/message-tool settlement,
+  append-only Zalo Bot streaming, recent-context slash command filtering, and
+  Slack persistent indicator recovery.
+- Updated channel integration and agent progress docs to make live reply update
+  capability explicit: channels that cannot update or clear an existing reply
+  must not fake streaming reconcile by posting duplicate progress messages.
 
 ## Update Notes
 
-- Update path: `0.1.52` -> `0.1.53-beta.4`
+- Update path: `0.1.52` -> `0.1.53-beta.5`
 - Manual action: none
 - Risk level: medium because this is a broad refactor beta
 - Automatic config update: no new schema migration is introduced by this beta
@@ -78,6 +108,9 @@ to become idle instead of reserving queue items immediately.
 - `0.1.53-beta.4`: fixes CLI count/times loop creation to reserve durable
   queue items immediately instead of waiting for the target session to become
   idle.
+- `0.1.53-beta.5`: fixes queue/message-tool settlement, recent-context command
+  filtering, Zalo Bot append-only streaming truthfulness, and Slack persistent
+  indicator cleanup after restart or reload.
 
 ## Validation
 
@@ -86,6 +119,8 @@ to become idle instead of reserving queue items immediately.
 - `git diff --check`
 - `npm publish --dry-run --access public`
 - Targeted CLI/channel loop regression tests for count-loop queue reservation.
+- Targeted queue/message-tool, recent-context, Zalo Bot, Slack indicator, and
+  channel breadth regression tests.
 - Live Slack queue, loop, slash command, help, and message E2E were validated
   during the refactor test matrix.
 

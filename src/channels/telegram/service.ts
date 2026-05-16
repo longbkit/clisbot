@@ -9,6 +9,7 @@ import {
 } from "../../agents/commands/commands.ts";
 import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { buildRecentConversationMessage } from "../message/recent-conversation.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
 import {
   isChannelSenderAllowed,
@@ -758,9 +759,9 @@ export class TelegramPollingService {
       : rawText;
     const recentMessageMarker = String(message.message_id);
     if (rawText || explicitMention || slashCommand) {
-      await this.agentService.appendRecentConversationMessage(sessionTarget, {
+      await this.agentService.appendRecentConversationMessage(sessionTarget, buildRecentConversationMessage({
         marker: recentMessageMarker,
-        text: slashCommand ? "" : textBody,
+        text: textBody,
         senderId:
           message.from?.id != null ? String(message.from.id).trim() : undefined,
         senderName: [message.from?.first_name, message.from?.last_name]
@@ -769,7 +770,9 @@ export class TelegramPollingService {
           .trim() || message.from?.username?.trim() || undefined,
         senderHandle: message.from?.username?.trim() || undefined,
         platform: "telegram",
-      });
+        commandPrefixes: route.commandPrefixes,
+        isCommand: Boolean(slashCommand),
+      }));
     }
     if (route.requireMention && !wasMentioned) {
       await this.processedEventsStore.markCompleted(eventId);

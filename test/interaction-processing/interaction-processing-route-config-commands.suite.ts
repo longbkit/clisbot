@@ -135,6 +135,78 @@ describe("processChannelInteraction route config commands", () => {
     expect(posted[0]).toContain("persists as `all`");
   });
 
+  test("rejects enabling streaming on append-only channels without mutating config", async () => {
+    const posted: string[] = [];
+    const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    const configDir = mkdtempSync(join(tmpdir(), "clisbot-interaction-config-"));
+    const configPath = join(configDir, "clisbot.json");
+    const template = JSON.parse(renderDefaultConfigTemplate());
+
+    try {
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          ...template,
+          bots: {
+            ...template.bots,
+            zaloBot: {
+              ...template.bots.zaloBot,
+              default: {
+                ...template.bots.zaloBot.default,
+                directMessages: {
+                  "user-123": {
+                    enabled: true,
+                    streaming: "off",
+                  },
+                },
+              },
+            },
+          },
+        }, null, 2),
+      );
+      process.env.CLISBOT_CONFIG_PATH = configPath;
+
+      await processChannelInteraction({
+        agentService: {
+          recordConversationReply: async () => undefined,
+        } as any,
+        sessionTarget: {
+          agentId: "default",
+          sessionKey: "agent:default:zalo-bot:dm:user-123",
+        },
+        identity: createIdentity({
+          platform: "zalo-bot",
+          conversationKind: "dm",
+          senderId: "user-123",
+          channelId: undefined,
+          threadTs: undefined,
+          chatId: "user-123",
+        }),
+        senderId: "user-123",
+        text: "/streaming on",
+        route: createRoute({
+          streaming: "off",
+        }),
+        canUpdateLiveReply: false,
+        maxChars: 2000,
+        postText: async (text) => {
+          posted.push(text);
+          return [text];
+        },
+        reconcileText: async (_chunks, text) => [text],
+      });
+
+      const configAfter = JSON.parse(readFileSync(configPath, "utf8"));
+      expect(configAfter.bots.zaloBot.default.directMessages["user-123"].streaming).toBe("off");
+    } finally {
+      process.env.CLISBOT_CONFIG_PATH = originalConfigPath;
+      rmSync(configDir, { recursive: true, force: true });
+    }
+
+    expect(posted[0]).toContain("Streaming live preview is not supported on this channel.");
+    expect(posted[0]).toContain("duplicate progress messages");
+  });
+
   test("shows persisted streaming mode for a telegram topic that inherits from its group route", async () => {
     const posted: string[] = [];
     const originalConfigPath = process.env.CLISBOT_CONFIG_PATH;

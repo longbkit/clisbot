@@ -239,7 +239,7 @@ describe("processChannelInteraction loop scheduling", () => {
     expect(enqueued).toHaveLength(3);
   });
 
-  test("loop times mode does not leak pane timeout settlements in message-tool mode when streaming is off", async () => {
+  test("loop times mode settles timed-out message-tool iterations through pane fallback when streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     const enqueued: string[] = [];
@@ -295,10 +295,10 @@ describe("processChannelInteraction loop scheduling", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(4);
     expect(posted[0]).toContain("Started loop for 3 iterations.");
-    expect(posted.some((text) => text.includes("Timed out waiting for more output"))).toBe(false);
-    expect(posted.some((text) => text.includes("timed out pane"))).toBe(false);
+    expect(posted.filter((text) => text.includes("Timed out waiting for more output"))).toHaveLength(3);
+    expect(posted.filter((text) => text.includes("timed out pane"))).toHaveLength(3);
     expect(reconciled).toEqual([]);
     expect(enqueued).toHaveLength(3);
   });

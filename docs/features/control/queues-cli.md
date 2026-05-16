@@ -4,7 +4,7 @@
 queued prompts.
 
 It uses the same routed session model as loop creation: operators address a
-Slack or Telegram surface, and clisbot stores the queued prompt under that
+supported message surface, and clisbot stores the queued prompt under that
 session entry.
 
 ## Commands

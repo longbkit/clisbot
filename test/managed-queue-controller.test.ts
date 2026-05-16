@@ -51,7 +51,7 @@ function createResolvedTarget(
 }
 
 describe("managed durable queue", () => {
-  test("settles a persisted running item when the queued run sends a message-tool final", async () => {
+  test("clears a persisted item without pane settlement when the queued run sends a message-tool final", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
     try {
       const sessionState = new AgentSessionState(new SessionStore(join(tempDir, "sessions.json")));
@@ -111,6 +111,74 @@ describe("managed durable queue", () => {
       await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 5_000);
       expect(await sessionState.listQueuedItems()).toEqual([]);
       expect(settlementNotifications).toBe(0);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, { timeout: 15_000 });
+
+  test("uses pane settlement when a persisted queued run sends only a progress message-tool reply", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-managed-queue-"));
+    try {
+      const sessionState = new AgentSessionState(new SessionStore(join(tempDir, "sessions.json")));
+      const resolved = createResolvedTarget(tempDir);
+      const item = createStoredQueueItem({
+        promptText: "queued prompt",
+        promptSummary: "queued prompt",
+        surfaceBinding: {
+          platform: "zalo-bot",
+          accountId: "default",
+          conversationKind: "dm",
+          chatId: "user-123",
+        },
+      });
+      await sessionState.setQueuedItem(resolved, item);
+
+      const settlementSnapshots: string[] = [];
+      const controller = new ManagedQueueController({
+        queue: new AgentJobQueue(),
+        sessionState,
+        activeRuns: {
+          executePrompt: async () => {
+            await sessionState.setSessionRuntime(resolved, {
+              state: "running",
+              startedAt: Date.now(),
+            });
+            await sessionState.recordConversationReply(resolved, "reply", "message-tool");
+            return {
+              status: "completed",
+              agentId: resolved.agentId,
+              sessionKey: resolved.sessionKey,
+              sessionName: resolved.sessionName,
+              workspacePath: resolved.workspacePath,
+              snapshot: "pane fallback final",
+              fullSnapshot: "pane fallback final",
+              initialSnapshot: "",
+            };
+          },
+        } as any,
+        surfaceRuntime: {
+          notifyManagedQueueStart: async () => undefined,
+          buildManagedQueuePrompt: async () => "queued prompt",
+          notifyManagedQueueSettlement: async (_target: unknown, _item: unknown, update: {
+            snapshot: string;
+          }) => {
+            settlementSnapshots.push(update.snapshot);
+          },
+          notifyManagedQueueFailure: async () => undefined,
+        } as any,
+        getQueueConfig: () => ({ maxPendingItemsPerSession: 10 }),
+        resolveTarget: () => resolved,
+        hasBlockingActiveRun: async () => false,
+        shouldSuppressShutdownError: () => false,
+      });
+
+      await controller.reconcilePersistedQueueItems();
+
+      await waitForCondition(async () => settlementSnapshots.length === 1, 5_000);
+      await waitForCondition(async () => (await sessionState.listQueuedItems()).length === 0, 5_000);
+
+      expect(settlementSnapshots).toEqual(["pane fallback final"]);
+      expect(await sessionState.listQueuedItems()).toEqual([]);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

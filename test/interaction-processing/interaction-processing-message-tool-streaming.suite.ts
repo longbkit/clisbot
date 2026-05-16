@@ -161,7 +161,7 @@ describe("processChannelInteraction message-tool streaming", () => {
     expect(observedPrompt).not.toBe("stale prompt envelope");
   });
 
-  test("does not post a pane final settlement when message-tool mode has streaming off and no tool final arrives", async () => {
+  test("posts a pane final settlement when message-tool mode has streaming off and no tool final arrives", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
 
@@ -202,11 +202,12 @@ describe("processChannelInteraction message-tool streaming", () => {
       },
     });
 
-    expect(posted).toHaveLength(0);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("final pane output");
     expect(reconciled).toEqual([]);
   });
 
-  test("streams one live preview and leaves it unchanged when no tool final arrives", async () => {
+  test("streams one live preview and settles with pane output when no tool final arrives", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     const runtime = {
@@ -265,11 +266,11 @@ describe("processChannelInteraction message-tool streaming", () => {
 
     expect(posted).toHaveLength(1);
     expect(posted[0]).toContain("Working");
-    expect(reconciled.at(-1)).toContain("working draft");
+    expect(reconciled.at(-1)).toContain("final pane output");
     expect(reconciled.at(-1)).not.toContain("Working...");
   });
 
-  test("hands off the live draft after a message-tool reply boundary", async () => {
+  test("hands off the live draft after a message-tool progress boundary and still falls back without a final", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];
     const runtime = {
@@ -338,13 +339,75 @@ describe("processChannelInteraction message-tool streaming", () => {
       },
     });
 
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
+    expect(posted.at(-1)).toContain("final pane output");
     expect(reconciled.some((text) => text.includes("draft one"))).toBe(true);
-    expect(reconciled.at(-1)).toBe("");
+    expect(reconciled).toContain("");
     expect(posted.join("\n")).not.toContain("draft two");
     expect(reconciled.join("\n")).not.toContain("draft two");
-    expect(posted.join("\n")).not.toContain("final pane output");
-    expect(reconciled.join("\n")).not.toContain("final pane output");
+  });
+
+  test("progress-only message-tool replies still get a pane fallback when completion has no visible body", async () => {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "draft before progress",
+              fullSnapshot: "draft before progress",
+              initialSnapshot: "",
+            });
+            runtime.lastMessageToolReplyAt = Date.now();
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "",
+              fullSnapshot: "",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return text ? [text] : [];
+      },
+    });
+
+    expect(reconciled).toContain("");
+    expect(posted.at(-1)).toContain("Completed with no new visible output");
   });
 
   test("does not resume the live draft after a message-tool boundary was already handed off", async () => {
@@ -571,6 +634,265 @@ describe("processChannelInteraction message-tool streaming", () => {
     expect(posted).toHaveLength(1);
     expect(reconciled.some((text) => text.includes("draft before final"))).toBe(true);
     expect(reconciled.at(-1)).toBe("");
+  });
+
+  test("append-only channels fall back to pane final after a progress-only message-tool reply", async () => {
+    const visible: string[] = [];
+    let clearAttempts = 0;
+    const target: AgentSessionTarget = {
+      agentId: "default",
+      sessionKey: "agent:default:zalo-bot:dm:user-123",
+    };
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "append-only draft",
+              fullSnapshot: "append-only draft",
+              initialSnapshot: "",
+            });
+            runtime.lastMessageToolReplyAt = Date.now();
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "ignored after progress reply",
+              fullSnapshot: "ignored after progress reply",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "append-only pane final",
+              fullSnapshot: "append-only pane final",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: target,
+      identity: createIdentity({
+        platform: "zalo-bot",
+        conversationKind: "dm",
+        senderId: "user-123",
+        channelId: undefined,
+        threadTs: undefined,
+      }),
+      senderId: "user-123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+        response: "final",
+      }),
+      canUpdateLiveReply: false,
+      maxChars: 2000,
+      postText: async (text) => {
+        visible.push(text);
+        return text ? [{ text }] : [];
+      },
+      reconcileText: async (_chunks, text) => {
+        if (!text) {
+          clearAttempts += 1;
+          return [];
+        }
+        visible.push(text);
+        return [{ text }];
+      },
+    });
+
+    expect(visible.join("\n")).not.toContain("append-only draft");
+    expect(visible.join("\n")).not.toContain("ignored after progress reply");
+    expect(visible.at(-1)).toContain("append-only pane final");
+    expect(clearAttempts).toBe(0);
+  });
+
+  test("append-only channels do not stream duplicate pane previews", async () => {
+    const visible: string[] = [];
+    let reconcileCalls = 0;
+    const target: AgentSessionTarget = {
+      agentId: "default",
+      sessionKey: "agent:default:zalo-bot:dm:user-123",
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 2,
+          persisted: Promise.resolve(),
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "first live pane preview",
+              fullSnapshot: "first live pane preview",
+              initialSnapshot: "",
+            });
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "second live pane preview",
+              fullSnapshot: "second live pane preview",
+              initialSnapshot: "",
+            });
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "append-only final",
+              fullSnapshot: "append-only final",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: target,
+      identity: createIdentity({
+        platform: "zalo-bot",
+        conversationKind: "dm",
+        senderId: "user-123",
+        channelId: undefined,
+        threadTs: undefined,
+      }),
+      senderId: "user-123",
+      text: "/queue summarize later",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+        response: "final",
+      }),
+      canUpdateLiveReply: false,
+      maxChars: 2000,
+      postText: async (text) => {
+        visible.push(text);
+        return text ? [{ text }] : [];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconcileCalls += 1;
+        visible.push(text);
+        return text ? [{ text }] : [];
+      },
+    });
+
+    const rendered = visible.join("\n");
+    expect(rendered).toContain("Queued: 2 ahead.");
+    expect(rendered).not.toContain("Working");
+    expect(rendered).not.toContain("first live pane preview");
+    expect(rendered).not.toContain("second live pane preview");
+    expect(visible.at(-1)).toContain("append-only final");
+    expect(reconcileCalls).toBe(0);
+  });
+
+  test("append-only channels do not leak pane Done after a message-tool final marker", async () => {
+    const visible: string[] = [];
+    let clearAttempts = 0;
+    const target: AgentSessionTarget = {
+      agentId: "default",
+      sessionKey: "agent:default:zalo-bot:dm:user-123",
+    };
+    const runtime = {
+      state: "running" as const,
+      startedAt: Date.now(),
+      lastMessageToolReplyAt: undefined as number | undefined,
+      messageToolFinalReplyAt: undefined as number | undefined,
+    };
+
+    await processChannelInteraction({
+      agentService: {
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 0,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "append-only draft before final",
+              fullSnapshot: "append-only draft before final",
+              initialSnapshot: "",
+            });
+            runtime.lastMessageToolReplyAt = Date.now();
+            runtime.messageToolFinalReplyAt = runtime.lastMessageToolReplyAt;
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: target.sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "Done.",
+              fullSnapshot: "Done.",
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        getSessionRuntime: async () => runtime,
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: target,
+      identity: createIdentity({
+        platform: "zalo-bot",
+        conversationKind: "dm",
+        senderId: "user-123",
+        channelId: undefined,
+        threadTs: undefined,
+      }),
+      senderId: "user-123",
+      text: "investigate this",
+      route: createRoute({
+        responseMode: "message-tool",
+        streaming: "all",
+        response: "final",
+      }),
+      canUpdateLiveReply: false,
+      maxChars: 2000,
+      postText: async (text) => {
+        visible.push(text);
+        return text ? [{ text }] : [];
+      },
+      reconcileText: async (_chunks, text) => {
+        if (!text) {
+          clearAttempts += 1;
+          return [];
+        }
+        visible.push(text);
+        return [{ text }];
+      },
+    });
+
+    expect(visible.join("\n")).not.toContain("append-only draft before final");
+    expect(visible.join("\n")).not.toContain("Done.");
+    expect(clearAttempts).toBe(0);
   });
 
 });

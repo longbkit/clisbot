@@ -32,6 +32,56 @@ function createLoadedConfig() {
 }
 
 describe("SlackSocketService shared audience enforcement", () => {
+  test("clears stale assistant statuses for idle Slack thread sessions on startup", async () => {
+    const calls: Array<{ channel_id: string; thread_ts: string; status: string }> = [];
+
+    await (SlackSocketService.prototype as any).clearStaleAssistantStatusesOnStart.call({
+      agentService: {
+        listSessionEntries: async () => [
+          {
+            sessionKey: "agent:default:slack:channel:c123:thread:1778930330.832089",
+            runtime: { state: "idle" },
+          },
+          {
+            sessionKey: "agent:default:slack:channel:c123:thread:1778930330.832089",
+            runtime: { state: "idle" },
+          },
+          {
+            sessionKey: "agent:default:slack:channel:c456:thread:1778930331.000000",
+            runtime: { state: "running" },
+          },
+          {
+            sessionKey: "agent:default:telegram:group:-1001:topic:4",
+            runtime: { state: "idle" },
+          },
+        ],
+      },
+      app: {
+        client: {
+          assistant: {
+            threads: {
+              setStatus: async (payload: {
+                channel_id: string;
+                thread_ts: string;
+                status: string;
+              }) => {
+                calls.push(payload);
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(calls).toEqual([
+      {
+        channel_id: "C123",
+        thread_ts: "1778930330.832089",
+        status: "",
+      },
+    ]);
+  });
+
   test("drops routed bot-originated messages when allowBots is false", async () => {
     const completed: string[] = [];
 
