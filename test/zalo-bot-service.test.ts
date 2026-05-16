@@ -3,13 +3,28 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resetOwnerClaimRuntimeForTests } from "../src/auth/owner-claim.ts";
+import type { OrderedIngressDispatcher } from "../src/channels/message/ordered-ingress-dispatcher.ts";
 import { ProcessedEventsStore } from "../src/channels/message/processed-events-store.ts";
 import type { ZaloBotUpdate } from "../src/channels/zalo-bot/api.ts";
-import { ZaloBotPollingService } from "../src/channels/zalo-bot/service.ts";
+import {
+  dispatchZaloBotUpdates,
+  ZaloBotPollingService,
+} from "../src/channels/zalo-bot/service.ts";
 import type { LoadedConfig } from "../src/config/core/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/core/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 import { ActivityStore } from "../src/control/runtime/activity-store.ts";
+
+type TestRunResult = {
+  status: "completed";
+  agentId: string;
+  sessionKey: string;
+  sessionName: string;
+  workspacePath: string;
+  snapshot: string;
+  fullSnapshot: string;
+  initialSnapshot: string;
+};
 
 beforeEach(() => {
   resetOwnerClaimRuntimeForTests();
@@ -76,6 +91,101 @@ function createLoadedConfig(): LoadedConfig {
   };
 }
 
+function buildZaloTextUpdate(messageId: string, text: string): ZaloBotUpdate {
+  return {
+    event_name: "message.text.received",
+    message: {
+      message_id: messageId,
+      date: 1_778_831_907,
+      text,
+      from: {
+        id: "user-123",
+        display_name: "User 123",
+      },
+      chat: {
+        id: "user-123",
+        chat_type: "PRIVATE",
+      },
+    },
+  };
+}
+
+function buildCompletedRunResult(params: {
+  agentId?: string;
+  sessionKey?: string;
+  workspacePath?: string;
+  snapshot: string;
+}): TestRunResult {
+  return {
+    status: "completed",
+    agentId: params.agentId ?? "default",
+    sessionKey: params.sessionKey ?? "agent:default:zalo-bot:dm:user-123",
+    sessionName: "test-session",
+    workspacePath: params.workspacePath ?? "/tmp",
+    snapshot: params.snapshot,
+    fullSnapshot: params.snapshot,
+    initialSnapshot: "",
+  };
+}
+
+function installZaloFetchMock() {
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({
+      ok: true,
+      result: {
+        message_id: "zalo-message-1",
+      },
+    }))) as unknown as typeof fetch;
+  return () => {
+    globalThis.fetch = previousFetch;
+  };
+}
+
+function createBlockedRun() {
+  let release!: () => void;
+  const result = new Promise<TestRunResult>((resolve) => {
+    release = () => resolve(buildCompletedRunResult({
+      snapshot: "first final",
+    }));
+  });
+  return { result, release };
+}
+
+function createReleaseGate() {
+  let release!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+async function createZaloBotServiceForTest(params: {
+  loadedConfig?: LoadedConfig;
+  agentService?: unknown;
+  tempDir?: string;
+}) {
+  const tempDir = params.tempDir ?? mkdtempSync(join(tmpdir(), "clisbot-zalo-bot-service-"));
+  const service = new ZaloBotPollingService(
+    params.loadedConfig ?? createLoadedConfig(),
+    (params.agentService ?? {
+      getWorkspacePath: () => tempDir,
+      async getConversationFollowUpState() {
+        return {};
+      },
+    }) as any,
+    new ProcessedEventsStore(join(tempDir, "processed-events.json")),
+    new ActivityStore(join(tempDir, "activity.json")),
+    "default",
+    { botToken: "zalo-token" },
+    async () => undefined,
+  );
+
+  (service as any).botUserId = "bot-1";
+  (service as any).botName = "clisbot";
+  return service;
+}
+
 async function runZaloBotServiceUpdate(params: {
   loadedConfig?: LoadedConfig;
   update: ZaloBotUpdate;
@@ -100,23 +210,11 @@ async function runZaloBotServiceUpdate(params: {
   }) as typeof fetch;
 
   try {
-    const service = new ZaloBotPollingService(
-      params.loadedConfig ?? createLoadedConfig(),
-      (params.agentService ?? {
-        getWorkspacePath: () => tempDir,
-        async getConversationFollowUpState() {
-          return {};
-        },
-      }) as any,
-      new ProcessedEventsStore(join(tempDir, "processed-events.json")),
-      new ActivityStore(join(tempDir, "activity.json")),
-      "default",
-      { botToken: "zalo-token" },
-      async () => undefined,
-    );
-
-    (service as any).botUserId = "bot-1";
-    (service as any).botName = "clisbot";
+    const service = await createZaloBotServiceForTest({
+      loadedConfig: params.loadedConfig,
+      agentService: params.agentService,
+      tempDir,
+    });
     await (service as any).handleUpdate(params.update);
 
     return apiCalls;
@@ -126,7 +224,122 @@ async function runZaloBotServiceUpdate(params: {
   }
 }
 
+function createQueueDispatchAgentService(params: {
+  tempDir: string;
+  firstRunResult: Promise<TestRunResult>;
+  firstFollowUpGate?: Promise<void>;
+  queuedPrompts: string[];
+  queuePositions?: number[];
+}) {
+  let activeRun = false;
+  let followUpChecks = 0;
+  return {
+    getWorkspacePath: () => params.tempDir,
+    async getConversationFollowUpState() {
+      followUpChecks += 1;
+      if (followUpChecks === 1) {
+        await params.firstFollowUpGate;
+      }
+      return {};
+    },
+    async appendRecentConversationMessage() {},
+    async getRecentConversationReplayMessages() {
+      return [];
+    },
+    resolveEffectiveTimezone() {
+      return { timezone: "UTC" };
+    },
+    enqueuePrompt(
+      target: { agentId: string; sessionKey: string },
+      _prompt: string | (() => string),
+      callbacks?: { queueItem?: { promptText?: string } },
+    ) {
+      const isExplicitQueue = Boolean(callbacks?.queueItem);
+      const positionAhead = activeRun ? 1 : 0;
+      if (isExplicitQueue) {
+        params.queuedPrompts.push(callbacks?.queueItem?.promptText ?? "");
+        params.queuePositions?.push(positionAhead);
+      } else {
+        activeRun = true;
+        void params.firstRunResult.finally(() => {
+          activeRun = false;
+        });
+      }
+      return {
+        positionAhead,
+        persisted: Promise.resolve(),
+        result: isExplicitQueue
+          ? params.firstRunResult.then(() => buildCompletedRunResult({
+            agentId: target.agentId,
+            sessionKey: target.sessionKey,
+            workspacePath: params.tempDir,
+            snapshot: "queued final",
+          }))
+          : params.firstRunResult,
+      };
+    },
+    async recordConversationReply() {},
+    async markRecentConversationProcessed() {},
+  };
+}
+
 describe("ZaloBotPollingService DM pairing enforcement", () => {
+  test("dispatches queue messages without waiting for an earlier DM run to finish", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-zalo-bot-service-"));
+    const restoreFetch = installZaloFetchMock();
+
+    const loadedConfig = createLoadedConfig();
+    const directRoute = loadedConfig.raw.bots.zaloBot.default.directMessages["user-123"]!;
+    directRoute.requireMention = false;
+    directRoute.responseMode = "capture-pane";
+    directRoute.streaming = "off";
+
+    const firstRun = createBlockedRun();
+    const firstFollowUpGate = createReleaseGate();
+    const queuedPrompts: string[] = [];
+    const queuePositions: number[] = [];
+    let tasks: Promise<void>[] = [];
+
+    try {
+      const service = await createZaloBotServiceForTest({
+        loadedConfig,
+        tempDir,
+        agentService: createQueueDispatchAgentService({
+          tempDir,
+          firstRunResult: firstRun.result,
+          firstFollowUpGate: firstFollowUpGate.promise,
+          queuedPrompts,
+          queuePositions,
+        }),
+      });
+
+      tasks = dispatchZaloBotUpdates({
+        updates: [
+          buildZaloTextUpdate("msg-running", "hi"),
+          buildZaloTextUpdate("msg-queue", "/queue 1+1"),
+        ],
+        dispatcher: (service as unknown as {
+          ingressDispatcher: OrderedIngressDispatcher<ZaloBotUpdate>;
+        }).ingressDispatcher,
+      });
+
+      await Bun.sleep(20);
+      expect(queuedPrompts).toEqual([]);
+
+      firstFollowUpGate.release();
+      for (let attempt = 0; attempt < 20 && queuedPrompts.length === 0; attempt += 1) {
+        await Bun.sleep(10);
+      }
+      expect(queuedPrompts).toEqual(["1+1"]);
+      expect(queuePositions).toEqual([1]);
+    } finally {
+      firstRun.release();
+      await Promise.allSettled(tasks);
+      restoreFetch();
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("uses the sender-specific DM route before asking for pairing", async () => {
     let followUpChecks = 0;
     const apiCalls = await runZaloBotServiceUpdate({

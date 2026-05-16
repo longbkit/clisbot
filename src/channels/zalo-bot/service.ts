@@ -35,6 +35,10 @@ import {
 import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 import type { ChannelRuntimeLifecycleEvent } from "../integration/channel-plugin.ts";
 import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
+import {
+  OrderedIngressDispatcher,
+  type OrderedIngressControls,
+} from "../message/ordered-ingress-dispatcher.ts";
 import { buildMentionOnlyFollowUpPrompt } from "../config/mention-follow-up.ts";
 import {
   ZaloBotApiError,
@@ -60,11 +64,31 @@ import {
 import { beginZaloBotTypingHeartbeat } from "./typing.ts";
 import { resolveZaloBotAttachmentPaths } from "./attachments.ts";
 
+export function dispatchZaloBotUpdates(params: {
+  updates: ZaloBotUpdate | ZaloBotUpdate[] | null | undefined;
+  dispatcher: OrderedIngressDispatcher<ZaloBotUpdate>;
+}) {
+  const updates = Array.isArray(params.updates)
+    ? params.updates
+    : params.updates
+      ? [params.updates]
+      : [];
+  return params.dispatcher.dispatch(updates);
+}
+
 export class ZaloBotPollingService {
   private botUserId = "";
   private botName = "";
   private running = false;
   private loopPromise?: Promise<void>;
+  private readonly inFlightUpdates = new Set<Promise<void>>();
+  private readonly ingressDispatcher = new OrderedIngressDispatcher<ZaloBotUpdate>(
+    (update) => getZaloBotIngressKey(this.botId, update),
+    (update, controls) => this.handleUpdate(update, controls),
+    (error) => {
+      console.error("zalo-bot handler error", error);
+    },
+  );
   private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
 
   constructor(
@@ -96,6 +120,7 @@ export class ZaloBotPollingService {
   async stop() {
     this.running = false;
     await this.loopPromise;
+    await Promise.allSettled([...this.inFlightUpdates]);
   }
 
   getRuntimeIdentity() {
@@ -110,11 +135,17 @@ export class ZaloBotPollingService {
     while (this.running) {
       const config = this.getBotConfig();
       try {
-        const update = await getZaloBotUpdates({
+        const updates = await getZaloBotUpdates({
           token: this.botCredentials.botToken,
           timeoutSeconds: config.polling.timeoutSeconds,
         });
-        await this.handleUpdate(update);
+        const tasks = dispatchZaloBotUpdates({
+          updates,
+          dispatcher: this.ingressDispatcher,
+        });
+        for (const task of tasks) {
+          this.trackInFlightUpdate(task);
+        }
       } catch (error) {
         if (error instanceof ZaloBotApiError && error.isPollingTimeout) {
           continue;
@@ -130,7 +161,17 @@ export class ZaloBotPollingService {
     }
   }
 
-  private async handleUpdate(update: ZaloBotUpdate) {
+  private trackInFlightUpdate(task: Promise<void>) {
+    this.inFlightUpdates.add(task);
+    task.finally(() => {
+      this.inFlightUpdates.delete(task);
+    });
+  }
+
+  private async handleUpdate(
+    update: ZaloBotUpdate,
+    controls?: OrderedIngressControls,
+  ) {
     const skipReason = getZaloBotUpdateSkipReason(update);
     if (skipReason) {
       return;
@@ -145,7 +186,7 @@ export class ZaloBotPollingService {
 
     await this.processedEventsStore.markProcessing(eventId);
     try {
-      await this.handleInboundMessage(eventId, message);
+      await this.handleInboundMessage(eventId, message, controls);
       await this.processedEventsStore.markCompleted(eventId);
     } catch (error) {
       await this.processedEventsStore.clear(eventId);
@@ -153,7 +194,11 @@ export class ZaloBotPollingService {
     }
   }
 
-  private async handleInboundMessage(eventId: string, message: ZaloBotMessage) {
+  private async handleInboundMessage(
+    eventId: string,
+    message: ZaloBotMessage,
+    controls?: OrderedIngressControls,
+  ) {
     if (isZaloBotOriginatedMessage(message)) {
       return;
     }
@@ -446,6 +491,7 @@ export class ZaloBotPollingService {
             sessionTarget,
             recentMessageMarker,
           );
+          controls?.markAccepted();
         },
         route,
         maxChars: 2000,
@@ -480,4 +526,13 @@ export class ZaloBotPollingService {
       action: "typing",
     });
   }
+}
+
+function getZaloBotIngressKey(botId: string, update: ZaloBotUpdate) {
+  const message = update.message;
+  const chatId = message?.chat?.id?.trim();
+  if (!chatId) {
+    return undefined;
+  }
+  return `zalo-bot:${botId}:${chatId}`;
 }

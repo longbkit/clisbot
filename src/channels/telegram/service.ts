@@ -78,6 +78,10 @@ import { renderTelegramRouteChoiceMessage } from "./route-guidance.ts";
 import { beginTelegramTypingHeartbeat } from "./typing.ts";
 import { buildTokenHint } from "../integration/channel-runtime-identity.ts";
 import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
+import {
+  OrderedIngressDispatcher,
+  type OrderedIngressControls,
+} from "../message/ordered-ingress-dispatcher.ts";
 import type { ChannelRuntimeLifecycleEvent } from "../integration/channel-plugin.ts";
 import { renderGroupRouteAccessDeniedMessage } from "../config/route-policy.ts";
 
@@ -228,18 +232,14 @@ export function buildTelegramCommandRegistrations(
 
 export function dispatchTelegramUpdates(params: {
   updates: TelegramUpdate[];
-  handleUpdate: (update: TelegramUpdate) => Promise<void>;
-  onUnhandledError?: (error: unknown, update: TelegramUpdate) => void;
+  dispatcher: OrderedIngressDispatcher<TelegramUpdate>;
 }) {
   const tasks: Promise<void>[] = [];
   let nextUpdateId: number | undefined;
 
   for (const update of params.updates) {
     nextUpdateId = update.update_id + 1;
-    const task = params.handleUpdate(update).catch((error) => {
-      params.onUnhandledError?.(error, update);
-    });
-    tasks.push(task);
+    tasks.push(...params.dispatcher.dispatch([update]));
   }
 
   return {
@@ -258,6 +258,13 @@ export class TelegramPollingService {
   private pollingConflictActive = false;
   private pollingConflictAttempt = 0;
   private readonly inFlightUpdates = new Set<Promise<void>>();
+  private readonly ingressDispatcher = new OrderedIngressDispatcher<TelegramUpdate>(
+    (update) => getTelegramIngressKey(this.botId, update),
+    (update, controls) => this.handleUpdate(update, controls),
+    (error) => {
+      console.error("telegram handler error", error);
+    },
+  );
   private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
 
   constructor(
@@ -374,10 +381,7 @@ export class TelegramPollingService {
 
         const dispatched = dispatchTelegramUpdates({
           updates,
-          handleUpdate: (update) => this.handleUpdate(update),
-          onUnhandledError: (error) => {
-            console.error("telegram handler error", error);
-          },
+          dispatcher: this.ingressDispatcher,
         });
         if (dispatched.nextUpdateId != null) {
           this.nextUpdateId = dispatched.nextUpdateId;
@@ -459,7 +463,10 @@ export class TelegramPollingService {
     });
   }
 
-  private async handleUpdate(update: TelegramUpdate) {
+  private async handleUpdate(
+    update: TelegramUpdate,
+    controls?: OrderedIngressControls,
+  ) {
     const skipReason = getTelegramUpdateSkipReason(update);
     if (skipReason) {
       return;
@@ -944,6 +951,7 @@ export class TelegramPollingService {
               sessionTarget,
               recentMessageMarker,
             );
+            controls?.markAccepted();
           },
           route,
           maxChars: this.getTelegramMaxChars(route.agentId),
@@ -1055,6 +1063,20 @@ export class TelegramPollingService {
       console.log(`telegram dropped ${updates.length} pending updates on startup`);
     }
   }
+}
+
+function getTelegramIngressKey(botId: string, update: TelegramUpdate) {
+  const message = update.message;
+  const chatId = message?.chat?.id;
+  if (chatId == null) {
+    return undefined;
+  }
+  return [
+    "telegram",
+    botId,
+    String(chatId),
+    message?.message_thread_id != null ? String(message.message_thread_id) : "root",
+  ].join(":");
 }
 
 function resolveRouteAndTarget(params: {

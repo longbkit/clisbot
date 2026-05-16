@@ -126,7 +126,7 @@ export function getZaloBotUpdates(params: {
   token: string;
   timeoutSeconds: number;
 }) {
-  return callZaloBotApi<ZaloBotUpdate>(
+  return callZaloBotApi<ZaloBotUpdate | ZaloBotUpdate[]>(
     params.token,
     "getUpdates",
     {

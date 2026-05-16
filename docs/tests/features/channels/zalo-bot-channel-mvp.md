@@ -118,3 +118,7 @@ If the channel does not come up:
    - `mode=polling`
    - token file is non-empty
    - bot is enabled at both provider-default and bot record level
+
+Regression guard:
+
+- While a Zalo Bot DM run is still active, send `/queue <message>` in the same DM. The command must be accepted by the shared queue path before the first run finishes, and it must be ordered behind the earlier DM message even if both updates arrive in one polling batch. The polling loop must not block on the active run, and concurrent handlers must not overtake each other before enqueue.

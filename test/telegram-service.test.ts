@@ -9,6 +9,7 @@ import {
   resolveTelegramMessageTopicId,
   TelegramPollingService,
 } from "../src/channels/telegram/service.ts";
+import { OrderedIngressDispatcher } from "../src/channels/message/ordered-ingress-dispatcher.ts";
 import { resolveTelegramBotConfig } from "../src/channels/telegram/config.ts";
 import type { TelegramUpdate } from "../src/channels/telegram/message.ts";
 import { ProcessedEventsStore } from "../src/channels/message/processed-events-store.ts";
@@ -190,32 +191,52 @@ async function runTelegramServiceUpdate(params: {
 }
 
 describe("dispatchTelegramUpdates", () => {
-  test("dispatches later updates without waiting for earlier ones to finish", async () => {
+  test("keeps same-chat updates ordered until the earlier update is accepted", async () => {
     const order: string[] = [];
-    let releaseFirst!: () => void;
-    const firstGate = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
+    let acceptFirst!: () => void;
+    let finishFirst!: () => void;
+    const firstAccepted = new Promise<void>((resolve) => {
+      acceptFirst = resolve;
     });
-
-    const { nextUpdateId, tasks } = dispatchTelegramUpdates({
-      updates: [makeUpdate(1), makeUpdate(2)],
-      handleUpdate: async (update) => {
+    const firstFinished = new Promise<void>((resolve) => {
+      finishFirst = resolve;
+    });
+    const dispatcher = new OrderedIngressDispatcher<TelegramUpdate>(
+      (update) => String(update.message?.chat.id),
+      async (update, controls) => {
         order.push(`start:${update.update_id}`);
         if (update.update_id === 1) {
-          await firstGate;
+          await firstAccepted;
+          controls.markAccepted();
+          order.push(`accepted:${update.update_id}`);
+          await firstFinished;
+        } else {
+          controls.markAccepted();
+          order.push(`accepted:${update.update_id}`);
         }
         order.push(`end:${update.update_id}`);
       },
+    );
+
+    const { nextUpdateId, tasks } = dispatchTelegramUpdates({
+      updates: [makeUpdate(1), makeUpdate(2)],
+      dispatcher,
     });
 
     await Bun.sleep(0);
     expect(nextUpdateId).toBe(3);
-    expect(order).toEqual(["start:1", "start:2", "end:2"]);
+    expect(order).toEqual(["start:1"]);
 
-    releaseFirst();
+    acceptFirst();
+    for (let attempt = 0; attempt < 20 && !order.includes("end:2"); attempt += 1) {
+      await Bun.sleep(10);
+    }
+    expect(order).toEqual(["start:1", "accepted:1", "start:2", "accepted:2", "end:2"]);
+
+    finishFirst();
     await Promise.all(tasks);
 
-    expect(order).toEqual(["start:1", "start:2", "end:2", "end:1"]);
+    expect(order).toEqual(["start:1", "accepted:1", "start:2", "accepted:2", "end:2", "end:1"]);
   });
 });
 

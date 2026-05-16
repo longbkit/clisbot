@@ -296,6 +296,7 @@ Questions:
 - did `queues` and `loops` preserve explicit target kind the same way the provider service and message command path do
 - did routed and unrouted command UX such as `/start`, `/status`, `/whoami`, and `/transcript` still tell the truth for this provider
 - did mention-gated routes still admit messages with shared agent command prefixes such as `/queue`, `\q`, configured slash shortcuts, and bash shortcuts through `hasAgentCommandPrefix` instead of provider-local prefix lists
+- did polling transports dispatch inbound updates without waiting for the current agent run to finish, while still preserving per-conversation ingress order until each message reaches the accepted/enqueued boundary
 - did prompt context, sender labeling, replay, and transcript shaping stay truthful for the provider
 
 ## Validation and Doc Bundle
@@ -316,6 +317,7 @@ The minimum bundle for a new channel is:
   - route resolution and session routing
   - route, queue, and loop CLI target parsing for every supported surface kind, plus reject-before-persist coverage for unsupported surface kinds
   - service-level mention-gate coverage proving messages with shared agent command prefixes reach `processChannelInteraction` when the route requires mention
+  - service-level polling dispatch coverage proving a later `/queue` message is accepted after the earlier DM message has been enqueued, but before that earlier run finishes
   - service-level DM pairing enforcement for each existing channel when exact DM routes are allowed
   - exact DM route admission when wildcard DM policy is `pairing`
   - message send or message action behavior
@@ -362,6 +364,8 @@ Carry this forward:
 - resolve the effective direct-message route with the current provider sender id before enforcing `pairing`, `allowlist`, or `disabled`
 - keep wildcard-only DM admission helpers limited to operator summaries or setup guidance; channel services should not use them to decide whether a sender must pair
 - add a provider service test where wildcard DM policy is `pairing`, an exact DM route allows one sender, and the allowed sender is admitted without receiving another pairing code
+- polling providers must not await the full agent run in the polling loop; dispatch update handlers as in-flight tasks and let `processChannelInteraction` own session queueing, otherwise `/queue` sent during a busy DM cannot reach the shared queue path in time
+- do not let concurrent polling handlers overtake each other before enqueue: use the shared `OrderedIngressDispatcher` per-conversation boundary that waits only until the previous message is accepted/enqueued, not until its full run settles
 - keep shared route tests for Slack, Telegram, and new providers close enough that a provider-specific shortcut cannot silently drift
 
 ### 4. Treat duplication as an output, not as cleanup debt
