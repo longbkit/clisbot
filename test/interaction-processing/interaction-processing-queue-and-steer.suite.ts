@@ -307,6 +307,7 @@ describe("processChannelInteraction queue and steer", () => {
         enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
           positionAhead: 1,
           result: (async () => {
+            await sleep(0);
             await callbacks.onUpdate({
               status: "running",
               agentId: "default",
@@ -631,6 +632,99 @@ describe("processChannelInteraction queue and steer", () => {
     expect(reconciled).toHaveLength(2);
     expect(reconciled[0]).toContain("Queued message is now running");
     expect(reconciled[1]).toContain("queued final after running");
+  });
+
+  async function runExplicitQueuedMessageToolFinalScenario(params: {
+    getMessageToolFinalReplyAt: () => number | undefined;
+    beforeComplete?: () => void;
+    finalSnapshot: string;
+  }) {
+    const posted: string[] = [];
+    const reconciled: string[] = [];
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        getSessionRuntime: async () => ({
+          state: "running",
+          messageToolFinalReplyAt: params.getMessageToolFinalReplyAt(),
+        }),
+        enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
+          positionAhead: 1,
+          result: (async () => {
+            await callbacks.onUpdate({
+              status: "running",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "",
+              fullSnapshot: "",
+              initialSnapshot: "",
+            });
+            params.beforeComplete?.();
+            return {
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: params.finalSnapshot,
+              fullSnapshot: params.finalSnapshot,
+              initialSnapshot: "",
+            };
+          })(),
+        }),
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue 1+1",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => {
+        reconciled.push(text);
+        return [text];
+      },
+    });
+
+    return { posted, reconciled };
+  }
+
+  test("explicit queue command suppresses pane settlement after a message-tool final reply", async () => {
+    let messageToolFinalSent = false;
+    const { posted, reconciled } = await runExplicitQueuedMessageToolFinalScenario({
+      getMessageToolFinalReplyAt: () => (messageToolFinalSent ? Date.now() : undefined),
+      beforeComplete: () => {
+        messageToolFinalSent = true;
+      },
+      finalSnapshot: "Done.",
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(reconciled.join("\n")).not.toContain("Done");
+  });
+
+  test("explicit queue command ignores stale message-tool final markers before queue start", async () => {
+    const { posted, reconciled } = await runExplicitQueuedMessageToolFinalScenario({
+      getMessageToolFinalReplyAt: () => 1,
+      finalSnapshot: "pane fallback final",
+    });
+
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(reconciled.at(-1)).toContain("pane fallback final");
   });
 
   test("queue start notifications can be disabled per route", async () => {

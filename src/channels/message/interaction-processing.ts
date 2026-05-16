@@ -710,7 +710,7 @@ async function executePromptDelivery<TChunk>(params: {
   }
 
   async function getMessageToolRuntimeSignals() {
-    if (params.route.responseMode !== "message-tool" || params.forceQueuedDelivery === true) {
+    if (params.route.responseMode !== "message-tool") {
       return {
         lastMessageToolReplyAt: undefined,
         messageToolFinalReplyAt: undefined,
@@ -756,6 +756,7 @@ async function executePromptDelivery<TChunk>(params: {
 
   async function waitForMessageToolFinalReply(params: {
     deadlineAt?: number;
+    sinceAt?: number;
     stopWhen?: () => boolean;
   } = {}) {
     const deadline = params.deadlineAt ?? (Date.now() + MESSAGE_TOOL_FINAL_GRACE_WINDOW_MS);
@@ -768,7 +769,8 @@ async function executePromptDelivery<TChunk>(params: {
       const signals = await getMessageToolRuntimeSignals();
       const toolFinalSeen =
         typeof signals.messageToolFinalReplyAt === "number" &&
-        Number.isFinite(signals.messageToolFinalReplyAt);
+        Number.isFinite(signals.messageToolFinalReplyAt) &&
+        (typeof params.sinceAt !== "number" || signals.messageToolFinalReplyAt >= params.sinceAt);
       if (toolFinalSeen) {
         return true;
       }
@@ -825,9 +827,9 @@ async function executePromptDelivery<TChunk>(params: {
     queueStartPending = false;
     if (responseChunks.length > 0) {
       const postedNew = await renderResponseText(text);
+      activePreviewStartedAt = Date.now();
       if (postedNew) {
         await recordVisibleReply("reply", "channel");
-        activePreviewStartedAt = Date.now();
       }
       renderedState = {
         text,
@@ -1088,6 +1090,20 @@ async function executePromptDelivery<TChunk>(params: {
       return;
     }
 
+    const toolFinalSeen =
+      finalResult.status === "completed" &&
+      params.route.responseMode === "message-tool" &&
+      (!paneManagedDelivery || typeof activePreviewStartedAt === "number")
+        ? await waitForMessageToolFinalReply({ sinceAt: activePreviewStartedAt })
+        : false;
+
+    if (toolFinalSeen) {
+      if (!paneManagedDelivery && params.route.response === "final") {
+        await clearResponseText();
+      }
+      return;
+    }
+
     if (!paneManagedDelivery && messageToolPreviewHandedOff) {
       return;
     }
@@ -1131,18 +1147,6 @@ async function executePromptDelivery<TChunk>(params: {
       }
       if (finalResult.status === "completed") {
         await recordVisibleReply("final", "channel");
-      }
-      return;
-    }
-
-    const toolFinalSeen =
-      finalResult.status === "completed"
-        ? await waitForMessageToolFinalReply()
-        : false;
-
-    if (finalResult.status === "completed" && toolFinalSeen) {
-      if (params.route.response === "final") {
-        await clearResponseText();
       }
       return;
     }
