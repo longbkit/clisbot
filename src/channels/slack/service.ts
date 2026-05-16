@@ -3,7 +3,7 @@ import {
   isImplicitFollowUpAllowed,
   resolveFollowUpMode,
 } from "../../agents/commands/follow-up-policy.ts";
-import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
+import { prependAttachmentMentionsToPrompt } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
 import { buildRecentConversationMessage } from "../message/recent-conversation.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
@@ -719,8 +719,8 @@ export class SlackSocketService {
       sessionKey: sessionTarget.sessionKey,
       messageId: messageTs ?? threadTs ?? `${Date.now()}`,
     });
-    const text = prependAttachmentMentions(effectivePromptText, attachmentPaths);
-    if (!text) {
+    const promptText = prependAttachmentMentionsToPrompt(effectivePromptText, attachmentPaths);
+    if (!promptText) {
       debugSlackEvent("drop-empty-text", { eventId, channelId });
       await this.processedEventsStore.markCompleted(eventId);
       return;
@@ -810,7 +810,7 @@ export class SlackSocketService {
       ? undefined
       : DEFAULT_PROTECTED_CONTROL_RULE;
     const agentPromptText = buildAgentPromptText({
-      text: enrichPromptText(text),
+      text: enrichPromptText(promptText),
       identity,
       config: this.getBotConfig().agentPrompt,
       cliTool,
@@ -886,7 +886,8 @@ export class SlackSocketService {
         identity,
         auth,
         senderId: slackSenderId,
-        text,
+        text: effectivePromptText,
+        attachmentPaths,
         agentPromptText,
         agentPromptBuilder: (nextText, options) =>
           buildAgentPromptText({

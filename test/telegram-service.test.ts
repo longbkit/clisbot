@@ -4,9 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildTelegramCommandRegistrations,
+  coalesceTelegramMediaGroupUpdates,
   dispatchTelegramUpdates,
   renderTelegramUnroutedRouteMessage,
   resolveTelegramMessageTopicId,
+  TelegramMediaGroupDispatcher,
   TelegramPollingService,
 } from "../src/channels/telegram/service.ts";
 import { OrderedIngressDispatcher } from "../src/channels/message/ordered-ingress-dispatcher.ts";
@@ -237,6 +239,152 @@ describe("dispatchTelegramUpdates", () => {
     await Promise.all(tasks);
 
     expect(order).toEqual(["start:1", "accepted:1", "start:2", "accepted:2", "end:2", "end:1"]);
+  });
+});
+
+describe("coalesceTelegramMediaGroupUpdates", () => {
+  test("coalesces Telegram album messages into one interaction update", () => {
+    const updates = coalesceTelegramMediaGroupUpdates([
+      {
+        update_id: 10,
+        message: {
+          message_id: 70,
+          media_group_id: "album-1",
+          caption: "read these",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+          photo: [{ file_id: "photo-a", file_size: 10 }],
+        },
+      },
+      {
+        update_id: 11,
+        message: {
+          message_id: 71,
+          media_group_id: "album-1",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+          photo: [{ file_id: "photo-b", file_size: 10 }],
+        },
+      },
+    ]);
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.update_id).toBe(10);
+    expect(updates[0]?.message?.caption).toBe("read these");
+    expect(updates[0]?.message?.media_group_messages?.map((message) => message.message_id)).toEqual([70, 71]);
+  });
+
+  test("keeps media groups separate by sender and surface", () => {
+    const updates = coalesceTelegramMediaGroupUpdates([
+      {
+        update_id: 10,
+        message: {
+          message_id: 70,
+          media_group_id: "album-1",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+          photo: [{ file_id: "photo-a" }],
+        },
+      },
+      {
+        update_id: 11,
+        message: {
+          message_id: 71,
+          media_group_id: "album-1",
+          from: { id: 128 },
+          chat: { id: 128, type: "private" },
+          photo: [{ file_id: "photo-b" }],
+        },
+      },
+    ]);
+
+    expect(updates).toHaveLength(2);
+  });
+});
+
+describe("TelegramMediaGroupDispatcher", () => {
+  test("buffers Telegram album updates across polling batches before dispatching one interaction", async () => {
+    const handled: TelegramUpdate[] = [];
+    const dispatcher = new OrderedIngressDispatcher<TelegramUpdate>(
+      (update) => String(update.message?.chat.id),
+      async (update) => {
+        handled.push(update);
+      },
+    );
+    const mediaGroups = new TelegramMediaGroupDispatcher(dispatcher, 10);
+
+    const firstTasks = mediaGroups.dispatch([
+      {
+        update_id: 10,
+        message: {
+          message_id: 70,
+          media_group_id: "album-1",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+          photo: [{ file_id: "photo-a" }],
+        },
+      },
+    ]);
+    const secondTasks = mediaGroups.dispatch([
+      {
+        update_id: 11,
+        message: {
+          message_id: 71,
+          media_group_id: "album-1",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+          photo: [{ file_id: "photo-b" }],
+        },
+      },
+    ]);
+
+    await Promise.all([...firstTasks, ...secondTasks]);
+
+    expect(handled).toHaveLength(1);
+    expect(handled[0]?.message?.media_group_messages?.map((message) => message.message_id)).toEqual([70, 71]);
+  });
+
+  test("keeps later normal messages behind a pending media group on the same surface", async () => {
+    const handled: string[] = [];
+    const dispatcher = new OrderedIngressDispatcher<TelegramUpdate>(
+      (update) => String(update.message?.chat.id),
+      async (update) => {
+        handled.push(
+          update.message?.media_group_messages
+            ? `album:${update.message.media_group_messages.map((message) => message.message_id).join(",")}`
+            : `message:${update.message?.message_id}`,
+        );
+      },
+    );
+    const mediaGroups = new TelegramMediaGroupDispatcher(dispatcher, 10);
+
+    const firstTasks = mediaGroups.dispatch([
+      {
+        update_id: 10,
+        message: {
+          message_id: 70,
+          media_group_id: "album-1",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+          photo: [{ file_id: "photo-a" }],
+        },
+      },
+    ]);
+    const secondTasks = mediaGroups.dispatch([
+      {
+        update_id: 11,
+        message: {
+          message_id: 71,
+          text: "after album",
+          from: { id: 127 },
+          chat: { id: 127, type: "private" },
+        },
+      },
+    ]);
+
+    await Promise.all([...firstTasks, ...secondTasks]);
+
+    expect(handled).toEqual(["message:70", "message:71"]);
   });
 });
 

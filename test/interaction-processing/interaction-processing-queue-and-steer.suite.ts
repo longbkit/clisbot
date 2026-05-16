@@ -475,6 +475,174 @@ describe("processChannelInteraction queue and steer", () => {
     expect(reconciled).toEqual([]);
   });
 
+  test("explicit queue command preserves attachment mentions in the queued prompt", async () => {
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued attachment final",
+              fullSnapshot: "queued attachment final",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue read this",
+      attachmentPaths: ["/tmp/queued-image-a.jpg", "/tmp/queued-image-b.jpg"],
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async () => ["posted"],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedPrompt).toBe("@/tmp/queued-image-a.jpg @/tmp/queued-image-b.jpg read this");
+  });
+
+  test("explicit queue command accepts an attachment-only queued prompt", async () => {
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued attachment-only final",
+              fullSnapshot: "queued attachment-only final",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue",
+      attachmentPaths: ["/tmp/queued-only-a.jpg", "/tmp/queued-only-b.jpg"],
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async () => ["posted"],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedPrompt).toBe("@/tmp/queued-only-a.jpg @/tmp/queued-only-b.jpg");
+  });
+
+  test("explicit queue command preserves attachments when queued payload starts with slash", async () => {
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued slash attachment final",
+              fullSnapshot: "queued slash attachment final",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/queue /status",
+      attachmentPaths: ["/tmp/queued-status.jpg"],
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async () => ["posted"],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedPrompt).toBe("@/tmp/queued-status.jpg /status");
+  });
+
+  test("queue shortcut preserves attachment-only queued prompts", async () => {
+    let observedPrompt = "";
+
+    await processChannelInteraction({
+      agentService: {
+        isAwaitingFollowUpRouting: async () => true,
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 1,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "queued shortcut attachment final",
+              fullSnapshot: "queued shortcut attachment final",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "\\q",
+      attachmentPaths: ["/tmp/queued-shortcut.jpg"],
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+      }),
+      maxChars: 4000,
+      postText: async () => ["posted"],
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(observedPrompt).toBe("@/tmp/queued-shortcut.jpg");
+  });
+
   test("explicit queue command renders queue start immediately when the queue is empty and streaming is off", async () => {
     const posted: string[] = [];
     const reconciled: string[] = [];

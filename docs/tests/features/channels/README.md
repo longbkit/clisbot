@@ -4,21 +4,27 @@
 
 These test cases define the ground truth for user-facing conversation surfaces.
 
-They should be used for ad hoc validation and later automation across Slack first, then API and other channels.
+They should be used for ad hoc validation and later automation across Slack,
+Telegram, Zalo Bot, API, and other channels.
 
 ## Environment
 
-- `.env` contains valid `SLACK_APP_TOKEN`, `SLACK_BOT_TOKEN`, and `SLACK_TEST_CHANNEL`
-- `~/.clisbot/clisbot.json` routes `SLACK_TEST_CHANNEL` to agent `default`
+- repo-local dev tests use `CLISBOT_HOME=~/.clisbot-dev` and the generated
+  `~/.clisbot-dev/bin/clisbot-dev` wrapper
+- `.env` contains the token and test-surface env vars for the channel under test
+- `~/.clisbot-dev/clisbot.json` routes the selected test surface to agent
+  `default`
 - mention-path validation works with `app_mention`
 - implicit no-mention follow-up validation requires the Slack app to subscribe to the routed `message.*` event family, not only `app_mention`
 - for channel threads, `message.channels` is the critical Slack subscription
 - for Slack, natural no-mention continuation means the bot has already replied in that thread; it does not require the bot to have authored the thread root
 - the channel configuration enables default chat-first rendering and any transcript request command used by the test
-- `bun run dev` is running
+- `bun run restart` has started the dev runtime and `bun run status` reports the
+  channel active
 
 ## Suites
 
+- [Channel Happy Path Matrix](channel-happy-path-matrix.md)
 - [Slack Routing And Follow-Up Tests](slack-routing-and-follow-up.md)
 - [Rendering And Command Tests](rendering-and-command-tests.md)
 - [Zalo Bot Channel MVP](zalo-bot-channel-mvp.md)
@@ -35,3 +41,8 @@ Run these checks whenever adding a channel, refactoring pairing, or changing rou
 - Route, queue, and loop CLI targeting preserves explicit surface kind. For providers whose DM and group ids can look alike, supported `group:<id>` forms must address the group route/session, and supported `dm:<id>` forms must address the DM route/session. If the provider slice is DM-only, `group:<id>` must fail before config or session persistence. No provider should guess surface kind from a brittle id prefix when the operator supplied the kind.
 - Mention-gated routes still let messages with shared agent command prefixes reach the shared interaction processor. Cover `/queue`, `\q`, configured slash shortcuts, and bash shortcuts through `hasAgentCommandPrefix` instead of provider-local prefix lists.
 - Polling channels dispatch later updates without waiting for an earlier agent run to finish, but they must preserve per-conversation ingress order until each message reaches the accepted/enqueued boundary. Cover a DM `hi` that keeps the session busy followed by `/queue <message>`; the queue command must enter behind `hi` before the first run resolves.
+- Every supported channel must keep a documented happy-path row for owner
+  auto-claim or pairing, unrouted guidance, multi-bot/default-agent routing,
+  queues, loops, slash commands, attachments, streaming, final settlement, and
+  processing indicators. Use the channel happy-path matrix as the minimum
+  checklist before release-facing channel changes are called done.

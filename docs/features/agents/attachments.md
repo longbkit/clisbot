@@ -47,6 +47,11 @@ Current prompt contract is intentionally minimal:
 
 - prepend one `@/absolute/path` token per stored file
 - then append the user message text
+- for explicit `/queue` and `/steer`, attach the stored file tokens to the
+  queued or steered payload, not to the control command itself
+- Telegram media groups are treated as one inbound message when Telegram
+  supplies `media_group_id`, so one album becomes one prompt with multiple
+  local attachment paths
 
 Example:
 
@@ -68,7 +73,6 @@ No extra metadata block is required in the current MVP slice.
 
 - outbound file sending
 - OCR or document extraction
-- media-group assembly
 - database-backed attachment indexing
 - object-storage offload
 

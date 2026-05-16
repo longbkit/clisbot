@@ -47,7 +47,7 @@ When a message starts with a configured bash shortcut such as `!`:
 - `/stop`: send `Escape` to interrupt current processing in the current conversation session, clear clisbot's active-run state, and let queued prompts continue
 - `/new`: start a new session for the current routed conversation and save the new `sessionId`
 - `/nudge`: send one extra `Enter` to the current tmux session without resending the prompt body
-- `/queue <message>` or `\q <message>`: create one durable queued prompt for the current session
+- `/queue <message>` or `\q <message>`: create one durable queued prompt for the current session; attachments sent with the command stay attached to the queued prompt
 - `/queue list`: show pending queued prompts for the current session
 - `/queue clear`: clear pending queued prompts for the current session without interrupting a running prompt
 - `/followup status`

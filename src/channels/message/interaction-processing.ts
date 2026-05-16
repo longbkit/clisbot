@@ -36,6 +36,7 @@ import {
   summarizeQueuePrompt,
   type StoredQueueItem,
 } from "../../agents/queue/queue-state.ts";
+import { prependAttachmentMentionsToPrompt } from "../../agents/attachments/prompt.ts";
 import { buildStoredSurfaceBinding } from "../../agents/routing/surface-binding.ts";
 import {
   renderChannelSnapshot,
@@ -1172,6 +1173,7 @@ export async function processChannelInteraction<TChunk>(params: {
   auth?: ResolvedChannelAuth;
   senderId?: string;
   text: string;
+  attachmentPaths?: string[];
   agentPromptText?: string;
   agentPromptBuilder?: (
     text: string,
@@ -1272,10 +1274,18 @@ export async function processChannelInteraction<TChunk>(params: {
   const slashCommand = parseAgentCommand(params.text, {
     commandPrefixes: params.route.commandPrefixes,
   });
+  const messageText = prependAttachmentMentionsToPrompt(
+    params.text,
+    params.attachmentPaths ?? [],
+  );
   const explicitQueueMessage =
-    slashCommand?.type === "queue" ? slashCommand.text.trim() : undefined;
+    slashCommand?.type === "queue"
+      ? prependAttachmentMentionsToPrompt(slashCommand.text, params.attachmentPaths ?? [])
+      : undefined;
   const explicitSteerMessage =
-    slashCommand?.type === "steer" ? slashCommand.text.trim() : undefined;
+    slashCommand?.type === "steer"
+      ? prependAttachmentMentionsToPrompt(slashCommand.text, params.attachmentPaths ?? [])
+      : undefined;
   const sessionBusy = await (
     params.agentService.isAwaitingFollowUpRouting?.(params.sessionTarget) ??
     params.agentService.isSessionBusy?.(params.sessionTarget) ??
@@ -1286,7 +1296,7 @@ export async function processChannelInteraction<TChunk>(params: {
     !sessionBusy;
   const queueByMode = !explicitQueueMessage && params.route.additionalMessageMode === "queue" && sessionBusy;
   const queuedPromptRequested = typeof explicitQueueMessage === "string" || queueByMode;
-  const delayedPromptQueueText = explicitQueueMessage ?? params.text;
+  const delayedPromptQueueText = explicitQueueMessage ?? messageText;
   const delayedPromptText = () => {
     if (queuedPromptRequested && params.agentPromptBuilder) {
       return params.agentPromptBuilder(delayedPromptQueueText);
@@ -1294,7 +1304,7 @@ export async function processChannelInteraction<TChunk>(params: {
     if (explicitQueueMessage) {
       return explicitQueueMessage;
     }
-    return params.agentPromptText ?? params.text;
+    return params.agentPromptText ?? messageText;
   };
   const queueItem = queuedPromptRequested
     ? createStoredQueueItem({
@@ -2002,7 +2012,7 @@ export async function processChannelInteraction<TChunk>(params: {
       await params.agentService.submitSessionInput(
         params.sessionTarget,
         buildSteeringPromptText({
-          text: params.transformSessionInputText?.(params.text) ?? params.text,
+          text: params.transformSessionInputText?.(messageText) ?? messageText,
           identity: params.identity,
           agentId: params.route.agentId,
           time: Date.now(),
@@ -2035,7 +2045,7 @@ export async function processChannelInteraction<TChunk>(params: {
     queueStartMode: params.route.surfaceNotifications.queueStart,
     notificationPromptSummary:
       explicitQueueMessage ??
-      summarizeSurfaceNotificationText(params.text),
+      summarizeSurfaceNotificationText(messageText),
     queueItem,
     postText: params.postText,
     reconcileText: params.reconcileText,

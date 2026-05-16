@@ -61,6 +61,8 @@ If this page and runtime ever disagree, runtime wins.
 ## Queue And Steering
 
 - `/queue <message>` or `\q <message>`: create a durable queued prompt behind the active run in the same session
+- `/queue` also preserves attachments sent with that command; the files become
+  `@/absolute/path` mentions in the queued prompt
 - `/queue help`: show queue-specific help and examples
 - `/steer <message>` or `\s <message>`: inject a steering message into the active run immediately
 - `/queue list`: show queued messages that have not started yet

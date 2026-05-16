@@ -7,7 +7,7 @@ import {
   hasAgentCommandPrefix,
   parseAgentCommand,
 } from "../../agents/commands/commands.ts";
-import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
+import { prependAttachmentMentionsToPrompt } from "../../agents/attachments/prompt.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
 import { buildRecentConversationMessage } from "../message/recent-conversation.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
@@ -149,6 +149,7 @@ const TELEGRAM_POLLING_CONFLICT_BACKOFF_MAX_DELAY_MS = 30_000;
 const TELEGRAM_POLLING_CONFLICT_SLEEP_SLICE_MS = 250;
 const TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_DELAY_MS = 60_000;
 const TELEGRAM_POLLING_CONFLICT_OWNER_ALERT_REPEAT_MS = 15 * 60_000;
+const TELEGRAM_MEDIA_GROUP_COALESCE_DELAY_MS = 750;
 
 function computeTelegramPollingConflictBackoffDelayMs(baseDelayMs: number, attempt: number) {
   const safeBaseDelayMs = Math.max(1, baseDelayMs);
@@ -236,10 +237,10 @@ export function dispatchTelegramUpdates(params: {
   dispatcher: OrderedIngressDispatcher<TelegramUpdate>;
 }) {
   const tasks: Promise<void>[] = [];
-  let nextUpdateId: number | undefined;
+  const lastUpdateId = params.updates.at(-1)?.update_id;
+  const nextUpdateId = typeof lastUpdateId === "number" ? lastUpdateId + 1 : undefined;
 
-  for (const update of params.updates) {
-    nextUpdateId = update.update_id + 1;
+  for (const update of coalesceTelegramMediaGroupUpdates(params.updates)) {
     tasks.push(...params.dispatcher.dispatch([update]));
   }
 
@@ -247,6 +248,117 @@ export function dispatchTelegramUpdates(params: {
     nextUpdateId,
     tasks,
   };
+}
+
+export function coalesceTelegramMediaGroupUpdates(updates: TelegramUpdate[]) {
+  const groups = new Map<string, { index: number; updates: TelegramUpdate[] }>();
+  const ordered: Array<TelegramUpdate | { mediaGroupKey: string }> = [];
+
+  for (const update of updates) {
+    const key = getTelegramMediaGroupKey(update);
+    if (!key) {
+      ordered.push(update);
+      continue;
+    }
+
+    const existing = groups.get(key);
+    if (existing) {
+      existing.updates.push(update);
+      continue;
+    }
+
+    groups.set(key, {
+      index: ordered.length,
+      updates: [update],
+    });
+    ordered.push({ mediaGroupKey: key });
+  }
+
+  for (const [key, group] of groups) {
+    ordered[group.index] = mergeTelegramMediaGroupUpdates(key, group.updates);
+  }
+
+  return ordered as TelegramUpdate[];
+}
+
+export class TelegramMediaGroupDispatcher {
+  private readonly pendingGroups = new Map<string, { ingressKey: string; updates: TelegramUpdate[] }>();
+  private readonly tailsByIngressKey = new Map<string, Promise<void>>();
+
+  constructor(
+    private readonly dispatcher: OrderedIngressDispatcher<TelegramUpdate>,
+    private readonly delayMs = TELEGRAM_MEDIA_GROUP_COALESCE_DELAY_MS,
+  ) {}
+
+  dispatch(updates: TelegramUpdate[]) {
+    const tasks: Promise<void>[] = [];
+
+    for (const update of updates) {
+      const ingressKey = getTelegramIngressKey("media-group-buffer", update);
+      const key = getTelegramMediaGroupKey(update);
+      if (!key) {
+        tasks.push(this.enqueueAfterIngressTail(
+          ingressKey,
+          async () => {
+            await Promise.all(this.dispatcher.dispatch([update]));
+          },
+        ));
+        continue;
+      }
+
+      const existing = this.pendingGroups.get(key);
+      if (existing) {
+        existing.updates.push(update);
+        continue;
+      }
+
+      this.pendingGroups.set(key, {
+        ingressKey: ingressKey ?? key,
+        updates: [update],
+      });
+      tasks.push(this.enqueueAfterIngressTail(
+        ingressKey ?? key,
+        () => this.dispatchPendingGroupAfterDelay(key),
+      ));
+    }
+
+    return tasks;
+  }
+
+  private enqueueAfterIngressTail(
+    ingressKey: string | undefined,
+    task: () => Promise<void>,
+  ) {
+    if (!ingressKey) {
+      return task();
+    }
+
+    const previous = this.tailsByIngressKey.get(ingressKey) ?? Promise.resolve();
+    const next = previous.then(task, task);
+    this.tailsByIngressKey.set(ingressKey, next);
+    next.finally(() => {
+      if (this.tailsByIngressKey.get(ingressKey) === next) {
+        this.tailsByIngressKey.delete(ingressKey);
+      }
+    });
+    return next;
+  }
+
+  private async dispatchPendingGroupAfterDelay(key: string) {
+    await sleep(this.delayMs);
+    const pending = this.pendingGroups.get(key);
+    if (!pending) {
+      return;
+    }
+
+    this.pendingGroups.delete(key);
+    const [merged] = coalesceTelegramMediaGroupUpdates(pending.updates);
+    if (!merged) {
+      return;
+    }
+
+    await Promise.all(this.dispatcher.dispatch([merged]));
+  }
 }
 
 export class TelegramPollingService {
@@ -266,6 +378,7 @@ export class TelegramPollingService {
       console.error("telegram handler error", error);
     },
   );
+  private readonly mediaGroupDispatcher = new TelegramMediaGroupDispatcher(this.ingressDispatcher);
   private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
 
   constructor(
@@ -380,14 +493,11 @@ export class TelegramPollingService {
         this.activePollController = undefined;
         await this.recoverFromPollingConflictIfNeeded();
 
-        const dispatched = dispatchTelegramUpdates({
-          updates,
-          dispatcher: this.ingressDispatcher,
-        });
-        if (dispatched.nextUpdateId != null) {
-          this.nextUpdateId = dispatched.nextUpdateId;
+        const lastUpdateId = updates.at(-1)?.update_id;
+        if (typeof lastUpdateId === "number") {
+          this.nextUpdateId = lastUpdateId + 1;
         }
-        for (const task of dispatched.tasks) {
+        for (const task of this.mediaGroupDispatcher.dispatch(updates)) {
           this.trackInFlightUpdate(task);
         }
       } catch (error) {
@@ -473,7 +583,7 @@ export class TelegramPollingService {
       return;
     }
 
-    const eventId = `telegram:${update.update_id}`;
+    const eventId = buildTelegramProcessedEventId(this.botId, update);
     const existingStatus = await this.processedEventsStore.getStatus(eventId);
     if (existingStatus === "processing" || existingStatus === "completed") {
       return;
@@ -757,7 +867,7 @@ export class TelegramPollingService {
     const textBody = explicitMention
       ? stripTelegramBotMention(rawText, this.botUsername)
       : rawText;
-    const recentMessageMarker = String(message.message_id);
+    const recentMessageMarker = buildTelegramRecentMessageMarker(message);
     if (rawText || explicitMention || slashCommand) {
       await this.agentService.appendRecentConversationMessage(sessionTarget, buildRecentConversationMessage({
         marker: recentMessageMarker,
@@ -799,10 +909,10 @@ export class TelegramPollingService {
       botToken: this.botCredentials.botToken,
       workspacePath: this.agentService.getWorkspacePath(sessionTarget),
       sessionKey: sessionTarget.sessionKey,
-      messageId: String(message.message_id),
+      messageId: recentMessageMarker,
     });
-    const text = prependAttachmentMentions(effectivePromptText, attachmentPaths);
-    if (!text) {
+    const promptText = prependAttachmentMentionsToPrompt(effectivePromptText, attachmentPaths);
+    if (!promptText) {
       await this.processedEventsStore.markCompleted(eventId);
       return;
     }
@@ -876,7 +986,7 @@ export class TelegramPollingService {
         time: promptTime,
       });
       const agentPromptText = buildAgentPromptText({
-        text: enrichPromptText(text),
+        text: enrichPromptText(promptText),
         identity,
         config: this.getBotConfig().agentPrompt,
         cliTool,
@@ -922,7 +1032,8 @@ export class TelegramPollingService {
           auth,
           senderId:
             message.from?.id != null ? String(message.from.id).trim() : undefined,
-          text,
+          text: effectivePromptText,
+          attachmentPaths,
           agentPromptText,
           agentPromptBuilder: (nextText, options) =>
             buildAgentPromptText({
@@ -1080,6 +1191,90 @@ function getTelegramIngressKey(botId: string, update: TelegramUpdate) {
     String(chatId),
     message?.message_thread_id != null ? String(message.message_thread_id) : "root",
   ].join(":");
+}
+
+function getTelegramMediaGroupKey(update: TelegramUpdate) {
+  const message = update.message;
+  const mediaGroupId = message?.media_group_id?.trim();
+  if (!message || !mediaGroupId) {
+    return undefined;
+  }
+
+  return [
+    "telegram-media-group",
+    String(message.chat.id),
+    message.message_thread_id != null ? String(message.message_thread_id) : "root",
+    message.from?.id != null ? String(message.from.id) : "unknown-sender",
+    mediaGroupId,
+  ].join(":");
+}
+
+function mergeTelegramMediaGroupUpdates(
+  _key: string,
+  updates: TelegramUpdate[],
+): TelegramUpdate {
+  const sorted = [...updates].sort((left, right) => left.update_id - right.update_id);
+  const messages = sorted
+    .map((update) => update.message)
+    .filter((message): message is TelegramMessage => Boolean(message));
+  const firstUpdate = sorted[0];
+  const firstMessage = messages[0];
+  if (!firstUpdate || !firstMessage || messages.length <= 1) {
+    return firstUpdate ?? updates[0]!;
+  }
+
+  const caption = messages
+    .map((message) => `${message.text ?? message.caption ?? ""}`.trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+
+  return {
+    ...firstUpdate,
+    message: {
+      ...firstMessage,
+      text: firstMessage.text,
+      caption: caption || firstMessage.caption,
+      media_group_messages: messages,
+    },
+  };
+}
+
+function buildTelegramProcessedEventId(botId: string, update: TelegramUpdate) {
+  const message = update.message;
+  const mediaGroupId = message?.media_group_id?.trim();
+  if (!message || !mediaGroupId) {
+    return `telegram:${update.update_id}`;
+  }
+
+  const groupMessages = message.media_group_messages ?? [message];
+  const messageIds = groupMessages
+    .map((entry) => entry.message_id)
+    .filter((id) => Number.isFinite(id))
+    .join(",");
+  return [
+    "telegram-media-group",
+    botId,
+    String(message.chat.id),
+    message.message_thread_id != null ? String(message.message_thread_id) : "root",
+    message.from?.id != null ? String(message.from.id) : "unknown-sender",
+    mediaGroupId,
+    messageIds,
+  ].join(":");
+}
+
+function buildTelegramRecentMessageMarker(message: TelegramMessage) {
+  const mediaGroupId = message.media_group_id?.trim();
+  if (!mediaGroupId) {
+    return String(message.message_id);
+  }
+
+  const groupMessages = message.media_group_messages ?? [message];
+  const messageIds = groupMessages
+    .map((entry) => entry.message_id)
+    .filter((id) => Number.isFinite(id))
+    .join(",");
+  return `media-group:${mediaGroupId}:${messageIds || message.message_id}`;
 }
 
 function resolveRouteAndTarget(params: {

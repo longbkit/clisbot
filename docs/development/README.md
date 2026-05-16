@@ -35,6 +35,47 @@ What this changes:
 
 Direct CLI overrides such as `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, and `CLISBOT_LOG_PATH` still work when you invoke `clisbot ...` or `bun run src/main.ts ...` manually. They are no longer part of the repo-local default flow because `CLISBOT_HOME` is the intended source of truth.
 
+## Channel Testing In Dev Mode
+
+Use `clisbot-dev` for channel fixes. A channel bug should be reproducible,
+fixed, and revalidated against `~/.clisbot-dev` before it needs an npm release.
+
+Baseline loop:
+
+```bash
+export CLISBOT_HOME=~/.clisbot-dev
+bun run restart
+bun run status
+~/.clisbot-dev/bin/clisbot-dev status
+```
+
+Use the wrapper for chat-facing operator actions:
+
+```bash
+~/.clisbot-dev/bin/clisbot-dev routes list --channel telegram
+~/.clisbot-dev/bin/clisbot-dev queues status --channel telegram --target topic:<chat-id>:<topic-id>
+~/.clisbot-dev/bin/clisbot-dev loops status --channel telegram --target topic:<chat-id>:<topic-id>
+```
+
+The wrapper matters because message-tool replies, queue settlement, loop
+notifications, and runtime status must all read and write the same dev home.
+
+For channel happy-path validation, run the matrix in
+[`docs/tests/features/channels/channel-happy-path-matrix.md`](../tests/features/channels/channel-happy-path-matrix.md).
+At minimum, a channel pass should cover:
+
+- first-DM owner auto-claim or pairing inside the 30-minute claim window
+- unrouted `/start`, `/status`, and `/whoami` guidance
+- a second provider bot on another channel bound to agent `default`
+- queues and loops from both CLI and slash command paths
+- slash-command inventory and auth denials
+- DM, group/shared surface, topic/thread when supported
+- one attachment, attachment-only input, and multiple attachments where the
+  provider supports them
+- streaming off/on behavior according to provider capability
+- processing indicator activation and cleanup, including detached sparse-follow
+  and restart cleanup when supported
+
 ## npm Publish
 
 Use the `release-clisbot` skill for beta/stable release sequencing, npm auth,

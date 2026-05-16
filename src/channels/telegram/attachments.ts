@@ -74,6 +74,32 @@ export async function resolveTelegramAttachmentPaths(params: {
 }) {
   const attachmentPaths: string[] = [];
 
+  const messages = resolveTelegramAttachmentMessages(params.message);
+  for (const message of messages) {
+    const paths = await resolveTelegramSingleMessageAttachmentPaths({
+      ...params,
+      message,
+    });
+    attachmentPaths.push(...paths);
+  }
+
+  return attachmentPaths;
+}
+
+function resolveTelegramAttachmentMessages(message: TelegramMessage) {
+  const messages = message.media_group_messages;
+  return Array.isArray(messages) && messages.length > 0 ? messages : [message];
+}
+
+async function resolveTelegramSingleMessageAttachmentPaths(params: {
+  message: TelegramMessage;
+  botToken: string;
+  workspacePath: string;
+  sessionKey: string;
+  messageId: string;
+}) {
+  const attachmentPaths: string[] = [];
+
   const document = params.message.document;
   if (document?.file_id) {
     try {

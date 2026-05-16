@@ -45,6 +45,7 @@ export type TelegramMessage = {
   message_id: number;
   date?: number;
   message_thread_id?: number;
+  media_group_id?: string;
   text?: string;
   caption?: string;
   from?: TelegramUser;
@@ -62,6 +63,7 @@ export type TelegramMessage = {
       name?: string;
     };
   };
+  media_group_messages?: TelegramMessage[];
 };
 
 export type TelegramUpdate = {

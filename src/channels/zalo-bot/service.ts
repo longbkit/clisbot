@@ -20,7 +20,7 @@ import {
   resolveZaloBotConfig,
   resolveZaloBotDirectMessageConfig,
 } from "./config.ts";
-import { prependAttachmentMentions } from "../../agents/attachments/prompt.ts";
+import { prependAttachmentMentionsToPrompt } from "../../agents/attachments/prompt.ts";
 import { buildAgentPromptText } from "../message/agent-prompt.ts";
 import {
   buildSurfacePromptContextWithDirectory,
@@ -379,8 +379,8 @@ export class ZaloBotPollingService {
             conversationKind: routeInfo.conversationKind,
           })
         : "");
-    const text = prependAttachmentMentions(effectivePromptText, attachmentPaths);
-    if (!text) {
+    const promptText = prependAttachmentMentionsToPrompt(effectivePromptText, attachmentPaths);
+    if (!promptText) {
       return;
     }
     const recentConversationReplay = await this.agentService.getRecentConversationReplayMessages(
@@ -417,7 +417,7 @@ export class ZaloBotPollingService {
       time: promptTime,
     });
     const agentPromptText = buildAgentPromptText({
-      text: enrichPromptText(text),
+      text: enrichPromptText(promptText),
       identity,
       config: this.getBotConfig().agentPrompt,
       cliTool,
@@ -461,7 +461,8 @@ export class ZaloBotPollingService {
         identity,
         auth,
         senderId,
-        text,
+        text: effectivePromptText,
+        attachmentPaths,
         agentPromptText,
         agentPromptBuilder: (nextText, options) =>
           buildAgentPromptText({
