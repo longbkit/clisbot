@@ -41,6 +41,18 @@ type SessionEntryUpdate = (existing: {
   recentConversation?: StoredRecentConversationState;
 };
 
+function preserveReplyMarkers(
+  existing: StoredSessionRuntime | undefined,
+  next: StoredSessionRuntime,
+): StoredSessionRuntime {
+  return {
+    ...next,
+    finalReplyAt: next.finalReplyAt ?? existing?.finalReplyAt,
+    lastMessageToolReplyAt: next.lastMessageToolReplyAt ?? existing?.lastMessageToolReplyAt,
+    messageToolFinalReplyAt: next.messageToolFinalReplyAt ?? existing?.messageToolFinalReplyAt,
+  };
+}
+
 export class AgentSessionState {
   constructor(private readonly sessionStore: SessionStore) {}
 
@@ -98,7 +110,7 @@ export class AgentSessionState {
       lastAdmittedPromptAt: existing?.lastAdmittedPromptAt,
       followUp: existing?.followUp,
       runnerCommand: existing?.runnerCommand ?? resolved.runner.command,
-      runtime,
+      runtime: preserveReplyMarkers(existing?.runtime, runtime),
       loops: getStoredLoops(existing),
       recentConversation: existing?.recentConversation,
     }));

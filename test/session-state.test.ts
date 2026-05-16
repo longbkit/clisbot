@@ -54,6 +54,35 @@ describe("session state runtime reply markers", () => {
     expect(typeof runtime.messageToolFinalReplyAt).toBe("number");
   });
 
+  test("keeps message-tool final markers when idle runtime overwrites running state", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-session-state-"));
+    const store = new SessionStore(join(tempDir, "sessions.json"));
+    const state = new AgentSessionState(store);
+    const resolved = createResolvedTarget(tempDir);
+    const startedAt = Date.now() - 1000;
+
+    await state.setSessionRuntime(resolved, {
+      state: "running",
+      startedAt,
+    });
+    await state.recordConversationReply(resolved, "final", "message-tool");
+    await state.setSessionRuntime(resolved, {
+      state: "idle",
+    });
+
+    const runtime = await state.getSessionRuntime({
+      sessionKey: resolved.sessionKey,
+      agentId: resolved.agentId,
+    });
+
+    expect(runtime.state).toBe("idle");
+    expect(runtime.startedAt).toBeUndefined();
+    expect(typeof runtime.finalReplyAt).toBe("number");
+    expect(typeof runtime.lastMessageToolReplyAt).toBe("number");
+    expect(typeof runtime.messageToolFinalReplyAt).toBe("number");
+    expect(runtime.messageToolFinalReplyAt).toBeGreaterThanOrEqual(startedAt);
+  });
+
   test("persists recent conversation replay state per session", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-session-state-"));
     const store = new SessionStore(join(tempDir, "sessions.json"));
