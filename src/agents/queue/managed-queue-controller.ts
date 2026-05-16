@@ -37,6 +37,7 @@ type QueueControllerDeps = {
 
 export type QueuePromptCallbacks = {
   onUpdate: (update: RunUpdate) => Promise<void> | void;
+  onStart?: (item?: StoredQueueItem) => Promise<void> | void;
   observerId?: string;
   timingContext?: LatencyDebugContext;
   queueText?: string;
@@ -91,7 +92,8 @@ export class ManagedQueueController {
       target.sessionKey,
       async () => {
         await persisted;
-        await this.markQueueItemRunning(target, queueItem);
+        const runningItem = await this.markQueueItemRunning(target, queueItem);
+        await callbacks.onStart?.(runningItem);
         const promptText = typeof prompt === "function" ? prompt() : prompt;
         return this.deps.activeRuns.executePrompt(target, promptText, {
           id: callbacks.observerId ?? `prompt:${target.sessionKey}`,

@@ -636,6 +636,8 @@ describe("processChannelInteraction queue and steer", () => {
 
   async function runExplicitQueuedMessageToolFinalScenario(params: {
     getMessageToolFinalReplyAt: () => number | undefined;
+    getQueueStartedAt?: () => number;
+    beforeRunningUpdate?: () => void;
     beforeComplete?: () => void;
     finalSnapshot: string;
   }) {
@@ -652,6 +654,10 @@ describe("processChannelInteraction queue and steer", () => {
         enqueuePrompt: (_target: AgentSessionTarget, _prompt: string, callbacks: any) => ({
           positionAhead: 1,
           result: (async () => {
+            await callbacks.onStart?.({
+              startedAt: params.getQueueStartedAt?.() ?? Date.now(),
+            });
+            params.beforeRunningUpdate?.();
             await callbacks.onUpdate({
               status: "running",
               agentId: "default",
@@ -716,8 +722,28 @@ describe("processChannelInteraction queue and steer", () => {
     expect(reconciled.join("\n")).not.toContain("Done");
   });
 
-  test("explicit queue command ignores stale message-tool final markers before queue start", async () => {
+  test("explicit queue command accepts message-tool final markers from run start before queue-start rendering", async () => {
+    const queueStartedAt = Date.now() - 1000;
+    let messageToolFinalAt: number | undefined;
     const { posted, reconciled } = await runExplicitQueuedMessageToolFinalScenario({
+      getQueueStartedAt: () => queueStartedAt,
+      getMessageToolFinalReplyAt: () => messageToolFinalAt,
+      beforeRunningUpdate: () => {
+        messageToolFinalAt = queueStartedAt + 1;
+      },
+      finalSnapshot: "Done.",
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]).toContain("Queued: 1 ahead.");
+    expect(reconciled[0]).toContain("Queued message is now running");
+    expect(reconciled.join("\n")).not.toContain("Done");
+  });
+
+  test("explicit queue command ignores stale message-tool final markers before queue start", async () => {
+    const queueStartedAt = Date.now() - 1000;
+    const { posted, reconciled } = await runExplicitQueuedMessageToolFinalScenario({
+      getQueueStartedAt: () => queueStartedAt,
       getMessageToolFinalReplyAt: () => 1,
       finalSnapshot: "pane fallback final",
     });

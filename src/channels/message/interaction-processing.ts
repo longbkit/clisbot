@@ -614,6 +614,7 @@ async function executePromptDelivery<TChunk>(params: {
   let finalReplyRecorded = false;
   let loggedFirstRunningUpdate = false;
   let activePreviewStartedAt: number | undefined;
+  let queuedRunStartedAt: number | undefined;
   let messageToolPreviewHandedOff = false;
   let messageToolPreviewMonitorStarted = false;
   let stopMessageToolPreviewMonitor = false;
@@ -918,6 +919,11 @@ async function executePromptDelivery<TChunk>(params: {
         timingContext: params.timingContext,
         queueText: params.queueText,
         queueItem: params.queueItem,
+        onStart: async (item) => {
+          if (typeof item?.startedAt === "number" && Number.isFinite(item.startedAt)) {
+            queuedRunStartedAt = item.startedAt;
+          }
+        },
         onUpdate: async (update) => {
           assertRunUpdateBelongsToSession(update);
           if (update.status === "running" && !loggedFirstRunningUpdate) {
@@ -1093,8 +1099,16 @@ async function executePromptDelivery<TChunk>(params: {
     const toolFinalSeen =
       finalResult.status === "completed" &&
       params.route.responseMode === "message-tool" &&
-      (!paneManagedDelivery || typeof activePreviewStartedAt === "number")
-        ? await waitForMessageToolFinalReply({ sinceAt: activePreviewStartedAt })
+      (
+        !paneManagedDelivery ||
+        typeof activePreviewStartedAt === "number" ||
+        (params.forceQueuedDelivery === true && typeof queuedRunStartedAt === "number")
+      )
+        ? await waitForMessageToolFinalReply({
+          sinceAt: params.forceQueuedDelivery === true
+            ? queuedRunStartedAt ?? activePreviewStartedAt
+            : activePreviewStartedAt,
+        })
         : false;
 
     if (toolFinalSeen) {
