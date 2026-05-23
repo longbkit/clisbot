@@ -128,7 +128,8 @@ sends do not require running upload separately.
 
 Video sent through the shared attachment path may render as a generic Zalo
 video attachment and can show a placeholder thumbnail until playback starts. If
-the thumbnail matters, use the native video command and provide a thumbnail:
+the thumbnail matters, use the native video command and provide a JPEG/RGB
+thumbnail:
 
 ```bash
 clisbot channel-native --channel zalo-personal --bot default messages video send \

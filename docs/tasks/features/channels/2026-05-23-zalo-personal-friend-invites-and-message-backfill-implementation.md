@@ -78,8 +78,8 @@ Keep operator-facing guidance in
     recipient screenshot
   - channel-native direct video send returned a Zalo `msgId` after uploading a
     separate thumbnail
-  - channel-native direct video send with a JPEG/RGB thumbnail also returned a
-    Zalo `msgId`; recipient visual confirmation is still pending
+  - channel-native direct video send with a JPEG/RGB thumbnail was confirmed by
+    recipient screenshot; the thumbnail preview rendered before playback
   - repeated shared `--file` is rejected until multi-file semantics are designed
 
 ## Current Constraint

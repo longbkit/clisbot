@@ -129,9 +129,9 @@ Current live validation:
 - send one direct native video with uploaded thumbnail: command returned `msgId`
   on `2026-05-23`; recipient visual confirmation is still needed for thumbnail
   display
-- send one direct native video with JPEG/RGB thumbnail: command returned `msgId`
-  on `2026-05-23`; recipient visual confirmation is still needed for thumbnail
-  display
+- send one direct native video with JPEG/RGB thumbnail: passed on
+  `2026-05-23`; recipient screenshot confirmed thumbnail preview rendered before
+  playback
 - repeated `--file` is intentionally rejected until multi-file semantics are designed
 
 Before promoting beyond alpha, validate:
