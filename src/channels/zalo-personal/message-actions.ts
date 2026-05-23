@@ -1,11 +1,11 @@
-import { readFile } from "node:fs/promises";
-import { basename, extname } from "node:path";
+import { extname } from "node:path";
 import type {
   MessageInputFormat,
   MessageRenderMode,
 } from "../message/message-command.ts";
 import { loginZaloPersonalFromSession } from "./zca-js.ts";
 import { renderZaloPersonalMessage } from "./message-render.ts";
+import { resolveZaloPersonalAttachmentSource } from "./attachment-source.ts";
 
 export async function sendZaloPersonalMessageAction(params: {
   tokenFile: string;
@@ -31,7 +31,7 @@ export async function sendZaloPersonalMessageAction(params: {
   const threadType = resolveThreadType(client, params.target.conversationKind);
   return await withUploadListenerIfNeeded(client, shouldStartUploadListener(params.media, params.fileType), async () => {
     if (params.media && params.fileType === "voice") {
-      const uploaded = await client.api.uploadAttachment(await toAttachmentSource(params.media), params.target.chatId, threadType);
+      const uploaded = await client.api.uploadAttachment(await resolveZaloPersonalAttachmentSource(params.media), params.target.chatId, threadType);
       const fileUrl = resolveFirstUploadedFileUrl(uploaded);
       if (!fileUrl) throw new Error("Zalo Personal upload did not return a voice file URL.");
       const message = rendered.text ? await client.api.sendMessage({ msg: rendered.text }, params.target.chatId, threadType) : null;
@@ -42,7 +42,7 @@ export async function sendZaloPersonalMessageAction(params: {
       msg: rendered.text,
       ...(rendered.styles ? { styles: rendered.styles } : {}),
       ...(rendered.mentions ? { mentions: rendered.mentions } : {}),
-      ...(params.media ? { attachments: await toAttachmentSource(params.media) } : {}),
+      ...(params.media ? { attachments: await resolveZaloPersonalAttachmentSource(params.media) } : {}),
     }, params.target.chatId, threadType);
   });
 }
@@ -204,18 +204,6 @@ function parseMessageLocator(raw: string, defaultUidFrom = "") {
     throw new Error("--message-id must be <msgId>[:<cliMsgId>[:<uidFrom>]] or a JSON message locator.");
   }
   return { msgId, cliMsgId, uidFrom };
-}
-
-async function toAttachmentSource(pathOrUrl: string) {
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  const data = await readFile(pathOrUrl);
-  const filename = basename(pathOrUrl);
-  if (!filename.includes(".")) throw new Error("--file path must include an extension.");
-  return {
-    data,
-    filename: filename as `${string}.${string}`,
-    metadata: { totalSize: data.length },
-  };
 }
 
 function resolveFirstUploadedFileUrl(uploaded: Array<{ fileUrl?: string; normalUrl?: string }>) {

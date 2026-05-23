@@ -77,6 +77,12 @@ function parseAliasedOptionValue(args: string[], preferredName: string, aliasNam
   if (preferredValues.length > 0 && aliasValues.length > 0) {
     throw new Error(`${preferredName} and ${aliasName} are aliases; use only one`);
   }
+  if (preferredValues.length > 1) {
+    throw new Error(`${preferredName} accepts one value; multiple attachments are not supported yet`);
+  }
+  if (aliasValues.length > 1) {
+    throw new Error(`${aliasName} accepts one value; multiple attachments are not supported yet`);
+  }
   return preferredValues.at(-1) ?? aliasValues.at(-1);
 }
 

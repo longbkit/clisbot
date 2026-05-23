@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { resolveZaloPersonalAttachmentSource } from "../../channels/zalo-personal/attachment-source.ts";
 import { loadConfig, type LoadedConfig, type LoadConfigOptions } from "../../config/core/load-config.ts";
 import { resolveZaloPersonalCredentials } from "../../channels/zalo-personal/config.ts";
 import {
@@ -179,18 +179,10 @@ export function parseJsonOption<T = unknown>(raw: string | undefined, label: str
 }
 
 export async function readAttachmentSource(pathOrUrl: string, deps: ZaloPersonalCliDependencies) {
-  if (/^https?:\/\//i.test(pathOrUrl)) {
-    return pathOrUrl;
+  if (!/^https?:\/\//i.test(pathOrUrl)) {
+    const data = await deps.readFile(pathOrUrl);
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    return await resolveZaloPersonalAttachmentSource(pathOrUrl, buffer);
   }
-  const data = await deps.readFile(pathOrUrl);
-  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-  const filename = basename(pathOrUrl);
-  if (!filename.includes(".")) {
-    throw new Error("--file path must include an extension for zca-js attachment upload.");
-  }
-  return {
-    data: buffer,
-    filename: filename as `${string}.${string}`,
-    metadata: { totalSize: buffer.length },
-  };
+  return await resolveZaloPersonalAttachmentSource(pathOrUrl);
 }

@@ -115,14 +115,16 @@ Expected:
 Current live validation:
 
 - send one image from local file: passed on `2026-05-23`
+- send one image from URL: passed on `2026-05-23`; clisbot downloads the URL, then uploads to Zalo
 - send one generic file from local file: passed on `2026-05-23`
+- send one generic file from URL: passed on `2026-05-23`; clisbot downloads the URL, then uploads to Zalo
 - send one audio file from local file: passed on `2026-05-23` as a generic attachment
 - send one voice note from local audio file: passed on `2026-05-23` through the Zalo voice API
+- repeated `--file` is intentionally rejected until multi-file semantics are designed
 
 Before promoting beyond alpha, validate:
 
 - send many images from local files
-- send one image from URL
 - send many images from URLs
 - receive one image
 - receive many images

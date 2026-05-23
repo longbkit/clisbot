@@ -429,6 +429,15 @@ separate voice/video URL APIs. Do not expose repeated `--file` yet. First
 live-test Slack multiple upload behavior, Telegram media group vs independent
 sends, and Zalo attachment ordering, limits, and partial failure.
 
+Zalo Personal URL send note: zca-js `sendMessage({ attachments })` and
+`uploadAttachment()` treat string attachments as local filesystem paths, not
+remote URLs. For the shared `message send --file <path-or-url>` contract,
+clisbot downloads remote URLs into an attachment buffer before calling
+`uploadAttachment()`. zca-js also has direct `sendVoice({ voiceUrl })` and
+`sendVideo({ videoUrl, thumbnailUrl })` APIs for already-uploaded or public
+media URLs, but those are channel-native send paths, not the generic
+image/file/audio attachment path.
+
 ### Phase 4: Channel-Native Extensions
 
 Goal: cover the remaining `zca-js` and `zca-cli` families without confusing
