@@ -8,6 +8,9 @@ This channel uses an unofficial Zalo Web personal-account session through
 `zca-js`. It is useful for local alpha testing, but it is not an official Zalo
 Bot or Official Account integration.
 
+For message visibility, stranger DMs, and history limits, see
+[Zalo Personal Messages And History](zalo-personal-messages-and-history.md).
+
 ## Safety Notes
 
 - Use a separate phone number and Zalo account for automation.

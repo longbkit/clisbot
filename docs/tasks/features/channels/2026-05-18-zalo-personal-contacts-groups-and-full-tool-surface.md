@@ -18,6 +18,8 @@ addressing, and text send:
 Evidence used for this task:
 
 - [Zalo Personal setup guide](../../../user-guide/zalo-personal-setup.md)
+- [Zalo Personal messages and history guide](../../../user-guide/zalo-personal-messages-and-history.md)
+- [Friend invites and message backfill implementation notes](2026-05-23-zalo-personal-friend-invites-and-message-backfill-implementation.md)
 - [Telegram, Official Zalo Bot, zca-js, Discord, And clisbot Channel Interface Matrix](../../../research/channels/2026-05-08-telegram-zalo-discord-channel-interface-matrix.md)
 - OpenClaw local `zalouser` docs and implementation
 - https://zca-cli.dev/docs
@@ -532,18 +534,10 @@ current CLI and is implemented by Slack and Telegram; Zalo Personal should use
 the same shared verb when delete is supported. Zalo channel-native recall moves
 under `channel-native ... messages undo`.
 
-Friend-invite and stranger-message validation notes: zca-js
-`getSentFriendRequest` calls `/api/friend/requested/list` and may throw code
-`112` for no sent requests; normalize it to `sent: {}`. Live `clisbot-dev`
-validation on 2026-05-23 with bot `default` returned `sent: {}` and
-`sent: {}, incoming: []`, so no active invite was API-visible. A later outgoing
-DM from Clisbot to a non-friend appeared via zca-js
-`listener.requestOldMessages(ThreadType.User)` as a self-authored
-`old_messages` item, proving websocket user-message backfill can see at least
-some sent stranger DMs but is still global, not target-specific. Incoming
-stranger DM validation still showed no listener event, incoming invite,
-contact-search hit, or shared DM history API; next test needs peer raw id/phone
-or accepted friendship, then compare status, listener events, and pairing.
+Friend-invite and stranger-message validation notes live in
+[Friend Invites And Message Backfill Implementation Notes](2026-05-23-zalo-personal-friend-invites-and-message-backfill-implementation.md).
+Keep the shared `message read` contract conservative until target-specific DM
+history is proven.
 
 Candidate channel-native command shapes after a `channel-native` gateway exists:
 

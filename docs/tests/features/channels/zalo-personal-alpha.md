@@ -50,6 +50,33 @@ Expected:
 - `/whoami` shows a `zalo-personal:<user-id>` sender
 - queue item is accepted behind any active run
 
+## Friend Invites And Stranger Messages
+
+1. From the Clisbot Zalo account, send a DM to a non-friend test account while
+   clisbot is logged in.
+2. Check friend invite lists:
+
+```bash
+clisbot-dev contacts friend-invites list --channel zalo-personal --bot default --direction sent --json
+clisbot-dev contacts friend-invites list --channel zalo-personal --bot default --direction all --json
+```
+
+3. Inspect zca-js `listener.requestOldMessages(ThreadType.User)` output for
+   self-authored `old_messages`.
+4. Send a fresh reply from the non-friend test account while clisbot is still
+   logged in.
+
+Expected:
+
+- empty sent-request lists render as `sent: {}` instead of failing on Zalo code
+  `112`
+- an outgoing non-friend DM can appear in `old_messages` even when no active
+  friend request is visible
+- messages sent manually from mobile before clisbot login are not treated as
+  listener regressions
+- incoming stranger DMs remain unclaimed until a live listener event or
+  target-specific history path is proven
+
 ## Group Flow
 
 1. Add the Zalo Personal account to a group.

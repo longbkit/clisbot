@@ -25,6 +25,7 @@ Related pages:
 - [Telegram Bot Setup](telegram-setup.md)
 - [Zalo Bot Setup](zalo-bot-setup.md)
 - [Zalo Personal Setup](zalo-personal-setup.md)
+- [Zalo Personal Messages And History](zalo-personal-messages-and-history.md)
 - [Slack App Setup](slack-setup.md)
 - [Slash Commands](slash-commands.md)
 - [Native CLI Commands](native-cli-commands.md)
