@@ -564,6 +564,31 @@ describe("loadConfig", () => {
     expect(warnings).toEqual([]);
   });
 
+  test("treats the DM wildcard route as canonical when dmPolicy conflicts", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
+    const configPath = join(tempDir, "clisbot.json");
+    const config = buildTemplateConfig();
+    config.bots.slack.default.dmPolicy = "disabled";
+    config.bots.slack.default.directMessages = {
+      "*": {
+        enabled: true,
+        requireMention: false,
+        policy: "pairing",
+        allowUsers: [],
+        blockUsers: [],
+        allowBots: false,
+      },
+    };
+
+    await Bun.write(configPath, JSON.stringify(config));
+
+    const loaded = await loadConfigWithoutEnvResolution(configPath);
+
+    expect(loaded.raw.bots.slack.default.dmPolicy).toBe("pairing");
+    expect(loaded.raw.bots.slack.default.directMessages["*"]?.enabled).toBe(true);
+    expect(loaded.raw.bots.slack.default.directMessages["*"]?.policy).toBe("pairing");
+  });
+
   test("treats 0.1.45 configs as post-legacy shape during 0.1.50 rewrite", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-config-"));
     const configPath = join(tempDir, "clisbot.json");

@@ -38,8 +38,10 @@ At minimum, answer these questions:
 - what are the real one-person and many-people surface kinds
 - whether the provider supports first-class sub-surfaces such as topics, threads, or replies
 - which trigger shapes are truthful: DM, mention, reply-to-bot, slash command, webhook event, socket event, polling update
-- whether outbound rendering is plain text only or supports native formatting
-- whether outbound media accepts local upload, remote URL only, or both
+- whether outbound rendering is plain text only, Markdown-compatible, or supports a separate native rich-text payload
+- whether Markdown can be converted into that native rich-text payload truthfully, including limits, unsupported syntax, and fallback behavior
+- whether outbound media accepts local upload, remote URL only, or both, checked separately for generic file, image, video, voice note, and audio
+- whether outbound media supports multiple files in one operator send, and if ordering, captions, partial failure, or album/group behavior change by media kind
 - whether inbound attachments need download support, what metadata is exposed, and whether URLs are durable enough for later download
 - what truthful onboarding help should appear when a surface is unrouted, unpaired, or blocked
 - what failure shape appears when attachment URLs are empty, expired, or zero-byte
@@ -56,6 +58,41 @@ At minimum, answer these questions:
 - what the canonical operator target syntax should be for DM and shared surfaces
 
 Do not copy another channel's behavior until each copied rule still matches the new provider truth.
+
+### Outbound render and file capability research
+
+Every channel integration must include a provider-specific research table before
+implementation claims parity with Slack, Telegram, or another channel. This is
+especially important for AI-authored replies because the default clisbot mental
+model is `--input md --render native`: the AI writes Markdown and the channel
+adapter produces the best native-looking output that channel can honestly send.
+
+Render capability table:
+
+| Question | Required answer |
+| --- | --- |
+| Text input accepted by provider | Plain text, HTML, Markdown, Slack-style `mrkdwn`, native rich-text object, or another payload shape. |
+| Markdown compatibility | Which Markdown constructs work natively, which require clisbot conversion, and which must degrade to readable text. |
+| Native rich-text support | Supported styles such as bold, italic, underline, links, color, lists, mentions, quotes, buttons, or blocks. |
+| Markdown-to-native feasibility | Whether clisbot can map Markdown spans to provider-native ranges/blocks without losing offsets, links, Unicode, emoji, or mentions. |
+| Limits | Message length, block count, style-range count, entity count, caption limits, and fallback text limits. |
+| Fallback contract | What happens when rich rendering fails: plain text retry, degraded plain text, split message, or hard failure. |
+| Tests needed | Unit conversion cases, integration payload assertions, and at least one live send for the richest supported path. |
+
+Outbound file capability table:
+
+| Media kind | Local file path | Remote URL | Multiple files | Caption/message behavior | Validation notes |
+| --- | --- | --- | --- | --- | --- |
+| Generic file | Unknown until researched | Unknown until researched | Unknown until researched | Unknown until researched | Check upload API, size limits, filename preservation, and local-file support. |
+| Image | Unknown until researched | Unknown until researched | Unknown until researched | Unknown until researched | Check whether it sends as image preview, document, or link-only. |
+| Video | Unknown until researched | Unknown until researched | Unknown until researched | Unknown until researched | Check thumbnail, duration, transcoding, size, and URL-only requirements. |
+| Voice note | Unknown until researched | Unknown until researched | Unknown until researched | Unknown until researched | Check whether the provider has a distinct voice-note API or only generic audio. |
+| Audio file | Unknown until researched | Unknown until researched | Unknown until researched | Unknown until researched | Check whether it renders as playable audio, document, or unsupported. |
+
+Do not collapse this to a single "supports files" checkbox. A provider can
+support image URLs but not local uploads, generic files but not voice notes, or
+one file per message but not multi-file albums. Document each difference before
+exposing shared `message send --file` behavior or prompting agents to use it.
 
 ## Delivery Workflow
 
@@ -91,6 +128,12 @@ Use this order unless the provider forces a different dependency:
 - message send path
 - reply-target recording
 - rendering or content shaping
+- `--input md --render native` behavior, including whether Markdown is parsed
+  by the provider or compiled by clisbot into a native rich-text payload
+- explicit render fallback behavior for unsupported Markdown or rich-text
+  failures
+- outbound file behavior for generic files, images, videos, voice notes, audio,
+  remote URLs, local file paths, and multiple files
 - live reply update capability: channels that cannot edit/delete or otherwise update a live reply must not implement shared streaming reconcile by posting duplicate progress messages
 - typing or processing indicators
 - routed and unrouted command behavior such as `/start`, `/status`, `/whoami`, and `/transcript`
@@ -294,6 +337,12 @@ Questions:
 
 - did help text over-promise commands the provider does not actually support
 - did reply-style hints stay truthful for the provider render capabilities
+- did `--render native` document the channel's best native output path, its
+  Markdown compatibility, and its plain-text or degraded fallback
+- did outbound `--file` docs distinguish local file upload from URL-only sends
+  for generic file, image, video, voice note, and audio
+- did any repeated `--file` or multi-file claim have live validation for
+  ordering, captions, grouping/albums, limits, and partial failure
 - did target syntax stay aligned across `message`, `routes`, `loops`, and `queues`
 - did route management reject unsupported surface families before writing config
 - did `queues` and `loops` preserve explicit target kind the same way the provider service and message command path do

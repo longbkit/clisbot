@@ -57,7 +57,7 @@ function createTopicGroupWildcardRoute(): BotRouteConfig & {
   };
 }
 
-type BaseProviderDefaultsTemplate<TMode extends "socket" | "polling"> = {
+type BaseProviderDefaultsTemplate<TMode extends "socket" | "polling" | "listener"> = {
   enabled: boolean;
   defaultBotId: string;
   mode: TMode;
@@ -88,7 +88,7 @@ type BaseProviderDefaultsTemplate<TMode extends "socket" | "polling"> = {
   };
 };
 
-type StandardProviderDefaultsTemplate<TMode extends "socket" | "polling", TExtra extends object> =
+type StandardProviderDefaultsTemplate<TMode extends "socket" | "polling" | "listener", TExtra extends object> =
   BaseProviderDefaultsTemplate<TMode> & {
     directMessages: {
       "*": BotRouteConfig;
@@ -111,7 +111,7 @@ type TopicProviderDefaultsTemplate<TMode extends "polling", TExtra extends objec
   } & TExtra;
 
 export function createStandardChannelProviderDefaultsTemplate<
-  TMode extends "socket" | "polling",
+  TMode extends "socket" | "polling" | "listener",
   TExtra extends object = {},
 >(params: {
   enabled: boolean;

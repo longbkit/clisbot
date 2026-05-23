@@ -433,7 +433,8 @@ Required vs optional:
 
 Important behavior:
 
-- `--account` chooses which bot account sends or edits the message; if omitted, the provider default bot is used
+- `--bot` chooses which provider bot sends or edits the message; if omitted, the provider default bot is used
+- `--account` remains a compatibility alias for `--bot`
 - `clisbot message --help --channel <channel-name>` prints channel-scoped target syntax, render hints, examples, and support boundaries
 - `message custom <subtree...>` is one shared gateway with channel-owned grammar after `custom`
 - `message custom` is intentionally not one provider-neutral mini-language; inspect the selected channel help before using it

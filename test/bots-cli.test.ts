@@ -106,6 +106,7 @@ describe("bots cli", () => {
     process.env.CLISBOT_HOME = tempDir;
     process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
     await seedConfig();
+    console.log = () => {};
 
     await expect(
       runBotsCli(
@@ -347,4 +348,66 @@ describe("bots cli", () => {
       }),
     ]);
   });
+
+  test("reads zalo personal dmPolicy without creating a wildcard DM route", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+
+    const output: string[] = [];
+    console.log = (value?: unknown) => {
+      output.push(String(value ?? ""));
+    };
+
+    await runBotsCli(["get-dm-policy", "--channel", "zalo-personal", "--bot", "default"]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(output.join("\n")).toContain("zalo-personal/default dmPolicy: disabled");
+    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("disabled");
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"]).toBeUndefined();
+  });
+
+  test("keeps dmPolicy and the wildcard DM route consistent when setting policy", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = () => {};
+
+    await runBotsCli([
+      "set-dm-policy",
+      "--channel",
+      "zalo-personal",
+      "--bot",
+      "default",
+      "--policy",
+      "pairing",
+    ]);
+
+    let rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("pairing");
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"].enabled).toBe(true);
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"].policy).toBe("pairing");
+
+    await runBotsCli([
+      "set-dm-policy",
+      "--channel",
+      "zalo-personal",
+      "--bot",
+      "default",
+      "--policy",
+      "disabled",
+    ]);
+
+    rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("disabled");
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"].enabled).toBe(false);
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"].policy).toBe("disabled");
+  });
+
 });

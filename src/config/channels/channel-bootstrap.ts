@@ -4,4 +4,5 @@ export type ChannelBootstrapBotInput = {
   botId: string;
   appToken?: ParsedTokenInput;
   botToken?: ParsedTokenInput;
+  qrPath?: string;
 };

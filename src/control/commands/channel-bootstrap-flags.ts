@@ -9,7 +9,10 @@ import type { ChannelBootstrapTokenField } from "../../channels/integration/chan
 import {
   hasLiteralBootstrapBotCredentials,
 } from "../../channels/integration/operator-inventory.ts";
-import { listChannelPlugins } from "../../channels/catalog/registry.ts";
+import {
+  listChannelPlugins,
+  parseRegisteredChannelOrThrow,
+} from "../../channels/catalog/registry.ts";
 
 export type ParsedBootstrapBotMap = Record<ChannelId, ChannelBootstrapBotInput[]>;
 
@@ -84,6 +87,10 @@ function renderMixedBootstrapSources(fields: readonly ChannelBootstrapTokenField
   return fields.join(" and ");
 }
 
+function hasQrBootstrap(plugin: ReturnType<typeof listChannelPlugins>[number]) {
+  return plugin.id === "zalo-personal";
+}
+
 function validateBootstrapBot(params: {
   label: string;
   bot: ChannelBootstrapBotInput;
@@ -133,6 +140,7 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
   let bootstrap: AgentBootstrapMode | undefined;
   let persist = false;
   let sawCredentialFlags = false;
+  let currentGenericChannel: ChannelId | undefined;
   const sawChannels = createEmptyChannelSeenMap();
   const channelStates = Object.fromEntries(
     listChannelPlugins().map((plugin) => [
@@ -181,6 +189,55 @@ export function parseBootstrapFlags(args: string[]): ParsedBootstrapFlags {
     }
     if (arg === "--persist") {
       persist = true;
+      continue;
+    }
+    if (arg === "--confirm") {
+      continue;
+    }
+    if (arg === "--channel") {
+      const channel = parseRegisteredChannelOrThrow(parseOptionValue(args, arg, index));
+      const plugin = listChannelPlugins().find((entry) => entry.id === channel);
+      if (!plugin?.bootstrapCli || !hasQrBootstrap(plugin)) {
+        throw new Error(`--channel ${channel} is not a QR bootstrap channel.`);
+      }
+      currentGenericChannel = channel;
+      channelStates[channel].markSeen();
+      getOrCreateBootstrapBot(
+        channelStates[channel].bots,
+        channelStates[channel].getCurrentBotId() ?? "default",
+      );
+      sawCredentialFlags = true;
+      index += 1;
+      continue;
+    }
+    if (arg === "--bot") {
+      if (!currentGenericChannel) {
+        throw new Error("--bot requires --channel for start/init bootstrap.");
+      }
+      const botId = parseOptionValue(args, arg, index);
+      const state = channelStates[currentGenericChannel];
+      const qrPath = state.bots[0]?.qrPath;
+      state.bots.splice(0, state.bots.length);
+      state.setCurrentBotId(botId);
+      getOrCreateBootstrapBot(state.bots, botId).qrPath = qrPath;
+      state.markSeen();
+      index += 1;
+      continue;
+    }
+    if (arg === "--qr-path") {
+      if (!currentGenericChannel) {
+        throw new Error("--qr-path requires --channel for start/init bootstrap.");
+      }
+      const plugin = listChannelPlugins().find((entry) => entry.id === currentGenericChannel);
+      if (!plugin || !hasQrBootstrap(plugin)) {
+        throw new Error(`--qr-path is not supported for ${currentGenericChannel}.`);
+      }
+      const state = channelStates[currentGenericChannel];
+      const bot = getOrCreateBootstrapBot(state.bots, state.getCurrentBotId() ?? "default");
+      bot.qrPath = parseOptionValue(args, arg, index);
+      sawCredentialFlags = true;
+      state.markSeen();
+      index += 1;
       continue;
     }
     const accountEntry = accountFlags.find((entry) => entry.flag === arg);

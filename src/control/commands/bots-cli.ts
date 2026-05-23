@@ -1,4 +1,3 @@
-import { setTimeout as sleep } from "node:timers/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { readEditableConfig, writeEditableConfig } from "../../config/core/config-file.ts";
 import { parseTimezone } from "../../config/runtime/timezone.ts";
@@ -11,11 +10,11 @@ import {
   reconcileChannelProviderDefaults,
   requireChannelBotRecord,
 } from "../../config/channels/channel-bots.ts";
-import { ensureBotDirectMessageWildcardRoute } from "../../config/channels/direct-message-routes.ts";
 import {
-  describeChannelCredentialSource,
-  getConfigReloadMtimeMs,
-} from "../../config/channels/channel-credentials.ts";
+  createDirectMessageRouteShell,
+  ensureBotDirectMessageWildcardRoute,
+} from "../../config/channels/direct-message-routes.ts";
+import { describeChannelCredentialSource } from "../../config/channels/channel-credentials.ts";
 import {
   applyChannelBotCredentialInput,
   listChannelBotCredentialContracts,
@@ -25,7 +24,6 @@ import {
 import { RuntimeHealthStore } from "../runtime/runtime-health-store.ts";
 import { getRuntimeStatus } from "../runtime/runtime-process.ts";
 import { getDefaultRuntimeCredentialsPath } from "../../infra/paths.ts";
-import { addAgentToEditableConfig } from "./agents-cli.ts";
 import { renderCliCommand } from "./cli-name.ts";
 import {
   parseRegisteredChannelOrThrow,
@@ -33,38 +31,32 @@ import {
   renderSupportedChannelsNote,
 } from "../../channels/catalog/registry.ts";
 import type { ChannelId } from "../../channels/integration/channel-surface-contract.ts";
+import {
+  ensureAgentExists,
+  findLastPositionalArg,
+  getBotId,
+  getMutuallyExclusiveAgentArgs,
+  hasFlag,
+  hasHelpFlag,
+  maybeCreateBotAgent,
+  parseOptionValue,
+  waitForReloadResult,
+  type BotsCliDependencies,
+} from "./bots-cli-shared.ts";
+import {
+  getZaloPersonalCredentialSource,
+  loginZaloPersonalBot,
+  logoutZaloPersonalBot,
+  renderZaloPersonalAddHelpLine,
+  renderZaloPersonalLifecycleHelpLines,
+  statusZaloPersonalBot,
+  tryAddZaloPersonalBot,
+} from "./zalo-personal-bots-cli.ts";
 
 type Provider = ChannelId;
 
-type BotsCliDependencies = {
-  getRuntimeStatus: typeof getRuntimeStatus;
-  runtimeHealthStore: RuntimeHealthStore;
-};
-
 function getEditableConfigPath() {
   return process.env.CLISBOT_CONFIG_PATH;
-}
-
-function parseOptionValue(args: string[], name: string) {
-  const index = args.findIndex((arg) => arg === name);
-  if (index === -1) {
-    return undefined;
-  }
-
-  const value = args[index + 1]?.trim();
-  if (!value) {
-    throw new Error(`Missing value for ${name}`);
-  }
-
-  return value;
-}
-
-function hasFlag(args: string[], name: string) {
-  return args.includes(name);
-}
-
-function hasHelpFlag(args: string[]) {
-  return args.includes("--help") || args.includes("-h");
 }
 
 function readRuntimeCredentialDocument() {
@@ -76,29 +68,6 @@ function readRuntimeCredentialDocument() {
   return text ? JSON.parse(text) : {};
 }
 
-async function waitForReloadResult(
-  configPath: string,
-  deps: BotsCliDependencies,
-  timeoutMs = 12_000,
-) {
-  const expectedMtimeMs = getConfigReloadMtimeMs(configPath);
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    const document = await deps.runtimeHealthStore.read();
-    if (
-      document.reload &&
-      document.reload.reason === "watch" &&
-      (document.reload.configMtimeMs ?? 0) >= expectedMtimeMs
-    ) {
-      return document.reload.status;
-    }
-    await sleep(200);
-  }
-
-  return "failed" as const;
-}
-
 function renderBotsHelp() {
   const channelName = renderChannelNamePlaceholder();
   const addExamples = listChannelBotCredentialContracts().map((contract) =>
@@ -106,6 +75,7 @@ function renderBotsHelp() {
       `bots add --channel ${contract.channel} [--bot <id>] ${renderChannelBotCredentialUsage(contract.channel)} [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`,
     )
   );
+  addExamples.push(renderZaloPersonalAddHelpLine());
   const setCredentialExamples = listChannelBotCredentialContracts().map((contract) =>
     renderCliCommand(
       `bots set-credentials --channel ${contract.channel} [--bot <id>] ${renderChannelBotCredentialUsage(contract.channel)} [--persist]`,
@@ -133,6 +103,7 @@ function renderBotsHelp() {
     `  ${renderCliCommand(`bots clear-timezone --channel ${channelName} [--bot <id>]`)}`,
     `  ${renderCliCommand(`bots get-credentials-source --channel ${channelName} [--bot <id>]`)}`,
     ...setCredentialExamples.map((line) => `  ${line}`),
+    ...renderZaloPersonalLifecycleHelpLines().map((line) => `  ${line}`),
     `  ${renderCliCommand(`bots get-dm-policy --channel ${channelName} [--bot <id>]`)}`,
     `  ${renderCliCommand(`bots set-dm-policy --channel ${channelName} [--bot <id>] --policy <disabled|pairing|allowlist|open>`)}`,
     "",
@@ -143,6 +114,7 @@ function renderBotsHelp() {
     "  - if you want an extra agent without adding another provider bot, create it with `agents add ...` and then point this bot at it with `set-agent`",
     "  - prefer app, agent, or route timezone first; bot timezone is an advanced concrete-bot fallback",
     "  - raw token input without `--persist` requires a running clisbot runtime",
+    "  - Zalo Personal login is QR-only; `--qr-path` only saves the QR image while the QR is still printed in the console",
     "  - normal shared-route admission now follows the bot's `group:*` default plus any exact `group:<id>` override",
     `  - ${renderSupportedChannelsNote()}`,
   ].join("\n");
@@ -154,80 +126,6 @@ function parseProvider(args: string[]) {
   } catch {
     throw new Error(renderBotsHelp());
   }
-}
-
-function getBotId(args: string[]) {
-  return parseOptionValue(args, "--bot") ?? "default";
-}
-
-function findLastPositionalArg(args: string[]) {
-  let value: string | undefined;
-  const flagsWithValue = new Set(["--channel", "--bot", "--agent", "--app-token", "--bot-token"]);
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (flagsWithValue.has(arg)) {
-      index += 1;
-      continue;
-    }
-    if (arg?.startsWith("--")) {
-      continue;
-    }
-    value = arg;
-  }
-  return value;
-}
-
-function ensureAgentExists(config: ClisbotConfig, agentId: string) {
-  if (!config.agents.list.some((entry) => entry.id === agentId)) {
-    throw new Error(`Unknown agent: ${agentId}`);
-  }
-}
-
-function getMutuallyExclusiveAgentArgs(args: string[]) {
-  const agentId = parseOptionValue(args, "--agent");
-  const cliTool = parseOptionValue(args, "--cli");
-  const botType = parseOptionValue(args, "--bot-type");
-
-  if (agentId && (cliTool || botType)) {
-    throw new Error("Use either --agent or --cli with --bot-type, not both.");
-  }
-
-  if ((cliTool && !botType) || (!cliTool && botType)) {
-    throw new Error("When creating a new bot agent, pass both --cli and --bot-type.");
-  }
-
-  return {
-    agentId,
-    cliTool,
-    botType,
-  };
-}
-
-async function maybeCreateBotAgent(
-  configPath: string,
-  botId: string,
-  cliTool?: string,
-  botType?: string,
-) {
-  if (!cliTool && !botType) {
-    return undefined;
-  }
-
-  if (cliTool !== "codex" && cliTool !== "claude" && cliTool !== "gemini") {
-    throw new Error("Bot agent CLI must be one of: codex, claude, gemini.");
-  }
-  if (botType !== "personal" && botType !== "team") {
-    throw new Error("Bot agent type must be `personal` or `team`.");
-  }
-
-  await addAgentToEditableConfig({
-    configPath,
-    agentId: botId,
-    cliTool,
-    bootstrap: botType === "personal" ? "personal-assistant" : "team-assistant",
-  });
-
-  return botId;
 }
 
 async function listBots(args: string[]) {
@@ -263,7 +161,7 @@ async function addOrSetBotCredentials(
   const botId = getBotId(args);
   const persist = hasFlag(args, "--persist");
   const runtimeStatus = await deps.getRuntimeStatus();
-  const { config, configPath } = await readEditableConfig(getEditableConfigPath());
+  let { config, configPath } = await readEditableConfig(getEditableConfigPath());
 
   const exists = Boolean(getChannelBotRecord(config, provider, botId));
   if (action === "add" && exists) {
@@ -279,6 +177,7 @@ async function addOrSetBotCredentials(
   const nextAgentId = agentId ?? (cliTool && botType ? await maybeCreateBotAgent(configPath, botId, cliTool, botType) : undefined);
   if (nextAgentId) {
     const refreshed = await readEditableConfig(configPath);
+    config = refreshed.config;
     ensureAgentExists(refreshed.config, nextAgentId);
   }
 
@@ -430,8 +329,50 @@ async function getSetClearBotTimezone(
   console.log(`config: ${configPath}`);
 }
 
-function ensureDefaultDmRoute(config: ClisbotConfig, provider: Provider, botId: string) {
-  return ensureBotDirectMessageWildcardRoute(config, provider, botId);
+type DmPolicy = "disabled" | "pairing" | "allowlist" | "open";
+
+function routeToDmPolicy(
+  route: { enabled?: boolean; policy?: string } | undefined,
+  fallbackPolicy: DmPolicy,
+): DmPolicy {
+  if (!route || route.enabled === false || route.policy === "disabled") {
+    return "disabled";
+  }
+  return route.policy === "open" || route.policy === "allowlist" || route.policy === "pairing"
+    ? route.policy
+    : fallbackPolicy;
+}
+
+function getEffectiveBotDmPolicy(config: ClisbotConfig, provider: Provider, botId: string) {
+  const bot = requireChannelBotRecord(config, provider, botId);
+  const defaults = getChannelProviderDefaults(config, provider);
+  const fallbackPolicy = routeToDmPolicy(
+    defaults.directMessages?.["*"],
+    defaults.dmPolicy ?? "pairing",
+  );
+  return routeToDmPolicy(bot.directMessages?.["*"], fallbackPolicy);
+}
+
+function setDefaultDmPolicy(
+  config: ClisbotConfig,
+  provider: Provider,
+  botId: string,
+  policy: DmPolicy,
+) {
+  const bot = requireChannelBotRecord(config, provider, botId);
+  bot.dmPolicy = policy;
+  if (policy === "disabled") {
+    bot.directMessages ??= {};
+    bot.directMessages["*"] = {
+      ...createDirectMessageRouteShell(policy),
+      enabled: false,
+      policy,
+    };
+    return;
+  }
+  const route = ensureBotDirectMessageWildcardRoute(config, provider, botId, policy);
+  route.enabled = true;
+  route.policy = policy;
 }
 
 async function getOrSetBotPolicy(args: string[], action: string) {
@@ -441,7 +382,7 @@ async function getOrSetBotPolicy(args: string[], action: string) {
   requireChannelBotRecord(config, provider, botId);
 
   if (action === "get-dm-policy") {
-    console.log(`${provider}/${botId} dmPolicy: ${ensureDefaultDmRoute(config, provider, botId).policy ?? "pairing"}`);
+    console.log(`${provider}/${botId} dmPolicy: ${getEffectiveBotDmPolicy(config, provider, botId)}`);
     console.log(`config: ${configPath}`);
     return;
   }
@@ -451,7 +392,7 @@ async function getOrSetBotPolicy(args: string[], action: string) {
     if (policy !== "disabled" && policy !== "pairing" && policy !== "allowlist" && policy !== "open") {
       throw new Error(renderBotsHelp());
     }
-    ensureDefaultDmRoute(config, provider, botId).policy = policy;
+    setDefaultDmPolicy(config, provider, botId, policy);
     await writeEditableConfig(configPath, config);
     console.log(`set dmPolicy for ${provider}/${botId} to ${policy}`);
     console.log(`config: ${configPath}`);
@@ -464,6 +405,10 @@ async function getOrSetBotPolicy(args: string[], action: string) {
 async function getCredentialSource(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
+  if (provider === "zalo-personal") {
+    await getZaloPersonalCredentialSource(args, renderBotsHelp);
+    return;
+  }
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   requireChannelBotRecord(config, provider, botId);
   const source = describeChannelCredentialSource({
@@ -497,6 +442,9 @@ export async function runBotsCli(
   }
 
   if (action === "add") {
+    if (await tryAddZaloPersonalBot(args.slice(1), resolvedDeps, renderBotsHelp)) {
+      return;
+    }
     await addOrSetBotCredentials(args.slice(1), resolvedDeps, "add");
     return;
   }
@@ -551,6 +499,21 @@ export async function runBotsCli(
 
   if (action === "get-credentials-source") {
     await getCredentialSource(args.slice(1));
+    return;
+  }
+
+  if (action === "login") {
+    await loginZaloPersonalBot(args.slice(1), renderBotsHelp);
+    return;
+  }
+
+  if (action === "logout") {
+    await logoutZaloPersonalBot(args.slice(1), resolvedDeps, renderBotsHelp);
+    return;
+  }
+
+  if (action === "status") {
+    await statusZaloPersonalBot(args.slice(1), resolvedDeps, renderBotsHelp);
     return;
   }
 

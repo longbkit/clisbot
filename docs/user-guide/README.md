@@ -24,6 +24,7 @@ Related pages:
 - [Gemini CLI Guide](gemini-cli.md)
 - [Telegram Bot Setup](telegram-setup.md)
 - [Zalo Bot Setup](zalo-bot-setup.md)
+- [Zalo Personal Setup](zalo-personal-setup.md)
 - [Slack App Setup](slack-setup.md)
 - [Slash Commands](slash-commands.md)
 - [Native CLI Commands](native-cli-commands.md)

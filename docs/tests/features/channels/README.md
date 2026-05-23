@@ -28,6 +28,7 @@ Telegram, Zalo Bot, API, and other channels.
 - [Slack Routing And Follow-Up Tests](slack-routing-and-follow-up.md)
 - [Rendering And Command Tests](rendering-and-command-tests.md)
 - [Zalo Bot Channel MVP](zalo-bot-channel-mvp.md)
+- [Zalo Personal Alpha Tests](zalo-personal-alpha.md)
 
 ## Cross-Channel Regression Checks
 

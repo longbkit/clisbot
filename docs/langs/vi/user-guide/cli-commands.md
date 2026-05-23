@@ -435,7 +435,8 @@ Phần bắt buộc và tùy chọn:
 
 Hành vi quan trọng:
 
-- `--account` chọn bot account nào sẽ gửi hoặc sửa message; nếu bỏ qua, bot mặc định của provider sẽ được dùng
+- `--bot` chọn provider bot nào sẽ gửi hoặc sửa message; nếu bỏ qua, bot mặc định của provider sẽ được dùng
+- `--account` vẫn là alias tương thích ngược cho `--bot`
 - `clisbot message --help --channel <channel-name>` in ra target syntax theo channel, render hint, ví dụ, và support boundary
 - `message custom <subtree...>` là một gateway dùng chung, nhưng grammar sau `custom` thuộc sở hữu của channel đã chọn
 - `message custom` cố ý không ép thành một mini-language trung lập cho mọi provider; hãy xem help của đúng channel trước khi dùng

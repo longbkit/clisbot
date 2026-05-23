@@ -75,7 +75,8 @@ Reason:
 
 - `zalo` is ambiguous
 - the three paths have different product and technical contracts
-- explicit ids will keep `clisbot message`, `channels add`, `routes add`, status, docs, and future health output easier to audit
+- explicit ids will keep `clisbot message`, `bots add`, `routes add`, status,
+  docs, and future health output easier to audit
 
 ## Provider roles
 
@@ -176,7 +177,7 @@ Concrete differences to preserve:
 
 ### Operator surface expectation
 
-- `clisbot channels add --channel zalo-bot ...`
+- `clisbot bots add --channel zalo-bot ...`
 - `clisbot message send --channel zalo-bot ...`
 - `clisbot status`
 - provider-aware startup help
@@ -218,12 +219,27 @@ Expected work before implementation:
 Implementation rule:
 
 - isolate it behind its own provider id and docs
-- do not let its risk profile leak into the official provider story
+- do not let its risk posture leak into the official provider story
 
 Operational recommendation:
 
-- keep the adapter seam open to `zca-cli` first
-- do not hard-commit the product plan to `zca-js` until live reliability and maintenance cost are proven
+- use native `zca-js` as the first implementation path
+- do not expose a public backend selector in the first CLI
+- keep QR login aligned with the existing bot/channel CLI model: `clisbot start`,
+  `clisbot bots add`, and `clisbot bots login` can accept `--qr-path`, but they
+  must still print the QR to the console and wait for the user to scan it
+- persist the resulting auth/session file through the same credential-file
+  architecture used by token-backed channels
+- treat the Zalo Personal session file as provider-owned opaque auth/session
+  content under the `tokenFile` path contract, not as a fake bot-token literal
+  or runtime `credentialType=mem` secret
+- treat the `zalo-personal` bot id as the account identity; do not add a
+  separate public account-label concept to clisbot
+- report missing or expired auth through the existing connection/status surface
+  instead of adding a separate auth column
+- if the existing token credential contract cannot express auth/session files
+  honestly, add a narrow session-file contract instead of weakening Slack,
+  Telegram, and Zalo Bot token behavior
 
 ## Work Breakdown
 
@@ -327,7 +343,10 @@ Required before shipping beyond alpha:
 - explicit risk warning in help and user guide
 - login and relogin recovery contract
 - operator troubleshooting contract
-- clear statement of supported dependency seam such as `zca-cli` or another chosen adapter
+- `--qr-path` login flow for `clisbot start`, `clisbot bots add`, and
+  `clisbot bots login`
+- `clisbot bots logout` and `clisbot bots status` with missing or expired auth
+  surfaced as connection/status failure reasons
 
 ## Related Docs
 

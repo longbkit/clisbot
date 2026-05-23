@@ -14,6 +14,7 @@ import {
   type ChannelCredentialFieldKey,
 } from "./channel-credential-contract.ts";
 import { reconcileChannelProviderDefaults } from "./channel-bots.ts";
+import { buildZaloPersonalBotConfig } from "../../channels/zalo-personal/config.ts";
 
 export type ChannelBootstrapBots = Record<ChannelId, ChannelBootstrapBotInput[]>;
 
@@ -31,6 +32,7 @@ type ManagedBootstrapBot = {
   groupPolicy?: string;
   directMessages?: Record<string, unknown>;
   groups?: Record<string, unknown>;
+  followUp?: Record<string, unknown>;
 };
 type ManagedProviderDefaults = {
   enabled?: boolean;
@@ -61,6 +63,51 @@ function getManagedProviderConfig(
 function getManagedBotRecords(config: ManagedProviderConfig) {
   const { defaults, ...bots } = config;
   return bots as Record<string, ManagedBootstrapBot | undefined>;
+}
+
+function getZaloPersonalProviderConfig(config: ClisbotConfig) {
+  return config.bots.zaloPersonal as unknown as ManagedProviderConfig;
+}
+
+function applyZaloPersonalBootstrapBots(
+  config: ClisbotConfig,
+  bootstrapBots: ChannelBootstrapBotInput[],
+  options: {
+    firstRun: boolean;
+  },
+) {
+  const providerConfig = getZaloPersonalProviderConfig(config);
+  if (options.firstRun) {
+    resetBootstrapProvider({
+      contract: {
+        channel: "zalo-personal",
+        configBotKey: "zaloPersonal",
+        providerLabel: "Zalo Personal",
+        literalTokenLabel: "Zalo Personal auth/session",
+        fields: [],
+      },
+      providerConfig,
+      bootstrapBots,
+    });
+  }
+
+  if (bootstrapBots.length === 0) {
+    return;
+  }
+
+  providerConfig.defaults.enabled = true;
+  if (!providerConfig.defaults.defaultBotId || providerConfig.defaults.defaultBotId === "default") {
+    providerConfig.defaults.defaultBotId = getFirstBotId(bootstrapBots);
+  }
+
+  for (const bot of bootstrapBots) {
+    providerConfig[bot.botId] = buildZaloPersonalBotConfig({
+      botId: bot.botId,
+      existing: providerConfig[bot.botId] as Record<string, unknown> | undefined,
+    });
+  }
+
+  reconcileChannelProviderDefaults(config, "zalo-personal");
 }
 
 function createManagedBotShell(
@@ -335,6 +382,10 @@ export function applyBootstrapBotsToConfig(
       reconcileChannelProviderDefaults(config, contract.channel);
     }
   }
+
+  applyZaloPersonalBootstrapBots(config, bots["zalo-personal"] ?? [], {
+    firstRun: options.firstRun,
+  });
 }
 
 export function stageBootstrapRuntimeCredentials(

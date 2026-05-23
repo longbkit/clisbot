@@ -10,12 +10,13 @@ import type { ChannelSurfaceConfigTargetContract } from "../config/surface-confi
 import slackChannelInstallation from "../slack/installation.ts";
 import telegramChannelInstallation from "../telegram/installation.ts";
 import zaloBotChannelInstallation from "../zalo-bot/installation.ts";
+import zaloPersonalChannelInstallation from "../zalo-personal/installation.ts";
 
 export type ChannelInstallation = {
   surfaceContract: ChannelSurfaceContract;
   configTarget: ChannelSurfaceConfigTargetContract;
   pairingAccess: ChannelPairingAccessContract;
-  credentialContract: ChannelCredentialContract;
+  credentialContract?: ChannelCredentialContract;
   botContract: ChannelBotContract;
   routeContract: ChannelRouteContract;
   schemaContract: ChannelSchemaContract;
@@ -27,6 +28,7 @@ export const CHANNEL_INSTALLATIONS = [
   slackChannelInstallation,
   telegramChannelInstallation,
   zaloBotChannelInstallation,
+  zaloPersonalChannelInstallation,
 ] as const satisfies readonly ChannelInstallation[];
 
 function projectInstallations<TValue>(
@@ -46,7 +48,7 @@ export const CHANNEL_PAIRING_ACCESS_CONTRACTS: readonly ChannelPairingAccessCont
 );
 export const CHANNEL_CREDENTIAL_CONTRACTS: readonly ChannelCredentialContract[] = projectInstallations(
   (installation) => installation.credentialContract,
-);
+).filter((contract): contract is ChannelCredentialContract => Boolean(contract));
 export const CHANNEL_BOT_CONTRACTS: readonly ChannelBotContract[] = projectInstallations(
   (installation) => installation.botContract,
 );

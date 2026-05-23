@@ -69,7 +69,7 @@ describe("pairing cli", () => {
     expect(text).toContain("clisbot pairing");
     expect(text).toContain("clisbot pairing help");
     expect(text).toContain("clisbot pairing clear <channel-name>");
-    expect(text).toContain("Supported channels: slack, telegram, zalo-bot.");
+    expect(text).toContain("Supported channels: slack, telegram, zalo-bot, zalo-personal.");
   });
 
   test("lists pending requests as text", async () => {

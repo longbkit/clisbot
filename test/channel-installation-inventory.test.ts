@@ -27,6 +27,12 @@ function joinChannels(values: readonly { channel: string }[]) {
   return values.map((value) => value.channel).join(",");
 }
 
+function joinCredentialChannels() {
+  return listBuiltInChannelDirectories()
+    .filter((channel) => channel !== "zalo-personal")
+    .join(",");
+}
+
 describe("channel installation inventory", () => {
   test("covers every built-in channel through one static installation seam", () => {
     const directories = listBuiltInChannelDirectories();
@@ -47,7 +53,7 @@ describe("channel installation inventory", () => {
     expect(joinChannels(CHANNEL_SURFACE_CONTRACTS)).toBe(directories.join(","));
     expect(joinChannels(CHANNEL_CONFIG_TARGET_CONTRACTS)).toBe(directories.join(","));
     expect(joinChannels(CHANNEL_PAIRING_ACCESS_CONTRACTS)).toBe(directories.join(","));
-    expect(joinChannels(CHANNEL_CREDENTIAL_CONTRACTS)).toBe(directories.join(","));
+    expect(joinChannels(CHANNEL_CREDENTIAL_CONTRACTS)).toBe(joinCredentialChannels());
     expect(joinChannels(CHANNEL_BOT_CONTRACTS)).toBe(directories.join(","));
     expect(joinChannels(CHANNEL_ROUTE_CONTRACTS)).toBe(directories.join(","));
     expect(joinChannels(CHANNEL_TEMPLATE_CONTRACTS)).toBe(directories.join(","));

@@ -273,14 +273,24 @@ function syncDmPolicy(
   });
 
   const directMessages = cloneRecord(owner.directMessages);
+  const hasWildcardRoute = Object.prototype.hasOwnProperty.call(
+    directMessages,
+    DIRECT_MESSAGE_WILDCARD_ROUTE_ID,
+  );
   const wildcardRoute = cloneRecord(directMessages[DIRECT_MESSAGE_WILDCARD_ROUTE_ID]);
   const configuredPolicy = typeof owner.dmPolicy === "string" ? owner.dmPolicy : undefined;
-  const effectivePolicy = configuredPolicy ??
-    (wildcardRoute.enabled === false || wildcardRoute.policy === "disabled"
+  const wildcardPolicy =
+    wildcardRoute.enabled === false || wildcardRoute.policy === "disabled"
       ? "disabled"
       : typeof wildcardRoute.policy === "string"
         ? wildcardRoute.policy
-        : fallbackPolicy);
+        : fallbackPolicy;
+  const effectivePolicy = hasWildcardRoute ? wildcardPolicy : configuredPolicy ?? fallbackPolicy;
+  if (!hasWildcardRoute && effectivePolicy === "disabled") {
+    owner.directMessages = orderWildcardFirst(directMessages, DIRECT_MESSAGE_WILDCARD_ROUTE_ID);
+    owner.dmPolicy = "disabled";
+    return;
+  }
 
   const nextWildcardRoute = {
     ...createDirectMessageRouteShell(fallbackPolicy),

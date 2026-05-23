@@ -13,12 +13,14 @@ import type {
 import slackChannelPlugin from "../slack/plugin.ts";
 import telegramChannelPlugin from "../telegram/plugin.ts";
 import zaloBotChannelPlugin from "../zalo-bot/plugin.ts";
+import zaloPersonalChannelPlugin from "../zalo-personal/plugin.ts";
 
 export const CHANNEL_NAME_PLACEHOLDER = "<channel-name>";
 export const CHANNEL_PLUGINS = [
   slackChannelPlugin,
   telegramChannelPlugin,
   zaloBotChannelPlugin,
+  zaloPersonalChannelPlugin,
 ] as const satisfies readonly ChannelPlugin[];
 
 export function listChannelPlugins() {
@@ -117,19 +119,19 @@ type RuntimeSummaryChannelDescriptor = {
 
 export function listBootstrapChannels() {
   return CHANNEL_PLUGINS
-    .filter((plugin) => plugin.bootstrapCli?.tokenFlags.length)
+    .filter((plugin) => plugin.bootstrapCli)
     .map((plugin) => plugin.id);
 }
 
 export function renderBootstrapUsageLines(indent: string) {
   return CHANNEL_PLUGINS
-    .filter((plugin) => plugin.bootstrapCli?.tokenFlags.length)
+    .filter((plugin) => plugin.bootstrapCli)
     .map((plugin) => `${indent}${plugin.bootstrapCli!.usageLine}`);
 }
 
 export function renderBootstrapExampleCommands(commandName: "init" | "start") {
   return CHANNEL_PLUGINS
-    .filter((plugin) => plugin.bootstrapCli?.tokenFlags.length)
+    .filter((plugin) => plugin.bootstrapCli)
     .flatMap((plugin) => plugin.bootstrapCli?.renderExampleCommands?.(commandName) ?? []);
 }
 

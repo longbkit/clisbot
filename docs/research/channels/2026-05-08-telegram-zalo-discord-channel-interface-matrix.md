@@ -390,4 +390,4 @@ Best fit:
 
 ## Follow-Up
 
-- [clisbot v2 Channel Tool Surface Proposal](./2026-05-08-clisbot-v2-channel-tool-surface-proposal.md)
+- [Zalo Personal Contacts, Groups, And Full Tool Surface](../../tasks/features/channels/2026-05-18-zalo-personal-contacts-groups-and-full-tool-surface.md)

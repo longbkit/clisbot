@@ -115,7 +115,7 @@ export function createBaseDefaultsSchema<
 }
 
 export function createBaseDefaults(
-  mode: "socket" | "polling",
+  mode: "socket" | "polling" | "listener",
   extra: Record<string, unknown> = {},
 ) {
   return {

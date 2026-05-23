@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes Agent Self-Evolution Architecture</title>
+  <style>
+    :root {
+      --ink: #172026;
+      --muted: #5f6f7a;
+      --line: #c9d5dc;
+      --bg: #f6f8f5;
+      --panel: #ffffff;
+      --hermes: #2f7d6d;
+      --evo: #8f5b2f;
+      --guard: #3c67a3;
+      --risk: #9b3f4b;
+      --soft-hermes: #e7f2ee;
+      --soft-evo: #f4eadf;
+      --soft-guard: #e8eef7;
+      --soft-risk: #f5e7ea;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.45;
+    }
+
+    header {
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fffdfa;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 48px);
+      letter-spacing: 0;
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      max-width: 980px;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    main {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 24px 40px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .canvas {
+      display: grid;
+      grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.05fr) minmax(300px, 1fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .lane {
+      background: rgba(255, 255, 255, 0.74);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 620px;
+    }
+
+    .lane h2 {
+      margin: 2px 0 12px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .node {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+      position: relative;
+    }
+
+    .node h3 {
+      margin: 0 0 5px;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    .node p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hermes { border-left: 5px solid var(--hermes); background: var(--soft-hermes); }
+    .evo { border-left: 5px solid var(--evo); background: var(--soft-evo); }
+    .guard { border-left: 5px solid var(--guard); background: var(--soft-guard); }
+    .risk { border-left: 5px solid var(--risk); background: var(--soft-risk); }
+
+    .arrow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 22px;
+      line-height: 1;
+      margin: 4px 0;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .maturity {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .phase {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 126px;
+    }
+
+    .phase strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .status {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 3px 7px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .done { color: #155d4f; background: var(--soft-hermes); }
+    .planned { color: #70431d; background: var(--soft-evo); }
+    .note {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--risk);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .focus-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(190px, 1fr));
+      gap: 10px;
+    }
+
+    .hype-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(160px, 1fr));
+      gap: 10px;
+    }
+
+    .metrics-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(190px, 1fr));
+      gap: 10px;
+    }
+
+    .focus-card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 12px;
+      min-height: 142px;
+    }
+
+    .focus-card h3 {
+      margin: 0 0 6px;
+      font-size: 15px;
+    }
+
+    .focus-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    code {
+      background: rgba(23, 32, 38, 0.08);
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+
+    @media (max-width: 980px) {
+      .canvas { grid-template-columns: 1fr; }
+      .lane { min-height: auto; }
+      .maturity { grid-template-columns: 1fr; }
+      .focus-grid { grid-template-columns: 1fr; }
+      .hype-grid { grid-template-columns: 1fr; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      header { padding: 24px 18px 16px; }
+      main { padding: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hermes Agent Self-Evolution Architecture</h1>
+    <div class="subtitle">
+      Technical map of the two mechanisms behind the "self-improving agent" claim: runtime learning inside Hermes Agent, and offline eval-driven artifact evolution in the companion self-evolution repo.
+    </div>
+  </header>
+
+  <main>
+    <section class="legend" aria-label="Legend">
+      <span class="tag"><span class="dot" style="background: var(--hermes)"></span> Runtime Hermes</span>
+      <span class="tag"><span class="dot" style="background: var(--evo)"></span> Offline evolution pipeline</span>
+      <span class="tag"><span class="dot" style="background: var(--guard)"></span> Gates and persistence</span>
+      <span class="tag"><span class="dot" style="background: var(--risk)"></span> Caveat or risk</span>
+    </section>
+
+    <section class="canvas">
+      <div class="lane">
+        <h2>1. Live Agent Learning Loop</h2>
+        <div class="node hermes">
+          <h3>User work through CLI, gateway, ACP, cron</h3>
+          <p><code>AIAgent.run_conversation()</code> handles prompt assembly, model calls, tool dispatch, retries, and session persistence.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node hermes">
+          <h3>Tool use and conversation traces</h3>
+          <p>Tool iterations, user turns, assistant outputs, tool results, and session metadata become the evidence base for later review.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="split">
+          <div class="node hermes">
+            <h3>Memory writes</h3>
+            <p>Durable facts go to <code>MEMORY.md</code>, <code>USER.md</code>, and optional memory providers such as Honcho.</p>
+          </div>
+          <div class="node hermes">
+            <h3>Skill writes</h3>
+            <p>Reusable procedures go to <code>~/.hermes/skills/</code> through <code>skill_manage</code>.</p>
+          </div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node guard">
+          <h3>Background review fork</h3>
+          <p>After threshold triggers, a quiet forked agent reviews the transcript. Runtime whitelist allows memory and skill tools only.</p>
+        </div>
+        <div class="node guard">
+          <h3>Curator</h3>
+          <p>Tracks agent-created skills, marks stale entries, archives recoverably, and can patch or consolidate skill sprawl.</p>
+        </div>
+      </div>
+
+      <div class="lane">
+        <h2>2. Offline Self-Evolution Pipeline</h2>
+        <div class="node evo">
+          <h3>Select optimization target</h3>
+          <p>Current implemented path targets <code>SKILL.md</code>. Planned targets include tool descriptions, prompt sections, and code.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node evo">
+          <h3>Build eval dataset</h3>
+          <p>Synthetic generation, golden JSONL, or mined sessions from Claude Code, Copilot, and Hermes history.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node evo">
+          <h3>Wrap artifact as DSPy module</h3>
+          <p>For skills, the body text becomes an optimizable instruction parameter: <code>skill_instructions + task_input -> output</code>.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node evo">
+          <h3>GEPA / MIPROv2 optimization</h3>
+          <p>Mutates text candidates, evaluates them, and uses feedback to search for better variants without GPU training.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node guard">
+          <h3>Holdout comparison and constraints</h3>
+          <p>Compare baseline vs evolved candidate. Enforce size, growth, structure, tests, benchmarks, and semantic preservation where implemented.</p>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="node guard">
+          <h3>Branch and PR</h3>
+          <p>Intended deployment is a reviewable diff with metrics. Human review remains in the merge path.</p>
+        </div>
+      </div>
+
+      <div class="lane">
+        <h2>3. Persistence Surfaces</h2>
+        <div class="node guard">
+          <h3>Semantic memory</h3>
+          <p><code>MEMORY.md</code>, <code>USER.md</code>, Honcho and other memory providers build durable user/environment context.</p>
+        </div>
+        <div class="node guard">
+          <h3>Procedural memory</h3>
+          <p>Skills capture workflows, commands, pitfalls, verification steps, and recurring task procedures.</p>
+        </div>
+        <div class="node guard">
+          <h3>Episodic memory</h3>
+          <p>SQLite sessions with FTS5 search power <code>session_search</code> and later mining for eval cases.</p>
+        </div>
+        <div class="node guard">
+          <h3>Trajectory memory</h3>
+          <p>ShareGPT-style JSONL from <code>agent/trajectory.py</code> and <code>batch_runner.py</code> supports eval and training workflows.</p>
+        </div>
+        <div class="node risk">
+          <h3>What it is not</h3>
+          <p>Not live model-weight self-training. Not arbitrary self-modifying code in the active conversation. Not auto-merge.</p>
+        </div>
+        <div class="node risk">
+          <h3>Main maturity caveat</h3>
+          <p>Skill evolution is the only implemented phase in the companion repo. Tool, prompt, code, and continuous evolution are roadmap-level.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="maturity" aria-label="Phase maturity">
+      <div class="phase">
+        <span class="status done">Implemented</span>
+        <strong>Phase 1: Skills</strong>
+        <span class="small">DSPy wrapper, dataset builders, importers, fitness, constraints, evolve_skill entrypoint.</span>
+      </div>
+      <div class="phase">
+        <span class="status planned">Planned</span>
+        <strong>Phase 2: Tool descriptions</strong>
+        <span class="small">Optimize tool schema descriptions and evaluate tool selection accuracy.</span>
+      </div>
+      <div class="phase">
+        <span class="status planned">Planned</span>
+        <strong>Phase 3: System prompt</strong>
+        <span class="small">Optimize prompt sections with broad behavioral and benchmark gates.</span>
+      </div>
+      <div class="phase">
+        <span class="status planned">Planned</span>
+        <strong>Phase 4: Code</strong>
+        <span class="small">Use Darwinian Evolver externally for tool implementation code under strict tests.</span>
+      </div>
+      <div class="phase">
+        <span class="status planned">Planned</span>
+        <strong>Phase 5: Continuous loop</strong>
+        <span class="small">Monitor weak areas, schedule optimization, generate PRs, keep human merge gate.</span>
+      </div>
+    </section>
+
+    <section class="focus-grid" aria-label="Skill lifecycle and scale risk">
+      <div class="focus-card hermes">
+        <h3>Create Skill</h3>
+        <p>Live runtime writes procedural memory after complex successful tasks, recovered errors, user corrections, or explicit "remember this procedure" requests.</p>
+      </div>
+      <div class="focus-card guard">
+        <h3>Name And Shape</h3>
+        <p>Names are lowercase filesystem-safe ids, max 64 chars. Good scale names use domain + workflow, such as <code>github-pr-review</code>.</p>
+      </div>
+      <div class="focus-card risk">
+        <h3>Scale Failure Mode</h3>
+        <p>Too many narrow or overlapping skills can make the index noisy, trigger wrong skill loads, and turn procedural memory into operational drag.</p>
+      </div>
+      <div class="focus-card evo">
+        <h3>Evolve Skill</h3>
+        <p>Offline pipeline wraps <code>SKILL.md</code> as a DSPy module, builds eval data, runs GEPA/MIPROv2, compares holdout scores, then saves a reviewable diff.</p>
+      </div>
+    </section>
+
+    <section class="metrics-grid" aria-label="Optimizer mechanics and current defaults">
+      <div class="focus-card hermes">
+        <h3>DSPy Wrapper</h3>
+        <p>The skill body becomes an instruction parameter. Eval calls look like <code>skill_instructions + task_input -> output</code>; frontmatter is preserved when reassembled.</p>
+      </div>
+      <div class="focus-card evo">
+        <h3>Optimizer Defaults</h3>
+        <p>Current CLI defaults: <code>10</code> GEPA steps, synthetic dataset of <code>20</code> examples, split about <code>10/5/5</code> train/val/holdout.</p>
+      </div>
+      <div class="focus-card guard">
+        <h3>Hard Gates</h3>
+        <p>Skill max size is <code>15,000</code> chars and growth max is <code>20%</code>. Tool descriptions are capped at <code>500</code> chars, params at <code>200</code>.</p>
+      </div>
+      <div class="focus-card risk">
+        <h3>Current Weakness</h3>
+        <p>Main scoring is keyword overlap, not full agent execution. The exposed test flag exists, but the inspected main flow does not call the full test gate.</p>
+      </div>
+    </section>
+
+    <section class="hype-grid" aria-label="Hype check and 80/20 differentiators">
+      <div class="focus-card risk">
+        <h3>Context Still Decays</h3>
+        <p>Hermes can still get worse when tool output, loaded skills, and recalled memory crowd the prompt. It manages context debt; it does not abolish it.</p>
+      </div>
+      <div class="focus-card hermes">
+        <h3>20% Pick: Skills</h3>
+        <p>Use skills for repeated procedures, recovered errors, and user-corrected workflows. Patch existing skills before creating new ones.</p>
+      </div>
+      <div class="focus-card guard">
+        <h3>20% Pick: Recall</h3>
+        <p>Use session search and memory as retrieval aids, then verify source files or commands before project-status claims and mutations.</p>
+      </div>
+      <div class="focus-card guard">
+        <h3>20% Pick: Governance</h3>
+        <p>Keep the default skill set small, use domain + workflow names, run curator dry-runs, and archive stale skills recoverably.</p>
+      </div>
+      <div class="focus-card evo">
+        <h3>20% Pick: Evals</h3>
+        <p>Turn repeated failures into trajectory and eval cases, then evolve selected skills under holdout comparison instead of trusting vibes.</p>
+      </div>
+    </section>
+
+    <section class="note">
+      <strong>One-sentence read:</strong>
+      Hermes has a real bounded learning loop for memory and skills today, but it still needs strict context and skill governance; otherwise it can reproduce the same long-context degradation pattern with more moving parts.
+    </section>
+  </main>
+</body>
+</html>

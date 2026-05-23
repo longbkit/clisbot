@@ -127,7 +127,7 @@ function stripCustomGatewayArgs(args: string[]) {
   const stripped: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === "--channel" || arg === "--account") {
+    if (arg === "--channel" || arg === "--bot" || arg === "--account") {
       index += 1;
       continue;
     }
@@ -154,7 +154,7 @@ function parseCustomMessageCommand(args: string[]): ParsedCustomMessageCommand |
   return {
     kind: "custom",
     channel: parseMessageChannel(rest),
-    account: parseOptionValue(rest, "--account"),
+    account: parseAliasedOptionValue(rest, "--bot", "--account"),
     json: hasFlag(rest, "--json"),
     subtreeArgs,
   };
@@ -176,7 +176,7 @@ function parseSharedMessageCommand(args: string[]): ParsedMessageCommand | null 
     kind: "shared",
     action,
     channel,
-    account: parseOptionValue(rest, "--account"),
+    account: parseAliasedOptionValue(rest, "--bot", "--account"),
     target: parseOptionValue(rest, "--target"),
     childSurface: parseChildSurfaceSelector({
       args: rest,
@@ -267,18 +267,18 @@ export function renderMessageHelp(channel?: MessageChannel) {
     renderCliCommand("message"),
     "",
     "Usage:",
-    `  ${renderCliCommand(`message send --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>] [--file <path-or-url>] [--reply-to <id>] [--force-document] [--silent] [--progress|--final]`)}`,
-    `  ${renderCliCommand(`message poll --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} --poll-question <text> --poll-option <value> [--poll-option <value>] [--account <id>] [--silent]`)}`,
-    `  ${renderCliCommand(`message react --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> --emoji <emoji> [--account <id>] [--remove]`)}`,
-    `  ${renderCliCommand(`message reactions --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--account <id>]`)}`,
-    `  ${renderCliCommand(`message read --channel ${renderChannelNamePlaceholder()} --target <dest> [--account <id>] [--limit <n>]`)}`,
-    `  ${renderCliCommand(`message edit --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--account <id>]`)}`,
-    `  ${renderCliCommand(`message delete --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--account <id>]`)}`,
-    `  ${renderCliCommand(`message pin --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--account <id>]`)}`,
-    `  ${renderCliCommand(`message unpin --channel ${renderChannelNamePlaceholder()} --target <dest> [--message-id <id>] [--account <id>]`)}`,
-    `  ${renderCliCommand(`message pins --channel ${renderChannelNamePlaceholder()} --target <dest> [--account <id>]`)}`,
-    `  ${renderCliCommand(`message search --channel ${renderChannelNamePlaceholder()} --target <dest> --query <text> [--account <id>] [--limit <n>]`)}`,
-    `  ${renderCliCommand(`message custom <subtree...> --channel ${renderChannelNamePlaceholder()} [--account <id>] [--json]`)}`,
+    `  ${renderCliCommand(`message send --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--bot <id>] [--file <path-or-url>] [--reply-to <id>] [--force-document] [--silent] [--progress|--final]`)}`,
+    `  ${renderCliCommand(`message poll --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} --poll-question <text> --poll-option <value> [--poll-option <value>] [--bot <id>] [--silent]`)}`,
+    `  ${renderCliCommand(`message react --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> --emoji <emoji> [--bot <id>] [--remove]`)}`,
+    `  ${renderCliCommand(`message reactions --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message read --channel ${renderChannelNamePlaceholder()} --target <dest> [--bot <id>] [--limit <n>]`)}`,
+    `  ${renderCliCommand(`message edit --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message delete --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message pin --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message unpin --channel ${renderChannelNamePlaceholder()} --target <dest> [--message-id <id>] [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message pins --channel ${renderChannelNamePlaceholder()} --target <dest> [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message search --channel ${renderChannelNamePlaceholder()} --target <dest> --query <text> [--bot <id>] [--limit <n>]`)}`,
+    `  ${renderCliCommand(`message custom <subtree...> --channel ${renderChannelNamePlaceholder()} [--bot <id>] [--json]`)}`,
     "",
     "Send/Edit Content Options:",
     "  --message <text>              Inline message body",
@@ -309,6 +309,7 @@ export function renderMessageHelp(channel?: MessageChannel) {
     "Capability Rules:",
     "  - shared actions are gated by channel capability truth before provider dispatch",
     "  - `message custom ...` is a channel-owned public subtree when a plugin exposes one",
+    "  - `--account` remains a compatibility alias for `--bot`",
     `  - ${renderSupportedChannelsNote()}`,
     "",
     "Examples:",

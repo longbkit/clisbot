@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { readEditableConfig } from "../src/config/core/config-file.ts";
 import { clisbotConfigSchema } from "../src/config/core/schema.ts";
@@ -6,6 +6,10 @@ import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 describe("renderDefaultConfigTemplate", () => {
   const originalClisbotHome = process.env.CLISBOT_HOME;
+
+  beforeEach(() => {
+    delete process.env.CLISBOT_HOME;
+  });
 
   afterEach(() => {
     process.env.CLISBOT_HOME = originalClisbotHome;
@@ -30,11 +34,22 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.telegram.defaults.groupPolicy).toBe("allowlist");
     expect(config.bots.zaloBot.defaults.enabled).toBe(false);
     expect(config.bots.zaloBot.defaults.dmPolicy).toBe("pairing");
+    expect(config.bots.zaloPersonal.defaults.enabled).toBe(false);
+    expect(config.bots.zaloPersonal.defaults.mode).toBe("listener");
+    expect(config.bots.zaloPersonal.defaults.dmPolicy).toBe("disabled");
+    expect(config.bots.zaloPersonal.defaults.groupPolicy).toBe("allowlist");
+    expect(config.bots.zaloPersonal.defaults.directMessages).toEqual({});
+    expect(config.bots.zaloPersonal.defaults.followUp.mode).toBe("mention-only");
     expect("groupPolicy" in config.bots.zaloBot.defaults).toBe(false);
     expect(config.bots.slack.default.appToken).toBe("${SLACK_APP_TOKEN}");
     expect(config.bots.slack.default.botToken).toBe("${SLACK_BOT_TOKEN}");
     expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
     expect(config.bots.zaloBot.default.botToken).toBe("${ZALO_BOT_TOKEN}");
+    expect(config.bots.zaloPersonal.default.credentialType).toBe("tokenFile");
+    expect(config.bots.zaloPersonal.default.dmPolicy).toBe("disabled");
+    expect(config.bots.zaloPersonal.default.tokenFile).toBe(
+      "~/.clisbot/credentials/zalo-personal/default/auth-session",
+    );
     expect(config.bots.slack.default.directMessages).toEqual({});
     expect(config.bots.slack.default.groups).toEqual({});
     expect(config.bots.telegram.default.directMessages).toEqual({});
@@ -67,6 +82,7 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.slack.defaults.timezone).toBeUndefined();
     expect(config.bots.telegram.defaults.timezone).toBeUndefined();
     expect(config.bots.zaloBot.defaults.timezone).toBeUndefined();
+    expect(config.bots.zaloPersonal.defaults.timezone).toBeUndefined();
     expect((config.bots.zaloBot.defaults as any).groups).toBeUndefined();
     expect(text).toContain("\"channelPolicy\"");
     expect(text).toContain("\"groupPolicy\"");
@@ -130,6 +146,9 @@ describe("renderDefaultConfigTemplate", () => {
       "~/.clisbot-dev/state/clisbot.sock",
     );
     expect(config.agents.defaults.workspace).toBe("~/.clisbot-dev/workspaces/{agentId}");
+    expect(config.bots.zaloPersonal.default.tokenFile).toBe(
+      "~/.clisbot-dev/credentials/zalo-personal/default/auth-session",
+    );
   });
 
   test("official config template validates and stays on the new top-level mental model", async () => {

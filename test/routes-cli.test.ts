@@ -522,6 +522,42 @@ describe("routes cli", () => {
     expect(rawConfig.bots.telegram.default.directMessages["1276408333"].policy).toBe("pairing");
   });
 
+  test("keeps dmPolicy in sync with the DM wildcard route", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+    console.log = (() => {}) as typeof console.log;
+
+    await runRoutesCli([
+      "add",
+      "--channel",
+      "zalo-personal",
+      "dm:*",
+      "--bot",
+      "default",
+      "--policy",
+      "pairing",
+    ]);
+
+    let rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("pairing");
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"].policy).toBe("pairing");
+
+    await runRoutesCli([
+      "remove",
+      "--channel",
+      "zalo-personal",
+      "dm:*",
+      "--bot",
+      "default",
+    ]);
+
+    rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("disabled");
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"]).toBeUndefined();
+  });
+
   test("rejects removing the shared wildcard route", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-routes-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
@@ -551,7 +587,7 @@ describe("routes cli", () => {
     expect(text).toContain("Canonical CLI ids are `dm:<id>`, `dm:*`, `group:<id>`, `group:*`");
     expect(text).toContain("routes add --channel <channel-name> <dm:*|dm:<id>>");
     expect(text).toContain("routes add --channel zalo-bot dm:<user-id>");
-    expect(text).toContain("Supported channels: slack, telegram, zalo-bot.");
+    expect(text).toContain("Supported channels: slack, telegram, zalo-bot, zalo-personal.");
     expect(text).toContain("Shared group policy values are `disabled`, `allowlist`, and `open`.");
     expect(text).toContain("DM wildcard policy values are `disabled`, `pairing`, `allowlist`, and `open`.");
     expect(text).toContain("You are not allowed to use this bot in this group.");

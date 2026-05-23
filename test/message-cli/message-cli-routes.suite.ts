@@ -39,6 +39,8 @@ describe("message cli", () => {
     expect(logs[0]).toContain("--message-file");
     expect(logs[0]).toContain("--file <path-or-url>");
     expect(logs[0]).toContain("--media (compat only)");
+    expect(logs[0]).toContain("[--bot <id>]");
+    expect(logs[0]).toContain("`--account` remains a compatibility alias for `--bot`");
     expect(logs[0]).toContain("--input <plain|md|html|mrkdwn|blocks>");
     expect(logs[0]).toContain("--render <native|none|html|mrkdwn|blocks>");
     expect(logs[0]).toContain("[<channel child-surface flags>]");
@@ -185,6 +187,53 @@ describe("message cli", () => {
       threadId: "171234.000100",
     });
     expect(replyTargets[0]?.kind).toBe("reply");
+  });
+
+  test("accepts --bot as the preferred message bot selector", async () => {
+    const { deps, calls, replyTargets } = createDependencies();
+
+    await runMessageCli([
+      "send",
+      "--channel",
+      "slack",
+      "--bot",
+      "alerts",
+      "--target",
+      "group:C123",
+      "--message",
+      "hello",
+      "--thread-id",
+      "171234.000100",
+    ], deps);
+
+    expect(calls[0]?.params).toMatchObject({
+      botToken: "xoxb-test",
+      target: "group:C123",
+      message: "hello",
+    });
+    expect(replyTargets[0]?.target).toMatchObject({
+      sessionKey: "agent:default:slack:channel:c123:thread:171234.000100",
+    });
+  });
+
+  test("rejects passing both message --bot and --account aliases", async () => {
+    const { deps } = createDependencies();
+
+    await expect(
+      runMessageCli([
+        "send",
+        "--channel",
+        "slack",
+        "--bot",
+        "alerts",
+        "--account",
+        "ops",
+        "--target",
+        "group:C123",
+        "--message",
+        "hello",
+      ], deps),
+    ).rejects.toThrow("--bot and --account are aliases; use only one");
   });
 
   test("accepts --file as the preferred attachment flag", async () => {

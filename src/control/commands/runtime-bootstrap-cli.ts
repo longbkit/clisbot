@@ -46,6 +46,10 @@ import {
   renderBootstrapExampleCommands,
   renderBootstrapUsageLines,
 } from "../../channels/catalog/registry.ts";
+import {
+  confirmZaloPersonalBootstrapIfNeeded,
+  loginZaloPersonalBootstrapBots,
+} from "./zalo-personal-bootstrap-cli.ts";
 
 type PreparedBootstrapState = {
   bootstrapFlags: ParsedBootstrapFlags;
@@ -88,6 +92,8 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
       ? "  - literal token values without `--persist` stay runtime-only for this start invocation"
       : "  - literal token values on `init` require `--persist` because no runtime exists yet",
     `  - \`--persist\` writes canonical credential files so later plain ${renderCliCommand("start")} can reuse them`,
+    "  - Zalo Personal login is QR-only; `--qr-path` only saves the QR image while the QR is still printed in the console",
+    "  - Zalo Personal first start requires approval; pass `--confirm` only after reading the console warning",
     "",
     "Examples:",
     ...renderBootstrapExampleCommands(commandName).map((command) => `  ${command}`),
@@ -224,6 +230,7 @@ async function prepareBootstrapState(
       `${renderCliCommand("init", { inline: true })} with literal channel tokens requires --persist.`,
     );
   }
+  await confirmZaloPersonalBootstrapIfNeeded(bootstrapFlags, rawArgs);
 
   const configResult = await ensureConfigFile(configPath);
   const editable = await readEditableConfig(configResult.configPath);
@@ -453,6 +460,11 @@ export async function start(args: string[] = []) {
   for (const line of state.persistenceLines) {
     console.log(line);
   }
+
+  await loginZaloPersonalBootstrapBots({
+    config: state.config,
+    bootstrapFlags: state.bootstrapFlags,
+  });
 
   const result = await startDetachedRuntime({
     scriptPath: process.argv[1]!,

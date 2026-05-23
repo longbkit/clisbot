@@ -159,6 +159,27 @@ function rejectSharedWildcardRemoval(parsed: ParsedRouteId) {
   );
 }
 
+function isDirectMessageWildcard(parsed: ParsedRouteId) {
+  return parsed.storage === "directMessages" && parsed.key === "*";
+}
+
+function syncDirectMessageWildcardSummary(
+  config: ClisbotConfig,
+  provider: Provider,
+  botId: string,
+  parsed: ParsedRouteId,
+) {
+  if (!isDirectMessageWildcard(parsed)) {
+    return;
+  }
+  const bot = ensureProviderBot(config, provider, botId);
+  const route = bot.directMessages?.["*"];
+  bot.dmPolicy =
+    !route || route.enabled === false || route.policy === "disabled"
+      ? "disabled"
+      : route.policy ?? "pairing";
+}
+
 async function listRoutes(args: string[]) {
   const { config } = await readEditableConfig(getEditableConfigPath());
   const provider = parseOptionalProvider(args);
@@ -214,6 +235,7 @@ async function addRoute(args: string[]) {
   if (allowBots !== undefined) {
     route.allowBots = parseBoolean(allowBots);
   }
+  syncDirectMessageWildcardSummary(config, provider, botId, parsed);
   await writeEditableConfig(configPath, config);
   console.log(`added ${provider}/${botId}/${parsed.routeId}`);
   console.log(`config: ${configPath}`);
@@ -243,6 +265,7 @@ async function setRouteEnabled(args: string[], enabled: boolean) {
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const route = ensureRoute(config, provider, botId, parsed);
   route.enabled = enabled;
+  syncDirectMessageWildcardSummary(config, provider, botId, parsed);
   await writeEditableConfig(configPath, config);
   console.log(`${enabled ? "enabled" : "disabled"} ${provider}/${botId}/${parsed.routeId}`);
   console.log(`config: ${configPath}`);
@@ -256,6 +279,7 @@ async function removeRoute(args: string[]) {
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   ensureRoute(config, provider, botId, parsed);
   removeRouteFromConfig(config, provider, botId, parsed);
+  syncDirectMessageWildcardSummary(config, provider, botId, parsed);
 
   await writeEditableConfig(configPath, config);
   console.log(`removed ${provider}/${botId}/${parsed.routeId}`);
@@ -291,10 +315,12 @@ async function getSetClearRouteField(args: string[], action: string) {
       throw new Error(renderRoutesHelp());
     }
     route.policy = policy as BotRouteConfig["policy"];
+    syncDirectMessageWildcardSummary(config, provider, botId, parsed);
     await writeEditableConfig(configPath, config);
     console.log(`set policy for ${provider}/${botId}/${parsed.routeId} to ${policy}`);
   } else if (action === "clear-policy") {
     delete route.policy;
+    syncDirectMessageWildcardSummary(config, provider, botId, parsed);
     await writeEditableConfig(configPath, config);
     console.log(`cleared policy for ${provider}/${botId}/${parsed.routeId}`);
   } else if (action === "get-require-mention") {
