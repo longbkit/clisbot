@@ -25,6 +25,30 @@ Keep operator-facing guidance in
 - Incoming stranger DM was still not visible in listener logs, contact search,
   incoming friend invites, or shared `message read`.
 
+## Attachment URL Decision
+
+- Shared `message send --file <path-or-url>` keeps the cross-channel operator
+  contract: the caller gives one file path or URL, and clisbot sends that file.
+- zca-js `sendMessage({ attachments })` and `uploadAttachment()` do not treat a
+  string attachment as a remote URL. They treat it as a local filesystem path,
+  so passing `https://...` directly fails with `File not found`.
+- clisbot therefore resolves both local paths and remote URLs into one
+  zca-js `AttachmentSource` buffer object before upload. The shared helper is
+  `src/channels/zalo-personal/attachment-source.ts`.
+- `message send --file` and channel-native `messages upload --file` both use
+  that helper, so filename, content-type fallback, download size checks, and
+  local-file handling stay consistent.
+- zca-js also exposes direct URL APIs for specific media:
+  `sendVoice({ voiceUrl })` and
+  `sendVideo({ videoUrl, thumbnailUrl, duration, width, height })`.
+  These are not the default for generic shared `--file` sends because they do
+  not cover normal files, require media-specific metadata, and may require URLs
+  that Zalo can fetch directly.
+- Current decision: use download-then-upload for shared `--file <path-or-url>`.
+  Keep direct URL send APIs as channel-native/specialized paths. `--file-type
+  voice` is the exception after upload: clisbot uploads the audio, gets a Zalo
+  file URL, then calls `sendVoice` so the client displays a voice note.
+
 ## Test Coverage
 
 - Unit: `test/zalo-personal/operator-cli.test.ts`
@@ -35,6 +59,12 @@ Keep operator-facing guidance in
   - a short zca-js listener script calling
     `listener.requestOldMessages(ThreadType.User)` and inspecting
     `old_messages`
+- Live Zalo Personal attachment checks on 2026-05-23:
+  - local image, local file, local audio, and voice note sends succeeded
+  - image URL and file URL sends succeeded after clisbot downloaded the URL and
+    uploaded the buffer to Zalo
+  - channel-native URL upload returned raw `fileUrl`/`fileId`
+  - repeated shared `--file` is rejected until multi-file semantics are designed
 
 ## Current Constraint
 
@@ -42,3 +72,8 @@ Do not expose `message read --target dm:<id>` for Zalo Personal from
 `requestOldMessages` yet. A production-ready implementation needs filtering by
 target, pagination/last-message handling, stale-window behavior, and tests that
 separate messages sent before login from messages visible after login.
+
+Do not make zca-js direct video URL send the default for
+`message send --file --file-type video` until live tests prove the expected URL,
+thumbnail, duration, dimensions, and client display behavior. Use the shared
+download-then-upload path for the generic file contract.
