@@ -60,9 +60,12 @@ Keep operator-facing guidance in
     `listener.requestOldMessages(ThreadType.User)` and inspecting
     `old_messages`
 - Live Zalo Personal attachment checks on 2026-05-23:
-  - local image, local file, local audio, and voice note sends succeeded
+  - local image, local file, local audio, local video, and voice note sends
+    succeeded
   - image URL and file URL sends succeeded after clisbot downloaded the URL and
     uploaded the buffer to Zalo
+  - video URL send succeeded after clisbot downloaded the URL and uploaded the
+    buffer to Zalo
   - channel-native URL upload returned raw `fileUrl`/`fileId`
   - repeated shared `--file` is rejected until multi-file semantics are designed
 

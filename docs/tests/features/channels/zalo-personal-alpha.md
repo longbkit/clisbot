@@ -120,6 +120,8 @@ Current live validation:
 - send one generic file from URL: passed on `2026-05-23`; clisbot downloads the URL, then uploads to Zalo
 - send one audio file from local file: passed on `2026-05-23` as a generic attachment
 - send one voice note from local audio file: passed on `2026-05-23` through the Zalo voice API
+- send one video from local file: passed on `2026-05-23` through shared attachment upload
+- send one video from URL: passed on `2026-05-23`; clisbot downloads the URL, then uploads to Zalo
 - repeated `--file` is intentionally rejected until multi-file semantics are designed
 
 Before promoting beyond alpha, validate:
