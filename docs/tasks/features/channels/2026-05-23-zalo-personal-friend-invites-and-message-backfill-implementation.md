@@ -74,6 +74,8 @@ Keep operator-facing guidance in
   - video URL send succeeded after clisbot downloaded the URL and uploaded the
     buffer to Zalo
   - channel-native URL upload returned raw `fileUrl`/`fileId`
+  - channel-native styled text and link preview sends were confirmed by
+    recipient screenshot
   - channel-native direct video send returned a Zalo `msgId` after uploading a
     separate thumbnail
   - repeated shared `--file` is rejected until multi-file semantics are designed

@@ -122,8 +122,10 @@ Current live validation:
 - send one voice note from local audio file: passed on `2026-05-23` through the Zalo voice API
 - send one video from local file: passed on `2026-05-23` through shared attachment upload
 - send one video from URL: passed on `2026-05-23`; clisbot downloads the URL, then uploads to Zalo
-- send one channel-native styled text message: passed on `2026-05-23`
-- parse and send one channel-native link preview: passed on `2026-05-23`
+- send one channel-native styled text message: passed on `2026-05-23`;
+  recipient screenshot confirmed red urgency, bold, and green style
+- parse and send one channel-native link preview: passed on `2026-05-23`;
+  recipient screenshot confirmed the native link preview card
 - send one direct native video with uploaded thumbnail: command returned `msgId`
   on `2026-05-23`; recipient visual confirmation is still needed for thumbnail
   display
