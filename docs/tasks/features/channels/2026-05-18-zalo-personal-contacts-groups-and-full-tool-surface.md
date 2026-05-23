@@ -2,7 +2,7 @@
 
 ## Source Of Truth
 
-Status: `Planned`
+Status: `In Progress`
 Priority: `P1`
 Owner system: channels / control
 
@@ -173,24 +173,24 @@ group access.
 
 | Command | Meaning | Unit test | Integration test | E2E test |
 | --- | --- | --- | --- | --- |
-| `clisbot bots me --channel zalo-personal --bot <bot-id> [--json]` | Show the logged-in Zalo account identity, including the raw id needed for diagnostics and route ownership. | Planned | Planned | Planned |
-| `clisbot contacts list --channel zalo-personal --bot <bot-id> [--status all\|online] [--favorite] [--label <label-id-or-name>...] [--label-match any\|all] [--limit N] [--json]` | List contacts for the selected account. `--status online` narrows to online contacts, `--favorite` is the cross-channel favorite/pinned/close-contact filter and maps to Zalo's close-friends API, and repeated `--label` filters by one or more classification labels. `--label-match` defaults to `any`; use `all` only when a contact/conversation must belong to every provided label. | Planned | Planned | Planned |
-| `clisbot contacts search --channel zalo-personal --bot <bot-id> [<query>] [--phone <phone>...] [--username <username>] [--limit N] [--json]` | Search contacts/users by text, phone, or Zalo `user_name`; use the result's raw `userId` for routes and later mutations. | Planned | Planned | Planned |
-| `clisbot contacts get --channel zalo-personal --bot <bot-id> <user-id> [--business] [--json]` | Fetch one user's profile/contact details by raw Zalo user id; `--business` also fetches business-account metadata when available. | Planned | Planned | Planned |
-| `clisbot contacts recommendations list --channel zalo-personal --bot <bot-id> [--json]` | List Zalo friend recommendations for this account. | Planned | Planned | Planned |
-| `clisbot contacts aliases list --channel zalo-personal --bot <bot-id> [--json]` | List local contact aliases/nicknames configured in Zalo. | Planned | Planned | Planned |
-| `clisbot contacts labels list --channel zalo-personal --bot <bot-id> [--json]` | List Zalo classification labels/tags, their conversation ids, and channel-specific version. | Planned | Planned | Planned |
-| `clisbot contacts boards list --channel zalo-personal --bot <bot-id> <conversation-id> [--json]` | List friend-board data for one conversation. The upstream payload is not yet well documented; keep `--json` available and finalize the operator meaning after live validation. | Planned | Planned | Planned |
-| `clisbot contacts mutual-groups list --channel zalo-personal --bot <bot-id> <user-id> [--json]` | List mutual/related groups shared with one user when Zalo exposes them. | Planned | Planned | Planned |
-| `clisbot contacts friend-invites list --channel zalo-personal --bot <bot-id> [--direction incoming\|sent\|all] [--json]` | List friend invites. `--direction sent` maps to `zca-js` `getSentFriendRequest`; incoming support must be verified before shipping. | Planned | Planned | Planned |
-| `clisbot contacts friend-invites status --channel zalo-personal --bot <bot-id> <user-id> [--json]` | Check the friend-invite relationship/status with one user. | Planned | Planned | Planned |
-| `clisbot groups list --channel zalo-personal --bot <bot-id> [--limit N] [--json]` | List groups visible to the selected Zalo Personal account. | Planned | Planned | Planned |
-| `clisbot groups search --channel zalo-personal --bot <bot-id> <query> [--limit N] [--json]` | Search the selected account's visible groups by name/text. | Planned | Planned | Planned |
-| `clisbot groups get --channel zalo-personal --bot <bot-id> <group-id> [--json]` | Fetch one group's details by raw Zalo group id. | Planned | Planned | Planned |
-| `clisbot groups members list --channel zalo-personal --bot <bot-id> <group-id> [--limit N] [--json]` | List members of one group, bounded for large groups. | Planned | Planned | Planned |
-| `clisbot groups boards list --channel zalo-personal --bot <bot-id> <group-id> [--page N] [--limit N] [--json]` | List group board items, currently typed by `zca-js` as notes, pinned messages, or polls. Use this to audit group board state before changing group state. | Planned | Planned | Planned |
-| `clisbot groups group-invites list --channel zalo-personal --bot <bot-id> [--json]` | List group invitations received by this account. This is "groups invited me", not `groups pending`. | Planned | Planned | Planned |
-| `clisbot groups group-invites get --channel zalo-personal --bot <bot-id> <invite-id> [--json]` | Inspect one received group invitation. | Planned | Planned | Planned |
+| `clisbot bots me --channel zalo-personal --bot <bot-id> [--json]` | Show the logged-in Zalo account identity, including the raw id needed for diagnostics and route ownership. | Done | Done | Planned |
+| `clisbot contacts list --channel zalo-personal --bot <bot-id> [--status all\|online] [--favorite] [--label <label-id-or-name>...] [--label-match any\|all] [--limit N] [--json]` | List contacts for the selected account. `--status online` narrows to online contacts, `--favorite` is the cross-channel favorite/pinned/close-contact filter and maps to Zalo's close-friends API, and repeated `--label` filters by one or more classification labels. `--label-match` defaults to `any`; use `all` only when a contact/conversation must belong to every provided label. | Done | Done | Planned |
+| `clisbot contacts search --channel zalo-personal --bot <bot-id> [<query>] [--phone <phone>...] [--username <username>] [--limit N] [--json]` | Search contacts/users by text, phone, or Zalo `user_name`; use the result's raw `userId` for routes and later mutations. | Done | Done | Planned |
+| `clisbot contacts get --channel zalo-personal --bot <bot-id> <user-id> [--business] [--json]` | Fetch one user's profile/contact details by raw Zalo user id; `--business` also fetches business-account metadata when available. | Done | Done | Planned |
+| `clisbot contacts recommendations list --channel zalo-personal --bot <bot-id> [--json]` | List Zalo friend recommendations for this account. | Done | Done | Planned |
+| `clisbot contacts aliases list --channel zalo-personal --bot <bot-id> [--json]` | List local contact aliases/nicknames configured in Zalo. | Done | Done | Planned |
+| `clisbot contacts labels list --channel zalo-personal --bot <bot-id> [--json]` | List Zalo classification labels/tags, their conversation ids, and channel-specific version. | Done | Done | Planned |
+| `clisbot contacts boards list --channel zalo-personal --bot <bot-id> <conversation-id> [--json]` | List friend-board data for one conversation. The upstream payload is not yet well documented; keep `--json` available and finalize the operator meaning after live validation. | Done | Done | Planned |
+| `clisbot contacts mutual-groups list --channel zalo-personal --bot <bot-id> <user-id> [--json]` | List mutual/related groups shared with one user when Zalo exposes them. | Done | Done | Planned |
+| `clisbot contacts friend-invites list --channel zalo-personal --bot <bot-id> [--direction incoming\|sent\|all] [--json]` | List friend invites. `--direction sent` maps to `zca-js` `getSentFriendRequest`; incoming support must be verified before shipping. | Done | Done | Planned |
+| `clisbot contacts friend-invites status --channel zalo-personal --bot <bot-id> <user-id> [--json]` | Check the friend-invite relationship/status with one user. | Done | Done | Planned |
+| `clisbot groups list --channel zalo-personal --bot <bot-id> [--limit N] [--json]` | List groups visible to the selected Zalo Personal account. | Done | Done | Planned |
+| `clisbot groups search --channel zalo-personal --bot <bot-id> <query> [--limit N] [--json]` | Search the selected account's visible groups by name/text. | Done | Done | Planned |
+| `clisbot groups get --channel zalo-personal --bot <bot-id> <group-id> [--json]` | Fetch one group's details by raw Zalo group id. | Done | Done | Planned |
+| `clisbot groups members list --channel zalo-personal --bot <bot-id> <group-id> [--limit N] [--json]` | List members of one group, bounded for large groups. | Done | Done | Planned |
+| `clisbot groups boards list --channel zalo-personal --bot <bot-id> <group-id> [--page N] [--limit N] [--json]` | List group board items, currently typed by `zca-js` as notes, pinned messages, or polls. Use this to audit group board state before changing group state. | Done | Done | Planned |
+| `clisbot groups group-invites list --channel zalo-personal --bot <bot-id> [--json]` | List group invitations received by this account. This is "groups invited me", not `groups pending`. | Done | Done | Planned |
+| `clisbot groups group-invites get --channel zalo-personal --bot <bot-id> <invite-id> [--json]` | Inspect one received group invitation. | Done | Done | Planned |
 
 Discovery output should print ready-to-copy route examples, but it must not run
 them: `clisbot routes add --channel zalo-personal group:<group-id> --bot <bot-id>`.
@@ -221,43 +221,43 @@ Goal: expose high-value graph and group operations with explicit confirmation.
 
 | Command | Meaning | Unit test | Integration test | E2E test |
 | --- | --- | --- | --- | --- |
-| `clisbot contacts friend-invites send --channel zalo-personal --bot <bot-id> --user <user-id> [--message <text>] [--confirm]` | Send a friend request to a known raw user id. | Planned | Planned | Planned |
-| `clisbot contacts friend-invites send --channel zalo-personal --bot <bot-id> --phone <phone> [--message <text>] [--confirm]` | Send a friend request after resolving a phone number. Username is intentionally not accepted here; search by username first, then send by raw user id. | Planned | Planned | Planned |
-| `clisbot contacts friend-invites accept --channel zalo-personal --bot <bot-id> <request-id-or-user-id> [--confirm]` | Accept an incoming friend request from another user. | Planned | Planned | Planned |
-| `clisbot contacts friend-invites reject --channel zalo-personal --bot <bot-id> <request-id-or-user-id> [--confirm]` | Reject an incoming friend request. | Planned | Planned | Planned |
-| `clisbot contacts friend-invites cancel --channel zalo-personal --bot <bot-id> <request-id-or-user-id> [--confirm]` | Cancel a friend request that this account already sent. This is different from `reject`. | Planned | Planned | Planned |
-| `clisbot contacts aliases set --channel zalo-personal --bot <bot-id> <user-id> --alias <name> [--confirm]` | Set the local nickname for an existing friend/contact. | Planned | Planned | Planned |
-| `clisbot contacts aliases clear --channel zalo-personal --bot <bot-id> <user-id> [--confirm]` | Clear the local nickname for an existing friend/contact. | Planned | Planned | Planned |
-| `clisbot contacts labels add --channel zalo-personal --bot <bot-id> --name <name> [--color <hex>] [--emoji <emoji>] [--confirm]` | Add a Zalo classification label by reading current labels, adding one label, then writing the versioned label payload. | Planned | Planned | Planned |
-| `clisbot contacts labels update --channel zalo-personal --bot <bot-id> <label-id> --name <name> [--confirm]` | Update one classification label through the same read-modify-write label payload. | Planned | Planned | Planned |
-| `clisbot contacts labels remove --channel zalo-personal --bot <bot-id> <label-id> [--confirm]` | Remove one classification label. | Planned | Planned | Planned |
-| `clisbot contacts labels assign --channel zalo-personal --bot <bot-id> <label-id> --target <target>... [--confirm]` | Add one or more conversations, such as `dm:<user-id>` or `group:<group-id>`, to a label. | Planned | Planned | Planned |
-| `clisbot contacts labels unassign --channel zalo-personal --bot <bot-id> <label-id> --target <target>... [--confirm]` | Remove one or more conversations from a label. | Planned | Planned | Planned |
-| `clisbot contacts blocked add --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Add one user to the direct-contact blocked list. | Planned | Planned | Planned |
-| `clisbot contacts blocked remove --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Remove one user from the direct-contact blocked list. | Planned | Planned | Planned |
-| `clisbot contacts feed-blocked add --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Add one user to the feed/timeline visibility blocked list. | Planned | Planned | Planned |
-| `clisbot contacts feed-blocked remove --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Remove one user from the feed/timeline visibility blocked list. | Planned | Planned | Planned |
-| `clisbot contacts remove --channel zalo-personal --bot <bot-id> <user-id> [--confirm]` | Remove an existing friend from the contact list. | Planned | Planned | Planned |
-| `clisbot groups add --channel zalo-personal --bot <bot-id> --name <name> --user <user-id>... [--confirm]` | Add a group with the supplied initial members. | Planned | Planned | Planned |
-| `clisbot groups update --channel zalo-personal --bot <bot-id> <group-id> --name <name> [--confirm]` | Update a group title. | Planned | Planned | Planned |
-| `clisbot groups avatar set --channel zalo-personal --bot <bot-id> <group-id> --file <path> [--confirm]` | Change a group avatar image. | Planned | Planned | Planned |
-| `clisbot groups members add --channel zalo-personal --bot <bot-id> <group-id> --user <user-id>... [--confirm]` | Add one or more users into an existing group. | Planned | Planned | Planned |
-| `clisbot groups members remove --channel zalo-personal --bot <bot-id> <group-id> --user <user-id>... [--confirm]` | Remove one or more users from an existing group. | Planned | Planned | Planned |
-| `clisbot groups pending list --channel zalo-personal --bot <bot-id> <group-id> [--json]` | List users waiting for approval to join a specific group. | Planned | Planned | Planned |
-| `clisbot groups pending approve --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Approve one pending user into a group. | Planned | Planned | Planned |
-| `clisbot groups pending reject --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Reject one pending user waiting to join a group. | Planned | Planned | Planned |
-| `clisbot groups blocked list --channel zalo-personal --bot <bot-id> <group-id> [--json]` | List users blocked from a group. | Planned | Planned | Planned |
-| `clisbot groups blocked add --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Add one user to a group's blocked list. | Planned | Planned | Planned |
-| `clisbot groups blocked remove --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Remove one user from a group's blocked list. | Planned | Planned | Planned |
-| `clisbot groups invite-link get --channel zalo-personal --bot <bot-id> <group-id> [--json]` | Get the current invite-link metadata for a group, including URL, enabled state, and expiration when Zalo returns them. | Planned | Planned | Planned |
-| `clisbot groups invite-link enable --channel zalo-personal --bot <bot-id> <group-id> [--confirm]` | Enable invite-link joining for a group and return the link metadata. | Planned | Planned | Planned |
-| `clisbot groups invite-link disable --channel zalo-personal --bot <bot-id> <group-id> [--confirm]` | Disable invite-link joining for a group. | Planned | Planned | Planned |
-| `clisbot groups join --channel zalo-personal --bot <bot-id> <invite-url-or-token> [--confirm]` | Join a group by an external invite URL or token. This is intentionally not under `groups invite-link`. | Planned | Planned | Planned |
-| `clisbot groups group-invites send --channel zalo-personal --bot <bot-id> --group <group-id> --user <user-id>... [--confirm]` | Send group invitations to one or more known raw user ids. This is not the same as `groups members add`; recipients may still need to accept through Zalo's normal flow. | Planned | Planned | Planned |
-| `clisbot groups group-invites send --channel zalo-personal --bot <bot-id> --group <group-id> --phone <phone>... [--confirm]` | Send group invitations after resolving one or more phone numbers, mirroring `contacts friend-invites send --phone`. Source support must be verified before claiming shipped. | Planned | Planned | Planned |
-| `clisbot groups group-invites accept --channel zalo-personal --bot <bot-id> <invite-id> [--confirm]` | Accept one received group invitation. | Planned | Planned | Planned |
-| `clisbot groups group-invites reject --channel zalo-personal --bot <bot-id> <invite-id> [--confirm]` | Reject one received group invitation. This maps to declining an inbound invite, not deleting an arbitrary record. | Planned | Planned | Planned |
-| `clisbot groups group-invites cancel --channel zalo-personal --bot <bot-id> --group <group-id> --user <user-id> [--confirm]` | Cancel a group invitation this account sent to another user; source support must be verified before claiming shipped. | Planned | Planned | Planned |
+| `clisbot contacts friend-invites send --channel zalo-personal --bot <bot-id> --user <user-id> [--message <text>] [--confirm]` | Send a friend request to a known raw user id. | Done | Done | Planned |
+| `clisbot contacts friend-invites send --channel zalo-personal --bot <bot-id> --phone <phone> [--message <text>] [--confirm]` | Send a friend request after resolving a phone number. Username is intentionally not accepted here; search by username first, then send by raw user id. | Done | Done | Planned |
+| `clisbot contacts friend-invites accept --channel zalo-personal --bot <bot-id> <request-id-or-user-id> [--confirm]` | Accept an incoming friend request from another user. | Done | Done | Planned |
+| `clisbot contacts friend-invites reject --channel zalo-personal --bot <bot-id> <request-id-or-user-id> [--confirm]` | Reject an incoming friend request. | Done | Done | Planned |
+| `clisbot contacts friend-invites cancel --channel zalo-personal --bot <bot-id> <request-id-or-user-id> [--confirm]` | Cancel a friend request that this account already sent. This is different from `reject`. | Done | Done | Planned |
+| `clisbot contacts aliases set --channel zalo-personal --bot <bot-id> <user-id> --alias <name> [--confirm]` | Set the local nickname for an existing friend/contact. | Done | Done | Planned |
+| `clisbot contacts aliases clear --channel zalo-personal --bot <bot-id> <user-id> [--confirm]` | Clear the local nickname for an existing friend/contact. | Done | Done | Planned |
+| `clisbot contacts labels add --channel zalo-personal --bot <bot-id> --name <name> [--color <hex>] [--emoji <emoji>] [--confirm]` | Add a Zalo classification label by reading current labels, adding one label, then writing the versioned label payload. | Done | Done | Planned |
+| `clisbot contacts labels update --channel zalo-personal --bot <bot-id> <label-id> --name <name> [--confirm]` | Update one classification label through the same read-modify-write label payload. | Done | Done | Planned |
+| `clisbot contacts labels remove --channel zalo-personal --bot <bot-id> <label-id> [--confirm]` | Remove one classification label. | Done | Done | Planned |
+| `clisbot contacts labels assign --channel zalo-personal --bot <bot-id> <label-id> --target <target>... [--confirm]` | Add one or more conversations, such as `dm:<user-id>` or `group:<group-id>`, to a label. | Done | Done | Planned |
+| `clisbot contacts labels unassign --channel zalo-personal --bot <bot-id> <label-id> --target <target>... [--confirm]` | Remove one or more conversations from a label. | Done | Done | Planned |
+| `clisbot contacts blocked add --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Add one user to the direct-contact blocked list. | Done | Done | Planned |
+| `clisbot contacts blocked remove --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Remove one user from the direct-contact blocked list. | Done | Done | Planned |
+| `clisbot contacts feed-blocked add --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Add one user to the feed/timeline visibility blocked list. | Done | Done | Planned |
+| `clisbot contacts feed-blocked remove --channel zalo-personal --bot <bot-id> --user <user-id> [--confirm]` | Remove one user from the feed/timeline visibility blocked list. | Done | Done | Planned |
+| `clisbot contacts remove --channel zalo-personal --bot <bot-id> <user-id> [--confirm]` | Remove an existing friend from the contact list. | Done | Done | Planned |
+| `clisbot groups add --channel zalo-personal --bot <bot-id> --name <name> --user <user-id>... [--confirm]` | Add a group with the supplied initial members. | Done | Done | Planned |
+| `clisbot groups update --channel zalo-personal --bot <bot-id> <group-id> --name <name> [--confirm]` | Update a group title. | Done | Done | Planned |
+| `clisbot groups avatar set --channel zalo-personal --bot <bot-id> <group-id> --file <path> [--confirm]` | Change a group avatar image. | Done | Done | Planned |
+| `clisbot groups members add --channel zalo-personal --bot <bot-id> <group-id> --user <user-id>... [--confirm]` | Add one or more users into an existing group. | Done | Done | Planned |
+| `clisbot groups members remove --channel zalo-personal --bot <bot-id> <group-id> --user <user-id>... [--confirm]` | Remove one or more users from an existing group. | Done | Done | Planned |
+| `clisbot groups pending list --channel zalo-personal --bot <bot-id> <group-id> [--json]` | List users waiting for approval to join a specific group. | Done | Done | Planned |
+| `clisbot groups pending approve --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Approve one pending user into a group. | Done | Done | Planned |
+| `clisbot groups pending reject --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Reject one pending user waiting to join a group. | Done | Done | Planned |
+| `clisbot groups blocked list --channel zalo-personal --bot <bot-id> <group-id> [--json]` | List users blocked from a group. | Done | Done | Planned |
+| `clisbot groups blocked add --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Add one user to a group's blocked list. | Done | Done | Planned |
+| `clisbot groups blocked remove --channel zalo-personal --bot <bot-id> <group-id> --user <user-id> [--confirm]` | Remove one user from a group's blocked list. | Done | Done | Planned |
+| `clisbot groups invite-link get --channel zalo-personal --bot <bot-id> <group-id> [--json]` | Get the current invite-link metadata for a group, including URL, enabled state, and expiration when Zalo returns them. | Done | Done | Planned |
+| `clisbot groups invite-link enable --channel zalo-personal --bot <bot-id> <group-id> [--confirm]` | Enable invite-link joining for a group and return the link metadata. | Done | Done | Planned |
+| `clisbot groups invite-link disable --channel zalo-personal --bot <bot-id> <group-id> [--confirm]` | Disable invite-link joining for a group. | Done | Done | Planned |
+| `clisbot groups join --channel zalo-personal --bot <bot-id> <invite-url-or-token> [--confirm]` | Join a group by an external invite URL or token. This is intentionally not under `groups invite-link`. | Done | Done | Planned |
+| `clisbot groups group-invites send --channel zalo-personal --bot <bot-id> --group <group-id> --user <user-id>... [--confirm]` | Send group invitations to one or more known raw user ids. This is not the same as `groups members add`; recipients may still need to accept through Zalo's normal flow. | Done | Done | Planned |
+| `clisbot groups group-invites send --channel zalo-personal --bot <bot-id> --group <group-id> --phone <phone>... [--confirm]` | Send group invitations after resolving one or more phone numbers, mirroring `contacts friend-invites send --phone`. Source support must be verified before claiming shipped. | Done | Done | Planned |
+| `clisbot groups group-invites accept --channel zalo-personal --bot <bot-id> <invite-id> [--confirm]` | Accept one received group invitation. | Done | Done | Planned |
+| `clisbot groups group-invites reject --channel zalo-personal --bot <bot-id> <invite-id> [--confirm]` | Reject one received group invitation. This maps to declining an inbound invite, not deleting an arbitrary record. | Done | Done | Planned |
+| `clisbot groups group-invites cancel --channel zalo-personal --bot <bot-id> --group <group-id> --user <user-id> [--confirm]` | Cancel a group invitation this account sent to another user; source support must be verified before claiming shipped. | Blocked | Done | Planned |
 
 Examples for mutation params:
 
@@ -316,35 +316,35 @@ clisbot renderer/compiler and must be live-tested.
 
 | Command | Meaning | Unit test | Integration test | E2E test |
 | --- | --- | --- | --- | --- |
-| `clisbot message send --channel zalo-personal --bot <bot-id> --target dm:<id>\|group:<id> --message <text>` | Send plain text to a Zalo DM or group through the shared message command. | Planned | Planned | Planned |
-| `clisbot message send --channel zalo-personal --bot <bot-id> --target <target> --input md --render native --message <markdown>` | Send AI-generated Markdown using the shared render contract. For Zalo Personal this should render to visible text plus Zalo `TextStyle` ranges where supported, falling back to readable plain text for unsupported Markdown. | Planned | Planned | Planned |
-| `clisbot message send --channel zalo-personal --bot <bot-id> --target <target> [--message <text>] --file <path-or-url> [--file-type auto\|file\|image\|video\|audio\|voice]` | Send one attachment through the shared file path. `auto` is the default; `file` is the portable replacement for Telegram's current `--force-document`; `voice` is only valid where a channel implements a real voice-note send. | Planned | Planned | Planned |
-| `clisbot message react --channel zalo-personal --bot <bot-id> --target <target> --message-id <id> --emoji <emoji>` | React to one message when Zalo exposes reaction support. | Planned | Planned | Planned |
-| `clisbot message read --channel zalo-personal --bot <bot-id> --target <target> [--limit N] [--json]` | Read recent messages through the existing shared read/history action for diagnostics or reply context. | Planned | Planned | Planned |
-| `clisbot message delete --channel zalo-personal --bot <bot-id> --target <target> --message-id <id> [--confirm]` | Delete one message where the account has permission. Keep this shared because Slack and Telegram already implement `message delete`. | Planned | Planned | Planned |
+| `clisbot message send --channel zalo-personal --bot <bot-id> --target dm:<id>\|group:<id> --message <text>` | Send plain text to a Zalo DM or group through the shared message command. | Done | Done | Planned |
+| `clisbot message send --channel zalo-personal --bot <bot-id> --target <target> --input md --render native --message <markdown>` | Send AI-generated Markdown using the shared render contract. For Zalo Personal this should render to visible text plus Zalo `TextStyle` ranges where supported, falling back to readable plain text for unsupported Markdown. | Done | Done | Planned |
+| `clisbot message send --channel zalo-personal --bot <bot-id> --target <target> [--message <text>] --file <path-or-url> [--file-type auto\|file\|image\|video\|audio\|voice]` | Send one attachment through the shared file path. `auto` is the default; `file` is the portable replacement for Telegram's current `--force-document`; `voice` is only valid where a channel implements a real voice-note send. | Done | Done | Planned |
+| `clisbot message react --channel zalo-personal --bot <bot-id> --target <target> --message-id <id> --emoji <emoji>` | React to one message when Zalo exposes reaction support. | Done | Done | Planned |
+| `clisbot message read --channel zalo-personal --bot <bot-id> --target <target> [--limit N] [--json]` | Read recent messages through the existing shared read/history action for diagnostics or reply context. | Done | Done | Planned |
+| `clisbot message delete --channel zalo-personal --bot <bot-id> --target <target> --message-id <id> [--confirm]` | Delete one message where the account has permission. Keep this shared because Slack and Telegram already implement `message delete`. | Done | Done | Planned |
 
 Channel-native Zalo message commands:
 
 | Command | Meaning | Unit test | Integration test | E2E test |
 | --- | --- | --- | --- | --- |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages send --target <target> --message <text> [--quote <json>] [--mention <spec>...] [--style <spec>...] [--urgency default\|important\|urgent\|0\|1\|2] [--ttl <ms>]` | Send Zalo enhanced text with quote/reply, mentions, styles, urgency, or self-delete TTL. Prefer inline mention placeholders in `--message`; keep `--mention` only as a low-level fallback. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages link send --target <target> <url> [--message <text>] [--ttl <ms>]` | Send a Zalo link preview/card. zca-js asks Zalo to parse title/description/thumb; do not expose fake manual `--title` or `--description` unless a source proves they are accepted. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages parse-link <url> [--json]` | Ask Zalo to parse link metadata before sending a link card. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages upload --target <target> --file <path> [--json]` | Diagnostic/pre-upload helper for Zalo APIs that require uploaded media URLs before send, not the normal operator send path. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages contact-card send --target <target> --user <user-id>` | Send a Zalo contact card for one user. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages bank-card send --target <target> --bin-bank <json-or-code> --account-number <account-number> [--account-name <name>]` | Send a bank-card/account card using Zalo's channel-native `binBank`, account number, and optional account name payload. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages typing --target <target>` | Send a Zalo typing indicator to one conversation. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages delivered --target <target> --message-id <id>` | Mark one message as delivered when Zalo exposes that event. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages seen --target <target> --message-id <id>` | Mark one message as seen/read. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages undo --target <target> --message-id <id> [--confirm]` | Undo/recall one sent message using Zalo recall semantics. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages forward --from <target> --message-id <id> --to <target> [--confirm]` | Forward one existing message to another Zalo target. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls add --target <target> --question <text> --option <text>...` | Add a poll in a Zalo conversation. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls vote --target <target> --poll-id <id> --option <id>` | Vote for one option in a poll. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls lock --target <target> --poll-id <id> [--confirm]` | Lock/close a poll. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls get --target <target> --poll-id <id> [--json]` | Fetch poll details/results. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls options add --target <target> --poll-id <id> --option <text>... [--confirm]` | Add one or more options to an existing poll. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls share --target <target> --poll-id <id> --to <target> [--confirm]` | Share a poll to another conversation. | Planned | Planned | Planned |
-| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages report --target <target> --reason <reason> [--confirm]` | Report a conversation/message target through Zalo channel-native reporting. | Planned | Planned | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages send --target <target> --message <text> [--quote <json>] [--mention <spec>...] [--style <spec>...] [--urgency default\|important\|urgent\|0\|1\|2] [--ttl <ms>]` | Send Zalo enhanced text with quote/reply, mentions, styles, urgency, or self-delete TTL. Prefer inline mention placeholders in `--message`; keep `--mention` only as a low-level fallback. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages link send --target <target> <url> [--message <text>] [--ttl <ms>]` | Send a Zalo link preview/card. zca-js asks Zalo to parse title/description/thumb; do not expose fake manual `--title` or `--description` unless a source proves they are accepted. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages parse-link <url> [--json]` | Ask Zalo to parse link metadata before sending a link card. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages upload --target <target> --file <path> [--json]` | Diagnostic/pre-upload helper for Zalo APIs that require uploaded media URLs before send, not the normal operator send path. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages contact-card send --target <target> --user <user-id>` | Send a Zalo contact card for one user. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages bank-card send --target <target> --bin-bank <json-or-code> --account-number <account-number> [--account-name <name>]` | Send a bank-card/account card using Zalo's channel-native `binBank`, account number, and optional account name payload. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages typing --target <target>` | Send a Zalo typing indicator to one conversation. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages delivered --target <target> --message-id <id>` | Mark one message as delivered when Zalo exposes that event. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages seen --target <target> --message-id <id>` | Mark one message as seen/read. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages undo --target <target> --message-id <id> [--confirm]` | Undo/recall one sent message using Zalo recall semantics. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages forward --message <text> --to <target> [--reference <json>] [--ttl <ms>] [--confirm]` | Forward a message payload to another Zalo target. zca-js forwards supplied content and optional reference metadata; it does not fetch a source message from `--message-id`. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls add --target <target> --question <text> --option <text>...` | Add a poll in a Zalo conversation. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls vote --target <target> --poll-id <id> --option <id>` | Vote for one option in a poll. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls lock --target <target> --poll-id <id> [--confirm]` | Lock/close a poll. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls get --target <target> --poll-id <id> [--json]` | Fetch poll details/results. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls options add --target <target> --poll-id <id> --option <text>... [--confirm]` | Add one or more options to an existing poll. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages polls share --poll-id <id> [--confirm]` | Share a poll through zca-js' native poll-share endpoint. Current zca-js does not expose a destination parameter, so do not invent `--to`. | Done | Done | Planned |
+| `clisbot channel-native --channel zalo-personal --bot <bot-id> messages report --target <target> --reason <reason> [--confirm]` | Report a conversation/message target through Zalo channel-native reporting. | Done | Done | Planned |
 
 Examples for shared file/media send:
 
@@ -404,6 +404,10 @@ clisbot channel-native --channel zalo-personal --bot work messages send --target
 # Link preview metadata is parsed by Zalo from the URL; --message is optional text.
 clisbot channel-native --channel zalo-personal --bot work messages link send \
   --target group:456 https://example.com/spec --message "Bản review"
+
+# Forward sends supplied content; add --reference only with a captured zca-js reference payload.
+clisbot channel-native --channel zalo-personal --bot work messages forward \
+  --message "Nhờ team xem lại phần này" --to group:456 --confirm
 ```
 
 Mention implementation note: zca-js requires `mentions: [{ pos, uid, len }]`
@@ -462,8 +466,6 @@ Command-shape decision for Phase 4:
 
 ## Standardization Notes
 
-Applied after review:
-
 - `groups group-invites send/accept/reject/cancel` mirrors friend-invite
   direction: send/cancel outbound invites, accept/reject inbound invites. Support
   sending by raw user id and by phone where Zalo lookup supports it.
@@ -490,6 +492,10 @@ Applied after review:
   reads; do not add a parallel `message history list` shape.
 - Zalo-only message semantics live under `channel-native ... messages ...`.
   `messages upload` is a diagnostic/pre-upload helper, not the normal send path.
+- zca-js `forwardMessage` forwards caller-supplied content plus optional
+  reference metadata; it does not expose source-message lookup by `--message-id`.
+- zca-js `sharePoll(pollId)` does not expose a destination argument; keep it
+  destination-free until a source proves otherwise.
 - Mention UX should prefer inline placeholders such as `<@alice_uid|Alice>` in
   the message body so AI-generated content can carry both visible text and the
   user id. Raw `--mention <uid>:<offset>:<length>` remains a fallback because
@@ -508,11 +514,9 @@ Board research:
 - Local `zca-js` exposes `getListBoard(options, groupId)` returning board items
   typed as `Note`, `PinnedMessage`, or `Poll`. This is the Zalo group board
   surface, not a general social feed/timeline.
-- Proposed use case: `groups boards list` can help operators audit pinned
-  messages, notes, and polls in a group before changing group state.
-  `contacts boards list` should also be included for coverage, but its
-  human-readable summary and operator use case must be finalized from live
-  payload validation.
+- Use case: `groups boards list` audits pinned messages, notes, and polls before
+  group changes. Keep `contacts boards list` for coverage, but finalize its
+  summary/use case from live payload validation.
 
 Sticker reads use `stickers get`, not `stickers detail`. The zca-js
 `getStickersDetail` API returns the full `StickerDetail[]` payload for one or
@@ -672,18 +676,13 @@ clisbot contacts labels replace --channel zalo-personal --bot work \
 | zca-js broad channel-native APIs | Phase 4, marked channel-native/high-risk |
 | zca-js low-level `custom` API | Out of scope as a raw CLI escape hatch; add named commands instead |
 
-Source command inventory checked:
-
-| Source family | Commands or APIs checked |
-| --- | --- |
-| OpenClaw `zalouser` and ZaloClaw-style coverage | `send`, `image`, `link`, `friends`, `groups`, `me`, `status`, `react`, typing, delivered, seen, group directory members |
-| zca-cli `msg` | `send`, quote/reply, mention, style, urgency, TTL, attachment, `image`, `video`, `voice`, `link`, `sticker`, `card`, `bank-card`, `upload`, `typing`, `delivered`, `seen`, `react`, `delete`, `undo`, `forward`, `parse-link`, `report` |
-| zca-cli `friend` | `list`, `find`, `online`, `recommendations`, `add`, `accept`, `reject`, `cancel`, `sent`, `request-status`, `remove`, `alias`, `remove-alias`, `aliases`, `block`, `unblock`, `block-feed`, `unblock-feed`, `boards` |
-| zca-cli `group` | `list`, `info`, `members`, `create`, `add`, `remove`, `rename`, `avatar`, `transfer`, `add-deputy`, `remove-deputy`, `block`, `unblock`, `blocked`, `enable-link`, `disable-link`, `link-detail`, `join-link`, `pending`, `review`, `settings`, `leave`, `disperse` |
-| zca-cli `me` | `info`, `id`, `update`, `avatar`, `avatars`, `delete-avatar`, `reuse-avatar`, `status`, `last-online` |
-| zca-cli account/runtime | `auth login/logout/status/cache-*`, `account list/switch/current/add/label/remove`, `listen`, `keep-alive`, `serve`, `license` |
-| zca-cli REST endpoint categories | messages, friends, groups, conversations, polls, auto replies, settings, profile, SSE events |
-| zca-js channel-native APIs | contacts/friend requests, phone and username lookup, close friends, related friend groups, business info, groups/members/admin/invite-link/group-invites/pending/community/boards, message/media/poll/reaction/history, profile/avatar URL/full image/settings/language, unread/archive/mute/pin/hidden chat, labels, notes/reminders, quick messages/auto reply, stickers list/search/detail/category, catalog/product, low-level custom API reviewed but not exposed |
+Source command inventory checked: OpenClaw `zalouser` / ZaloClaw-style
+coverage (`send`, `image`, `link`, `friends`, `groups`, `me`, `status`,
+reactions and events), zca-cli `msg`, `friend`, `group`, `me`,
+account/runtime, REST endpoint categories, and local zca-js APIs for contacts,
+groups, messages/media/polls/reactions/history, profile/settings/conversation
+state, labels, notes/reminders, quick messages/auto reply, stickers, catalog,
+product, and low-level custom API review.
 
 ## Done Criteria
 

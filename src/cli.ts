@@ -35,6 +35,9 @@ export type ParsedCliCommand =
   | { name: "loops"; args: string[] }
   | { name: "queues"; args: string[] }
   | { name: "message"; args: string[] }
+  | { name: "contacts"; args: string[] }
+  | { name: "groups"; args: string[] }
+  | { name: "channel-native"; args: string[] }
   | { name: "agents"; args: string[] }
   | { name: "auth"; args: string[] }
   | { name: "runner"; args: string[] }
@@ -197,6 +200,30 @@ const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
       helpLines: ["                     See `message --help` for channel-specific syntax."],
       passthroughArgs: true,
       handler: ({ passthroughArgs }) => ({ name: "message", args: [...passthroughArgs] }),
+    },
+    {
+      name: "contacts",
+      summary: "Inspect or manage contacts for channels that expose a contact graph.",
+      usage: ["contacts <subcommand>"],
+      helpLines: ["                     Zalo Personal: list|search|get|friend-invites|aliases|labels|blocked."],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "contacts", args: [...passthroughArgs] }),
+    },
+    {
+      name: "groups",
+      summary: "Inspect or manage provider groups where a channel exposes group APIs.",
+      usage: ["groups <subcommand>"],
+      helpLines: ["                     Zalo Personal: list|search|get|members|pending|blocked|invite-link|group-invites."],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "groups", args: [...passthroughArgs] }),
+    },
+    {
+      name: "channel-native",
+      summary: "Run explicitly channel-native commands that do not fit shared cross-channel surfaces.",
+      usage: ["channel-native --channel <channel> --bot <id> <subtree...>"],
+      helpLines: ["                     Zalo Personal phase 3: messages enhanced send/link/upload/cards/polls/events."],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "channel-native", args: [...passthroughArgs] }),
     },
     {
       name: "agents",

@@ -4,7 +4,10 @@ import { runAgentsCli } from "./control/commands/agents-cli.ts";
 import { runAccountsCli } from "./control/commands/accounts-cli.ts";
 import { runAuthCli } from "./control/commands/auth-cli.ts";
 import { runBotsCli } from "./control/commands/bots-cli.ts";
+import { runChannelNativeCli } from "./control/commands/channel-native-cli.ts";
 import { runChannelsCli } from "./control/commands/channels-cli.ts";
+import { runContactsCli } from "./control/commands/contacts-cli.ts";
+import { runGroupsCli } from "./control/commands/groups-cli.ts";
 import { runLoopsCli } from "./control/commands/loops-cli.ts";
 import { runMessageCli } from "./control/commands/message-cli.ts";
 import { runQueuesCli } from "./control/commands/queues-cli.ts";
@@ -147,6 +150,21 @@ async function runControlCommand(command: ReturnType<typeof parseCliArgs>) {
 
   if (command.name === "message") {
     await runMessageCli(command.args);
+    return true;
+  }
+
+  if (command.name === "contacts") {
+    await runContactsCli(command.args);
+    return true;
+  }
+
+  if (command.name === "groups") {
+    await runGroupsCli(command.args);
+    return true;
+  }
+
+  if (command.name === "channel-native") {
+    await runChannelNativeCli(command.args);
     return true;
   }
 

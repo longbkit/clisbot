@@ -12,6 +12,7 @@ import {
   loginConfiguredZaloPersonalBot,
   logoutConfiguredZaloPersonalBot,
 } from "../../channels/zalo-personal/login.ts";
+import { loginZaloPersonalFromSession } from "../../channels/zalo-personal/zca-js.ts";
 import { buildZaloPersonalBotConfig } from "../../channels/zalo-personal/config.ts";
 import {
   ensureAgentExists,
@@ -39,6 +40,7 @@ export function renderZaloPersonalAddHelpLine() {
 
 export function renderZaloPersonalLifecycleHelpLines() {
   return [
+    renderCliCommand("bots me --channel zalo-personal [--bot <id>] [--json]"),
     renderCliCommand("bots login --channel zalo-personal [--bot <id>] [--qr-path <path>] [--confirm]"),
     renderCliCommand("bots logout --channel zalo-personal [--bot <id>]"),
     renderCliCommand("bots status --channel zalo-personal [--bot <id>]"),
@@ -221,4 +223,22 @@ export async function statusZaloPersonalBot(
   console.log(`${provider}/${botId} login=${login.loggedIn ? "present" : "missing"} connection=${connection}`);
   console.log(`credentials: ${login.detail}`);
   console.log(`config: ${configPath}`);
+}
+
+export async function meZaloPersonalBot(args: string[], renderHelp: HelpRenderer) {
+  const provider = parseZaloPersonalProvider(args, renderHelp);
+  const botId = getBotId(args);
+  const { config } = await readEditableConfig(process.env.CLISBOT_CONFIG_PATH);
+  const bot = requireChannelBotRecord(config, provider, botId) as { tokenFile?: string };
+  const client = await loginZaloPersonalFromSession(bot.tokenFile ?? "");
+  const account = await client.api.fetchAccountInfo().catch(() => undefined);
+  const profile = (account as any)?.profile ?? account;
+  const value = {
+    channel: provider,
+    botId,
+    userId: String((profile as any)?.userId ?? client.api.getOwnId()),
+    displayName: String((profile as any)?.displayName ?? (profile as any)?.zaloName ?? ""),
+    raw: account,
+  };
+  console.log(args.includes("--json") ? JSON.stringify(value, null, 2) : `${provider}/${botId} userId=${value.userId} displayName=${value.displayName}`);
 }

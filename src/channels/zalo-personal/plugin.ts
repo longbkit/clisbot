@@ -10,7 +10,12 @@ import {
   type ZaloPersonalCredentialConfig,
 } from "./config.ts";
 import { ZaloPersonalListenerService } from "./service.ts";
-import { sendZaloPersonalMessageAction } from "./message-actions.ts";
+import {
+  deleteZaloPersonalMessageAction,
+  reactZaloPersonalMessageAction,
+  readZaloPersonalMessageAction,
+  sendZaloPersonalMessageAction,
+} from "./message-actions.ts";
 import { resolveZaloPersonalConversationRoute } from "./route-config.ts";
 import { resolveZaloPersonalConversationTarget } from "./session-routing.ts";
 import {
@@ -79,7 +84,7 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
   },
   capabilities: {
     surfaceKinds: ["dm", "group"],
-    messageActions: ["send"],
+    messageActions: ["send", "react", "read", "delete"],
     supportsMessageCustomSubtree: false,
   },
   bootstrapCli: {
@@ -112,7 +117,7 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
           "Zalo Personal `--target` accepts `dm:<user-id>` or `group:<group-id>`",
         ],
         renderLines: [
-          "  - Zalo Personal native: Markdown/plain -> readable plain text",
+          "  - Zalo Personal native: Markdown -> visible text plus Zalo TextStyle ranges where supported",
         ],
         exampleLines: [
           `  ${renderCliCommand("message send --channel zalo-personal --bot work --target dm:user-123 --message \"Status\"")}`,
@@ -189,8 +194,48 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
             },
             message: command.message,
             media: command.media,
+            fileType: command.fileType,
             inputFormat: command.inputFormat,
             renderMode: command.renderMode,
+          }),
+        };
+      case "react":
+        return {
+          botId: bot.botId,
+          result: await reactZaloPersonalMessageAction({
+            tokenFile: bot.config.tokenFile,
+            target: {
+              conversationKind: resolvedSurface?.provider.conversationKind ?? "dm",
+              chatId: resolvedSurface?.provider.chatId ?? command.target!,
+            },
+            messageId: command.messageId ?? "",
+            emoji: command.emoji ?? "",
+            remove: command.remove,
+          }),
+        };
+      case "read":
+        return {
+          botId: bot.botId,
+          result: await readZaloPersonalMessageAction({
+            tokenFile: bot.config.tokenFile,
+            target: {
+              conversationKind: resolvedSurface?.provider.conversationKind ?? "dm",
+              chatId: resolvedSurface?.provider.chatId ?? command.target!,
+            },
+            limit: command.limit,
+          }),
+        };
+      case "delete":
+        return {
+          botId: bot.botId,
+          result: await deleteZaloPersonalMessageAction({
+            tokenFile: bot.config.tokenFile,
+            target: {
+              conversationKind: resolvedSurface?.provider.conversationKind ?? "dm",
+              chatId: resolvedSurface?.provider.chatId ?? command.target!,
+            },
+            messageId: command.messageId ?? "",
+            confirm: command.confirm,
           }),
         };
       default:

@@ -34,6 +34,7 @@ export type ParsedMessageCommand = {
   message?: string;
   messageFile?: string;
   media?: string;
+  fileType?: "auto" | "file" | "image" | "video" | "audio" | "voice";
   messageId?: string;
   emoji?: string;
   remove: boolean;
@@ -46,6 +47,7 @@ export type ParsedMessageCommand = {
   silent: boolean;
   progress: boolean;
   final: boolean;
+  confirm?: boolean;
   json: boolean;
   inputFormat: MessageInputFormat;
   renderMode: MessageRenderMode;

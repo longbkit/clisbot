@@ -105,6 +105,24 @@ function parseIntegerOption(args: string[], name: string) {
   return parsed;
 }
 
+function parseMessageFileType(args: string[]) {
+  const raw = parseOptionValue(args, "--file-type");
+  if (!raw) {
+    return undefined;
+  }
+  if (
+    raw === "auto" ||
+    raw === "file" ||
+    raw === "image" ||
+    raw === "video" ||
+    raw === "audio" ||
+    raw === "voice"
+  ) {
+    return raw;
+  }
+  throw new Error("--file-type must be auto, file, image, video, audio, or voice");
+}
+
 function hasFlag(args: string[], name: string) {
   return args.includes(name);
 }
@@ -186,6 +204,7 @@ function parseSharedMessageCommand(args: string[]): ParsedMessageCommand | null 
     message: parseOptionValue(rest, "--message") ?? parseOptionValue(rest, "-m"),
     messageFile: parseMessageBodyFileOption(rest),
     media: parseMessageAttachmentOption(rest),
+    fileType: parseMessageFileType(rest),
     messageId: parseOptionValue(rest, "--message-id"),
     emoji: parseOptionValue(rest, "--emoji"),
     remove: hasFlag(rest, "--remove"),
@@ -198,6 +217,7 @@ function parseSharedMessageCommand(args: string[]): ParsedMessageCommand | null 
     silent: hasFlag(rest, "--silent"),
     progress: hasFlag(rest, "--progress"),
     final: hasFlag(rest, "--final"),
+    confirm: hasFlag(rest, "--confirm"),
     json: hasFlag(rest, "--json"),
     inputFormat: parseMessageInputFormat(parseOptionValue(rest, "--input")),
     renderMode: parseMessageRenderMode(parseOptionValue(rest, "--render")),
@@ -267,13 +287,13 @@ export function renderMessageHelp(channel?: MessageChannel) {
     renderCliCommand("message"),
     "",
     "Usage:",
-    `  ${renderCliCommand(`message send --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--bot <id>] [--file <path-or-url>] [--reply-to <id>] [--force-document] [--silent] [--progress|--final]`)}`,
+    `  ${renderCliCommand(`message send --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--bot <id>] [--file <path-or-url>] [--file-type auto|file|image|video|audio|voice] [--reply-to <id>] [--force-document] [--silent] [--progress|--final]`)}`,
     `  ${renderCliCommand(`message poll --channel ${renderChannelNamePlaceholder()} --target <dest>${childSurfaceUsage} --poll-question <text> --poll-option <value> [--poll-option <value>] [--bot <id>] [--silent]`)}`,
     `  ${renderCliCommand(`message react --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> --emoji <emoji> [--bot <id>] [--remove]`)}`,
     `  ${renderCliCommand(`message reactions --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>]`)}`,
     `  ${renderCliCommand(`message read --channel ${renderChannelNamePlaceholder()} --target <dest> [--bot <id>] [--limit <n>]`)}`,
     `  ${renderCliCommand(`message edit --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--message <text> | --body-file <path>] [--input <plain|md|html|mrkdwn|blocks>] [--render <native|none|html|mrkdwn|blocks>] [--bot <id>]`)}`,
-    `  ${renderCliCommand(`message delete --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>]`)}`,
+    `  ${renderCliCommand(`message delete --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>] [--confirm]`)}`,
     `  ${renderCliCommand(`message pin --channel ${renderChannelNamePlaceholder()} --target <dest> --message-id <id> [--bot <id>]`)}`,
     `  ${renderCliCommand(`message unpin --channel ${renderChannelNamePlaceholder()} --target <dest> [--message-id <id>] [--bot <id>]`)}`,
     `  ${renderCliCommand(`message pins --channel ${renderChannelNamePlaceholder()} --target <dest> [--bot <id>]`)}`,
@@ -286,6 +306,7 @@ export function renderMessageHelp(channel?: MessageChannel) {
     "                                Alias: --message-file (compat only)",
     "  --file <path-or-url>          Attach a file or remote URL",
     "                                Alias: --media (compat only)",
+    "  --file-type <type>            auto|file|image|video|audio|voice. Default: auto",
     "  --input <plain|md|html|mrkdwn|blocks>",
     "                               Input content format. Default: md",
     "  --render <native|none|html|mrkdwn|blocks>",

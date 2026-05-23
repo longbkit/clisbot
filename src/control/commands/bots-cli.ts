@@ -47,6 +47,7 @@ import {
   getZaloPersonalCredentialSource,
   loginZaloPersonalBot,
   logoutZaloPersonalBot,
+  meZaloPersonalBot,
   renderZaloPersonalAddHelpLine,
   renderZaloPersonalLifecycleHelpLines,
   statusZaloPersonalBot,
@@ -90,6 +91,7 @@ function renderBotsHelp() {
     `  ${renderCliCommand(`bots list [--channel ${channelName}] [--json]`)}`,
     ...addExamples.map((line) => `  ${line}`),
     `  ${renderCliCommand(`bots get --channel ${channelName} [--bot <id>] [--json]`)}`,
+    `  ${renderCliCommand(`bots me --channel ${channelName} [--bot <id>] [--json]`)}`,
     `  ${renderCliCommand(`bots enable --channel ${channelName} [--bot <id>]`)}`,
     `  ${renderCliCommand(`bots disable --channel ${channelName} [--bot <id>]`)}`,
     `  ${renderCliCommand(`bots remove --channel ${channelName} [--bot <id>]`)}`,
@@ -456,6 +458,11 @@ export async function runBotsCli(
 
   if (action === "get") {
     await getBot(args.slice(1));
+    return;
+  }
+
+  if (action === "me") {
+    await meZaloPersonalBot(args.slice(1), renderBotsHelp);
     return;
   }
 
