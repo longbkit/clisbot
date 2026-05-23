@@ -308,11 +308,12 @@ Personal, native rendering should parse Markdown in clisbot and send the best
 available Zalo-native payload: visible plain text plus zca-js `TextStyle`
 ranges for supported formatting. Source checks found zca-js `sendMessage`
 accepts a `msg` string plus explicit `styles`, `mentions`, `quote`, `urgency`,
-and `ttl`; zca-cli mirrors that with `--style`, `--mention`, `--quote`,
-`--urgency`, and `--ttl`. No source checked in this pass proves that Zalo
-Personal itself parses Telegram-style HTML, Slack-style `mrkdwn`, or raw
-Markdown as rich text, so the Markdown-to-Zalo-rich-text conversion must be a
-clisbot renderer/compiler and must be live-tested.
+and `ttl`; zca-cli mirrors the same low-level specs. No source checked here
+proves Zalo Personal parses HTML, Slack `mrkdwn`, or raw Markdown as rich text,
+so Markdown-to-Zalo rich text must be a clisbot renderer/compiler. The shipped
+renderer covers common AI Markdown, Zalo `TextStyle` ranges, and `<@uid|Name>`
+mention remapping; live E2E still must verify Vietnamese/emoji offsets, actual
+Zalo client display, group mention delivery, and attachment captions.
 
 | Command | Meaning | Unit test | Integration test | E2E test |
 | --- | --- | --- | --- | --- |

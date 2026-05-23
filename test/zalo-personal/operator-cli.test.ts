@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { TextStyle } from "zca-js";
 import { renderZaloPersonalMessage } from "../../src/channels/zalo-personal/message-render.ts";
 import { clisbotConfigSchema } from "../../src/config/core/schema.ts";
 import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
@@ -49,6 +50,82 @@ describe("zalo personal operator command surface", () => {
     })).toMatchObject({
       text: "Quan trọng @Alice\nviệc 1",
       mentions: [{ uid: "u1", pos: 11, len: 6 }],
+    });
+  });
+
+  test("zalo native markdown keeps code, math markers, and escapes literal", () => {
+    expect(renderZaloPersonalMessage({
+      text: "before `inline *code*` after\n2 * 3 * 4\n\\*literal\\*",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "before `inline *code*` after\n2 * 3 * 4\n*literal*",
+    });
+  });
+
+  test("zalo native markdown maps headings quotes lists and fenced code", () => {
+    expect(renderZaloPersonalMessage({
+      text: "# Title\n> quoted\n  - nested\n```ts\n*code*\n```",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "Title\nquoted\nnested\n*code*",
+      styles: [
+        { start: 0, len: 5, st: TextStyle.Bold },
+        { start: 0, len: 5, st: TextStyle.Big },
+        { start: 6, len: 6, st: TextStyle.Indent, indentSize: 1 },
+        { start: 13, len: 6, st: TextStyle.UnorderedList },
+      ],
+    });
+  });
+
+  test("zalo native markdown supports nested color and emphasis tags", () => {
+    expect(renderZaloPersonalMessage({
+      text: "**{red}x{/red}** {green}**y**{/green}",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "x y",
+      styles: [
+        { start: 0, len: 1, st: TextStyle.Bold },
+        { start: 0, len: 1, st: TextStyle.Red },
+        { start: 2, len: 1, st: TextStyle.Green },
+        { start: 2, len: 1, st: TextStyle.Bold },
+      ],
+    });
+  });
+
+  test("zalo native markdown remaps style ranges around mention placeholders", () => {
+    expect(renderZaloPersonalMessage({
+      text: "**<@u1|Alice> check**",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "@Alice check",
+      styles: [{ start: 0, len: 12, st: TextStyle.Bold }],
+      mentions: [{ uid: "u1", pos: 0, len: 6 }],
+    });
+  });
+
+  test("zalo native markdown remaps styles after adjacent mention placeholders", () => {
+    expect(renderZaloPersonalMessage({
+      text: "<@u1|Alice>**check**",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "@Alicecheck",
+      styles: [{ start: 6, len: 5, st: TextStyle.Bold }],
+      mentions: [{ uid: "u1", pos: 0, len: 6 }],
+    });
+  });
+
+  test("zalo native markdown treats an unclosed fenced block as literal text", () => {
+    expect(renderZaloPersonalMessage({
+      text: "```ts\n**not style**",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "```ts\n**not style**",
     });
   });
 
