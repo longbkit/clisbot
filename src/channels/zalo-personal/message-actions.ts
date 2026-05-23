@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, extname } from "node:path";
 import type {
   MessageInputFormat,
   MessageRenderMode,
@@ -29,20 +29,22 @@ export async function sendZaloPersonalMessageAction(params: {
   }
   const client = await loginZaloPersonalFromSession(params.tokenFile);
   const threadType = resolveThreadType(client, params.target.conversationKind);
-  if (params.media && params.fileType === "voice") {
-    const uploaded = await client.api.uploadAttachment(await toAttachmentSource(params.media), params.target.chatId, threadType);
-    const fileUrl = resolveFirstUploadedFileUrl(uploaded);
-    if (!fileUrl) throw new Error("Zalo Personal upload did not return a voice file URL.");
-    const message = rendered.text ? await client.api.sendMessage({ msg: rendered.text }, params.target.chatId, threadType) : null;
-    const voice = await client.api.sendVoice({ voiceUrl: fileUrl }, params.target.chatId, threadType);
-    return { message, voice };
-  }
-  return await client.api.sendMessage({
-    msg: rendered.text,
-    ...(rendered.styles ? { styles: rendered.styles } : {}),
-    ...(rendered.mentions ? { mentions: rendered.mentions } : {}),
-    ...(params.media ? { attachments: await toAttachmentSource(params.media) } : {}),
-  }, params.target.chatId, threadType);
+  return await withUploadListenerIfNeeded(client, shouldStartUploadListener(params.media, params.fileType), async () => {
+    if (params.media && params.fileType === "voice") {
+      const uploaded = await client.api.uploadAttachment(await toAttachmentSource(params.media), params.target.chatId, threadType);
+      const fileUrl = resolveFirstUploadedFileUrl(uploaded);
+      if (!fileUrl) throw new Error("Zalo Personal upload did not return a voice file URL.");
+      const message = rendered.text ? await client.api.sendMessage({ msg: rendered.text }, params.target.chatId, threadType) : null;
+      const voice = await client.api.sendVoice({ voiceUrl: fileUrl }, params.target.chatId, threadType);
+      return { message, voice };
+    }
+    return await client.api.sendMessage({
+      msg: rendered.text,
+      ...(rendered.styles ? { styles: rendered.styles } : {}),
+      ...(rendered.mentions ? { mentions: rendered.mentions } : {}),
+      ...(params.media ? { attachments: await toAttachmentSource(params.media) } : {}),
+    }, params.target.chatId, threadType);
+  });
 }
 
 export async function reactZaloPersonalMessageAction(params: {
@@ -98,6 +100,93 @@ export async function deleteZaloPersonalMessageAction(params: {
 
 function resolveThreadType(client: Awaited<ReturnType<typeof loginZaloPersonalFromSession>>, kind: "dm" | "group") {
   return kind === "dm" ? client.ThreadType.User : client.ThreadType.Group;
+}
+
+async function withUploadListenerIfNeeded<T>(
+  client: Awaited<ReturnType<typeof loginZaloPersonalFromSession>>,
+  needed: boolean,
+  fn: () => Promise<T>,
+) {
+  if (!needed) return await fn();
+  return await withZaloPersonalUploadListener(client, fn);
+}
+
+export async function withZaloPersonalUploadListener<T>(
+  client: Awaited<ReturnType<typeof loginZaloPersonalFromSession>>,
+  fn: () => Promise<T>,
+) {
+  if (!client.api.listener?.start) return await fn();
+  useNonBlockingUploadCallbackTimers(client);
+  await waitForListenerConnection(client);
+  try {
+    return await fn();
+  } finally {
+    try {
+      (client.api.listener as any).ws?.terminate?.();
+      client.api.listener.stop();
+    } catch {
+      // The listener is best-effort plumbing for zca-js upload callbacks.
+    }
+  }
+}
+
+function useNonBlockingUploadCallbackTimers(client: Awaited<ReturnType<typeof loginZaloPersonalFromSession>>) {
+  if (!client.api.getContext) return;
+  const callbacks = client.api.getContext().uploadCallbacks as Map<string, unknown> & {
+    __clisbotUnrefSet?: boolean;
+  };
+  if (callbacks.__clisbotUnrefSet) return;
+  callbacks.set = function setWithUnrefTimer(this: Map<string, unknown>, key: string, value: unknown, ttl = 5 * 60 * 1000) {
+    const timer = setTimeout(() => {
+      this.delete(key);
+    }, ttl);
+    timer.unref?.();
+    return Map.prototype.set.call(this, key, value);
+  };
+  callbacks.__clisbotUnrefSet = true;
+}
+
+async function waitForListenerConnection(client: Awaited<ReturnType<typeof loginZaloPersonalFromSession>>) {
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out while waiting for Zalo Personal upload listener connection."));
+    }, 10_000);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      client.api.listener.off("connected", onConnected);
+      client.api.listener.off("error", onError);
+      client.api.listener.off("closed", onClosed);
+    };
+    const onConnected = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: unknown) => {
+      cleanup();
+      reject(error);
+    };
+    const onClosed = (code: number, reason: string) => {
+      cleanup();
+      reject(new Error(`Zalo Personal upload listener closed before connect: ${code} ${reason}`.trim()));
+    };
+    client.api.listener.once("connected", onConnected);
+    client.api.listener.once("error", onError);
+    client.api.listener.once("closed", onClosed);
+    try {
+      client.api.listener.start({ retryOnClose: false });
+    } catch (error) {
+      cleanup();
+      reject(error);
+    }
+  });
+}
+
+function shouldStartUploadListener(media?: string, fileType?: "auto" | "file" | "image" | "video" | "audio" | "voice") {
+  if (!media) return false;
+  if (fileType === "voice" || fileType === "video" || fileType === "audio" || fileType === "file") return true;
+  if (/^https?:\/\//i.test(media)) return false;
+  return ![".jpg", ".jpeg", ".png", ".webp"].includes(extname(media).toLowerCase());
 }
 
 function parseMessageLocator(raw: string, defaultUidFrom = "") {

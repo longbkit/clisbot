@@ -4,6 +4,7 @@ import {
   parseZaloPersonalUrgency,
   renderZaloPersonalMessage,
 } from "../../channels/zalo-personal/message-render.ts";
+import { withZaloPersonalUploadListener } from "../../channels/zalo-personal/message-actions.ts";
 import {
   defaultZaloPersonalCliDependencies,
   hasFlag,
@@ -101,7 +102,7 @@ async function sendLink(local: string[], global: string[], deps: ZaloPersonalCli
 async function upload(global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {
   const target = parseZaloPersonalTarget(parseOptionValue(global, "--target"), client);
   const source = await readAttachmentSource(parseRequiredOption(global, "--file"), deps);
-  printRaw(global, deps, await api.uploadAttachment(source, target.id, target.threadType));
+  printRaw(global, deps, await withZaloPersonalUploadListener(client, () => api.uploadAttachment(source, target.id, target.threadType)));
 }
 
 async function sendContactCard(global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {

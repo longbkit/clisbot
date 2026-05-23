@@ -11,6 +11,9 @@
 | `[MASKED_MESSAGE_ID]` | Zalo message id |
 | `[MASKED_CLIENT_MESSAGE_ID]` | Zalo client message id |
 | `[MASKED_TIMESTAMP]` | Zalo timestamp |
+| `[MASKED_FILE_ID]` | Zalo uploaded file id |
+| `[MASKED_FILE_URL]` | Zalo uploaded file URL |
+| `[MASKED_CHECKSUM]` | Uploaded file checksum |
 
 ## Friend Invite Discovery
 
@@ -33,6 +36,23 @@
 | Command | Output | Note |
 | --- | --- | --- |
 | <pre><code class="language-bash">clisbot-dev contacts search --channel zalo-personal --bot default Long --json</code></pre> | <pre><code class="language-json">[]</code></pre> | Non-friend not found by search |
+
+## Message Send
+
+| Command | Output | Note |
+| --- | --- | --- |
+| <pre><code class="language-bash">clisbot-dev message send --channel zalo-personal --bot default --target dm:[ZALO_LONG_USER_ID] --message "Test từ clisbot-dev lúc 2026-05-23 15:45 UTC. Anh confirm giúp em nhận được không." --json</code></pre> | <pre><code class="language-json">{<br>  "message": {<br>    "msgId": "[MASKED_MESSAGE_ID]"<br>  },<br>  "attachment": []<br>}</code></pre> | Sends DM to non-friend user |
+| ``clisbot-dev message send --channel zalo-personal --bot default --target dm:[ZALO_LONG_USER_ID] --message $'**Rich text test** từ clisbot-dev\n- Bold markdown\n- Link: https://example.com\n`inline code`' --render native --json`` | <pre><code class="language-json">{<br>  "message": {<br>    "msgId": "[MASKED_MESSAGE_ID]"<br>  },<br>  "attachment": []<br>}</code></pre> | Rendered bold, bullets, link; inline code stayed visible as backtick text |
+| <pre><code class="language-bash">clisbot-dev message send --channel zalo-personal --bot default --target dm:[ZALO_LONG_USER_ID] --message "Image attachment test từ clisbot-dev" --file /tmp/clisbot-zalo-e2e/zalo-personal-image-test.png --file-type image --json</code></pre> | <pre><code class="language-json">{<br>  "message": null,<br>  "attachment": [<br>    {<br>      "msgId": "[MASKED_MESSAGE_ID]"<br>    }<br>  ]<br>}</code></pre> | Image caption delivered with image |
+| <pre><code class="language-bash">clisbot-dev message send --channel zalo-personal --bot default --target dm:[ZALO_LONG_USER_ID] --message "Plain file attachment final pass" --file /tmp/clisbot-zalo-e2e/zalo-personal-file-test.txt --file-type file --json</code></pre> | <pre><code class="language-json">{<br>  "message": {<br>    "msgId": "[MASKED_MESSAGE_ID]"<br>  },<br>  "attachment": [<br>    {<br>      "msgId": "[MASKED_MESSAGE_ID]"<br>    }<br>  ]<br>}</code></pre> | File attachment requires upload listener callback |
+| <pre><code class="language-bash">clisbot-dev message send --channel zalo-personal --bot default --target dm:[ZALO_LONG_USER_ID] --message "Audio attachment final pass" --file /tmp/clisbot-zalo-e2e/zalo-personal-audio-test.wav --file-type audio --json</code></pre> | <pre><code class="language-json">{<br>  "message": {<br>    "msgId": "[MASKED_MESSAGE_ID]"<br>  },<br>  "attachment": [<br>    {<br>      "msgId": "[MASKED_MESSAGE_ID]"<br>    }<br>  ]<br>}</code></pre> | Audio sent as generic file attachment |
+| <pre><code class="language-bash">clisbot-dev message send --channel zalo-personal --bot default --target dm:[ZALO_LONG_USER_ID] --message "Voice attachment final pass" --file /tmp/clisbot-zalo-e2e/zalo-personal-audio-test.wav --file-type voice --json</code></pre> | <pre><code class="language-json">{<br>  "message": {<br>    "message": {<br>      "msgId": "[MASKED_MESSAGE_ID]"<br>    },<br>    "attachment": []<br>  },<br>  "voice": {<br>    "msgId": "[MASKED_MESSAGE_ID]"<br>  }<br>}</code></pre> | Voice sent through Zalo voice API |
+
+## Channel-Native Upload
+
+| Command | Output | Note |
+| --- | --- | --- |
+| <pre><code class="language-bash">clisbot-dev channel-native --channel zalo-personal --bot default messages upload --target dm:[ZALO_LONG_USER_ID] --file /tmp/clisbot-zalo-e2e/zalo-personal-file-test.txt --json</code></pre> | <pre><code class="language-json">[<br>  {<br>    "fileType": "others",<br>    "finished": 1,<br>    "clientFileId": "[MASKED_CLIENT_MESSAGE_ID]",<br>    "chunkId": 1,<br>    "fileId": "[MASKED_FILE_ID]",<br>    "fileUrl": "[MASKED_FILE_URL]",<br>    "totalSize": 69,<br>    "fileName": "zalo-personal-file-test.txt",<br>    "checksum": "[MASKED_CHECKSUM]"<br>  }<br>]</code></pre> | Diagnostic upload returns URL after upload listener callback |
 
 ## Message History Checks
 

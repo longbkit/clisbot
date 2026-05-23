@@ -112,16 +112,23 @@ Expected:
 
 ## Media Parity Gap
 
+Current live validation:
+
+- send one image from local file: passed on `2026-05-23`
+- send one generic file from local file: passed on `2026-05-23`
+- send one audio file from local file: passed on `2026-05-23` as a generic attachment
+- send one voice note from local audio file: passed on `2026-05-23` through the Zalo voice API
+
 Before promoting beyond alpha, validate:
 
-- send one image from local file
 - send many images from local files
 - send one image from URL
 - send many images from URLs
 - receive one image
 - receive many images
-- send and receive voice or audio if supported by the provider
-- send and receive one or many generic attachments
+- receive voice or audio
+- receive one or many generic attachments
+- send many generic attachments
 
 If a capability is unsupported, document the exact limitation in the user guide
 and keep the message CLI error explicit.
