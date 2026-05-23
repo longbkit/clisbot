@@ -182,7 +182,7 @@ group access.
 | `clisbot contacts labels list --channel zalo-personal --bot <bot-id> [--json]` | List Zalo classification labels/tags, their conversation ids, and channel-specific version. | Done | Done | Planned |
 | `clisbot contacts boards list --channel zalo-personal --bot <bot-id> <conversation-id> [--json]` | List friend-board data for one conversation. The upstream payload is not yet well documented; keep `--json` available and finalize the operator meaning after live validation. | Done | Done | Planned |
 | `clisbot contacts mutual-groups list --channel zalo-personal --bot <bot-id> <user-id> [--json]` | List mutual/related groups shared with one user when Zalo exposes them. | Done | Done | Planned |
-| `clisbot contacts friend-invites list --channel zalo-personal --bot <bot-id> [--direction incoming\|sent\|all] [--json]` | List friend invites. `--direction sent` maps to `zca-js` `getSentFriendRequest`; incoming support must be verified before shipping. | Done | Done | Planned |
+| `clisbot contacts friend-invites list --channel zalo-personal --bot <bot-id> [--direction incoming\|sent\|all] [--json]` | List friend invites. `--direction sent` maps to `zca-js` `getSentFriendRequest`; Zalo can return code `112` for an empty sent list, so clisbot normalizes that to `sent: {}`. `--direction all` combines normalized sent requests with incoming recommendations where `recommType=2`. | Done | Done | Planned |
 | `clisbot contacts friend-invites status --channel zalo-personal --bot <bot-id> <user-id> [--json]` | Check the friend-invite relationship/status with one user. | Done | Done | Planned |
 | `clisbot groups list --channel zalo-personal --bot <bot-id> [--limit N] [--json]` | List groups visible to the selected Zalo Personal account. | Done | Done | Planned |
 | `clisbot groups search --channel zalo-personal --bot <bot-id> <query> [--limit N] [--json]` | Search the selected account's visible groups by name/text. | Done | Done | Planned |
@@ -321,7 +321,7 @@ Zalo client display, group mention delivery, and attachment captions.
 | `clisbot message send --channel zalo-personal --bot <bot-id> --target <target> --input md --render native --message <markdown>` | Send AI-generated Markdown using the shared render contract. For Zalo Personal this should render to visible text plus Zalo `TextStyle` ranges where supported, falling back to readable plain text for unsupported Markdown. | Done | Done | Planned |
 | `clisbot message send --channel zalo-personal --bot <bot-id> --target <target> [--message <text>] --file <path-or-url> [--file-type auto\|file\|image\|video\|audio\|voice]` | Send one attachment through the shared file path. `auto` is the default; `file` is the portable replacement for Telegram's current `--force-document`; `voice` is only valid where a channel implements a real voice-note send. | Done | Done | Planned |
 | `clisbot message react --channel zalo-personal --bot <bot-id> --target <target> --message-id <id> --emoji <emoji>` | React to one message when Zalo exposes reaction support. | Done | Done | Planned |
-| `clisbot message read --channel zalo-personal --bot <bot-id> --target <target> [--limit N] [--json]` | Read recent messages through the existing shared read/history action for diagnostics or reply context. | Done | Done | Planned |
+| `clisbot message read --channel zalo-personal --bot <bot-id> --target <target> [--limit N] [--json]` | Read recent messages through the existing shared read/history action for diagnostics or reply context. Current zca-js request/response support is group history only; `dm:<id>` intentionally returns unsupported until a real DM/stranger history source is proven. | Done | Done | Planned |
 | `clisbot message delete --channel zalo-personal --bot <bot-id> --target <target> --message-id <id> [--confirm]` | Delete one message where the account has permission. Keep this shared because Slack and Telegram already implement `message delete`. | Done | Done | Planned |
 
 Channel-native Zalo message commands:
@@ -490,7 +490,12 @@ Command-shape decision for Phase 4:
   Markdown falls back to readable plain text. Do not assume Zalo Personal itself
   parses raw Markdown, HTML, or Slack `mrkdwn`.
 - Use the existing shared `message read` action for recent-message/history
-  reads; do not add a parallel `message history list` shape.
+  reads; do not add a parallel `message history list` shape. For Zalo Personal,
+  current implementation supports group history through zca-js
+  `getGroupChatHistory` only. Do not claim DM history support from
+  `listener.requestOldMessages(ThreadType.User)` yet: it is a listener-level
+  websocket backfill emitting `old_messages`, not a proven target-specific
+  request/response read API.
 - Zalo-only message semantics live under `channel-native ... messages ...`.
   `messages upload` is a diagnostic/pre-upload helper, not the normal send path.
 - zca-js `forwardMessage` forwards caller-supplied content plus optional
@@ -519,15 +524,26 @@ Board research:
   group changes. Keep `contacts boards list` for coverage, but finalize its
   summary/use case from live payload validation.
 
-Sticker reads use `stickers get`, not `stickers detail`. The zca-js
-`getStickersDetail` API returns the full `StickerDetail[]` payload for one or
-more sticker ids, so `get [--json]` covers the detail use case without adding a
-separate verb.
+Sticker reads use `stickers get`, not `stickers detail`; zca-js
+`getStickersDetail` returns full `StickerDetail[]`, so `get [--json]` covers it.
 
 Keep `message delete` as-is. It is already a shared message action in the
 current CLI and is implemented by Slack and Telegram; Zalo Personal should use
 the same shared verb when delete is supported. Zalo channel-native recall moves
 under `channel-native ... messages undo`.
+
+Friend-invite and stranger-message validation notes: zca-js
+`getSentFriendRequest` calls `/api/friend/requested/list` and may throw code
+`112` for no sent requests; normalize it to `sent: {}`. Live `clisbot-dev`
+validation on 2026-05-23 with bot `default` returned `sent: {}` and
+`sent: {}, incoming: []`, so no active invite was API-visible. A later outgoing
+DM from Clisbot to a non-friend appeared via zca-js
+`listener.requestOldMessages(ThreadType.User)` as a self-authored
+`old_messages` item, proving websocket user-message backfill can see at least
+some sent stranger DMs but is still global, not target-specific. Incoming
+stranger DM validation still showed no listener event, incoming invite,
+contact-search hit, or shared DM history API; next test needs peer raw id/phone
+or accepted friendship, then compare status, listener events, and pairing.
 
 Candidate channel-native command shapes after a `channel-native` gateway exists:
 
@@ -595,32 +611,25 @@ Candidate channel-native command shapes after a `channel-native` gateway exists:
 Examples for complex channel-native params:
 
 ```bash
-# Account settings use channel-specific setting type/value pairs; keep this channel-native.
 clisbot channel-native --channel zalo-personal --bot work settings update \
   --type display_seen_status --value 0 --confirm
 
-# Mute for a duration or channel-specific shortcut.
 clisbot channel-native --channel zalo-personal --bot work conversations mute set \
   group:456 on --duration until8AM --confirm
 
-# Auto-delete chat TTL is a channel-specific enum, not arbitrary milliseconds.
 clisbot channel-native --channel zalo-personal --bot work conversations auto-delete set \
   dm:123 --ttl seven-days --type user --confirm
 
-# Reminder timestamps use epoch milliseconds so CLI and API do not fight timezone parsing.
 clisbot channel-native --channel zalo-personal --bot work reminders add \
   group:456 --title "Check hợp đồng" --at 1779600000000 --type group --confirm
 
-# Auto replies can target a scope and optionally narrow to users.
 clisbot channel-native --channel zalo-personal --bot work auto-replies add \
   --content "Em đang bận, sẽ phản hồi sau." --enabled on \
   --start 1779523200000 --end 1779609600000 --scope selected --user 123 --confirm
 
-# Sticker send needs the fields returned by stickers get --json.
 clisbot channel-native --channel zalo-personal --bot work stickers send \
   --target group:456 --id 123 --category 456 --type 1
 
-# Bank card send needs Zalo's binBank payload or a supported resolver code.
 clisbot channel-native --channel zalo-personal --bot work messages bank-card send \
   --target dm:123 --bin-bank '{"bin":"970436","name":"Vietcombank"}' \
   --account-number 0123456789 --account-name "LONG"
@@ -677,14 +686,6 @@ clisbot contacts labels replace --channel zalo-personal --bot work \
 | zca-js broad channel-native APIs | Phase 4, marked channel-native/high-risk |
 | zca-js low-level `custom` API | Out of scope as a raw CLI escape hatch; add named commands instead |
 
-Source command inventory checked: OpenClaw `zalouser` / ZaloClaw-style
-coverage (`send`, `image`, `link`, `friends`, `groups`, `me`, `status`,
-reactions and events), zca-cli `msg`, `friend`, `group`, `me`,
-account/runtime, REST endpoint categories, and local zca-js APIs for contacts,
-groups, messages/media/polls/reactions/history, profile/settings/conversation
-state, labels, notes/reminders, quick messages/auto reply, stickers, catalog,
-product, and low-level custom API review.
-
 ## Done Criteria
 
 - Backlog, setup guide, CLI help, and user-guide docs agree on shipped command
@@ -696,5 +697,4 @@ product, and low-level custom API review.
 - Route/auth tests prove discovery cannot bypass fail-closed DM/group defaults.
 - Large-contact and large-group-list behavior is paginated or bounded.
 - Channel-native commands are labeled as channel-native/high-risk in docs and help.
-- Live validation is recorded with a separate Zalo test account before any
-  release note claims the full surface works.
+- Live validation is recorded before any release note claims the full surface works.

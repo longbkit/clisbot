@@ -106,7 +106,7 @@ export async function getZaloPersonalContact(api: ZaloApi, userId: string, busin
 export async function listZaloPersonalFriendInvites(api: ZaloApi, direction: "incoming" | "sent" | "all") {
   const result: Record<string, unknown> = {};
   if (direction === "sent" || direction === "all") {
-    result.sent = await api.getSentFriendRequest();
+    result.sent = await getZaloPersonalSentFriendRequests(api);
   }
   if (direction === "incoming" || direction === "all") {
     const recommendations = await api.getFriendRecommendations();
@@ -115,6 +115,19 @@ export async function listZaloPersonalFriendInvites(api: ZaloApi, direction: "in
     );
   }
   return result;
+}
+
+async function getZaloPersonalSentFriendRequests(api: ZaloApi) {
+  try {
+    return await api.getSentFriendRequest();
+  } catch (error) {
+    if (isZaloEmptyFriendRequestList(error)) return {};
+    throw error;
+  }
+}
+
+function isZaloEmptyFriendRequestList(error: unknown) {
+  return typeof error === "object" && error !== null && (error as { code?: unknown }).code === 112;
 }
 
 export async function listZaloPersonalGroups(api: ZaloApi, limit?: number) {

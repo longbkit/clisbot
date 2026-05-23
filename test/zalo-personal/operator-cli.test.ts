@@ -129,6 +129,29 @@ describe("zalo personal operator command surface", () => {
     });
   });
 
+  test("friend invite list treats Zalo code 112 as an empty sent list", async () => {
+    const api = createFullApi();
+    api.getSentFriendRequest = async () => {
+      throw Object.assign(new Error("Lỗi không xác định"), { code: 112 });
+    };
+    const { deps, output } = createDeps(api);
+
+    await runContactsCli([
+      "friend-invites",
+      "list",
+      "--channel",
+      "zalo-personal",
+      "--direction",
+      "all",
+      "--json",
+    ], deps as any);
+
+    expect(JSON.parse(output.at(-1)!)).toEqual({
+      sent: {},
+      incoming: [{ dataInfo: { recommType: 2 } }],
+    });
+  });
+
   test("label all matching requires every requested label to be present", async () => {
     const { deps, output } = createDeps({
       getAllFriends: async () => [{ userId: "u1", displayName: "Alice" }],
