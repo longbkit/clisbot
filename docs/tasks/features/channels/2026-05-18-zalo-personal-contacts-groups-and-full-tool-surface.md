@@ -17,8 +17,7 @@ addressing, and text send:
 
 Evidence used for this task:
 
-- [Zalo Personal setup guide](../../../user-guide/zalo-personal-setup.md)
-- [Zalo Personal messages and history guide](../../../user-guide/zalo-personal-messages-and-history.md)
+- [Zalo Personal user guide](../../../user-guide/zalo-personal.md)
 - [Friend invites and message backfill implementation notes](2026-05-23-zalo-personal-friend-invites-and-message-backfill-implementation.md)
 - [Telegram, Official Zalo Bot, zca-js, Discord, And clisbot Channel Interface Matrix](../../../research/channels/2026-05-08-telegram-zalo-discord-channel-interface-matrix.md)
 - OpenClaw local `zalouser` docs and implementation

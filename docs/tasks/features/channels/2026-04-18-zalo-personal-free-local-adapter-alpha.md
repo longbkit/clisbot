@@ -288,7 +288,7 @@ Implementation must update or add operator docs alongside CLI help:
   - add a channel setup entry
 - `docs/user-guide/bots-and-credentials.md`
   - explain `tokenFile` for Zalo Personal auth/session files
-- `docs/user-guide/zalo-personal-setup.md`
+- `docs/user-guide/zalo-personal.md`
   - document QR login, `--qr-path`, console QR output, relogin, logout, status,
     risk, single-listener caveat, and recommendation to use a separate phone
     number or Zalo account for automation
@@ -486,7 +486,7 @@ Tests and docs:
 - `test/message-cli.test.ts`
 - `test/queues-cli.test.ts`
 - `test/loops-cli.test.ts`
-- `docs/user-guide/zalo-personal-setup.md`
+- `docs/user-guide/zalo-personal.md`
 - `docs/tests/features/channels/zalo-personal-alpha.md`
 - `docs/tasks/backlog.md`
 - `docs/features/feature-tables.md`

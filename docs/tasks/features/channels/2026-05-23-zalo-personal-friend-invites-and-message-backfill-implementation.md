@@ -5,7 +5,7 @@
 This note records live implementation details for
 [Zalo Personal Contacts, Groups, And Full Tool Surface](2026-05-18-zalo-personal-contacts-groups-and-full-tool-surface.md).
 Keep operator-facing guidance in
-[Zalo Personal Messages And History](../../../user-guide/zalo-personal-messages-and-history.md).
+[Zalo Personal](../../../user-guide/zalo-personal.md).
 
 ## Findings
 
