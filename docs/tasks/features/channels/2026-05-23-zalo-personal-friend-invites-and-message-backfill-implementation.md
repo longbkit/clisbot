@@ -48,6 +48,13 @@ Keep operator-facing guidance in
   Keep direct URL send APIs as channel-native/specialized paths. `--file-type
   voice` is the exception after upload: clisbot uploads the audio, gets a Zalo
   file URL, then calls `sendVoice` so the client displays a voice note.
+- Video thumbnail note: shared `message send --file --file-type video` uses
+  zca-js `sendMessage({ attachments })`, which sends through the generic
+  attachment flow and does not pass an explicit thumbnail URL in the final send
+  payload. Live validation showed the Zalo client may initially display a black
+  thumbnail until playback starts. For thumbnail-sensitive video sends, use the
+  channel-native `messages video send` path, which uploads the video and
+  thumbnail, then calls zca-js `sendVideo`.
 
 ## Test Coverage
 
@@ -67,6 +74,8 @@ Keep operator-facing guidance in
   - video URL send succeeded after clisbot downloaded the URL and uploaded the
     buffer to Zalo
   - channel-native URL upload returned raw `fileUrl`/`fileId`
+  - channel-native direct video send returned a Zalo `msgId` after uploading a
+    separate thumbnail
   - repeated shared `--file` is rejected until multi-file semantics are designed
 
 ## Current Constraint
@@ -79,4 +88,5 @@ separate messages sent before login from messages visible after login.
 Do not make zca-js direct video URL send the default for
 `message send --file --file-type video` until live tests prove the expected URL,
 thumbnail, duration, dimensions, and client display behavior. Use the shared
-download-then-upload path for the generic file contract.
+download-then-upload path for the generic file contract, and keep explicit
+thumbnail control in channel-native video send until that behavior is stable.

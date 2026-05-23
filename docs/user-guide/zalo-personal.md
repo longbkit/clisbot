@@ -112,6 +112,32 @@ to a non-friend account appeared in zca-js `old_messages` after login. The
 earlier missing message was explained by timing: it was sent manually from the
 mobile app before the Zalo Personal session was logged in and listening.
 
+## Media Sends
+
+Shared sends use one file input:
+
+```bash
+clisbot message send --channel zalo-personal --bot default --target dm:<user-id> --message "image" --file ./image.png --file-type image
+clisbot message send --channel zalo-personal --bot default --target dm:<user-id> --message "video" --file ./video.mp4 --file-type video
+```
+
+`--file` accepts either a local file path or an HTTP(S) URL. For URLs, clisbot
+downloads the file first, then uploads it to Zalo. `channel-native messages
+upload` is a diagnostic primitive that returns Zalo upload metadata; normal
+sends do not require running upload separately.
+
+Video sent through the shared attachment path may render as a generic Zalo
+video attachment and can show a placeholder thumbnail until playback starts. If
+the thumbnail matters, use the native video command and provide a thumbnail:
+
+```bash
+clisbot channel-native --channel zalo-personal --bot default messages video send \
+  --target dm:<user-id> \
+  --file ./video.mp4 \
+  --thumbnail ./thumbnail.png \
+  --message "video"
+```
+
 ## Friend Invites
 
 Use these commands to inspect friend-request state:

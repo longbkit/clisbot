@@ -14,6 +14,7 @@
 | `[MASKED_FILE_ID]` | Zalo uploaded file id |
 | `[MASKED_FILE_URL]` | Zalo uploaded file URL |
 | `[MASKED_CHECKSUM]` | Uploaded file checksum |
+| `[MASKED_LINK_THUMB_URL]` | Link preview thumbnail URL |
 
 ## Friend Invite Discovery
 
@@ -59,6 +60,15 @@
 | --- | --- | --- |
 | <pre><code class="language-bash">clisbot-dev channel-native --channel zalo-personal --bot default messages upload --target dm:[ZALO_LONG_USER_ID] --file /tmp/clisbot-zalo-e2e/zalo-personal-file-test.txt --json</code></pre> | <pre><code class="language-json">[<br>  {<br>    "fileType": "others",<br>    "finished": 1,<br>    "clientFileId": "[MASKED_CLIENT_MESSAGE_ID]",<br>    "chunkId": 1,<br>    "fileId": "[MASKED_FILE_ID]",<br>    "fileUrl": "[MASKED_FILE_URL]",<br>    "totalSize": 69,<br>    "fileName": "zalo-personal-file-test.txt",<br>    "checksum": "[MASKED_CHECKSUM]"<br>  }<br>]</code></pre> | Diagnostic upload returns URL after upload listener callback |
 | <pre><code class="language-bash">clisbot-dev channel-native --channel zalo-personal --bot default messages upload --target dm:[ZALO_LONG_USER_ID] --file http://127.0.0.1:6430/zalo-personal-file-test.txt --json</code></pre> | <pre><code class="language-json">[<br>  {<br>    "fileType": "others",<br>    "finished": 1,<br>    "clientFileId": "[MASKED_CLIENT_MESSAGE_ID]",<br>    "chunkId": 1,<br>    "fileId": "[MASKED_FILE_ID]",<br>    "fileUrl": "[MASKED_FILE_URL]",<br>    "totalSize": 69,<br>    "fileName": "zalo-personal-file-test.txt",<br>    "checksum": "[MASKED_CHECKSUM]"<br>  }<br>]</code></pre> | Diagnostic URL upload downloads first, then uploads to Zalo |
+
+## Channel-Native Send
+
+| Command | Output | Note |
+| --- | --- | --- |
+| <pre><code class="language-bash">set -a; source .env; set +a; clisbot-dev channel-native --channel zalo-personal --bot default messages send --target dm:[ZALO_LONG_USER_ID] --message "Native style command test" --style bold:0:6 --style green:7:5 --urgency important --json</code></pre> | <pre><code class="language-json">{<br>  "message": {<br>    "msgId": "[MASKED_MESSAGE_ID]"<br>  },<br>  "attachment": []<br>}</code></pre> | Direct native styled text send |
+| <pre><code class="language-bash">clisbot-dev channel-native --channel zalo-personal --bot default messages parse-link https://example.com --json</code></pre> | <pre><code class="language-json">{<br>  "data": {<br>    "thumb": "[MASKED_LINK_THUMB_URL]",<br>    "title": "Example Domain",<br>    "desc": "https://example.com",<br>    "src": "example.com",<br>    "href": "https://example.com",<br>    "media": {<br>      "type": 0,<br>      "count": 0,<br>      "mediaTitle": "",<br>      "artist": "",<br>      "streamUrl": "",<br>      "stream_icon": ""<br>    },<br>    "stream_icon": ""<br>  },<br>  "error_maps": {<br>    "1": 0,<br>    "2": 0<br>  }<br>}</code></pre> | Parses link preview metadata |
+| <pre><code class="language-bash">set -a; source .env; set +a; clisbot-dev channel-native --channel zalo-personal --bot default messages link send --target dm:[ZALO_LONG_USER_ID] https://example.com --message "Native link send test" --json</code></pre> | <pre><code class="language-json">{<br>  "msgId": "[MASKED_MESSAGE_ID]"<br>}</code></pre> | Sends native link preview |
+| <pre><code class="language-bash">set -a; source .env; set +a; clisbot-dev channel-native --channel zalo-personal --bot default messages video send --target dm:[ZALO_LONG_USER_ID] --message "Video direct send with uploaded thumbnail" --file /tmp/clisbot-zalo-e2e/zalo-personal-video-test.mp4 --thumbnail /tmp/clisbot-zalo-e2e/zalo-personal-image-test.png --duration-ms 1000 --width 640 --height 360 --json</code></pre> | <pre><code class="language-json">{<br>  "msgId": "[MASKED_MESSAGE_ID]"<br>}</code></pre> | Direct `sendVideo` path uploads video and thumbnail, then sends video URL with thumbnail URL |
 
 ## Message History Checks
 

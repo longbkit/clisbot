@@ -322,6 +322,7 @@ describe("zalo personal operator command surface", () => {
     await runChannelNativeCli([...base, "link", "send", "--target", "group:g1", "https://example.com"], deps as any);
     await runChannelNativeCli([...base, "parse-link", "https://example.com"], deps as any);
     await runChannelNativeCli([...base, "upload", "--target", "group:g1", "--file", "a.txt"], deps as any);
+    await runChannelNativeCli([...base, "video", "send", "--target", "dm:u1", "--file", "video.mp4", "--thumbnail", "thumb.png", "--message", "Video", "--duration-ms", "1000", "--width", "640", "--height", "360"], deps as any);
     await runChannelNativeCli([...base, "contact-card", "send", "--target", "dm:u1", "--user", "u2"], deps as any);
     await runChannelNativeCli([...base, "bank-card", "send", "--target", "dm:u1", "--bin-bank", "970436", "--account-number", "123"], deps as any);
     await runChannelNativeCli([...base, "typing", "--target", "group:g1"], deps as any);
@@ -338,6 +339,7 @@ describe("zalo personal operator command surface", () => {
     await runChannelNativeCli([...base, "report", "--target", "group:g1", "--reason", "fraud", "--confirm"], deps as any);
 
     expect(api.calls.map((call: any[]) => call[0])).toContain("createPoll");
+    expect(api.calls.map((call: any[]) => call[0])).toContain("sendVideo");
     expect(api.calls.map((call: any[]) => call[0])).toContain("sendReport");
   });
 });
@@ -401,6 +403,7 @@ function createFullApi() {
     sendLink: record("sendLink", { msgId: "1" }),
     parseLink: record("parseLink", { data: { href: "https://example.com" }, error_maps: {} }),
     uploadAttachment: record("uploadAttachment", [{ fileUrl: "https://file" }]),
+    sendVideo: record("sendVideo", { msgId: 1 }),
     sendCard: record("sendCard", { msgId: 1 }),
     sendBankCard: record("sendBankCard"),
     sendTypingEvent: record("sendTypingEvent"),

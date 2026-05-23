@@ -1,4 +1,7 @@
 import {
+  resolveZaloPersonalUploadedUrl,
+} from "../../channels/zalo-personal/attachment-source.ts";
+import {
   parseZaloPersonalMentionSpec,
   parseZaloPersonalStyleSpec,
   parseZaloPersonalUrgency,
@@ -27,6 +30,7 @@ function renderChannelNativeHelp() {
     "Usage:",
     `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages send --target <target> --message <text> [--quote <json>] [--mention <uid:pos:len>...] [--style <style:pos:len>...] [--urgency default|important|urgent|0|1|2] [--ttl <ms>]")}`,
     `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages link send --target <target> <url> [--message <text>] [--ttl <ms>]")}`,
+    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages video send --target <target> --file <path-or-url> --thumbnail <path-or-url> [--message <text>] [--duration-ms <ms>] [--width <px>] [--height <px>] [--ttl <ms>]")}`,
     `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages parse-link <url> [--json]")}`,
     `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages upload --target <target> --file <path> [--json]")}`,
     `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages contact-card|bank-card|typing|delivered|seen|undo|forward|polls|report ...")}`,
@@ -55,6 +59,7 @@ async function handleMessages(local: string[], global: string[], deps: ZaloPerso
   const action = local[0];
   if (action === "send") return sendEnhanced(global, deps, client, api);
   if (action === "link" && local[1] === "send") return sendLink(local, global, deps, client, api);
+  if (action === "video" && local[1] === "send") return sendVideo(global, deps, client, api);
   if (action === "parse-link") return printRaw(global, deps, await api.parseLink(requireLocalPositional(local, 1, "url")));
   if (action === "upload") return upload(global, deps, client, api);
   if (action === "contact-card" && local[1] === "send") return sendContactCard(global, deps, client, api);
@@ -97,6 +102,28 @@ async function sendLink(local: string[], global: string[], deps: ZaloPersonalCli
     msg: parseOptionValue(global, "--message"),
     ttl: parseIntOption(global, "--ttl"),
   }, target.id, target.threadType));
+}
+
+async function sendVideo(global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {
+  const target = parseZaloPersonalTarget(parseOptionValue(global, "--target"), client);
+  const file = await readAttachmentSource(parseRequiredOption(global, "--file"), deps);
+  const thumbnail = await readAttachmentSource(parseRequiredOption(global, "--thumbnail"), deps);
+  const result = await withZaloPersonalUploadListener(client, async () => {
+    const [videoUpload, thumbnailUpload] = await Promise.all([
+      api.uploadAttachment(file, target.id, target.threadType),
+      api.uploadAttachment(thumbnail, target.id, target.threadType),
+    ]);
+    return await api.sendVideo({
+      videoUrl: resolveZaloPersonalUploadedUrl(videoUpload, "video", ["fileUrl", "normalUrl"]),
+      thumbnailUrl: resolveZaloPersonalUploadedUrl(thumbnailUpload, "thumbnail", ["normalUrl", "hdUrl", "thumbUrl", "fileUrl"]),
+      ...(parseOptionValue(global, "--message") ? { msg: parseOptionValue(global, "--message") } : {}),
+      ...(parseIntOption(global, "--duration-ms") !== undefined ? { duration: parseIntOption(global, "--duration-ms") } : {}),
+      ...(parseIntOption(global, "--width") !== undefined ? { width: parseIntOption(global, "--width") } : {}),
+      ...(parseIntOption(global, "--height") !== undefined ? { height: parseIntOption(global, "--height") } : {}),
+      ...(parseIntOption(global, "--ttl") !== undefined ? { ttl: parseIntOption(global, "--ttl") } : {}),
+    }, target.id, target.threadType);
+  });
+  printRaw(global, deps, result);
 }
 
 async function upload(global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {

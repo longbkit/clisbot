@@ -22,6 +22,20 @@ export async function resolveZaloPersonalAttachmentSource(pathOrUrl: string, loc
   };
 }
 
+export function resolveZaloPersonalUploadedUrl(
+  uploaded: Array<Record<string, unknown>>,
+  label: string,
+  keys: string[] = ["fileUrl", "normalUrl", "hdUrl", "thumbUrl"],
+) {
+  for (const item of uploaded) {
+    for (const key of keys) {
+      const value = item[key];
+      if (typeof value === "string" && value.trim()) return value;
+    }
+  }
+  throw new Error(`Zalo Personal upload did not return a ${label} URL.`);
+}
+
 function filenameFromUrl(rawUrl: string, contentType?: string) {
   const pathname = new URL(rawUrl).pathname;
   const name = basename(pathname);

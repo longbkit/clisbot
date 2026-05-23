@@ -5,7 +5,10 @@ import type {
 } from "../message/message-command.ts";
 import { loginZaloPersonalFromSession } from "./zca-js.ts";
 import { renderZaloPersonalMessage } from "./message-render.ts";
-import { resolveZaloPersonalAttachmentSource } from "./attachment-source.ts";
+import {
+  resolveZaloPersonalAttachmentSource,
+  resolveZaloPersonalUploadedUrl,
+} from "./attachment-source.ts";
 
 export async function sendZaloPersonalMessageAction(params: {
   tokenFile: string;
@@ -32,8 +35,7 @@ export async function sendZaloPersonalMessageAction(params: {
   return await withUploadListenerIfNeeded(client, shouldStartUploadListener(params.media, params.fileType), async () => {
     if (params.media && params.fileType === "voice") {
       const uploaded = await client.api.uploadAttachment(await resolveZaloPersonalAttachmentSource(params.media), params.target.chatId, threadType);
-      const fileUrl = resolveFirstUploadedFileUrl(uploaded);
-      if (!fileUrl) throw new Error("Zalo Personal upload did not return a voice file URL.");
+      const fileUrl = resolveZaloPersonalUploadedUrl(uploaded, "voice file");
       const message = rendered.text ? await client.api.sendMessage({ msg: rendered.text }, params.target.chatId, threadType) : null;
       const voice = await client.api.sendVoice({ voiceUrl: fileUrl }, params.target.chatId, threadType);
       return { message, voice };
@@ -204,9 +206,4 @@ function parseMessageLocator(raw: string, defaultUidFrom = "") {
     throw new Error("--message-id must be <msgId>[:<cliMsgId>[:<uidFrom>]] or a JSON message locator.");
   }
   return { msgId, cliMsgId, uidFrom };
-}
-
-function resolveFirstUploadedFileUrl(uploaded: Array<{ fileUrl?: string; normalUrl?: string }>) {
-  return uploaded.find((item) => item.fileUrl || item.normalUrl)?.fileUrl ??
-    uploaded.find((item) => item.fileUrl || item.normalUrl)?.normalUrl;
 }

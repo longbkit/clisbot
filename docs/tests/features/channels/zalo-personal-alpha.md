@@ -122,6 +122,11 @@ Current live validation:
 - send one voice note from local audio file: passed on `2026-05-23` through the Zalo voice API
 - send one video from local file: passed on `2026-05-23` through shared attachment upload
 - send one video from URL: passed on `2026-05-23`; clisbot downloads the URL, then uploads to Zalo
+- send one channel-native styled text message: passed on `2026-05-23`
+- parse and send one channel-native link preview: passed on `2026-05-23`
+- send one direct native video with uploaded thumbnail: command returned `msgId`
+  on `2026-05-23`; recipient visual confirmation is still needed for thumbnail
+  display
 - repeated `--file` is intentionally rejected until multi-file semantics are designed
 
 Before promoting beyond alpha, validate:
@@ -133,6 +138,8 @@ Before promoting beyond alpha, validate:
 - receive voice or audio
 - receive one or many generic attachments
 - send many generic attachments
+- decide whether shared `message send --file --file-type video` should stay as a
+  generic attachment or switch to the native video path with thumbnail metadata
 
 If a capability is unsupported, document the exact limitation in the user guide
 and keep the message CLI error explicit.
