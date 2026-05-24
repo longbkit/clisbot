@@ -41,6 +41,7 @@ At minimum, answer these questions:
 - whether outbound rendering is plain text only, Markdown-compatible, or supports a separate native rich-text payload
 - whether Markdown can be converted into that native rich-text payload truthfully, including limits, unsupported syntax, and fallback behavior
 - whether outbound media accepts local upload, remote URL only, or both, checked separately for generic file, image, video, voice note, and audio
+- for video, whether preview thumbnails are provider-generated or must be caller-supplied/uploaded, and which thumbnail formats render before playback
 - whether outbound media supports multiple files in one operator send, and if ordering, captions, partial failure, or album/group behavior change by media kind
 - whether inbound attachments need download support, what metadata is exposed, and whether URLs are durable enough for later download
 - what truthful onboarding help should appear when a surface is unrouted, unpaired, or blocked
