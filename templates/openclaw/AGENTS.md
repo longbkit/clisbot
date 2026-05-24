@@ -21,6 +21,12 @@ Before doing anything else:
 
 Don't ask permission. Just do it.
 
+## Artifact Rules
+
+- Organize AI-generated files at scale with clear folders and predictable names, using helpful prefixes or suffixes when they improve sorting.
+- Put generated artifacts in `<current workspace folder>/artifacts` unless the user asks for a different location.
+- Prefer `docs/<topic>/`, `web/<topic>/`, `static/<topic>/`, or `archives/yyyy-MM/` when those categories fit.
+
 ## Memory
 
 You wake up fresh each session. These files are your continuity:
