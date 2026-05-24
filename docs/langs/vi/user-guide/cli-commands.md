@@ -413,7 +413,6 @@ Hành vi quan trọng:
 - `clisbot message unpin ...`
 - `clisbot message pins ...`
 - `clisbot message search ...`
-- `clisbot message custom ...`
 
 Hướng dẫn nhanh:
 
@@ -423,7 +422,7 @@ Hướng dẫn nhanh:
 - dùng `read` hoặc `search` để xem message history
 - dùng `pin`, `unpin`, hoặc `pins` cho pinned message
 - dùng `poll` để tạo poll
-- dùng `custom` khi một channel có public subtree thuộc domain `message` nhưng chưa nên nhét vào shared stable action list
+- dùng `clisbot channel-native ...` cho lệnh riêng của provider chưa thuộc shared stable action list
 
 Phần bắt buộc và tùy chọn:
 
@@ -438,8 +437,7 @@ Hành vi quan trọng:
 - `--bot` chọn provider bot nào sẽ gửi hoặc sửa message; nếu bỏ qua, bot mặc định của provider sẽ được dùng
 - `--account` vẫn là alias tương thích ngược cho `--bot`
 - `clisbot message --help --channel <channel-name>` in ra target syntax theo channel, render hint, ví dụ, và support boundary
-- `message custom <subtree...>` là một gateway dùng chung, nhưng grammar sau `custom` thuộc sở hữu của channel đã chọn
-- `message custom` cố ý không ép thành một mini-language trung lập cho mọi provider; hãy xem help của đúng channel trước khi dùng
+- `message custom` đã bị gỡ; dùng các lệnh `channel-native` có tên rõ ràng thay cho raw provider subtree
 - shared message action được chặn theo capability trước khi dispatch xuống provider, nên cặp channel/action không hỗ trợ sẽ fail sớm
 - `--target` là đích đến:
   - Slack dùng id của channel, group, hoặc DM destination

@@ -152,6 +152,28 @@ describe("zalo personal operator command surface", () => {
     });
   });
 
+  test("group mutation subcommand help describes required flags and examples without logging in", async () => {
+    const output: string[] = [];
+    const deps = {
+      loadConfig: async () => createLoadedConfig(),
+      login: async () => {
+        throw new Error("help should not login");
+      },
+      print: (text: string) => output.push(text),
+      readFile: async () => Buffer.from("file"),
+    };
+
+    await runGroupsCli(["add", "--help"], deps as any);
+    await runGroupsCli(["members", "add", "--help"], deps as any);
+
+    expect(output[0]).toContain("groups add --channel zalo-personal --bot <id> --name <name> --user <user-id>");
+    expect(output[0]).toContain("--confirm           Required because this creates a real Zalo group.");
+    expect(output[0]).toContain("groups add --channel zalo-personal --bot default --name \"Gia đình\"");
+    expect(output[1]).toContain("groups members add --channel zalo-personal --bot <id> <group-id> --user <user-id>");
+    expect(output[1]).toContain("<group-id>          Raw Zalo group id.");
+    expect(output[1]).toContain("groups members add --channel zalo-personal --bot default 3374540724734114698");
+  });
+
   test("label all matching requires every requested label to be present", async () => {
     const { deps, output } = createDeps({
       getAllFriends: async () => [{ userId: "u1", displayName: "Alice" }],

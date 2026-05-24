@@ -85,7 +85,6 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
   capabilities: {
     surfaceKinds: ["dm", "group"],
     messageActions: ["send", "react", "read", "delete"],
-    supportsMessageCustomSubtree: false,
   },
   bootstrapCli: {
     tokenFlags: [],

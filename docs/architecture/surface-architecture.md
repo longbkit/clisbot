@@ -50,9 +50,8 @@ Channel responsibilities:
 Shared message-surface rule:
 
 - `clisbot message <action> --channel ...` is the shared stable message surface
-- `clisbot message custom ... --channel ...` is a channel-owned public subtree behind one shared gateway
-- the shared layer should dispatch that subtree by channel, not force one provider-neutral grammar inside it
-- channel plugins may expose both shared message actions and custom message subtrees when that is the cleaner product shape
+- `clisbot channel-native --channel ...` is the provider-specific command surface for capabilities that do not belong in the shared stable action list
+- provider-specific capabilities should be named commands, not a raw shared `message custom` escape hatch
 
 Channel failure boundary:
 
@@ -81,34 +80,33 @@ When live rendering fails temporarily:
 - the channel should recover on later successful delivery when practical
 - the architecture prefers degraded user-visible delivery over process death or false run failure
 
-## Custom Message Subtrees
+## Channel-Native Commands
 
-The shared `message` CLI may expose a public extension gateway:
+Provider-specific message capabilities belong under named `channel-native` commands:
 
-- `clisbot message custom ... --channel ...`
+- `clisbot channel-native --channel <channel> ...`
 
-That gateway exists to keep provider-specific message capabilities public without forcing them into the shared stable action list too early.
+This keeps the shared `message` CLI focused on portable message actions while still giving each provider a public home for richer native operations.
 
 Ownership split:
 
-- shared layer owns the gateway and channel dispatch contract
-- channel plugin owns the subtree grammar and semantics after `custom`
+- shared layer owns the `channel-native` entry point and channel dispatch contract
+- channel-owned command modules own native grammar and semantics
 
 Reuse rule:
 
-- do not require one shared subtree grammar
-- do require one shared subtree toolkit so channel-defined command trees can reuse help rendering, validation, parsing, examples, and consistent errors
+- do not require one shared provider grammar
+- do require named commands with help, validation, examples, and consistent errors
 
 Recommended implementation direction:
 
-- channel defines a declarative-first custom command tree spec
-- shared layer walks that spec to provide reusable CLI mechanics
-- handler execution stays provider-owned
+- channel defines explicit native subcommands for supported provider features
+- handler execution stays provider-owned, with confirmation around risky mutations
 
 Domain guardrail:
 
-- keep `message custom` inside the message domain
-- if a workflow no longer belongs to the message domain, it needs a different architecture home
+- keep shared `message` actions portable
+- if a workflow needs provider-only semantics, put it under `channel-native`
 
 ## Control
 

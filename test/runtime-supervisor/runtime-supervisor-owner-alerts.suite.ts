@@ -44,7 +44,6 @@ describe("RuntimeSupervisor owner alerts", () => {
         capabilities: {
           surfaceKinds: ["dm", "group", "topic"],
           messageActions: ["send"],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [{ botId: "default", config: {} }],
@@ -144,7 +143,6 @@ describe("RuntimeSupervisor owner alerts", () => {
         capabilities: {
           surfaceKinds: ["dm", "group", "topic"],
           messageActions: ["send"],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [{ botId: "default", config: {} }],
@@ -226,7 +224,6 @@ describe("RuntimeSupervisor owner alerts", () => {
         capabilities: {
           surfaceKinds: ["dm"],
           messageActions: ["send"],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [{ botId: "default", config: {} }],
@@ -278,7 +275,6 @@ describe("RuntimeSupervisor owner alerts", () => {
         capabilities: {
           surfaceKinds: ["dm", "group"],
           messageActions: ["send"],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [{ botId: "default", config: {} }],
@@ -335,7 +331,6 @@ describe("RuntimeSupervisor owner alerts", () => {
         capabilities: {
           surfaceKinds: ["dm", "group", "topic"],
           messageActions: ["send"],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [{ botId: "alerts:primary", config: {} }],

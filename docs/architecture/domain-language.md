@@ -58,8 +58,8 @@ _Owner_: Agents own schedule state; channels supply surface context for delivery
 **steering**: A new user message injected while a run is still active.  
 _Owner_: Channels detect it; agents or runners submit it to the active run.
 
-**custom message subtree**: A channel-owned public CLI subtree behind `clisbot message custom ...`. It stays inside the message domain, but its grammar after `custom` is owned by the selected channel plugin rather than the shared `message` surface.
-_Owner_: Shared layer owns the gateway and dispatch contract; channel plugins own subtree grammar and semantics.
+**channel-native command**: A provider-specific public CLI command behind `clisbot channel-native --channel ...`. It is the home for capabilities that do not fit the shared stable `message`, `contacts`, `groups`, `routes`, or other portable command surfaces.
+_Owner_: Shared layer owns channel dispatch; channel-owned command modules own native grammar and semantics.
 
 **channel message lifecycle**: The channel-owned path for one inbound or
 scheduled message: parse channel-aware commands, build the agent prompt

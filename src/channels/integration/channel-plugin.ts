@@ -17,7 +17,6 @@ import type {
   MessageRenderMode,
   MessageSurfaceKind,
   ResolvedMessageSurface,
-  ParsedCustomMessageCommand,
   ParsedMessageCommand,
 } from "../message/message-command.ts";
 import type { SurfaceRoute } from "../config/route-policy.ts";
@@ -71,7 +70,6 @@ export type ChannelRuntimeEntry = {
 export type ChannelPluginCapabilities = {
   surfaceKinds: readonly MessageSurfaceKind[];
   messageActions: readonly MessageAction[];
-  supportsMessageCustomSubtree: boolean;
 };
 
 export type ChannelControlSurfaceContext = {
@@ -218,10 +216,6 @@ export type ChannelPlugin = {
     botId: string;
     result: unknown;
   }>;
-  runCustomMessageCommand?(
-    loadedConfig: LoadedConfig,
-    command: ParsedCustomMessageCommand,
-  ): Promise<unknown>;
   resolveMessageSurface(command: ParsedMessageCommand): ResolvedMessageSurface | null;
   resolveControlSurfaceContext?(params: {
     loadedConfig: LoadedConfig;

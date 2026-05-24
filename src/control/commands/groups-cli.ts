@@ -36,11 +36,70 @@ function renderGroupsHelp() {
   ].join("\n");
 }
 
+function renderGroupAddHelp() {
+  return [
+    renderCliCommand("groups add"),
+    "",
+    "Usage:",
+    `  ${renderCliCommand("groups add --channel zalo-personal --bot <id> --name <name> --user <user-id> [--user <user-id>...] --confirm [--json]")}`,
+    "",
+    "Required flags:",
+    "  --name <name>       New Zalo group name.",
+    "  --user <user-id>    Initial member raw Zalo user id. Repeat for more members.",
+    "  --confirm           Required because this creates a real Zalo group.",
+    "",
+    "Notes:",
+    "  - Use contacts search first when you only know a person's name or phone number.",
+    "  - The current Zalo account becomes a member automatically when Zalo creates the group.",
+    "",
+    "Examples:",
+    `  ${renderCliCommand("contacts search --channel zalo-personal --bot default \"Na\"")}`,
+    `  ${renderCliCommand("groups add --channel zalo-personal --bot default --name \"Gia đình\" --user 8150872152578633027 --user 123456789 --confirm")}`,
+  ].join("\n");
+}
+
+function renderGroupMembersHelp(action?: string) {
+  const usageByAction: Record<string, string> = {
+    list: "groups members list --channel zalo-personal --bot <id> <group-id> [--limit N] [--json]",
+    add: "groups members add --channel zalo-personal --bot <id> <group-id> --user <user-id> [--user <user-id>...] --confirm [--json]",
+    remove: "groups members remove --channel zalo-personal --bot <id> <group-id> --user <user-id> [--user <user-id>...] --confirm [--json]",
+  };
+  const actions = action && usageByAction[action] ? [usageByAction[action]] : Object.values(usageByAction);
+  return [
+    renderCliCommand("groups members"),
+    "",
+    "Usage:",
+    ...actions.map((usage) => `  ${renderCliCommand(usage)}`),
+    "",
+    "Required values:",
+    "  <group-id>          Raw Zalo group id. Use groups list/search to find it.",
+    "  --user <user-id>    Raw Zalo user id for add/remove. Repeat for more users.",
+    "  --confirm           Required for add/remove because they change real membership.",
+    "",
+    "Examples:",
+    `  ${renderCliCommand("groups search --channel zalo-personal --bot default \"Gia đình\"")}`,
+    `  ${renderCliCommand("groups members add --channel zalo-personal --bot default 3374540724734114698 --user 123456789 --confirm")}`,
+    `  ${renderCliCommand("groups members list --channel zalo-personal --bot default 3374540724734114698 --json")}`,
+  ].join("\n");
+}
+
 export async function runGroupsCli(
   args: string[],
   deps: ZaloPersonalCliDependencies = defaultZaloPersonalCliDependencies,
 ) {
-  if (!args[0] || args[0] === "help" || hasFlag(args, "--help")) {
+  if (!args[0] || args[0] === "help") {
+    deps.print(renderGroupsHelp());
+    return;
+  }
+  if (args[0] === "add" && hasFlag(args, "--help")) {
+    deps.print(renderGroupAddHelp());
+    return;
+  }
+  if (args[0] === "members" && (!args[1] || args[1] === "help" || hasFlag(args, "--help"))) {
+    deps.print(renderGroupMembersHelp(args[1] === "help" ? args[2] : args[1]));
+    return;
+  }
+  if (hasFlag(args, "--help")) {
     deps.print(renderGroupsHelp());
     return;
   }

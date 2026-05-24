@@ -186,13 +186,11 @@ clisbot auth add-permission agent-defaults --role member --permission transcript
 - `clisbot message read ...`
 - `clisbot message search ...`
 - `clisbot message poll ...`
-- `clisbot message custom ...`
 
 핵심 규칙:
 
 - `message send`는 `--channel`, `--target`, `--message` 또는 `--body-file` 필요
-- `message custom <subtree...>`는 shared gateway이고, `custom` 뒤 문법은 선택한 channel plugin이 소유
-- provider마다 같은 custom grammar를 강제하지 않으므로 먼저 `clisbot message --help --channel <channel-name>`로 channel-scoped help를 확인
+- `message custom`은 제거되었고, provider-specific command는 명시적인 `channel-native` command를 사용한다
 - Slack thread는 `--thread-id`
 - Telegram topic은 `--topic-id`
 - 기본값은 `--input md`, `--render native`

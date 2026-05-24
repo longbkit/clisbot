@@ -83,7 +83,6 @@ export const zaloBotChannelPlugin: ChannelPlugin = {
   capabilities: {
     surfaceKinds: ["dm"],
     messageActions: ["send"],
-    supportsMessageCustomSubtree: false,
   },
   bootstrapCli: {
     accountFlag: "--zalo-bot-account",

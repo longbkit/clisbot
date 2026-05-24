@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded in part by [Channel-Native Replaces Message Custom](2026-05-24-channel-native-replaces-message-custom.md).
 
 ## Date
 

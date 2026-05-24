@@ -150,7 +150,6 @@ describe("serveMonitor", () => {
       capabilities: {
         surfaceKinds: ["dm", "group", "topic"],
         messageActions: ["send"],
-        supportsMessageCustomSubtree: false,
       },
       isEnabled: () => true,
       listBots: () => [{ botId: "alerts", config: {} }],

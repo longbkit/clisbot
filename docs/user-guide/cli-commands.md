@@ -411,7 +411,6 @@ Important behavior:
 - `clisbot message unpin ...`
 - `clisbot message pins ...`
 - `clisbot message search ...`
-- `clisbot message custom ...`
 
 Quick guide:
 
@@ -421,7 +420,7 @@ Quick guide:
 - use `read` or `search` to inspect message history
 - use `pin`, `unpin`, or `pins` for pinned messages
 - use `poll` to create a poll
-- use `custom` when one channel exposes a public message-domain subtree that does not belong in the shared stable action list yet
+- use `clisbot channel-native ...` for provider-specific commands that do not belong in the shared stable action list
 
 Required vs optional:
 
@@ -436,8 +435,7 @@ Important behavior:
 - `--bot` chooses which provider bot sends or edits the message; if omitted, the provider default bot is used
 - `--account` remains a compatibility alias for `--bot`
 - `clisbot message --help --channel <channel-name>` prints channel-scoped target syntax, render hints, examples, and support boundaries
-- `message custom <subtree...>` is one shared gateway with channel-owned grammar after `custom`
-- `message custom` is intentionally not one provider-neutral mini-language; inspect the selected channel help before using it
+- `message custom` has been removed; use named `channel-native` commands instead of a raw provider subtree
 - shared message actions are capability-gated before provider dispatch, so unsupported channel/action pairs fail fast
 - `--target` is the destination:
   - Slack uses destination ids such as channels, groups, or DM destinations

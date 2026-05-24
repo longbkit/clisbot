@@ -107,7 +107,6 @@ export const telegramChannelPlugin: ChannelPlugin = {
       "unpin",
       "pins",
     ],
-    supportsMessageCustomSubtree: false,
   },
   bootstrapCli: {
     accountFlag: "--telegram-account",

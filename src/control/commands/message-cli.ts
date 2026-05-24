@@ -16,8 +16,6 @@ import { type ChannelPlugin } from "../../channels/integration/channel-plugin.ts
 import type {
   MessageAction,
   MessageChannel,
-  ParsedCustomMessageCommand,
-  ParsedMessageCliCommand,
   ParsedMessageCommand,
 } from "../../channels/message/message-command.ts";
 import {
@@ -147,50 +145,13 @@ function parseMessageChannel(args: string[]): MessageChannel {
   return parseRegisteredChannelOrThrow(parseOptionValue(args, "--channel"));
 }
 
-function stripCustomGatewayArgs(args: string[]) {
-  const stripped: string[] = [];
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--channel" || arg === "--bot" || arg === "--account") {
-      index += 1;
-      continue;
-    }
-    if (arg === "--json") {
-      continue;
-    }
-    stripped.push(arg!);
-  }
-  return stripped;
-}
-
-function parseCustomMessageCommand(args: string[]): ParsedCustomMessageCommand | null {
-  const rest = args.slice(1);
-  const subtreeArgs = stripCustomGatewayArgs(rest);
-  if (
-    subtreeArgs.length === 0 ||
-    subtreeArgs[0] === "--help" ||
-    subtreeArgs[0] === "-h" ||
-    subtreeArgs[0] === "help"
-  ) {
-    return null;
-  }
-
-  return {
-    kind: "custom",
-    channel: parseMessageChannel(rest),
-    account: parseAliasedOptionValue(rest, "--bot", "--account"),
-    json: hasFlag(rest, "--json"),
-    subtreeArgs,
-  };
-}
-
 function parseSharedMessageCommand(args: string[]): ParsedMessageCommand | null {
   const rawAction = args[0];
   if (!rawAction || rawAction === "--help" || rawAction === "-h" || rawAction === "help") {
     return null;
   }
   if (rawAction === "custom") {
-    throw new Error("Internal error: custom commands must be parsed separately");
+    throw new Error("message custom has been removed. Use channel-native for provider-specific commands.");
   }
   const action = rawAction as MessageAction;
   const rest = args.slice(1);
@@ -230,10 +191,7 @@ function parseSharedMessageCommand(args: string[]): ParsedMessageCommand | null 
   };
 }
 
-function parseMessageCommand(args: string[]): ParsedMessageCliCommand | null {
-  if (args[0] === "custom") {
-    return parseCustomMessageCommand(args);
-  }
+function parseMessageCommand(args: string[]): ParsedMessageCommand | null {
   return parseSharedMessageCommand(args);
 }
 
@@ -304,7 +262,6 @@ export function renderMessageHelp(channel?: MessageChannel) {
     `  ${renderCliCommand(`message unpin --channel ${renderChannelNamePlaceholder()} --target <dest> [--message-id <id>] [--bot <id>]`)}`,
     `  ${renderCliCommand(`message pins --channel ${renderChannelNamePlaceholder()} --target <dest> [--bot <id>]`)}`,
     `  ${renderCliCommand(`message search --channel ${renderChannelNamePlaceholder()} --target <dest> --query <text> [--bot <id>] [--limit <n>]`)}`,
-    `  ${renderCliCommand(`message custom <subtree...> --channel ${renderChannelNamePlaceholder()} [--bot <id>] [--json]`)}`,
     "",
     "Send/Edit Content Options:",
     "  --message <text>              Inline message body",
@@ -335,7 +292,7 @@ export function renderMessageHelp(channel?: MessageChannel) {
     "",
     "Capability Rules:",
     "  - shared actions are gated by channel capability truth before provider dispatch",
-    "  - `message custom ...` is a channel-owned public subtree when a plugin exposes one",
+    "  - provider-specific commands belong under `channel-native`, not `message custom`",
     "  - `--account` remains a compatibility alias for `--bot`",
     `  - ${renderSupportedChannelsNote()}`,
     "",
@@ -388,18 +345,6 @@ function assertSharedMessageSurfaceSupport(
   throw new Error(`Channel ${plugin.id} does not support ${surface.surfaceKind} surfaces.`);
 }
 
-function assertCustomMessageSupport(
-  plugin: ChannelPlugin,
-  command: ParsedCustomMessageCommand,
-) {
-  if (plugin.capabilities.supportsMessageCustomSubtree && plugin.runCustomMessageCommand) {
-    return;
-  }
-  throw new Error(
-    `Channel ${command.channel} does not expose a custom message subtree.`,
-  );
-}
-
 export async function runMessageCli(
   args: string[],
   dependencies: MessageCliDependencies = defaultMessageCliDependencies,
@@ -419,20 +364,6 @@ export async function runMessageCli(
   const plugin = dependencies.plugins.find((entry) => entry.id === command.channel);
   if (!plugin) {
     throw new Error(`Unsupported message channel: ${command.channel}`);
-  }
-
-  if (command.kind === "custom") {
-    assertCustomMessageSupport(plugin, command);
-    const loadedConfig = await dependencies.loadConfig(getConfigPath(), {
-      materializeChannels: [command.channel],
-    });
-    const result = await plugin.runCustomMessageCommand!(loadedConfig, command);
-    if (command.json) {
-      dependencies.print(JSON.stringify(result, null, 2));
-      return;
-    }
-    dependencies.print(JSON.stringify(result, null, 2));
-    return;
   }
 
   const resolvedCommand = await resolveCommandMessage(command);

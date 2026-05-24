@@ -192,7 +192,6 @@ export const slackChannelPlugin: ChannelPlugin = {
       "pins",
       "search",
     ],
-    supportsMessageCustomSubtree: false,
   },
   bootstrapCli: {
     accountFlag: "--slack-account",

@@ -214,7 +214,6 @@ export function createDependencies() {
             "pins",
             "search",
           ],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [],
@@ -319,7 +318,6 @@ export function createDependencies() {
             "unpin",
             "pins",
           ],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [],
@@ -441,7 +439,6 @@ export function createDependencies() {
         capabilities: {
           surfaceKinds: ["dm"],
           messageActions: ["send"],
-          supportsMessageCustomSubtree: false,
         },
         isEnabled: () => true,
         listBots: () => [],

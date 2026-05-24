@@ -34,7 +34,7 @@ describe("message cli", () => {
     expect(calls).toHaveLength(0);
     expect(logs[0]).toContain("clisbot message");
     expect(logs[0]).toContain("message send");
-    expect(logs[0]).toContain("message custom <subtree...>");
+    expect(logs[0]).not.toContain("message custom <subtree...>");
     expect(logs[0]).toContain("--body-file");
     expect(logs[0]).toContain("--message-file");
     expect(logs[0]).toContain("--file <path-or-url>");
@@ -411,7 +411,7 @@ describe("message cli", () => {
     expect(calls).toEqual([]);
   });
 
-  test("fails custom gateway early when the channel does not expose one", async () => {
+  test("fails removed custom gateway early", async () => {
     const { deps, calls } = createDependencies();
 
     await expect(
@@ -421,7 +421,7 @@ describe("message cli", () => {
         "--channel",
         "slack",
       ], deps),
-    ).rejects.toThrow("Channel slack does not expose a custom message subtree.");
+    ).rejects.toThrow("message custom has been removed");
     expect(calls).toEqual([]);
   });
 

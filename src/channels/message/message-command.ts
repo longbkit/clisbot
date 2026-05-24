@@ -53,18 +53,6 @@ export type ParsedMessageCommand = {
   renderMode: MessageRenderMode;
 };
 
-export type ParsedCustomMessageCommand = {
-  kind: "custom";
-  channel: MessageChannel;
-  account?: string;
-  json: boolean;
-  subtreeArgs: string[];
-};
-
-export type ParsedMessageCliCommand =
-  | ParsedMessageCommand
-  | ParsedCustomMessageCommand;
-
 export type ResolvedMessageSurface<TProvider = any> = {
   channel: MessageChannel;
   rawTarget: string;
