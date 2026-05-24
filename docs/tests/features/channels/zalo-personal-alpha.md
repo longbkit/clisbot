@@ -132,13 +132,22 @@ Current live validation:
 - send one direct native video with JPEG/RGB thumbnail: passed on
   `2026-05-23`; recipient screenshot confirmed thumbnail preview rendered before
   playback
+- receive one image: passed on `2026-05-24`; live two-image validation stored
+  both files in the routed workspace `.attachments` path and passed each image
+  to the agent with its caption. zca-js emitted the two-image send as two
+  message events, one per image. A follow-up `old_messages` probe found
+  album metadata inside `content.params` JSON:
+  `group_layout_id`, `id_in_group`, and `total_item_in_group`. clisbot now
+  buffers matching image events and presents them to the agent as one message.
 - repeated `--file` is intentionally rejected until multi-file semantics are designed
+- per-image captions currently require one image send per caption; Zalo may
+  visually group adjacent sends as an album, but shared `message send` does not
+  expose an atomic multi-file send yet
 
 Before promoting beyond alpha, validate:
 
 - send many images from local files
 - send many images from URLs
-- receive one image
 - receive many images
 - receive voice or audio
 - receive one or many generic attachments

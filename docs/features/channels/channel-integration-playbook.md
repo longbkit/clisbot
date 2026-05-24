@@ -38,6 +38,10 @@ At minimum, answer these questions:
 - what are the real one-person and many-people surface kinds
 - whether the provider supports first-class sub-surfaces such as topics, threads, or replies
 - which trigger shapes are truthful: DM, mention, reply-to-bot, slash command, webhook event, socket event, polling update
+- when a user sends multiple images at once, whether the provider delivers one
+  event or many events, whether each image can have its own caption, whether a
+  shared caption exists, and which metadata can safely identify the same
+  provider-side album/group
 - whether outbound rendering is plain text only, Markdown-compatible, or supports a separate native rich-text payload
 - whether Markdown can be converted into that native rich-text payload truthfully, including limits, unsupported syntax, and fallback behavior
 - whether outbound media accepts local upload, remote URL only, or both, checked separately for generic file, image, video, voice note, and audio
@@ -95,6 +99,19 @@ support image URLs but not local uploads, generic files but not voice notes, or
 one file per message but not multi-file albums. Document each difference before
 exposing shared `message send --file` behavior or prompting agents to use it.
 
+Inbound multi-image behavior checklist:
+
+| Question | Required answer |
+| --- | --- |
+| Provider event shape | One event with many files, or one event per image. |
+| Group key | Stable album/group id, same timestamp only, adjacent-event heuristic only, or none. |
+| Ordering metadata | Explicit index such as `id_in_group`, provider order only, timestamp order, or none. |
+| Count metadata | Explicit total item count, unknown count requiring timeout, or not applicable. |
+| Caption model | One shared caption, per-image captions, both, or no captions. |
+| clisbot interaction shape | One agent interaction with many attachment paths, or one interaction per provider event. |
+| Timeout behavior | How long to wait for remaining album items before dispatching partial input. |
+| Regression coverage | Unit coverage for grouping, ordering, captions, timeout/partial dispatch, and same-surface ordering. |
+
 ## Delivery Workflow
 
 Use this order unless the provider forces a different dependency:
@@ -119,6 +136,11 @@ Use this order unless the provider forces a different dependency:
 ### 3. Land inbound runtime truth
 
 - provider service, event parsing, dedupe, and startup validation
+- ordered ingress must mark an event accepted when the prompt has been
+  accepted, enqueued, or steered, not when the final agent run settles. Use
+  `chainOrderedIngressAccepted()` with `processChannelInteraction` so
+  `additionalMessageMode=steer|queue` can apply to later messages on the same
+  surface while a run is still active.
 - route resolution, admission, follow-up, and session routing
 - DM admission with the effective sender-specific route, not only wildcard admission
 - attachment intake, workspace file staging, and recent-message context

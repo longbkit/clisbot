@@ -11,8 +11,10 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/clisbot"><img src="https://img.shields.io/npm/v/clisbot?label=npm&color=cb3837" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/clisbot"><img src="https://img.shields.io/npm/dm/clisbot?label=downloads&color=22c55e" alt="npm downloads per month" /></a>
+  <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-d4a017" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/CLI-Codex%20%7C%20Claude%20%7C%20Gemini-111827" alt="supported cli tools" />
-  <img src="https://img.shields.io/badge/Channels-Slack%20%7C%20Telegram-0a66c2" alt="supported channels" />
+  <img src="https://img.shields.io/badge/Channels-Slack%20%7C%20Telegram%20%7C%20Zalo-0a66c2" alt="supported channels" />
   <img src="https://img.shields.io/badge/Runtime-tmux%20backed-16a34a" alt="tmux backed runtime" />
   <img src="https://img.shields.io/badge/Workflow-AI--native-f59e0b" alt="AI-native workflow" />
 </p>
@@ -21,138 +23,73 @@
   Theo dõi cập nhật sản phẩm tại <a href="https://x.com/clisbot">x.com/clisbot</a>.
 </p>
 
-# clisbot - Biến coding CLI yêu thích của bạn thành trợ lý cá nhân kiểu agent, trợ lý công việc, và bạn đồng hành coding khi đang di chuyển
-Bạn muốn dùng OpenClaw nhưng đang vướng vì:
+# clisbot - Biến coding CLI yêu thích của bạn thành trợ lý cá nhân, trợ lý công việc, và bạn đồng hành coding khi đang di chuyển
 
-- chi phí API quá cao nên cuối cùng lại phải đi tìm các đường vòng qua LLM proxy
-- phải tách OpenClaw cho việc hằng ngày, còn Claude / Codex / Gemini mới dùng cho coding thật
-- muốn code và làm việc cả khi đang ở ngoài
+Muốn dùng OpenClaw / Hermes Agent nhưng đang vướng vì:
 
-`clisbot` được làm ra cho đúng bài toán đó.
+- chi phí API quá cao nên cuối cùng phải tìm đường vòng qua LLM proxy
+- phải dùng OpenClaw / Hermes Agent cho việc hằng ngày, rồi quay lại Claude / Codex / Gemini cho coding thật
+- muốn code và làm việc ngay cả khi đang ở ngoài
 
-`clisbot` biến các frontier agent CLI như Claude Code, Codex, và Gemini CLI thành bot chạy bền trên Slack và Telegram. Mỗi agent chạy trong một tmux session riêng, giữ workspace thật, và có thể đóng vai bot coding, trợ lý công việc hằng ngày, hoặc trợ lý cho team với SOUL, IDENTITY, và MEMORY.
+`clisbot` là một cách thực dụng để giải bài toán đó.
 
-Đây không chỉ là một cầu nối tmux rồi dán chat lên trên. `clisbot` coi Slack và Telegram là các ngữ cảnh chat thật, có routing, trạng thái hội thoại bền, pairing, follow-up control, gửi nhận file, và khả năng giữ các coding agent frontier ngay trong những công cụ và kênh giao tiếp nơi team đang làm việc thật.
+`clisbot` biến các native frontier agent CLI như Claude Code, Codex, và Gemini CLI thành bot chat-native chạy bền qua nhiều kênh. Các kênh hiện tại gồm Slack, Telegram, Zalo Bot, và Zalo Personal, và sẽ còn thêm nữa. Mỗi agent chạy trong tmux session riêng, giữ workspace thật, và có thể làm bot coding, trợ lý công việc hằng ngày, hoặc trợ lý team với SOUL, IDENTITY, và MEMORY.
 
-`clisbot` cũng được định hướng trở thành một lớp runtime agent dùng lại được, có thể nâng đỡ nhiều CLI, nhiều kênh giao tiếp, và nhiều kiểu workflow trên cùng một session agentic AI mạnh mẽ.
+Đây không chỉ là một cầu nối tmux rồi dán chat lên trên. `clisbot` coi các nền tảng chat là ngữ cảnh làm việc thật, gồm Slack, Telegram, Zalo Bot, và Zalo Personal hiện nay, với routing, trạng thái hội thoại bền, pairing, follow-up control, gửi nhận file, và khả năng đưa các frontier coding agent vào đúng công cụ, đúng kênh giao tiếp nơi team đang làm việc.
 
-## Bắt đầu theo mục tiêu
+`clisbot` cũng được định hướng thành một lớp agent runtime dùng lại được, có thể hỗ trợ nhiều CLI, nhiều kênh, và nhiều kiểu workflow trên cùng một durable agent session.
 
-### Tôi muốn có một bot coding cá nhân trong Telegram hoặc Slack
-
-- bắt đầu từ [Khởi động nhanh](#quick-start)
-- phù hợp nhất khi bạn muốn dùng Codex, Claude, hoặc Gemini ngay từ chat nhưng không phải bỏ workspace thật
-- giá trị đáng chú ý của release hiện tại: đường điều khiển theo kiểu AI-native mạnh hơn nhiều, nơi bot ngày càng có thể tự thiết lập `/queue`, loop, schedule, và các việc lặp lại khác từ chat bình thường thay vì bắt bạn phải nhớ cú pháp lệnh ngay từ đầu
-
-### Tôi muốn có một bot dùng chung cho team
-
-- bắt đầu từ [Khởi động nhanh](#quick-start), sau đó đọc [Mô hình truy cập ngữ cảnh chat](#surface-access-model)
-- phù hợp nhất khi bạn cần một bot sống trong Slack channel thật, Telegram group thật, hoặc Telegram topic thật, với route và quyền người gửi được kiểm soát rõ ràng
-- giá trị đáng chú ý của release hiện tại: chính sách chia sẻ ngữ cảnh chat an toàn hơn, cô lập topic hoặc thread chặt hơn, kiểm soát người gửi theo group tốt hơn, và permission boundary đủ để một bot sống trong group của team mà không mở cho tất cả mọi người trong đó
-
-### Tôi cần quyền điều hành và debug
-
-- bắt đầu từ [Các lệnh CLI thường dùng](#common-cli-commands)
-- các công cụ hữu ích nhất: `clisbot status`, `clisbot logs`, `clisbot watch --latest`, `clisbot inspect --latest`, và `clisbot queues`
-- giá trị đáng chú ý của release hiện tại: `sessionId` đúng sự thật hơn, runner inventory gọn hơn, và hành vi restart bớt gây hiểu nhầm trong lúc update
-
-### Tôi chỉ muốn biết gần đây có gì mới
-
-- bắt đầu từ [Điểm nổi bật của các bản phát hành gần đây](#recent-release-highlights)
-- sau đó đọc [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md) hoặc [v0.1.52 Release Guide](../../../docs/updates/releases/v0.1.52-release-guide.md)
-
+<a id="why-i-built-this"></a>
 ## Vì sao tôi làm clisbot
 
-Tôi là Long Luong (Long), Co-founder & CTO của Vexere, nền tảng đặt vé đi lại số 1 Việt Nam cho xe khách, tàu hỏa, máy bay và thuê xe, nơi chúng tôi cũng xây cả hạ tầng SaaS và phân phối kho vé cho các nhà vận hành vận tải. Khi mở rộng một công ty 300 người với hơn 100 thành viên trong khối Engineering, Product, và Design, tôi đã tìm cách thực tế nhất để đưa AI-native workflow vào trong tổ chức.
+Tôi là Long Luong (Long), Co-founder & CTO của Vexere, nền tảng đặt vé vận tải số 1 Việt Nam, nơi chúng tôi cũng xây SaaS và hạ tầng phân phối tồn kho cho các nhà vận hành vận tải. Khi mở rộng một công ty 300 người với đội Engineering, Product, và Design hơn 100 người, tôi đã tìm cách thực tế nhất để đưa AI-native workflow vào tổ chức.
 
-Thách thức không nằm ở việc AI có hữu ích hay không. Nó nằm ở cách làm sao để AI chạy được ở quy mô enterprise mà không tạo ra một stack bị phân mảnh, đắt đỏ, hoặc khó quản trị. Trên thực tế, điều đó có nghĩa là phải giải được nhiều bài toán khó cùng lúc: kiểm soát chi phí, giữ workflow đúng sự thật, giúp team dễ tiếp cận, đảm bảo governance, và đưa frontier AI vào đúng những công cụ và ngữ cảnh chat nơi công việc đang diễn ra.
+Thách thức không phải là AI có hữu ích hay không. Vấn đề là làm sao để AI chạy được ở quy mô enterprise mà không tạo ra một stack phân mảnh, đắt đỏ, hoặc khó quản trị. Trên thực tế, điều đó nghĩa là phải giải cùng lúc nhiều bài toán: kiểm soát chi phí, workflow bám sát cách team làm việc thật, team dễ tiếp cận, governance, và đưa frontier AI vào đúng công cụ, đúng kênh nơi công việc đang diễn ra.
 
-`clisbot` là hướng tiếp cận tôi chốt sử dụng ở thời điểm hiện tại. Thay vì xây thêm một lớp AI tách biệt nữa, nó biến những coding CLI mà chúng ta đã tin dùng thành các agentic AI mạnh mẽ, cho trải nghiệm tối ưu ở kênh chat, có thể làm việc qua Slack, Telegram, và workflow thật của team.
+`clisbot` là hướng tiếp cận tôi chọn. Thay vì xây thêm một lớp AI cô lập, nó biến các coding CLI mà chúng ta đã tin dùng thành agent bền, chat-native, có thể làm việc qua Slack, Telegram, các kênh Zalo, và workflow thật của team.
 
-## Vì sao là clisbot
-
-- Một stack frontier-agent duy nhất cho cả việc hằng ngày lẫn coding thật. Bạn không cần một sản phẩm cho trợ lý và một sản phẩm khác cho công việc engineering thật.
-- Tận dụng lại các subscription CLI bạn đã trả tiền, như Claude Code, Codex, và Gemini CLI, thay vì ép bạn qua một stack nặng chi phí API riêng.
-- Học và tiếp thu hai điểm mạnh lớn nhất khiến OpenClaw được yêu thích: memory và tích hợp kênh giao tiếp theo kiểu native với năng lực hội thoại và trình bày đẹp, dễ đọc theo từng nền tảng.
-- Không chỉ là cầu nối tmux. Slack và Telegram được đối xử như các ngữ cảnh chat thật, có routing, continuity theo thread hoặc topic, pairing, follow-up control, và tương tác aware về attachment thay vì chỉ là text passthrough, để bạn vẫn làm việc được từ laptop hoặc khi đang di chuyển mà không phải bỏ workspace coding thật.
-- Team-first ngay từ thiết kế, với bootstrap context kiểu `AGENTS`, `USER`, và `MEMORY` phản ánh thực tế làm việc nhóm thay vì chỉ nhắm vào trợ lý cá nhân cho một người.
-- Kiểm soát quyền trên ngữ cảnh chat chia sẻ là tính năng hạng nhất: bot có thể ở trong group của team nhưng chỉ trả lời đúng những người bạn cho phép ở đó, còn các hành động điều khiển nhạy cảm vẫn nằm sau vai trò và quyền rõ ràng.
-- Hữu ích cho coding, vận hành, teamwork, và cả công việc trợ lý nói chung, với các chat control nhanh như `!<command>`, `/bash <command>`, `/queue`, `/loop`, `/streaming`, và `/mention`.
-- Mới trong `v0.1.50`: trải nghiệm điều khiển AI-native tốt hơn rõ rệt. Bạn ngày càng có thể nhờ bot trong chat bình thường để tự update và giải thích có gì thay đổi, hỗ trợ onboarding, thêm hoặc cấu hình bot và agent, hoặc tạo lịch lặp và loop cho bạn thay vì chỉ dựa vào slash command.
-
-## Phù hợp nhất với ai
-
-- Bất kỳ ai muốn có một trợ lý cá nhân có độ chủ động cao, mang phong cách OpenClaw với memory, bối cảnh workspace, và mô hình vận hành theo skill, làm được nhiều hơn hẳn một lớp chat wrapper mỏng.
-- Những người xây dựng một mình muốn có một trợ lý coding thật trong Telegram hoặc Slack, chạy bằng Codex, Claude, hoặc Gemini, mà không cần xoay toàn bộ workflow của mình sang một web product mới.
-- Team lead muốn có một bot dùng chung với an toàn rõ ràng theo group hoặc topic, bối cảnh bền, và workflow chat aware về attachment.
-
-<a id="surface-access-model"></a>
-
-## Mô hình truy cập ngữ cảnh chat
-
-Cách hiểu quan trọng nhất của config hiện tại là:
-
-- `app`
-- `bots`
-- `agents`
-
-Bên trong mỗi bot:
-
-- `directMessages` là map ngữ cảnh chat một-người
-- `groups` là map ngữ cảnh chat nhiều-người
-- key được lưu dùng raw provider-local id cộng với `*`
-
-Ví dụ:
-
-- Slack shared context: `groups["C1234567890"]`
-- Telegram group: `groups["-1001234567890"]`
-- Telegram topic: `groups["-1001234567890"].topics["42"]`
-- DM wildcard default: `directMessages["*"]`
-
-Operator CLI id vẫn dùng dạng có prefix:
-
-- `dm:<id>`
-- `dm:*`
-- `group:<id>`
-- `group:*`
-- `topic:<chatId>:<topicId>`
-
-Các invariant hiện tại:
-
-- Slack `channel:<id>` chỉ là input tương thích ngược, không phải tên gọi chuẩn cho operator
-- config được lưu dưới một bot chỉ dùng raw id cộng với `*` bên trong `directMessages` và `groups`
-- `group:*` là node policy mặc định cho ngữ cảnh chat nhiều-người của một bot và nên được cập nhật hoặc tắt, không nên xóa
-- `disabled` nghĩa là im lặng với mọi người trong ngữ cảnh chat đó, kể cả owner/admin và cả pairing guidance
-- owner/admin không bypass admission của `groupPolicy`/`channelPolicy`; sau khi group được admit và enable, họ mới bypass sender allowlist, còn `blockUsers` vẫn thắng
-- deny message cố ý dùng một từ chung hướng tới con người là `group` cho mọi ngữ cảnh chat nhiều-người
-
-## Tương thích CLI hiện tại
-
-`clisbot` hiện hoạt động tốt với Codex, Claude, và Gemini.
-
-| CLI      | Độ ổn định hiện tại | Nhận xét ngắn |
-| --- | --- | --- |
-| `codex`  | Tốt nhất hiện nay | Lựa chọn mặc định mạnh nhất cho routed coding work. |
-| `claude` | Dùng được nhưng có lưu ý | Claude có thể tự hiện plan-approval và auto-mode riêng ngay cả khi đã khởi động với bypass-permissions. |
-| `gemini` | Tương thích đầy đủ | Gemini được hỗ trợ như một runner hạng nhất cho các workflow Slack và Telegram có route. |
-
-Ghi chú theo từng CLI cho operator:
-
-- [Hướng dẫn Codex CLI](../vi/user-guide/codex-cli.md)
-- [Hướng dẫn Claude CLI](../vi/user-guide/claude-cli.md)
-- [Hướng dẫn Gemini CLI](../vi/user-guide/gemini-cli.md)
+Nếu `clisbot` giúp workflow của bạn, một GitHub star là cách đơn giản để tôi biết nó hữu ích và giúp nhiều người khác tìm thấy nó hơn.
 
 <a id="quick-start"></a>
-
 ## Khởi động nhanh
+
+### Thiết lập với AI hỗ trợ
+
+Nếu bạn đã dùng Codex, Claude Code, hoặc Gemini CLI, hãy mở repo này trong CLI đó và dán prompt ngắn này trước:
+
+```text
+Giúp tôi làm rõ nhu cầu và thiết lập clisbot từ repo GitHub này: https://github.com/longbkit/clisbot
+```
+
+Nếu đã biết rõ nhu cầu, hãy dùng prompt cụ thể hơn và điền các chỗ trống:
+
+```text
+Giúp tôi làm rõ nhu cầu và thiết lập clisbot từ repo GitHub này: https://github.com/longbkit/clisbot
+
+Tôi muốn:
+- target channel / kênh muốn dùng: <Slack|Telegram|Zalo Bot|Zalo Personal>
+- coding CLI tool muốn dùng: <Codex|Claude Code|Gemini CLI>
+- usage shape / cách dùng: <personal assistant|team assistant>
+
+Hãy hỏi những thông tin còn thiếu, hướng dẫn tôi chuẩn bị token/login cần thiết, cài đặt clisbot, cấu hình an toàn, rồi hướng dẫn tôi các bước tiếp theo.
+```
+
+Dành cho AI agent: dùng hướng dẫn dưới đây để giúp người dùng cài, thiết lập, và onboard với `clisbot` ít ma sát nhất có thể.
+
+1. Chỉ hỏi số câu làm rõ tối thiểu. Đặc biệt cần làm rõ target channel, coding CLI tool, và usage shape.
+2. Mặc định nên persist credentials sau lần test đầu tiên thành công, để các lần restart sau chỉ cần `clisbot start` mà không nhập lại token.
+3. Đọc `README.md` và `docs/user-guide/README.md`, sau đó hướng dẫn luồng setup ngắn và an toàn nhất. Khi môi trường cho phép, chạy đúng lệnh `clisbot` và kiểm tra bằng status/logs.
+4. Nếu một bước phải làm thủ công, như tạo bot, setup Slack app, hoặc login Zalo Personal, giải thích chính xác người dùng cần làm gì và đợi họ trước khi tiếp tục.
+5. Nếu giới hạn kỹ thuật ngăn không chạy được lệnh, đưa đúng command để người dùng chạy. Nếu một bug chưa xử lý chặn setup, giúp người dùng tạo GitHub issue hoặc gửi feedback qua https://docs.google.com/forms/d/e/1FAIpQLSd7L7mHOo0ea8YXFI4tGnyDIj94ESn4hbbDa5YTbcEKTVOKTA/viewform.
 
 Hỗ trợ nền tảng:
 
-- Linux và macOS là các môi trường host được hỗ trợ ở thời điểm hiện tại.
-- Windows native chưa được hỗ trợ vì `clisbot` hiện phụ thuộc vào `tmux` và các runtime flow dựa trên Bash.
-- Nếu dùng Windows, hãy chạy `clisbot` trong WSL2.
+- Linux và macOS là môi trường host được hỗ trợ hiện tại.
+- Nếu dùng Windows, hãy chạy `clisbot` trong WSL2 vì native Windows chưa được hỗ trợ; hiện `clisbot` phụ thuộc vào `tmux` và luồng runtime dựa trên Bash.
 
-Hầu hết mọi người nên bắt đầu ở đây:
+### Thiết lập thủ công
+
+Hầu hết người dùng nên bắt đầu ở đây:
 
 ```bash
 npm install -g clisbot
@@ -163,132 +100,465 @@ clisbot start \
   --persist
 ```
 
-Nếu muốn thử trước mà chưa persist token ngay, chỉ cần bỏ `--persist`.
-Các lệnh cứu hộ hằng ngày là `clisbot stop`, `clisbot restart`,
-`clisbot status`, và `clisbot logs`.
+Nếu muốn thử trước mà chưa persist token, bỏ `--persist`. Các lệnh cứu hộ hằng ngày là `clisbot stop`, `clisbot restart`, `clisbot status`, và `clisbot logs`.
 
 Các bước tiếp theo:
 
-- Vì lý do bảo mật, DM mặc định đi theo pairing.
-- `clisbot` cũng có smart autopairing để giảm friction khi chạy lần đầu. Nếu bạn nhắn DM cho bot trong 30 phút đầu, thường có thể claim vai trò owner ngay và bắt đầu dùng mà không cần qua một vòng pairing riêng.
-- Mới từ `v0.1.50`: trải nghiệm operator theo kiểu AI-native mạnh hơn nhiều. Bạn ngày càng có thể nhờ bot qua chat để giải thích cách dùng, tự update và tóm tắt có gì mới, hỗ trợ onboarding, tạo hoặc thêm bot hay agent mới, hoặc dựng loop và schedule cho công việc lặp lại thay vì chỉ dựa vào slash command.
-- Các config cũ trước `0.1.50` sẽ được update trực tiếp lên `0.1.50` tự động ngay lần chạy đầu. clisbot ghi backup trước vào `~/.clisbot/backups/`, rồi rewrite config sang shape hiện tại.
-- Slack channel chia sẻ, Slack group, Telegram group, và Telegram topic là một lớp gate riêng: người dùng bình thường cần route rõ ràng như `group:<id>` hoặc `topic:<chatId>:<topicId>` thì bot mới nói chuyện ở đó. Legacy Slack `channel:<id>` vẫn hoạt động để tương thích.
-- Sau khi một ngữ cảnh chat dùng chung được admit, sender control theo từng ngữ cảnh chat đến từ shared rule mặc định `groups["*"]` của bot cộng với bất kỳ `allowUsers` hoặc `blockUsers` local nào theo route.
-- Với permission model đó, bot có thể được thêm vào group của team nhưng vẫn chỉ được phép trả lời một vài người trong group đó.
-- Nếu effective shared policy là `disabled`, bot sẽ im lặng ở đó với mọi người, kể cả owner/admin.
-- Nếu effective shared policy là `allowlist` và một sender không được cho phép, bot sẽ chặn trước khi vào runner:
-  - `You are not allowed to use this bot in this group. Ask a bot owner or admin to add you to \`allowUsers\` for this surface.`
-- Để chat với bot trong group:
-  - telegram: thêm bot vào group, rồi dùng `/start` ở đó. Bot sẽ hướng bạn tới route cần thêm. Bạn có thể chạy lệnh đó trực tiếp hoặc copy nó vào một DM với bot và nhờ bot tự làm setup cho mình nếu đã có quyền.
-  - slack: flow tương tự, nhưng slash command native của Slack hơi khó chịu. Dùng dấu cách ở đầu như ` /start`, hoặc alias `\start`. Cách workaround này cũng áp dụng cho các slash command khác như ` /streaming on` hoặc `\mention`.
-  - group conversation mặc định yêu cầu mention để tránh lạm dụng, nhưng smart follow-up sẽ giữ cửa mở trong một khoảng ngắn để bạn không phải tag bot lại ở mọi reply. Bạn cũng có thể nhờ bot đổi mode đó cho mình.
-  - Nếu muốn mention behavior chặt hơn, dùng `/mention` cho cuộc hội thoại hiện tại, `/mention channel` cho mặc định của channel hoặc group hiện tại, hoặc `/mention all` cho mặc định hiện tại của bot.
-  - Với tác vụ dài như coding, hãy bật streaming bằng `/streaming on` và kiểm tra bằng `/streaming status`. Trong Slack, dùng dấu cách đầu dòng như ` /streaming on` hoặc alias `\streaming on`.
-- Nếu muốn thêm owner hoặc app admin, hãy grant rõ principal đó với prefix nền tảng cộng user id native của kênh, ví dụ `clisbot auth add-user app --role owner --user telegram:1276408333` hoặc `clisbot auth add-user app --role admin --user slack:U123ABC456`.
-- `clisbot auth --help` hiện đã bao quát role scope, permission set, và add/remove flow cho user và permission.
-- Runtime reality hiện tại cùng với các gap còn lại của target model về app-level auth và owner-claim được mô tả trong [Quyền truy cập và vai trò](../vi/user-guide/auth-and-roles.md).
+- Vì lý do bảo mật, DM mặc định dùng pairing.
+- `clisbot` cũng có luồng autopairing thông minh để giảm ma sát lần đầu. Nếu bạn gửi DM cho bot trong 30 phút đầu, thường bạn có thể claim owner role ngay và bắt đầu dùng mà không cần pairing riêng.
 
-Bạn cần tài liệu setup từng bước thay vì đường ngắn nhất?
+Cần tài liệu setup từng bước thay vì luồng ngắn nhất?
 
-- Telegram: [Thiết lập Telegram bot](../vi/user-guide/telegram-setup.md)
-- Slack: [Thiết lập Slack app](../vi/user-guide/slack-setup.md)
-- Lịch sử phát hành: [CHANGELOG.md](../../../CHANGELOG.md), [release notes](../vi/releases/README.md), [update guide](../vi/updates/update-guide.md), [release guides](../vi/updates/README.md), và [migration index](../../../docs/migrations/index.md)
+- Telegram: [Telegram Bot Setup](../vi/user-guide/telegram-setup.md)
+- Slack: [Slack App Setup](../vi/user-guide/slack-setup.md)
+- Zalo Bot: [Zalo Bot Setup](../vi/user-guide/zalo-bot-setup.md)
+- Zalo Personal: [Zalo Personal](../vi/user-guide/zalo-personal.md)
+- Lịch sử release: [CHANGELOG.md](../../../CHANGELOG.md), [release notes](../../../docs/releases/README.md), [update guide](../../../docs/updates/update-guide.md), [release guides](../../../docs/updates/README.md), và [migration index](../../../docs/migrations/index.md)
 - Slack app manifest template: [app-manifest.json](../../../templates/slack/default/app-manifest.json)
 - Slack app manifest guide: [app-manifest-guide.md](../../../templates/slack/default/app-manifest-guide.md)
 
-Sau đó chuyện gì xảy ra:
+Sau đó điều gì xảy ra:
 
 - `--bot-type personal` tạo một assistant cho một người
-- `--bot-type team` tạo một assistant dùng chung cho team, channel, hoặc workflow trong group
-- literal token input chỉ nằm trong bộ nhớ trừ khi bạn cũng truyền `--persist`
-- `--persist` đẩy token vào canonical credential file để lần `clisbot start` sau có thể dùng lại mà không phải nhập lại
-- fresh bootstrap chỉ enable đúng những channel bạn chỉ định rõ
-- sau lần đầu đã persist, các lần restart sau chỉ cần `clisbot start` bình thường
+- `--bot-type team` tạo một assistant dùng chung cho team, channel, hoặc group workflow
+- token literal chỉ nằm trong memory trừ khi bạn truyền thêm `--persist`
+- `--persist` đưa token vào credential file chuẩn để lần `clisbot start` sau có thể dùng lại
+- bootstrap mới chỉ bật những channel bạn nêu rõ
+- sau lần chạy đầu đã persist, các lần restart sau có thể dùng `clisbot start`
 
-<a id="recent-release-highlights"></a>
+<a id="page-index"></a>
+## Mục lục trang
 
-## Điểm nổi bật của các bản phát hành gần đây
+- [Bắt đầu theo nhu cầu](#start-by-need)
+- [Kênh được hỗ trợ](#supported-channels)
+- [Dành cho ai](#who-it-is-for)
+- [clisbot phù hợp thế nào](#how-clisbot-fits)
+- [Bản đồ use case](#use-case-map)
+- [FAQ thiết lập đầu tiên](#first-setup-faq)
+- [FAQ routing và access](#routing-and-access-faq)
+- [Trải nghiệm vận hành chat-native](#chat-native-operator-experience)
+- [FAQ runtime và workflow](#runtime-and-workflow-faq)
+- [Troubleshooting theo triệu chứng](#troubleshooting-by-symptom)
+- [Troubleshooting playbook](#troubleshooting-playbooks)
+- [Bảng lệnh nhanh](#command-cheat-sheet)
+- [Tài liệu liên quan](#related-docs)
 
-- `v0.1.50`: trải nghiệm operator theo kiểu AI-native mạnh hơn nhiều, nơi bạn ngày càng có thể nói chuyện với bot để bot tự quản chính nó; cộng với bot cá nhân và bot team an toàn hơn trong Slack group và Telegram group thật, update trực tiếp tự động từ bản cài cũ, durable queue control, session continuity truth rõ hơn, scheduled loop ổn định hơn, trust/restart chắc hơn, và cô lập streaming/session chặt hơn.
-- `v0.1.43`: runtime recovery bền hơn, routed follow-up control rõ hơn, tmux prompt submission check đúng sự thật hơn, queued-start notification tốt hơn, và hành vi attachment trong Slack thread an toàn hơn.
+<a id="start-by-need"></a>
+## Bắt đầu theo nhu cầu
 
-`v0.1.50` thực tế có ý nghĩa gì nhất với bạn:
+| Nhu cầu | Luồng bắt đầu tốt nhất | Vì sao phù hợp | Đọc tiếp |
+| --- | --- | --- | --- |
+| Assistant coding cá nhân trong chat | Telegram DM + `codex` | Ít ma sát setup, routing cho coding mạnh, workspace bền. | [Telegram Bot Setup](../vi/user-guide/telegram-setup.md), [Codex CLI Guide](../../../docs/user-guide/codex-cli.md) |
+| Assistant team trong phòng chung | Slack channel hoặc Telegram group/topic + `codex` | Route rõ, mặc định cần mention, và sender policy giúp dùng chung an toàn hơn. | [Slack App Setup](../vi/user-guide/slack-setup.md), [Routes](../../../docs/user-guide/channels.md) |
+| Claude Code từ chat | Bất kỳ channel đã route nào + `claude` | Giữ được command và skill native của Claude từ chat. | [Claude CLI Guide](../../../docs/user-guide/claude-cli.md), [Native CLI Commands](../../../docs/user-guide/native-cli-commands.md) |
+| Assistant kiểu OpenClaw với memory local | Personal hoặc team bot + workspace bootstrap | `AGENTS.md`, `USER.md`, `MEMORY.md`, pairing, routes, và UX chat-native rất hợp với thói quen OpenClaw. | [User Guide](../../../docs/user-guide/README.md), [Authorization And Roles](../../../docs/user-guide/auth-and-roles.md) |
+| Background workflow kiểu Hermes agent | Đặt lịch review các task lặp lại hoặc từng gây khó để tạo và cải thiện skill. | Một kênh chat có thể biến việc khó lặp lại thành skill, review loop, và brief định kỳ. | [Slash Commands](../../../docs/user-guide/slash-commands.md), [Runtime Operations](../../../docs/user-guide/runtime-operations.md) |
+| Cứu hộ và kiểm tra operator | `clisbot status`, `logs`, `watch`, `runner inspect` | Xem channel health, runtime pid, active runs, và runner pane live. | [Runtime Operations](../../../docs/user-guide/runtime-operations.md), [CLI Commands](../../../docs/user-guide/cli-commands.md) |
+| Tự động hóa Zalo | Zalo Bot hoặc Zalo Personal | Zalo Bot hợp official DM; Zalo Personal hỗ trợ DM/group qua tài khoản cá nhân local và im lặng cho tới khi user/group được allowlist. | [Zalo Bot Setup](../vi/user-guide/zalo-bot-setup.md), [Zalo Personal](../vi/user-guide/zalo-personal.md) |
 
-- Điểm nhấn lớn nhất là AI-native control: nhờ bot trong chat để queue việc, lên lịch các brief lặp lại, hỗ trợ update chính nó, giải thích thay đổi của release, hoặc dẫn bạn qua setup và routing thay vì việc gì cũng phải rơi xuống shell.
-- người dùng cá nhân: ít lỗi mong manh hơn trong các phiên chạy dài, `/queue` tốt hơn, media handling trên Telegram tốt hơn
-- owner của shared bot: route safety rõ hơn, dễ upgrade trực tiếp từ bản cũ hơn, và mở ra nhiều use case thú vị hơn khi một bot sống trong group nhưng chỉ trả lời đúng người được chọn
-- operator: queue visibility tốt hơn, session continuity truth tốt hơn, hành vi restart bớt gây hiểu nhầm trong khi update, cộng với các shortcut `watch` và `inspect` nhanh hơn khi có sự cố
+<a id="supported-channels"></a>
+## Kênh được hỗ trợ
 
-Full release notes còn có nhiều sửa lỗi và cải tiến operator hữu ích khác, bao gồm an toàn khi update config, CLI help, setup docs, runner debugging, route policy behavior, các chỗ polish theo từng channel, và hướng workflow AI-native rộng hơn đứng sau bản phát hành này.
+Tài liệu hướng dẫn theo từng channel:
 
-Đọc đầy đủ ở đây:
+- [Slack App Setup](../vi/user-guide/slack-setup.md)
+- [Telegram Bot Setup](../vi/user-guide/telegram-setup.md)
+- [Zalo Bot Setup](../vi/user-guide/zalo-bot-setup.md)
+- [Zalo Personal](../vi/user-guide/zalo-personal.md)
+
+| Kênh | Phù hợp nhất | Ngữ cảnh hỗ trợ | Dạng routing | Trạng thái |
+| --- | --- | --- | --- | --- |
+| Slack | Team channel, private group, workflow trợ lý công việc. | DM, public/private channel, thread continuity. | `dm:<userId>`, `group:<channelId>`, `group:*` | Channel chính ổn định |
+| Telegram | Bot cá nhân, coding mobile, group, workflow team tách theo topic. | DM, group, forum topic. | `dm:<userId>`, `group:<chatId>`, `topic:<chatId>:<topicId>` | Channel chính ổn định |
+| Zalo Bot | Official Zalo bot DM và thử nghiệm thị trường Việt Nam. | Hiện thiên về DM. | `dm:<user-id>`, `dm:*` | Alpha; polling-first |
+| Zalo Personal | Tự động hóa tài khoản cá nhân local. | DM và group, mặc định im lặng cho tới khi user/group được allowlist. | `dm:<user-id>`, `dm:*`, `group:<group-id>` | Channel local được hỗ trợ |
+
+Bảng capability đơn giản:
+
+| Năng lực | Slack | Telegram | Zalo Bot | Zalo Personal |
+| --- | --- | --- | --- | --- |
+| DM | Có | Có | Có | Có |
+| Phòng chung | Channels và groups | Groups | Chưa có group model hiện tại | Groups |
+| Cô lập hội thoại con | Threads | Forum topics | Không | Không có topic/thread model |
+| Pairing / luồng truy cập đầu tiên | Có | Có | Có | Opt-in; mặc định im lặng |
+| Route allowlists | Có | Có | DM allowlists | DM và group allowlists |
+| Dùng queue/loop qua chat | Có | Có | Có, thiên về DM | Có, theo route |
+| Message send CLI | Có | Có | Có, text và ảnh qua URL-backed path | Có, text và media file/URL |
+| File nhận vào | Qua attachment đã route | Qua attachment đã route | Ảnh/sticker vào `.attachments/` | Ảnh và xử lý nhóm ảnh |
+| Runner mặc định tốt nhất | `codex` | `codex` | `codex` | `codex` |
+
+Dùng hướng dẫn đúng channel bạn muốn triển khai. Slack và Telegram là trải nghiệm public ổn định nhất hiện nay; Zalo Bot và Zalo Personal phù hợp khi thị trường hoặc môi trường test cần Zalo, kèm các lưu ý an toàn trong từng guide.
+
+<a id="who-it-is-for"></a>
+## Dành cho ai
+
+| Nhóm người dùng | Mục tiêu phổ biến | Cách dùng đề xuất | Rủi ro cần quản |
+| --- | --- | --- | --- |
+| Solo builder | Code từ điện thoại hoặc chat mà không mất repo workspace thật. | `--bot-type personal`, Telegram DM, `codex`. | CLI native chưa auth hoặc máy thiếu dependency. |
+| Nhân viên văn phòng | Dùng frontier agent cho business work, marketing, research, writing, planning, reporting, và follow-up mà không phải sống trong terminal hoặc app AI riêng. | `--bot-type personal`, channel bạn dùng nhiều nhất, `codex` hoặc CLI bạn thích. | Cho bot quyền vào workspace quá rộng trước khi có thói quen và permission rõ. |
+| Thành viên team | Đưa assistant vào channel nơi quyết định, file, và follow-up đang diễn ra. | `--bot-type team`, shared room route, require mention, queue/loop cho follow-up. | Nhầm assistant chung với assistant riêng; route và sender policy cần rõ. |
+| Team business, marketing, operations | Biến report định kỳ, campaign brief, research khách hàng/thị trường, update doc, review, reminder, và yêu cầu cross-functional thành workflow chat-native. | Slack, Telegram, Zalo Bot, hoặc Zalo Personal theo channel team đang dùng thật; queue và loop cho việc lặp lại. | Schedule sai timezone, sender identity, hoặc target channel. |
+| Engineering lead | Đặt assistant trong team channel mà không mở cho tất cả mọi người. | `--bot-type team`, shared route allowlist, require mention. | Nhầm route admission và sender policy. |
+| AI workflow operator | Chạy review lặp lại, status check, và follow-up work. | Chat-native request dựa trên `/queue`, `/loop`, `clisbot queues`, và `clisbot loops`. | Tạo loop/queue với sai sender, target, hoặc timezone. |
+| Team dùng Claude nhiều | Giữ command và skill habit của Claude Code. | `claude` runner, native command pass-through, bật streaming cho task dài. | Claude plan approval và auto-mode vẫn có thể xuất hiện. |
+| Người dùng OpenClaw / Hermes Agent | Giữ trải nghiệm chat-native, memory, background work, và skill evolution trong khi vẫn dùng frontier coding CLI. | Các channel đã route, memory files, workspace bootstrap, scheduled skill review loops. | Đừng giả định mọi hành vi OpenClaw hoặc Hermes đều tương ứng 1-1. |
+| Platform builder | Đánh giá clisbot như một local agent runtime layer. | Nhiều agents, route rõ, runtime inspection, queue/loop primitives. | Làm mờ boundary giữa channel, control, agents, và runner. |
+
+<a id="how-clisbot-fits"></a>
+## clisbot phù hợp thế nào
+
+`clisbot` biến native CLI agent như Codex, Claude Code, và Gemini CLI thành bot bền có thể truy cập qua Slack, Telegram, và Zalo. Mỗi agent chạy trong workspace thật qua runner tmux-backed, còn channel chịu trách nhiệm cho trải nghiệm chat-native, routing, pairing, xử lý file, và mạch trả lời tiếp theo.
+
+Bài toán chính không chỉ là "đưa text terminal vào chat." `clisbot` cho operator một cách an toàn hơn để đưa coding agent mạnh, dựa trên subscription, vào các kênh giao tiếp thật mà không phải xây lại mọi workflow quanh một sản phẩm assistant chỉ dùng API.
+
+Khi nào nên dùng:
+
+- Dùng Codex khi muốn default an toàn nhất cho coding work đã được route qua chat.
+- Dùng Claude khi Claude Code là ưu tiên và bạn chấp nhận operator phải theo dõi nhiều hơn ở task dài.
+- Dùng Gemini khi Gemini auth đã sạch và bạn thật sự muốn Gemini.
+- Dùng clisbot như một lựa chọn thay thế chi phí thấp hơn cho phần lớn workflow assistant kiểu OpenClaw khi mục tiêu là memory, workspace continuity, pairing, UX chat-native, và routed chat access tới agent mạnh.
+- Dùng clisbot cho background workflow kiểu Hermes agent khi bạn muốn durable queue/loop primitives cộng với tạo và cải thiện skill trong workspace coding-agent thật.
+- Ưu tiên vận hành chat-native: hỏi bot tạo loop, thêm route, update clisbot, tóm tắt release change, hoặc inspect runtime của chính nó. Slash command và CLI command vẫn là điểm điều khiển rõ ràng và fallback đáng tin cậy.
+
+<a id="use-case-map"></a>
+## Bản đồ use case
+
+| Tình huống | Prompt thường dùng | Control hữu ích | Ghi chú |
+| --- | --- | --- | --- |
+| Task coding nhanh | "Sửa test đang fail và gửi tôi diff." | `/streaming on`, `/watch every 30s`, `/stop` | Bắt đầu với Codex trừ khi cần CLI khác. |
+| Code review loop | "Sau implementation này, queue một lượt code review theo architecture rồi sửa các lỗi tìm được." | Queue do bot tạo, `/queue`, `clisbot queues list` | Queue giữ các bước tuần tự thay vì steer run hiện tại. |
+| Assistant cho group/team | "@bot tóm tắt thread incident này" | `routes add`, `routes add-allow-user`, `/mention` | Shared group mặc định nên require mention. |
+| Brief vận hành định kỳ | "Tạo loop lúc 09:00 mỗi ngày trong tuần để kiểm tra CI và tóm tắt rủi ro." | Loop do bot tạo, `/loop status`, `/loop cancel <id>` | Kiểm tra timezone trong response tạo loop. |
+| Skill Claude native | "`/code-review`" | Native command pass-through | Trong Slack, gửi thêm leading space nếu Slack intercept `/...`. |
+| Assistant memory cá nhân | "Ghi nhớ rule này của project và cập nhật docs trong workspace." | Bootstrapped `AGENTS.md`, `USER.md`, `MEMORY.md` | Không đưa private memory vào shared context. |
+| Bạn đồng hành coding trên điện thoại | "Tiếp tục task trong repo từ điện thoại của tôi." | `/attach`, `/detach`, `/watch`, `/new` | Workspace ở trên máy; chat là nơi điều khiển. |
+| Bot tự update | "Update clisbot, làm theo update guide, rồi tóm tắt thay đổi." | Bot kiểm tra `clisbot update --help`, operator auth, `clisbot status` | Bot có thể chạy update routine khi có quyền. |
+| Tự động hóa Zalo local | "Cho Zalo user hoặc group này dùng work bot." | `dm:*` allowUsers hoặc exact `group:<id>` routes | Giữ Zalo Personal im lặng trừ user/group được allowlist có chủ ý. |
+
+<a id="first-setup-faq"></a>
+## FAQ thiết lập đầu tiên
+
+### Nên chọn CLI nào trước?
+
+Chọn `codex` cho trải nghiệm coding qua chat tổng quát và an toàn nhất. Hiện đây là default ổn định nhất về mặt operator trong clisbot.
+
+Chọn `claude` khi team đã phụ thuộc vào Claude Code, command native của Claude, hoặc skill riêng của Claude. Với task dài, bật streaming để thấy Claude có đang chờ bước plan approval không.
+
+Chọn `gemini` khi Gemini đã auth xong trong runtime environment và bạn thật sự muốn dùng Gemini. Nếu Gemini mở OAuth hoặc màn hình setup, hãy xử lý auth Gemini trực tiếp trước.
+
+Tài liệu liên quan: [Codex CLI Guide](../../../docs/user-guide/codex-cli.md), [Claude CLI Guide](../../../docs/user-guide/claude-cli.md), [Gemini CLI Guide](../../../docs/user-guide/gemini-cli.md).
+
+### Nên bắt đầu với Telegram hay Slack?
+
+Dùng Telegram khi muốn luồng bot cá nhân đơn giản nhất. Dùng Slack khi workflow ưu tiên team-channel. Telegram topic và Slack thread đều hoạt động tốt như ngữ cảnh hội thoại tách riêng khi route đã rõ.
+
+Tài liệu liên quan: [Telegram Bot Setup](../vi/user-guide/telegram-setup.md), [Slack App Setup](../vi/user-guide/slack-setup.md).
+
+### Khác nhau giữa personal và team bot type là gì?
+
+`personal` tối ưu cho một người, thường bắt đầu từ DM. `team` tối ưu cho một shared room, team, hoặc group workflow, nơi route, mention behavior, và sender policy quan trọng hơn.
+
+### Vì sao lần chạy đầu cần cả `--cli` và `--bot-type`?
+
+Fresh config chưa có agent nào. `--cli` chọn native runner như `codex`, `claude`, hoặc `gemini`; `--bot-type` chọn bootstrap shape ban đầu. Sau khi agent đã tồn tại, config có thể reuse cho các lần start sau.
+
+### clisbot có thay thế OpenClaw không?
+
+Với phần lớn workflow kiểu OpenClaw, có. clisbot được định hướng là lựa chọn thay thế tốt hơn và rẻ hơn cho các use case OpenClaw phổ biến vì nó dùng lại subscription của CLI tool bạn đã trả tiền, thay vì ép bạn vào một stack API riêng đắt hơn.
+
+Điểm khác biệt chính là execution model. Các hệ kiểu OpenClaw thường trỏ tới API hoặc agent runtime riêng. clisbot chạy các agentic coding CLI native như Codex, Claude Code, và Gemini CLI trong tmux session bền. Hiện tại các agent coding này vẫn là lớp agentic AI mạnh nhất cho việc code, nhưng chúng cũng đủ tổng quát cho office work, research, planning, writing, operations, và team follow-up.
+
+### clisbot có phải Hermes agent không?
+
+Không phải clone trực tiếp, nhưng clisbot là lựa chọn thay thế thực tế cho nhiều use case kiểu Hermes-agent background. Durable sessions, queues, loops, workspace memory, và chat-native control rất khớp với background task, review định kỳ, và skill evolution.
+
+Bạn có thể yêu cầu bot tạo skill sau khi gặp task khó, cải thiện skill ở các mốc hằng ngày hoặc hằng tuần, hoặc schedule review các task lặp lại và task từng gây khó để tạo/cải thiện skill. Về mặt vận hành, điều này rất giống cách Hermes agent tự tạo và evolve skills, nhưng clisbot giữ rõ boundary của channel, control, agent, config, auth, và runner.
+
+<a id="routing-and-access-faq"></a>
+## FAQ routing và access
+
+### Vì sao bot trả lời trong DM nhưng không trả lời trong group?
+
+DM và ngữ cảnh chat chung là hai gate riêng. DM có thể đi qua pairing hoặc route DM. Group, channel, và topic cần shared route rõ như `group:<id>` hoặc `topic:<chatId>:<topicId>`, và có thể yêu cầu mention.
+
+### `group:*` nghĩa là gì?
+
+`group:*` là node policy mặc định cho multi-user sender dưới một bot. Nó không đồng nghĩa với việc cho phép mọi group. Exact shared route vẫn quyết định group, topic, hoặc channel nào được nhận vào khi shared admission policy của bot là `allowlist`.
+
+### Vì sao deny message dùng chữ "group" trong Slack channel hoặc Telegram topic?
+
+Thông báo deny cố ý dùng một từ dễ hiểu chung cho ngữ cảnh nhiều người dùng. Bên trong, các ngữ cảnh theo từng provider vẫn map vào route concept canonical như `group` và `topic`.
+
+### Vì sao bot cần được mention trong group?
+
+Ngữ cảnh chat chung mặc định nghiêng về an toàn. Require mention giảm việc bot bị kích hoạt nhầm trong phòng đông. Dùng `/mention`, `/mention channel`, hoặc `/mention all` để siết mention behavior, hoặc `routes set-require-mention` khi bạn chủ động muốn route lắng nghe mà không cần mention.
+
+### Làm sao chỉ cho một số người dùng bot trong ngữ cảnh chat chung?
+
+Thêm route, giữ hoặc đặt policy là `allowlist`, rồi thêm allowed users:
+
+```bash
+clisbot routes add --channel telegram group:<chatId> --bot default --policy allowlist
+clisbot routes add-allow-user --channel telegram group:<chatId> --bot default --user <userId>
+```
+
+Route policy quyết định request của ai được bot xử lý. Auth role quyết định họ được làm gì sau khi vào được.
+
+Tài liệu liên quan: [Authorization And Roles](../../../docs/user-guide/auth-and-roles.md).
+
+<a id="chat-native-operator-experience"></a>
+## Trải nghiệm vận hành chat-native
+
+### Tôi có cần nhớ slash command và CLI command không?
+
+Không. Trải nghiệm ưu tiên là chat-native: cứ nói với bot điều bạn muốn, để nó inspect help liên quan, chạy đúng lệnh `clisbot`, và báo kết quả.
+
+Prompt tốt:
+
+```text
+Tạo loop mỗi ngày trong tuần lúc 09:00 để kiểm tra CI và tóm tắt rủi ro tại đây.
+Queue một lượt code review sau khi implementation hiện tại xong, rồi chạy test.
+Thêm Telegram topic này vào bot default nếu tôi có quyền quản lý routes.
+Update clisbot, làm theo update guide, restart an toàn, rồi tóm tắt thay đổi.
+```
+
+Slash command như `/loop`, `/queue`, `/watch`, và `/status` vẫn quan trọng. Chúng là điểm điều khiển chính xác trong chat cho người đã biết lệnh. CLI vẫn là kênh operator rõ ràng và fallback khi bạn cần control chính xác, scriptable.
+
+### Bot-native configuration an toàn bằng cách nào?
+
+clisbot được thiết kế để bot có thể giúp tự cấu hình chính nó, nhưng không coi mọi chat message là quyền thay đổi protected state.
+
+Các guardrail quan trọng:
+
+- routes quyết định bot có được trả lời ở đâu
+- auth roles và permissions quyết định sender có được quản route, queue, loop, runtime operation, hoặc protected resource hay không
+- agent prompt yêu cầu bot dùng `clisbot` CLI help cho configuration, update, loop, queue, và route request thay vì tự bịa command
+- hành động nhạy cảm nên có bước kiểm tra permission read-only trước, ví dụ `clisbot auth get-permissions --sender <principal> --agent <agentId> --json`
+- runtime monitoring, `status`, `logs`, `watch`, `/attach`, `/stop`, và `stop --hard` cho operator lối phục hồi nếu native CLI hoặc runner bị kẹt
+
+Cân bằng mong muốn là: bạn có thể vận hành clisbot bằng chat, còn thay đổi config vẫn đi qua command rõ ràng, auth check, durable state, và recovery mechanism quan sát được.
+
+<a id="runtime-and-workflow-faq"></a>
+## FAQ runtime và workflow
+
+### Nên dùng gì khi một run mất nhiều thời gian?
+
+Dùng `/attach` để nối lại live updates trong thread hiện tại. Dùng `/watch every 30s` cho update định kỳ. Dùng `/detach` khi muốn run tiếp tục yên lặng nhưng vẫn post final result.
+
+Chỉ dùng `/stop` khi muốn interrupt run hiện tại.
+
+### Khác nhau giữa queue và steer là gì?
+
+`/queue <message>` lưu prompt phía sau run hiện tại và chạy sau theo thứ tự. Dùng cho review-after-code, test-after-fix, hoặc công việc nhiều bước có chủ ý.
+
+`/steer <message>` inject prompt vào active run ngay bây giờ. Dùng khi run hiện tại đi sai hướng và cần sửa ngay.
+
+### Khi nào nên tạo loop?
+
+Dùng loop cho việc lặp lại hoặc theo lịch. Cách dễ nhất là yêu cầu bot tạo loop bằng ngôn ngữ tự nhiên:
+
+```text
+Tạo loop mỗi ngày trong tuần lúc 09:00 để tóm tắt các rủi ro vận hành còn mở tại đây.
+Chạy prompt review này 3 lần, lần lượt nối tiếp nhau, cho tới khi các lỗi được sửa.
+Kiểm tra CI mỗi 2 giờ và chỉ tóm tắt các lỗi có hành động xử lý rõ ràng.
+```
+
+Bot nên inspect live loop help khi cần, tạo loop qua control command của clisbot, và báo timezone đã resolve cùng command cancel. Direct `/loop ...` vẫn dùng được khi bạn muốn cú pháp chính xác.
+
+Loop là durable và session-scoped. Check loop state bằng cách hỏi bot, dùng `/loop status`, hoặc `clisbot loops status`. Hủy loop cũ trước khi tạo schedule thay thế.
+
+### Vì sao queued hoặc looped prompt không chạy ngay?
+
+Managed loops là skip-if-busy, còn queues chờ logical run hiện tại settle. Điều này tránh làm hỏng active conversation hoặc dồn prompt không liên quan vào cùng một run.
+
+### Native CLI commands hoạt động thế nào?
+
+clisbot giữ một nhóm control command nhỏ như `/status`, `/stop`, `/queue`, và `/loop`. Các slash command khác được forward nguyên trạng tới CLI bên dưới. Vì vậy command native của Claude như `/code-review` và thói quen Codex như `/review` hoặc `$code-review` vẫn có thể hoạt động.
+
+Tài liệu liên quan: [Native CLI Commands](../../../docs/user-guide/native-cli-commands.md).
+
+<a id="troubleshooting-by-symptom"></a>
+## Troubleshooting theo triệu chứng
+
+| Triệu chứng | Kiểm tra đầu tiên | Nguyên nhân hay gặp | Cách xử lý |
+| --- | --- | --- | --- |
+| `clisbot start` báo chưa có agent | `clisbot start --help` | Fresh config chưa có agent. | Start với cả `--cli` và `--bot-type`. |
+| Token refs báo `missing` | `clisbot status` | Env var không visible với runtime. | Truyền token lại, persist token, hoặc restart từ shell đã export env. |
+| Channel cứ ở trạng thái `starting` | `clisbot logs` | Credential, network, auth, hoặc provider startup fail. | Sửa lỗi provider trong logs rồi restart. |
+| Bot trả lời DM nhưng không trả lời group | `/whoami` trong group/topic | Thiếu shared route hoặc mention requirement. | Thêm route `group:<id>` hoặc `topic:<chatId>:<topicId>`. |
+| Tin nhắn được nhận nhưng không có trả lời | `clisbot watch --latest --lines 100` | Runner bị block, chưa auth, hoặc đang chờ prompt. | Sửa trạng thái native CLI trong workspace, rồi restart hoặc `/new`. |
+| Native CLI runner không trả lời | Chạy trực tiếp `codex`, `claude`, hoặc `gemini` trong terminal | Coding CLI bên dưới chưa install/auth/trust hoặc không chạy được trên máy. | Sửa native CLI trước; clisbot chỉ hoạt động sau khi CLI có thể trả lời bình thường. |
+| Channel hoặc runtime có vẻ bị kẹt | `clisbot status` và `clisbot logs` | Channel worker, detached runtime, hoặc tmux runner state stale. | Thử `clisbot restart`; nếu chưa đủ, chạy `clisbot stop --hard` rồi `clisbot start`. |
+| Claude có vẻ bị kẹt | `/streaming on` và `/watch every 30s` | Claude plan approval hoặc auto-mode behavior. | Gửi `/nudge` nếu nó đang chờ default confirmation. |
+| Gemini startup bị block | `clisbot logs` | Gemini OAuth hoặc setup screen. | Auth Gemini trực tiếp hoặc cung cấp headless auth path. |
+| Codex báo thiếu env var | `clisbot watch --latest` | Detached runtime không inherit shell env. | Restart clisbot từ shell có env, hoặc cấu hình service env. |
+| Slack slash command không tới clisbot | Hành vi Slack client | Slack intercept `/...`. | Gửi leading space, ví dụ ` /status`, hoặc dùng `\status`. |
+| Hành vi cũ còn sau restart | `clisbot runner list` | Runner tmux hoặc environment cũ còn stale. | Dùng `clisbot stop --hard`, rồi start lại. |
+| Update hoặc restart có vẻ bị kẹt | `clisbot status` | Worker đã exit hoặc monitor đang chuyển trạng thái. | Kiểm tra status trước; nếu runtime down thì chạy `clisbot start`. |
+
+<a id="troubleshooting-playbooks"></a>
+## Troubleshooting playbook
+
+### Kiểm tra native CLI trước
+
+Khi clisbot nhận message nhưng agent không trả lời, trước hết tách clisbot khỏi coding CLI bên dưới.
+
+1. Mở terminal trên cùng máy.
+2. Đi tới workspace clisbot dự kiến dùng, thường là `~/.clisbot/workspaces/default`.
+3. Start CLI đã cấu hình trực tiếp:
+
+```bash
+codex
+claude
+gemini
+```
+
+4. Nói `hi` và xác nhận CLI trả lời được.
+5. Nếu CLI không start hoặc không reply, sửa install, login, trust prompt, model access, hoặc local dependency trước. clisbot không thể làm một native CLI hỏng chạy được; nó chỉ chạy và route một CLI vốn đã hoạt động trên máy.
+
+### Reset channel hoặc runtime bị kẹt
+
+Nếu native CLI chạy được trong terminal nhưng chat channel vẫn kẹt, reset runtime boundary của clisbot.
+
+1. Thử restart bình thường trước:
+
+```bash
+clisbot restart
+```
+
+2. Nếu tmux session stale hoặc channel state cũ vẫn còn, hard-stop tất cả clisbot tmux session và start mới:
+
+```bash
+clisbot stop --hard
+clisbot start
+```
+
+3. Sau restart, chạy `clisbot status` và gửi một tin nhắn test ngắn từ target channel.
+
+### Bot không start
+
+1. Chạy `clisbot status`.
+2. Chạy `clisbot logs`.
+3. Xác nhận token refs có mặt và channel enabled.
+4. Nếu là lần chạy đầu, gồm cả `--cli` và `--bot-type`.
+5. Nếu restart bình thường chưa đủ, chạy `clisbot stop --hard`, rồi start lại từ shell có đúng environment.
+
+### Bot không trả lời trong ngữ cảnh đã route
+
+1. Gửi `/whoami` trong ngữ cảnh chat đó.
+2. Xác nhận exact route tồn tại với `clisbot routes list --channel <channel>`.
+3. Xác nhận sender policy không block user.
+4. Xác nhận message mention bot khi `requireMention` là true.
+5. Chạy `clisbot watch --latest --lines 100` sau một tin nhắn test để inspect runner pane.
+
+### Runner có vẻ kẹt
+
+1. Chạy `clisbot runner list`.
+2. Chạy `clisbot runner inspect --latest`.
+3. Dùng `clisbot watch --latest --lines 100` để xem pane live.
+4. Mở workspace trực tiếp, thường là `~/.clisbot/workspaces/default`.
+5. Start native CLI ở đó và clear auth, trust, hoặc dependency prompt.
+6. Dùng `/nudge`, `/stop`, hoặc `/new` tùy run đang chờ, sai hướng, hay cần conversation mới.
+
+### Access control khó hiểu
+
+1. Tách hai câu hỏi:
+   - route policy: sender này có được vào ngữ cảnh chat này không?
+   - auth role: sau khi admission, sender này được làm gì?
+2. Dùng `clisbot routes get --channel <channel> <route-id> --bot <bot>`.
+3. Dùng:
+
+```bash
+clisbot auth get-permissions --sender <principal> --agent <agentId> --json
+```
+
+4. Nhớ rằng `disabled` thắng owner/admin, và `blockUsers` vẫn thắng.
+
+### Queue hoặc loop behavior bất ngờ
+
+1. Check session hiện tại bằng `/status`.
+2. List queue items đang chờ bằng `/queue list` hoặc `clisbot queues list`.
+3. Check loops bằng `/loop status` hoặc `clisbot loops status`.
+4. Xác nhận timezone của loop trong response tạo loop.
+5. Hủy stale loops trước khi tạo replacement schedules.
+
+<a id="command-cheat-sheet"></a>
+## Bảng lệnh nhanh
+
+| Việc | Lệnh |
+| --- | --- |
+| Khởi động Telegram personal bot đầu tiên | `clisbot start --cli codex --bot-type personal --telegram-bot-token <token> --persist` |
+| Khởi động Slack team bot đầu tiên | `clisbot start --cli codex --bot-type team --slack-app-token <xapp> --slack-bot-token <xoxb> --persist` |
+| Kiểm tra runtime health | `clisbot status` |
+| Đọc logs gần đây | `clisbot logs` |
+| Inspect live runner output | `clisbot watch --latest --lines 100` |
+| Thêm Telegram group route | `clisbot routes add --channel telegram group:<chatId> --bot default` |
+| Thêm Telegram topic route | `clisbot routes add --channel telegram topic:<chatId>:<topicId> --bot default` |
+| Thêm Slack channel route | `clisbot routes add --channel slack group:<channelId> --bot default` |
+| Approve DM pairing | `clisbot pairing approve <channel> <code>` |
+| Hard reset runtime sessions | `clisbot stop --hard` |
+| Xem hướng dẫn update | `clisbot update --help` |
+
+<a id="related-docs"></a>
+## Tài liệu liên quan
+
+- [User Guide](../../../docs/user-guide/README.md)
+- [CLI Commands](../../../docs/user-guide/cli-commands.md)
+- [Runtime Operations](../../../docs/user-guide/runtime-operations.md)
+- [Routes](../../../docs/user-guide/channels.md)
+- [Surface Access Model](../../../docs/user-guide/surface-access-model.md)
+- [Bots And Credentials](../../../docs/user-guide/bots-and-credentials.md)
+- [Authorization And Roles](../../../docs/user-guide/auth-and-roles.md)
+- [Slash Commands](../../../docs/user-guide/slash-commands.md)
+- [Agent Progress Replies](../../../docs/user-guide/agent-progress-replies.md)
+- [Telegram Bot Setup](../vi/user-guide/telegram-setup.md)
+- [Slack App Setup](../vi/user-guide/slack-setup.md)
+- [Zalo Bot Setup](../vi/user-guide/zalo-bot-setup.md)
+- [Zalo Personal](../vi/user-guide/zalo-personal.md)
+
+## Tương thích CLI hiện tại
+
+`clisbot` hiện hoạt động tốt với Codex, Claude, và Gemini.
+
+| CLI | Độ ổn định hiện tại | Tóm tắt |
+| --- | --- | --- |
+| `codex` | Tốt nhất hiện nay | Default mạnh nhất cho coding work đã route qua chat. |
+| `claude` | Dùng được, có lưu ý riêng | Claude có thể hiện plan-approval và auto-mode riêng ngay cả khi launch với bypass-permissions. |
+| `gemini` | Tương thích đầy đủ | Gemini được hỗ trợ như runner hạng nhất cho workflow chat-native có routing. |
+
+Ghi chú operator theo CLI:
+
+- [Codex CLI Guide](../../../docs/user-guide/codex-cli.md)
+- [Claude CLI Guide](../../../docs/user-guide/claude-cli.md)
+- [Gemini CLI Guide](../../../docs/user-guide/gemini-cli.md)
+
+## Điểm nổi bật release gần đây
+
+- `v0.1.52`: làm rõ shared-route setup để `routes add ...` có nghĩa rõ là "dùng agent hiện được assign cho bot đó theo default", và dọn stale short `startupDelayMs` override để bản đã upgrade có thể inherit startup default mới 60 giây.
+- `v0.1.51`: tăng default runner startup window lên 60 giây cho các CLI family chuẩn và shared runner fallback, giúp lần launch mới nhưng chậm ít fail trước khi prompt đầu tiên được submit.
+- `v0.1.50`: trải nghiệm operator AI-native mạnh hơn nhiều, nơi bạn ngày càng có thể nói chuyện với bot để nó tự quản; cộng với personal/team bot an toàn hơn trong ngữ cảnh chat chung, direct update tự động từ install cũ, durable queue control, session continuity rõ ràng hơn, scheduled loops đáng tin cậy hơn, trust/restart behavior mạnh hơn, và streaming/session isolation chặt hơn.
+- `v0.1.43`: runtime recovery bền hơn, routed follow-up control rõ hơn, tmux prompt submission check đúng sự thật hơn, queued-start notification tốt hơn, và Slack thread attachment an toàn hơn.
+
+Dòng stable hiện tại thường có nghĩa là:
+
+- Điểm chính là AI-native control: hỏi bot trong chat để queue công việc, schedule recurring brief, tự update, giải thích release change, hoặc guide setup/routing thay vì luôn phải xuống shell.
+- Personal user: ít lỗi long-run mong manh hơn, `/queue` tốt hơn, xử lý media Telegram tốt hơn.
+- Shared bot owner: route safety rõ hơn, upgrade trực tiếp từ install cũ dễ hơn, và use case team thú vị hơn khi một bot sống trong group nhưng chỉ trả lời vài người được chọn.
+- Operator: queue visibility tốt hơn, session continuity truth tốt hơn, restart behavior bớt gây hiểu nhầm khi update, cộng với `watch` và `inspect` nhanh hơn khi có sự cố.
+
+Đọc đầy đủ tại:
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
-- [Release Notes Index](../vi/releases/README.md)
+- [Release Notes Index](../../../docs/releases/README.md)
 - [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md)
-- [v0.1.50 Release Notes](../vi/releases/v0.1.50.md)
-- [v0.1.43 Release Notes](../vi/releases/v0.1.43.md)
-- [v0.1.39 Release Notes](../vi/releases/v0.1.39.md)
+- [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md)
+- [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md)
+- [v0.1.43 Release Notes](../../../docs/releases/v0.1.43.md)
+- [v0.1.39 Release Notes](../../../docs/releases/v0.1.39.md)
 
-Nếu bạn muốn đi theo Slack trước:
+## Minh họa
 
-```bash
-clisbot start \
-  --cli codex \
-  --bot-type team \
-  --slack-app-token SLACK_APP_TOKEN \
-  --slack-bot-token SLACK_BOT_TOKEN
-```
-
-Alias ngắn:
-
-```bash
-clis start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>
-```
-
-Đường repo local:
-
-```bash
-bun install
-bun run start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token> --persist
-```
-
-`bun run start|stop|restart|status|logs|init|pairing` khi chạy từ repo sẽ được `.env` pin vào `CLISBOT_HOME=~/.clisbot-dev`, để local testing không vô tình reuse runtime `~/.clisbot` chính của bạn.
-
-Ghi chú update cho các bản cài đang tồn tại:
-
-- Các bản cài cũ trước `v0.1.50` giờ sẽ update trực tiếp ở lần chạy đầu, có backup được ghi trước, nên đa số mọi người có thể update và restart mà không cần thêm một vòng manual migration.
-- Sau khi đã lên `v0.1.50`, các lần upgrade về sau sẽ ngày càng AI-native hơn: trong nhiều trường hợp bạn chỉ cần nhờ bot update `clisbot` lên latest version, bot có thể tự đi theo update guide, chạy upgrade flow, rồi brief lại có gì đã thay đổi.
-- Nếu vẫn muốn một agent inspect config hiện tại trước khi update, hãy nhờ Codex hoặc Claude trong repo này review trước.
-- Đường manual package upgrade giờ đơn giản hơn:
-
-```bash
-npm install -g clisbot && clisbot restart
-clisbot --version
-```
-
-Flow của cuộc hội thoại đầu tiên:
-
-- gửi DM cho bot trên Slack hoặc Telegram
-- nếu principal đó đã là app `owner` hoặc app `admin`, pairing sẽ bị bypass và bot nên trả lời bình thường
-- nếu không, `clisbot` mặc định DMs sang pairing mode và trả về pairing code cùng approval command
-
-Duyệt với:
-
-```bash
-clisbot pairing approve slack <CODE>
-clisbot pairing approve telegram <CODE>
-```
-
-Fresh config khởi đầu không có agent nào được cấu hình, nên lần đầu `clisbot start` cần cả `--cli` lẫn `--bot-type` trước khi nó tạo agent `default` đầu tiên.
-Fresh config cũng khởi đầu không có sẵn Slack channel, Telegram group, hay topic nào. Hãy thêm các route đó thủ công trong `~/.clisbot/clisbot.json`.
-`clisbot start` đòi hỏi explicit channel token input trước khi bootstrap bất cứ thứ gì. Bạn có thể truyền raw value, tên env như `MY_TELEGRAM_BOT_TOKEN`, hoặc placeholder như `'${MY_TELEGRAM_BOT_TOKEN}'`.
-Nếu muốn một dev instance tách riêng bên cạnh bot chính, xem [Development Guide](../../../docs/development/README.md).
-
-## Trình diễn
-
-Mục tiêu là một trải nghiệm agentic AI mạnh mẽ, tối ưu ở kênh chat, chứ không phải tấm gương phản chiếu terminal transcript: thread, topic, follow-up behavior, và workflow aware về file nên cho cảm giác native trong Slack và Telegram.
+Mục tiêu là một agent chat-native thật, không phải bản sao transcript terminal: thread, topic, follow-up behavior, và file handling theo workflow phải có cảm giác native với từng channel được hỗ trợ.
 
 Slack
 
@@ -304,227 +574,63 @@ Telegram
 
 ## Lưu ý quan trọng
 
-Việc các vendor đầu tư mạnh cho security và safety không có nghĩa là frontier agentic CLI tool vốn dĩ an toàn. `clisbot` đưa những công cụ đó ra rộng hơn qua ngữ cảnh chat và workflow, nên bạn cần coi cả hệ thống như một phần mềm high-trust và dùng với rủi ro do mình tự chấp nhận.
+Việc các vendor lớn đầu tư mạnh vào security và safety không làm frontier agentic CLI tool tự động an toàn. `clisbot` mở rộng các tool đó qua chat và workflow thật, vì vậy hãy coi toàn hệ thống là phần mềm cần độ tin cậy cao và tự chịu rủi ro khi sử dụng.
 
 ## Ghi nhận
 
-`clisbot` sẽ không tồn tại nếu không có những ý tưởng, đà phát triển, và cảm hứng rất thực dụng mà OpenClaw tạo ra. Nhiều khái niệm về configuration, routing, và workspace ở đây được học từ việc nghiên cứu OpenClaw, sau đó mới được điều chỉnh theo hướng đi riêng của `clisbot`. Xin gửi sự tôn trọng và cảm ơn tới dự án OpenClaw và cộng đồng của nó.
-
-## Hướng dẫn cài đặt
-
-Flow cài đặt dễ nhất hiện tại vẫn là:
-
-1. Cài `clisbot`.
-2. Chạy lệnh quick start ở trên.
-3. DM cho bot; duyệt pairing trừ khi principal đó đã là app `owner` hoặc app `admin`.
-4. Chỉ chuyển sang advanced config sau khi lần chạy đầu tiên thành công.
-
-Nếu muốn đi theo đường setup có agent dẫn trong repo:
-
-1. Clone repo này.
-2. Mở Claude Code, Codex, hoặc Gemini CLI trong repo này.
-3. Nhờ nó giúp bạn setup `clisbot`.
-
-Tài liệu trong repo này được giữ cập nhật, bao gồm cả [User Guide](../vi/user-guide/README.md), nên agent sẽ có đủ context để dẫn bạn qua setup, config, và troubleshooting trực tiếp ngay trong repo.
-Nếu có gì trục trặc, rescue loop nhanh nhất thường là `clisbot logs`,
-`clisbot status`, `clisbot restart`, hoặc nếu cần thì `clisbot stop --hard`
-rồi `clisbot start`.
-Ngoài ra hãy mở coding CLI trực tiếp trong bot workspace, thường là
-`~/.clisbot/workspaces/default`, và chắc rằng CLI đó đã chạy được ở đó.
-Đó là một trong những kiểm tra end-to-end mạnh nhất cho sức khỏe của bot.
-
-Nếu muốn tự cấu hình mọi thứ bằng tay:
-
-1. Đọc template config chính thức tại [config/clisbot.json.template](../../../config/clisbot.json.template).
-2. Nếu cần bản snapshot đã phát hành để review phục vụ migration, hãy so với [config/clisbot.v0.1.43.json.template](../../../config/clisbot.v0.1.43.json.template).
-3. Copy template chính thức sang `~/.clisbot/clisbot.json` rồi chỉnh bots, routes, agents, workspaces, và policies cho môi trường của bạn.
-4. Thêm agent qua CLI để tool defaults, startup options, và bootstrap templates được nhất quán.
-5. Tuỳ chọn, chuyển các channel secret ổn định sang env var hoặc canonical credential file sau lần chạy thành công đầu tiên.
-
-Channel route setup được giữ manual có chủ đích:
-
-- fresh config không tự add Slack channel
-- fresh config không tự add Telegram group hoặc topic
-- chỉ add đúng channel, group, topic, hoặc DM routing mà bạn muốn mở ra
-- setup mặc định cho bot credential được mô tả trong [Bots và credentials](../vi/user-guide/bots-and-credentials.md)
-
-Quản lý agent nâng cao:
-
-- đa số người dùng nên ở lại với `clisbot start --cli ... --bot-type ...` và để lần chạy đầu tự tạo default agent
-- nếu bạn cần nhiều hơn một agent, custom bot default, hoặc các flow manual route setup, hãy dùng các lệnh `clisbot agents ...`, `clisbot bots ...`, và `clisbot routes ...` được mô tả trong [User Guide](../vi/user-guide/README.md)
-- README này cố ý không đưa phần low-level đó vào main onboarding path vì public first-run model là `--bot-type personal|team`, không phải internal template-mode naming
-- fresh bot config vẫn trỏ vào agent `default`; nếu agent hữu dụng đầu tiên của bạn dùng một id khác, hãy cập nhật fallback bằng `clisbot bots set-agent ...` hoặc override trên route bằng `clisbot routes set-agent ...`
-
-Env-backed setup vẫn được hỗ trợ khi bạn muốn config chỉ tới một env name thay vì persist credential file:
-
-```bash
-clisbot start \
-  --cli codex \
-  --bot-type personal \
-  --slack-app-token CUSTOM_SLACK_APP_TOKEN \
-  --slack-bot-token CUSTOM_SLACK_BOT_TOKEN
-```
-
-- các flag này được ghi vào `~/.clisbot/clisbot.json` dưới dạng `${ENV_NAME}` placeholder
-- bạn có thể truyền `CUSTOM_SLACK_APP_TOKEN` hoặc `'${CUSTOM_SLACK_APP_TOKEN}'`
-- dùng đường này khi muốn config trỏ về các env variable name do bạn tự chọn
-- giữ chi tiết export env ở [Bots và credentials](../vi/user-guide/bots-and-credentials.md) thay vì đẩy hết chúng vào quick start ngay từ đầu
-
-## Xử lý sự cố
-
-Nếu quick start không chạy, hãy kiểm tra theo thứ tự này:
-
-- Nếu setup thấy chưa rõ, hãy mở Claude Code, Codex, hoặc Gemini CLI trong repo này rồi nhờ nó hỗ trợ bằng local docs.
-- Nếu có gì nhìn sai, bắt đầu với `clisbot logs`, `clisbot status`,
-  `clisbot restart`, hoặc nếu cần thì `clisbot stop --hard` rồi
-  `clisbot start`.
-- Nếu hành vi config gây bối rối, hãy xem [config/clisbot.json.template](../../../config/clisbot.json.template) trước, rồi đối chiếu với [User Guide](../vi/user-guide/README.md).
-- Nếu `clisbot start` báo không có agent nào được cấu hình, hãy ưu tiên `clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegram-bot-token>`.
-- Nếu `clisbot start` in token ref dưới dạng `missing`, hoặc truyền token thẳng trên command line hoặc chuyển sang env-backed setup được mô tả trong [Bots và credentials](../vi/user-guide/bots-and-credentials.md).
-- Nếu `clisbot status` cho thấy `bootstrap=...:missing` hoặc `bootstrap=...:not-bootstrapped`, hãy đi theo advanced agent bootstrap steps trong [User Guide](../vi/user-guide/README.md).
-- Trust thường được bot xử lý tự động, nhưng nếu trust hoặc startup behavior vẫn trông không đúng, hãy vào workspace rồi chạy underlying CLI trực tiếp ở đó, ví dụ `cd ~/.clisbot/workspaces/default` rồi tự khởi động `codex`, `claude`, hoặc `gemini`. Nếu CLI không thể khởi động sạch trong workspace đó thì bot cũng sẽ không khỏe được.
-- Nếu Gemini startup báo đang chờ manual authorization, hãy authenticate Gemini trực tiếp trước hoặc đưa vào một headless auth path như `GEMINI_API_KEY` hoặc Vertex AI credentials; `clisbot` giờ sẽ coi màn hình đó là startup blocker thay vì ready session khỏe mạnh.
-- Nếu Codex cảnh báo thiếu `bubblewrap` trên Linux, hãy cài `bubblewrap` trong runtime environment.
-- Nếu bot không trả lời, hãy xem `clisbot status` trước. Channel khỏe nên hiện `connection=active`; nếu một channel cứ đứng ở `starting`, hãy xem `clisbot logs`.
-- Nếu một routed message đã được nhận nhưng không có reply, hãy gửi một test message rồi ngay lập tức chạy `clisbot watch --latest --lines 100` trong terminal. Lệnh này sẽ cho bạn thấy tmux runner pane live và thường lộ ra ngay các lỗi như thiếu CLI auth, trust prompt, startup mắc kẹt, hoặc model/provider error.
-- Nếu Codex chạy được trong terminal bình thường nhưng routed runner lại hiện `Missing environment variable: CODEX_CLIPROXYAPI_KEY`, hãy nhớ rằng `clisbot` chạy Codex từ detached background process và tmux session. Hãy start hoặc restart `clisbot` từ một shell nơi `echo $CODEX_CLIPROXYAPI_KEY` có giá trị, hoặc export key đó trong môi trường mà service manager của bạn dùng. Các tmux runner session đang tồn tại vẫn giữ môi trường cũ, nên hãy recycle chúng sau khi sửa env.
-- Nếu runtime startup vẫn lỗi, hãy chạy `clisbot logs` và xem log tail gần nhất mà `clisbot` giờ tự in ra khi startup fail.
-- Nếu `clisbot restart` cảnh báo stop bị timeout trong lúc update, hãy chạy `clisbot status` một lần. Ở release hiện tại, nếu status đã cho thấy worker exit thì thường vẫn tiếp tục sạch; chỉ xem đó là bug thật nếu restart khiến runtime bị down hẳn.
-- Nếu restart bình thường chưa đủ, dùng `clisbot stop --hard` để dừng runtime và kill tất cả tmux runner session trên clisbot socket đang cấu hình, rồi start lại từ shell có môi trường đúng.
-- Nếu bạn cần full command list, chạy `clisbot --help`.
-- Nếu cần operator docs theo từng bước, bắt đầu từ [User Guide](../vi/user-guide/README.md).
-- Nếu Slack thread behavior có vẻ quá eager, dùng `/followup pause` hoặc `/followup mention-only`.
-- Nếu Slack slash command đụng với Slack-native command handling, thêm một dấu cách ở đầu, ví dụ ` /bash ls -la`.
-
-<a id="common-cli-commands"></a>
-
-## Các lệnh CLI thường dùng
-
-Đa số người dùng lúc đầu chỉ cần một bộ lệnh nhỏ:
-
-- `clisbot start`: khởi động bot runtime và tạo default first-run setup khi cần.
-- `clisbot restart`: restart runtime sạch; hãy dùng lệnh này trước khi bot ngừng trả lời.
-- `clisbot stop`: dừng runtime sạch trước khi update, đổi config, hoặc bảo trì.
-- `clisbot stop --hard`: dừng runtime và kill toàn bộ tmux runner session trên clisbot socket đang cấu hình; dùng khi runner pane cũ, biến môi trường cũ, hoặc session mắc kẹt vẫn sống qua một lần restart bình thường.
-- `clisbot status`: kiểm tra xem runtime, channel, và active session có đang khỏe hay không.
-- `clisbot logs`: xem runtime log gần đây khi startup, routing, hoặc reply có gì sai.
-- `clisbot runner list`: liệt kê live tmux-backed runner session để xem cái gì đang hoạt động.
-- `clisbot inspect --latest`: chụp trạng thái pane hiện tại của session mới nhất đã được admit một lần.
-- `clisbot watch --latest --lines 100`: nhảy thẳng vào live session mới nhất đã được admit với đủ context để debug một message vừa gửi.
-- `clisbot watch --index 2`: theo dõi session mới admit gần nhì mà không cần copy tên tmux session trước.
-- `clisbot queues list`: xem các durable queued prompt đang chờ trên toàn app.
-- `clisbot queues create --channel telegram --target group:-1001234567890 --topic-id 4335 --sender telegram:1276408333 <prompt>`: tạo một durable queued prompt cùng session, bị cap bởi `control.queue.maxPendingItemsPerSession` (mặc định `20`).
-
-Full operator command reference:
-
-- [CLI Commands Guide](../vi/user-guide/cli-commands.md)
-
-Nếu bạn chạy từ repo thay vì global package:
-
-- `bun run dev`
-- `bun run start`
-- `bun run restart`
-- `bun run stop`
-- `bun run typecheck`
-- `bun run test`
-- `bun run check`
-
-## Trong chat
-
-`clisbot` hỗ trợ một bộ nhỏ command tối ưu cho kênh chat để điều khiển thread và tăng tốc workflow ngay bên trong Slack và Telegram.
-
-Tương thích với native coding-CLI command:
-
-- `clisbot` chỉ chặn những reserved chat command của chính nó
-- mọi native Claude, Codex, hoặc Gemini command text khác đều được chuyển nguyên xuống CLI bên dưới
-- operator guide: [Native CLI Commands](../vi/user-guide/native-cli-commands.md)
-
-Ghi chú cho Slack:
-
-- Để Slack không diễn giải slash command như một Slack slash command native, hãy thêm một dấu cách ở đầu.
-- Ví dụ: ` /bash ls -la`
-- Bash shorthand cũng dùng được: `!ls -la`
-
-Các command thường dùng:
-
-- `/start`: hiện onboarding hoặc route-status help cho cuộc hội thoại hiện tại.
-- `/help`: hiện các conversation command có sẵn của clisbot.
-- `/stop`: ngắt turn đang chạy hiện tại.
-- `/streaming on`, `/streaming off`, `/streaming status`: bật tiến độ live khi bạn muốn theo dõi một tác vụ coding dài, rồi tắt lại khi chỉ cần câu trả lời cuối; trong Slack, dùng ` /streaming on` hoặc `\streaming on` khi Slack giữ mất slash command gốc.
-- `/followup status`, `/followup auto`, `/followup mention-only`, `/followup pause`, `/followup resume`: điều khiển xem bot có tiếp tục theo thread tự nhiên, giữ im lặng, hay yêu cầu mention rõ ràng trở lại; shorthand nhanh gồm `/mention`, `/pause`, và `/resume`.
-- `/queue <message>`: xếp prompt tiếp theo vào sau run hiện tại để bot làm xong một việc rồi tự động làm tiếp, không bắt bạn phải theo dõi thủ công liên tục.
-- `/loop <schedule or count> <message>`: biến một chỉ dẫn thành công việc lặp, từ automation định kỳ cho tới kiểu brute-force progress như `/loop 3 tiếp đi em` khi bạn muốn AI tiếp tục đẩy thay vì dừng sớm.
-
-Vì sao `/queue` và `/loop` quan trọng:
-
-- `/queue` là workflow primitive rất đơn giản: xếp prompt tiếp theo ngay bây giờ, để bot tự chạy lần lượt về sau.
-- `/loop` là force multiplier: dùng nó cho review/reporting định kỳ, hoặc đơn giản là để giữ AI tiếp tục đi qua các bước coding dài với ít lười hơn và ít dừng sớm hơn.
-
-Ví dụ:
-
-- `/queue tiếp đi em`
-- `/queue code review theo architecture, guideline và fix, test`
-- `/loop 3 tiếp đi em`
-
-Hướng dẫn slash command chi tiết:
-
-- [Slash Commands](../vi/user-guide/slash-commands.md)
+`clisbot` sẽ không tồn tại nếu không có ý tưởng, động lực, và cảm hứng thực tế từ OpenClaw. Nhiều concept về configuration, routing, và workspace ở đây được học từ OpenClaw rồi điều chỉnh theo hướng riêng của `clisbot`. Trân trọng cảm ơn project và cộng đồng OpenClaw.
 
 ## Tài liệu
 
-- [Tổng quan doc đa ngôn ngữ](../README.md)
-- [README tiếng Việt của repo](./README.vi.md)
-- [Thuật ngữ tiếng Việt](../vi/_translations/glossary.md)
-- [Trạng thái dịch tiếng Việt](../vi/_translations/status.md)
-- [README tiếng Trung giản thể](./README.zh-CN.md)
-- [README tiếng Hàn](./README.ko.md)
-- [Tổng quan dự án](../vi/overview/README.md)
-- [Kiến trúc hệ thống](../vi/architecture/README.md)
-- [Hướng dẫn phát triển (bản gốc tiếng Bạn)](../../../docs/development/README.md)
-- [Bảng trạng thái tính năng (bản gốc tiếng Bạn)](../../../docs/features/feature-tables.md)
-- [Backlog (bản gốc tiếng Bạn)](../../../docs/tasks/backlog.md)
-- [Hướng dẫn sử dụng](../vi/user-guide/README.md)
+- [Localized Docs Hub](../README.md)
+- [Vietnamese Repo README](./README.vi.md)
+- [Simplified Chinese Repo README](./README.zh-CN.md)
+- [Korean Repo README](./README.ko.md)
+- [Overview](../../../docs/overview/README.md)
+- [Architecture](../../../docs/architecture/README.md)
+- [Development Guide](../../../docs/development/README.md)
+- [Feature Tables](../../../docs/features/feature-tables.md)
+- [Backlog](../../../docs/tasks/backlog.md)
+- [User Guide](../../../docs/user-guide/README.md)
 
-## Lộ trình
+## Roadmap
 
-- Thêm nhiều native CLI hơn, bắt đầu bằng bộ ba Claude, Codex, và Gemini mạnh hơn nữa.
-- Thêm nhiều channel hơn, bắt đầu từ Slack và Telegram, rồi mở rộng sang Zalo và các ngữ cảnh chat khác.
-- Thêm các workflow building block tốt hơn như heartbeat, cron-style job, và loop automation mạnh hơn.
-- Khám phá structured output, ACP, và native SDK integration ở nơi chúng thực sự cải thiện truthfulness hoặc quyền điều khiển của operator.
-- Khám phá các đường native messaging ổn định hơn theo thời gian, vượt ra ngoài kiểu capture tmux-pane hiện tại.
+Nền tảng đã ship:
 
-## Trọng tâm hiện tại
+- Native CLI runners: Codex, Claude Code, và Gemini CLI.
+- Channels: Telegram, Slack, Zalo Bot, và Zalo Personal.
+- Workflow primitives: durable queues và loops đã đủ ổn định cho công việc vận hành chat-native thật.
 
-`clisbot` đang lớn dần thành một lớp agent runtime rộng hơn:
+Trọng tâm tiếp theo:
 
-- hỗ trợ nhiều CLI tool hơn ngoài Claude Code, Codex, và Gemini CLI
-- nhiều communication channel hơn ngoài Slack và Telegram
-- các workflow building block đơn giản như cron job, heartbeat job, và loop
-- durable agent session, workspace, follow-up policy, command, attachment, và operator control có thể dùng lại xuyên suốt mọi ngữ cảnh chat đó
-- stability và security luôn là ưu tiên hàng đầu của dự án; nếu bạn thấy vấn đề ở một trong hai mảng này, hãy báo lại
+- Chuẩn hóa auto-skill creation và improvement, tương tự pattern Hermes agent: task lặp lại hoặc từng gây khó nên trở thành skill dùng lại qua daily/weekly review loops.
+- Thêm nhóm channel tiếp theo: Discord và WhatsApp Personal unofficial.
+- Tiếp tục cải thiện runtime safety, recovery, và channel-native operator experience quanh durable tmux runner boundary.
 
-tmux vẫn là stability boundary hiện tại. Một agent map vào một durable runner session trong một workspace, và mọi lớp CLI, channel, hoặc workflow đều nên route lên đúng runtime bền đó thay vì tạo lại agent từ đầu.
+## AI-Native Workflow
 
-## Đã hoàn thành
+Repo này cũng là ví dụ nhỏ về AI-native engineering workflow:
 
-- [x] Nhiều Codex, Claude, và Gemini session với hỗ trợ streaming on/off.
-- [x] Dọn stale tmux session và resume session.
-- [x] Hệ thống config tương thích với OpenClaw.
-- [x] Hỗ trợ Slack channel với streaming và attachment, cùng smart follow mode.
-- [x] Hỗ trợ Telegram channel với streaming và attachment.
-
-## Quy trình AI-native
-
-Repo này cũng là một ví dụ nhỏ cho AI-native engineering workflow:
-
-- các quy tắc vận hành kiểu `AGENTS.md` gọn, với file tương thích Claude và Gemini có thể symlink về cùng một nguồn
-- docs kiểu lessons-learned để ghi lại feedback và pitfall lặp đi lặp lại
-- architecture docs được dùng như stable implementation contract
+- operating rules kiểu `AGENTS.md`, với file tương thích cho Claude và Gemini có thể symlink về cùng nguồn
+- lessons-learned docs để ghi nhận feedback và pitfall lặp lại
+- architecture docs như implementation contract ổn định
 - kỳ vọng validation end-to-end để đóng feedback loop cho AI agent
-- workflow docs cho các artifact ngắn, ưu tiên review sớm, repeated review loop, và task-readiness shaping trong [docs/workflow/README.md](../../../docs/workflow/README.md)
+- workflow docs cho artifact review ngắn nhất trước, repeated review loops, và task-readiness shaping trong [docs/workflow/README.md](../../../docs/workflow/README.md)
+
+## Báo lỗi
+
+Cách report bug ưu tiên là tạo issue trong GitHub repo này. Bạn cũng có thể report qua [Google Form](https://docs.google.com/forms/d/e/1FAIpQLSd7L7mHOo0ea8YXFI4tGnyDIj94ESn4hbbDa5YTbcEKTVOKTA/viewform).
+
+Vui lòng gồm:
+
+- phiên bản clisbot
+- channel và runner đã dùng
+- bạn kỳ vọng điều gì
+- thực tế xảy ra gì
+- output `clisbot status` hoặc `clisbot logs` liên quan, đã xóa secret
 
 ## Đóng góp
 
-Merge request luôn được chào đón.
+Pull request luôn được chào đón.
 
-MR có test thật, screenshot, hoặc recording của hành vi đang được test sẽ được merge nhanh hơn.
+PR có test thật, screenshot, hoặc recording của behavior được test sẽ được merge nhanh hơn.

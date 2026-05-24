@@ -36,9 +36,13 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.zaloBot.defaults.dmPolicy).toBe("pairing");
     expect(config.bots.zaloPersonal.defaults.enabled).toBe(false);
     expect(config.bots.zaloPersonal.defaults.mode).toBe("listener");
-    expect(config.bots.zaloPersonal.defaults.dmPolicy).toBe("disabled");
+    expect(config.bots.zaloPersonal.defaults.dmPolicy).toBe("allowlist");
     expect(config.bots.zaloPersonal.defaults.groupPolicy).toBe("allowlist");
-    expect(config.bots.zaloPersonal.defaults.directMessages).toEqual({});
+    expect(config.bots.zaloPersonal.defaults.directMessages["*"]).toMatchObject({
+      enabled: true,
+      policy: "allowlist",
+      allowUsers: [],
+    });
     expect(config.bots.zaloPersonal.defaults.followUp.mode).toBe("mention-only");
     expect("groupPolicy" in config.bots.zaloBot.defaults).toBe(false);
     expect(config.bots.slack.default.appToken).toBe("${SLACK_APP_TOKEN}");
@@ -46,7 +50,12 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.telegram.default.botToken).toBe("${TELEGRAM_BOT_TOKEN}");
     expect(config.bots.zaloBot.default.botToken).toBe("${ZALO_BOT_TOKEN}");
     expect(config.bots.zaloPersonal.default.credentialType).toBe("tokenFile");
-    expect(config.bots.zaloPersonal.default.dmPolicy).toBe("disabled");
+    expect(config.bots.zaloPersonal.default.dmPolicy).toBe("allowlist");
+    expect(config.bots.zaloPersonal.default.directMessages["*"]).toMatchObject({
+      enabled: true,
+      policy: "allowlist",
+      allowUsers: [],
+    });
     expect(config.bots.zaloPersonal.default.tokenFile).toBe(
       "~/.clisbot/credentials/zalo-personal/default/auth-session",
     );
@@ -76,6 +85,16 @@ describe("renderDefaultConfigTemplate", () => {
     });
     expect(config.agents.defaults.defaultAgentId).toBe("default");
     expect(config.agents.defaults.auth.defaultRole).toBe("member");
+    expect(config.agents.defaults.auth.roles.admin.allow).toContain("contactsManage");
+    expect(config.agents.defaults.auth.roles.admin.allow).toContain("groupsManage");
+    expect(config.agents.defaults.auth.roles.admin.allow).toContain(
+      "sensitiveChannelActionManage",
+    );
+    expect(config.agents.defaults.auth.roles.member.allow).not.toContain("contactsManage");
+    expect(config.agents.defaults.auth.roles.member.allow).not.toContain("groupsManage");
+    expect(config.agents.defaults.auth.roles.member.allow).not.toContain(
+      "sensitiveChannelActionManage",
+    );
     expect(config.agents.defaults.runner.defaults.startupDelayMs).toBeUndefined();
     expect(JSON.stringify(config)).not.toContain("privilegeCommands");
     expect(config.bots.defaults.timezone).toBeUndefined();
@@ -159,7 +178,7 @@ describe("renderDefaultConfigTemplate", () => {
     const parsed = JSON.parse(text);
     const config = clisbotConfigSchema.parse(parsed);
 
-    expect(config.meta.schemaVersion).toBe("0.1.50");
+    expect(config.meta.schemaVersion).toBe("0.1.53");
     expect(Object.keys(config)).toEqual(["meta", "app", "bots", "agents"]);
     expect(config.agents.defaults.runner.defaults.startupDelayMs).toBe(60000);
     expect(config.bots.slack.defaults.defaultBotId).toBe("default");
@@ -174,7 +193,7 @@ describe("renderDefaultConfigTemplate", () => {
     const editable = await readEditableConfig(
       new URL("../config/clisbot.json.template", import.meta.url).pathname,
     );
-    expect(editable.config.meta.schemaVersion).toBe("0.1.50");
+    expect(editable.config.meta.schemaVersion).toBe("0.1.53");
     expect(editable.config.bots.slack.default.directMessages["*"]?.policy).toBe("pairing");
     expect(editable.config.bots.slack.default.groups["*"]?.policy).toBe("open");
   });

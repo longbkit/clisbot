@@ -530,7 +530,7 @@ describe("routes cli", () => {
     console.log = (() => {}) as typeof console.log;
 
     await runRoutesCli([
-      "add",
+      "set-policy",
       "--channel",
       "zalo-personal",
       "dm:*",

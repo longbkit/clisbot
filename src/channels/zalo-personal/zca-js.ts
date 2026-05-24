@@ -10,8 +10,7 @@ import {
 const DEFAULT_ZALO_PERSONAL_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0";
 const DEFAULT_ZALO_PERSONAL_LANGUAGE = "vi";
-const QR_TERMINAL_COLUMNS = 56;
-const QR_TERMINAL_BORDER = 2;
+const QR_TERMINAL_QUIET_MODULES = 4;
 
 type ZcaJsModule = typeof import("zca-js");
 type ZaloPersonalApi = Awaited<ReturnType<InstanceType<ZcaJsModule["Zalo"]>["login"]>>;
@@ -39,25 +38,116 @@ function stripPngDataUrlPrefix(image: string) {
 }
 
 function renderPngAsTerminalQr(png: PNG) {
-  const width = Math.min(QR_TERMINAL_COLUMNS, png.width);
-  const height = Math.max(1, Math.round(width * png.height / png.width));
+  const modules = extractQrModules(png) ?? samplePngAsQrModules(png);
+  const padded = padQrModules(modules, QR_TERMINAL_QUIET_MODULES);
   const lines: string[] = [];
-  for (let y = -QR_TERMINAL_BORDER; y < height + QR_TERMINAL_BORDER; y += 2) {
+  if (padded.length % 2 === 1) {
+    padded.push(new Array(padded[0]?.length ?? 0).fill(false));
+  }
+
+  for (let y = 0; y < padded.length; y += 2) {
     const line: string[] = [];
-    for (let x = -QR_TERMINAL_BORDER; x < width + QR_TERMINAL_BORDER; x++) {
-      line.push(renderHalfBlock(sampleDark(png, x, y, width, height), sampleDark(png, x, y + 1, width, height)));
+    for (let x = 0; x < (padded[y]?.length ?? 0); x++) {
+      line.push(renderHalfBlock(padded[y]?.[x] ?? false, padded[y + 1]?.[x] ?? false));
     }
     lines.push(`${line.join("")}\x1b[0m`);
   }
   return lines.join("\n");
 }
 
-function sampleDark(png: PNG, outX: number, outY: number, outWidth: number, outHeight: number) {
-  if (outX < 0 || outY < 0 || outX >= outWidth || outY >= outHeight) {
+function extractQrModules(png: PNG) {
+  const bounds = findDarkBounds(png);
+  if (!bounds) {
+    return null;
+  }
+  const moduleCount = inferQrModuleCount(bounds.width, bounds.height);
+  if (!moduleCount) {
+    return null;
+  }
+  const stepX = bounds.width / moduleCount;
+  const stepY = bounds.height / moduleCount;
+  return Array.from({ length: moduleCount }, (_, row) =>
+    Array.from({ length: moduleCount }, (_, col) =>
+      isDarkPngPixel(
+        png,
+        Math.round(bounds.minX + (col + 0.5) * stepX),
+        Math.round(bounds.minY + (row + 0.5) * stepY),
+      )
+    )
+  );
+}
+
+function findDarkBounds(png: PNG) {
+  let minX = png.width;
+  let minY = png.height;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < png.height; y++) {
+    for (let x = 0; x < png.width; x++) {
+      if (!isDarkPngPixel(png, x, y)) {
+        continue;
+      }
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  return maxX >= minX && maxY >= minY
+    ? { minX, minY, width: maxX - minX + 1, height: maxY - minY + 1 }
+    : null;
+}
+
+function inferQrModuleCount(width: number, height: number) {
+  let best: { count: number; score: number } | undefined;
+  for (let count = 21; count <= 177; count += 4) {
+    const stepX = width / count;
+    const stepY = height / count;
+    const roundedX = Math.round(stepX);
+    const roundedY = Math.round(stepY);
+    const score = Math.abs(stepX - roundedX) + Math.abs(stepY - roundedY);
+    if (roundedX < 2 || roundedY < 2 || Math.abs(stepX - stepY) > 0.25) {
+      continue;
+    }
+    if (!best || score < best.score) {
+      best = { count, score };
+    }
+  }
+  return best && best.score < 0.1 ? best.count : null;
+}
+
+function samplePngAsQrModules(png: PNG) {
+  const width = Math.min(56, png.width);
+  const height = Math.max(1, Math.round(width * png.height / png.width));
+  return Array.from({ length: height }, (_, row) =>
+    Array.from({ length: width }, (_, col) =>
+      isDarkPngPixel(
+        png,
+        Math.floor((col + 0.5) * png.width / width),
+        Math.floor((row + 0.5) * png.height / height),
+      )
+    )
+  );
+}
+
+function padQrModules(modules: boolean[][], border: number) {
+  const width = modules[0]?.length ?? 0;
+  const quietRow = new Array(width + border * 2).fill(false);
+  return [
+    ...Array.from({ length: border }, () => [...quietRow]),
+    ...modules.map((row) => [
+      ...new Array(border).fill(false),
+      ...row,
+      ...new Array(border).fill(false),
+    ]),
+    ...Array.from({ length: border }, () => [...quietRow]),
+  ];
+}
+
+function isDarkPngPixel(png: PNG, x: number, y: number) {
+  if (x < 0 || y < 0 || x >= png.width || y >= png.height) {
     return false;
   }
-  const x = Math.min(png.width - 1, Math.floor((outX + 0.5) * png.width / outWidth));
-  const y = Math.min(png.height - 1, Math.floor((outY + 0.5) * png.height / outHeight));
   const offset = (png.width * y + x) << 2;
   const alpha = png.data[offset + 3] ?? 255;
   const luminance = 0.2126 * (png.data[offset] ?? 255) +

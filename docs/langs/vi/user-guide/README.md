@@ -11,11 +11,12 @@ Nó nên giúp bạn trả lời:
 - khởi động bot thế nào
 - kiểm tra và xử lý sự cố ra sao
 - credential, route, auth, và agent được quản lý thế nào
-- Slack/Telegram có lưu ý riêng gì
+- Slack, Telegram, Zalo Bot, và Zalo Personal có lưu ý riêng gì
 
 ## Nên đọc gì đầu tiên
 
 - [Routes và ngữ cảnh chat](./channels.md)
+- [Mô hình truy cập surface](./surface-access-model.md)
 - [Bots và credentials](./bots-and-credentials.md)
 - [Lệnh CLI](./cli-commands.md)
 - [Vận hành runtime](./runtime-operations.md)
@@ -25,6 +26,8 @@ Nó nên giúp bạn trả lời:
 
 - [Thiết lập Telegram bot](./telegram-setup.md)
 - [Thiết lập Slack app](./slack-setup.md)
+- [Thiết lập Zalo Bot](./zalo-bot-setup.md)
+- [Zalo Personal](./zalo-personal.md)
 - [Hướng dẫn Codex CLI](./codex-cli.md)
 - [Hướng dẫn Claude CLI](./claude-cli.md)
 - [Hướng dẫn Gemini CLI](./gemini-cli.md)
@@ -49,6 +52,7 @@ Sau đó ưu tiên nhớ các lệnh khắc phục nhanh sau:
 - [Quyền truy cập và vai trò](./auth-and-roles.md)
 - [Bots và credentials](./bots-and-credentials.md)
 - [Routes và ngữ cảnh chat](./channels.md)
+- [Mô hình truy cập surface](./surface-access-model.md)
 - [Hướng dẫn Claude CLI](./claude-cli.md)
 - [Lệnh CLI](./cli-commands.md)
 - [Hướng dẫn Codex CLI](./codex-cli.md)
@@ -58,6 +62,9 @@ Sau đó ưu tiên nhớ các lệnh khắc phục nhanh sau:
 - [Thiết lập Slack app](./slack-setup.md)
 - [Lệnh slash](./slash-commands.md)
 - [Thiết lập Telegram bot](./telegram-setup.md)
+- [Thiết lập Zalo Bot](./zalo-bot-setup.md)
+- [Zalo Personal](./zalo-personal.md)
+- [Generic README backup](../../../user-guide/generic-readme.md) (English source)
 
 ## Cách đọc nhóm này
 

@@ -1,41 +1,10 @@
-import { basename } from "node:path";
-import { downloadRemoteBuffer } from "../../agents/attachments/download.ts";
-import { saveWorkspaceAttachment } from "../../agents/attachments/storage.ts";
+import {
+  inferRemoteAttachmentFilename,
+  isSupportedRemoteAttachmentUrl,
+  saveRemoteWorkspaceAttachment,
+  summarizeRemoteAttachmentUrl,
+} from "../../agents/attachments/remote.ts";
 import type { ZaloBotMessage } from "./api.ts";
-
-const ZALO_BOT_ATTACHMENT_RETRY_DELAYS_MS = [250, 750];
-
-function isSupportedRemoteAttachmentUrl(rawUrl: string | undefined) {
-  if (!rawUrl) {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(rawUrl);
-    return parsed.protocol === "https:" || parsed.protocol === "http:";
-  } catch {
-    return false;
-  }
-}
-
-function inferAttachmentFilename(url: string, fallbackName: string) {
-  try {
-    const parsed = new URL(url);
-    const fileName = basename(parsed.pathname);
-    return fileName || fallbackName;
-  } catch {
-    return fallbackName;
-  }
-}
-
-function summarizeAttachmentUrl(rawUrl: string) {
-  try {
-    const parsed = new URL(rawUrl);
-    return `${parsed.host}${parsed.pathname}`;
-  } catch {
-    return rawUrl;
-  }
-}
 
 async function downloadZaloBotAttachment(params: {
   url: string;
@@ -45,33 +14,7 @@ async function downloadZaloBotAttachment(params: {
   originalFilename: string;
   defaultBaseName: string;
 }) {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= ZALO_BOT_ATTACHMENT_RETRY_DELAYS_MS.length; attempt += 1) {
-    try {
-      const downloaded = await downloadRemoteBuffer({
-        url: params.url,
-      });
-      return saveWorkspaceAttachment({
-        workspacePath: params.workspacePath,
-        sessionKey: params.sessionKey,
-        messageId: params.messageId,
-        buffer: downloaded.buffer,
-        originalFilename: params.originalFilename,
-        contentType: downloaded.contentType,
-        defaultBaseName: params.defaultBaseName,
-      });
-    } catch (error) {
-      lastError = error;
-      if (attempt >= ZALO_BOT_ATTACHMENT_RETRY_DELAYS_MS.length) {
-        break;
-      }
-      await Bun.sleep(ZALO_BOT_ATTACHMENT_RETRY_DELAYS_MS[attempt]!);
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error(`zalo-bot attachment download failed for ${summarizeAttachmentUrl(params.url)}`);
+  return saveRemoteWorkspaceAttachment(params);
 }
 
 export async function resolveZaloBotAttachmentPaths(params: {
@@ -89,7 +32,7 @@ export async function resolveZaloBotAttachmentPaths(params: {
         workspacePath: params.workspacePath,
         sessionKey: params.sessionKey,
         messageId: params.messageId,
-        originalFilename: inferAttachmentFilename(
+        originalFilename: inferRemoteAttachmentFilename(
           params.message.photo_url!,
           "zalo-bot-photo",
         ),
@@ -99,7 +42,7 @@ export async function resolveZaloBotAttachmentPaths(params: {
     } catch (error) {
       console.error("zalo-bot photo download failed", {
         messageId: params.message.message_id,
-        url: summarizeAttachmentUrl(params.message.photo_url!),
+        url: summarizeRemoteAttachmentUrl(params.message.photo_url!),
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -112,7 +55,7 @@ export async function resolveZaloBotAttachmentPaths(params: {
         workspacePath: params.workspacePath,
         sessionKey: params.sessionKey,
         messageId: params.messageId,
-        originalFilename: inferAttachmentFilename(
+        originalFilename: inferRemoteAttachmentFilename(
           params.message.sticker!,
           "zalo-bot-sticker",
         ),
@@ -122,7 +65,7 @@ export async function resolveZaloBotAttachmentPaths(params: {
     } catch (error) {
       console.error("zalo-bot sticker download failed", {
         messageId: params.message.message_id,
-        url: summarizeAttachmentUrl(params.message.sticker!),
+        url: summarizeRemoteAttachmentUrl(params.message.sticker!),
         error: error instanceof Error ? error.message : String(error),
       });
     }

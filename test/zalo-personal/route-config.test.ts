@@ -57,7 +57,7 @@ function createLoadedConfig(): LoadedConfig {
 }
 
 describe("Zalo Personal route resolution", () => {
-  test("does not admit every direct message from template defaults", () => {
+  test("defaults direct messages to a silent allowlist route", () => {
     const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
     config.bots.zaloPersonal.defaults.enabled = true;
     config.bots.zaloPersonal.default.enabled = true;
@@ -83,8 +83,12 @@ describe("Zalo Personal route resolution", () => {
       senderId: "friend-1",
     });
 
-    expect(resolved.route).toBeNull();
-    expect(resolved.status).toBe("disabled");
+    expect(resolved.status).toBe("admitted");
+    expect(resolved.route).toMatchObject({
+      policy: "allowlist",
+      allowUsers: [],
+      requireMention: false,
+    });
   });
 
   test("requires an exact group route when group admission is allowlist", () => {

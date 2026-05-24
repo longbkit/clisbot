@@ -43,11 +43,44 @@ function renderContactsHelp() {
   ].join("\n");
 }
 
+function renderFriendInvitesHelp(action?: string) {
+  const usageByAction: Record<string, string> = {
+    list: "contacts friend-invites list --channel zalo-personal --bot <id> [--direction incoming|sent|all] [--json]",
+    status: "contacts friend-invites status --channel zalo-personal --bot <id> <user-id> [--json]",
+    send: "contacts friend-invites send --channel zalo-personal --bot <id> --user <user-id> [--user <user-id>...] [--phone <phone>...] [--message <text>] --confirm [--json]",
+    accept: "contacts friend-invites accept --channel zalo-personal --bot <id> <request-id-or-user-id> --confirm [--json]",
+    reject: "contacts friend-invites reject --channel zalo-personal --bot <id> <request-id-or-user-id> --confirm [--json]",
+    cancel: "contacts friend-invites cancel --channel zalo-personal --bot <id> <request-id-or-user-id> --confirm [--json]",
+  };
+  const actions = action && usageByAction[action]
+    ? [usageByAction[action]]
+    : Object.values(usageByAction);
+  return [
+    renderCliCommand("contacts friend-invites"),
+    "",
+    "Usage:",
+    ...actions.map((usage) => `  ${renderCliCommand(usage)}`),
+    "",
+    "Notes:",
+    "  - status takes the target Zalo user id.",
+    "  - accept/reject take an inbound request id or user id and require --confirm.",
+    "  - cancel takes an outbound request user id and requires --confirm.",
+  ].join("\n");
+}
+
 export async function runContactsCli(
   args: string[],
   deps: ZaloPersonalCliDependencies = defaultZaloPersonalCliDependencies,
 ) {
-  if (!args[0] || args[0] === "help" || hasFlag(args, "--help")) {
+  if (!args[0] || args[0] === "help") {
+    deps.print(renderContactsHelp());
+    return;
+  }
+  if (args[0] === "friend-invites" && (!args[1] || args[1] === "help" || hasFlag(args, "--help"))) {
+    deps.print(renderFriendInvitesHelp(args[1] === "help" ? args[2] : args[1]));
+    return;
+  }
+  if (hasFlag(args, "--help")) {
     deps.print(renderContactsHelp());
     return;
   }

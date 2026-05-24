@@ -79,7 +79,7 @@ describe("zalo-personal zca-js wrapper", () => {
 
       expect(logs.some((line) => line.includes("Zalo Personal QR login only"))).toBe(true);
       expect(logs.some((line) => line.includes("\x1b["))).toBe(true);
-      expect(maxVisibleQrLineWidth(logs)).toBeLessThanOrEqual(60);
+      expect(maxVisibleQrLineWidth(logs)).toBeLessThanOrEqual(50);
       expect(logs.some((line) => line.includes("not-a-login-qr"))).toBe(false);
       expect(logs.some((line) => line.includes("QR save failed"))).toBe(true);
       const session = JSON.parse(readFileSync(tokenFile, "utf8"));
@@ -139,11 +139,26 @@ describe("zalo-personal zca-js wrapper", () => {
 });
 
 function buildQrPngBase64() {
-  const png = new PNG({ width: 128, height: 128 });
+  const moduleCount = 41;
+  const moduleSize = 9;
+  const quietPx = 15;
+  const png = new PNG({
+    width: moduleCount * moduleSize + quietPx * 2,
+    height: moduleCount * moduleSize + quietPx * 2,
+  });
   for (let y = 0; y < png.height; y++) {
     for (let x = 0; x < png.width; x++) {
       const offset = (png.width * y + x) << 2;
-      const dark = x === y || x + y === png.width - 1;
+      const moduleX = Math.floor((x - quietPx) / moduleSize);
+      const moduleY = Math.floor((y - quietPx) / moduleSize);
+      const inQr = moduleX >= 0 && moduleY >= 0 && moduleX < moduleCount && moduleY < moduleCount;
+      const dark = inQr && (
+        moduleX === 0 ||
+        moduleY === 0 ||
+        moduleX === moduleCount - 1 ||
+        moduleY === moduleCount - 1 ||
+        (moduleX + moduleY) % 3 === 0
+      );
       const value = dark ? 0 : 255;
       png.data[offset] = value;
       png.data[offset + 1] = value;

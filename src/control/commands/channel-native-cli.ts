@@ -23,18 +23,198 @@ import {
 } from "./zalo-personal-cli-common.ts";
 import { renderCliCommand } from "./cli-name.ts";
 
-function renderChannelNativeHelp() {
+const channelNativeMessageUsages = [
+  "messages send --target <target> --message <text> [--quote <json>] [--mention <uid:pos:len>...] [--style <style:pos:len>...] [--urgency default|important|urgent|0|1|2] [--ttl <ms>]",
+  "messages link send --target <target> <url> [--message <text>] [--ttl <ms>]",
+  "messages video send --target <target> --file <path-or-url> --thumbnail <path-or-url> [--message <text>] [--duration-ms <ms>] [--width <px>] [--height <px>] [--ttl <ms>]",
+  "messages parse-link <url> [--json]",
+  "messages upload --target <target> --file <path-or-url> [--json]",
+  "messages contact-card|bank-card|typing|delivered|seen|undo|forward|polls|report ...",
+];
+
+const channelNativeStickerUsages = [
+  "stickers list --query <query> [--limit <n>] [--detail] [--json]",
+  "stickers search <query> [--limit <n>] [--detail] [--json]",
+  "stickers get <sticker-id> [--json]",
+  "stickers send --target <target> --id <id> --category <cate-id> --type <type> [--json]",
+  "stickers categories get <category-id> [--json]",
+];
+
+const defaultStickerLimit = 10;
+
+const channelNativeMessageHelp: Record<string, { usages: string[]; notes: string[] }> = {
+  send: {
+    usages: [channelNativeMessageUsages[0]],
+    notes: [
+      "--target accepts dm:<id> or group:<id>.",
+      "Prefer mention placeholders in --message, for example <@uid|Name>; --mention is the low-level uid:pos:len fallback.",
+      "--style accepts style:pos:len. Styles: bold, italic, underline, strike, red, orange, yellow, green, small, big, unordered-list, ordered-list, indent.",
+    ],
+  },
+  link: {
+    usages: [channelNativeMessageUsages[1], "messages parse-link <url> [--json]"],
+    notes: ["Zalo parses title, description, thumbnail, and source metadata from the URL."],
+  },
+  video: {
+    usages: [channelNativeMessageUsages[2]],
+    notes: [
+      "--file and --thumbnail accept local paths or URLs; clisbot downloads first, uploads both to Zalo, then sends the native video payload.",
+      "Provide a real thumbnail image when preview quality matters; do not rely on Zalo to generate a stable first-frame thumbnail.",
+    ],
+  },
+  "parse-link": {
+    usages: [channelNativeMessageUsages[3]],
+    notes: ["Returns Zalo's parsed link metadata without sending a message."],
+  },
+  upload: {
+    usages: [channelNativeMessageUsages[4]],
+    notes: ["Diagnostic/pre-upload helper. Normal sends with --file should use the shared message command when possible."],
+  },
+  "contact-card": {
+    usages: ["messages contact-card send --target <target> --user <user-id> [--json]"],
+    notes: ["Sends a Zalo-native contact card for one user id."],
+  },
+  "bank-card": {
+    usages: ["messages bank-card send --target <target> --bin-bank <json-or-code> --account-number <account-number> [--account-name <name>] [--json]"],
+    notes: ["--bin-bank may be a bank code or the JSON payload expected by zca-js."],
+  },
+  typing: {
+    usages: ["messages typing --target <target> [--json]"],
+    notes: ["Sends one Zalo typing indicator event."],
+  },
+  delivered: {
+    usages: ["messages delivered --target <target> --message-id <msgId[:cliMsgId[:uidFrom[:ts]]]> [--json]"],
+    notes: ["--message-id also accepts the raw JSON locator payload."],
+  },
+  seen: {
+    usages: ["messages seen --target <target> --message-id <msgId[:cliMsgId[:uidFrom[:ts]]]> [--json]"],
+    notes: ["--message-id also accepts the raw JSON locator payload."],
+  },
+  undo: {
+    usages: ["messages undo --target <target> --message-id <msgId[:cliMsgId]> --confirm [--json]"],
+    notes: ["Recalls one sent message and requires --confirm."],
+  },
+  forward: {
+    usages: ["messages forward --to <target> --message <text> [--reference <json>] [--ttl <ms>] --confirm [--json]"],
+    notes: ["Forwards the supplied message payload; it does not fetch a source message by id. Requires --confirm."],
+  },
+  report: {
+    usages: ["messages report --target <target> --reason sensitive|annoy|fraud|other [--content <text>] --confirm [--json]"],
+    notes: ["Reports a Zalo conversation/message target and requires --confirm."],
+  },
+};
+
+const channelNativePollsHelp: Record<string, { usages: string[]; notes: string[] }> = {
+  add: {
+    usages: ["messages polls add --target <target> --question <text> --option <text>... [--json]"],
+    notes: ["Creates a poll in the target conversation."],
+  },
+  vote: {
+    usages: ["messages polls vote --target <target> --poll-id <id> --option <id>... [--json]"],
+    notes: ["Votes for one or more poll option ids."],
+  },
+  lock: {
+    usages: ["messages polls lock --target <target> --poll-id <id> --confirm [--json]"],
+    notes: ["Locks/closes a poll and requires --confirm."],
+  },
+  get: {
+    usages: ["messages polls get --target <target> --poll-id <id> --confirm [--json]"],
+    notes: ["Fetches poll detail/results. Treat as sensitive because provider payloads may include voter ids."],
+  },
+  options: {
+    usages: ["messages polls options add --target <target> --poll-id <id> --option <text>... --confirm [--json]"],
+    notes: ["Adds options to an existing poll and requires --confirm."],
+  },
+  share: {
+    usages: ["messages polls share --poll-id <id> --confirm [--json]"],
+    notes: ["Shares a poll through zca-js' native endpoint; current zca-js does not expose a destination flag. Requires --confirm."],
+  },
+};
+
+function renderChannelNativeHelp(path: string[] = []) {
+  if (path[0] === "messages") return renderChannelNativeMessagesHelp(path.slice(1));
+  if (path[0] === "stickers") return renderChannelNativeStickersHelp(path.slice(1));
   return [
     renderCliCommand("channel-native"),
     "",
     "Usage:",
-    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages send --target <target> --message <text> [--quote <json>] [--mention <uid:pos:len>...] [--style <style:pos:len>...] [--urgency default|important|urgent|0|1|2] [--ttl <ms>]")}`,
-    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages link send --target <target> <url> [--message <text>] [--ttl <ms>]")}`,
-    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages video send --target <target> --file <path-or-url> --thumbnail <path-or-url> [--message <text>] [--duration-ms <ms>] [--width <px>] [--height <px>] [--ttl <ms>]")}`,
-    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages parse-link <url> [--json]")}`,
-    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages upload --target <target> --file <path> [--json]")}`,
-    `  ${renderCliCommand("channel-native --channel zalo-personal --bot <id> messages contact-card|bank-card|typing|delivered|seen|undo|forward|polls|report ...")}`,
+    ...channelNativeMessageUsages.map((usage) => (
+      `  ${renderCliCommand(`channel-native --channel zalo-personal --bot <id> ${usage}`)}`
+    )),
+    ...channelNativeStickerUsages.map((usage) => (
+      `  ${renderCliCommand(`channel-native --channel zalo-personal --bot <id> ${usage}`)}`
+    )),
+    "",
+    "Help:",
+    `  ${renderCliCommand("channel-native --channel zalo-personal messages send --help")}`,
+    `  ${renderCliCommand("channel-native --channel zalo-personal messages polls --help")}`,
+    `  ${renderCliCommand("channel-native --channel zalo-personal stickers --help")}`,
   ].join("\n");
+}
+
+function renderChannelNativeMessagesHelp(path: string[]) {
+  if (!path[0]) return renderHelpBlock("channel-native messages", channelNativeMessageUsages, [
+    "--target accepts dm:<id> or group:<id>.",
+    "Use subcommand --help for exact flags and confirmation requirements.",
+  ]);
+  if (path[0] === "polls") return renderChannelNativePollsHelp(path.slice(1));
+  const help = channelNativeMessageHelp[path[0]];
+  if (help) return renderHelpBlock(`channel-native messages ${path[0]}`, help.usages, help.notes);
+  return renderHelpBlock("channel-native messages", channelNativeMessageUsages, [
+    "Unknown messages subcommand. Use one of: send, link, video, parse-link, upload, contact-card, bank-card, typing, delivered, seen, undo, forward, polls, report.",
+  ]);
+}
+
+function renderChannelNativePollsHelp(path: string[]) {
+  const key = path[0] === "options" ? "options" : path[0];
+  const help = key ? channelNativePollsHelp[key] : undefined;
+  if (help) return renderHelpBlock(`channel-native messages polls ${key}`, help.usages, help.notes);
+  return renderHelpBlock("channel-native messages polls", Object.values(channelNativePollsHelp).flatMap((entry) => entry.usages), [
+    "Mutating poll operations lock, options add, and share require --confirm.",
+    "Poll detail reads require --confirm because provider payloads may include voter ids.",
+  ]);
+}
+
+function renderChannelNativeStickersHelp(path: string[]) {
+  const action = path[0] === "categories" ? "categories" : path[0];
+  const usages = action === "send"
+    ? [channelNativeStickerUsages[3]]
+    : action === "categories"
+    ? [channelNativeStickerUsages[4]]
+    : channelNativeStickerUsages;
+  return renderHelpBlock("channel-native stickers", usages, [
+    "Use --detail to fetch enough metadata for inspection, then send with id, category, and type.",
+    "--target accepts dm:<id> or group:<id>.",
+  ]);
+}
+
+function renderHelpBlock(title: string, usages: string[], notes: string[]) {
+  return [
+    renderCliCommand(title),
+    "",
+    "Usage:",
+    ...usages.map((usage) => `  ${renderCliCommand(`channel-native --channel zalo-personal --bot <id> ${usage}`)}`),
+    "",
+    "Notes:",
+    ...notes.map((note) => `  - ${note}`),
+  ].join("\n");
+}
+
+function requireSensitiveConfirm(args: readonly string[], action: string) {
+  if (!hasFlag(args, "--confirm")) {
+    throw new Error(`${action} exposes sensitive Zalo Personal state and requires --confirm.`);
+  }
+}
+
+function channelNativeHelpPath(args: string[]) {
+  const helpArgs = args[0] === "help" ? args.slice(1) : args;
+  const messagesIndex = helpArgs.indexOf("messages");
+  const stickersIndex = helpArgs.indexOf("stickers");
+  if (messagesIndex === -1 && stickersIndex === -1) return [];
+  if (stickersIndex !== -1 && (messagesIndex === -1 || stickersIndex < messagesIndex)) {
+    return helpArgs.slice(stickersIndex).filter((arg) => !arg.startsWith("--"));
+  }
+  return helpArgs.slice(messagesIndex).filter((arg) => !arg.startsWith("--"));
 }
 
 export async function runChannelNativeCli(
@@ -42,7 +222,7 @@ export async function runChannelNativeCli(
   deps: ZaloPersonalCliDependencies = defaultZaloPersonalCliDependencies,
 ) {
   if (!args[0] || args[0] === "help" || hasFlag(args, "--help")) {
-    deps.print(renderChannelNativeHelp());
+    deps.print(renderChannelNativeHelp(channelNativeHelpPath(args)));
     return;
   }
   if (parseOptionValue(args, "--channel") !== "zalo-personal") {
@@ -51,8 +231,10 @@ export async function runChannelNativeCli(
   const ctx = await resolveZaloPersonalCliContext(args, deps);
   const api = ctx.client.api as any;
   const messagesIndex = args.indexOf("messages");
-  if (messagesIndex === -1) throw new Error(renderChannelNativeHelp());
-  return handleMessages(args.slice(messagesIndex + 1), args, deps, ctx.client, api);
+  const stickersIndex = args.indexOf("stickers");
+  if (messagesIndex !== -1) return handleMessages(args.slice(messagesIndex + 1), args, deps, ctx.client, api);
+  if (stickersIndex !== -1) return handleStickers(args.slice(stickersIndex + 1), args, deps, ctx.client, api);
+  throw new Error(renderChannelNativeHelp());
 }
 
 async function handleMessages(local: string[], global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {
@@ -173,7 +355,10 @@ async function handlePolls(local: string[], global: string[], deps: ZaloPersonal
   if (action === "add") return withTarget(global, client, async (target) => printRaw(global, deps, await api.createPoll({ question: parseRequiredOption(global, "--question"), options: parseRepeatedOption(global, "--option") }, target.id)));
   if (action === "vote") return printRaw(global, deps, await api.votePoll(Number(parseRequiredOption(global, "--poll-id")), parseRepeatedOption(global, "--option").map(Number)));
   if (action === "lock") return mutate(global, deps, () => api.lockPoll(Number(parseRequiredOption(global, "--poll-id"))), "messages polls lock");
-  if (action === "get") return printRaw(global, deps, await api.getPollDetail(Number(parseRequiredOption(global, "--poll-id"))));
+  if (action === "get") {
+    requireSensitiveConfirm(global, "messages polls get");
+    return printRaw(global, deps, await api.getPollDetail(Number(parseRequiredOption(global, "--poll-id"))));
+  }
   if (action === "options" && local[1] === "add") return mutate(global, deps, () => api.addPollOptions({ pollId: Number(parseRequiredOption(global, "--poll-id")), options: parseRepeatedOption(global, "--option").map((content) => ({ content, voted: false })), votedOptionIds: [] }), "messages polls options add");
   if (action === "share") return mutate(global, deps, () => api.sharePoll(Number(parseRequiredOption(global, "--poll-id"))), "messages polls share");
   throw new Error(renderChannelNativeHelp());
@@ -181,6 +366,49 @@ async function handlePolls(local: string[], global: string[], deps: ZaloPersonal
 
 async function report(global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {
   return mutate(global, deps, () => withTarget(global, client, (target) => api.sendReport({ reason: resolveReportReason(parseRequiredOption(global, "--reason")), content: parseOptionValue(global, "--content") ?? "" }, target.id, target.threadType)), "messages report");
+}
+
+async function handleStickers(local: string[], global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {
+  const action = local[0];
+  if (action === "list") return listStickers(global, deps, api);
+  if (action === "search") return searchStickers(local, global, deps, api);
+  if (action === "get") return printRaw(global, deps, firstStickerDetail(await api.getStickersDetail(parsePositiveInt(requireLocalPositional(local, 1, "sticker-id"), "sticker-id"))));
+  if (action === "send") return sendSticker(global, deps, client, api);
+  if (action === "categories" && local[1] === "get") {
+    return printRaw(global, deps, await api.getStickerCategoryDetail(parsePositiveInt(requireLocalPositional(local, 2, "category-id"), "category-id")));
+  }
+  throw new Error(renderChannelNativeHelp(["stickers"]));
+}
+
+async function listStickers(global: string[], deps: ZaloPersonalCliDependencies, api: any) {
+  const ids = (await api.getStickers(parseRequiredOption(global, "--query"))).slice(0, stickerLimit(global));
+  if (!hasFlag(global, "--detail")) return printRaw(global, deps, ids);
+  printRaw(global, deps, await detailStickers(api, ids));
+}
+
+async function searchStickers(local: string[], global: string[], deps: ZaloPersonalCliDependencies, api: any) {
+  const results = await api.searchSticker(requireLocalPositional(local, 1, "query"), stickerLimit(global));
+  if (!hasFlag(global, "--detail")) return printRaw(global, deps, results);
+  const ids = results.map((item: any) => item.sticker_id).filter((id: unknown) => Number.isInteger(id));
+  printRaw(global, deps, await detailStickers(api, ids));
+}
+
+async function detailStickers(api: any, ids: number[]) {
+  return ids.length === 0 ? [] : api.getStickersDetail(ids);
+}
+
+function stickerLimit(global: string[]) {
+  return parseIntOption(global, "--limit") ?? defaultStickerLimit;
+}
+
+async function sendSticker(global: string[], deps: ZaloPersonalCliDependencies, client: any, api: any) {
+  const target = parseZaloPersonalTarget(parseOptionValue(global, "--target"), client);
+  const payload = {
+    id: parsePositiveInt(parseRequiredOption(global, "--id"), "--id"),
+    cateId: parsePositiveInt(parseRequiredOption(global, "--category"), "--category"),
+    type: parsePositiveInt(parseRequiredOption(global, "--type"), "--type"),
+  };
+  printRaw(global, deps, await api.sendSticker(payload, target.id, target.threadType));
 }
 
 async function withTarget<T>(global: string[], client: any, fn: (target: ReturnType<typeof parseZaloPersonalTarget>) => Promise<T>) {
@@ -222,6 +450,16 @@ function parseIntOption(args: string[], name: string) {
   const value = Number.parseInt(raw, 10);
   if (!Number.isInteger(value) || value < 0) throw new Error(`${name} requires a non-negative integer.`);
   return value;
+}
+
+function parsePositiveInt(raw: string, label: string) {
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${label} requires a positive integer.`);
+  return value;
+}
+
+function firstStickerDetail(value: unknown) {
+  return Array.isArray(value) && value.length === 1 ? value[0] : value;
 }
 
 function requireLocalPositional(args: string[], index: number, label: string) {

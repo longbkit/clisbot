@@ -47,6 +47,11 @@
 | prompt | prompt | 제품 문서에서 무리한 순화 번역 지양 |
 | control plane | control plane / 제어 평면 | |
 | workflow | 작업 흐름 / 워크플로 | 일반 문장에서는 “작업 흐름”을 우선 |
+| OpenClaw / Hermes Agent | OpenClaw / Hermes Agent | 외부 project/product 이름은 유지 |
+| Zalo Bot | Zalo Bot | channel 이름은 유지 |
+| Zalo Personal | Zalo Personal | 이름 유지; main positioning에서는 alpha라고 부르지 않음 |
+| auto-skill | auto-skill / skill 자동 생성과 개선 | Hermes-style skill evolution 문맥에서 사용 |
+| channel surface | channel surface / 채널 대화 공간 | 독자용 문장에서는 “채널 대화 공간”도 사용 |
 
 ## 사용 규칙
 

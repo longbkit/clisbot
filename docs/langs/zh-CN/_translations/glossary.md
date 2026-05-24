@@ -43,6 +43,11 @@
 | prompt | prompt | 不建议硬译成“提示词”后到处替换。 |
 | control plane | control plane / 控制平面 | |
 | workflow | 工作流 / 工作流程 | 正文优先用“工作流”。 |
+| OpenClaw / Hermes Agent | OpenClaw / Hermes Agent | 作为外部项目/产品名保留。 |
+| Zalo Bot | Zalo Bot | 保留 channel 名称。 |
+| Zalo Personal | Zalo Personal | 保留名称；主定位里不再标为 alpha。 |
+| auto-skill | auto-skill / 自动创建和改进 skill | 用于 Hermes-style skill evolution 语境。 |
+| channel surface | channel surface / 渠道接入场景 | 面向读者时可写成“渠道场景”。 |
 
 ## 使用规则
 

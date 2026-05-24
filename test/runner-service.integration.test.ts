@@ -28,7 +28,7 @@ function createConfig(dir: string) {
   const sessionStorePath = join(stateDir, "sessions.json");
   const socketPath = join(stateDir, "clisbot.sock");
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
-  config.meta.schemaVersion = "0.1.51";
+  config.meta.schemaVersion = "0.1.53";
   mkdirSync(stateDir, { recursive: true });
 
   config.app.session.storePath = sessionStorePath;

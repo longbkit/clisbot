@@ -3,6 +3,7 @@ import {
   DEFAULT_AGENT_ADMIN_PERMISSIONS,
 } from "../../auth/defaults.ts";
 import {
+  hasEffectiveAgentPermission,
   normalizeAuthPrincipal,
   resolvePrincipalAuth,
   type ResolvedChannelAuth,
@@ -316,9 +317,7 @@ function permissionEntry(allowed: boolean, allowedText: string, deniedText = all
 }
 
 function buildEffectivePermissionEntries(auth: ResolvedChannelAuth) {
-  const appAdminLike = auth.appRole === "owner" || auth.appRole === "admin";
-  const agentPermissions = auth.agentPermissions ?? [];
-  const allows = (permission: string) => appAdminLike || agentPermissions.includes(permission);
+  const allows = (permission: string) => hasEffectiveAgentPermission(auth, permission);
   return {
     sendMessage: permissionEntry(
       allows("sendMessage"),
@@ -336,6 +335,18 @@ function buildEffectivePermissionEntries(auth: ResolvedChannelAuth) {
     runShellSlashCommand: permissionEntry(
       auth.canUseShell,
       "use shell through clisbot slash commands such as /bash. Normal agent workspace file reads/edits are separate from this permission.",
+    ),
+    manageContacts: permissionEntry(
+      allows("contactsManage"),
+      "use contact graph commands such as clisbot contacts for sensitive contact operations.",
+    ),
+    manageGroups: permissionEntry(
+      allows("groupsManage"),
+      "use provider group commands such as clisbot groups for sensitive group operations.",
+    ),
+    manageSensitiveChannelActions: permissionEntry(
+      allows("sensitiveChannelActionManage"),
+      "use other sensitive channel-native actions such as mutating Zalo Personal polls or reading poll voter ids.",
     ),
     manageProtectedResources: permissionEntry(
       auth.mayManageProtectedResources,

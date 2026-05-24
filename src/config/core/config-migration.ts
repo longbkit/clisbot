@@ -1,4 +1,5 @@
 import type { BotRouteConfig } from "./schema.ts";
+import { SENSITIVE_CHANNEL_ACTION_PERMISSIONS } from "../../auth/defaults.ts";
 import type { ChannelId } from "../../channels/integration/channel-surface-contract.ts";
 import { getHostTimezone } from "../runtime/timezone.ts";
 import {
@@ -24,7 +25,7 @@ import type {
   ChannelTopicRoutes,
 } from "../channels/channel-config-shapes.ts";
 
-export const CURRENT_SCHEMA_VERSION = "0.1.50";
+export const CURRENT_SCHEMA_VERSION = "0.1.53";
 const LEGACY_CONFIG_UPGRADE_MAX_SCHEMA_VERSION = "0.1.44";
 
 type Provider = ChannelId;
@@ -35,6 +36,65 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function cloneRecord(value: unknown) {
   return isRecord(value) ? { ...value } : {};
+}
+
+function appendMissingStrings(target: unknown, values: readonly string[]) {
+  const current = Array.isArray(target)
+    ? target.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const next = [...current];
+  for (const value of values) {
+    if (!next.includes(value)) {
+      next.push(value);
+    }
+  }
+  return {
+    changed: next.length !== current.length,
+    values: next,
+  };
+}
+
+function addSensitiveChannelPermissionsToAdminRole(role: unknown, options?: {
+  requireExistingAllow?: boolean;
+}) {
+  if (!isRecord(role)) {
+    return false;
+  }
+  if (options?.requireExistingAllow && !Array.isArray(role.allow)) {
+    return false;
+  }
+  const nextAllow = appendMissingStrings(
+    role.allow,
+    SENSITIVE_CHANNEL_ACTION_PERMISSIONS,
+  );
+  if (!nextAllow.changed) {
+    return false;
+  }
+  role.allow = nextAllow.values;
+  return true;
+}
+
+export function addMissingSensitiveChannelAdminPermissions(input: unknown) {
+  if (!isRecord(input)) {
+    return false;
+  }
+  const agents = isRecord(input.agents) ? input.agents : undefined;
+  const defaults = isRecord(agents?.defaults) ? agents.defaults : undefined;
+  const defaultAuth = isRecord(defaults?.auth) ? defaults.auth : undefined;
+  const defaultRoles = isRecord(defaultAuth?.roles) ? defaultAuth.roles : undefined;
+  let changed = addSensitiveChannelPermissionsToAdminRole(defaultRoles?.admin);
+
+  const agentList = Array.isArray(agents?.list) ? agents.list : [];
+  for (const agent of agentList) {
+    if (!isRecord(agent) || !isRecord(agent.auth) || !isRecord(agent.auth.roles)) {
+      continue;
+    }
+    changed = addSensitiveChannelPermissionsToAdminRole(agent.auth.roles.admin, {
+      requireExistingAllow: true,
+    }) || changed;
+  }
+
+  return changed;
 }
 
 function parseVersionParts(schemaVersion: string | undefined) {

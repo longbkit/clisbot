@@ -7,6 +7,7 @@ import {
   createBaseDefaultsSchema,
   createGroupDefault,
 } from "../config/config-schema-base.ts";
+import { createDefaultZaloPersonalDirectMessages } from "./defaults.ts";
 
 const zaloPersonalChannelSchemaContract = defineChannelSchemaContract({
   channel: "zalo-personal",
@@ -18,8 +19,8 @@ const zaloPersonalChannelSchemaContract = defineChannelSchemaContract({
       groups: z.record(z.string(), params.botRouteSchema).default({}),
     });
     const defaults = createBaseDefaults("listener", {
-      dmPolicy: "disabled",
-      directMessages: {},
+      dmPolicy: "allowlist",
+      directMessages: createDefaultZaloPersonalDirectMessages(),
       groups: createGroupDefault(),
       followUp: {
         mode: "mention-only",

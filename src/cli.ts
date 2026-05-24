@@ -221,7 +221,7 @@ const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
       name: "channel-native",
       summary: "Run explicitly channel-native commands that do not fit shared cross-channel surfaces.",
       usage: ["channel-native --channel <channel> --bot <id> <subtree...>"],
-      helpLines: ["                     Zalo Personal phase 3: messages enhanced send/link/upload/cards/polls/events."],
+      helpLines: ["                     Zalo Personal: messages send/link/video/upload/cards/polls/events. See `channel-native --help`."],
       passthroughArgs: true,
       handler: ({ passthroughArgs }) => ({ name: "channel-native", args: [...passthroughArgs] }),
     },
@@ -406,6 +406,7 @@ function renderRootCommandLines(configPath: string) {
       )
       .replace("`queues --help`", renderCliCommand("queues --help", { inline: true }))
       .replace("`message --help`", renderCliCommand("message --help", { inline: true }))
+      .replace("`channel-native --help`", renderCliCommand("channel-native --help", { inline: true }))
       .replace("`agents --help`", renderCliCommand("agents --help", { inline: true }))
       .replace("`auth --help`", renderCliCommand("auth --help", { inline: true }))
       .replace("`runner --help`", renderCliCommand("runner --help", { inline: true }))

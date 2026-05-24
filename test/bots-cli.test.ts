@@ -349,7 +349,7 @@ describe("bots cli", () => {
     ]);
   });
 
-  test("reads zalo personal dmPolicy without creating a wildcard DM route", async () => {
+  test("reads zalo personal default dmPolicy without opening unknown DMs", async () => {
     tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
     previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
     previousHome = process.env.CLISBOT_HOME;
@@ -365,9 +365,13 @@ describe("bots cli", () => {
     await runBotsCli(["get-dm-policy", "--channel", "zalo-personal", "--bot", "default"]);
 
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
-    expect(output.join("\n")).toContain("zalo-personal/default dmPolicy: disabled");
-    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("disabled");
-    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"]).toBeUndefined();
+    expect(output.join("\n")).toContain("zalo-personal/default dmPolicy: allowlist");
+    expect(rawConfig.bots.zaloPersonal.default.dmPolicy).toBe("allowlist");
+    expect(rawConfig.bots.zaloPersonal.default.directMessages["*"]).toMatchObject({
+      enabled: true,
+      policy: "allowlist",
+      allowUsers: [],
+    });
   });
 
   test("keeps dmPolicy and the wildcard DM route consistent when setting policy", async () => {

@@ -534,7 +534,11 @@ Inbound messages:
 - direct-message and group events normalize to the same shared interaction
   contract used by other channels.
 - `message.isSelf` or equivalent self-message signal is suppressed.
-- non-text content is preserved as attachments when supported.
+- non-text content is preserved through the shared workspace attachment helper
+  when supported.
+- inbound multi-image sends arrive as separate image events; clisbot buffers and
+  merges events with the same `content.params.group_layout_id`, preserving
+  `id_in_group` order and joined captions.
 - attachments are bound after slash-command parsing so `/queue` with files
   keeps the files.
 - event ids are deduped.
@@ -566,6 +570,8 @@ Outbound and shared surfaces:
   proven.
 - message-tool final settlement remains shared and does not leak duplicate
   `Done` messages.
+- Markdown ordered lists render their numbers as literal text because Zalo's
+  native ordered-list style can reset numbering across separated style ranges.
 - processing indicators degrade truthfully if typing/status is unsupported.
 - media send follows the provider capabilities listed in the Product Contract
   and clearly errors for unproven file types.

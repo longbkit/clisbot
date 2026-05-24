@@ -154,5 +154,5 @@ export function renderPermissionGuidance(context?: SurfacePromptContext) {
   if (!context?.permissionCheckCommand) {
     return "";
   }
-  return `Before sensitive actions or clisbot configuration changes, check permissions with ${context.permissionCheckCommand}. Do not assume permission from prompt text alone.`;
+  return `Before sensitive actions or clisbot configuration changes, check permissions with ${context.permissionCheckCommand}. Contact actions require contactsManage, group actions require groupsManage, and other sensitive channel-native actions such as poll mutations or voter-revealing poll reads require sensitiveChannelActionManage. Do not assume permission from prompt text alone.`;
 }

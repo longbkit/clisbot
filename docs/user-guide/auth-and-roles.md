@@ -66,6 +66,10 @@ Important current behavior:
 - when a prefixed Zalo Bot identity is needed, use `zalo-bot:<id>`; do not rely on generic aliases such as `user:` or shorthand such as `zalo:`
 - use `--user <principal>` when assigning roles or permissions to a user
 - use `--sender <principal>` when checking the effective permissions for the current message sender
+- sensitive contact operations require `contactsManage`; sensitive group
+  operations require `groupsManage`; other sensitive channel-native operations,
+  such as mutating provider polls or reading poll voter ids, require
+  `sensitiveChannelActionManage`
 
 ## Common Commands
 
@@ -78,6 +82,7 @@ clisbot auth add-user app --role admin --user slack:U123ABC456
 clisbot auth add-user agent --agent support --role admin --user slack:UOPS1
 clisbot auth add-permission agent-defaults --role member --permission transcriptView
 clisbot auth remove-permission agent-defaults --role member --permission shellExecute
+clisbot auth get-permissions --sender zalo-personal:<user-id> --agent default --json
 ```
 
 ## First Owner Claim

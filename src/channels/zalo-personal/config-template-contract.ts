@@ -3,6 +3,7 @@ import {
   createStandardChannelProviderDefaultsTemplate,
   defineChannelTemplateContract,
 } from "../../config/channels/channel-template-defaults.ts";
+import { createDefaultZaloPersonalDirectMessages } from "./defaults.ts";
 import { buildDefaultZaloPersonalTokenFile } from "./session-path.ts";
 
 const zaloPersonalChannelTemplateContract = defineChannelTemplateContract({
@@ -15,8 +16,8 @@ const zaloPersonalChannelTemplateContract = defineChannelTemplateContract({
         enabled,
         mode: "listener",
         extra: {
-          dmPolicy: "disabled",
-          directMessages: {},
+          dmPolicy: "allowlist",
+          directMessages: createDefaultZaloPersonalDirectMessages(),
           followUp: {
             mode: "mention-only",
           },
@@ -26,7 +27,8 @@ const zaloPersonalChannelTemplateContract = defineChannelTemplateContract({
         enabled,
         extra: {
           credentialType: "tokenFile",
-          dmPolicy: "disabled",
+          dmPolicy: "allowlist",
+          directMessages: createDefaultZaloPersonalDirectMessages(),
           tokenFile: buildDefaultZaloPersonalTokenFile("default"),
           followUp: {
             mode: "mention-only",

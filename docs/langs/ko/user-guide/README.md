@@ -11,11 +11,12 @@
 - bot을 어떻게 시작하는가
 - 어떻게 점검하고 문제를 찾는가
 - credentials, routes, auth, agents를 어떻게 관리하는가
-- Slack과 Telegram에서 각각 무엇을 조심해야 하는가
+- Slack, Telegram, Zalo Bot, Zalo Personal에서 각각 무엇을 조심해야 하는가
 
 ## 먼저 볼 문서
 
 - [라우트와 채팅 표면](./channels.md)
+- [Surface Access Model](./surface-access-model.md)
 - [봇과 자격 증명](./bots-and-credentials.md)
 - [CLI 명령](./cli-commands.md)
 - [Runtime 운영](./runtime-operations.md)
@@ -25,6 +26,8 @@
 
 - [Telegram bot 설정](./telegram-setup.md)
 - [Slack app 설정](./slack-setup.md)
+- [Zalo Bot Setup](./zalo-bot-setup.md)
+- [Zalo Personal](./zalo-personal.md)
 - [Codex CLI 가이드](./codex-cli.md)
 - [Claude CLI 가이드](./claude-cli.md)
 - [Gemini CLI 가이드](./gemini-cli.md)
@@ -49,6 +52,7 @@ clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegra
 - [권한과 역할](./auth-and-roles.md)
 - [봇과 자격 증명](./bots-and-credentials.md)
 - [라우트와 채팅 표면](./channels.md)
+- [Surface Access Model](./surface-access-model.md)
 - [Claude CLI 가이드](./claude-cli.md)
 - [CLI 명령](./cli-commands.md)
 - [Codex CLI 가이드](./codex-cli.md)
@@ -58,6 +62,9 @@ clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegra
 - [Slack app 설정](./slack-setup.md)
 - [슬래시 명령](./slash-commands.md)
 - [Telegram bot 설정](./telegram-setup.md)
+- [Zalo Bot Setup](./zalo-bot-setup.md)
+- [Zalo Personal](./zalo-personal.md)
+- [Generic README Backup](../../../user-guide/generic-readme.md) (English source)
 
 ## 추천 읽기 순서
 

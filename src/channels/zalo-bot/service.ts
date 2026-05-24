@@ -37,6 +37,7 @@ import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 import type { ChannelRuntimeLifecycleEvent } from "../integration/channel-plugin.ts";
 import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
 import {
+  chainOrderedIngressAccepted,
   OrderedIngressDispatcher,
   type OrderedIngressControls,
 } from "../message/ordered-ingress-dispatcher.ts";
@@ -489,13 +490,12 @@ export class ZaloBotPollingService {
         promptContext,
         protectedControlMutationRule,
         transformSessionInputText: enrichPromptText,
-        onPromptAccepted: async () => {
+        onPromptAccepted: chainOrderedIngressAccepted(controls, async () => {
           await this.agentService.markRecentConversationProcessed(
             sessionTarget,
             recentMessageMarker,
           );
-          controls?.markAccepted();
-        },
+        }),
         route,
         maxChars: 2000,
         canUpdateLiveReply: false,

@@ -79,6 +79,17 @@ describe("zalo personal operator command surface", () => {
     });
   });
 
+  test("zalo native markdown preserves ordered list numbers literally", () => {
+    expect(renderZaloPersonalMessage({
+      text: "1. first\n\n- nested\n\n2. second",
+      inputFormat: "md",
+      renderMode: "native",
+    })).toEqual({
+      text: "1. first\n\nnested\n\n2. second",
+      styles: [{ start: 10, len: 6, st: TextStyle.UnorderedList }],
+    });
+  });
+
   test("zalo native markdown supports nested color and emphasis tags", () => {
     expect(renderZaloPersonalMessage({
       text: "**{red}x{/red}** {green}**y**{/green}",
@@ -150,6 +161,18 @@ describe("zalo personal operator command surface", () => {
       sent: {},
       incoming: [{ dataInfo: { recommType: 2 } }],
     });
+  });
+
+  test("friend invite subcommand help describes positional ids and confirmation", async () => {
+    const { deps, output } = createDeps({});
+
+    await runContactsCli(["friend-invites", "cancel", "--help"], deps as any);
+    await runContactsCli(["friend-invites", "status", "--help"], deps as any);
+
+    expect(output[0]).toContain("contacts friend-invites cancel --channel zalo-personal --bot <id> <request-id-or-user-id> --confirm [--json]");
+    expect(output[0]).toContain("cancel takes an outbound request user id and requires --confirm.");
+    expect(output[1]).toContain("contacts friend-invites status --channel zalo-personal --bot <id> <user-id> [--json]");
+    expect(output[1]).toContain("status takes the target Zalo user id.");
   });
 
   test("group mutation subcommand help describes required flags and examples without logging in", async () => {
@@ -279,6 +302,40 @@ describe("zalo personal operator command surface", () => {
     expect(calls[0][2]).toBe(1);
   });
 
+  test("channel-native messages help describes detailed flags without logging in", async () => {
+    const output: string[] = [];
+    const deps = {
+      loadConfig: async () => createLoadedConfig(),
+      login: async () => {
+        throw new Error("help should not login");
+      },
+      print: (text: string) => output.push(text),
+      readFile: async () => Buffer.from("file"),
+    };
+
+    await runChannelNativeCli(["--channel", "zalo-personal", "messages", "send", "--help"], deps as any);
+    await runChannelNativeCli(["--channel", "zalo-personal", "messages", "video", "send", "--help"], deps as any);
+    await runChannelNativeCli(["--channel", "zalo-personal", "messages", "polls", "--help"], deps as any);
+    await runChannelNativeCli(["--channel", "zalo-personal", "messages", "polls", "options", "add", "--help"], deps as any);
+    await runChannelNativeCli(["--channel", "zalo-personal", "messages", "undo", "--help"], deps as any);
+    await runChannelNativeCli(["--channel", "zalo-personal", "stickers", "--help"], deps as any);
+    await runChannelNativeCli(["--channel", "zalo-personal", "stickers", "send", "--help"], deps as any);
+
+    expect(output[0]).toContain("--target accepts dm:<id> or group:<id>.");
+    expect(output[0]).toContain("Prefer mention placeholders in --message, for example <@uid|Name>");
+    expect(output[0]).toContain("Styles: bold, italic, underline, strike, red, orange, yellow, green");
+    expect(output[1]).toContain("--file and --thumbnail accept local paths or URLs");
+    expect(output[1]).toContain("Provide a real thumbnail image when preview quality matters");
+    expect(output[2]).toContain("messages polls lock --target <target> --poll-id <id> --confirm");
+    expect(output[2]).toContain("Mutating poll operations lock, options add, and share require --confirm.");
+    expect(output[2]).toContain("messages polls get --target <target> --poll-id <id> --confirm");
+    expect(output[2]).toContain("Poll detail reads require --confirm");
+    expect(output[3]).toContain("messages polls options add --target <target> --poll-id <id> --option <text>... --confirm");
+    expect(output[4]).toContain("messages undo --target <target> --message-id <msgId[:cliMsgId]> --confirm");
+    expect(output[5]).toContain("stickers search <query> [--limit <n>] [--detail] [--json]");
+    expect(output[6]).toContain("stickers send --target <target> --id <id> --category <cate-id> --type <type> [--json]");
+  });
+
   test("phase 1 discovery commands smoke through the zca-js API boundary", async () => {
     const api = createFullApi();
     const { deps } = createDeps(api);
@@ -336,7 +393,7 @@ describe("zalo personal operator command surface", () => {
     expect(api.calls.map((call: any[]) => call[0])).toContain("inviteUserToGroups");
   });
 
-  test("phase 3 channel-native message commands smoke through zca-js APIs", async () => {
+  test("channel-native message commands smoke through zca-js APIs", async () => {
     const api = createFullApi();
     const { deps } = createDeps(api);
     const base = ["--channel", "zalo-personal", "messages"];
@@ -355,7 +412,9 @@ describe("zalo personal operator command surface", () => {
     await runChannelNativeCli([...base, "polls", "add", "--target", "group:g1", "--question", "Q", "--option", "A"], deps as any);
     await runChannelNativeCli([...base, "polls", "vote", "--target", "group:g1", "--poll-id", "1", "--option", "2"], deps as any);
     await runChannelNativeCli([...base, "polls", "lock", "--target", "group:g1", "--poll-id", "1", "--confirm"], deps as any);
-    await runChannelNativeCli([...base, "polls", "get", "--target", "group:g1", "--poll-id", "1"], deps as any);
+    await expect(runChannelNativeCli([...base, "polls", "get", "--target", "group:g1", "--poll-id", "1"], deps as any))
+      .rejects.toThrow("exposes sensitive Zalo Personal state");
+    await runChannelNativeCli([...base, "polls", "get", "--target", "group:g1", "--poll-id", "1", "--confirm"], deps as any);
     await runChannelNativeCli([...base, "polls", "options", "add", "--target", "group:g1", "--poll-id", "1", "--option", "B", "--confirm"], deps as any);
     await runChannelNativeCli([...base, "polls", "share", "--poll-id", "1", "--confirm"], deps as any);
     await runChannelNativeCli([...base, "report", "--target", "group:g1", "--reason", "fraud", "--confirm"], deps as any);
@@ -363,6 +422,23 @@ describe("zalo personal operator command surface", () => {
     expect(api.calls.map((call: any[]) => call[0])).toContain("createPoll");
     expect(api.calls.map((call: any[]) => call[0])).toContain("sendVideo");
     expect(api.calls.map((call: any[]) => call[0])).toContain("sendReport");
+  });
+
+  test("channel-native sticker commands smoke through zca-js APIs", async () => {
+    const api = createFullApi();
+    const { deps } = createDeps(api);
+    const base = ["--channel", "zalo-personal", "stickers"];
+    await expect(runChannelNativeCli([...base, "list"], deps as any)).rejects.toThrow("--query is required");
+    await runChannelNativeCli([...base, "list", "--query", "ok", "--detail"], deps as any);
+    await runChannelNativeCli([...base, "list", "--query", "ok"], deps as any);
+    await runChannelNativeCli([...base, "search", "ok", "--limit", "2"], deps as any);
+    await runChannelNativeCli([...base, "search", "ok", "--detail"], deps as any);
+    await runChannelNativeCli([...base, "get", "43519", "--json"], deps as any);
+    await runChannelNativeCli([...base, "send", "--target", "dm:u1", "--id", "43519", "--category", "11786", "--type", "7"], deps as any);
+    await runChannelNativeCli([...base, "categories", "get", "11786"], deps as any);
+    expect(api.calls).toContainEqual(["searchSticker", "ok", 10]);
+    expect(api.calls.filter((call: any[]) => call[0] === "getStickersDetail")).toHaveLength(3);
+    expect(api.calls.find((call: any[]) => call[0] === "sendSticker")).toEqual(["sendSticker", { id: 43519, cateId: 11786, type: 7 }, "u1", 0]);
   });
 });
 
@@ -440,5 +516,10 @@ function createFullApi() {
     addPollOptions: record("addPollOptions", { options: [] }),
     sharePoll: record("sharePoll"),
     sendReport: record("sendReport", { reportId: "r1" }),
+    getStickers: record("getStickers", [43519, 43520]),
+    searchSticker: record("searchSticker", [{ sticker_id: 43519, cate_id: 11786, type: 7 }]),
+    getStickersDetail: record("getStickersDetail", [{ id: 43519, cateId: 11786, type: 7, text: "ok" }]),
+    sendSticker: record("sendSticker", { msgId: 1 }),
+    getStickerCategoryDetail: record("getStickerCategoryDetail", [{ id: 43519 }]),
   };
 }

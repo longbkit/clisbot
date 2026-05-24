@@ -265,6 +265,9 @@ describe("renderCliHelp", () => {
     expect(help).toContain("Use `clisbot loops --help --channel <channel-name>` for channel-specific loop extensions.");
     expect(help).toContain("clisbot queues <subcommand>");
     expect(help).toContain("clisbot message <subcommand>");
+    expect(help).toContain("clisbot channel-native --channel <channel> --bot <id> <subtree...>");
+    expect(help).toContain("clisbot channel-native --help");
+    expect(help).not.toContain("Zalo Personal phase 3");
     expect(help).toContain("clisbot agents <subcommand>");
     expect(help).toContain("clisbot agents --help");
     expect(help).toContain("clisbot auth <subcommand>");

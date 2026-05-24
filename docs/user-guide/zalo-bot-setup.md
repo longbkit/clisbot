@@ -9,6 +9,19 @@ It does not cover:
 - Zalo OA
 - unofficial personal-account automation
 
+## Create A Zalo Bot
+
+Use the official Zalo Bot Creator flow to create a bot and receive its bot token. The detailed official guide is here: [Create Bot](https://bot.zapps.me/docs/create-bot).
+
+Quick path:
+
+1. Open Zalo and scan this QR code to open Zalo Bot Creator.
+2. Create a bot. Zalo requires the bot name to start with `Bot`, for example `Bot MyShop`.
+3. After the bot is created, Zalo sends the bot information and `Bot Token` to your Zalo account.
+4. Use that token as `ZALO_BOT_TOKEN` in the clisbot setup commands below.
+
+<img src="../pics/zalo-bot-creator-qr.jpg" alt="Zalo Bot Creator QR code" width="320" />
+
 ## Mental Model
 
 `zalo-bot` behaves closer to Telegram than Slack:

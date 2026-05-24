@@ -6,7 +6,7 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-`v0.1.53-beta.5` is the fifth beta for the channel/control/config/agents
+`v0.1.53-beta.6` is the sixth beta for the channel/control/config/agents
 boundary cleanup and release-workflow hardening after `v0.1.52`. It fixes a
 beta.1 runtime status regression for legacy configs that do not yet contain
 disabled provider bot records for every built-in channel, and removes
@@ -15,7 +15,10 @@ regression where `clisbot loops create ... 3 ...` waited for the target session
 to become idle instead of reserving queue items immediately. The fifth beta
 tightens queue/message-tool settlement, channel recent-context handling,
 append-only Zalo Bot streaming truthfulness, and Slack persistent indicator
-cleanup after runtime restart or reload.
+cleanup after runtime restart or reload. The sixth beta adds the larger
+README/user-guide refresh, localized root README and user-guide mirrors, Zalo
+Bot QR onboarding, and the Zalo Personal attachment/media-group and channel
+operator documentation pass.
 
 ## Operator Impact
 
@@ -30,7 +33,8 @@ cleanup after runtime restart or reload.
 - Known risks: broad internal file moves may still expose stale import or package
   layout issues in environments not covered by the local/live test matrix.
   Zalo Bot remains append-only and therefore does not support live draft
-  streaming previews.
+  streaming previews. The large README and localized-doc refresh should be
+  reviewed for tone and link accuracy across languages before stable release.
 
 ## Functional Changes
 
@@ -69,6 +73,15 @@ cleanup after runtime restart or reload.
 - Fixed Slack processing indicators so assistant thread status clears when runs
   detach or complete, and stale persistent Slack statuses are swept for idle
   thread sessions when the Slack service starts after a restart or reload.
+- Added Zalo Personal media and attachment handling updates, including local
+  inbound image attachment staging, media-group coalescing, and clearer safe
+  default guidance for personal-account DM/group routing.
+- Added Zalo Bot setup onboarding with an embedded QR code for Zalo Bot Creator
+  and a link to the official create-bot documentation.
+- Reworked the root README into the main FAQ/troubleshooting and quick-start
+  surface, including OpenClaw/Hermes positioning, supported channel capability
+  mapping, AI-assisted setup prompts, bug-report guidance, and channel-specific
+  guide links.
 
 ## Non-Functional Changes
 
@@ -89,13 +102,20 @@ cleanup after runtime restart or reload.
 - Updated channel integration and agent progress docs to make live reply update
   capability explicit: channels that cannot update or clear an existing reply
   must not fake streaming reconcile by posting duplicate progress messages.
+- Added localized root README mirrors and user-guide mirrors for Vietnamese,
+  Simplified Chinese, and Korean where the current documentation architecture
+  supports them.
+- Added surface-access model documentation and generic README backup in
+  `docs/user-guide/` so the new root README can stay focused on user-facing
+  onboarding and FAQ content.
 
 ## Update Notes
 
-- Update path: `0.1.52` -> `0.1.53-beta.5`
+- Update path: `0.1.52` -> `0.1.53-beta.6`
 - Manual action: none
 - Risk level: medium because this is a broad refactor beta
-- Automatic config update: no new schema migration is introduced by this beta
+- Automatic config update: yes; configs before schema `0.1.53` are backed up
+  and rewritten to add the new admin-only sensitive channel permissions
 
 ## Beta History
 
@@ -111,6 +131,8 @@ cleanup after runtime restart or reload.
 - `0.1.53-beta.5`: fixes queue/message-tool settlement, recent-context command
   filtering, Zalo Bot append-only streaming truthfulness, and Slack persistent
   indicator cleanup after restart or reload.
+- `0.1.53-beta.6`: adds the README/user-guide refresh, localized docs mirrors,
+  Zalo Bot QR onboarding, and Zalo Personal attachment/media-group guidance.
 
 ## Validation
 

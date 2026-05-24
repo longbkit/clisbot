@@ -2,6 +2,18 @@ export type OrderedIngressControls = {
   markAccepted: () => void;
 };
 
+export type OrderedIngressAcceptedCallback = () => Promise<void> | void;
+
+export function chainOrderedIngressAccepted(
+  controls: OrderedIngressControls | undefined,
+  callback?: OrderedIngressAcceptedCallback,
+) {
+  return async () => {
+    await callback?.();
+    controls?.markAccepted();
+  };
+}
+
 export class OrderedIngressDispatcher<TItem> {
   private readonly acceptedByKey = new Map<string, Promise<void>>();
 

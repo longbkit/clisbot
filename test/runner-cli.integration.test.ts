@@ -27,7 +27,7 @@ function createConfig(dir: string) {
   const socketPath = join(stateDir, "clisbot.sock");
   mkdirSync(stateDir, { recursive: true });
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
-  config.meta.schemaVersion = "0.1.51";
+  config.meta.schemaVersion = "0.1.53";
   config.app.session.storePath = sessionStorePath;
   config.agents.defaults.workspace = join(dir, "workspaces", "{agentId}");
   config.agents.defaults.runner.defaults.tmux.socketPath = socketPath;

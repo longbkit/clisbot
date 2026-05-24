@@ -13,11 +13,12 @@
 - 如何启动 bot
 - 如何检查和排障
 - credentials、routes、auth、agents 分别怎么管理
-- Slack 和 Telegram 各自有哪些注意事项
+- Slack、Telegram、Zalo Bot、Zalo Personal 各自有哪些注意事项
 
 ## 建议先读
 
 - [Channels（英文原文）](../../../user-guide/channels.md)
+- [Surface Access Model](./surface-access-model.md)
 - [Bots And Credentials（英文原文）](../../../user-guide/bots-and-credentials.md)
 - [CLI Commands（英文原文）](../../../user-guide/cli-commands.md)
 - [Runtime Operations（英文原文）](../../../user-guide/runtime-operations.md)
@@ -27,6 +28,8 @@
 
 - [Telegram Bot Setup（英文原文）](../../../user-guide/telegram-setup.md)
 - [Slack App Setup（英文原文）](../../../user-guide/slack-setup.md)
+- [Zalo Bot Setup](./zalo-bot-setup.md)
+- [Zalo Personal](./zalo-personal.md)
 - [Codex CLI Guide（英文原文）](../../../user-guide/codex-cli.md)
 - [Claude CLI Guide（英文原文）](../../../user-guide/claude-cli.md)
 - [Gemini CLI Guide（英文原文）](../../../user-guide/gemini-cli.md)
@@ -50,3 +53,11 @@ clisbot start --cli codex --bot-type personal --telegram-bot-token <your-telegra
 1. 先完成 Telegram 或 Slack setup
 2. 再理解 `bots`、`routes`、`auth`、`agents`
 3. 出现问题时回到 `runtime-operations.md` 和 `cli-commands.md`
+
+## 已补齐的中文子页面
+
+- [Surface Access Model](./surface-access-model.md)
+- [Zalo Bot Setup](./zalo-bot-setup.md)
+- [Zalo Personal](./zalo-personal.md)
+
+其他 user-guide 子页面仍明确回退到英文原文，直到中文 mirror 补齐。

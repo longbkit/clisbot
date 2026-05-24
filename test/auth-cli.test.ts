@@ -379,6 +379,9 @@ describe("auth cli", () => {
     expect(output.sender).toBe("telegram:1276408333");
     expect(output.permissions.manageLoop.allowed).toBe(true);
     expect(output.permissions.manageLoop.explanation).toStartWith("Can ");
+    expect(output.permissions.manageContacts.allowed).toBe(false);
+    expect(output.permissions.manageGroups.allowed).toBe(false);
+    expect(output.permissions.manageSensitiveChannelActions.allowed).toBe(false);
     expect(output.permissions.runShellSlashCommand.allowed).toBe(false);
     expect(output.permissions.runShellSlashCommand.explanation).toStartWith("Cannot ");
     expect(output.permissions.runShellSlashCommand.explanation).toContain("/bash");
@@ -417,6 +420,9 @@ describe("auth cli", () => {
     };
 
     expect(output.permissions.manageProtectedResources.allowed).toBe(true);
+    expect(output.permissions.manageContacts.allowed).toBe(true);
+    expect(output.permissions.manageGroups.allowed).toBe(true);
+    expect(output.permissions.manageSensitiveChannelActions.allowed).toBe(true);
     expect(output.permissions.manageProtectedResources.explanation).toStartWith("Can ");
     expect(output.resolution?.appRole).toBe("owner");
     expect(output.resolution?.effective?.mayManageProtectedResources).toBe(true);

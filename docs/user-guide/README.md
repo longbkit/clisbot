@@ -17,6 +17,7 @@ This folder should explain:
 Related pages:
 
 - [Channel Operations](channels.md)
+- [Surface Access Model](surface-access-model.md)
 - [Bots And Credentials](bots-and-credentials.md)
 - [Release Notes](../releases/README.md)
 - [Codex CLI Guide](codex-cli.md)
@@ -32,6 +33,7 @@ Related pages:
 - [Agent Progress Replies](agent-progress-replies.md)
 - [Authorization And Roles](auth-and-roles.md)
 - [Runtime Operations](runtime-operations.md)
+- [Generic README Backup](generic-readme.md)
 
 If setup is unclear, clone this repo, open it in Codex or Claude Code, and ask it to help set up `clisbot`. The docs here are kept current enough for guided setup and troubleshooting.
 

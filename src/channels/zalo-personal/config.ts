@@ -8,6 +8,7 @@ import {
   type ResolvedChannelBotConfig,
 } from "../../config/channels/channel-bot-resolution.ts";
 import type { ChannelBotRecord } from "../../config/channels/channel-config-shapes.ts";
+import { createDefaultZaloPersonalDirectMessages } from "./defaults.ts";
 import { buildDefaultZaloPersonalTokenFile } from "./session-path.ts";
 import { resolveZaloPersonalSessionPath } from "./session-file.ts";
 
@@ -47,9 +48,9 @@ export function buildZaloPersonalBotConfig(params: {
   const { botId, existing } = params;
   return {
     name: botId,
-    dmPolicy: "disabled",
+    dmPolicy: "allowlist",
     groupPolicy: "allowlist",
-    directMessages: {},
+    directMessages: createDefaultZaloPersonalDirectMessages(),
     groups: {},
     ...existing,
     enabled: true,

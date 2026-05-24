@@ -80,6 +80,7 @@ import { beginTelegramTypingHeartbeat } from "./typing.ts";
 import { buildTokenHint } from "../integration/channel-runtime-identity.ts";
 import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
 import {
+  chainOrderedIngressAccepted,
   OrderedIngressDispatcher,
   type OrderedIngressControls,
 } from "../message/ordered-ingress-dispatcher.ts";
@@ -1060,13 +1061,12 @@ export class TelegramPollingService {
           promptContext,
           protectedControlMutationRule,
           transformSessionInputText: enrichPromptText,
-          onPromptAccepted: async () => {
+          onPromptAccepted: chainOrderedIngressAccepted(controls, async () => {
             await this.agentService.markRecentConversationProcessed(
               sessionTarget,
               recentMessageMarker,
             );
-            controls?.markAccepted();
-          },
+          }),
           route,
           maxChars: this.getTelegramMaxChars(route.agentId),
           timingContext,

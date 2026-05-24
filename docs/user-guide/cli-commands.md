@@ -394,6 +394,10 @@ Important behavior:
 - agent-specific writes clone the inherited role from `agents.defaults.auth.roles.<role>` into the target agent override on first mutation
 - app permissions are limited to the app permission set: `configManage`, `appAuthManage`, `agentAuthManage`, `promptGovernanceManage`
 - agent permissions are limited to the agent permission set shown by `clisbot auth --help`
+- contact graph operations use `contactsManage`, provider group operations use
+  `groupsManage`, and other sensitive channel-native operations such as
+  mutating polls or reading poll voter ids use
+  `sensitiveChannelActionManage`
 - this CLI writes config; config remains the source of truth for routed auth
 - `clisbot auth --help` is the detailed operator help surface for scopes, examples, and permission names
 - app `owner` and `admin` principals bypass DM pairing automatically once granted

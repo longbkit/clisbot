@@ -1,6 +1,6 @@
 {
   "meta": {
-    "schemaVersion": "0.1.50",
+    "schemaVersion": "0.1.53",
     "lastTouchedAt": "2026-04-24T06:21:29.693Z"
   },
   "app": {
@@ -296,7 +296,10 @@
               "runNudge",
               "followupManage",
               "responseModeManage",
-              "additionalMessageModeManage"
+              "additionalMessageModeManage",
+              "contactsManage",
+              "groupsManage",
+              "sensitiveChannelActionManage"
             ],
             "users": []
           },

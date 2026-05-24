@@ -3,13 +3,14 @@ import { ensureDir, fileExists, readTextFile, writeTextFile } from "../../infra/
 import { collapseHomePath, expandHomePath } from "../../infra/paths.ts";
 import { applyDynamicPathDefaults, assertNoLegacyPrivilegeCommands } from "./config-document.ts";
 import {
+  addMissingSensitiveChannelAdminPermissions,
   CURRENT_SCHEMA_VERSION,
   normalizeConfigDocumentShape,
   shouldUpgradeConfigSchema,
 } from "./config-migration.ts";
 import { normalizeConfigDirectMessageRoutes } from "../channels/direct-message-routes.ts";
 import { normalizeConfigGroupRoutes } from "../channels/group-routes.ts";
-import { deleteStaleStartupDelay, pruneConfigForPersistence } from "./persisted-config.ts";
+import { pruneConfigForPersistence } from "./persisted-config.ts";
 import { clisbotConfigSchema } from "./schema.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -27,66 +28,12 @@ function readSchemaVersion(value: unknown) {
   return typeof schemaVersion === "string" ? schemaVersion.trim() : undefined;
 }
 
-function readMetaRecord(value: unknown) {
-  return isRecord(value) && isRecord(value.meta) ? value.meta : {};
-}
-
 function logUpgradeStage(message: string) {
   console.warn(`clisbot config upgrade: ${message}`);
 }
 
 function stableConfigText(config: unknown) {
   return `${JSON.stringify(config, null, 2)}\n`;
-}
-
-function pruneCurrentSchemaStartupDefaults(config: unknown) {
-  const nextConfig = structuredClone(config) as Record<string, unknown>;
-  const meta = readMetaRecord(nextConfig);
-  if (readSchemaVersion(nextConfig) !== CURRENT_SCHEMA_VERSION) {
-    return nextConfig;
-  }
-  const agents = isRecord(nextConfig.agents) ? nextConfig.agents : undefined;
-  const defaults = isRecord(agents?.defaults) ? agents.defaults : undefined;
-  const runner = isRecord(defaults?.runner) ? defaults.runner : undefined;
-  const runnerDefaults = isRecord(runner?.defaults) ? runner.defaults : undefined;
-  const familyRunners = ["codex", "claude", "gemini"]
-    .map((family) => isRecord(runner?.[family]) ? runner[family] : undefined);
-  const agentList = Array.isArray(agents?.list) ? agents.list : [];
-  let pruned = false;
-  if (deleteStaleStartupDelay(runnerDefaults)) {
-    pruned = true;
-  }
-  for (const familyRunner of familyRunners) {
-    if (deleteStaleStartupDelay(familyRunner)) {
-      pruned = true;
-    }
-  }
-  for (const agent of agentList) {
-    if (!isRecord(agent) || !isRecord(agent.runner)) {
-      continue;
-    }
-    if (deleteStaleStartupDelay(agent.runner)) {
-      pruned = true;
-    }
-    const runnerDefaultsOverride = isRecord(agent.runner.defaults) ? agent.runner.defaults : undefined;
-    if (deleteStaleStartupDelay(runnerDefaultsOverride)) {
-      if (runnerDefaultsOverride && Object.keys(runnerDefaultsOverride).length === 0) {
-        delete agent.runner.defaults;
-      }
-      if (Object.keys(agent.runner).length === 0) {
-        delete agent.runner;
-      }
-      pruned = true;
-    }
-  }
-  if (pruned) {
-    nextConfig.meta = {
-      ...meta,
-      schemaVersion: CURRENT_SCHEMA_VERSION,
-      lastTouchedAt: new Date().toISOString(),
-    };
-  }
-  return nextConfig;
 }
 
 function renderBackupTimestamp(date = new Date()) {
@@ -114,24 +61,6 @@ export async function upgradeEditableConfigFileIfNeeded(configPath: string) {
   const fromVersion = readSchemaVersion(rawConfig);
 
   if (!shouldUpgradeConfigSchema(fromVersion)) {
-    const persistedConfig = pruneCurrentSchemaStartupDefaults(rawConfig);
-    if (stableConfigText(persistedConfig) !== stableConfigText(rawConfig)) {
-      const backupPath = await reserveBackupPath(expandedConfigPath, fromVersion);
-      await writeTextFile(
-        backupPath,
-        originalText.endsWith("\n") ? originalText : `${originalText}\n`,
-      );
-      const normalizedDocument = normalizeConfigDocumentShape(persistedConfig);
-      assertNoLegacyPrivilegeCommands(normalizedDocument);
-      clisbotConfigSchema.parse(applyDynamicPathDefaults(normalizedDocument));
-      await writeTextFile(expandedConfigPath, stableConfigText(persistedConfig));
-      return {
-        upgraded: false as const,
-        pruned: true as const,
-        backupPath,
-        schemaVersion: fromVersion || CURRENT_SCHEMA_VERSION,
-      };
-    }
     return { upgraded: false as const };
   }
 
@@ -144,6 +73,7 @@ export async function upgradeEditableConfigFileIfNeeded(configPath: string) {
   logUpgradeStage(`preparing ${versionLabel} -> ${CURRENT_SCHEMA_VERSION}`);
 
   const normalizedDocument = normalizeConfigDocumentShape(rawConfig);
+  addMissingSensitiveChannelAdminPermissions(normalizedDocument);
   assertNoLegacyPrivilegeCommands(normalizedDocument);
   logUpgradeStage(`dry-run validating ${CURRENT_SCHEMA_VERSION} config`);
   const normalizedConfig = normalizeConfigGroupRoutes(

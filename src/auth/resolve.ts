@@ -119,6 +119,15 @@ function hasAppPermission(config: ClisbotConfig, appRole: string, permission: st
   return getAllowedPermissions(config.app.auth.roles, appRole).has(permission);
 }
 
+export function hasEffectiveAgentPermission(
+  auth: Pick<ResolvedChannelAuth, "appRole" | "agentPermissions">,
+  permission: string,
+) {
+  return auth.appRole === "owner" ||
+    auth.appRole === "admin" ||
+    (auth.agentPermissions ?? []).includes(permission);
+}
+
 export function resolveChannelAuth(params: {
   config: ClisbotConfig;
   agentId: string;

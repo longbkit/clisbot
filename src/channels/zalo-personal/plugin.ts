@@ -80,7 +80,14 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
       "Zalo Personal is append-only until edit/update support is proven.",
       renderPlainTextReplyStyleHint("Keep the message body under 3000 chars."),
     ].join(" "),
-    resolveTarget: (identity) => identity.chatId ?? null,
+    resolveTarget: (identity) => {
+      if (!identity.chatId) {
+        return null;
+      }
+      return identity.conversationKind === "group"
+        ? `group:${identity.chatId}`
+        : `dm:${identity.chatId}`;
+    },
   },
   capabilities: {
     surfaceKinds: ["dm", "group"],
@@ -98,11 +105,11 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
   get operatorGuidance() {
     return {
       dmFirstLine: "DM the Zalo Personal account first to confirm the listener receives messages",
-      pairingCodeLine: "Send a direct message (DM) to the Zalo Personal account. Send `hi` to receive a pairing code.",
-      onboardingLine: "Zalo Personal: use QR login, then DM the account for pairing flow and queue/loop validation",
-      setupMissingLine: "zalo-personal: no explicit DM or group routes are configured yet",
+      pairingCodeLine: "Zalo Personal is silent for unknown DMs by default; add the raw Zalo user id to `dm:*` allowUsers before expecting replies.",
+      onboardingLine: "Zalo Personal: use QR login, allowlist the intended DM or group, then validate queue/loop behavior",
+      setupMissingLine: "zalo-personal: no allowed DM users or group routes are configured yet",
       addRouteLines: [
-        `add DM: ${renderCliCommand("routes add --channel zalo-personal dm:<user-id> --bot default", { inline: true })}`,
+        `allow DM user: ${renderCliCommand("routes add-allow-user --channel zalo-personal dm:* --bot default --user <user-id>", { inline: true })}`,
         `add group: ${renderCliCommand("routes add --channel zalo-personal group:<group-id> --bot default --require-mention true", { inline: true })}`,
       ],
       overrideLine:
@@ -119,7 +126,7 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
           "  - Zalo Personal native: Markdown -> visible text plus Zalo TextStyle ranges where supported",
         ],
         exampleLines: [
-          `  ${renderCliCommand("message send --channel zalo-personal --bot work --target dm:user-123 --message \"Status\"")}`,
+          `  ${renderCliCommand("message send --channel zalo-personal --bot default --target dm:user-123 --message \"Status\"")}`,
         ],
       },
       routes: {
@@ -127,8 +134,8 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
           `  ${renderCliCommand("routes add --channel zalo-personal <dm:<id>|group:<id>> [--bot <id>] [--policy <...>] [--require-mention <true|false>] [--allow-bots <true|false>]")}`,
         ],
         exampleLines: [
-          `  ${renderCliCommand("routes add --channel zalo-personal dm:user-123 --bot work --policy pairing")}`,
-          `  ${renderCliCommand("routes add --channel zalo-personal group:group-123 --bot work --require-mention true --policy allowlist")}`,
+          `  ${renderCliCommand("routes add-allow-user --channel zalo-personal dm:* --bot default --user user-123")}`,
+          `  ${renderCliCommand("routes add --channel zalo-personal group:group-123 --bot default --require-mention true --policy allowlist")}`,
         ],
       },
     };
@@ -257,15 +264,15 @@ export const zaloPersonalChannelPlugin: ChannelPlugin = {
   renderLoopExampleLines: ({ command }) =>
     command === "create"
       ? [
-          `  ${renderCliCommand("loops create --channel zalo-personal --bot work --target dm:user-123 --sender zalo-personal:user-123 5m check inbox")}`,
+          `  ${renderCliCommand("loops create --channel zalo-personal --bot default --target dm:user-123 --sender zalo-personal:user-123 5m check inbox")}`,
         ]
       : [
-          `  ${renderCliCommand("loops list --channel zalo-personal --bot work --target dm:user-123")}`,
-          `  ${renderCliCommand("loops status --channel zalo-personal --bot work --target dm:user-123")}`,
-          `  ${renderCliCommand("loops cancel --channel zalo-personal --bot work --target dm:user-123 --all")}`,
+          `  ${renderCliCommand("loops list --channel zalo-personal --bot default --target dm:user-123")}`,
+          `  ${renderCliCommand("loops status --channel zalo-personal --bot default --target dm:user-123")}`,
+          `  ${renderCliCommand("loops cancel --channel zalo-personal --bot default --target dm:user-123 --all")}`,
         ],
   renderQueueExampleLines: () => [
-    `  ${renderCliCommand("queues create --channel zalo-personal --bot work --target dm:user-123 --sender zalo-personal:user-123 review inbox")}`,
+    `  ${renderCliCommand("queues create --channel zalo-personal --bot default --target dm:user-123 --sender zalo-personal:user-123 review inbox")}`,
   ],
 };
 

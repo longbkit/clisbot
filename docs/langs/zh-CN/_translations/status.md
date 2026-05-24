@@ -2,8 +2,8 @@
 
 # 简体中文文档状态
 
-- 基线版本：`v0.1.50`
-- 最后更新：`2026-05-03 UTC`
+- 基线版本：`v0.1.52`
+- 最后更新：`2026-05-24 UTC`
 - 当前目标：严格按 mirror tree 补齐真实源文件，并尽量减少常读页面再次跳回英文。
 
 ## 当前覆盖情况
@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 仓库根 README | `1/1` | `docs/langs/root/README.zh-CN.md` 已按根 `README.md` 的真实结构完成镜像 |
 | Overview | `4/5` | 已补齐除 `human-requirements.md` 之外的常读子页面 |
-| User Guide | `1/14` | 目前只有入口页，子文档仍待补齐 |
+| User Guide | `4/18` | 已有入口页、`surface-access-model.md`、`zalo-bot-setup.md`、`zalo-personal.md`；其他子文档仍明确回退到英文原文 |
 | Features | `1/32` | 目前只有入口页，子文档仍待补齐 |
 | Architecture | `1/15` | 目前只有入口页，子文档仍待补齐 |
 | Updates | `1/5` | 目前只有入口页，子文档仍待补齐 |
@@ -29,7 +29,7 @@
 
 ## 后续重点
 
-1. 先补 `user-guide/` 全量子文档
+1. 继续补 `user-guide/` 全量子文档，优先 runtime operations、auth/routes、CLI commands
 2. 再补 `updates/` 与 `releases/`
 3. 然后补 `features/`、`architecture/`、`migrations/`
 4. 每个批次之后做中文语感与 glossary 同步复查

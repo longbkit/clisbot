@@ -132,7 +132,7 @@ describe("legacy config migration", () => {
     const loaded = await loadConfigWithoutEnvResolution(configPath);
     const slackBot = loaded.raw.bots.slack.default;
 
-    expect(loaded.raw.meta.schemaVersion).toBe("0.1.50");
+    expect(loaded.raw.meta.schemaVersion).toBe("0.1.53");
     expect(loaded.raw.bots.slack.defaults.enabled).toBe(true);
     expect(loaded.raw.bots.slack.defaults.defaultBotId).toBe("default");
     expect(slackBot.enabled).toBe(true);

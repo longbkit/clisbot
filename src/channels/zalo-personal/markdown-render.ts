@@ -207,8 +207,12 @@ function processMarkdownLine(
     if (totalIndent > 0) {
       lineStyles.push({ lineIndex: outputLineIndex, style: TextStyle.Indent, indentSize: totalIndent });
     }
-    lineStyles.push({ lineIndex: outputLineIndex, style: ordered ? TextStyle.OrderedList : TextStyle.UnorderedList });
-    processedLines.push((ordered?.[2] ?? unordered?.[1])!);
+    if (ordered) {
+      processedLines.push(`${ordered[1]}. ${ordered[2]}`);
+      return;
+    }
+    lineStyles.push({ lineIndex: outputLineIndex, style: TextStyle.UnorderedList });
+    processedLines.push(unordered![1]!);
     return;
   }
 

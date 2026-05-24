@@ -8,9 +8,15 @@ import { resolveChannelAuth } from "../../auth/resolve.ts";
 import { buildAgentPromptText } from "../message/agent-prompt.ts";
 import { renderGroupRouteAccessDeniedMessage } from "../config/route-policy.ts";
 import { processChannelInteraction } from "../message/interaction-processing.ts";
+import { prependAttachmentMentionsToPrompt } from "../../agents/attachments/prompt.ts";
 import { buildRecentConversationMessage } from "../message/recent-conversation.ts";
+import { ConversationProcessingIndicatorCoordinator } from "../message/processing-indicator.ts";
 import { ProcessedEventsStore } from "../message/processed-events-store.ts";
-import { OrderedIngressDispatcher } from "../message/ordered-ingress-dispatcher.ts";
+import {
+  chainOrderedIngressAccepted,
+  OrderedIngressDispatcher,
+  type OrderedIngressControls,
+} from "../message/ordered-ingress-dispatcher.ts";
 import { ActivityStore } from "../../control/runtime/activity-store.ts";
 import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 import { getAgentEntry, type LoadedConfig } from "../../config/core/load-config.ts";
@@ -25,6 +31,12 @@ import { resolveZaloPersonalConversationRoute } from "./route-config.ts";
 import { resolveZaloPersonalConversationTarget } from "./session-routing.ts";
 import { loginZaloPersonalFromSession, type ZaloPersonalClient } from "./zca-js.ts";
 import { resolveZaloPersonalGroupSenderPolicy } from "./sender-policy.ts";
+import { resolveZaloPersonalAttachmentPaths } from "./attachments.ts";
+import { beginZaloPersonalTypingHeartbeat } from "./typing.ts";
+import {
+  getZaloPersonalIngressKey,
+  ZaloPersonalMediaGroupDispatcher,
+} from "./media-group.ts";
 import {
   getZaloPersonalMessageId,
   getZaloPersonalMessageSenderId,
@@ -42,14 +54,16 @@ import type {
 export class ZaloPersonalListenerService {
   private client?: ZaloPersonalClient;
   private accountLabel = "";
+  private readonly processingIndicators = new ConversationProcessingIndicatorCoordinator();
   private readonly inFlightMessages = new Set<Promise<void>>();
   private readonly ingressDispatcher = new OrderedIngressDispatcher<ZaloPersonalInboundMessage>(
-    (message) => `zalo-personal:${this.botId}:${message.threadId}`,
-    (message) => this.handleMessage(message),
+    (message) => getZaloPersonalIngressKey(this.botId, message),
+    (message, controls) => this.handleMessage(message, controls),
     (error) => {
       console.error("zalo-personal message handler error", error);
     },
   );
+  private readonly mediaGroupDispatcher = new ZaloPersonalMediaGroupDispatcher(this.ingressDispatcher);
 
   constructor(
     private readonly loadedConfig: LoadedConfig,
@@ -89,7 +103,7 @@ export class ZaloPersonalListenerService {
       });
     });
     this.client.api.listener.on("message", (message) => {
-      for (const task of this.ingressDispatcher.dispatch([message])) {
+      for (const task of this.mediaGroupDispatcher.dispatch([message])) {
         this.trackInFlightMessage(task);
       }
     });
@@ -120,6 +134,16 @@ export class ZaloPersonalListenerService {
     );
   }
 
+  private async sendTyping(conversationKind: "dm" | "group", chatId: string) {
+    if (!this.client) {
+      throw new Error("Zalo Personal listener is not connected.");
+    }
+    await this.client.api.sendTypingEvent(
+      chatId,
+      conversationKind === "dm" ? this.client.ThreadType.User : this.client.ThreadType.Group,
+    );
+  }
+
   private trackInFlightMessage(task: Promise<void>) {
     this.inFlightMessages.add(task);
     task.finally(() => {
@@ -127,15 +151,15 @@ export class ZaloPersonalListenerService {
     });
   }
 
-  private async handleMessage(message: ZaloPersonalInboundMessage) {
+  private async handleMessage(
+    message: ZaloPersonalInboundMessage,
+    ingressControls?: OrderedIngressControls,
+  ) {
     if (message.isSelf) {
       return;
     }
     const ownId = this.client?.api.getOwnId?.();
     const rawText = getZaloPersonalMessageText(message, ownId);
-    if (!rawText) {
-      return;
-    }
     const conversationKind = message.type === this.client?.ThreadType.Group ? "group" : "dm";
     const senderId = getZaloPersonalMessageSenderId(message);
     const eventId = `zalo-personal:${this.botId}:${getZaloPersonalMessageId(message)}`;
@@ -146,6 +170,7 @@ export class ZaloPersonalListenerService {
     await this.processedEventsStore.markProcessing(eventId);
     try {
       await this.processInboundMessage({
+        message,
         eventId,
         rawText,
         conversationKind,
@@ -153,6 +178,7 @@ export class ZaloPersonalListenerService {
         chatId: message.threadId,
         messageTime: Number(message.data.ts) || Date.now(),
         mentionedSelf: hasZaloPersonalSelfMention(message, ownId),
+        ingressControls,
       });
       await this.processedEventsStore.markCompleted(eventId);
     } catch (error) {
@@ -218,7 +244,25 @@ export class ZaloPersonalListenerService {
     if (!this.wasMentionedOrAllowedFollowUp(params, route, followUpState)) {
       return;
     }
-    await this.submitInboundMessage({ params, routeInfo, route, sessionTarget, identity, auth });
+    const attachmentPaths = await resolveZaloPersonalAttachmentPaths({
+      message: params.message,
+      workspacePath: this.agentService.getWorkspacePath(sessionTarget),
+      sessionKey: sessionTarget.sessionKey,
+      messageId: params.eventId,
+    });
+    if (!params.rawText && attachmentPaths.length === 0) {
+      return;
+    }
+    await this.submitInboundMessage({
+      params,
+      routeInfo,
+      route,
+      sessionTarget,
+      attachmentPaths,
+      identity,
+      auth,
+      ingressControls: params.ingressControls,
+    });
   }
 
   private isBlockedSender(route: { blockUsers?: string[] }, senderId: string) {
@@ -323,35 +367,59 @@ export class ZaloPersonalListenerService {
 
   private async submitInboundMessage(context: ZaloPersonalSubmissionContext) {
     const env = await this.buildPromptEnvironment(context);
-    const interaction = await processChannelInteraction({
-      agentService: this.agentService,
-      sessionTarget: context.sessionTarget,
-      identity: context.identity,
-      auth: context.auth,
-      senderId: context.params.senderId,
-      text: env.effectivePromptText,
-      attachmentPaths: [],
-      agentPromptText: env.agentPromptText,
-      agentPromptBuilder: (nextText, options) => this.buildInteractionPrompt({
-        context,
-        env,
-        nextText,
-        maxProgressMessagesOverride: options?.maxProgressMessagesOverride,
-      }),
-      promptContext: env.promptContext,
-      protectedControlMutationRule: env.protectedControlMutationRule,
-      transformSessionInputText: env.enrichPromptText,
-      onPromptAccepted: async () => {
-        await this.agentService.markRecentConversationProcessed(context.sessionTarget, env.recentMessageMarker);
+    const processingLease = await this.acquireProcessingLease(context);
+    try {
+      const interaction = await processChannelInteraction({
+        agentService: this.agentService,
+        sessionTarget: context.sessionTarget,
+        identity: context.identity,
+        auth: context.auth,
+        senderId: context.params.senderId,
+        text: env.effectivePromptText,
+        attachmentPaths: context.attachmentPaths,
+        agentPromptText: env.agentPromptText,
+        agentPromptBuilder: (nextText, options) => this.buildInteractionPrompt({
+          context,
+          env,
+          nextText,
+          maxProgressMessagesOverride: options?.maxProgressMessagesOverride,
+        }),
+        promptContext: env.promptContext,
+        protectedControlMutationRule: env.protectedControlMutationRule,
+        transformSessionInputText: env.enrichPromptText,
+        onPromptAccepted: chainOrderedIngressAccepted(context.ingressControls, async () => {
+          await this.agentService.markRecentConversationProcessed(
+            context.sessionTarget,
+            env.recentMessageMarker,
+          );
+        }),
+        route: context.route,
+        maxChars: 2000,
+        canUpdateLiveReply: false,
+        timingContext: env.timingContext,
+        postText: async (nextText) => this.postInteractionText(context, nextText),
+        reconcileText: async (_chunks, nextText) => this.postInteractionText(context, nextText),
+      });
+      void interaction;
+    } finally {
+      await processingLease.release();
+    }
+  }
+
+  private async acquireProcessingLease(context: ZaloPersonalSubmissionContext) {
+    return this.processingIndicators.acquire({
+      key: `zalo-personal:${this.botId}:${context.params.chatId}`,
+      activate: async () =>
+        beginZaloPersonalTypingHeartbeat({
+          sendTyping: () => this.sendTyping(context.routeInfo.conversationKind, context.params.chatId),
+          onError: (error) => {
+            console.error("zalo-personal typing failed", error);
+          },
+        }),
+      onError: (_phase, error) => {
+        console.error("zalo-personal processing indicator failed", error);
       },
-      route: context.route,
-      maxChars: 2000,
-      canUpdateLiveReply: false,
-      timingContext: env.timingContext,
-      postText: async (nextText) => this.postInteractionText(context, nextText),
-      reconcileText: async (_chunks, nextText) => this.postInteractionText(context, nextText),
     });
-    void interaction;
   }
 
   private async buildPromptEnvironment(context: ZaloPersonalSubmissionContext) {
@@ -403,6 +471,10 @@ export class ZaloPersonalListenerService {
       (route.requireMention
         ? buildMentionOnlyFollowUpPrompt({ conversationKind: routeInfo.conversationKind })
         : "");
+    const promptText = prependAttachmentMentionsToPrompt(
+      effectivePromptText,
+      context.attachmentPaths,
+    );
     const recentConversationReplay = await this.agentService.getRecentConversationReplayMessages(
       sessionTarget,
       { excludeMarker: recentMessageMarker },
@@ -411,7 +483,7 @@ export class ZaloPersonalListenerService {
       currentText: input,
       recentMessages: recentConversationReplay,
     });
-    return { effectivePromptText, enrichPromptText };
+    return { effectivePromptText, promptText, enrichPromptText };
   }
 
   private async recordInboundActivity(context: ZaloPersonalSubmissionContext) {
@@ -431,6 +503,7 @@ export class ZaloPersonalListenerService {
     context: ZaloPersonalSubmissionContext,
     promptInput: {
       effectivePromptText: string;
+      promptText: string;
       enrichPromptText: (input: string) => string;
     },
   ) {
@@ -447,7 +520,7 @@ export class ZaloPersonalListenerService {
       time: params.messageTime,
     });
     const agentPromptText = buildAgentPromptText({
-      text: promptInput.enrichPromptText(promptInput.effectivePromptText),
+      text: promptInput.enrichPromptText(promptInput.promptText),
       identity,
       config: this.getBotConfig().agentPrompt,
       cliTool,
