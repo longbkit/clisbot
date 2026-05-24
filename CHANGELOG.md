@@ -8,6 +8,7 @@ GitHub Releases should publish a shorter summary and link back to the matching f
 ## Releases
 
 - [Upcoming](docs/releases/upcoming.md)
+- [v0.1.53](docs/releases/v0.1.53.md) - channel/control/config boundary cleanup, queue/loop fixes, Zalo onboarding/docs, localized README/user guides, and sensitive channel permissions
 - [v0.1.52](docs/releases/v0.1.52.md) - clearer default-route guidance, stale startup-delay pruning for current-schema installs, and queue workflow thread-targeting doc cleanup
 - [v0.1.51](docs/releases/v0.1.51.md) - longer default runner startup window, stable package bump, and no new schema migration
 - [v0.1.50](docs/releases/v0.1.50.md) - shared group policy, automatic config update, loop reliability, prompt context, Telegram audio, and streaming isolation

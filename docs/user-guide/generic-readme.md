@@ -69,8 +69,8 @@ It is not just a tmux bridge with chat glued on top. `clisbot` treats Slack and 
 ### I Just Want To Know What Changed Recently
 
 - start with [Recent Release Highlights](#recent-release-highlights)
-- then read [v0.1.52 Release Notes](docs/releases/v0.1.52.md) or the
-  [v0.1.52 Release Guide](docs/updates/releases/v0.1.52-release-guide.md)
+- then read [v0.1.53 Release Notes](docs/releases/v0.1.53.md) or the
+  [v0.1.53 Release Guide](docs/updates/releases/v0.1.53-release-guide.md)
 
 ## Why I Built This
 
@@ -272,6 +272,7 @@ Read the full notes here:
 
 - [CHANGELOG.md](CHANGELOG.md)
 - [Release Notes Index](docs/releases/README.md)
+- [v0.1.53 Release Notes](docs/releases/v0.1.53.md)
 - [v0.1.52 Release Notes](docs/releases/v0.1.52.md)
 - [v0.1.51 Release Notes](docs/releases/v0.1.51.md)
 - [v0.1.50 Release Notes](docs/releases/v0.1.50.md)

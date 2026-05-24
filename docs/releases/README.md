@@ -68,6 +68,7 @@ Use beta notes to support testers and operators, not as a second release-history
 ## Current Notes
 
 - [Upcoming](upcoming.md)
+- [v0.1.53](v0.1.53.md)
 - [v0.1.52](v0.1.52.md)
 - [v0.1.51](v0.1.51.md)
 - [v0.1.50](v0.1.50.md)

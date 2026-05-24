@@ -532,6 +532,7 @@ CLI별 operator notes:
 
 ## 최근 릴리스 하이라이트
 
+- `v0.1.53`: main README와 localized user guides를 refresh하고, Zalo Bot QR onboarding과 Zalo Personal media guide를 추가하며, queue/loop/message-tool edge cases와 Slack/Telegram/Zalo channel behavior를 고치고, contacts/groups/poll 같은 민감한 channel action용 admin-only permissions를 추가한다.
 - `v0.1.52`: `routes add ...`가 “해당 bot에 현재 default로 assigned된 agent 사용”을 뜻한다는 점을 명확히 하고, stale short `startupDelayMs` overrides를 정리해 upgraded installs가 새로운 60초 startup default를 inherit하게 한다.
 - `v0.1.51`: standard CLI families와 shared runner fallback의 default runner startup window를 60초로 높여 느린 fresh launch가 첫 prompt 제출 전에 실패할 가능성을 줄인다.
 - `v0.1.50`: 훨씬 강한 AI-native operator experience. chat으로 bot이 자기 자신을 관리하게 할 수 있고, real shared chat surfaces의 safer personal/team bots, older installs direct update, durable queue control, clearer session continuity truth, more reliable scheduled loops, stronger trust/restart behavior, stricter streaming/session isolation을 포함한다.
@@ -548,6 +549,7 @@ CLI별 operator notes:
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [Release Notes Index](../../../docs/releases/README.md)
+- [v0.1.53 Release Notes](../../../docs/releases/v0.1.53.md)
 - [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md)
 - [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md)
 - [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md)

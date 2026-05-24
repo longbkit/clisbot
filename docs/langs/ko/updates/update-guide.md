@@ -37,9 +37,11 @@ clisbot status
 사용자가 무엇이 바뀌었는지, 무엇을 써 봐야 하는지, 무엇을 조심해야 하는지 묻는다면 다음을 읽습니다.
 
 - [릴리스 노트](../releases/README.md)
+- [v0.1.53 릴리스 노트](../../../releases/v0.1.53.md)
 - [v0.1.52 릴리스 노트](../../../releases/v0.1.52.md)
 - [v0.1.51 릴리스 노트](../../../releases/v0.1.51.md)
 - [릴리스 가이드 모음](README.md)
+- [v0.1.53 릴리스 가이드](../../../updates/releases/v0.1.53-release-guide.md)
 - [v0.1.52 릴리스 가이드](../../../updates/releases/v0.1.52-release-guide.md)
 - [v0.1.51 릴리스 가이드](../../../updates/releases/v0.1.51-release-guide.md)
 - [사용자 가이드](../user-guide/README.md)
@@ -49,17 +51,17 @@ clisbot status
 ## 현재 stable 경로
 
 ```text
-Path: any version before 0.1.52 -> 0.1.52
-Target: clisbot@0.1.52
+Path: any version before 0.1.53 -> 0.1.53
+Target: clisbot@0.1.53
 Update path: direct
 Manual action: none
-Risk: low
-Automatic config update: yes for installs before `0.1.50`; `0.1.52` adds no new schema migration but may still rewrite current-schema configs when stale short startup-delay overrides are detected
+Risk: medium
+Automatic config update: yes; configs before schema `0.1.53` are backed up and rewritten to add the new admin-only sensitive channel permissions
 Breaking change: no
-Command: npm install -g clisbot@0.1.52 && clisbot restart
+Command: npm install -g clisbot@0.1.53 && clisbot restart
 검증: clisbot status
-Release note: ../../../releases/v0.1.52.md
-Release guide: ../../../updates/releases/v0.1.52-release-guide.md
+Release note: ../../../releases/v0.1.53.md
+Release guide: ../../../updates/releases/v0.1.53-release-guide.md
 ```
 
-이 경로에는 공개된 `0.1.43`, 그보다 오래된 legacy install, 내부 `0.1.44` pre-release install, 그리고 package bump와 stale startup-delay cleanup만 받으면 되는 `0.1.50` 또는 `0.1.51` install이 모두 포함됩니다.
+이 경로에는 공개된 `0.1.43`, 그보다 오래된 legacy install, 내부 `0.1.44` pre-release install, 그리고 `0.1.50`, `0.1.51`, `0.1.52` install이 모두 포함됩니다.

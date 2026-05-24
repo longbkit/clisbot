@@ -5,17 +5,19 @@
 Hãy đọc file này đầu tiên khi update package. Nó chỉ tồn tại để trả lời một câu hỏi: có cần migration thủ công hay không.
 
 ```text
-Path: mọi version trước 0.1.52 -> 0.1.52
+Path: mọi version trước 0.1.53 -> 0.1.53
 Update path: trực tiếp
 Manual action: không có
-Risk: thấp
-Automatic config update: có cho bản cài trước `0.1.50`; `0.1.52` không thêm schema migration mới nhưng vẫn có thể rewrite config current-schema nếu phát hiện stale short startup-delay override
+Risk: medium
+Automatic config update: có; config trước schema `0.1.53` được backup và rewrite để thêm các quyền sensitive channel admin-only mới
 Breaking change: không
 Migration runbook: không có
 Read next: ../updates/update-guide.md
-Release note: ../../../releases/v0.1.52.md
+Release note: ../../../releases/v0.1.53.md
 ```
 
-Phạm vi này bao gồm config đã phát hành ở `0.1.43`, các config legacy cũ hơn `0.1.43`, config pre-release nội bộ `0.1.44`, và cả bản cài `0.1.50` hoặc `0.1.51` chỉ cần bump package đồng thời dọn stale startup-delay override nếu còn bị ghim.
+`0.1.53` là release refactor boundary khá rộng, nhưng không cần chỉnh config thủ công. Khi upgrade, config cũ sẽ được backup rồi cập nhật schema để admin hiện tại có thêm `contactsManage`, `groupsManage`, và `sensitiveChannelActionManage`.
+
+Sau khi restart, operator nên kiểm tra startup, route, queue, loop, và các channel đang bật vì nhiều file nội bộ đã được di chuyển nhưng public contract vẫn giữ nguyên.
 
 Quy tắc: nếu `Manual action: none` thì không cần đọc, cũng không được tự bịa thêm migration runbook.

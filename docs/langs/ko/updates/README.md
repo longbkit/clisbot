@@ -14,6 +14,7 @@
 ## 핵심 문서
 
 - [update-guide.md](./update-guide.md)
+- [v0.1.53 릴리스 가이드 (English)](../../../updates/releases/v0.1.53-release-guide.md)
 - [v0.1.52 릴리스 가이드 (English)](../../../updates/releases/v0.1.52-release-guide.md)
 - [v0.1.51 릴리스 가이드 (English)](../../../updates/releases/v0.1.51-release-guide.md)
 

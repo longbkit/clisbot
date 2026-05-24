@@ -656,6 +656,7 @@ CLI-specific operator notes:
 
 ## Recent Release Highlights
 
+- `v0.1.53`: refreshes the main README and localized user guides, adds Zalo Bot QR onboarding and Zalo Personal media guidance, fixes queue/loop/message-tool edge cases, tightens Slack/Telegram/Zalo channel behavior, and adds admin-only sensitive channel permissions for contact, group, and channel-native actions.
 - `v0.1.52`: clarifies shared-route setup so `routes add ...` clearly means “use the agent currently assigned to that bot by default,” and prunes stale short `startupDelayMs` overrides so upgraded installs can actually inherit the newer 60-second startup default.
 - `v0.1.51`: raises the default runner startup window to 60 seconds across the
   standard CLI families and the shared runner fallback, so slower fresh launches
@@ -691,6 +692,7 @@ Read the full notes here:
 
 - [CHANGELOG.md](CHANGELOG.md)
 - [Release Notes Index](docs/releases/README.md)
+- [v0.1.53 Release Notes](docs/releases/v0.1.53.md)
 - [v0.1.52 Release Notes](docs/releases/v0.1.52.md)
 - [v0.1.51 Release Notes](docs/releases/v0.1.51.md)
 - [v0.1.50 Release Notes](docs/releases/v0.1.50.md)

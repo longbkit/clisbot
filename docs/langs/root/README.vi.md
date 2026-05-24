@@ -534,6 +534,7 @@ Ghi chú operator theo CLI:
 
 ## Điểm nổi bật release gần đây
 
+- `v0.1.53`: refresh README chính và user guide đa ngôn ngữ, thêm QR onboarding cho Zalo Bot và hướng dẫn media cho Zalo Personal, sửa các edge case của queue/loop/message-tool, siết behavior cho Slack/Telegram/Zalo, và thêm quyền admin-only cho các thao tác nhạy cảm trên channel như contacts, groups, poll.
 - `v0.1.52`: làm rõ shared-route setup để `routes add ...` có nghĩa rõ là "dùng agent hiện được assign cho bot đó theo default", và dọn stale short `startupDelayMs` override để bản đã upgrade có thể inherit startup default mới 60 giây.
 - `v0.1.51`: tăng default runner startup window lên 60 giây cho các CLI family chuẩn và shared runner fallback, giúp lần launch mới nhưng chậm ít fail trước khi prompt đầu tiên được submit.
 - `v0.1.50`: trải nghiệm operator AI-native mạnh hơn nhiều, nơi bạn ngày càng có thể nói chuyện với bot để nó tự quản; cộng với personal/team bot an toàn hơn trong ngữ cảnh chat chung, direct update tự động từ install cũ, durable queue control, session continuity rõ ràng hơn, scheduled loops đáng tin cậy hơn, trust/restart behavior mạnh hơn, và streaming/session isolation chặt hơn.
@@ -550,6 +551,7 @@ Dòng stable hiện tại thường có nghĩa là:
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [Release Notes Index](../../../docs/releases/README.md)
+- [v0.1.53 Release Notes](../../../docs/releases/v0.1.53.md)
 - [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md)
 - [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md)
 - [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md)

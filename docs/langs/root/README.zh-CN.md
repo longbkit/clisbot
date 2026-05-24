@@ -532,6 +532,7 @@ CLI-specific operator notes：
 
 ## 最近 release highlights
 
+- `v0.1.53`: 刷新主 README 和多语言 user guides，加入 Zalo Bot QR onboarding 与 Zalo Personal media guide，修复 queue/loop/message-tool edge cases，收紧 Slack/Telegram/Zalo channel behavior，并为 contacts、groups、poll 等敏感 channel actions 添加 admin-only permissions。
 - `v0.1.52`: 澄清 shared-route setup，让 `routes add ...` 明确表示“默认使用当前分配给该 bot 的 agent”，并清理 stale 的短 `startupDelayMs` override，让已升级安装能继承新的 60 秒 startup default。
 - `v0.1.51`: 将标准 CLI family 和 shared runner fallback 的默认 runner startup window 提高到 60 秒，降低较慢 fresh launch 在首个 prompt submit 前失败的概率。
 - `v0.1.50`: 更强的 AI-native operator experience，可以越来越多地通过 chat 让 bot 管理自身；同时带来更安全的 personal/team bot、旧安装自动 direct update、durable queue control、更真实的 session continuity、更可靠的 scheduled loops、更强的 trust/restart behavior、更严格的 streaming/session isolation。
@@ -548,6 +549,7 @@ CLI-specific operator notes：
 
 - [CHANGELOG.md](../../../CHANGELOG.md)
 - [Release Notes Index](../../../docs/releases/README.md)
+- [v0.1.53 Release Notes](../../../docs/releases/v0.1.53.md)
 - [v0.1.52 Release Notes](../../../docs/releases/v0.1.52.md)
 - [v0.1.51 Release Notes](../../../docs/releases/v0.1.51.md)
 - [v0.1.50 Release Notes](../../../docs/releases/v0.1.50.md)
