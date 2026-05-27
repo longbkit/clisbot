@@ -3,7 +3,7 @@ import { fileExists, readTextFile, writeTextFile } from "../shared/fs.ts";
 import { ensureDir, getDefaultRuntimeHealthPath } from "../shared/paths.ts";
 import { renderCliCommand } from "../shared/cli-name.ts";
 
-export type RuntimeChannel = "slack" | "telegram";
+export type RuntimeChannel = "slack" | "telegram" | "web";
 export type RuntimeChannelConnection =
   | "disabled"
   | "stopped"
@@ -204,6 +204,16 @@ export class RuntimeHealthStore {
       summary: diagnostic.summary,
       detail: diagnostic.detail,
       actions: diagnostic.actions,
+    });
+  }
+
+  async markWebFailure(error: unknown) {
+    await this.setChannel({
+      channel: "web",
+      connection: "failed",
+      summary: "Web channel failed to start.",
+      detail: error instanceof Error ? error.message : String(error),
+      actions: ["Check bots.web.port and bots.web.apiKey in your config."],
     });
   }
 
