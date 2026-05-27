@@ -111,6 +111,9 @@ function resolveAgentTargetInternal(
         override?.runner?.promptSubmitDelayMs ??
         runnerFamily.promptSubmitDelayMs ??
         runnerDefaults.promptSubmitDelayMs,
+      newSessionCommand:
+        override?.runner?.newSessionCommand ??
+        runnerFamily.newSessionCommand,
       sessionId: {
         ...runnerSessionId,
         create: {

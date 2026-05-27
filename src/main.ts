@@ -10,6 +10,7 @@ import { runContactsCli } from "./control/commands/contacts-cli.ts";
 import { runGroupsCli } from "./control/commands/groups-cli.ts";
 import { runLoopsCli } from "./control/commands/loops-cli.ts";
 import { runMessageCli } from "./control/commands/message-cli.ts";
+import { runPromptCli } from "./control/prompt-cli.ts";
 import { runQueuesCli } from "./control/commands/queues-cli.ts";
 import { runRoutesCli } from "./control/commands/routes-cli.ts";
 import { runRunnerCli } from "./control/runner/runner-cli.ts";
@@ -150,6 +151,11 @@ async function runControlCommand(command: ReturnType<typeof parseCliArgs>) {
 
   if (command.name === "message") {
     await runMessageCli(command.args);
+    return true;
+  }
+
+  if (command.name === "prompt") {
+    await runPromptCli(command.args);
     return true;
   }
 
