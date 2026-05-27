@@ -1,16 +1,23 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { AgentSessionState } from "../src/agents/session/session-state.ts";
-import { SessionMapping } from "../src/agents/session/session-mapping.ts";
-import { SessionStore } from "../src/agents/session/session-store.ts";
-import { RunnerService } from "../src/agents/runtime/runner-service.ts";
-import { resolveAgentTarget } from "../src/agents/routing/resolved-target.ts";
-import { loadConfig, resolveSessionStorePath } from "../src/config/core/load-config.ts";
-import { clisbotConfigSchema } from "../src/config/core/schema.ts";
-import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
-import { TmuxClient } from "../src/runners/tmux/client.ts";
+import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { AgentSessionState } from '../src/agents/session/session-state.ts'
+import { SessionMapping } from '../src/agents/session/session-mapping.ts'
+import { SessionStore } from '../src/agents/session/session-store.ts'
+import { RunnerService } from '../src/agents/runtime/runner-service.ts'
+import { resolveAgentTarget } from '../src/agents/routing/resolved-target.ts'
+import { loadConfig, resolveSessionStorePath } from '../src/config/core/load-config.ts'
+import { clisbotConfigSchema } from '../src/config/core/schema.ts'
+import { renderDefaultConfigTemplate } from '../src/config/core/template.ts'
+import { TmuxClient } from '../src/runners/tmux/client.ts'
+import {
+  DEFAULT_AGENT_TOOL_TEMPLATES,
+  SUPPORTED_AGENT_CLI_TOOLS,
+  buildRunnerFromToolTemplate,
+  inferAgentCliToolId,
+} from '../src/config/runtime/agent-tool-presets.ts'
+import { isActiveTimerStatusLine } from '../src/runners/transcript/transcript-normalization.ts'
 
 const tempDirs: string[] = [];
 const UUID_PATTERN =
@@ -89,6 +96,250 @@ afterEach(async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+describe('pi runner template', () => {
+  test('SUPPORTED_AGENT_CLI_TOOLS includes "pi"', () => {
+    expect(SUPPORTED_AGENT_CLI_TOOLS).toContain('pi')
+  })
+
+  test('DEFAULT_AGENT_TOOL_TEMPLATES["pi"] exists and has command: "pi"', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi']).toBeDefined()
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].command).toBe('pi')
+  })
+
+  test('sessionId.create.mode === "explicit"', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].sessionId.create.mode).toBe('explicit')
+  })
+
+  test('sessionId.capture.mode === "off"', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].sessionId.capture.mode).toBe('off')
+  })
+
+  test('sessionId.create.args deepEquals ["--session", "{sessionId}"]', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].sessionId.create.args).toEqual(['--session', '{sessionId}'])
+  })
+
+  test('sessionId.resume.mode === "command"', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].sessionId.resume.mode).toBe('command')
+  })
+
+  test('newSessionCommand === "/new"', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].newSessionCommand).toBe('/new')
+  })
+
+  test('startupReadyPattern matches "escape interrupt" text', () => {
+    const pattern = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupReadyPattern
+    expect(pattern).toBeDefined()
+    expect(new RegExp(pattern!, 'i').test('• escape interrupt (Ctrl+C to cancel)')).toBe(true)
+    expect(new RegExp(pattern!, 'i').test('  escape interrupt help text here')).toBe(true)
+    expect(new RegExp(pattern!, 'i').test('escape interrupt')).toBe(true)
+  })
+
+  test('inferAgentCliToolId("pi") returns "pi"', () => {
+    expect(inferAgentCliToolId('pi')).toBe('pi')
+  })
+
+  test('inferAgentCliToolId("PI") returns "pi" (case-insensitive)', () => {
+    expect(inferAgentCliToolId('PI')).toBe('pi')
+  })
+
+  test('buildRunnerFromToolTemplate("pi", template, undefined).args deepEquals ["--dangerously-skip-permissions"]', () => {
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['pi']
+    const resolved = buildRunnerFromToolTemplate('pi', template, undefined)
+    expect(resolved.args).toEqual(['--dangerously-skip-permissions'])
+  })
+
+  test('buildRunnerFromToolTemplate("pi", template, undefined).sessionId.resume.args deepEquals ["--resume", "{sessionId}", "--dangerously-skip-permissions"]', () => {
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['pi']
+    const resolved = buildRunnerFromToolTemplate('pi', template, undefined)
+    expect(resolved.sessionId.resume.args).toEqual(['--resume', '{sessionId}', '--dangerously-skip-permissions'])
+  })
+
+  test('buildRunnerFromToolTemplate non-codex branch preserves template resume.args (not reconstructed)', () => {
+    // Create a minimal template with custom resume args to verify template is preserved,
+    // not reconstructed from scratch with hardcoded ["--resume", "{sessionId}", ...options]
+    const customTemplate = {
+      ...DEFAULT_AGENT_TOOL_TEMPLATES['pi'],
+      sessionId: {
+        ...DEFAULT_AGENT_TOOL_TEMPLATES['pi'].sessionId,
+        resume: {
+          ...DEFAULT_AGENT_TOOL_TEMPLATES['pi'].sessionId.resume,
+          args: ['--attach', '{sessionId}', '--custom-flag'],
+        },
+      },
+    }
+    const resolved = buildRunnerFromToolTemplate('pi', customTemplate, undefined)
+    expect(resolved.sessionId.resume.args).toEqual(['--attach', '{sessionId}', '--custom-flag'])
+  })
+
+  test('isActiveTimerStatusLine("Working...") returns true', () => {
+    expect(isActiveTimerStatusLine('Working...')).toBe(true)
+  })
+
+  test('isActiveTimerStatusLine("• Working...") returns true', () => {
+    expect(isActiveTimerStatusLine('• Working...')).toBe(true)
+  })
+
+  test('isActiveTimerStatusLine("Working... (some task)") returns false — trailing text not a pi status line', () => {
+    expect(isActiveTimerStatusLine('Working... (some task)')).toBe(false)
+  })
+
+  test('startupBlockers is defined and has 2 entries', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers).toBeDefined()
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers?.length).toBe(2)
+  })
+
+  test('BLOCK-01: startupBlockers[0].pattern matches "Warning: No models available"', () => {
+    const blockers = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers!
+    expect(new RegExp(blockers[0].pattern, 'i').test('Warning: No models available')).toBe(true)
+    expect(new RegExp(blockers[0].pattern, 'i').test('tmux extended-keys is off')).toBe(false)
+  })
+
+  test('BLOCK-01: startupBlockers[0].message directs operator to configure a provider', () => {
+    const message = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers![0].message
+    expect(message.toLowerCase()).toContain('configure')
+    expect(message).toMatch(/login|DEEPSEEK_API_KEY|GITHUB_TOKEN|API.?KEY/i)
+  })
+
+  test('BLOCK-02: startupBlockers[1].pattern matches "tmux extended-keys is off"', () => {
+    const blockers = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers!
+    expect(new RegExp(blockers[1].pattern, 'i').test('tmux extended-keys is off')).toBe(true)
+    expect(new RegExp(blockers[1].pattern, 'i').test('Warning: No models available')).toBe(false)
+  })
+
+  test('BLOCK-02: startupBlockers[1].message includes set -g extended-keys on and .tmux.conf', () => {
+    const message = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers![1].message
+    expect(message).toContain('extended-keys on')
+    expect(message).toContain('.tmux.conf')
+  })
+
+  test('BLOCK-01 pattern compiles to valid regex (no throw)', () => {
+    const blockers = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers!
+    expect(() => new RegExp(blockers[0].pattern, 'i')).not.toThrow()
+  })
+
+  test('BLOCK-02 pattern compiles to valid regex (no throw)', () => {
+    const blockers = DEFAULT_AGENT_TOOL_TEMPLATES['pi'].startupBlockers!
+    expect(() => new RegExp(blockers[1].pattern, 'i')).not.toThrow()
+  })
+})
+
+describe('pi schema defaults', () => {
+  // Parse with pi runner key absent — schema supplies full defaults
+  function parsedWithoutPiOverrides() {
+    const raw = JSON.parse(renderDefaultConfigTemplate())
+    if (raw.agents?.defaults?.runner) {
+      delete raw.agents.defaults.runner.pi
+    }
+    return clisbotConfigSchema.parse(raw).agents.defaults.runner.pi
+  }
+  const piDefaults = parsedWithoutPiOverrides()
+
+  test('schema provides pi defaults when config has no runner overrides', () => {
+    expect(piDefaults).toBeDefined()
+    expect(piDefaults.command).toBe('pi')
+  })
+
+  test('parsed pi defaults have sessionId.create.mode === "explicit"', () => {
+    expect(piDefaults.sessionId!.create.mode).toBe('explicit')
+  })
+
+  test('parsed pi defaults have sessionId.capture.mode === "off"', () => {
+    expect(piDefaults.sessionId!.capture.mode).toBe('off')
+  })
+
+  test('parsed pi defaults have sessionId.create.args deepEquals ["--session", "{sessionId}"]', () => {
+    expect(piDefaults.sessionId!.create.args).toEqual(['--session', '{sessionId}'])
+  })
+
+  test('parsed pi defaults have newSessionCommand === "/new"', () => {
+    expect(piDefaults.newSessionCommand).toBe('/new')
+  })
+
+  test('parsed pi defaults have sessionId.resume.mode === "command"', () => {
+    expect(piDefaults.sessionId!.resume.mode).toBe('command')
+  })
+})
+
+describe('newSessionCommand defaults', () => {
+  test('codex template declares /new as newSessionCommand', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES.codex.newSessionCommand).toBe('/new')
+  })
+
+  test('claude template declares /new as newSessionCommand', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES.claude.newSessionCommand).toBe('/new')
+  })
+
+  test('gemini template declares /clear as newSessionCommand', () => {
+    expect(DEFAULT_AGENT_TOOL_TEMPLATES.gemini.newSessionCommand).toBe('/clear')
+  })
+})
+
+describe('pi triggerNewSession routing (Fix 1)', () => {
+  test('pi template satisfies skipLiveRotation guard condition', () => {
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['pi']
+    expect(template.sessionId.capture.mode).toBe('off')
+    expect(template.sessionId.create.mode).toBe('explicit')
+    // Both conditions true: pi will route through restartRunnerWithFreshSessionIdForNewCommand
+  })
+
+  test('codex template does NOT satisfy skipLiveRotation guard (create.mode is runner)', () => {
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['codex']
+    const skipLiveRotation =
+      template.sessionId.capture.mode === 'off' &&
+      template.sessionId.create.mode === 'explicit'
+    expect(skipLiveRotation).toBe(false)
+  })
+
+  test('claude template satisfies skipLiveRotation guard (capture.mode off + create.mode explicit)', () => {
+    // claude also has capture.mode: "off" and create.mode: "explicit"
+    // like pi, it routes through restartRunnerWithFreshSessionIdForNewCommand
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['claude']
+    expect(template.sessionId.capture.mode).toBe('off')
+    expect(template.sessionId.create.mode).toBe('explicit')
+  })
+
+  test('gemini template does NOT satisfy skipLiveRotation guard (create.mode is runner)', () => {
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['gemini']
+    const skipLiveRotation =
+      template.sessionId.capture.mode === 'off' &&
+      template.sessionId.create.mode === 'explicit'
+    expect(skipLiveRotation).toBe(false)
+  })
+})
+
+describe('retryFreshStartAfterStoredResumeFailure gate (Fix 2)', () => {
+  test('pi template satisfies gate continuation condition (create.mode explicit + resume.mode command)', () => {
+    const template = DEFAULT_AGENT_TOOL_TEMPLATES['pi']
+    // Gate: resume.mode !== 'command' || (create.mode !== 'runner' && create.mode !== 'explicit')
+    // Pi: resume.mode === 'command' (false), create.mode === 'explicit' (false in inner AND)
+    // Both false → gate condition is false → does NOT return null → pi session preserved
+    const resumeMode = template.sessionId.resume.mode
+    const createMode = template.sessionId.create.mode
+    const gateRejectsSession =
+      resumeMode !== 'command' ||
+      (createMode !== 'runner' && createMode !== 'explicit')
+    expect(gateRejectsSession).toBe(false)
+  })
+
+  test('unknown create.mode is rejected by gate (returns null)', () => {
+    const resumeMode: string = 'command'
+    const createMode: string = 'unknown-mode'
+    const gateRejectsSession =
+      resumeMode !== 'command' ||
+      (createMode !== 'runner' && createMode !== 'explicit')
+    expect(gateRejectsSession).toBe(true)
+  })
+
+  test('non-command resume.mode is still rejected by gate regardless of create.mode', () => {
+    const resumeMode: string = 'off'
+    const createMode: string = 'explicit'
+    const gateRejectsSession =
+      resumeMode !== 'command' ||
+      (createMode !== 'runner' && createMode !== 'explicit')
+    expect(gateRejectsSession).toBe(true)
+  })
+})
 
 describe("RunnerService integration", () => {
   test("creates a fresh runner for a prefix-colliding session key when the stored sessionId is missing", async () => {

@@ -7,7 +7,7 @@ import {
   renderInteractionForRenderer,
   renderTranscriptCommandForRenderer,
 } from "../../runners/transcript/index.ts";
-import { resolveChannelInteractionRenderer } from "../catalog/registry.ts";
+import { getChannelPlugin, resolveChannelInteractionRenderer } from "../catalog/registry.ts";
 
 export type ChannelRenderedMessageState = {
   text: string;
@@ -56,7 +56,8 @@ export function renderPlatformInteraction(params: {
   allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
-  return renderInteractionForRenderer(resolveChannelInteractionRenderer(params.platform), params);
+  const renderer = getChannelPlugin(params.platform)?.interactionRenderer ?? "plain";
+  return renderInteractionForRenderer(renderer, params);
 }
 
 export function renderPlatformTranscriptCommand(platform: ChannelId) {
