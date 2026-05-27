@@ -43,6 +43,7 @@ export type ParsedCliCommand =
   | { name: "runner"; args: string[] }
   | { name: "pairing"; args: string[] }
   | { name: "init"; args: string[] }
+  | { name: "prompt"; args: string[] }
   | { name: "serve-foreground" }
   | { name: "serve-monitor" };
 
@@ -288,6 +289,14 @@ const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
       handler: ({ passthroughArgs }) => ({ name: "init", args: [...passthroughArgs] }),
     },
     {
+      name: "prompt",
+      summary: "Send a prompt directly to an agent and receive the response on stdout.",
+      usage: ["prompt --agent <id> --message <text> [--session-key <key>] [--stream] [--timeout <seconds>] [--json]"],
+      helpLines: ["                     See `prompt --help` for agent, session-key, stream, and json options."],
+      passthroughArgs: true,
+      handler: ({ passthroughArgs }) => ({ name: "prompt", args: [...passthroughArgs] }),
+    },
+    {
       name: "serve-foreground",
       hiddenInHelp: true,
       handler: () => ({ name: "serve-foreground" }),
@@ -411,7 +420,8 @@ function renderRootCommandLines(configPath: string) {
       .replace("`auth --help`", renderCliCommand("auth --help", { inline: true }))
       .replace("`runner --help`", renderCliCommand("runner --help", { inline: true }))
       .replace("`pairing --help`", renderCliCommand("pairing --help", { inline: true }))
-      .replace("`init --help`", renderCliCommand("init --help", { inline: true })),
+      .replace("`init --help`", renderCliCommand("init --help", { inline: true }))
+      .replace("`prompt --help`", renderCliCommand("prompt --help", { inline: true })),
   );
 }
 

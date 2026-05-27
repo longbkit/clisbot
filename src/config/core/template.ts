@@ -254,6 +254,32 @@ export function renderDefaultConfigTemplate(options: DefaultConfigTemplateOption
                 },
               },
             },
+            pi: {
+              command: "pi",
+              args: ["--dangerously-skip-permissions"],
+              sessionId: {
+                create: {
+                  mode: "explicit",
+                  args: ["--session", "{sessionId}"],
+                },
+                capture: {
+                  mode: "off",
+                  statusCommand: "/status",
+                  pattern:
+                    "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+                  timeoutMs: 5000,
+                  pollIntervalMs: 250,
+                },
+                resume: {
+                  mode: "command",
+                  args: [
+                    "--resume",
+                    "{sessionId}",
+                    "--dangerously-skip-permissions",
+                  ],
+                },
+              },
+            },
           },
         },
         list: [],
