@@ -4,12 +4,12 @@ export type WebChunk = { id: string; text: string };
 
 export type HistoryMessage = { role: "user" | "assistant"; text: string };
 
-export function sendWebHistory(ws: WebSocket, todoId: string, messages: HistoryMessage[]) {
-  ws.send(JSON.stringify({ type: "history", todoId, messages }));
+export function sendWebHistory(ws: WebSocket, contextId: string, messages: HistoryMessage[]) {
+  ws.send(JSON.stringify({ type: "history", contextId, messages }));
 }
 
-export function sendAnnotation(ws: WebSocket, todoId: string | undefined, key: string, value: string) {
-  ws.send(JSON.stringify({ type: "annotation", todoId, key, value }));
+export function sendAnnotation(ws: WebSocket, contextId: string | undefined, key: string, value: string) {
+  ws.send(JSON.stringify({ type: "annotation", contextId, key, value }));
 }
 
 let chunkCounter = 0;

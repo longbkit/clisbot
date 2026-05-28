@@ -52,24 +52,17 @@ export async function readSessionHistory(params: {
           .join("\n");
       }
 
-      // Skip empty, strip context injection block (our own prefixes).
-      // Prefer the [USER_INPUT] marker (new sessions); fall back to lastIndexOf('\n\n') for old ones.
+      // Strip context prefix injected by clients (everything before [USER_INPUT] marker).
       text = text.trim();
       if (!text) continue;
-      if (text.startsWith("[Context:") || text.startsWith("[iCloud Reminder:") || text.startsWith("[Task:")) {
-        const markerIdx = text.indexOf('\n[USER_INPUT]\n');
-        if (markerIdx !== -1) {
-          text = text.slice(markerIdx + '\n[USER_INPUT]\n'.length).trim();
-        } else {
-          const sep = text.lastIndexOf('\n\n');
-          text = sep !== -1 ? text.slice(sep + 2).trim() : '';
-        }
+      const markerIdx = text.indexOf('\n[USER_INPUT]\n');
+      if (markerIdx !== -1) {
+        text = text.slice(markerIdx + '\n[USER_INPUT]\n'.length).trim();
         if (!text) continue;
       }
 
-      // Strip [[CHANNEL_EVENT:...]] markers (and legacy [[BRIEF_UPDATE:...]])
-      text = text.replace(/\[\[CHANNEL_EVENT:[^\]]*?\]\]/gi, "").trim();
-      text = text.replace(/\[\[BRIEF_UPDATE:\s*[\s\S]*?\]\]/gi, "").trim();
+      // Strip [[CHANNEL_EVENT:...]] annotations from historical assistant messages.
+      text = text.replace(/\[\[CHANNEL_EVENT:[\s\S]*?\]\]/gi, "").trim();
       text = text.replace(/\[\[CHANNEL_EVENT:[\s\S]*$/i, "").trim();
       if (!text) continue;
 

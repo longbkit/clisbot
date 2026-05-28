@@ -8,13 +8,13 @@ export type WebConversationTarget = {
   agentId: string;
   sessionKey: string;
   mainSessionKey: string;
-  todoId?: string;
+  contextId?: string;
 };
 
 export function resolveWebConversationTarget(params: {
   loadedConfig: LoadedConfig;
   agentId: string;
-  todoId?: string;
+  contextId?: string;
 }): WebConversationTarget {
   const sessionConfig = params.loadedConfig.raw.session;
   const mainSessionKey = buildAgentMainSessionKey({
@@ -23,7 +23,7 @@ export function resolveWebConversationTarget(params: {
   });
 
   // Per-todo sessions get their own conversation context; otherwise falls back to main DM.
-  const peerId = params.todoId ? `todo:${params.todoId}` : "web:main";
+  const peerId = params.contextId ? `todo:${params.contextId}` : "web:main";
 
   return {
     agentId: params.agentId,
@@ -38,6 +38,6 @@ export function resolveWebConversationTarget(params: {
       identityLinks: sessionConfig.identityLinks,
     }),
     mainSessionKey,
-    todoId: params.todoId,
+    contextId: params.contextId,
   };
 }

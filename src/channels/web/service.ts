@@ -30,8 +30,8 @@ export type WebBotConfig = {
 };
 
 type IncomingWsMessage =
-  | { type: "message"; text: string; todoId?: string }
-  | { type: "get_history"; todoId: string }
+  | { type: "message"; text: string; contextId?: string }
+  | { type: "get_history"; contextId: string }
   | { type: "invoke_tool"; server: string; tool: string; args?: Record<string, unknown> };
 
 const DEFAULT_MAX_CHARS = 32_000;
@@ -156,7 +156,7 @@ export class WebRuntimeService implements ChannelRuntimeService {
           const target = resolveWebConversationTarget({
             loadedConfig,
             agentId,
-            todoId: msg.todoId,
+            contextId: msg.contextId,
           });
 
           const sessionEntry = await agentService.sessionState.getEntry(target.sessionKey).catch(() => null);
@@ -166,9 +166,9 @@ export class WebRuntimeService implements ChannelRuntimeService {
               workspacePath: sessionEntry.workspacePath,
               limit: 60,
             });
-            sendWebHistory(ws, msg.todoId, history);
+            sendWebHistory(ws, msg.contextId, history);
           } else {
-            sendWebHistory(ws, msg.todoId, []);
+            sendWebHistory(ws, msg.contextId, []);
           }
           return;
         }
@@ -204,7 +204,7 @@ export class WebRuntimeService implements ChannelRuntimeService {
         const conversationTarget = resolveWebConversationTarget({
           loadedConfig,
           agentId,
-          todoId: msg.todoId,
+          contextId: msg.contextId,
         });
 
         const identity = {
@@ -281,7 +281,7 @@ export class WebRuntimeService implements ChannelRuntimeService {
 
           const { events } = extractChannelEvents(accumulatedText);
           for (const event of events) {
-            sendAnnotation(ws, msg.todoId, event.key, event.value);
+            sendAnnotation(ws, msg.contextId, event.key, event.value);
           }
 
           sendWebDone(ws);
