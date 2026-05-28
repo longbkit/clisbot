@@ -971,6 +971,18 @@ export const clisbotConfigSchema = z.object({
         },
       },
     } as any),
+    web: z.object({
+      apiKey: z.string(),
+      port: z.number().int().default(3099),
+      agentId: z.string().optional(),
+      ownerId: z.string().optional(),
+      senderName: z.string().optional(),
+      mcpServers: z.record(z.object({
+        command: z.string(),
+        args: z.array(z.string()),
+        env: z.record(z.string()).optional(),
+      })).optional(),
+    }).optional(),
   }),
   agents: z.object({
     defaults: agentsDefaultsSchema.default({
