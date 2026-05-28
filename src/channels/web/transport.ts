@@ -1,7 +1,16 @@
-import type { ServerWebSocket } from "bun";
-import type { WebSocketData } from "./service.ts";
+import type { WebSocket } from "ws";
 
 export type WebChunk = { id: string; text: string };
+
+export type HistoryMessage = { role: "user" | "assistant"; text: string };
+
+export function sendWebHistory(ws: WebSocket, todoId: string, messages: HistoryMessage[]) {
+  ws.send(JSON.stringify({ type: "history", todoId, messages }));
+}
+
+export function sendAnnotation(ws: WebSocket, todoId: string | undefined, key: string, value: string) {
+  ws.send(JSON.stringify({ type: "annotation", todoId, key, value }));
+}
 
 let chunkCounter = 0;
 function nextChunkId() {
@@ -9,7 +18,7 @@ function nextChunkId() {
 }
 
 export async function postWebText(
-  ws: ServerWebSocket<WebSocketData>,
+  ws: WebSocket,
   text: string,
 ): Promise<WebChunk[]> {
   const chunk: WebChunk = { id: nextChunkId(), text };
@@ -18,7 +27,7 @@ export async function postWebText(
 }
 
 export async function reconcileWebText(
-  ws: ServerWebSocket<WebSocketData>,
+  ws: WebSocket,
   chunks: WebChunk[],
   text: string,
 ): Promise<WebChunk[]> {
@@ -30,10 +39,10 @@ export async function reconcileWebText(
   return [{ id: firstId, text }];
 }
 
-export function sendWebDone(ws: ServerWebSocket<WebSocketData>) {
+export function sendWebDone(ws: WebSocket) {
   ws.send(JSON.stringify({ type: "done" }));
 }
 
-export function sendWebError(ws: ServerWebSocket<WebSocketData>, message: string) {
+export function sendWebError(ws: WebSocket, message: string) {
   ws.send(JSON.stringify({ type: "error", message }));
 }

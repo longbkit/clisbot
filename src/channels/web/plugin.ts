@@ -3,7 +3,15 @@ import type { WebBotConfig } from "./service.ts";
 import { WebRuntimeService } from "./service.ts";
 
 function getWebConfig(loadedConfig: Parameters<ChannelPlugin["isEnabled"]>[0]): WebBotConfig | null {
-  const raw = loadedConfig.raw as { bots?: { web?: { apiKey?: string; port?: number; agentId?: string; ownerId?: string } } };
+  const raw = loadedConfig.raw as {
+    bots?: {
+      web?: {
+        apiKey?: string; port?: number; agentId?: string; ownerId?: string;
+        senderName?: string;
+        mcpServers?: Record<string, { command: string; args: string[]; env?: Record<string, string> }>;
+      };
+    };
+  };
   const web = raw.bots?.web;
   if (!web?.apiKey) return null;
   return {
@@ -11,6 +19,8 @@ function getWebConfig(loadedConfig: Parameters<ChannelPlugin["isEnabled"]>[0]): 
     apiKey: web.apiKey,
     agentId: web.agentId ?? loadedConfig.raw.agents.defaults.defaultAgentId ?? "default",
     ownerId: web.ownerId,
+    senderName: web.senderName,
+    mcpServers: web.mcpServers,
   };
 }
 
