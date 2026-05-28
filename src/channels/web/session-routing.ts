@@ -22,8 +22,8 @@ export function resolveWebConversationTarget(params: {
     mainKey: sessionConfig.mainKey,
   });
 
-  // Per-todo sessions get their own conversation context; otherwise falls back to main DM.
-  const peerId = params.contextId ? `todo:${params.contextId}` : "web:main";
+  // Per-context sessions get their own conversation thread; otherwise falls back to main DM.
+  const peerId = params.contextId ? `ctx:${params.contextId}` : "web:main";
 
   return {
     agentId: params.agentId,
