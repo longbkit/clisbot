@@ -237,7 +237,7 @@ export class WebRuntimeService implements ChannelRuntimeService {
           commandPrefixes: { slash: ["/"], bash: ["!"] },
           streaming: "latest" as const,
           response: "all" as const,
-          responseMode: "message-tool" as const,
+          responseMode: "capture-pane" as const,
           additionalMessageMode: "queue" as const,
           surfaceNotifications: { loopStart: "off" as const, loopEnd: "off" as const },
           verbose: "off" as const,
