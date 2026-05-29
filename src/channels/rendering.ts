@@ -13,7 +13,7 @@ export type ChannelRenderedMessageState = {
 };
 
 export function buildRenderedMessageState(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "web";
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   snapshot: string;
   queuePosition?: number;
@@ -45,7 +45,7 @@ export function buildRenderedMessageState(params: {
 }
 
 export function renderPlatformInteraction(params: {
-  platform: "slack" | "telegram";
+  platform: "slack" | "telegram" | "web";
   status: "queued" | "running" | "completed" | "timeout" | "detached" | "error";
   content: string;
   maxChars: number;
@@ -54,6 +54,8 @@ export function renderPlatformInteraction(params: {
   allowTranscriptInspection?: boolean;
   responsePolicy?: "all" | "final";
 }) {
+  // Web channel receives raw markdown — no platform rendering needed.
+  if (params.platform === "web") return params.content;
   return params.platform === "telegram"
     ? renderTelegramInteraction(params)
     : renderSlackInteraction(params);

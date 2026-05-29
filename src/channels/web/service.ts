@@ -279,6 +279,33 @@ export class WebRuntimeService implements ChannelRuntimeService {
             },
           });
 
+          // Claude Code renders markdown in the terminal, so the tmux-captured text
+          // has code fences stripped. Read the final assistant message directly from
+          // the session JSONL (raw API response) and send it as the authoritative text.
+          const sessionEntry = await agentService.sessionState.getEntry(conversationTarget.sessionKey).catch(() => null);
+          if (sessionEntry?.sessionId && sessionEntry.workspacePath) {
+            const history = await readSessionHistory({
+              sessionId: sessionEntry.sessionId,
+              workspacePath: sessionEntry.workspacePath,
+              limit: 10,
+            });
+            const lastAssistant = history.filter(m => m.role === "assistant").at(-1);
+            if (lastAssistant?.text) {
+              const { text: cleanFinal, events: finalEvents } = extractChannelEvents(lastAssistant.text);
+              if (activeChunks.length === 0) {
+                activeChunks = await postWebText(ws, cleanFinal);
+              } else {
+                await reconcileWebText(ws, activeChunks, cleanFinal);
+              }
+              // Use JSONL-derived events (more reliable than tmux-captured accumulatedText)
+              for (const event of finalEvents) {
+                sendAnnotation(ws, msg.contextId, event.key, event.value);
+              }
+              sendWebDone(ws);
+              return;
+            }
+          }
+
           const { events } = extractChannelEvents(accumulatedText);
           for (const event of events) {
             sendAnnotation(ws, msg.contextId, event.key, event.value);
