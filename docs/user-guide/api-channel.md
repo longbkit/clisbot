@@ -103,7 +103,7 @@ Example config:
           "auth": { "mode": "none" },
           "map": {
             "surfaceKind": "dm",
-            "surfaceId": "{{$.senderId}}-{{$.surfaceId}}",
+            "surfaceId": "$.surfaceId",
             "senderId": "$.senderId",
             "senderDisplayName": "$.senderName",
             "text": "$.text",
@@ -154,7 +154,7 @@ EID=$(echo "$A" | jq -r .eventId)
 clisbot message send \
   --channel api \
   --bot local \
-  --target dm:longluong-1 \
+  --target dm:1 \
   --reply-to "$EID" \
   --final \
   --message "local final ok"
@@ -238,7 +238,8 @@ https://clisbot-api.example.com/api/bots/<botId>/events
 
 ## Auth Modes
 
-Bearer:
+API auth currently reads bearer tokens and HMAC secrets from environment
+variables, not token files. Bearer:
 
 ```json
 {
@@ -620,7 +621,7 @@ curl -sS -X POST "$BASE/api/bots/local/events/$EID/stop"
 Stop whatever is currently active for a surface:
 
 ```bash
-curl -sS -X POST "$BASE/api/bots/local/surfaces/longluong-1/stop"
+curl -sS -X POST "$BASE/api/bots/local/surfaces/1/stop"
 ```
 
 Stopping a completed event returns an error. Stopping an active event uses the
