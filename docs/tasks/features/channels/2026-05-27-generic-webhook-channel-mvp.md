@@ -69,6 +69,11 @@ Still deliberately outside this first slice:
 - delivery status tracking
 - retries and idempotency keys
 
+Known partial coverage after the expanded local test pass: detailed API health
+and live Chatwoot/Jira e2e remain follow-up work. Local coverage now includes
+handler integration, mocked provider delivery, auth/mapper/result-store unit
+matrices, and a real local `Bun.serve` listener smoke.
+
 ## Implementation Reading Contract
 
 An implementation agent should treat this task doc as the primary
@@ -88,17 +93,6 @@ Read order:
 Do not mine the grill docs for extra MVP scope. If this task doc and a grill doc
 disagree, this task doc wins for implementation scope unless the ADR says
 otherwise.
-
-## Task Doc Completeness Standard
-
-A task doc is implementation-ready only when an agent can implement the first
-slice without reconstructing decisions from research notes. For this task the
-doc must include final decisions, scope/non-scope, API contracts, status models,
-config shape, auth/security, mapping/filter semantics, result-store behavior,
-actions, provider first target, plan, risks/rejected paths, and validation.
-
-Grill docs are for rationale, tradeoff history, and audit. They are not hidden
-requirement sources.
 
 ## Why
 
@@ -129,24 +123,6 @@ These are not open questions for the MVP:
 | Delivery status | Not in first result shape |
 | Code organization | Build a shared channel-result primitive, expose it only through API bot in this slice |
 | Retention | Default 6 hours, bounded by count/text size; no retention upper-bound knob defined yet |
-
-## Grill Decision Coverage
-
-Important grill conclusions are copied into this task doc so implementers do not
-need to infer them:
-
-| Grill conclusion | Where this task encodes it |
-| --- | --- |
-| `api` naming replaces `webhook` channel naming | `Final Decision Snapshot`, `Scope`, `Target Config Shape` |
-| Result polling is baseline behavior | `Result API`, `Validation` |
-| Provider delivery is optional | `Message Send And Actions` |
-| `actions.message.send` replaces top-level `outbound` | `First Slice Support Matrix`, `Target Config Shape`, `Message Send And Actions` |
-| HMAC, bearer, and local-only `none` are all required | `Inbound Auth Modes` |
-| `reply.params` is action metadata, not prompt context | `Scope`, `Risks And Decisions`, `Validation` |
-| Mapper/filter DSL stays small and declarative | `Mapper And Filter Baseline` |
-| Queue/steer/result status is event-scoped | `Result API` |
-| Delivery status is future work | `Final Decision Snapshot`, `Not supported` |
-| Chatwoot HMAC contract is first target | `Chatwoot First Slice` |
 
 ## Scope
 
@@ -466,19 +442,83 @@ Retention:
 - bound stored progress entries per event, for example latest 20 entries
 - bound stored text size and truncate with an explicit marker
 
-Implementation thinking for storage organization:
+## Result Store Storage Layout
 
-- Scope public behavior to API bot only in this MVP.
-- Put the underlying result-store primitive at a shared channel level, for
-  example under `src/channels/results`, not inside Chatwoot/API-only transport
-  code.
-- The primitive should be channel-agnostic: key by channel, bot id, event id,
-  and optional surface/session/run references.
-- Do not expose polling endpoints for Slack, Telegram, or other channels in
-  this slice.
-- Keep the shape ready for future channels to record processing state and
-  result output, then optionally call their provider APIs for delivery.
-- This is a code-organization guardrail, not expanded MVP scope.
+Current first-slice implementation stores channel result state in one local JSON
+document:
+
+```text
+${CLISBOT_HOME:-~/.clisbot}/state/channel-results.json
+```
+
+Implementation files: `src/infra/paths.ts` via
+`getDefaultChannelResultsPath()` and `src/channels/results/result-store.ts`.
+There is no public config knob in MVP; tests can inject a custom store path.
+
+Top-level document shape:
+
+| Field | Key shape | Purpose |
+| --- | --- | --- |
+| `results` | `<channel>:<botId>:<eventId>` | Event-scoped polling truth; for MVP usually `api:<botId>:<eventId>`. |
+| `surfaces` | `<channel>:<botId>:<surfaceId>` | Latest known reply target for a surface, used by `message send` without `--reply-to` and by surface stop. |
+
+Sample storage data:
+
+```json
+{
+  "results": {
+    "api:chatwoot:message_created:123": {
+      "channel": "api",
+      "botId": "chatwoot",
+      "eventId": "message_created:123",
+      "status": "processing",
+      "progress": [
+        { "sequence": 1, "kind": "progress", "text": "Checking context.", "render": "text", "createdAt": "2026-05-30T03:30:02.000Z" }
+      ],
+      "result": null,
+      "error": null,
+      "expiresAt": "2026-05-30T09:30:00.000Z",
+      "updatedAt": "2026-05-30T03:30:02.000Z",
+      "surfaceId": "3:970",
+      "surfaceKind": "dm",
+      "agentId": "default",
+      "sessionKey": "agent:default:api:chatwoot:dm:3:970",
+      "reply": { "targetId": "970", "params": { "accountId": 3 } }
+    }
+  },
+  "surfaces": {
+    "api:chatwoot:3:970": {
+      "channel": "api", "botId": "chatwoot",
+      "surfaceId": "3:970",
+      "surfaceKind": "dm",
+      "agentId": "default",
+      "sessionKey": "agent:default:api:chatwoot:dm:3:970",
+      "targetId": "970", "params": { "accountId": 3 },
+      "activeEventId": "message_created:123",
+      "updatedAt": "2026-05-30T03:30:02.000Z"
+    }
+  }
+}
+```
+
+Stored data includes lifecycle, bounded outputs, run/surface context, and non-secret reply addressing.
+
+Lifecycle behavior:
+
+- authenticated parsed events create a `results` record before routing
+- result creation/context updates also upsert the matching `surfaces` record
+- appending `progress` keeps the latest 20 entries
+- appending `final` writes `result` and moves status to `completed`
+- text is capped at 12,000 characters with an explicit truncation marker
+- expired records are marked `expired`, then pruned after a short grace window
+- the file is rewritten as one JSON document in the first slice
+
+Never store raw provider payloads, HMAC/bearer secrets, raw prompt envelopes,
+provider response bodies, or attachment/media bodies in this result store.
+
+Implementation thinking: keep public behavior scoped to API bot in this MVP,
+but keep the primitive under `src/channels/results` so future channels can
+reuse the same event/result state before provider delivery.
 
 ## Message Send And Actions
 
@@ -585,25 +625,25 @@ mapping, action URL, action auth, and action body examples.
 
 ## Implementation Plan
 
-1. Add config schema/template contracts for `bots.api`.
-2. Add channel installation and runtime plugin entries.
-3. Add listener routing for `/api/bots/<botId>/events` with raw-body capture.
-4. Implement HMAC verification before JSON parse.
-5. Implement bearer verification and local-only `none`.
-6. Implement mapper: path reads, composed strings, required fields, structured
-   filters, array projection, and non-secret `reply.params`.
-7. Build canonical message/sender/surface envelope and principal
-   `api:<botId>:<provider-user-id>`.
-8. Reuse existing routing, queue, steering, session, and dedupe seams.
-9. Implement result store with progress/final output records.
-10. Implement `actions.message.send` HTTP delivery with URL/header/body
-    templating and default no retry.
-11. Add operator send support through `clisbot message send --channel api`.
-12. Add runtime health details: endpoint, auth mode, render mode, last ingress,
-    last action status, and sanitized error code/category.
-13. Add result endpoint `/api/bots/<botId>/events/<eventId>/result`.
-14. Add event and surface stop endpoints using the chat `/stop` interrupt path.
-15. Add docs and examples for Chatwoot.
+Implementation and test traceability:
+
+| # | Scope | Implementation | Unit coverage | Integration coverage | E2E/live coverage |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Config schema/template for `bots.api` | Done: `src/channels/api/config-schema.ts`, template contract, config helpers | `test/config-template.test.ts` validates defaults and official template | `test/channel-bots.test.ts`, `test/routes-cli.test.ts`, `test/pairing-cli.test.ts` cover shared CLI inventory using `api` | Not live-tested |
+| 2 | Channel installation and runtime plugin | Done: registry, installation inventory, `src/channels/api/plugin.ts` | `test/channel-installation-inventory.test.ts` covers built-in installation seam | Message/routes/pairing CLI tests accept `api` as a supported channel | Not live-tested |
+| 3 | Listener routing for `/api/bots/<botId>/events` with raw body | Done: `ApiChannelService` and `handleApiRequest` | Path parsing is covered through handler tests | `test/api-channel.test.ts` posts to event/result URLs and verifies acceptance/result | Local `Bun.serve` listener smoke covered; no external live provider test |
+| 4 | HMAC before JSON parse | Done: auth verifies raw body before JSON parse | `test/api-auth.test.ts` covers missing signature, stale timestamp, wrong secret | Bad HMAC with invalid JSON returns `401` and creates no result record | No provider HMAC live test |
+| 5 | Bearer and loopback-only `none` | Done | Bearer/none covered through handler tests | Bearer success and non-loopback `none` rejection covered | No public-bind startup warning test yet |
+| 6 | Mapper/filter DSL and `reply.params` | Done: `src/channels/api/mapper.ts` | `test/api-mapper.test.ts` covers bracket paths, arrays, `in`, `anyIn`, and projection | Event mapping, filter drop, reply params, and action templates covered | Not live-tested with Chatwoot/Jira payloads |
+| 7 | Canonical envelope and principal `api:<botId>:<provider-user-id>` | Done | `test/auth-resolve.test.ts` preserves provider ids containing `:` | API ingress builds route/session context using the mapped sender and surface | Not live-tested |
+| 8 | Existing routing, queue, steering, session, and dedupe seams | Done for first slice | Existing route/session tests cover shared machinery; API-specific duplicate and `runMode: steer` covered | API happy path enqueues/processes; stop tests use stored session context | No live long-running run test |
+| 9 | Result store with progress/final output records | Done: shared `src/channels/results/result-store.ts`, default path `${CLISBOT_HOME:-~/.clisbot}/state/channel-results.json` | `test/channel-results-store.test.ts` covers persistence, progress/final, expiry, and prune grace | Polling result, filtered result, final output, surface reply index, and stop status covered | Restart behavior covered at store level, not process e2e |
+| 10 | `actions.message.send` HTTP delivery, templates, no retry | Done for text/Markdown only | `test/api-message-actions.test.ts` covers provider action and no-action store-only behavior | Mocked fetch verifies Chatwoot URL/header/body and result-store final record | No live Chatwoot send |
+| 11 | `clisbot message send --channel api` | Done through channel plugin | Message CLI accepts `api` through shared command tests | `sendApiMessage` integration test records final and calls provider action | No CLI subprocess smoke yet |
+| 12 | Runtime health details | Partial: plugin reports active/disabled/stopped summary | Existing runtime summary tests cover generic channel health inventory | No API-specific last ingress/action status test | Detailed endpoint/auth/render/last-action health is not implemented yet |
+| 13 | Result endpoint | Done | Covered through handler-level tests | Happy path polls `/result` until `completed` | Local real listener smoke covers `/events` and `/result` |
+| 14 | Event and surface stop endpoints | Done | Covered through handler-level tests | Event stop, terminal-event `409`, and surface stop are covered | No live long-running run stop test yet |
+| 15 | Docs and Chatwoot examples | Done for MVP plus follow-up thinking docs | Drift checks run with `rg` | Docs link task, ADR, channel playbook, Chatwoot media thinking, Jira validation thinking | Live Chatwoot/Jira docs remain validation follow-up |
 
 ## Risks And Decisions
 
@@ -632,35 +672,27 @@ mapping, action URL, action auth, and action body examples.
 
 ## Validation
 
-- unit: HMAC success, missing signature, invalid signature, stale timestamp,
-  wrong secret, `sha256=` prefix handling
-- unit: raw body is verified before JSON parsing
-- unit: filters drop outgoing/private/agent-bot/template/activity messages
-- unit: composed `eventId`, `surfaceId`, `reply.params`, and URL templates
-- unit: prompt command rendering exposes only safe target syntax while transport
-  still resolves `reply.params`
-- unit: principal parser preserves `api:chatwoot:<sender-id>`
-- unit: dedupe separates same event id across API bots
-- unit: bearer auth succeeds/fails without logging token values
-- unit: local-only `none` is allowed on loopback and rejected/warned on public
-  bind
-- unit: result resource reports `filtered`, `duplicate`, `queued`, `processing`,
-  `completed`, and `failed` without raw payload or secrets
-- unit: result store accepts progress/final outputs when no action is configured
-- integration: POST returns `401` on bad HMAC and does not call handler
-- integration: POST accepted fast on valid HMAC and enqueues/processes ingress
-- integration: Chatwoot `actions.message.send` request shape matches expected
-  URL, header, and JSON body without logging secrets
+Latest local gate:
 
-## Related Docs
+- `bun test test/api-channel.test.ts test/api-message-actions.test.ts test/api-auth.test.ts test/api-mapper.test.ts test/channel-results-store.test.ts`: 24 pass
+- `bunx tsc --noEmit`: pass
+- `bun run check`: 970 pass, 0 fail, 3419 expectations, 115 files
+- `git diff --check`: pass before commit `fbba84a`
 
-- [Generic API Channel Events And Actions ADR](../../../architecture/decisions/2026-05-25-generic-webhook-channel-connectors.md)
-- [Generic API Channel Events And Actions Grill](../../../research/channels/2026-05-25-generic-webhook-channel-grill.md)
-- [API Channel Naming And Result Polling Grill](../../../research/channels/2026-05-30-api-channel-result-polling-grill.md)
-- [Chatwoot API Media Action Thinking](../../../research/channels/2026-05-30-chatwoot-api-media-action.md)
-- [Jira Server Webhook Ingress-Only Automation](../../../research/channels/2026-05-30-jira-server-webhook-ingress-only-automation.md)
-- [Jira Server API Bot AI Native Workflow](../../../research/channels/2026-05-30-jira-server-api-ai-native-workflow.md)
-- [Channel Integration Playbook](../../../features/channels/channel-integration-playbook.md)
-- [Channels README](../../../features/channels/README.md)
-- [Backlog](../../backlog.md)
-- [Large-Scale Doc Migration Lesson](../../../lessons/2026-05-30-large-scale-doc-migrations-need-inventory-and-repeatable-gates.md)
+| Area | Current coverage | Remaining gap |
+| --- | --- | --- |
+| HMAC success and `sha256=` prefix | Covered by handler test and isolated missing-signature, stale timestamp, wrong-secret tests | None for first slice |
+| HMAC before JSON parse | Covered by bad-HMAC invalid-JSON test returning `401` and no result record | None for first slice |
+| Bearer auth | Covered by bearer success and wrong-token failure tests | None for first slice |
+| Local-only `none` | Covered for non-loopback rejection | Public-bind startup/health warning is not implemented yet |
+| Filters | Covered for outgoing message filtered result | Add private/agent-bot/template/activity fixture tests if Chatwoot payload variants are finalized |
+| Mapper/templates | Covered for event id, surface id, reply params, URL/header/body templates, bracket paths, arrays, `in`, `anyIn`, and projection | None for first slice |
+| Principal parsing | Covered by auth principal normalization test | None known |
+| Dedupe | Covered for duplicate event id on same bot and same event id across another bot | None for first slice |
+| Result statuses | Covered for `filtered`, `queued`, `steered`, `processing`, `completed`, `failed`, `expired`, and `stopped`; duplicate response is covered | None for first slice |
+| Result store progress/final without provider action | Covered by explicit no-action `message.send` test plus handler flow | None for first slice |
+| Result store storage layout | Documented in `Result Store Storage Layout`; standalone store persistence/expiry/prune tests added | Process restart e2e remains optional follow-up |
+| `actions.message.send` | Mocked fetch verifies Chatwoot URL, header, body, render, and final result | No live Chatwoot send test |
+| Stop endpoints | Event stop, terminal-event `409`, and surface stop covered | No live long-running process stop test |
+| Real HTTP listener | Covered by local `Bun.serve` smoke for event ingress and result polling | External provider networking remains live-validation follow-up |
+| External e2e | None | Live Chatwoot webhook/send and Jira webhook-ingress validation remain follow-up |
