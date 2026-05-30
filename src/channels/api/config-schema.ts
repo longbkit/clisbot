@@ -115,7 +115,7 @@ const apiChannelSchemaContract = defineChannelSchemaContract({
       groups: createGroupDefault(),
       listener: {
         host: "127.0.0.1",
-        port: 8787,
+        port: 6868,
       },
     });
     const defaultsSchema = z.object({
@@ -126,10 +126,10 @@ const apiChannelSchemaContract = defineChannelSchemaContract({
       groups: z.record(z.string(), params.botRouteSchema).default({}),
       listener: z.object({
         host: z.string().min(1).default("127.0.0.1"),
-        port: z.number().int().min(0).max(65535).default(8787),
+        port: z.number().int().min(0).max(65535).default(6868),
       }).default({
         host: "127.0.0.1",
-        port: 8787,
+        port: 6868,
       }),
     });
     return asChannelProviderConfigSchema(

@@ -29,7 +29,7 @@ const apiChannelTemplateContract = defineChannelTemplateContract({
           },
           listener: {
             host: "127.0.0.1",
-            port: 8787,
+            port: 6868,
           },
         },
       }),

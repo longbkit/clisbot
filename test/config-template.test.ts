@@ -29,7 +29,7 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.api.defaults.mode).toBe("listener");
     expect(config.bots.api.defaults.listener).toEqual({
       host: "127.0.0.1",
-      port: 8787,
+      port: 6868,
     });
     expect(config.bots.slack.defaults.enabled).toBe(false);
     expect(config.bots.slack.defaults.dmPolicy).toBe("pairing");

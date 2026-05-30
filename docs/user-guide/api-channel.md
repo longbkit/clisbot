@@ -77,7 +77,7 @@ Example config:
       "defaults": {
         "enabled": true,
         "defaultBotId": "local",
-        "listener": { "host": "127.0.0.1", "port": 8787 },
+        "listener": { "host": "127.0.0.1", "port": 6868 },
         "dmPolicy": "allowlist",
         "groupPolicy": "allowlist",
         "directMessages": {},
@@ -128,7 +128,7 @@ clisbot status
 Post an event:
 
 ```bash
-BASE=http://127.0.0.1:8787
+BASE=http://127.0.0.1:6868
 A=$(curl -sS -X POST "$BASE/api/bots/local/events" \
   -H 'content-type: application/json' \
   -d '{"surfaceId":"1","senderId":"longluong","senderName":"A Long","text":"1+2"}')
@@ -167,7 +167,7 @@ clisbot message send \
 Keep the listener on loopback:
 
 ```json
-{ "listener": { "host": "127.0.0.1", "port": 8787 } }
+{ "listener": { "host": "127.0.0.1", "port": 6868 } }
 ```
 
 Use `auth.mode: "none"` only here. The `none` mode is loopback-only.
@@ -178,7 +178,7 @@ Bind the listener to all interfaces and use bearer or HMAC auth:
 
 ```json
 {
-  "listener": { "host": "0.0.0.0", "port": 8787 }
+  "listener": { "host": "0.0.0.0", "port": 6868 }
 }
 ```
 
@@ -206,7 +206,7 @@ Do not expose `auth.mode: "none"` publicly.
 
 Recommended shape:
 
-- keep clisbot on `127.0.0.1:8787`
+- keep clisbot on `127.0.0.1:6868`
 - put Nginx, Caddy, Cloudflare Tunnel, Tailscale Funnel, or another gateway in
   front
 - terminate HTTPS at the gateway
@@ -222,7 +222,7 @@ server {
   server_name clisbot-api.example.com;
 
   location /api/ {
-    proxy_pass http://127.0.0.1:8787;
+    proxy_pass http://127.0.0.1:6868;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
@@ -327,7 +327,7 @@ Config:
       "defaults": {
         "enabled": true,
         "defaultBotId": "chatwoot",
-        "listener": { "host": "127.0.0.1", "port": 8787 },
+        "listener": { "host": "127.0.0.1", "port": 6868 },
         "dmPolicy": "allowlist",
         "groupPolicy": "allowlist",
         "directMessages": {},
