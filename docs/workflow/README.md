@@ -17,6 +17,7 @@ This folder should capture:
 - [workflow-principles-draft.md](workflow-principles-draft.md): draft workflow north stars for shortest-review-first output, user-near review order, task-readiness shaping, and convergence discipline
 - [ai-review-checklist.md](ai-review-checklist.md): short high-leverage checklist for looping AI review until naming, mental model, decision ownership, user flow, and risk issues are cleaned up
 - [working-prompts.md](working-prompts.md): reusable prompts that are showing good results in real `clisbot` workflow loops
+- [ai-native-workflow-harness-backlog.md](ai-native-workflow-harness-backlog.md): working backlog for making `clisbot` behave like a workflow harness through plain language, keywords, and slash-command entry points
 - [agent-rules-review-draft.md](agent-rules-review-draft.md): review draft of durable AI-agent operating rules learned from real `clisbot` work before selected rules are promoted into `AGENTS.md`
 - [decision-and-struggle-patterns.md](decision-and-struggle-patterns.md): review draft of decision patterns and recurring AI struggle patterns to prevent repeated mistakes before selected rules move into `AGENTS.md`
 
@@ -35,6 +36,7 @@ Current owner split:
 
 - `workflow-principles-draft.md` owns workflow direction and shaping heuristics
 - `ai-review-checklist.md` owns the reusable review loop
+- `ai-native-workflow-harness-backlog.md` owns backlog ideas for turning recurring repo-work patterns into explicit harness workflows
 - `agent-rules-review-draft.md` owns candidate durable operating rules before `AGENTS.md`
 - `working-prompts.md` owns concrete prompts that are proving useful in practice
 - `decision-and-struggle-patterns.md` owns recurring failure modes and decision-style corrections
