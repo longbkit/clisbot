@@ -210,6 +210,19 @@ Persistence behavior should therefore be:
 - retry or defer when the write path is temporarily unavailable
 - avoid re-writing the same unchanged `sessionId` on every poll or status read
 
+Cross-process state rule:
+
+- clisbot runtime, monitor, HTTP listeners, and one-shot CLI commands may run
+  in different OS processes
+- in-memory state and caches are process-local and must not be treated as
+  shared truth across runtime and CLI boundaries
+- when more than one process can read or mutate the same runtime-facing state,
+  use an explicit durable store, IPC path, or runtime command path; file-backed
+  stores must reload or validate a file version before serving cached state
+- tests for these features should include at least one cross-process or
+  independent-store-view regression, because same-process unit tests can miss
+  stale cache behavior
+
 Do not persist transient runner artifacts as canonical state in the agents layer without a documented reason.
 
 For AI CLI-backed runners, this implies one important split:

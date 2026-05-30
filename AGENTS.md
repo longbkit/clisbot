@@ -96,6 +96,8 @@ Treat runtime path resolution in this order:
 
 If runtime behavior looks wrong, inspect `CLISBOT_HOME`, `CLISBOT_CONFIG_PATH`, `CLISBOT_PID_PATH`, `CLISBOT_LOG_PATH`, and related runtime env vars before assuming the code is wrong.
 
+When planning runtime/control features, remember the foreground runtime, monitor, HTTP listener, and one-shot CLI commands may be separate processes; never rely on in-memory state crossing that boundary.
+
 ## Documentation Workflow
 Use the repo doc systems consistently:
 - `docs/overview/README.md` is the top-level project overview
