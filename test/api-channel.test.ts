@@ -85,6 +85,35 @@ describe("api channel", () => {
     expect(result.reply.params.accountId).toBe(3);
   });
 
+  test("generates a timestamp event id when mapping omits eventId", async () => {
+    const loadedConfig = createLoadedConfig();
+    delete (loadedConfig.raw.bots.api.chatwoot as any).ingress.map.eventId;
+    const originalNow = Date.now;
+    Date.now = () => 1780150000000;
+
+    try {
+      const response = await handleApiRequest({
+        request: new Request("http://127.0.0.1/api/bots/chatwoot/events", {
+          method: "POST",
+          body: JSON.stringify(chatwootPayload()),
+        }),
+        remoteAddress: "127.0.0.1",
+        loadedConfig,
+        agentService: createAgentService(),
+        resultStore: new ChannelResultStore(tempPath("results.json")),
+      });
+      const accepted = await response.json() as any;
+
+      expect(response.status).toBe(202);
+      expect(accepted).toMatchObject({
+        eventId: "1780150000000",
+        resultUrl: "/api/bots/chatwoot/events/1780150000000/result",
+      });
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+
   test("records filtered events without dispatching them", async () => {
     const loadedConfig = createLoadedConfig();
     const resultStore = new ChannelResultStore(tempPath("results.json"));

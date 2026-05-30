@@ -161,6 +161,8 @@ Supported:
 - filters: `all`, `any`, `not`, `equals`, `notEquals`, `exists`, `in`, `anyIn`
 - mapped inbound fields: event id, surface kind/id, sender id/display name,
   text, optional `runMode`, reply target id, non-secret reply params
+- `eventId` is optional in the map; when omitted or empty, clisbot generates
+  one from the current timestamp string and returns it in the accept response
 - event ids should be URL-segment friendly in examples and default configs;
   prefer `-` separators over `:` because event ids are embedded in result and
   stop URLs

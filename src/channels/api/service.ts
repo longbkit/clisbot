@@ -55,7 +55,9 @@ function normalizeMappedEvent(mapped: Record<string, unknown>): ApiMappedEvent {
   }
   const runMode = rawRunMode as "queue" | "steer" | undefined;
   return {
-    eventId: normalizeMappedString(mapped.eventId, "eventId"),
+    eventId: mapped.eventId == null || mapped.eventId === ""
+      ? String(Date.now())
+      : normalizeMappedString(mapped.eventId, "eventId"),
     surfaceKind,
     surfaceId: normalizeMappedString(mapped.surfaceId, "surfaceId"),
     senderId: normalizeMappedString(mapped.senderId, "senderId"),
