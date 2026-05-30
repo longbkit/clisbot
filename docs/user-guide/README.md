@@ -17,6 +17,7 @@ This folder should explain:
 Related pages:
 
 - [Channel Operations](channels.md)
+- [API Channel](api-channel.md)
 - [Surface Access Model](surface-access-model.md)
 - [Bots And Credentials](bots-and-credentials.md)
 - [Release Notes](../releases/README.md)
