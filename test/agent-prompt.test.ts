@@ -179,6 +179,32 @@ describe("agent prompt envelope", () => {
     expect(prompt).toContain("`clisbot auth get-permissions --sender telegram:123 --agent default --json`");
   });
 
+  test("renders provider bot selection with --bot in reply guidance", () => {
+    const prompt = buildAgentPromptText({
+      text: "ship it",
+      identity: {
+        platform: "telegram",
+        botId: "ops",
+        conversationKind: "topic",
+        senderId: "123",
+        chatId: "-1001",
+        topicId: "4",
+      },
+      config: {
+        enabled: true,
+        maxProgressMessages: 2,
+        requireFinalResponse: true,
+      },
+      responseMode: "message-tool",
+      streaming: "all",
+      agentId: "default",
+      time: "2026-04-27T07:02:27.000Z",
+    });
+
+    expect(prompt).toContain("  --bot ops \\");
+    expect(prompt).not.toContain("  --account ops \\");
+  });
+
   test("renders a Zalo Bot DM reply command", () => {
     previousWrapperPath = process.env.CLISBOT_WRAPPER_PATH;
     previousPromptCommand = process.env.CLISBOT_PROMPT_COMMAND;

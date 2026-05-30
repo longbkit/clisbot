@@ -15,7 +15,7 @@ export function renderAgentReplyCommandBase(params: {
   return [
     `${params.command} message send \\`,
     `  --channel ${params.channel} \\`,
-    params.botId ? `  --account ${params.botId} \\` : null,
+    params.botId ? `  --bot ${params.botId} \\` : null,
     `  --target ${params.target} \\`,
     params.childSurface
       ? `  ${params.childSurface.flag} ${params.childSurface.value} \\`
