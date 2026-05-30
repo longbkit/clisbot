@@ -6,6 +6,9 @@ a Long wants `clisbot start` to expose an OpenAI-compatible completion API first
 
 This is not a separate product system. The existing architecture already names future API endpoints as channel surfaces, so the implementation should stay isolated under `channels` and be wired into `control` only for lifecycle and start flags.
 
+Session continuity for Chat Completions is covered in the companion grill note:
+[Chat Completions Session Continuity Grill](2026-05-25-chat-completions-session-continuity-grill.md).
+
 ## Current Architecture Fit
 
 - `channels` owns inbound surfaces, including future API.
@@ -55,7 +58,15 @@ Recommended answer: expose configured agent ids through `/v1/models`. If `model`
 
 ### 8. How should request session continuity work?
 
-Recommended answer: derive `sessionKey` from `x-clisbot-session-key`, then `metadata.clisbot_session_key`, then `user`, then the target agent id. Prefix with `api:openai:` so API sessions do not collide with Slack or Telegram sessions.
+Recommended answer: Chat Completions has no first-class session id, so add a
+small compatibility extension. Resolve an external continuity key from
+`X-Clisbot-Session-Key`, then `metadata.clisbot_session_key`, then fallback
+metadata such as `metadata.conversation_id`, then `user`. If no external
+continuity key is supplied, treat the request as stateless/per-request for
+clisbot continuity. Map the external key to a clisbot `sessionKey` such as
+`agent:<agentId>:completion-api:openai:<key>`. Do not expose or accept the
+native runner `sessionId` in the first slice; `SessionService` should keep the
+private `sessionKey -> sessionId` mapping.
 
 ### 9. Should OpenAI streaming be supported now?
 
@@ -75,6 +86,13 @@ Recommended answer: yes. Keep the service as `completion-api`, with provider ada
 - Add `POST /v1/chat/completions` non-streaming.
 - Reject `stream: true` explicitly until SSE behavior is designed.
 - Require Bearer auth when the configured API key env exists, and always require it for non-local binds.
+- Accept authenticated continuity metadata through `X-Clisbot-Session-Key` and
+  `metadata.clisbot_session_key`.
+- Echo the resolved continuity key in response metadata and the
+  `X-Clisbot-Session-Key` header.
+- Reject `metadata.clisbot_session_id`, `metadata.session_id`, and
+  `X-Clisbot-Session-Id` to avoid confusing external client continuity with
+  native runner `sessionId`.
 
 ## Proposed File Boundaries
 
@@ -92,6 +110,9 @@ Recommended answer: yes. Keep the service as `completion-api`, with provider ada
 - `clisbot stop` stops the API listener together with the rest of runtime.
 - `/v1/models` returns configured agent ids.
 - `/v1/chat/completions` routes to the default or selected agent and returns an OpenAI-shaped non-streaming response.
+- `/v1/chat/completions` can preserve clisbot session continuity when an
+  authenticated request supplies `X-Clisbot-Session-Key` or
+  `metadata.clisbot_session_key`.
 - Non-local binds fail fast without a configured API key env.
 - No secret values are written to config, docs, logs, or CLI output.
 
@@ -107,6 +128,8 @@ Recommended answer: yes. Keep the service as `completion-api`, with provider ada
 
 - Should non-local bind always require auth, or should Tailnet-only host be allowed without Bearer token?
 - Should `model` names be raw agent ids, `clisbot/<agentId>`, or both?
-- Should the API default session be shared (`api:openai:<agent>`) or stateless per request unless a session key is supplied?
+- Should best-effort fingerprint continuity be offered later as an opt-in
+  compatibility mode for clients that cannot send metadata, headers,
+  `conversation_id`, or `user`?
 - Should `start --host/--port` be named generic `--host/--port`, or more explicit `--api-host/--api-port` before release hardening?
 - Should Anthropic compatibility use the same auth key and session mapping, or separate `anthropic:` session prefixes?

@@ -80,33 +80,36 @@ describe("zalo-personal bots cli", () => {
     setTestConfigEnv();
     await seedConfig();
 
+    const tokenFile = join(tempDir, "credentials", "zalo-personal", "default", "auth-session");
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
     rawConfig.bots.zaloPersonal.defaults.enabled = true;
     rawConfig.bots.zaloPersonal.default.enabled = true;
     rawConfig.bots.zaloPersonal.default.credentialType = "tokenFile";
-    rawConfig.bots.zaloPersonal.default.tokenFile = "~/.clisbot/credentials/zalo-personal/default/auth-session";
+    rawConfig.bots.zaloPersonal.default.tokenFile = tokenFile;
     writeFileSync(process.env.CLISBOT_CONFIG_PATH!, `${JSON.stringify(rawConfig, null, 2)}\n`);
 
     const output = captureConsole();
     await runBotsCli(["status", "--channel", "zalo-personal"], createRuntimeDeps({ running: false }));
 
     expect(output.join("\n")).toContain("zalo-personal/default login=missing connection=not-running");
-    expect(output.join("\n")).toContain("credentials: missing path=~/.clisbot/credentials/zalo-personal/default/auth-session");
+    expect(output.join("\n")).toContain(`credentials: missing path=${tokenFile}`);
   });
 
   test("status scopes active connection to the selected bot", async () => {
     setTestConfigEnv();
     await seedConfig();
 
+    const defaultTokenFile = join(tempDir, "credentials", "zalo-personal", "default", "auth-session");
+    const workTokenFile = join(tempDir, "credentials", "zalo-personal", "work", "auth-session");
     const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
     rawConfig.bots.zaloPersonal.defaults.enabled = true;
     rawConfig.bots.zaloPersonal.default.enabled = true;
     rawConfig.bots.zaloPersonal.default.credentialType = "tokenFile";
-    rawConfig.bots.zaloPersonal.default.tokenFile = "~/.clisbot/credentials/zalo-personal/default/auth-session";
+    rawConfig.bots.zaloPersonal.default.tokenFile = defaultTokenFile;
     rawConfig.bots.zaloPersonal.work = {
       enabled: true,
       credentialType: "tokenFile",
-      tokenFile: "~/.clisbot/credentials/zalo-personal/work/auth-session",
+      tokenFile: workTokenFile,
     };
     writeFileSync(process.env.CLISBOT_CONFIG_PATH!, `${JSON.stringify(rawConfig, null, 2)}\n`);
 

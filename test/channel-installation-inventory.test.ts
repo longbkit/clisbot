@@ -29,7 +29,7 @@ function joinChannels(values: readonly { channel: string }[]) {
 
 function joinCredentialChannels() {
   return listBuiltInChannelDirectories()
-    .filter((channel) => channel !== "zalo-personal")
+    .filter((channel) => channel !== "api" && channel !== "zalo-personal")
     .join(",");
 }
 

@@ -587,7 +587,7 @@ describe("routes cli", () => {
     expect(text).toContain("Canonical CLI ids are `dm:<id>`, `dm:*`, `group:<id>`, `group:*`");
     expect(text).toContain("routes add --channel <channel-name> <dm:*|dm:<id>>");
     expect(text).toContain("routes add --channel zalo-bot dm:<user-id>");
-    expect(text).toContain("Supported channels: slack, telegram, zalo-bot, zalo-personal.");
+    expect(text).toContain("Supported channels: api, slack, telegram, zalo-bot, zalo-personal.");
     expect(text).toContain("Shared group policy values are `disabled`, `allowlist`, and `open`.");
     expect(text).toContain("DM wildcard policy values are `disabled`, `pairing`, `allowlist`, and `open`.");
     expect(text).toContain("You are not allowed to use this bot in this group.");

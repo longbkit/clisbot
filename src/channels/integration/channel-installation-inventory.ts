@@ -7,6 +7,7 @@ import type { ChannelSurfaceContract } from "./channel-surface-contract.ts";
 import type { ChannelLegacyConfigMigrationContract } from "../config/legacy-config-migration-contract.ts";
 import type { ChannelPairingAccessContract } from "../pairing/access-contract.ts";
 import type { ChannelSurfaceConfigTargetContract } from "../config/surface-config-target-contract.ts";
+import apiChannelInstallation from "../api/installation.ts";
 import slackChannelInstallation from "../slack/installation.ts";
 import telegramChannelInstallation from "../telegram/installation.ts";
 import zaloBotChannelInstallation from "../zalo-bot/installation.ts";
@@ -25,6 +26,7 @@ export type ChannelInstallation = {
 };
 
 export const CHANNEL_INSTALLATIONS = [
+  apiChannelInstallation,
   slackChannelInstallation,
   telegramChannelInstallation,
   zaloBotChannelInstallation,

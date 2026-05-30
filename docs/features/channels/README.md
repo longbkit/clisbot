@@ -69,6 +69,10 @@ Channels is where those surfaces live.
 - [OpenClaw Channel Standardization Vs Clisbot Gaps](../../research/channels/2026-04-10-openclaw-channel-standardization-vs-clisbot-gaps.md)
 - [OpenClaw Structured Channel Rendering Techniques For Slack And Telegram](../../research/channels/2026-04-14-openclaw-structured-channel-rendering-techniques.md)
 - [OpenClaw Zalo Paths And Official Zalo Bot Platform](../../research/channels/2026-04-18-openclaw-zalo-paths-and-official-zalo-bot-platform.md)
+- [OpenAI-Compatible Completion API Research](../../research/channels/2026-05-23-openai-compatible-completion-api.md)
+- [Chat Completions Session Continuity Grill](../../research/channels/2026-05-25-chat-completions-session-continuity-grill.md)
+- [Generic API Channel Events And Actions Grill](../../research/channels/2026-05-25-generic-webhook-channel-grill.md)
+- [API Channel Naming And Result Polling Grill](../../research/channels/2026-05-30-api-channel-result-polling-grill.md)
 
 ## Related Feature Docs
 
@@ -129,7 +133,16 @@ Current surface contract to preserve:
 - channel observer delivery is now explicitly best-effort: transient Slack or Telegram send or edit failures may miss intermediate updates, but they must not terminate runner supervision or require a process restart
 - `/status` on a routed thread should expose the current session run state so users can see active detached work without switching to transcript-first inspection
 - Slack and Telegram now keep only the latest 5 routed inbound messages per conversation boundary plus a `lastProcessedMarker`, then replay only the unprocessed tail when a later invocation needs recent context
-- expand the same channel model to the API surface next
+- API-surface expansion now has a first end-to-end built-in `api` channel
+  slice with API bot configs for event ingress, result polling, shared result
+  storage, event/surface stop endpoints, and optional `actions.message.send`
+- keep API bots as static `bots.api.<botId>` config under the built-in `api`
+  channel, not as dynamic per-provider channel plugins
+- Chat Completions compatibility is a separate request/response API surface,
+  and should preserve continuity through authenticated
+  `metadata.clisbot_session_key` or `X-Clisbot-Session-Key`, mapped into the
+  existing clisbot `sessionKey -> sessionId` store; `session_id`-named client
+  fields should not be accepted as continuity aliases in the first slice.
 - Telegram now ships as a topic-aware channel surface, using OpenClaw-style group and topic config inheritance instead of reusing Slack follow-up mechanics for topic identity
 - Telegram transport should respect Telegram Bot API retry-after hints and pace live message edits so streaming does not fail on 429 rate limits
 - Telegram processing feedback should keep a topic-aware typing heartbeat alive while work is still running, following OpenClaw's documented rule that typing remains scoped to the active topic

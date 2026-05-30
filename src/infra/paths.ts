@@ -57,6 +57,10 @@ export function getDefaultProcessedEventsPath(env: NodeJS.ProcessEnv = process.e
   return join(getDefaultStateDir(env), "processed-events.json");
 }
 
+export function getDefaultChannelResultsPath(env: NodeJS.ProcessEnv = process.env) {
+  return join(getDefaultStateDir(env), "channel-results.json");
+}
+
 export function getDefaultSessionStorePath(env: NodeJS.ProcessEnv = process.env) {
   return join(getDefaultStateDir(env), "sessions.json");
 }
@@ -100,6 +104,7 @@ export const DEFAULT_WORKSPACE_ROOT = getDefaultWorkspaceRoot();
 export const DEFAULT_CREDENTIALS_DIR = getDefaultCredentialsDir();
 export const DEFAULT_TMUX_SOCKET_PATH = getDefaultTmuxSocketPath();
 export const DEFAULT_PROCESSED_EVENTS_PATH = getDefaultProcessedEventsPath();
+export const DEFAULT_CHANNEL_RESULTS_PATH = getDefaultChannelResultsPath();
 export const DEFAULT_SESSION_STORE_PATH = getDefaultSessionStorePath();
 export const DEFAULT_PAIRING_DIR = getDefaultPairingDir();
 export const DEFAULT_ACTIVITY_STORE_PATH = getDefaultActivityStorePath();

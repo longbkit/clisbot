@@ -1,1 +1,1 @@
-export type ChannelConfigBotKey = "slack" | "telegram" | "zaloBot" | "zaloPersonal";
+export type ChannelConfigBotKey = "api" | "slack" | "telegram" | "zaloBot" | "zaloPersonal";

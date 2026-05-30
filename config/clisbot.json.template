@@ -119,6 +119,79 @@
         "participationTtlMin": 5
       }
     },
+    "api": {
+      "defaults": {
+        "enabled": false,
+        "defaultBotId": "default",
+        "mode": "listener",
+        "allowBots": false,
+        "dmPolicy": "allowlist",
+        "groupPolicy": "allowlist",
+        "agentPrompt": {
+          "enabled": true,
+          "maxProgressMessages": 3,
+          "requireFinalResponse": true
+        },
+        "directMessages": {},
+        "groups": {
+          "*": {
+            "enabled": true,
+            "requireMention": false,
+            "policy": "open",
+            "allowUsers": [],
+            "blockUsers": [],
+            "allowBots": false
+          }
+        },
+        "commandPrefixes": {
+          "slash": [
+            "::",
+            "\\"
+          ],
+          "bash": [
+            "!"
+          ]
+        },
+        "streaming": "off",
+        "response": "final",
+        "responseMode": "message-tool",
+        "additionalMessageMode": "steer",
+        "surfaceNotifications": {
+          "queueStart": "brief",
+          "loopStart": "brief"
+        },
+        "verbose": "minimal",
+        "followUp": {
+          "mode": "auto",
+          "participationTtlMin": 5
+        },
+        "listener": {
+          "host": "127.0.0.1",
+          "port": 8787
+        }
+      },
+      "default": {
+        "enabled": false,
+        "name": "default",
+        "dmPolicy": "pairing",
+        "groupPolicy": "allowlist",
+        "directMessages": {},
+        "groups": {},
+        "ingress": {
+          "auth": {
+            "mode": "none"
+          },
+          "map": {
+            "eventId": "$.id",
+            "surfaceKind": "dm",
+            "surfaceId": "$.surfaceId",
+            "senderId": "$.senderId",
+            "text": "$.text"
+          }
+        },
+        "actions": {}
+      }
+    },
     "slack": {
       "defaults": {
         "enabled": false,

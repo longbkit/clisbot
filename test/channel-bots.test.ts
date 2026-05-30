@@ -100,6 +100,7 @@ describe("channel bots", () => {
     expect(getChannelManagedProviderDefaults(config, "zalo-personal").defaultBotId).toBe("default");
 
     expect(listChannelManagedProviderDefaults(config)).toEqual([
+      { channel: "api", defaults: config.bots.api.defaults },
       { channel: "slack", defaults: config.bots.slack.defaults },
       { channel: "telegram", defaults: config.bots.telegram.defaults },
       { channel: "zalo-bot", defaults: config.bots.zaloBot.defaults },

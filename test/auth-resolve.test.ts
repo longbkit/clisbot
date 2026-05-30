@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveChannelAuth } from "../src/auth/resolve.ts";
+import { normalizeAuthPrincipal, resolveChannelAuth } from "../src/auth/resolve.ts";
 import { clisbotConfigSchema, type ClisbotConfig } from "../src/config/core/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
@@ -19,6 +19,11 @@ function createConfig(): ClisbotConfig {
 }
 
 describe("resolveChannelAuth", () => {
+  test("normalizes principals by splitting only the channel prefix", () => {
+    expect(normalizeAuthPrincipal("slack:u123:workspace")).toBe("slack:U123:WORKSPACE");
+    expect(normalizeAuthPrincipal("custom:acme:user-123")).toBe("custom:acme:user-123");
+  });
+
   test("grants app admins pairing bypass and protected-resource management", () => {
     const auth = resolveChannelAuth({
       config: createConfig(),

@@ -10,6 +10,7 @@ import type {
   ChannelRuntimeSummaryBuilder,
   ChannelStartupDescriptor,
 } from "../integration/operator-inventory.ts";
+import apiChannelPlugin from "../api/plugin.ts";
 import slackChannelPlugin from "../slack/plugin.ts";
 import telegramChannelPlugin from "../telegram/plugin.ts";
 import zaloBotChannelPlugin from "../zalo-bot/plugin.ts";
@@ -17,6 +18,7 @@ import zaloPersonalChannelPlugin from "../zalo-personal/plugin.ts";
 
 export const CHANNEL_NAME_PLACEHOLDER = "<channel-name>";
 export const CHANNEL_PLUGINS = [
+  apiChannelPlugin,
   slackChannelPlugin,
   telegramChannelPlugin,
   zaloBotChannelPlugin,

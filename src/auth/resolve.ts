@@ -55,7 +55,9 @@ export function normalizeAuthPrincipal(principal: string) {
     return "";
   }
 
-  const [platform, userId] = trimmed.split(":", 2);
+  const separatorIndex = trimmed.indexOf(":");
+  const platform = separatorIndex >= 0 ? trimmed.slice(0, separatorIndex) : "";
+  const userId = separatorIndex >= 0 ? trimmed.slice(separatorIndex + 1) : "";
   if (!platform || !userId) {
     return trimmed;
   }

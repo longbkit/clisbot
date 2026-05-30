@@ -86,6 +86,23 @@ migration. It is static for built-in channels today; it is not a runtime plugin
 loader.
 _Owner_: Channels.
 
+**API bot**: A configured provider mapping under the built-in `api` channel for
+third-party systems that can deliver JSON events, poll event results, and
+optionally accept outbound HTTP actions such as `message.send`. It is static
+channel configuration, not a dynamic channel plugin. In config, runtime state,
+and operator docs, identify one integration by `bots.api.<botId>`.
+_Owner_: Channels.
+
+**inbound webhook**: One supported input mode for an API bot. Use this term
+when discussing the provider-to-clisbot HTTP event delivery shape, not as the
+channel id.
+_Owner_: Channels.
+
+**external continuity key**: A stable caller-supplied API value, such as
+`metadata.clisbot_session_key` or `X-Clisbot-Session-Key`, that is mapped into a
+clisbot `sessionKey`. It is not the native runner `sessionId`.
+_Owner_: Channels capture it; agents own the resulting `sessionKey`.
+
 Channel folder language:
 
 - `src/channels/integration`: channel integration seam and static inventories
@@ -172,6 +189,10 @@ Rules:
 - Slack principal ids are Slack user ids such as `U...` or `W...`, not display names or mention syntax.
 - Zalo Bot principal ids use the raw provider user id returned by the Bot API,
   which may be numeric, long hex-like, or mixed alphanumeric text.
+- API bot principal ids are bot-scoped provider ids such as
+  `api:acme:user-456`, preserving the canonical
+  `<platform>:<provider-user-id>` shape by treating `acme:user-456` as the
+  provider user id after the first colon.
 - `allowUsers` and `blockUsers` store raw provider user ids only. They must not
   match handles, usernames, display names, or mention syntax.
 - A handle change can change prompt/display text, but it must not change access

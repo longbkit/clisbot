@@ -64,6 +64,26 @@ At minimum, answer these questions:
 
 Do not copy another channel's behavior until each copied rule still matches the new provider truth.
 
+### Generic API bot decision tree
+
+Use a generic API bot only when the provider fits this contract: HTTP event
+ingress, result polling, optional HTTP `actions.message.send`, text-or-Markdown
+rendering, and truthful surface mapping. Prefer one built-in `api` channel with
+configs under `bots.api.<botId>` in `clisbot.json`; do not add a `connectors`
+alias yet. Infer the default ingress endpoint as
+`/api/bots/<botId>/events` and the result endpoint as
+`/api/bots/<botId>/events/<eventId>/result`. Decide principal format
+`api:<botId>:<provider-user-id>`, session key shape, auth mode, dedupe, fast
+ack, exact-match inbound filters, explicit inbound field mapping, composed ids,
+optional action URL/header/body templating, non-secret `reply.params` for action
+addressing fragments, default no-retry behavior, idempotency support, and
+whether the bot's `native` render mode is `text` or `markdown` before coding.
+Do not expose a public unauthenticated endpoint; HMAC must be signed server-side
+by the provider or a trusted proxy, not by a browser/client. Known default
+secrets are local/UAT bootstrap only. Graduate to a native built-in channel when
+provider-specific commands, rich rendering, media upload, polling/socket
+runtime, special identity rules, or live updates become core.
+
 ### Outbound render and file capability research
 
 Every channel integration must include a provider-specific research table before

@@ -25,6 +25,12 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.app.control.configReload.watch).toBe(true);
     expect(config.app.control.loop.defaultTimezone).toBeUndefined();
     expect(config.bots.defaults.allowBots).toBe(false);
+    expect(config.bots.api.defaults.enabled).toBe(false);
+    expect(config.bots.api.defaults.mode).toBe("listener");
+    expect(config.bots.api.defaults.listener).toEqual({
+      host: "127.0.0.1",
+      port: 8787,
+    });
     expect(config.bots.slack.defaults.enabled).toBe(false);
     expect(config.bots.slack.defaults.dmPolicy).toBe("pairing");
     expect(config.bots.slack.defaults.channelPolicy).toBe("allowlist");
@@ -59,6 +65,8 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.zaloPersonal.default.tokenFile).toBe(
       "~/.clisbot/credentials/zalo-personal/default/auth-session",
     );
+    expect((config.bots.api.default.ingress as any).auth.mode).toBe("none");
+    expect((config.bots.api.default.actions as any)).toEqual({});
     expect(config.bots.slack.default.directMessages).toEqual({});
     expect(config.bots.slack.default.groups).toEqual({});
     expect(config.bots.telegram.default.directMessages).toEqual({});
@@ -102,6 +110,7 @@ describe("renderDefaultConfigTemplate", () => {
     expect(config.bots.telegram.defaults.timezone).toBeUndefined();
     expect(config.bots.zaloBot.defaults.timezone).toBeUndefined();
     expect(config.bots.zaloPersonal.defaults.timezone).toBeUndefined();
+    expect(config.bots.api.defaults.timezone).toBeUndefined();
     expect((config.bots.zaloBot.defaults as any).groups).toBeUndefined();
     expect(text).toContain("\"channelPolicy\"");
     expect(text).toContain("\"groupPolicy\"");
