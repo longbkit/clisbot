@@ -43,6 +43,37 @@ describe("channel result store", () => {
     expect(result?.result?.render).toBe("markdown");
   });
 
+  test("reloads external writes from another process view", async () => {
+    const path = tempPath("results.json");
+    const runtimeStore = new ChannelResultStore(path);
+    const cliStore = new ChannelResultStore(path);
+    await cliStore.createResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message_created:123",
+    });
+
+    expect((await runtimeStore.getResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message_created:123",
+    }))?.result).toBeNull();
+
+    await cliStore.appendOutput({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message_created:123",
+      kind: "final",
+      text: "Updated by CLI",
+    });
+
+    expect((await runtimeStore.getResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message_created:123",
+    }))?.result?.text).toBe("Updated by CLI");
+  });
+
   test("marks records expired after retention and prunes records past grace", async () => {
     const path = tempPath("results.json");
     const expiringStore = new ChannelResultStore(path, 1);

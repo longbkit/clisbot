@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { getDefaultChannelResultsPath } from "../../infra/paths.ts";
 import type { ChannelId } from "../integration/channel-surface-contract.ts";
@@ -105,6 +105,7 @@ function sanitizeProgress(progress: ChannelResultOutput[]) {
 
 export class ChannelResultStore {
   private loaded = false;
+  private fileVersion: string | null = null;
   private document: StoreDocument = { results: {}, surfaces: {} };
 
   constructor(
@@ -112,8 +113,18 @@ export class ChannelResultStore {
     private readonly retentionMs = DEFAULT_RETENTION_MS,
   ) {}
 
+  private async readFileVersion() {
+    try {
+      const stats = await stat(this.filePath, { bigint: true });
+      return `${stats.mtimeNs}:${stats.size}`;
+    } catch {
+      return "missing";
+    }
+  }
+
   private async load() {
-    if (this.loaded) {
+    const nextVersion = await this.readFileVersion();
+    if (this.loaded && nextVersion === this.fileVersion) {
       return;
     }
 
@@ -122,8 +133,8 @@ export class ChannelResultStore {
     } catch {
       this.document = { results: {}, surfaces: {} };
     }
-
     this.loaded = true;
+    this.fileVersion = nextVersion;
     this.prune();
   }
 
@@ -146,6 +157,8 @@ export class ChannelResultStore {
   private async save() {
     await mkdir(dirname(this.filePath), { recursive: true });
     await writeFile(this.filePath, JSON.stringify(this.document, null, 2));
+    this.fileVersion = await this.readFileVersion();
+    this.loaded = true;
   }
 
   async hasResult(params: { channel: ChannelId; botId: string; eventId: string }) {

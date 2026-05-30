@@ -674,10 +674,10 @@ Implementation and test traceability:
 
 Latest local gate:
 
-- `bun test test/api-channel.test.ts test/api-message-actions.test.ts test/api-auth.test.ts test/api-mapper.test.ts test/channel-results-store.test.ts`: 24 pass
+- `bun test test/api-channel.test.ts test/api-message-actions.test.ts test/api-auth.test.ts test/api-mapper.test.ts test/channel-results-store.test.ts`: 25 pass
 - `bunx tsc --noEmit`: pass
-- `bun run check`: 970 pass, 0 fail, 3419 expectations, 115 files
-- `git diff --check`: pass before commit `fbba84a`
+- `bun run check`: 971 pass, 0 fail, 3421 expectations, 115 files
+- local API e2e: foreground listener, HTTP event/result polling, external CLI `message send`, then HTTP result reload: pass
 
 | Area | Current coverage | Remaining gap |
 | --- | --- | --- |
@@ -691,8 +691,8 @@ Latest local gate:
 | Dedupe | Covered for duplicate event id on same bot and same event id across another bot | None for first slice |
 | Result statuses | Covered for `filtered`, `queued`, `steered`, `processing`, `completed`, `failed`, `expired`, and `stopped`; duplicate response is covered | None for first slice |
 | Result store progress/final without provider action | Covered by explicit no-action `message.send` test plus handler flow | None for first slice |
-| Result store storage layout | Documented in `Result Store Storage Layout`; standalone store persistence/expiry/prune tests added | Process restart e2e remains optional follow-up |
+| Result store storage layout | Documented in `Result Store Storage Layout`; standalone store persistence/expiry/prune and cross-process reload tests added | Process restart e2e remains optional follow-up |
 | `actions.message.send` | Mocked fetch verifies Chatwoot URL, header, body, render, and final result | No live Chatwoot send test |
 | Stop endpoints | Event stop, terminal-event `409`, and surface stop covered | No live long-running process stop test |
 | Real HTTP listener | Covered by local `Bun.serve` smoke for event ingress and result polling | External provider networking remains live-validation follow-up |
-| External e2e | None | Live Chatwoot webhook/send and Jira webhook-ingress validation remain follow-up |
+| Local API e2e | Foreground runtime, HTTP ingress/result polling, and external CLI final writeback pass locally | Live Chatwoot webhook/send and Jira webhook-ingress validation remain follow-up |
