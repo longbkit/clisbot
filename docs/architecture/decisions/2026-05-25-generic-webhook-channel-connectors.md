@@ -100,7 +100,7 @@ Example config shape:
             "signingBase": "{{timestamp}}.{{rawBody}}"
           },
           "map": {
-            "eventId": "message_created:{{$.id}}",
+            "eventId": "message-created-{{$.id}}",
             "surfaceKind": "dm",
             "surfaceId": "{{$.account.id}}:{{$.conversation.id}}",
             "senderId": "$.sender.id",

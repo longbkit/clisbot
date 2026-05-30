@@ -36,7 +36,7 @@ describe("api channel", () => {
     expect(await resultStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     })).toBeNull();
     delete process.env.API_TEST_SECRET;
   });
@@ -60,16 +60,16 @@ describe("api channel", () => {
     expect(accepted).toMatchObject({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       status: "queued",
-      resultUrl: "/api/bots/chatwoot/events/message_created%3A123/result",
+      resultUrl: "/api/bots/chatwoot/events/message-created-123/result",
     });
 
     let result: any;
     for (let attempt = 0; attempt < 10; attempt += 1) {
       await Bun.sleep(20);
       const resultResponse = await handleApiRequest({
-        request: new Request("http://127.0.0.1/api/bots/chatwoot/events/message_created%3A123/result"),
+        request: new Request("http://127.0.0.1/api/bots/chatwoot/events/message-created-123/result"),
         remoteAddress: "127.0.0.1",
         loadedConfig,
         agentService: createAgentService(),
@@ -102,7 +102,7 @@ describe("api channel", () => {
     const result = await resultStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
 
     expect(accepted.status).toBe("filtered");
@@ -135,7 +135,7 @@ describe("api channel", () => {
     });
 
     expect(response.status).toBe(202);
-    expect((await response.json() as any).eventId).toBe("message_created:456");
+    expect((await response.json() as any).eventId).toBe("message-created-456");
     delete process.env.API_TEST_SECRET;
   });
 
@@ -160,7 +160,7 @@ describe("api channel", () => {
     });
 
     expect(response.status).toBe(202);
-    expect((await response.json() as any).eventId).toBe("message_created:789");
+    expect((await response.json() as any).eventId).toBe("message-created-789");
     delete process.env.API_TEST_TOKEN;
   });
 
@@ -222,7 +222,7 @@ describe("api channel", () => {
     expect(await resultStore.getResult({
       channel: "api",
       botId: "jira",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     })).not.toBeNull();
   });
 
@@ -256,7 +256,7 @@ describe("api channel", () => {
     const result = await resultStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
     expect(accepted.status).toBe("steered");
     expect(submitted).toBe(true);
@@ -281,7 +281,7 @@ describe("api channel", () => {
     const result = await resultStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
 
     expect(accepted.status).toBe("failed");
@@ -295,7 +295,7 @@ describe("api channel", () => {
     await resultStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       status: "processing",
       surfaceId: "3:970",
       surfaceKind: "dm",
@@ -303,7 +303,7 @@ describe("api channel", () => {
       sessionKey: "agent:default:api:chatwoot:dm:3:970",
     });
     const response = await handleApiRequest({
-      request: new Request("http://127.0.0.1/api/bots/chatwoot/events/message_created%3A123/stop", {
+      request: new Request("http://127.0.0.1/api/bots/chatwoot/events/message-created-123/stop", {
         method: "POST",
       }),
       remoteAddress: "127.0.0.1",
@@ -321,14 +321,14 @@ describe("api channel", () => {
 
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       status: "stopped",
       stopped: true,
     });
     expect((await resultStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     }))?.status).toBe("stopped");
   });
 
@@ -338,7 +338,7 @@ describe("api channel", () => {
     await resultStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       status: "completed",
       surfaceId: "3:970",
       surfaceKind: "dm",
@@ -346,7 +346,7 @@ describe("api channel", () => {
       sessionKey: "agent:default:api:chatwoot:dm:3:970",
     });
     const response = await handleApiRequest({
-      request: new Request("http://127.0.0.1/api/bots/chatwoot/events/message_created%3A123/stop", {
+      request: new Request("http://127.0.0.1/api/bots/chatwoot/events/message-created-123/stop", {
         method: "POST",
       }),
       remoteAddress: "127.0.0.1",
@@ -367,7 +367,7 @@ describe("api channel", () => {
     await resultStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       status: "processing",
       surfaceId: "3:970",
       surfaceKind: "dm",
@@ -394,7 +394,7 @@ describe("api channel", () => {
     expect(response.status).toBe(200);
     expect(body).toMatchObject({
       surfaceId: "3:970",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       status: "stopped",
       stopped: true,
     });
@@ -419,12 +419,12 @@ describe("api channel", () => {
       });
       const accepted = await acceptedResponse.json() as any;
       expect(acceptedResponse.status).toBe(202);
-      expect(accepted.eventId).toBe("message_created:555");
+      expect(accepted.eventId).toBe("message-created-555");
 
       let result: any;
       for (let attempt = 0; attempt < 10; attempt += 1) {
         await Bun.sleep(20);
-        const resultResponse = await fetch(`http://127.0.0.1:${port}/api/bots/chatwoot/events/message_created%3A555/result`);
+        const resultResponse = await fetch(`http://127.0.0.1:${port}/api/bots/chatwoot/events/message-created-555/result`);
         result = await resultResponse.json();
         if (result.status === "completed") {
           break;

@@ -103,9 +103,9 @@ Example accepted response:
 {
   "channel": "api",
   "botId": "acme",
-  "eventId": "ticket:123",
+  "eventId": "ticket-123",
   "status": "queued",
-  "resultUrl": "/api/bots/acme/events/ticket%3A123/result",
+  "resultUrl": "/api/bots/acme/events/ticket-123/result",
   "expiresAt": "2026-05-30T09:30:00.000Z"
 }
 ```
@@ -116,7 +116,7 @@ Example result response:
 {
   "channel": "api",
   "botId": "acme",
-  "eventId": "ticket:123",
+  "eventId": "ticket-123",
   "status": "processing",
   "progress": [
     {
@@ -185,7 +185,7 @@ Use current `clisbot.json` style under `bots.api.<botId>`.
             ]
           },
           "map": {
-            "eventId": "message_created:{{$.id}}",
+            "eventId": "message-created-{{$.id}}",
             "surfaceKind": "dm",
             "surfaceId": "{{$.account.id}}:{{$.conversation.id}}",
             "senderId": "$.sender.id",
@@ -437,7 +437,7 @@ Expected Chatwoot HMAC contract:
 
 Mapping notes:
 
-- `eventId`: `message_created:<message id>`
+- `eventId`: `message-created-<message id>`
 - `surfaceId`: `<account id>:<conversation id>`
 - `reply.targetId`: Chatwoot conversation id
 - `reply.params.accountId`: Chatwoot account id for the reply API only
@@ -449,7 +449,7 @@ Chatwoot reply API should be configured as `actions.message.send`.
 
 Jira is a useful proof that the API channel is not chat-only. A first event can
 map `surfaceKind` to `issue`, `surfaceId` to `{{$.issue.key}}`, and `eventId` to
-`{{$.webhookEvent}}:{{$.issue.id}}:{{$.timestamp}}`. Later actions may include
+`jira-issue-{{$.issue.id}}-{{$.timestamp}}`. Later actions may include
 description update, add comment, update comment, or reactions, but the first
 slice should not accept those names yet.
 

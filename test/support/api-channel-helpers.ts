@@ -56,7 +56,7 @@ export function createLoadedConfig(auth: any = { mode: "none" }): LoadedConfig {
         ],
       },
       map: {
-        eventId: "message_created:{{$.id}}",
+        eventId: "message-created-{{$.id}}",
         surfaceKind: "dm",
         surfaceId: "{{$.account.id}}:{{$.conversation.id}}",
         senderId: "$.sender.id",

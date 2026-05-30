@@ -142,7 +142,7 @@ Example bot config:
             ]
           },
           "map": {
-            "eventId": "{{$.webhookEvent}}:{{$.issue.id}}:{{$.timestamp}}",
+            "eventId": "jira-issue-{{$.issue.id}}-{{$.timestamp}}",
             "surfaceKind": "issue",
             "surfaceId": "{{$.issue.key}}",
             "senderId": "$.user.name",
@@ -279,7 +279,7 @@ Jira issue property, for example `clisbot.aiRun`:
   "runId": "api:jira:PROD-123:2026-05-30T06:00:00Z",
   "status": "processing",
   "startedAt": "2026-05-30T06:00:00Z",
-  "startedByEventId": "jira:issue_updated:10001:1780120000",
+  "startedByEventId": "jira-issue-updated-10001-1780120000",
   "aiUser": "jira-ai",
   "previousAssignee": "dev.a",
   "progressCommentId": "123456",

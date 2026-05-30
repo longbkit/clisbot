@@ -114,7 +114,7 @@ const apiChannelPlugin: ChannelPlugin = {
         "  - first slice stores text or markdown result output only",
       ],
       exampleLines: [
-        `  ${renderCliCommand("message send --channel api --bot chatwoot --target dm:3:970 --reply-to message_created:123 --final --message \"Done\"")}`,
+        `  ${renderCliCommand("message send --channel api --bot chatwoot --target dm:3:970 --reply-to message-created-123 --final --message \"Done\"")}`,
       ],
     },
     routes: {

@@ -23,7 +23,7 @@ describe("api mapper", () => {
 
   test("maps composed strings, arrays, and projections", () => {
     expect(evaluateApiMapObject({
-      eventId: "{{$.event}}:{{$.conversation.id}}",
+      eventId: "message-created-{{$.conversation.id}}",
       sender: ["$.sender.id", "$.sender.name"],
       attachments: {
         from: "$.attachments",
@@ -33,7 +33,7 @@ describe("api mapper", () => {
         },
       },
     }, payload)).toEqual({
-      eventId: "message_created:970",
+      eventId: "message-created-970",
       sender: ["u123", "A User"],
       attachments: [
         { id: "a1", label: "photo.png (image/png)" },

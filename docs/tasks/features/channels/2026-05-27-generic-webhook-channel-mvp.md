@@ -161,6 +161,9 @@ Supported:
 - filters: `all`, `any`, `not`, `equals`, `notEquals`, `exists`, `in`, `anyIn`
 - mapped inbound fields: event id, surface kind/id, sender id/display name,
   text, optional `runMode`, reply target id, non-secret reply params
+- event ids should be URL-segment friendly in examples and default configs;
+  prefer `-` separators over `:` because event ids are embedded in result and
+  stop URLs
 - principal: `api:<botId>:<provider-user-id>`
 - result store: event-scoped `status`, `progress[]`, `result`, `error`,
   `expiresAt`
@@ -234,7 +237,7 @@ Use the existing clisbot bot config hierarchy. Do not add `channels.api.bots`,
             ]
           },
           "map": {
-            "eventId": "message_created:{{$.id}}",
+            "eventId": "message-created-{{$.id}}",
             "surfaceKind": "dm",
             "surfaceId": "{{$.account.id}}:{{$.conversation.id}}",
             "senderId": "$.sender.id",
@@ -329,9 +332,9 @@ support a per-bot `ingress.successStatusCode: 200` compatibility override.
 {
   "channel": "api",
   "botId": "chatwoot",
-  "eventId": "message_created:123",
+  "eventId": "message-created-123",
   "status": "queued",
-  "resultUrl": "/api/bots/chatwoot/events/message_created%3A123/result",
+  "resultUrl": "/api/bots/chatwoot/events/message-created-123/result",
   "expiresAt": "2026-05-30T09:30:00.000Z"
 }
 ```
@@ -348,7 +351,7 @@ The response must not include secrets, raw payload, or full prompt text.
 {
   "channel": "api",
   "botId": "chatwoot",
-  "eventId": "message_created:123",
+  "eventId": "message-created-123",
   "status": "processing",
   "progress": [
     {
@@ -467,10 +470,10 @@ Sample storage data:
 ```json
 {
   "results": {
-    "api:chatwoot:message_created:123": {
+    "api:chatwoot:message-created-123": {
       "channel": "api",
       "botId": "chatwoot",
-      "eventId": "message_created:123",
+      "eventId": "message-created-123",
       "status": "processing",
       "progress": [
         { "sequence": 1, "kind": "progress", "text": "Checking context.", "render": "text", "createdAt": "2026-05-30T03:30:02.000Z" }
@@ -494,7 +497,7 @@ Sample storage data:
       "agentId": "default",
       "sessionKey": "agent:default:api:chatwoot:dm:3:970",
       "targetId": "970", "params": { "accountId": 3 },
-      "activeEventId": "message_created:123",
+      "activeEventId": "message-created-123",
       "updatedAt": "2026-05-30T03:30:02.000Z"
     }
   }

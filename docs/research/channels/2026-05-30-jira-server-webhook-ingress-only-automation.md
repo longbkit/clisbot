@@ -116,7 +116,7 @@ Local test path:
             ]
           },
           "map": {
-            "eventId": "{{$.webhookEvent}}:{{$.issue.id}}:{{$.timestamp}}",
+            "eventId": "jira-issue-{{$.issue.id}}-{{$.timestamp}}",
             "surfaceKind": "issue",
             "surfaceId": "{{$.issue.key}}",
             "senderId": "$.user.name",

@@ -78,7 +78,7 @@ existing reply mapping is still enough:
 ```json
 {
   "map": {
-    "eventId": "message_created:{{$.id}}",
+    "eventId": "message-created-{{$.id}}",
     "surfaceKind": "dm",
     "surfaceId": "{{$.account.id}}:{{$.conversation.id}}",
     "senderId": "$.sender.id",

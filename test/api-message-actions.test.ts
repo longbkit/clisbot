@@ -27,7 +27,7 @@ describe("api message actions", () => {
     await resultStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       surfaceId: "3:970",
       reply: {
         targetId: "970",
@@ -50,7 +50,7 @@ describe("api message actions", () => {
         account: "chatwoot",
         target: "dm:3:970",
         message: "Done",
-        replyTo: "message_created:123",
+        replyTo: "message-created-123",
         pollOptions: [],
         remove: false,
         forceDocument: false,
@@ -74,7 +74,7 @@ describe("api message actions", () => {
     const result = await resultStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
     expect(result?.status).toBe("completed");
     expect(result?.result?.render).toBe("markdown");
@@ -87,7 +87,7 @@ describe("api message actions", () => {
     await resultStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       surfaceId: "3:970",
       reply: { targetId: "970", params: { accountId: 3 } },
     });
@@ -106,7 +106,7 @@ describe("api message actions", () => {
         account: "chatwoot",
         target: "dm:3:970",
         message: "Stored only",
-        replyTo: "message_created:123",
+        replyTo: "message-created-123",
         pollOptions: [],
         remove: false,
         forceDocument: false,

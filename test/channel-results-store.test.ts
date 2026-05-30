@@ -10,21 +10,21 @@ describe("channel result store", () => {
     await firstStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       surfaceId: "3:970",
       surfaceKind: "dm",
     });
     await firstStore.appendOutput({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       kind: "progress",
       text: "Working",
     });
     await firstStore.appendOutput({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       kind: "final",
       text: "Done",
       render: "markdown",
@@ -34,7 +34,7 @@ describe("channel result store", () => {
     const result = await secondStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
 
     expect(result?.status).toBe("completed");
@@ -50,19 +50,19 @@ describe("channel result store", () => {
     await cliStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
 
     expect((await runtimeStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     }))?.result).toBeNull();
 
     await cliStore.appendOutput({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
       kind: "final",
       text: "Updated by CLI",
     });
@@ -70,7 +70,7 @@ describe("channel result store", () => {
     expect((await runtimeStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     }))?.result?.text).toBe("Updated by CLI");
   });
 
@@ -80,14 +80,14 @@ describe("channel result store", () => {
     await expiringStore.createResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     });
     await Bun.sleep(5);
 
     expect((await expiringStore.getResult({
       channel: "api",
       botId: "chatwoot",
-      eventId: "message_created:123",
+      eventId: "message-created-123",
     }))?.status).toBe("expired");
 
     await writeFile(path, JSON.stringify({

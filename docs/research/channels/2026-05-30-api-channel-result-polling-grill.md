@@ -168,9 +168,9 @@ Proposed POST response:
 {
   "channel": "api",
   "botId": "acme",
-  "eventId": "ticket:123",
+  "eventId": "ticket-123",
   "status": "queued",
-  "resultUrl": "/api/bots/acme/events/ticket%3A123/result",
+  "resultUrl": "/api/bots/acme/events/ticket-123/result",
   "expiresAt": "2026-05-30T09:30:00.000Z"
 }
 ```
@@ -181,7 +181,7 @@ Proposed result response:
 {
   "channel": "api",
   "botId": "acme",
-  "eventId": "ticket:123",
+  "eventId": "ticket-123",
   "status": "processing",
   "progress": [
     {
