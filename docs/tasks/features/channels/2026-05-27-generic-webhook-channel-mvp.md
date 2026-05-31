@@ -74,6 +74,26 @@ and live Chatwoot/Jira e2e remain follow-up work. Local coverage now includes
 handler integration, mocked provider delivery, auth/mapper/result-store unit
 matrices, and a real local `Bun.serve` listener smoke.
 
+## API Channel Investment Backlog
+
+Keep these follow-ups visible when planning the next API channel slices:
+
+1. Runner admission/backpressure - add bounded global runner/session admission
+   for burst traffic across many API conversations.
+2. File-backed ingress secrets - support `tokenFile`/`secretFile` for API auth
+   using existing credential file patterns, without turning API bots into
+   provider-login bots.
+3. Live integration validation - prove real Chatwoot ingress/send and Jira
+   ingress configs, then tighten docs around the proven payloads.
+4. Provider action hardening - add bounded retry, status/error-body recording,
+   idempotency, and secret redaction for provider HTTP actions.
+5. Media/file delivery - extend `actions.message.send` beyond text/Markdown
+   after the text contract stays stable.
+
+Keep this generic: Chatwoot, Jira, and custom systems should continue to share
+the same ingress map/filter/result/action machinery unless a provider-specific
+channel becomes clearly justified.
+
 ## Implementation Reading Contract
 
 An implementation agent should treat this task doc as the primary
