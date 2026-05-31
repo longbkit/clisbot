@@ -58,4 +58,5 @@ Tradeoff:
 ## Links
 
 - [Runtime Architecture](../runtime-architecture.md)
+- [Persistence Store Inventory](../persistence-stores.md)
 - [Generic API Channel Events And Actions](2026-05-25-generic-webhook-channel-connectors.md)

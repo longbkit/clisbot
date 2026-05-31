@@ -12,6 +12,7 @@ Historical or exploratory material may still exist under subfolders such as `v0.
 - [Architecture Overview](architecture-overview.md)
 - [Surface Architecture](surface-architecture.md)
 - [Runtime Architecture](runtime-architecture.md)
+- [Persistence Store Inventory](persistence-stores.md)
 - [Transcript Presentation And Streaming](transcript-presentation-and-streaming.md)
 - [Domain Language](domain-language.md)
 - [Architecture Design Decisions](decisions/README.md)

@@ -218,10 +218,26 @@ Cross-process state rule:
   shared truth across runtime and CLI boundaries
 - when more than one process can read or mutate the same runtime-facing state,
   use an explicit durable store, IPC path, or runtime command path; file-backed
-  stores must reload or validate a file version before serving cached state
+  stores must reload or validate a file version before serving cached state and
+  serialize read-modify-write mutations with a bounded lock or single-writer path
 - tests for these features should include at least one cross-process or
   independent-store-view regression, because same-process unit tests can miss
   stale cache behavior
+
+JSON file storage rule:
+
+- use `src/infra/json-storage.ts` for JSON files that may be read and mutated
+  by more than one process or request path
+- use `withJsonFileMutation` for read-modify-write updates; do not hand-roll
+  `readFile -> JSON.parse -> mutate -> writeFile` in owner systems
+- the primitive owns bounded file locking, temp-file writes, atomic rename,
+  fallback document creation, and optional file mode handling
+- owner systems still own schema validation, normalization, migration,
+  retention, pruning, config reload suppression, and domain side effects
+- readers may use fresh unlocked reads when old-or-new snapshot semantics are
+  acceptable; mutations that must preserve every update need the mutation helper
+- check [Persistence Store Inventory](persistence-stores.md) before adding a
+  new store or splitting an existing store
 
 Do not persist transient runner artifacts as canonical state in the agents layer without a documented reason.
 

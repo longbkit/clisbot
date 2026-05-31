@@ -25,6 +25,7 @@ The goal is to catch avoidable bad fixes early.
 - Did the patch keep shared loader, resolver, or helper semantics unchanged unless change was truly required?
 - Did any utility or shared helper silently change contract?
 - Is ownership still clear about which layer decides behavior?
+- If the patch adds or splits persisted state, did it check and update `docs/architecture/persistence-stores.md`?
 
 ## 3. Blast Radius
 
@@ -42,6 +43,7 @@ The goal is to catch avoidable bad fixes early.
 
 - Do tests cover the real production seam, not just a mocked outcome?
 - Is there at least one check for regression on the previously working path?
+- For file-backed stores touched by multiple processes or instances, is there a concurrent or independent-store regression?
 - Was compile or typecheck run when relevant?
 
 ## 6. Ship Decision

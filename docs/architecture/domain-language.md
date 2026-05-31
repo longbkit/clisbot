@@ -204,6 +204,8 @@ Rules:
 ### Surface
 
 **surfaceId**: Canonical clisbot surface identity.  
+In user-facing terms, this is usually an external conversation or work item,
+such as a Chatwoot conversation, Slack thread, Telegram topic, or Jira issue.
 _Avoid_: human display text, unresolved or compatibility CLI target syntax
 
 **surfaceKind**: Canonical shared surface shape.  
@@ -318,6 +320,8 @@ Every significant model must be defined by all of the following:
 **Agent entity**: Canonical operating truth of the system, such as how agents, sessions, workspaces, tools, skills, memory, and subagents relate.
 
 **Persistence model**: What the backend stores durably. It should be deterministic, versioned when needed, migration-friendly, and explicit about canonical ownership.
+
+**Persistence store**: The concrete durable store that owns one persisted state lifecycle. Before adding or splitting one, check [Persistence Store Inventory](persistence-stores.md).
 
 **Surface contract**: What crosses a channel or control boundary. It does not need to mirror persistence shape exactly.
 

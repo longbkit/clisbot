@@ -62,6 +62,27 @@ function sanitizeHeaders(headers: Record<string, unknown>) {
   );
 }
 
+async function resolveApiMessageEvent(params: {
+  command: ParsedMessageCommand;
+  resultStore: ChannelResultStore;
+  botId: string;
+  surfaceId: string;
+}) {
+  const explicitEventId = params.command.replyTo?.trim();
+  if (explicitEventId) {
+    return { eventId: explicitEventId, surfaceReply: null };
+  }
+  const surfaceReply = await params.resultStore.resolveSurfaceReply({
+    channel: "api",
+    botId: params.botId,
+    surfaceId: params.surfaceId,
+  });
+  if (!surfaceReply?.activeEventId) {
+    throw new Error("No API event result is active for this target. Pass --reply-to <eventId> or ingest an event first.");
+  }
+  return { eventId: surfaceReply.activeEventId, surfaceReply };
+}
+
 export async function sendApiMessage(params: {
   loadedConfig: LoadedConfig;
   command: ParsedMessageCommand;
@@ -80,33 +101,30 @@ export async function sendApiMessage(params: {
   const botConfig = resolveApiBotConfig(params.loadedConfig.raw.bots.api, params.botId);
   const action = botConfig.actions?.["message.send"];
   const resultStore = params.resultStore ?? new ChannelResultStore();
-  const surfaceReply = await resultStore.resolveSurfaceReply({
-    channel: "api",
+  const eventContext = await resolveApiMessageEvent({
+    command: params.command,
+    resultStore,
     botId: params.botId,
     surfaceId: surface.provider.surfaceId,
   });
-  const eventId = params.command.replyTo?.trim() || surfaceReply?.activeEventId;
-  if (!eventId) {
-    throw new Error("No API event result is active for this target. Pass --reply-to <eventId> or ingest an event first.");
-  }
   const render = resolveRender(params.command, action?.rendering?.native ?? "markdown");
   const updated = await resultStore.appendOutput({
     channel: "api",
     botId: params.botId,
-    eventId,
+    eventId: eventContext.eventId,
     kind: outputKind(params.command),
     text,
     render,
   });
   if (!updated) {
-    throw new Error(`Unknown API event result: ${params.botId}/${eventId}`);
+    throw new Error(`Unknown API event result: ${params.botId}/${eventContext.eventId}`);
   }
   if (!action) {
     return {
       ok: true,
       channel: "api",
       botId: params.botId,
-      eventId,
+      eventId: eventContext.eventId,
       delivered: false,
       result: updated,
     };
@@ -115,8 +133,8 @@ export async function sendApiMessage(params: {
   const context = buildTemplateContext({
     text,
     render,
-    targetId: surfaceReply?.targetId ?? surface.provider.surfaceId,
-    replyParams: surfaceReply?.params,
+    targetId: updated.reply?.targetId ?? eventContext.surfaceReply?.targetId ?? surface.provider.surfaceId,
+    replyParams: updated.reply?.params ?? eventContext.surfaceReply?.params,
   });
   const response = await (params.fetch ?? fetch)(String(evaluateApiMapValue(action.url, {}, undefined, context)), {
     method: action.method,
@@ -132,7 +150,7 @@ export async function sendApiMessage(params: {
     ok: response.ok,
     channel: "api",
     botId: params.botId,
-    eventId,
+    eventId: eventContext.eventId,
     delivered: response.ok,
     providerStatus: response.status,
     result: updated,

@@ -81,6 +81,86 @@ describe("api message actions", () => {
     delete process.env.CHATWOOT_API_TOKEN;
   });
 
+  test("message.send uses explicit reply-to event metadata for provider action", async () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.api.chatwoot.actions = {
+      "message.send": {
+        method: "POST",
+        url: "https://chatwoot.test/api/v1/accounts/{{reply.params.accountId}}/conversations/{{reply.targetId}}/messages",
+        headers: {},
+        body: {
+          content: "{{message.text}}",
+        },
+        rendering: { native: "markdown" },
+        retry: { mode: "none" },
+      },
+    };
+    const resultStore = new ChannelResultStore(tempPath("results.json"));
+    await resultStore.createResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message-created-123",
+      surfaceId: "shared",
+      reply: {
+        targetId: "970",
+        params: { accountId: 3 },
+      },
+    });
+    await resultStore.createResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message-created-456",
+      surfaceId: "shared",
+      reply: {
+        targetId: "971",
+        params: { accountId: 9 },
+      },
+    });
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+
+    await sendApiMessage({
+      loadedConfig,
+      botId: "chatwoot",
+      resultStore,
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        calls.push({ url: String(url), init: init ?? {} });
+        return new Response("{}", { status: 200 });
+      }) as any,
+      command: {
+        kind: "shared",
+        action: "send",
+        channel: "api",
+        account: "chatwoot",
+        target: "dm:shared",
+        message: "Done",
+        replyTo: "message-created-123",
+        pollOptions: [],
+        remove: false,
+        forceDocument: false,
+        silent: false,
+        progress: false,
+        final: true,
+        json: false,
+        inputFormat: "md",
+        renderMode: "native",
+      },
+    });
+
+    expect(calls[0]?.url).toBe("https://chatwoot.test/api/v1/accounts/3/conversations/970/messages");
+    const originalEvent = await resultStore.getResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message-created-123",
+    });
+    expect(originalEvent?.status).toBe("completed");
+    const newerEvent = await resultStore.getResult({
+      channel: "api",
+      botId: "chatwoot",
+      eventId: "message-created-456",
+    });
+    expect(newerEvent?.status).toBe("received");
+  });
+
   test("message.send records output without a configured provider action", async () => {
     const loadedConfig = createLoadedConfig();
     const resultStore = new ChannelResultStore(tempPath("results.json"));

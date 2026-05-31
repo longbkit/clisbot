@@ -34,6 +34,12 @@ host/runtime primitives such as filesystem helpers, path defaults, process
 helpers, and runtime logging. Product concepts do not belong there; they should
 live under the system that owns their behavior.
 
+File-backed JSON persistence should use the shared `src/infra/json-storage.ts`
+primitive when a file can be read or mutated from multiple processes or request
+paths. Product systems still own their document schema, migrations,
+normalization, retention, and side effects. The living store inventory is
+[Persistence Store Inventory](persistence-stores.md).
+
 ## Top-Level Diagram
 
 ```text
@@ -170,6 +176,11 @@ Current session continuity metadata is intentionally small:
 - `updatedAt`
 
 Do not treat tmux pane ids, tmux window ids, or other transient runner artifacts as canonical state in the agents layer.
+
+When JSON state is file-backed and may have concurrent read-modify-write
+updates, use `src/infra/json-storage.ts` instead of ad hoc JSON file IO. Check
+[Persistence Store Inventory](persistence-stores.md) before adding or splitting
+a store, and use the detailed rules in [Runtime Architecture](runtime-architecture.md).
 
 ## Ownership Rules
 

@@ -74,6 +74,90 @@ describe("channel result store", () => {
     }))?.result?.text).toBe("Updated by CLI");
   });
 
+  test("serializes concurrent independent-store writes without losing records", async () => {
+    const path = tempPath("results.json");
+    const eventIds = Array.from({ length: 24 }, (_, index) => `message-created-${index}`);
+
+    await Promise.all(eventIds.map((eventId) => {
+      const store = new ChannelResultStore(path);
+      return store.createResult({
+        channel: "api",
+        botId: "chatwoot",
+        eventId,
+        surfaceId: `conversation-${eventId}`,
+      });
+    }));
+
+    await Promise.all(eventIds.map((eventId) => {
+      const store = new ChannelResultStore(path);
+      return store.appendOutput({
+        channel: "api",
+        botId: "chatwoot",
+        eventId,
+        kind: "final",
+        text: `Done ${eventId}`,
+      });
+    }));
+
+    const verifier = new ChannelResultStore(path);
+    for (const eventId of eventIds) {
+      const result = await verifier.getResult({
+        channel: "api",
+        botId: "chatwoot",
+        eventId,
+      });
+      expect(result?.status).toBe("completed");
+      expect(result?.result?.text).toBe(`Done ${eventId}`);
+    }
+  });
+
+  test("keeps concurrent result readers stable while independent stores append outputs", async () => {
+    const path = tempPath("results.json");
+    const eventIds = Array.from({ length: 16 }, (_, index) => `message-created-${index}`);
+    const setupStore = new ChannelResultStore(path);
+
+    for (const eventId of eventIds) {
+      await setupStore.createResult({
+        channel: "api",
+        botId: "chatwoot",
+        eventId,
+      });
+    }
+
+    const writes = Promise.all(eventIds.map((eventId) => {
+      const store = new ChannelResultStore(path);
+      return store.appendOutput({
+        channel: "api",
+        botId: "chatwoot",
+        eventId,
+        kind: "final",
+        text: `Done ${eventId}`,
+      });
+    }));
+    const reads = Promise.all(eventIds.flatMap((eventId) =>
+      Array.from({ length: 3 }, async () => {
+        await Bun.sleep(1);
+        const store = new ChannelResultStore(path);
+        const result = await store.getResult({
+          channel: "api",
+          botId: "chatwoot",
+          eventId,
+        });
+        expect(result?.eventId).toBe(eventId);
+      })
+    ));
+
+    await Promise.all([writes, reads]);
+    const verifier = new ChannelResultStore(path);
+    for (const eventId of eventIds) {
+      expect((await verifier.getResult({
+        channel: "api",
+        botId: "chatwoot",
+        eventId,
+      }))?.result?.text).toBe(`Done ${eventId}`);
+    }
+  });
+
   test("marks records expired after retention and prunes records past grace", async () => {
     const path = tempPath("results.json");
     const expiringStore = new ChannelResultStore(path, 1);
