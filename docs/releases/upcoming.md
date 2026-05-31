@@ -70,5 +70,6 @@ follow-up backlog clarity before a future stable `v0.1.54`.
 
 ## Links
 
+- Release guide: [docs/updates/releases/v0.1.54-beta.1-release-guide.md](../updates/releases/v0.1.54-beta.1-release-guide.md)
 - Migration index: [docs/migrations/index.md](../migrations/index.md)
 - Release workflow: [skills/release-clisbot/SKILL.md](../../skills/release-clisbot/SKILL.md)

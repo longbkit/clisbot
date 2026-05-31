@@ -35,10 +35,12 @@ are outside this document; use the repo release workflow for those tasks.
 Read these when the user asks what is new, what to try, or what to watch:
 
 - [Release notes](../releases/README.md)
+- [Upcoming release note](../releases/upcoming.md)
 - [v0.1.53 release note](../releases/v0.1.53.md)
 - [v0.1.52 release note](../releases/v0.1.52.md)
 - [v0.1.51 release note](../releases/v0.1.51.md)
 - [Release guides](README.md)
+- [v0.1.54-beta.1 release guide](releases/v0.1.54-beta.1-release-guide.md)
 - [v0.1.53 release guide](releases/v0.1.53-release-guide.md)
 - [v0.1.52 release guide](releases/v0.1.52-release-guide.md)
 - [v0.1.51 release guide](releases/v0.1.51-release-guide.md)
@@ -47,6 +49,22 @@ Read these when the user asks what is new, what to try, or what to watch:
 Use [Release notes](../releases/README.md) for the canonical version map.
 Use [Release guides](README.md) for shorter catch-up summaries.
 For deeper questions that the migration index, update guide, and release docs do not answer, inspect the full [docs folder](https://github.com/longbkit/clisbot/tree/main/docs), including `docs/user-guide/`. If the local docs are not available, fetch or clone the GitHub docs and read the relevant files before answering.
+
+## Current Beta Path
+
+```text
+Path: 0.1.53 -> 0.1.54-beta.1
+Target: clisbot@0.1.54-beta.1 or clisbot@beta
+Update path: direct
+Manual action: none
+Risk: medium for API channel adopters; low for non-API-channel users
+Automatic config update: no new schema migration in this beta
+Breaking change: no
+Command: npm install -g clisbot@beta && clisbot restart
+Verify: clisbot status
+Release note: ../releases/upcoming.md
+Release guide: releases/v0.1.54-beta.1-release-guide.md
+```
 
 ## Current Stable Path
 
