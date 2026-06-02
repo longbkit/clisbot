@@ -72,7 +72,7 @@ Still deliberately outside this first slice:
 Known partial coverage after the expanded local test pass: detailed API health
 and live Chatwoot/Jira e2e remain follow-up work. Local coverage now includes
 handler integration, mocked provider delivery, auth/mapper/result-store unit
-matrices, and a real local `Bun.serve` listener smoke.
+matrices, and a real local Node HTTP listener smoke.
 
 ## API Channel Investment Backlog
 
@@ -656,7 +656,7 @@ Implementation and test traceability:
 | --- | --- | --- | --- | --- | --- |
 | 1 | Config schema/template for `bots.api` | Done: `src/channels/api/config-schema.ts`, template contract, config helpers | `test/config-template.test.ts` validates defaults and official template | `test/channel-bots.test.ts`, `test/routes-cli.test.ts`, `test/pairing-cli.test.ts` cover shared CLI inventory using `api` | Not live-tested |
 | 2 | Channel installation and runtime plugin | Done: registry, installation inventory, `src/channels/api/plugin.ts` | `test/channel-installation-inventory.test.ts` covers built-in installation seam | Message/routes/pairing CLI tests accept `api` as a supported channel | Not live-tested |
-| 3 | Listener routing for `/api/bots/<botId>/events` with raw body | Done: `ApiChannelService` and `handleApiRequest` | Path parsing is covered through handler tests | `test/api-channel.test.ts` posts to event/result URLs and verifies acceptance/result | Local `Bun.serve` listener smoke covered; no external live provider test |
+| 3 | Listener routing for `/api/bots/<botId>/events` with raw body | Done: `ApiChannelService` and `handleApiRequest` | Path parsing is covered through handler tests | `test/api-channel.test.ts` posts to event/result URLs and verifies acceptance/result | Local Node HTTP listener smoke covered; no external live provider test |
 | 4 | HMAC before JSON parse | Done: auth verifies raw body before JSON parse | `test/api-auth.test.ts` covers missing signature, stale timestamp, wrong secret | Bad HMAC with invalid JSON returns `401` and creates no result record | No provider HMAC live test |
 | 5 | Bearer and loopback-only `none` | Done | Bearer/none covered through handler tests | Bearer success and non-loopback `none` rejection covered | No public-bind startup warning test yet |
 | 6 | Mapper/filter DSL and `reply.params` | Done: `src/channels/api/mapper.ts` | `test/api-mapper.test.ts` covers bracket paths, arrays, `in`, `anyIn`, and projection | Event mapping, filter drop, reply params, and action templates covered | Not live-tested with Chatwoot/Jira payloads |
@@ -719,5 +719,5 @@ Latest local gate:
 | Result store storage layout | Documented in `Result Store Storage Layout`; standalone store persistence/expiry/prune and cross-process reload tests added | Process restart e2e remains optional follow-up |
 | `actions.message.send` | Mocked fetch verifies Chatwoot URL, header, body, render, and final result | No live Chatwoot send test |
 | Stop endpoints | Event stop, terminal-event `409`, and surface stop covered | No live long-running process stop test |
-| Real HTTP listener | Covered by local `Bun.serve` smoke for event ingress and result polling | External provider networking remains live-validation follow-up |
+| Real HTTP listener | Covered by local Node HTTP smoke for event ingress and result polling | External provider networking remains live-validation follow-up |
 | Local API e2e | Foreground runtime, HTTP ingress/result polling, and external CLI final writeback pass locally | Live Chatwoot webhook/send and Jira webhook-ingress validation remain follow-up |

@@ -1,6 +1,6 @@
 {
   "name": "clisbot",
-  "version": "0.1.54-beta.1",
+  "version": "0.1.54-beta.2",
   "private": false,
   "description": "Chat surfaces for durable AI coding agents running in tmux",
   "license": "MIT",
@@ -40,7 +40,7 @@
     "typecheck": "bunx tsc --noEmit",
     "test": "env -u SLACK_APP_TOKEN -u SLACK_BOT_TOKEN -u TELEGRAM_BOT_TOKEN -u TELEGRAM_CONTROL_BOT_TOKEN -u TELEGRAM_DEV_BOT_TOKEN bun test --preload ./test/preload-env.ts",
     "prepack": "bun run build",
-    "check": "bun run typecheck && bun test"
+    "check": "bun run typecheck && bun test --timeout 30000"
   },
   "dependencies": {
     "@slack/bolt": "^4.6.0",

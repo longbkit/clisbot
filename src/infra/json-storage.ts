@@ -28,7 +28,7 @@ export type JsonFileStorageOptions<TDocument extends object> = {
 
 const DEFAULT_JSON_FILE_LOCK_OPTIONS = {
   retries: {
-    retries: 10,
+    retries: 20,
     factor: 2,
     minTimeout: 50,
     maxTimeout: 2_000,

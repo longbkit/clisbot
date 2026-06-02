@@ -125,6 +125,10 @@ clisbot restart
 clisbot status
 ```
 
+The packaged `clisbot` CLI runs this listener on Node's built-in HTTP server.
+Bun is used by the source repo for development and tests, but it is not
+required to run the API listener from the npm package.
+
 Post an event:
 
 ```bash

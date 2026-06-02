@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ApiChannelService, handleApiRequest } from "../src/channels/api/service.ts";
+import { startApiHttpListener } from "../src/channels/api/http-listener.ts";
 import { ChannelResultStore } from "../src/channels/results/result-store.ts";
 import { chatwootPayload, createAgentService, createLoadedConfig, hmacHeaders, tempPath } from "./support/api-channel-helpers.ts";
 
@@ -429,8 +430,17 @@ describe("api channel", () => {
     });
   });
 
-  test("serves event ingress and result polling through the real listener", async () => {
-    const loadedConfig = createLoadedConfig();
+  test("serves hmac event ingress and result polling through the Node HTTP listener", async () => {
+    process.env.API_TEST_SECRET = "secret";
+    const loadedConfig = createLoadedConfig({
+      mode: "hmac",
+      secretEnv: "API_TEST_SECRET",
+      timestampHeader: "x-ts",
+      signatureHeader: "x-sig",
+      signaturePrefix: "sha256=",
+      signingBase: "{{timestamp}}.{{rawBody}}",
+      toleranceSecondsDefault: 300,
+    });
     loadedConfig.raw.bots.api.defaults.listener = { host: "127.0.0.1", port: 0 };
     const resultStore = new ChannelResultStore(tempPath("results.json"));
     const service = new ApiChannelService({
@@ -440,11 +450,14 @@ describe("api channel", () => {
     });
     await service.start();
     const port = (service as any).server.port;
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const rawBody = JSON.stringify(chatwootPayload({ id: 555 }));
 
     try {
       const acceptedResponse = await fetch(`http://127.0.0.1:${port}/api/bots/chatwoot/events`, {
         method: "POST",
-        body: JSON.stringify(chatwootPayload({ id: 555 })),
+        headers: hmacHeaders({ body: rawBody, secret: "secret", timestamp }),
+        body: rawBody,
       });
       const accepted = await acceptedResponse.json() as any;
       expect(acceptedResponse.status).toBe(202);
@@ -453,7 +466,9 @@ describe("api channel", () => {
       let result: any;
       for (let attempt = 0; attempt < 10; attempt += 1) {
         await Bun.sleep(20);
-        const resultResponse = await fetch(`http://127.0.0.1:${port}/api/bots/chatwoot/events/message-created-555/result`);
+        const resultResponse = await fetch(`http://127.0.0.1:${port}/api/bots/chatwoot/events/message-created-555/result`, {
+          headers: hmacHeaders({ body: "", secret: "secret", timestamp }),
+        });
         result = await resultResponse.json();
         if (result.status === "completed") {
           break;
@@ -463,6 +478,31 @@ describe("api channel", () => {
       expect(result.result.text).toContain("Agent final answer");
     } finally {
       await service.stop();
+      delete process.env.API_TEST_SECRET;
     }
+  });
+
+  test("force-stops the Node HTTP listener even when a request is still open", async () => {
+    const controller = new AbortController();
+    const listener = await startApiHttpListener({
+      host: "127.0.0.1",
+      port: 0,
+      handle: async () =>
+        await new Promise<Response>(() => {
+          // Keep the request open until stop(true) closes the socket.
+        }),
+    });
+
+    const request = fetch(`http://127.0.0.1:${listener.port}/api/bots/chatwoot/events`, {
+      signal: controller.signal,
+    })
+      .catch((error) => error);
+    await Bun.sleep(20);
+    await expect(listener.stop(true)).resolves.toBeUndefined();
+    controller.abort();
+    await expect(Promise.race([
+      request,
+      Bun.sleep(100).then(() => new Error("request still open")),
+    ])).resolves.toBeInstanceOf(Error);
   });
 });

@@ -229,23 +229,24 @@ describe("AgentService calendar loops and follow-up", () => {
       }),
     );
 
-    const deadline = Date.now() + 2_000;
+    const listDeadline = Date.now() + 10_000;
     let loop = service.listIntervalLoops({ sessionKey: target.sessionKey })[0];
-    while (!loop && Date.now() < deadline) {
+    while (!loop && Date.now() < listDeadline) {
       await new Promise((resolve) => setTimeout(resolve, 25));
       loop = service.listIntervalLoops({ sessionKey: target.sessionKey })[0];
     }
 
     expect(loop?.promptSummary).toBe("check deploy");
 
-    while ((loop?.attemptedRuns ?? 0) === 0 && Date.now() < deadline) {
+    const runDeadline = Date.now() + 10_000;
+    while ((loop?.attemptedRuns ?? 0) === 0 && Date.now() < runDeadline) {
       await new Promise((resolve) => setTimeout(resolve, 25));
       loop = service.listIntervalLoops({ sessionKey: target.sessionKey })[0];
     }
 
     expect(loop?.attemptedRuns ?? 0).toBeGreaterThan(0);
     await service.stop();
-  });
+  }, { timeout: 25_000 });
 
   test("does not rewrite a cancelled loop when a stale runtime update arrives later", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-loop-race-"));

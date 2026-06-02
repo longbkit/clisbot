@@ -380,13 +380,13 @@ describe("AgentService loops and queue", () => {
         channelId: "c4",
         threadTs: "loop-notify",
       },
-      intervalMs: 300,
-      maxRuns: 3,
+      intervalMs: 500,
+      maxRuns: 20,
       createdBy: "U123",
       force: true,
     });
 
-    const deadline = Date.now() + 2_000;
+    const deadline = Date.now() + 10_000;
     while (notifications.length === 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }

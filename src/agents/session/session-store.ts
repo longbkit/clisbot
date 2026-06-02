@@ -97,7 +97,15 @@ export class SessionStore {
       return {};
     }
 
-    const text = await readTextFile(this.storePath);
+    let text: string;
+    try {
+      text = await readTextFile(this.storePath);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+        return {};
+      }
+      throw error;
+    }
     if (!text.trim()) {
       return {};
     }

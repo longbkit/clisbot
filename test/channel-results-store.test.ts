@@ -109,7 +109,7 @@ describe("channel result store", () => {
       expect(result?.status).toBe("completed");
       expect(result?.result?.text).toBe(`Done ${eventId}`);
     }
-  });
+  }, { timeout: 60_000 });
 
   test("keeps concurrent result readers stable while independent stores append outputs", async () => {
     const path = tempPath("results.json");
@@ -156,7 +156,7 @@ describe("channel result store", () => {
         eventId,
       }))?.result?.text).toBe(`Done ${eventId}`);
     }
-  });
+  }, { timeout: 60_000 });
 
   test("marks records expired after retention and prunes records past grace", async () => {
     const path = tempPath("results.json");

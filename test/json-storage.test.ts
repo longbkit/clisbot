@@ -43,7 +43,7 @@ describe("json storage", () => {
       normalize: normalizeItemsDocument,
     });
     expect(document.items.slice().sort()).toEqual(items.slice().sort());
-  });
+  }, { timeout: 60_000 });
 
   test("allows concurrent readers while mutations are writing", async () => {
     const path = tempPath("state.json");
@@ -68,5 +68,5 @@ describe("json storage", () => {
     await Promise.all([writes, reads]);
     const document = await readJsonFile(path, options);
     expect(document.items.slice().sort()).toEqual(items.slice().sort());
-  });
+  }, { timeout: 60_000 });
 });

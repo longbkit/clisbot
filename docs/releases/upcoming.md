@@ -6,9 +6,10 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-`0.1.54-beta.1` starts the API channel hardening beta after `v0.1.53`.
-It focuses on API ingress/operator docs, result persistence safety, and
-follow-up backlog clarity before a future stable `v0.1.54`.
+`0.1.54-beta.2` continues the API channel hardening beta after
+`0.1.54-beta.1`. It focuses on removing the packaged API listener's Bun runtime
+dependency while keeping API ingress/operator docs, result persistence safety,
+and follow-up backlog clarity before a future stable `v0.1.54`.
 
 ## Operator Impact
 
@@ -16,6 +17,8 @@ follow-up backlog clarity before a future stable `v0.1.54`.
 - Behavior users should notice: API bot result polling and `message.send`
   replies are safer under concurrent API listener / one-shot CLI writes.
 - Compatibility notes: API listener default port is now `6868`.
+- Compatibility notes: API listener now uses Node's built-in HTTP server in
+  the packaged runtime; Bun is no longer required to run API bots.
 - Known risks: global runner admission/backpressure is still planned; high-burst
   API traffic across many conversations can still start many runner sessions.
 
@@ -30,6 +33,8 @@ follow-up backlog clarity before a future stable `v0.1.54`.
 - Fixed API message reply routing so explicit `--reply-to` uses that event's
   reply metadata.
 - Fixed default API event ids to use a timestamp when mapping omits `eventId`.
+- Changed the packaged API listener from `Bun.serve` to Node's built-in HTTP
+  server while keeping the API request handler framework-neutral.
 
 ## Non-Functional Changes
 
@@ -37,6 +42,10 @@ follow-up backlog clarity before a future stable `v0.1.54`.
 
 - Fixed channel result persistence so concurrent result-store writers do not
   lose records or outputs.
+- Increased the shared JSON file lock retry budget so high-contention result
+  and JSON-store writes are less likely to fail with transient lock contention.
+- Added bounded forced shutdown coverage for the Node HTTP listener so runtime
+  stop does not hang behind an open request.
 - Added shared JSON storage guidance and a persistence-store inventory to reduce
   unplanned JSON store sprawl.
 - Added a planned backlog item for global runner admission and API burst
@@ -49,7 +58,7 @@ follow-up backlog clarity before a future stable `v0.1.54`.
 
 ## Update Notes
 
-- Update path: direct from `0.1.53` to `0.1.54-beta.1`.
+- Update path: direct from `0.1.53` or `0.1.54-beta.1` to `0.1.54-beta.2`.
 - Manual action: none.
 - Risk level: medium for API channel adopters; low for non-API-channel users.
 - Automatic config update: no new schema migration in this beta.
@@ -59,17 +68,23 @@ follow-up backlog clarity before a future stable `v0.1.54`.
 - `0.1.54-beta.1`: API channel MVP hardening, result persistence concurrency
   fix, API listener default port `6868`, API docs, and backlog item for global
   runner admission/backpressure.
+- `0.1.54-beta.2`: API listener runs on Node's built-in HTTP server in the
+  packaged CLI, so API bots no longer require Bun at runtime. Also adds
+  bounded force-stop coverage for open listener requests and a higher JSON file
+  lock retry budget under contention.
 
 ## Validation
 
-- `bun test test/api-channel.test.ts test/api-message-actions.test.ts test/api-auth.test.ts test/channel-results-store.test.ts test/json-storage.test.ts`: 28 pass, 0 fail.
-- `bun run check`: 978 pass, 0 fail.
+- `bun test test/api-channel.test.ts test/api-auth.test.ts`: 19 pass, 0 fail.
+- Packaged Node API smoke with `node dist/main.js serve-foreground`: pass.
+- `bun test --timeout 15000`: 979 pass, 0 fail.
 - `bun run build`: pass.
+- `bunx tsc --noEmit`: pass.
 - `git diff --check`: pass.
 - `npm publish --dry-run --access public`: pass.
 
 ## Links
 
-- Release guide: [docs/updates/releases/v0.1.54-beta.1-release-guide.md](../updates/releases/v0.1.54-beta.1-release-guide.md)
+- Release guide: [docs/updates/releases/v0.1.54-beta.2-release-guide.md](../updates/releases/v0.1.54-beta.2-release-guide.md)
 - Migration index: [docs/migrations/index.md](../migrations/index.md)
 - Release workflow: [skills/release-clisbot/SKILL.md](../../skills/release-clisbot/SKILL.md)

@@ -10,6 +10,7 @@ import { ChannelResultStore, type ChannelResultRecord } from "../results/result-
 import { authorizeApiBotRequest } from "./auth.ts";
 import { listApiBotIds, resolveApiBotConfig, resolveApiProviderConfig } from "./config.ts";
 import { buildAcceptanceBody, jsonResponse, parseApiPath } from "./http-contract.ts";
+import { startApiHttpListener, type ApiHttpListener } from "./http-listener.ts";
 import { evaluateApiFilter, evaluateApiMapObject, normalizeMappedString } from "./mapper.ts";
 import { resolveApiConversationRoute } from "./route-config.ts";
 import { resolveApiConversationTarget } from "./session-routing.ts";
@@ -79,7 +80,7 @@ function appendApiReplyToPrompt(prompt: string, eventId: string) {
 }
 
 export class ApiChannelService {
-  private server?: ReturnType<typeof Bun.serve>;
+  private server?: ApiHttpListener;
   private readonly resultStore: ChannelResultStore;
 
   constructor(private readonly dependencies: ApiServiceDependencies) {
@@ -96,19 +97,19 @@ export class ApiChannelService {
 
   async start() {
     const providerConfig = resolveApiProviderConfig(this.dependencies.loadedConfig.raw.bots.api);
-    this.server = Bun.serve({
-      hostname: providerConfig.defaults.listener.host,
+    this.server = await startApiHttpListener({
+      host: providerConfig.defaults.listener.host,
       port: providerConfig.defaults.listener.port,
-      fetch: (request, server) =>
+      handle: (request, remoteAddress) =>
         this.handleRequest(
           request,
-          server.requestIP(request)?.address ?? undefined,
+          remoteAddress,
         ),
     });
   }
 
   async stop() {
-    this.server?.stop(true);
+    await this.server?.stop(true);
     this.server = undefined;
   }
 
