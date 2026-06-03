@@ -14,6 +14,32 @@ describe("resolveSlackMessageContent", () => {
     });
   });
 
+  test("preserves nested markdown list hierarchy in native Slack mrkdwn", () => {
+    const resolved = resolveSlackMessageContent({
+      text: [
+        "Priority order:",
+        "- `P1` — J4 / PS3: Kiểm soát context gửi vào Copilot",
+        "  - Job: auto-detect context hiện tại",
+        "  - Problem: thiếu context thì gợi ý kém",
+        "  - Status: `done`.",
+        "- `P2` — J1 / PS1: Mở Copilot trong ngữ cảnh hiện tại",
+        "  - Problem: panel/chat surface riêng làm user rời workflow",
+      ].join("\n"),
+      inputFormat: "md",
+      renderMode: "native",
+    });
+
+    expect(resolved.text).toBe([
+      "Priority order:",
+      "• `P1` — J4 / PS3: Kiểm soát context gửi vào Copilot",
+      "  ◦ Job: auto-detect context hiện tại",
+      "  ◦ Problem: thiếu context thì gợi ý kém",
+      "  ◦ Status: `done`.",
+      "• `P2` — J1 / PS1: Mở Copilot trong ngữ cảnh hiện tại",
+      "  ◦ Problem: panel/chat surface riêng làm user rời workflow",
+    ].join("\n"));
+  });
+
   test("renders markdown to Slack blocks when requested", () => {
     const resolved = resolveSlackMessageContent({
       text: "## Title\n\n### Details\n- first\n- second",
@@ -43,6 +69,45 @@ describe("resolveSlackMessageContent", () => {
         text: {
           type: "mrkdwn",
           text: "• first\n• second",
+        },
+      },
+    ]);
+  });
+
+  test("preserves nested markdown list hierarchy in Slack blocks", () => {
+    const resolved = resolveSlackMessageContent({
+      text: [
+        "## Copilot",
+        "",
+        "Priority order:",
+        "- `P1` — J4 / PS3: Kiểm soát context gửi vào Copilot",
+        "  - Job: auto-detect context hiện tại",
+        "  - Problem: thiếu context thì gợi ý kém",
+        "  - Status: `done`.",
+      ].join("\n"),
+      inputFormat: "md",
+      renderMode: "blocks",
+    });
+
+    expect(resolved.blocks).toEqual([
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: "Copilot",
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: [
+            "Priority order:",
+            "• `P1` — J4 / PS3: Kiểm soát context gửi vào Copilot",
+            "  ◦ Job: auto-detect context hiện tại",
+            "  ◦ Problem: thiếu context thì gợi ý kém",
+            "  ◦ Status: `done`.",
+          ].join("\n"),
         },
       },
     ]);

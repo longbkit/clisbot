@@ -4,6 +4,7 @@ export type SlackBlock = Record<string, unknown>;
 type SlackTableCell = Record<string, unknown>;
 
 const SLACK_MAX_BLOCKS = 50;
+const SLACK_BULLET_MARKERS = ["•", "◦", "▪"] as const;
 
 function normalizeMarkdownLinks(text: string) {
   return text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label: string, href: string) => {
@@ -19,6 +20,26 @@ function renderInlineMarkdownToSlackMrkdwn(text: string) {
   return normalizeMarkdownLinks(text)
     .replace(/~~([^~]+)~~/g, "~$1~")
     .replace(/\*\*([^*\n][\s\S]*?[^*\n])\*\*/g, "*$1*");
+}
+
+function trimOuterBlankLines(text: string) {
+  return text.replace(/^\n+/, "").replace(/\n+$/, "");
+}
+
+function getMarkdownListDepth(rawIndent: string) {
+  const width = rawIndent.replaceAll("\t", "    ").length;
+  return Math.floor(width / 2);
+}
+
+function renderSlackListIndent(depth: number) {
+  return "  ".repeat(Math.min(Math.max(depth, 0), 6));
+}
+
+function renderSlackBulletPrefix(depth: number) {
+  const marker =
+    SLACK_BULLET_MARKERS[Math.min(depth, SLACK_BULLET_MARKERS.length - 1)] ??
+    SLACK_BULLET_MARKERS[0];
+  return `${renderSlackListIndent(depth)}${marker}`;
 }
 
 function stripMarkdownInline(text: string) {
@@ -116,7 +137,7 @@ function parseSlackBlocksInput(text: string) {
 }
 
 function renderMarkdownToSlackMrkdwn(markdown: string) {
-  const normalized = markdown.replaceAll("\r\n", "\n").replaceAll("\r", "\n").trim();
+  const normalized = trimOuterBlankLines(markdown.replaceAll("\r\n", "\n").replaceAll("\r", "\n"));
   if (!normalized) {
     return "";
   }
@@ -134,14 +155,16 @@ function renderMarkdownToSlackMrkdwn(markdown: string) {
         return content;
       }
 
-      const bulletMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+      const bulletMatch = line.match(/^(\s*)[-*+]\s+(.+)$/);
       if (bulletMatch) {
-        return `• ${renderInlineMarkdownToSlackMrkdwn(bulletMatch[1] ?? "")}`;
+        const depth = getMarkdownListDepth(bulletMatch[1] ?? "");
+        return `${renderSlackBulletPrefix(depth)} ${renderInlineMarkdownToSlackMrkdwn(bulletMatch[2] ?? "")}`;
       }
 
-      const orderedMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
+      const orderedMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
       if (orderedMatch) {
-        return `${orderedMatch[1]}. ${renderInlineMarkdownToSlackMrkdwn(orderedMatch[2] ?? "")}`;
+        const depth = getMarkdownListDepth(orderedMatch[1] ?? "");
+        return `${renderSlackListIndent(depth)}${orderedMatch[2]}. ${renderInlineMarkdownToSlackMrkdwn(orderedMatch[3] ?? "")}`;
       }
 
       return renderInlineMarkdownToSlackMrkdwn(line);
@@ -232,7 +255,7 @@ function renderMarkdownTableToFallbackSlackBlock(headers: string[], rows: string
 }
 
 function renderMarkdownToSlackBlocks(markdown: string) {
-  const normalized = markdown.replaceAll("\r\n", "\n").replaceAll("\r", "\n").trim();
+  const normalized = trimOuterBlankLines(markdown.replaceAll("\r\n", "\n").replaceAll("\r", "\n"));
   if (!normalized) {
     return [];
   }
@@ -268,7 +291,7 @@ function renderMarkdownToSlackBlocks(markdown: string) {
     if (paragraph.length === 0) {
       return;
     }
-    const text = paragraph.join("\n").trim();
+    const text = paragraph.join("\n").trimEnd();
     if (text) {
       const shouldRenderAsPreamble =
         !hasSeenHeading && firstHeadingLineIndex > 0 && blocks.length === 0;
@@ -392,16 +415,18 @@ function renderMarkdownToSlackBlocks(markdown: string) {
       continue;
     }
 
-    const bulletMatch = line.match(/^\s*[-*+]\s+(.+)$/);
+    const bulletMatch = line.match(/^(\s*)[-*+]\s+(.+)$/);
     if (bulletMatch) {
-      paragraph.push(`• ${renderInlineMarkdownToSlackMrkdwn(bulletMatch[1] ?? "")}`);
+      const depth = getMarkdownListDepth(bulletMatch[1] ?? "");
+      paragraph.push(`${renderSlackBulletPrefix(depth)} ${renderInlineMarkdownToSlackMrkdwn(bulletMatch[2] ?? "")}`);
       continue;
     }
 
-    const orderedMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
+    const orderedMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
     if (orderedMatch) {
+      const depth = getMarkdownListDepth(orderedMatch[1] ?? "");
       paragraph.push(
-        `${orderedMatch[1]}. ${renderInlineMarkdownToSlackMrkdwn(orderedMatch[2] ?? "")}`,
+        `${renderSlackListIndent(depth)}${orderedMatch[2]}. ${renderInlineMarkdownToSlackMrkdwn(orderedMatch[3] ?? "")}`,
       );
       continue;
     }
