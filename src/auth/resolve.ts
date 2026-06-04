@@ -76,6 +76,9 @@ export function resolveAuthPrincipal(identity: ChannelIdentity) {
   if (!senderId) {
     return undefined;
   }
+  if (!isKnownChannelId(identity.platform)) {
+    return normalizeAuthPrincipal(`${identity.platform}:${senderId}`);
+  }
   return normalizeAuthPrincipal(buildNormalizedChannelPrincipal(identity.platform, senderId));
 }
 

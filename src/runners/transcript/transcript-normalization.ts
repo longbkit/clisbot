@@ -59,6 +59,7 @@ const CLAUDE_TIMER_FOOTER_PATTERN = new RegExp(
   String.raw`\|\s*claude\s*\|.*\|\s*${DURATION_STATUS_PATTERN}\s*$`,
   "i",
 );
+const PI_WORKING_STATUS_PATTERN = /^(?:[•◦·✻✽*]\s*)?Working(?:\.{3}|…)\s*$/i;
 
 function looksLikeUrlContinuation(line: string) {
   const trimmed = line.trim();
@@ -202,6 +203,18 @@ export function looksLikeGeminiSnapshot(lines: string[]) {
       trimmed.includes("workspace (/directory)")
     );
   });
+}
+
+export function looksLikePiSnapshot(lines: string[]) {
+  return lines.some((line) => {
+    const trimmed = line.trim()
+    return (
+      trimmed.includes('Welcome to pi') ||
+      /^pi\s+v\d+\.\d+\.\d+/i.test(trimmed) ||
+      trimmed.includes('Type your message') ||
+      trimmed.includes('run /help')
+    )
+  })
 }
 
 export function isProgressLine(line: string) {
@@ -353,6 +366,10 @@ function dropGeminiPromptBlocks(lines: string[]) {
   return dropPromptBlocks(lines, /^\s*>\s/);
 }
 
+function dropPiPromptBlocks(lines: string[]) {
+  return dropPromptBlocks(lines, /^\s*>\s/)
+}
+
 function isInterruptStatusLine(line: string) {
   const trimmed = line.trim();
   if (!trimmed) {
@@ -374,7 +391,8 @@ export function isActiveTimerStatusLine(line: string) {
   return (
     isInterruptStatusLine(trimmed) ||
     GEMINI_THINKING_STATUS_PATTERN.test(trimmed) ||
-    CLAUDE_TIMER_FOOTER_PATTERN.test(trimmed)
+    CLAUDE_TIMER_FOOTER_PATTERN.test(trimmed) ||
+    PI_WORKING_STATUS_PATTERN.test(trimmed)
   );
 }
 
@@ -529,6 +547,24 @@ function shouldDropGeminiChromeLine(line: string) {
   );
 }
 
+function shouldDropPiChromeLine(line: string) {
+  const trimmed = line.trim()
+  if (!trimmed) {
+    return false
+  }
+
+  return (
+    /\bfd:\s+(?:command\s+)?not\s+found\b/i.test(trimmed) ||
+    /^─+$/.test(trimmed) ||
+    /^[╭╰│]/.test(trimmed) ||
+    trimmed.includes('Welcome to pi') ||
+    /^pi\s+v\d+\.\d+\.\d+/i.test(trimmed) ||
+    trimmed === '>' ||
+    trimmed.includes('Type your message') ||
+    trimmed.includes('run /help')
+  )
+}
+
 function normalizeBoundaryLine(line: string) {
   return line.trim().replace(/^(?::eight_spoked_asterisk:|[-*•◦·✽✶])\s+/, "");
 }
@@ -580,13 +616,16 @@ function cleanInteractionSnapshotInternal(raw: string, options?: {
   const isCodex = looksLikeCodexSnapshot(lines);
   const isClaude = looksLikeClaudeSnapshot(lines);
   const isGemini = looksLikeGeminiSnapshot(lines);
+  const isPi = !isCodex && !isClaude && !isGemini && looksLikePiSnapshot(lines);
   const promptStripped = isCodex
     ? dropCodexPromptBlocks(lines)
     : isClaude
       ? dropClaudePromptBlocks(lines)
       : isGemini
         ? dropGeminiPromptBlocks(lines)
-        : lines;
+        : isPi
+          ? dropPiPromptBlocks(lines)
+          : lines;
   const timerStatusLines: string[] = [];
   const filtered = promptStripped.filter((line) => {
     if (shouldDropDeliveryReportLine(line)) {
@@ -607,6 +646,10 @@ function cleanInteractionSnapshotInternal(raw: string, options?: {
     }
 
     if (isGemini && shouldDropGeminiChromeLine(line)) {
+      return false;
+    }
+
+    if (isPi && shouldDropPiChromeLine(line)) {
       return false;
     }
 

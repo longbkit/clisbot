@@ -349,10 +349,11 @@ export class RunnerService {
     }
 
     if (
-      resolved.runner.sessionId.resume.mode !== "command" ||
-      resolved.runner.sessionId.create.mode !== "runner"
+      resolved.runner.sessionId.resume.mode !== 'command' ||
+      (resolved.runner.sessionId.create.mode !== 'runner' &&
+        resolved.runner.sessionId.create.mode !== 'explicit')
     ) {
-      return null;
+      return null
     }
 
     const existing = await this.sessionMapping.get(resolved.sessionKey);
@@ -819,7 +820,16 @@ export class RunnerService {
   }
 
   async triggerNewSession(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
+    const resolved = this.resolveTarget(target)
+    // Runners with explicit session IDs and no capture command cannot rotate in-process.
+    // Route directly to restart with a fresh UUID rather than triggering live rotation,
+    // which would call captureNewSessionIdentityAfterTrigger (requires /status — not available).
+    const skipLiveRotation =
+      resolved.runner.sessionId?.capture.mode === 'off' &&
+      resolved.runner.sessionId?.create.mode === 'explicit'
+    if (skipLiveRotation) {
+      return this.restartRunnerWithFreshSessionIdForNewCommand(target)
+    }
     if (!(await this.tmux.hasSession(resolved.sessionName))) {
       return this.restartRunnerWithFreshSessionIdForNewCommand(target);
     }
@@ -966,7 +976,7 @@ export class RunnerService {
   }
 
   private resolveNewSessionCommand(resolved: ResolvedAgentTarget) {
-    return resolved.runner.command.toLowerCase().includes("gemini") ? "/clear" : "/new";
+    return resolved.runner.newSessionCommand ?? '/new'
   }
 
   async captureTranscript(target: AgentSessionTarget) {

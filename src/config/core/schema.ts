@@ -71,6 +71,7 @@ const runnerLaunchSchema = z.object({
   startupReadyPattern: z.string().min(1).optional(),
   startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
   promptSubmitDelayMs: z.number().int().min(0).optional(),
+  newSessionCommand: z.string().min(1).optional(),
   sessionId: runnerSessionIdSchema.optional(),
 });
 
@@ -144,6 +145,7 @@ const runnerFamilyOverrideSchema = z.object({
   startupReadyPattern: z.string().min(1).optional(),
   startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
   promptSubmitDelayMs: z.number().int().min(0).optional(),
+  newSessionCommand: z.string().min(1).optional(),
   sessionId: z.object({
     create: runnerSessionIdCreateSchema.partial().optional(),
     capture: runnerSessionIdCaptureSchema.partial().optional(),
@@ -329,6 +331,7 @@ const agentRunnerOverrideSchema = z.object({
   startupReadyPattern: z.string().min(1).optional(),
   startupBlockers: z.array(runnerStartupBlockerSchema).optional(),
   promptSubmitDelayMs: z.number().int().min(0).optional(),
+  newSessionCommand: z.string().min(1).optional(),
   sessionId: z.object({
     create: runnerSessionIdCreateSchema.partial().optional(),
     capture: runnerSessionIdCaptureSchema.partial().optional(),
@@ -394,6 +397,7 @@ const agentsDefaultsSchema = z.object({
       ],
       startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
       startupReadyPattern: codexStartupReadyPattern,
+      newSessionCommand: "/new",
       sessionId: {
         create: {
           mode: "runner",
@@ -423,6 +427,7 @@ const agentsDefaultsSchema = z.object({
       command: "claude",
       args: ["--dangerously-skip-permissions"],
       startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+      newSessionCommand: "/new",
       sessionId: {
         create: {
           mode: "explicit",
@@ -463,6 +468,7 @@ const agentsDefaultsSchema = z.object({
         },
       ],
       promptSubmitDelayMs: 200,
+      newSessionCommand: "/clear",
       sessionId: {
         create: {
           mode: "runner",
@@ -478,6 +484,45 @@ const agentsDefaultsSchema = z.object({
         resume: {
           mode: "command",
           args: ["--resume", "{sessionId}", "--approval-mode=yolo", "--sandbox=false"],
+        },
+      },
+    }),
+    pi: runnerFamilySchema.default({
+      command: "pi",
+      args: [],
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+      startupRetryCount: 2,
+      startupRetryDelayMs: 1000,
+      startupReadyPattern: "(?:^|\\s)escape\\s+interrupt(?:\\s|$)",
+      startupBlockers: [
+        {
+          pattern: "Warning: No models available",
+          message:
+            "Pi has no models configured. Configure a provider via `/login` or set an API key env var (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY) before routing through clisbot.",
+        },
+        {
+          pattern: "tmux extended-keys is off",
+          message:
+            "Pi requires tmux extended-keys support. Add `set -g extended-keys on` to ~/.tmux.conf and restart tmux.",
+        },
+      ],
+      promptSubmitDelayMs: 150,
+      newSessionCommand: "/new",
+      sessionId: {
+        create: {
+          mode: "runner",
+          args: [],
+        },
+        capture: {
+          mode: "status-command",
+          statusCommand: "/session",
+          pattern: defaultSessionIdPattern,
+          timeoutMs: 5000,
+          pollIntervalMs: 250,
+        },
+        resume: {
+          mode: "command",
+          args: ["--session", "{sessionId}"],
         },
       },
     }),
@@ -643,6 +688,7 @@ export const clisbotConfigSchema = z.object({
           ],
           startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupReadyPattern: codexStartupReadyPattern,
+          newSessionCommand: "/new",
           sessionId: {
             create: {
               mode: "runner",
@@ -672,6 +718,7 @@ export const clisbotConfigSchema = z.object({
           command: "claude",
           args: ["--dangerously-skip-permissions"],
           startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+          newSessionCommand: "/new",
           sessionId: {
             create: {
               mode: "explicit",
@@ -712,6 +759,7 @@ export const clisbotConfigSchema = z.object({
             },
           ],
           promptSubmitDelayMs: 200,
+          newSessionCommand: "/clear",
           sessionId: {
             create: {
               mode: "runner",
@@ -776,6 +824,7 @@ export const clisbotConfigSchema = z.object({
           ],
           startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
           startupReadyPattern: codexStartupReadyPattern,
+          newSessionCommand: "/new",
           sessionId: {
             create: {
               mode: "runner",
@@ -805,6 +854,7 @@ export const clisbotConfigSchema = z.object({
           command: "claude",
           args: ["--dangerously-skip-permissions"],
           startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+          newSessionCommand: "/new",
           sessionId: {
             create: {
               mode: "explicit",
@@ -845,6 +895,7 @@ export const clisbotConfigSchema = z.object({
             },
           ],
           promptSubmitDelayMs: 200,
+          newSessionCommand: "/clear",
           sessionId: {
             create: {
               mode: "runner",

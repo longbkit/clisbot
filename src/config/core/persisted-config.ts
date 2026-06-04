@@ -121,6 +121,7 @@ function pruneAgentRunnerOverride(runner: MutableRecord, cli: AgentCliToolId | u
     "startupReadyPattern",
     "startupBlockers",
     "promptSubmitDelayMs",
+    "newSessionCommand",
     "sessionId",
   ]) {
     if (Object.hasOwn(runner, field) && areJsonEqual(runner[field], defaults[field])) {

@@ -14,6 +14,7 @@ import {
 } from "../surface/surface-prompt-context.ts";
 import { getClisbotPromptCommand } from "../../control/commands/clisbot-wrapper.ts";
 import { getRenderedCliName, renderCliCommand } from "../../control/commands/cli-name.ts";
+import type { AgentCliToolId } from "../../config/runtime/agent-tool-presets.ts";
 
 export type ChannelAgentPromptConfig = {
   enabled: boolean;
@@ -86,7 +87,7 @@ export function buildAgentPromptText(params: {
   text: string;
   identity: ChannelIdentity;
   config: ChannelAgentPromptConfig;
-  cliTool?: "codex" | "claude" | "gemini";
+  cliTool?: AgentCliToolId;
   responseMode?: "capture-pane" | "message-tool";
   streaming?: "off" | "latest" | "all";
   protectedControlMutationRule?: string;

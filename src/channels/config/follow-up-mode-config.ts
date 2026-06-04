@@ -58,6 +58,9 @@ export async function setScopedConversationFollowUpMode(params: {
   scope: ConfiguredFollowUpModeScope;
   mode: FollowUpMode;
 }) {
+  if (params.identity.platform === "terminal") {
+    return undefined;
+  }
   const { config, configPath } = await readEditableConfig(getEditableConfigPath());
   const target = resolveConfiguredFollowUpModeTarget(
     config,
