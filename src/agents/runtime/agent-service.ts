@@ -185,12 +185,13 @@ export class AgentService {
       return;
     }
 
-    await this.runnerSessions.runSessionCleanup();
-    this.cleanupTimer = setInterval(() => {
+    const runCleanup = () => {
       void this.runnerSessions.runSessionCleanup().catch((error) => {
         console.error("session cleanup failed", error);
       });
-    }, cleanup.intervalMinutes * 60_000);
+    };
+    runCleanup();
+    this.cleanupTimer = setInterval(runCleanup, cleanup.intervalMinutes * 60_000);
   }
 
   async stop() {

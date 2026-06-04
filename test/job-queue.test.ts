@@ -200,6 +200,48 @@ describe("AgentJobQueue", () => {
     expect(order).toEqual(["first:start", "first:end", "second:start", "second:end"]);
   });
 
+  test("rejects a job when canStart fails and keeps draining the queue", async () => {
+    const queue = new AgentJobQueue();
+    const order: string[] = [];
+    const admissionError = new Error("admission failed");
+
+    const first = queue.enqueue(
+      "default",
+      async () => {
+        order.push("first");
+        return "first";
+      },
+      { text: "first" },
+    );
+    const second = queue.enqueue(
+      "default",
+      async () => "second",
+      {
+        text: "second",
+        canStart: () => {
+          throw admissionError;
+        },
+        onFailure: (error) => {
+          expect(error).toBe(admissionError);
+          order.push("second:failed");
+        },
+      },
+    );
+    const third = queue.enqueue(
+      "default",
+      async () => {
+        order.push("third");
+        return "third";
+      },
+      { text: "third" },
+    );
+
+    await expect(first.result).resolves.toBe("first");
+    await expect(second.result).rejects.toBe(admissionError);
+    await expect(third.result).resolves.toBe("third");
+    expect(order).toEqual(["first", "second:failed", "third"]);
+  });
+
   test("supports stable queue ids and lifecycle callbacks", async () => {
     const queue = new AgentJobQueue();
     const events: string[] = [];

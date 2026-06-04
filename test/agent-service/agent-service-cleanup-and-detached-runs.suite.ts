@@ -26,6 +26,76 @@ import {
 } from "./agent-service-support.ts";
 
 describe("AgentService detached runs and cleanup", () => {
+  test("does not block startup on initial stale-session cleanup", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            cleanupEnabled: true,
+            cleanupIntervalMinutes: 5,
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "off",
+                statusCommand: "/status",
+                pattern: "session id:\\s*(\\S+)",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "off",
+                args: [],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: new FakeTmuxClient() as unknown as TmuxClient,
+      });
+      let cleanupStarted = false;
+      let releaseCleanup!: () => void;
+      const cleanupGate = new Promise<void>((resolve) => {
+        releaseCleanup = resolve;
+      });
+      (service as any).runnerSessions.runSessionCleanup = async () => {
+        cleanupStarted = true;
+        await cleanupGate;
+      };
+
+      const started = await Promise.race([
+        service.start().then(() => "started" as const),
+        Bun.sleep(20).then(() => "blocked" as const),
+      ]);
+
+      expect(started).toBe("started");
+      expect(cleanupStarted).toBe(true);
+      releaseCleanup();
+      await Bun.sleep(0);
+      await service.stop();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test("sunsets stale tmux sessions without discarding the stored session id", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 

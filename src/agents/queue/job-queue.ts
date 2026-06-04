@@ -36,6 +36,11 @@ type QueueState = {
   entries: QueueEntry<unknown>[];
 };
 
+type QueueAdmission =
+  | { status: "start" }
+  | { status: "wait" }
+  | { status: "failed"; error: unknown };
+
 export class ClearedQueuedTaskError extends Error {
   constructor() {
     super("Queued task was cleared before execution.");
@@ -82,7 +87,9 @@ export class AgentJobQueue {
     state.entries.push(entry as QueueEntry<unknown>);
     this.sortEntries(state);
     const positionAhead = state.entries.indexOf(entry as QueueEntry<unknown>);
-    void this.drain(key, state);
+    void this.drain(key, state).catch((error) => {
+      this.abortDrainAfterUnexpectedFailure(key, state, error);
+    });
 
     return { positionAhead, result };
   }
@@ -192,7 +199,13 @@ export class AgentJobQueue {
           break;
         }
 
-        if (nextEntry.canStart && !(await nextEntry.canStart())) {
+        const admission = await this.resolveAdmission(nextEntry);
+        if (admission.status === "failed") {
+          await this.failEntry(nextEntry, admission.error);
+          state.entries = state.entries.filter((entry) => entry !== nextEntry);
+          continue;
+        }
+        if (admission.status === "wait") {
           await sleep(QUEUE_PENDING_POLL_INTERVAL_MS);
           continue;
         }
@@ -208,8 +221,7 @@ export class AgentJobQueue {
           await Promise.resolve(nextEntry.lifecycle?.onComplete?.(value)).catch(() => undefined);
           nextEntry.resolve(value);
         } catch (error) {
-          await Promise.resolve(nextEntry.lifecycle?.onFailure?.(error)).catch(() => undefined);
-          nextEntry.reject(error);
+          await this.failEntry(nextEntry, error);
         } finally {
           state.entries = state.entries.filter((entry) => entry !== nextEntry);
         }
@@ -220,5 +232,32 @@ export class AgentJobQueue {
         this.states.delete(key);
       }
     }
+  }
+
+  private async resolveAdmission(entry: QueueEntry<unknown>): Promise<QueueAdmission> {
+    if (!entry.canStart) {
+      return { status: "start" };
+    }
+
+    try {
+      return (await entry.canStart()) ? { status: "start" } : { status: "wait" };
+    } catch (error) {
+      return { status: "failed", error };
+    }
+  }
+
+  private async failEntry(entry: QueueEntry<unknown>, error: unknown) {
+    await Promise.resolve(entry.lifecycle?.onFailure?.(error)).catch(() => undefined);
+    entry.reject(error);
+  }
+
+  private abortDrainAfterUnexpectedFailure(key: string, state: QueueState, error: unknown) {
+    for (const entry of state.entries) {
+      entry.reject(error);
+    }
+    state.entries = [];
+    state.running = false;
+    this.states.delete(key);
+    console.error("agent job queue drain failed", error);
   }
 }
