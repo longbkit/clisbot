@@ -11,6 +11,8 @@ import {
   waitForTmuxSessionBootstrap,
 } from "../../src/runners/tmux/session-handshake.ts";
 import { monitorTmuxRun } from "../../src/runners/tmux/run-monitor.ts";
+import { paneShowsResumeRejected } from "../../src/runners/resume-rejection.ts";
+import { paneShowsRunnerExitSentinel } from "../../src/control/runner/runner-exit-diagnostics.ts";
 
 describe("tmux runner latency behavior", () => {
   test("waitForTmuxSessionBootstrap returns before the full startup budget once output appears", async () => {
@@ -134,6 +136,62 @@ describe("tmux runner latency behavior", () => {
       message: "auth required",
     });
     expect(captureCount).toBe(1);
+  });
+
+  test("waitForTmuxSessionBootstrap stops early when the runner rejects the resumed session id", async () => {
+    let captureCount = 0;
+    const fakeTmux = {
+      async capturePane() {
+        captureCount += 1;
+        return "ERROR: No saved session found with ID 019e8b71-11aa-79b0-829b-7d149276afb1. Run codex resume without an ID to choose from existing sessions.";
+      },
+    } as unknown as TmuxClient;
+
+    const startedAt = Date.now();
+    const result = await waitForTmuxSessionBootstrap({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      captureLines: 80,
+      startupDelayMs: 5_000,
+      readyPattern: "(?:^|\\s)›\\s",
+      resumeRejection: {
+        detect: paneShowsResumeRejected,
+      },
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.status).toBe("resume-rejected");
+    expect(result.snapshot).toContain("No saved session found with ID");
+    expect(captureCount).toBe(1);
+    expect(elapsedMs).toBeLessThan(1_000);
+  });
+
+  test("waitForTmuxSessionBootstrap classifies a lingering runner exit instead of waiting for timeout", async () => {
+    let captureCount = 0;
+    const fakeTmux = {
+      async capturePane() {
+        captureCount += 1;
+        return "codex: database is locked\n[clisbot] runner exited with status 1";
+      },
+    } as unknown as TmuxClient;
+
+    const startedAt = Date.now();
+    const result = await waitForTmuxSessionBootstrap({
+      tmux: fakeTmux,
+      sessionName: "test-session",
+      captureLines: 80,
+      startupDelayMs: 5_000,
+      readyPattern: "(?:^|\\s)›\\s",
+      exitDetection: {
+        detect: paneShowsRunnerExitSentinel,
+      },
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.status).toBe("exited");
+    expect(result.snapshot).toContain("database is locked");
+    expect(captureCount).toBe(1);
+    expect(elapsedMs).toBeLessThan(1_000);
   });
 
   test("waitForTmuxSessionBootstrap returns timeout when ready pattern never appears", async () => {

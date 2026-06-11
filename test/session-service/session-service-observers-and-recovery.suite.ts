@@ -440,7 +440,9 @@ describe("SessionService observers and recovery", () => {
       state: "idle",
     });
     expect((rejectedError as Error).message).toBe(
-      buildRunRecoveryNote("manual-new-required"),
+      buildRunRecoveryNote("manual-new-required", {
+        storedSessionId: "11111111-1111-1111-1111-111111111111",
+      }),
     );
   });
 

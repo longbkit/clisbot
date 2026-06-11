@@ -59,6 +59,11 @@ export class FakeTmuxClient {
   serverDefaultsEnsured = 0;
   private sessions = new Map<string, FakeSession>();
   private readonly invalidResumeSessionIds = new Set<string>();
+  private readonly resumeRejectedPaneSessionIds = new Set<string>();
+  private readonly startupExitPanesOnResume = new Map<
+    string,
+    { paneText: string; remaining: number }
+  >();
   private readonly disappearingOnCaptureSessionIds = new Set<string>();
   private readonly noServerOnCaptureSessionIds = new Set<string>();
   private readonly duplicateOnNewSession = new Set<string>();
@@ -78,6 +83,18 @@ export class FakeTmuxClient {
 
   markInvalidResumeSessionId(sessionId: string) {
     this.invalidResumeSessionIds.add(sessionId);
+  }
+
+  markResumeRejectedPaneOnResume(sessionId: string) {
+    this.resumeRejectedPaneSessionIds.add(sessionId);
+  }
+
+  markStartupExitPaneOnResume(
+    sessionId: string,
+    paneText: string,
+    times = Number.POSITIVE_INFINITY,
+  ) {
+    this.startupExitPanesOnResume.set(sessionId, { paneText, remaining: times });
   }
 
   markSessionIdDisappearOnCapture(sessionId: string) {
@@ -227,6 +244,57 @@ export class FakeTmuxClient {
       this.nextStatusResponseMode = "session-id";
       this.nextDropPromptLiteralCount = 0;
       throw new Error(`duplicate session: ${params.sessionName}`);
+    }
+    const startupExitPane = this.startupExitPanesOnResume.get(sessionId);
+    if (
+      params.command.includes("resume ") &&
+      startupExitPane &&
+      startupExitPane.remaining > 0
+    ) {
+      // The runner printed a fatal startup error, exited nonzero, and the
+      // wrapper linger keeps the pane alive with the sentinel for clisbot to
+      // classify post-mortem.
+      startupExitPane.remaining -= 1;
+      this.writeExitRecord(params.command, params.sessionName, 1);
+      this.sessions.set(params.sessionName, {
+        command: params.command,
+        pendingInput: "",
+        sessionId,
+        snapshot: `${startupExitPane.paneText}\n[clisbot] runner exited with status 1`,
+        cursorX: 0,
+        cursorY: 0,
+        historySize: 0,
+        longRunning: false,
+        longRunningStep: 0,
+        statusResponseMode: this.nextStatusResponseMode,
+      });
+      this.nextStatusResponseMode = "session-id";
+      this.nextDropPromptLiteralCount = 0;
+      this.serverRunning = true;
+      return;
+    }
+    if (
+      params.command.includes("resume ") &&
+      this.resumeRejectedPaneSessionIds.has(sessionId)
+    ) {
+      // The runner stays alive but only shows its resume rejection output,
+      // mirroring `codex resume <stale-id>` waiting at the session picker.
+      this.sessions.set(params.sessionName, {
+        command: params.command,
+        pendingInput: "",
+        sessionId,
+        snapshot: `ERROR: No saved session found with ID ${sessionId}. Run fake-cli resume without an ID to choose from existing sessions.`,
+        cursorX: 0,
+        cursorY: 0,
+        historySize: 0,
+        longRunning: false,
+        longRunningStep: 0,
+        statusResponseMode: this.nextStatusResponseMode,
+      });
+      this.nextStatusResponseMode = "session-id";
+      this.nextDropPromptLiteralCount = 0;
+      this.serverRunning = true;
+      return;
     }
     if (
       params.command.includes("resume ") &&

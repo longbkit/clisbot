@@ -9,6 +9,17 @@ export type RunnerExitRecord = {
   exitedAt: string;
 };
 
+// After a nonzero runner exit the wrapper prints this sentinel and keeps the
+// pane alive briefly, so clisbot can read the runner's final error output and
+// classify the failure (resume rejected, state-db locked, state-db corrupted)
+// instead of only seeing that the tmux session disappeared.
+export const RUNNER_EXIT_SENTINEL_PREFIX = "[clisbot] runner exited with status";
+export const RUNNER_EXIT_LINGER_SECONDS = 8;
+
+export function paneShowsRunnerExitSentinel(snapshot: string) {
+  return snapshot.includes(RUNNER_EXIT_SENTINEL_PREFIX);
+}
+
 function shellQuote(value: string) {
   if (/^[a-zA-Z0-9_./:@=-]+$/.test(value)) {
     return value;
@@ -35,7 +46,9 @@ export function buildRunnerLaunchCommand(params: {
   wrapperPath: string;
   sessionName: string;
   stateDir: string;
+  exitLingerSeconds?: number;
 }) {
+  const exitLingerSeconds = params.exitLingerSeconds ?? RUNNER_EXIT_LINGER_SECONDS;
   const runnerCommand = buildCommandString(params.command, params.args);
   const exitRecordPath = getRunnerExitRecordPath(params.stateDir, params.sessionName);
   const exitWriterScript = [
@@ -60,6 +73,9 @@ export function buildRunnerLaunchCommand(params: {
     runnerCommand,
     "status=$?",
     `node -e ${shellQuote(exitWriterScript)} ${shellQuote(exitRecordPath)} ${shellQuote(params.sessionName)} "$status" ${shellQuote(runnerCommand)} || true`,
+    // Keep the pane alive briefly after a failed start so clisbot can read
+    // and classify the runner's final error output before the session closes.
+    `if [ "$status" -ne 0 ]; then echo ${shellQuote(`${RUNNER_EXIT_SENTINEL_PREFIX} `)}"$status"; sleep ${exitLingerSeconds}; fi`,
     'exit "$status"',
   ].join("; ");
 }

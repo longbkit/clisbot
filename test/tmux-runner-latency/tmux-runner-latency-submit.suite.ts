@@ -139,6 +139,7 @@ describe("tmux runner latency behavior", () => {
           cursorY: 1,
           historySize: 1,
         };
+        snapshot = "ECHO ping";
       },
       async getPaneState() {
         return state;
@@ -247,6 +248,63 @@ describe("tmux runner latency behavior", () => {
 
     expect(sendLiteralCount).toBe(3);
     expect(enterCount).toBe(1);
+  });
+
+  test("submitTmuxSessionInput nudges Enter again when the prompt stays pending in the composer", async () => {
+    let enterCount = 0;
+    let state = {
+      cursorX: 4,
+      cursorY: 0,
+      historySize: 0,
+    };
+    let snapshot = "READY";
+
+    const fakeTmux = {
+      async sendLiteral() {
+        state = {
+          cursorX: 10,
+          cursorY: 0,
+          historySize: 0,
+        };
+        snapshot = "READY\n› ping";
+      },
+      async sendKey() {
+        enterCount += 1;
+        if (enterCount === 1) {
+          // Enter landed as a newline inside the composer: the pane changes,
+          // but the prompt text is still pending and was never submitted.
+          state = {
+            cursorX: 0,
+            cursorY: 1,
+            historySize: 0,
+          };
+          return;
+        }
+        state = {
+          cursorX: 0,
+          cursorY: 2,
+          historySize: 2,
+        };
+        snapshot = "READY\n› ping\n• Working (esc to interrupt)";
+      },
+      async getPaneState() {
+        return state;
+      },
+      async capturePane() {
+        return snapshot;
+      },
+    } as unknown as TmuxClient;
+
+    await expect(
+      submitTmuxSessionInput({
+        tmux: fakeTmux,
+        sessionName: "test-session",
+        text: "ping",
+        promptSubmitDelayMs: 1,
+      }),
+    ).resolves.toEqual({ submittedSnapshot: "READY\n› ping" });
+
+    expect(enterCount).toBe(2);
   });
 
   test("submitTmuxSessionInput fails when pane state never confirms submit", async () => {

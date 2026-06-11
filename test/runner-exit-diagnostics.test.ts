@@ -21,6 +21,7 @@ describe("runner exit diagnostics", () => {
         wrapperPath: "/tmp/clisbot",
         sessionName: "agent-default-topic-1230",
         stateDir: tempDir,
+        exitLingerSeconds: 0,
       });
 
       const result = spawnSync("bash", ["-lc", launchCommand], {
@@ -28,6 +29,9 @@ describe("runner exit diagnostics", () => {
       });
 
       expect(result.status).toBe(7);
+      // The wrapper announces the failed exit so clisbot can read it from the
+      // lingering pane and classify the failure post-mortem.
+      expect(result.stdout).toContain("[clisbot] runner exited with status 7");
       const exitRecord = await readRunnerExitRecord(tempDir, "agent-default-topic-1230");
       expect(exitRecord).not.toBeNull();
       expect(exitRecord?.sessionName).toBe("agent-default-topic-1230");

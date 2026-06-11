@@ -22,6 +22,17 @@ import {
   runTmuxShellCommand,
 } from "../../runners/tmux/shell-command.ts";
 import {
+  paneShowsResumeRejected,
+  RunnerResumeRejectedError,
+} from "../../runners/resume-rejection.ts";
+import {
+  paneShowsRunnerStateContention,
+  paneShowsRunnerStateCorruption,
+  RunnerStateContentionError,
+  RunnerStateCorruptionError,
+} from "../../runners/runner-state-failures.ts";
+import { buildResumeRejectedFreshStartNote } from "../session/run-recovery.ts";
+import {
   buildRunnerLaunchCommand,
   clearRunnerExitRecord,
   ensureClisbotWrapper,
@@ -30,6 +41,7 @@ import {
   getClisbotWrapperPath,
   readRunnerExitRecord,
 } from "../../control/commands/clisbot-wrapper.ts";
+import { paneShowsRunnerExitSentinel } from "../../control/runner/runner-exit-diagnostics.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
 
 export type ShellCommandResult = {
@@ -53,13 +65,18 @@ const SESSION_READY_CAPTURE_RETRY_DELAY_MS = 100;
 const STARTUP_SESSION_ID_CAPTURE_RETRY_COUNT = 2;
 const STARTUP_SESSION_ID_CAPTURE_RETRY_DELAY_MS = 500;
 const SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS = 15_000;
-const PRESERVED_SESSION_ID_RETRY_MESSAGE =
-  "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to trigger a new runner conversation, then resend the prompt.";
 
 type SessionErrorAction =
   | "during startup"
   | "before prompt submission"
   | "while the prompt was running";
+
+type EnsureSessionReadyOptions = {
+  allowFreshRetry?: boolean;
+  remainingFreshRetries?: number;
+  timingContext?: LatencyDebugContext;
+  startupNotes?: string[];
+};
 
 function summarizeSnapshot(snapshot: string) {
   const compact = snapshot
@@ -138,15 +155,28 @@ export class RunnerService {
   ) {
     if (isRecoverableStartupSessionLoss(error)) {
       const exitRecord = await readRunnerExitRecord(this.loadedConfig.stateDir, sessionName);
+      const paneSnapshot =
+        lastSnapshot ||
+        (error instanceof TmuxBootstrapSessionLostError ? error.lastSnapshot : "");
       console.error("runner session disappeared", {
         sessionName,
         action,
         exitCode: exitRecord?.exitCode,
         exitedAt: exitRecord?.exitedAt,
         runnerCommand: exitRecord?.command,
-        lastVisiblePane: lastSnapshot ? summarizeSnapshot(lastSnapshot).trim() : undefined,
+        lastVisiblePane: paneSnapshot ? summarizeSnapshot(paneSnapshot).trim() : undefined,
       });
-      return new Error(`Runner session "${sessionName}" disappeared ${action}.`);
+      const exitDetail =
+        typeof exitRecord?.exitCode === "number"
+          ? ` The runner process exited with code ${exitRecord.exitCode}.`
+          : "";
+      const nextStep =
+        action === "while the prompt was running"
+          ? `The prompt may have partially run; check ${renderCliCommand("watch --latest --lines 100", { inline: true })} before resending.`
+          : "Your prompt was not submitted; resend it to retry.";
+      return new Error(
+        `Runner session "${sessionName}" disappeared ${action}.${exitDetail} ${nextStep} If this keeps happening, verify the runner CLI starts cleanly in the workspace terminal and inspect ${renderCliCommand("logs", { inline: true })}.${summarizeSnapshot(paneSnapshot)}`,
+      );
     }
 
     if (isTransientTmuxTargetError(error)) {
@@ -294,6 +324,7 @@ export class RunnerService {
     target: AgentSessionTarget,
     resolved: ResolvedAgentTarget,
     remainingFreshRetries: number,
+    startupNotes?: string[],
   ) {
     if (remainingFreshRetries <= 0) {
       return null;
@@ -305,6 +336,51 @@ export class RunnerService {
     }
     return this.ensureSessionReady(target, {
       remainingFreshRetries: remainingFreshRetries - 1,
+      startupNotes,
+    });
+  }
+
+  // Maps a lingering post-exit pane to the truthful failure class. State-db
+  // contention is transient (retry with the preserved session id), state-db
+  // corruption is permanent (operator repair), anything else flows into the
+  // existing recoverable startup-loss handling with the pane as evidence.
+  private classifyRunnerStartupExit(resolved: ResolvedAgentTarget, snapshot: string) {
+    if (paneShowsRunnerStateCorruption(snapshot)) {
+      return new RunnerStateCorruptionError(resolved.sessionName, snapshot);
+    }
+    if (paneShowsRunnerStateContention(snapshot)) {
+      return new RunnerStateContentionError(resolved.sessionName, snapshot);
+    }
+    return new TmuxBootstrapSessionLostError(
+      resolved.sessionName,
+      "runner exited during startup",
+      snapshot,
+    );
+  }
+
+  private async retryAfterStateContention(
+    target: AgentSessionTarget,
+    resolved: ResolvedAgentTarget,
+    remainingFreshRetries: number,
+    startupNotes?: string[],
+  ) {
+    if (remainingFreshRetries <= 0) {
+      return null;
+    }
+
+    const attempt = resolved.runner.startupRetryCount - remainingFreshRetries + 1;
+    const backoffMs =
+      resolved.runner.startupRetryDelayMs * attempt + Math.floor(Math.random() * 250);
+    console.log(
+      `clisbot runner state database contention for ${resolved.sessionName}; retrying startup with the preserved session id in ${backoffMs}ms`,
+    );
+    await this.killRunnerAndPreserveSessionId(resolved);
+    if (backoffMs > 0) {
+      await sleep(backoffMs);
+    }
+    return this.ensureSessionReady(target, {
+      remainingFreshRetries: remainingFreshRetries - 1,
+      startupNotes,
     });
   }
 
@@ -314,16 +390,30 @@ export class RunnerService {
     error: unknown,
     remainingFreshRetries: number,
     allowFreshResumeFallback: boolean,
+    startupNotes?: string[],
   ) {
+    if (error instanceof RunnerStateContentionError) {
+      return this.retryAfterStateContention(
+        target,
+        resolved,
+        remainingFreshRetries,
+        startupNotes,
+      );
+    }
+    if (error instanceof RunnerStateCorruptionError) {
+      return null;
+    }
+
     if (allowFreshResumeFallback) {
-      const resumedFresh = await this.retryFreshStartAfterStoredResumeFailure(
+      const fallback = await this.fallBackToFreshAfterRejectedResume(
         target,
         resolved,
         error,
         remainingFreshRetries,
+        startupNotes,
       );
-      if (resumedFresh) {
-        return resumedFresh;
+      if (fallback) {
+        return fallback;
       }
     }
 
@@ -335,28 +425,46 @@ export class RunnerService {
       target,
       resolved,
       remainingFreshRetries,
+      startupNotes,
     );
   }
 
-  private async retryFreshStartAfterStoredResumeFailure(
-    target: AgentSessionTarget,
+  // Decides whether a startup failure means the stored session id can no
+  // longer be resumed. "rejected" is definitive runner output; "exit" means
+  // the resume launch kept dying after the preserved-session-id retries.
+  private async classifyRejectedResumeStartup(
     resolved: ResolvedAgentTarget,
     error: unknown,
     remainingFreshRetries: number,
-  ) {
-    if (!isRecoverableStartupSessionLoss(error)) {
+  ): Promise<{ storedSessionId: string; reason: "rejected" | "exit" } | null> {
+    const storedSessionId =
+      (await this.sessionMapping.get(resolved.sessionKey))?.sessionId?.trim() || "";
+    if (!storedSessionId) {
       return null;
     }
 
+    if (error instanceof RunnerResumeRejectedError) {
+      return { storedSessionId, reason: "rejected" };
+    }
+    if (
+      error instanceof TmuxBootstrapSessionLostError &&
+      paneShowsResumeRejected(error.lastSnapshot)
+    ) {
+      return { storedSessionId, reason: "rejected" };
+    }
+
+    if (!isRecoverableStartupSessionLoss(error)) {
+      return null;
+    }
     if (
       resolved.runner.sessionId.resume.mode !== "command" ||
       resolved.runner.sessionId.create.mode !== "runner"
     ) {
       return null;
     }
-
-    const existing = await this.sessionMapping.get(resolved.sessionKey);
-    if (!existing?.sessionId) {
+    if (remainingFreshRetries > 0) {
+      // Let the preserved-session-id resume retries run first; fall back to a
+      // fresh conversation only when resume keeps dying.
       return null;
     }
 
@@ -364,25 +472,68 @@ export class RunnerService {
     if (!exitRecord || exitRecord.exitCode === 0) {
       return null;
     }
+    return { storedSessionId, reason: "exit" };
+  }
+
+  private async fallBackToFreshAfterRejectedResume(
+    target: AgentSessionTarget,
+    resolved: ResolvedAgentTarget,
+    error: unknown,
+    remainingFreshRetries: number,
+    startupNotes?: string[],
+  ) {
+    const rejection = await this.classifyRejectedResumeStartup(
+      resolved,
+      error,
+      remainingFreshRetries,
+    );
+    if (!rejection) {
+      return null;
+    }
 
     console.log(
-      `clisbot preserved stored sessionId after failed runner resume startup ${resolved.sessionName}`,
+      `clisbot resume rejected for ${resolved.sessionName}; opening a fresh runner conversation`,
+      {
+        storedSessionId: rejection.storedSessionId,
+        reason: rejection.reason,
+      },
     );
-    await this.sessionMapping.touch(resolved, {
+    await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
+    await this.sessionMapping.clearActive(resolved, {
       runnerCommand: resolved.runner.command,
     });
-    throw new Error(PRESERVED_SESSION_ID_RETRY_MESSAGE);
+    startupNotes?.push(
+      buildResumeRejectedFreshStartNote({
+        storedSessionId: rejection.storedSessionId,
+        reason: rejection.reason,
+        resumeCommand: this.renderRunnerResumeCommand(resolved, rejection.storedSessionId),
+      }),
+    );
+    return this.ensureSessionReady(target, {
+      remainingFreshRetries: resolved.runner.startupRetryCount,
+      startupNotes,
+    });
+  }
+
+  private renderRunnerResumeCommand(resolved: ResolvedAgentTarget, sessionId: string) {
+    if (resolved.runner.sessionId.resume.mode !== "command") {
+      return undefined;
+    }
+    const launch = this.buildRunnerArgs(resolved, { sessionId, resume: true });
+    return [launch.command, ...launch.args].join(" ");
   }
 
   private async retryAfterStartupTimeout(
     target: AgentSessionTarget,
     resolved: ResolvedAgentTarget,
     remainingFreshRetries: number,
+    startupNotes?: string[],
   ) {
     return this.retryRunnerRestartPreservingSessionId(
       target,
       resolved,
       remainingFreshRetries,
+      startupNotes,
     );
   }
 
@@ -502,11 +653,7 @@ export class RunnerService {
 
   async ensureSessionReady(
     target: AgentSessionTarget,
-    options: {
-      allowFreshRetry?: boolean;
-      remainingFreshRetries?: number;
-      timingContext?: LatencyDebugContext;
-    } = {},
+    options: EnsureSessionReadyOptions = {},
   ): Promise<ResolvedAgentTarget> {
     await ensureClisbotWrapper();
     const resolved = this.resolveTarget(target);
@@ -525,21 +672,28 @@ export class RunnerService {
     const serverRunning = await this.tmux.isServerRunning();
 
     if (serverRunning && (await this.tmux.hasSession(resolved.sessionName))) {
-      logLatencyDebug("ensure-session-ready-existing-session", timingContext, {
-        hasStoredSessionId: Boolean(preparedMapping.storedSessionId),
-      });
-      try {
-        await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-        await this.acceptStartupContinuePromptIfPresent(resolved);
-        await this.syncActiveSessionMappingForResolvedTarget(resolved);
-      } catch (error) {
-        throw await this.mapSessionError(error, resolved.sessionName, "during startup");
+      const lingeringExitSnapshot = await this.captureSessionSnapshot(resolved).catch(() => "");
+      if (paneShowsRunnerExitSentinel(lingeringExitSnapshot)) {
+        // A failed runner is lingering for post-mortem reads only; never
+        // reuse it or submit into it. Clear it and start normally below.
+        await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
+      } else {
+        logLatencyDebug("ensure-session-ready-existing-session", timingContext, {
+          hasStoredSessionId: Boolean(preparedMapping.storedSessionId),
+        });
+        try {
+          await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
+          await this.acceptStartupContinuePromptIfPresent(resolved);
+          await this.syncActiveSessionMappingForResolvedTarget(resolved);
+        } catch (error) {
+          throw await this.mapSessionError(error, resolved.sessionName, "during startup");
+        }
+        logLatencyDebug("ensure-session-ready-complete", timingContext, {
+          startupDelayMs: 0,
+          reusedSession: true,
+        });
+        return resolved;
       }
-      logLatencyDebug("ensure-session-ready-complete", timingContext, {
-        startupDelayMs: 0,
-        reusedSession: true,
-      });
-      return resolved;
     }
 
     if (!resolved.session.createIfMissing) {
@@ -589,7 +743,28 @@ export class RunnerService {
         trustWorkspace: resolved.runner.trustWorkspace,
         readyPattern: resolved.runner.startupReadyPattern,
         blockers: resolved.runner.startupBlockers,
+        resumeRejection:
+          resumingExistingSession && storedOrExplicitSessionId
+            ? { detect: paneShowsResumeRejected }
+            : undefined,
+        exitDetection: { detect: paneShowsRunnerExitSentinel },
       });
+      if (bootstrapResult.status === "exited") {
+        await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
+        throw this.classifyRunnerStartupExit(resolved, bootstrapResult.snapshot);
+      }
+      if (bootstrapResult.status === "resume-rejected") {
+        // Kill the dead resume pane so a later prompt can never be submitted
+        // into the runner's session picker. Caught below: either falls back to
+        // a fresh conversation with a user-visible note, or propagates
+        // truthfully to recovery callers.
+        await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
+        throw new RunnerResumeRejectedError(
+          resolved.sessionName,
+          storedOrExplicitSessionId,
+          bootstrapResult.snapshot,
+        );
+      }
       if (bootstrapResult.status === "blocked") {
         await this.abortUnreadySession(
           resolved,
@@ -603,13 +778,14 @@ export class RunnerService {
           target,
           resolved,
           remainingFreshRetries,
+          options.startupNotes,
         );
         if (retried) {
           return retried;
         }
         await this.abortUnreadySession(
           resolved,
-          `Runner session "${resolved.sessionName}" did not reach the configured ready state within ${resolved.runner.startupDelayMs}ms.`,
+          `Runner session "${resolved.sessionName}" did not reach the configured ready state within ${resolved.runner.startupDelayMs}ms, so your prompt was not submitted. Verify that \`${resolved.runner.command}\` starts cleanly in the workspace terminal, then resend. Inspect ${renderCliCommand("runner inspect --latest --lines 120", { inline: true })} and ${renderCliCommand("logs", { inline: true })} if it keeps happening.`,
           bootstrapResult.snapshot,
         );
       }
@@ -625,6 +801,7 @@ export class RunnerService {
         error,
         remainingFreshRetries,
         options.allowFreshRetry !== false,
+        options.startupNotes,
       );
       if (retried) {
         return retried;
@@ -738,15 +915,18 @@ export class RunnerService {
       timingContext?: LatencyDebugContext;
     } = {},
   ) {
+    const startupNotes: string[] = [];
     let resolved = await this.ensureSessionReady(target, {
       allowFreshRetry: options.allowFreshRetryBeforePrompt,
       timingContext: options.timingContext,
+      startupNotes,
     });
 
     try {
       return {
         resolved,
         initialSnapshot: await this.captureSessionSnapshot(resolved),
+        startupNotes,
       };
     } catch (error) {
       if (
@@ -765,6 +945,7 @@ export class RunnerService {
         target,
         resolved,
         resolved.runner.startupRetryCount,
+        startupNotes,
       );
       if (!retried) {
         throw await this.mapSessionError(
@@ -779,8 +960,51 @@ export class RunnerService {
       return {
         resolved,
         initialSnapshot: await this.captureSessionSnapshot(resolved),
+        startupNotes,
       };
     }
+  }
+
+  // Post-run capture point: the pane is idle after a run settles, so this is
+  // the safest moment to retry a missed session id capture and make the
+  // conversation resumable. Deliberately bypasses the in-run capture cooldown.
+  async recaptureSessionIdAfterRun(target: AgentSessionTarget) {
+    const resolved = this.resolveTarget(target);
+    if (resolved.runner.sessionId.capture.mode !== "status-command") {
+      return null;
+    }
+    const existing = await this.sessionMapping.get(resolved.sessionKey);
+    if (existing?.sessionId) {
+      return existing.sessionId;
+    }
+    if (!(await this.tmux.hasSession(resolved.sessionName))) {
+      return null;
+    }
+
+    let sessionId: string | null = null;
+    try {
+      sessionId = await this.captureSessionIdFromRunner(resolved);
+    } catch (error) {
+      console.warn(
+        `clisbot post-run session id recapture failed for ${resolved.sessionName}`,
+        error,
+      );
+      this.deferSessionIdCapture(resolved.sessionKey);
+      return null;
+    }
+    if (!sessionId) {
+      this.deferSessionIdCapture(resolved.sessionKey);
+      return null;
+    }
+
+    const recorded = await this.recordActiveSessionIdBestEffort(resolved, sessionId);
+    if (!recorded) {
+      return null;
+    }
+    console.log(
+      `clisbot captured durable session id after run completion for ${resolved.sessionName}`,
+    );
+    return sessionId;
   }
 
   canRecoverMidRun(error: unknown) {
@@ -959,7 +1183,9 @@ export class RunnerService {
   }
 
   private async killRunnerAndPreserveSessionId(resolved: ResolvedAgentTarget) {
-    await this.tmux.killSession(resolved.sessionName);
+    // The session may already be gone (runner exited, server lost); a missing
+    // target must not abort the preserved-session-id retry itself.
+    await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
     await this.sessionMapping.touch(resolved, {
       runnerCommand: resolved.runner.command,
     });

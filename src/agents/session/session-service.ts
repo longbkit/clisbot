@@ -124,8 +124,10 @@ function isRetryableObserverDeliveryError(error: unknown) {
 
 function buildMissingSessionIdStartupWarning() {
   return [
-    "Runner session started, but clisbot could not capture a durable session id yet.",
-    "This session is running, but it is not resumable until a session id is captured and persisted.",
+    "Runner session started, but clisbot could not capture a durable session id yet,",
+    "so this conversation is not resumable if the runner restarts.",
+    "clisbot keeps retrying automatically and will persist the id once the runner reports it; no action is needed.",
+    "If this warning keeps appearing, the runner status output may have changed; check the pane with `clisbot watch --latest`.",
   ].join(" ");
 }
 
@@ -261,7 +263,7 @@ export class SessionService {
     });
     try {
       await this.sessionState.markPromptAdmitted(provisionalResolved);
-      const { resolved, initialSnapshot } = await this.runnerSessions.ensureRunnerReady(
+      const { resolved, initialSnapshot, startupNotes } = await this.runnerSessions.ensureRunnerReady(
         target,
         {
           ...options,
@@ -296,6 +298,17 @@ export class SessionService {
         state: "running",
         startedAt,
       });
+      for (const startupNote of startupNotes ?? []) {
+        await this.notifyRunObservers(run, this.createRunUpdate({
+          resolved,
+          status: "running",
+          snapshot: "",
+          fullSnapshot: initialSnapshot,
+          initialSnapshot,
+          note: startupNote,
+          forceVisible: true,
+        }));
+      }
       if (!run.sessionId) {
         await this.notifyRunObservers(run, this.createRunUpdate({
           resolved,
@@ -641,6 +654,21 @@ export class SessionService {
       return;
     }
 
+    if (!run.sessionId) {
+      // The pane is idle once the run settles, so retry the missed session id
+      // capture here to make the conversation resumable after all.
+      try {
+        run.sessionId =
+          (await this.runnerSessions.recaptureSessionIdAfterRun({
+            agentId: run.resolved.agentId,
+            sessionKey: run.resolved.sessionKey,
+          })) ?? undefined;
+      } catch {
+        // Best-effort only; the missing-session-id warning already told the
+        // user this conversation is not resumable yet.
+      }
+    }
+
     await this.sessionState.setSessionRuntime(run.resolved, {
       state: "idle",
     });
@@ -830,11 +858,18 @@ export class SessionService {
         return true;
       }
       if (await this.requiresManualNewAfterFailedResume(currentRun)) {
-        await this.notifyRecoveryStep(currentRun, buildRunRecoveryNote("resume-failed"));
+        await this.notifyRecoveryStep(
+          currentRun,
+          buildRunRecoveryNote("resume-failed", { storedSessionId: currentRun.sessionId }),
+        );
         await this.failActiveRun(
           sessionKey,
           currentRun.runId,
-          new Error(buildRunRecoveryNote("manual-new-required")),
+          new Error(
+            buildRunRecoveryNote("manual-new-required", {
+              storedSessionId: currentRun.sessionId,
+            }),
+          ),
         );
         return true;
       }

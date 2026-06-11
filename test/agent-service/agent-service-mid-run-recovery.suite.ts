@@ -13,7 +13,10 @@ import { renderDefaultConfigTemplate } from "../../src/config/core/template.ts";
 import { AgentSessionState } from "../../src/agents/session/session-state.ts";
 import { SessionStore } from "../../src/agents/session/session-store.ts";
 import { RunnerService } from "../../src/agents/runtime/runner-service.ts";
-import { MID_RUN_RECOVERY_CONTINUE_PROMPT } from "../../src/agents/session/run-recovery.ts";
+import {
+  buildRunRecoveryNote,
+  MID_RUN_RECOVERY_CONTINUE_PROMPT,
+} from "../../src/agents/session/run-recovery.ts";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 import { recordSurfaceDirectoryIdentity } from "../../src/channels/surface/surface-directory.ts";
 import {
@@ -422,7 +425,9 @@ describe("AgentService mid-run recovery", () => {
 
       expect(receivedError).toBeInstanceOf(Error);
       expect((receivedError as Error).message).toBe(
-        "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to trigger a new runner conversation, then resend the prompt.",
+        buildRunRecoveryNote("manual-new-required", {
+          storedSessionId: RUNNER_GENERATED_ID,
+        }),
       );
       expect(fakeTmux.sessionCommands[1]).toContain(`resume ${RUNNER_GENERATED_ID}`);
       expect(fakeTmux.sessionCommands).toHaveLength(2);

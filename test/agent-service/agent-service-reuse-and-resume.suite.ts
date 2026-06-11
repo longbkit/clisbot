@@ -27,7 +27,7 @@ import {
 } from "./agent-service-support.ts";
 
 describe("AgentService reuse and resume", () => {
-  test("preserves the stored session id instead of falling back fresh after stale resume startup failure", async () => {
+  test("falls back to a fresh conversation and still runs the prompt when stale resume keeps dying at startup", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
     try {
@@ -99,21 +99,399 @@ describe("AgentService reuse and resume", () => {
         tmux: fakeTmux as unknown as TmuxClient,
       });
 
+      const notes: string[] = [];
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: (update) => {
+          if (update.note && update.forceVisible) {
+            notes.push(update.note);
+          }
+        },
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+      expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
+      expect(fakeTmux.sessionCommands[1]).toContain(`resume ${staleResumeSessionId}`);
+      expect(fakeTmux.sessionCommands).toHaveLength(3);
+      expect(fakeTmux.sessionCommands[2]).not.toContain("resume");
+      const fallbackNote = notes.find((note) =>
+        note.includes("could not be resumed"),
+      );
+      expect(fallbackNote).toBeDefined();
+      expect(fallbackNote).toContain(staleResumeSessionId);
+      expect(fallbackNote).toContain("fresh conversation");
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test("opens a fresh conversation immediately when the runner reports the resumed session id no longer exists", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c2:thread:resume-rejected-pane",
+      };
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            startupDelayMs: 3000,
+            startupRetryCount: 1,
+            startupReadyPattern: "(?:^|\\s)›\\s",
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+      const staleResumeSessionId = "44444444-4444-4444-4444-444444444444";
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              agentId: target.agentId,
+              sessionKey: target.sessionKey,
+              sessionId: staleResumeSessionId,
+              workspacePath: join(tempDir, "default"),
+              runnerCommand: "fake-cli",
+              runtime: { state: "idle" },
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.markResumeRejectedPaneOnResume(staleResumeSessionId);
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      const notes: string[] = [];
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: (update) => {
+          if (update.note && update.forceVisible) {
+            notes.push(update.note);
+          }
+        },
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+      // Definitive rejection skips preserved-session-id retries entirely:
+      // one rejected resume launch, then one fresh launch.
+      expect(fakeTmux.sessionCommands).toHaveLength(2);
+      expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
+      expect(fakeTmux.sessionCommands[1]).not.toContain("resume");
+      const fallbackNote = notes.find((note) => note.includes("no longer exists"));
+      expect(fallbackNote).toBeDefined();
+      expect(fallbackNote).toContain(staleResumeSessionId);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, { timeout: 12_000 });
+
+  test("retries with the preserved session id when the runner state database is locked, then succeeds", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c2:thread:state-db-locked",
+      };
+      const staleResumeSessionId = "55555555-5555-5555-5555-555555555555";
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            startupDelayMs: 50,
+            startupRetryCount: 2,
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              agentId: target.agentId,
+              sessionKey: target.sessionKey,
+              sessionId: staleResumeSessionId,
+              workspacePath: join(tempDir, "default"),
+              runnerCommand: "fake-cli",
+              runtime: { state: "idle" },
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.markStartupExitPaneOnResume(
+        staleResumeSessionId,
+        "codex: database is locked",
+        1,
+      );
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${staleResumeSessionId}`);
+      // Contention is transient: the stored session id is preserved and the
+      // resume is retried, never replaced with a fresh conversation.
+      expect(readSessionId(storePath, target.sessionKey)).toBe(staleResumeSessionId);
+      expect(fakeTmux.sessionCommands).toHaveLength(2);
+      expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
+      expect(fakeTmux.sessionCommands[1]).toContain(`resume ${staleResumeSessionId}`);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, { timeout: 12_000 });
+
+  test("stops with a preserved-session contention error when the state database stays locked", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c2:thread:state-db-locked-hard",
+      };
+      const staleResumeSessionId = "66666666-6666-6666-6666-666666666666";
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            startupDelayMs: 50,
+            startupRetryCount: 1,
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              agentId: target.agentId,
+              sessionKey: target.sessionKey,
+              sessionId: staleResumeSessionId,
+              workspacePath: join(tempDir, "default"),
+              runnerCommand: "fake-cli",
+              runtime: { state: "idle" },
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.markStartupExitPaneOnResume(
+        staleResumeSessionId,
+        "codex: database is locked",
+      );
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
       const receivedError = await service.enqueuePrompt(target, "ping", {
         onUpdate: () => undefined,
       }).result.catch((error) => error);
 
       expect(receivedError).toBeInstanceOf(Error);
-      expect((receivedError as Error).message).toBe(
-        "The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use `/new` if you want to trigger a new runner conversation, then resend the prompt.",
-      );
+      expect((receivedError as Error).message).toContain("state database is locked");
+      expect((receivedError as Error).message).toContain("Resend your prompt");
       expect(readSessionId(storePath, target.sessionKey)).toBe(staleResumeSessionId);
-      expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
+      expect(fakeTmux.sessionCommands).toHaveLength(2);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, { timeout: 12_000 });
+
+  test("fails fast with operator guidance when the runner state database is corrupted", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c2:thread:state-db-corrupt",
+      };
+      const staleResumeSessionId = "77777777-7777-7777-7777-777777777777";
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            startupDelayMs: 50,
+            startupRetryCount: 2,
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+      await Bun.write(
+        storePath,
+        JSON.stringify(
+          {
+            [target.sessionKey]: {
+              agentId: target.agentId,
+              sessionKey: target.sessionKey,
+              sessionId: staleResumeSessionId,
+              workspacePath: join(tempDir, "default"),
+              runnerCommand: "fake-cli",
+              runtime: { state: "idle" },
+              updatedAt: Date.now(),
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.markStartupExitPaneOnResume(
+        staleResumeSessionId,
+        'state runtime: corrupt state_5.sqlite (SQLite "file is not a database")',
+      );
+      const loaded = await loadConfig(configPath);
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      const receivedError = await service.enqueuePrompt(target, "ping", {
+        onUpdate: () => undefined,
+      }).result.catch((error) => error);
+
+      expect(receivedError).toBeInstanceOf(Error);
+      expect((receivedError as Error).message).toContain("corrupted or version-mismatched");
+      expect((receivedError as Error).message).toContain("Retrying will not help");
+      expect(readSessionId(storePath, target.sessionKey)).toBe(staleResumeSessionId);
+      // Corruption is permanent: no retry launches happen.
       expect(fakeTmux.sessionCommands).toHaveLength(1);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
-  });
+  }, { timeout: 12_000 });
 
   test("reuses an existing tmux session without forcing another server-defaults preflight", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));

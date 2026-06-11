@@ -161,6 +161,78 @@ describe("AgentService startup capture retries", () => {
     }
   });
 
+  test("captures the durable session id after the run completes when startup capture missed", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
+
+    try {
+      const socketPath = join(tempDir, "clisbot.sock");
+      const configPath = join(tempDir, "clisbot.json");
+      const storePath = join(tempDir, "sessions.json");
+      await Bun.write(
+        configPath,
+        JSON.stringify(
+          buildConfig({
+            socketPath,
+            storePath,
+            workspaceTemplate: join(tempDir, "{agentId}"),
+            runnerCommand: "fake-cli",
+            runnerArgs: ["-C", "{workspace}"],
+            sessionId: {
+              create: {
+                mode: "runner",
+                args: [],
+              },
+              capture: {
+                mode: "status-command",
+                statusCommand: "/status",
+                pattern:
+                  "session id:\\s*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+                timeoutMs: 100,
+                pollIntervalMs: 1,
+              },
+              resume: {
+                mode: "command",
+                args: ["resume", "{sessionId}", "-C", "{workspace}"],
+              },
+            },
+          }),
+          null,
+          2,
+        ),
+      );
+
+      const loaded = await loadConfig(configPath);
+      const target = {
+        agentId: "default",
+        sessionKey: "agent:default:slack:channel:c1:thread:post-run-capture",
+      };
+      const resolved = resolveAgentTarget(loaded, target);
+      const fakeTmux = new FakeTmuxClient();
+      fakeTmux.setStatusResponseModeOnNextSession("no-session-id");
+      const service = new AgentService(loaded, {
+        tmux: fakeTmux as unknown as TmuxClient,
+      });
+
+      let sawMissingSessionIdWarning = false;
+      const run = await service.enqueuePrompt(target, "ping", {
+        onUpdate: (update) => {
+          if (update.note?.includes("could not capture a durable session id")) {
+            sawMissingSessionIdWarning = true;
+            // The runner only starts reporting its session id after startup
+            // capture already gave up; the post-run recapture must pick it up.
+            fakeTmux.setStatusResponseMode(resolved.sessionName, "session-id");
+          }
+        },
+      }).result;
+
+      expect(run.snapshot).toContain(`PONG ${RUNNER_GENERATED_ID}`);
+      expect(sawMissingSessionIdWarning).toBe(true);
+      expect(readSessionId(storePath, target.sessionKey)).toBe(RUNNER_GENERATED_ID);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, { timeout: 12_000 });
+
   test("retries in one fresh session when startup status-command submit is not confirmed", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "clisbot-agent-service-"));
 
@@ -211,7 +283,7 @@ describe("AgentService startup capture retries", () => {
       };
       const resolved = resolveAgentTarget(loaded, target);
       const fakeTmux = new FakeTmuxClient();
-      fakeTmux.ignoreNextEnters(resolved.sessionName, 2);
+      fakeTmux.ignoreNextEnters(resolved.sessionName, 3);
       const service = new AgentService(loaded, {
         tmux: fakeTmux as unknown as TmuxClient,
       });

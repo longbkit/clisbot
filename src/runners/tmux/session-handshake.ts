@@ -22,9 +22,12 @@ const PASTE_CONFIRM_MAX_ATTEMPTS = 3;
 const PASTE_CAPTURE_REVALIDATE_POLL_INTERVAL_MS = 40;
 const PASTE_CAPTURE_REVALIDATE_MAX_WAIT_MS = 160;
 const SUBMIT_CONFIRM_POLL_INTERVAL_MS = 40;
-const SUBMIT_CONFIRM_MAX_WAIT_MS = 160;
-const SUBMIT_SNAPSHOT_CONFIRM_POLL_INTERVAL_MS = 40;
-const SUBMIT_SNAPSHOT_CONFIRM_MAX_WAIT_MS = 320;
+// Submit settling exits as soon as the composer truthfully drains, so a wider
+// window only slows down the genuine-failure path. The previous 160ms/320ms
+// windows produced false TmuxSubmitUnconfirmedError under host load or slow
+// CLI redraws even though Enter had truthfully submitted.
+const SUBMIT_CONFIRM_MAX_WAIT_MS = 600;
+const SUBMIT_ENTER_MAX_ATTEMPTS = 3;
 const POST_STATUS_SETTLE_POLL_INTERVAL_MS = 40;
 const POST_STATUS_SETTLE_QUIET_WINDOW_MS = 80;
 const POST_STATUS_SETTLE_MAX_WAIT_MS = 240;
@@ -36,6 +39,7 @@ export class TmuxBootstrapSessionLostError extends Error {
   constructor(
     readonly sessionName: string,
     detail: string,
+    readonly lastSnapshot = "",
   ) {
     super(`tmux bootstrap lost session "${sessionName}": ${detail}`);
     this.name = "TmuxBootstrapSessionLostError";
@@ -54,7 +58,11 @@ export class TmuxPasteUnconfirmedError extends Error {
 export class TmuxSubmitUnconfirmedError extends Error {
   constructor() {
     super(
-      "tmux submit was not confirmed after Enter. The pane state did not change, so clisbot did not treat the prompt as truthfully submitted.",
+      [
+        "tmux submit was not confirmed after Enter: the pane did not change, so clisbot does not treat the prompt as truthfully submitted.",
+        "The runner may be busy, redrawing slowly, or showing a blocking prompt.",
+        "Check the live pane with `clisbot watch --latest --lines 100`; if your text is sitting unsubmitted there, send /nudge, otherwise resend the message.",
+      ].join(" "),
     );
     this.name = "TmuxSubmitUnconfirmedError";
   }
@@ -69,6 +77,14 @@ export type TmuxSessionBootstrapResult =
       status: "blocked";
       snapshot: string;
       message: string;
+    }
+  | {
+      status: "resume-rejected";
+      snapshot: string;
+    }
+  | {
+      status: "exited";
+      snapshot: string;
     }
   | {
       status: "timeout";
@@ -124,37 +140,144 @@ export async function submitTmuxSessionInput(params: {
     await params.tmux.capturePane(params.sessionName, captureLines),
   );
 
-  await params.tmux.sendKey(params.sessionName, "Enter");
-  const submitted = await waitForPaneSubmitConfirmation({
-    tmux: params.tmux,
-    sessionName: params.sessionName,
-    baseline: preSubmitState,
-    baselineSnapshot: preSubmitSnapshot,
-    captureLines,
-  });
-  if (submitted.confirmed) {
-    return { submittedSnapshot: preSubmitSnapshot };
-  }
-
-  logLatencyDebug("tmux-submit-enter-retry", params.timingContext, {
-    sessionName: params.sessionName,
-  });
-  await params.tmux.sendKey(params.sessionName, "Enter");
-  const retrySubmitted = await waitForPaneSubmitConfirmation({
-    tmux: params.tmux,
-    sessionName: params.sessionName,
-    baseline: preSubmitState,
-    baselineSnapshot: preSubmitSnapshot,
-    captureLines,
-  });
-  if (retrySubmitted.confirmed) {
-    return { submittedSnapshot: preSubmitSnapshot };
+  for (let attempt = 1; attempt <= SUBMIT_ENTER_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 1) {
+      logLatencyDebug("tmux-submit-enter-retry", params.timingContext, {
+        sessionName: params.sessionName,
+        attempt,
+      });
+    }
+    await params.tmux.sendKey(params.sessionName, "Enter");
+    const outcome = await waitForSubmitSettled({
+      tmux: params.tmux,
+      sessionName: params.sessionName,
+      baseline: preSubmitState,
+      baselineSnapshot: preSubmitSnapshot,
+      text: params.text,
+      captureLines,
+    });
+    if (outcome === "submitted") {
+      return { submittedSnapshot: preSubmitSnapshot };
+    }
+    // "pending-input": the pane changed but the prompt text is still sitting
+    // in the CLI composer, meaning Enter landed as a newline or was swallowed
+    // during a redraw. "unchanged": Enter had no visible effect at all. Both
+    // are healed the way a manual /nudge would heal them: send Enter again.
   }
 
   logLatencyDebug("tmux-submit-unconfirmed", params.timingContext, {
     sessionName: params.sessionName,
   });
   throw new TmuxSubmitUnconfirmedError();
+}
+
+type SubmitSettleOutcome = "submitted" | "pending-input" | "unchanged";
+
+// The submit gate is only allowed to report "submitted" when the pane both
+// changed and no longer shows the prompt text waiting in the composer. A bare
+// "pane changed" signal is not submission truth: Enter can land as a newline
+// inside the composer, which changes the pane while the prompt stays unsent.
+async function waitForSubmitSettled(params: {
+  tmux: TmuxClient;
+  sessionName: string;
+  baseline: TmuxPaneState;
+  baselineSnapshot: string;
+  text: string;
+  captureLines: number;
+}): Promise<SubmitSettleOutcome> {
+  const deadline = Date.now() + SUBMIT_CONFIRM_MAX_WAIT_MS;
+  let sawChange = false;
+
+  while (true) {
+    let changed = sawChange;
+    if (!changed) {
+      const state = await params.tmux.getPaneState(params.sessionName);
+      changed = hasPaneStateChanged(params.baseline, state);
+    }
+    const snapshot = normalizePaneText(
+      await params.tmux.capturePane(params.sessionName, params.captureLines),
+    );
+    if (!changed) {
+      changed = snapshot !== params.baselineSnapshot;
+    }
+    if (changed) {
+      sawChange = true;
+      if (!paneShowsPendingComposerText(snapshot, params.text)) {
+        return "submitted";
+      }
+    }
+
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      return sawChange ? "pending-input" : "unchanged";
+    }
+    await sleep(Math.min(SUBMIT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
+  }
+}
+
+const COMPOSER_HINT_LINE_PATTERN =
+  /^\?\s+for shortcuts|^Type your message or @path\/to\/file|^\d+%\s+context left|^press enter to send/i;
+const COMPOSER_RUNNING_INDICATOR_PATTERN = /esc to interrupt/i;
+const COMPOSER_BORDER_LINE_PATTERN = /^[─━═╌╍╭╮╰╯┌┐└┘+|\-_=\s]+$/;
+const COMPOSER_TAIL_SCAN_LINES = 12;
+
+// Conservative composer check: it only claims "pending" when the last
+// contentful pane line is exactly the final prompt line, optionally behind a
+// composer prompt character or inside a composer box border. False negatives
+// fall back to the plain pane-change signal; false positives only cost one
+// extra Enter, which is a no-op on an empty composer.
+export function paneShowsPendingComposerText(snapshot: string, text: string) {
+  const lastPromptLine = collapseWhitespace(lastNonEmptyLine(text));
+  if (!lastPromptLine) {
+    return false;
+  }
+  const lines = trimBlankLines(splitNormalizedLines(snapshot));
+  for (
+    let index = lines.length - 1;
+    index >= Math.max(0, lines.length - COMPOSER_TAIL_SCAN_LINES);
+    index -= 1
+  ) {
+    const line = (lines[index] ?? "").trim();
+    if (!line || COMPOSER_HINT_LINE_PATTERN.test(line) || isPromptMetadataLine(line)) {
+      continue;
+    }
+    if (COMPOSER_RUNNING_INDICATOR_PATTERN.test(line)) {
+      // The runner is already executing; nothing is pending in the composer.
+      return false;
+    }
+    if (COMPOSER_BORDER_LINE_PATTERN.test(line)) {
+      // Composer box border; keep walking up to the composer content line.
+      continue;
+    }
+    const stripped = stripComposerChrome(line);
+    if (!stripped) {
+      // A bare prompt character means the composer is empty: submitted.
+      return false;
+    }
+    return stripped === lastPromptLine;
+  }
+  return false;
+}
+
+function stripComposerChrome(line: string) {
+  return collapseWhitespace(
+    line
+      .replace(/^[│┃]\s*/, "")
+      .replace(/\s*[│┃]$/, "")
+      .replace(/^[›❯>]+\s*/, ""),
+  );
+}
+
+function lastNonEmptyLine(text: string) {
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines[lines.length - 1] ?? "";
+}
+
+function collapseWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 export async function captureTmuxSessionIdentity(params: {
@@ -358,6 +481,12 @@ export async function waitForTmuxSessionBootstrap(params: {
     pattern: string;
     message: string;
   }>;
+  resumeRejection?: {
+    detect: (snapshot: string) => boolean;
+  };
+  exitDetection?: {
+    detect: (snapshot: string) => boolean;
+  };
 }): Promise<TmuxSessionBootstrapResult> {
   const deadline = Date.now() + Math.max(params.startupDelayMs, SESSION_BOOTSTRAP_POLL_INTERVAL_MS);
   const readyRegex = params.readyPattern ? new RegExp(params.readyPattern, "i") : null;
@@ -379,7 +508,7 @@ export async function waitForTmuxSessionBootstrap(params: {
         continue;
       }
       if (isBootstrapSessionGoneError(error)) {
-        throw buildBootstrapSessionLostError(params.sessionName, error);
+        throw buildBootstrapSessionLostError(params.sessionName, error, lastSnapshot);
       }
       throw error;
     }
@@ -396,6 +525,18 @@ export async function waitForTmuxSessionBootstrap(params: {
         });
         await sleep(SESSION_BOOTSTRAP_POLL_INTERVAL_MS);
         continue;
+      }
+      if (params.resumeRejection?.detect(snapshot)) {
+        return {
+          status: "resume-rejected",
+          snapshot,
+        };
+      }
+      if (params.exitDetection?.detect(snapshot)) {
+        return {
+          status: "exited",
+          snapshot,
+        };
       }
       for (const blocker of blockerPatterns) {
         if (blocker.regex.test(snapshot)) {
@@ -460,81 +601,6 @@ async function acceptStartupContinuePrompt(params: {
     }
 
     return;
-  }
-}
-
-async function waitForPaneSubmitConfirmation(params: {
-  tmux: TmuxClient;
-  sessionName: string;
-  baseline: TmuxPaneState;
-  baselineSnapshot: string;
-  captureLines: number;
-}) {
-  const deadline = Date.now() + SUBMIT_CONFIRM_MAX_WAIT_MS;
-  while (true) {
-    const state = await params.tmux.getPaneState(params.sessionName);
-    if (hasPaneStateChanged(params.baseline, state)) {
-      return {
-        confirmed: true,
-        snapshot: normalizePaneText(
-          await params.tmux.capturePane(params.sessionName, params.captureLines),
-        ),
-      };
-    }
-
-    const snapshotChange = await waitForPaneSubmitSnapshotConfirmation({
-      tmux: params.tmux,
-      sessionName: params.sessionName,
-      baselineSnapshot: params.baselineSnapshot,
-      captureLines: params.captureLines,
-      maxWaitMs: Math.min(
-        SUBMIT_SNAPSHOT_CONFIRM_MAX_WAIT_MS,
-        Math.max(0, deadline - Date.now()),
-      ),
-    });
-    if (snapshotChange.confirmed) {
-      return snapshotChange;
-    }
-
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) {
-      return {
-        confirmed: false,
-        snapshot: params.baselineSnapshot,
-      };
-    }
-    await sleep(Math.min(SUBMIT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
-  }
-}
-
-async function waitForPaneSubmitSnapshotConfirmation(params: {
-  tmux: TmuxClient;
-  sessionName: string;
-  baselineSnapshot: string;
-  captureLines: number;
-  maxWaitMs: number;
-}) {
-  const deadline = Date.now() + params.maxWaitMs;
-
-  while (true) {
-    const snapshot = normalizePaneText(
-      await params.tmux.capturePane(params.sessionName, params.captureLines),
-    );
-    if (snapshot !== params.baselineSnapshot) {
-      return {
-        confirmed: true,
-        snapshot,
-      };
-    }
-
-    const remainingMs = deadline - Date.now();
-    if (remainingMs <= 0) {
-      return {
-        confirmed: false,
-        snapshot: params.baselineSnapshot,
-      };
-    }
-    await sleep(Math.min(SUBMIT_SNAPSHOT_CONFIRM_POLL_INTERVAL_MS, remainingMs));
   }
 }
 
@@ -741,9 +807,13 @@ function isBootstrapSessionGoneError(error: unknown) {
   );
 }
 
-function buildBootstrapSessionLostError(sessionName: string, error: unknown) {
+function buildBootstrapSessionLostError(
+  sessionName: string,
+  error: unknown,
+  lastSnapshot = "",
+) {
   const message = error instanceof Error ? error.message : String(error);
-  return new TmuxBootstrapSessionLostError(sessionName, message);
+  return new TmuxBootstrapSessionLostError(sessionName, message, lastSnapshot);
 }
 
 function arePaneStatesEqual(left: TmuxPaneState, right: TmuxPaneState) {
