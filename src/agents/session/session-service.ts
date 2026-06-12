@@ -228,7 +228,11 @@ export class SessionService {
     options: { allowFreshRetryBeforePrompt?: boolean } = {},
   ): Promise<AgentExecutionResult> {
     if (this.stopping) {
-      throw new Error("Runtime is stopping and cannot accept a new prompt.");
+      // Keep the "Runtime is stopping" prefix: loop shutdown suppression in
+      // AgentService matches on it.
+      throw new Error(
+        "Runtime is stopping and cannot accept a new prompt. clisbot is most likely restarting (update, config reload, or operator restart); nothing was started. Resend your message in a few seconds. If the bot stays down, check `clisbot status`.",
+      );
     }
 
     const existingActiveRun = this.activeRuns.get(target.sessionKey);
@@ -279,7 +283,9 @@ export class SessionService {
       const run = this.activeRuns.get(provisionalResolved.sessionKey);
       if (!run) {
         if (this.stopping) {
-          throw new Error("Runtime stopped before the active run finished startup.");
+          throw new Error(
+            "Runtime stopped before the active run finished startup. Your prompt was not submitted; resend it once the restart finishes.",
+          );
         }
         throw new Error(`Active run disappeared during startup for ${provisionalResolved.sessionKey}.`);
       }
