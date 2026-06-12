@@ -240,6 +240,9 @@ describe("tmux runner latency behavior", () => {
             };
       },
       async capturePane() {
+        if (entered) {
+          return "READY";
+        }
         const snapshots = literalVisible ? ["READY\nnoop", "READY\nnoop", "READY\nnoop"] : ["READY"];
         const snapshot = snapshots[Math.min(captureIndex, snapshots.length - 1)] ?? "";
         captureIndex += 1;

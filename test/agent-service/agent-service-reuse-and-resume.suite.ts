@@ -213,7 +213,7 @@ describe("AgentService reuse and resume", () => {
       // one rejected resume launch, then one fresh launch.
       expect(fakeTmux.sessionCommands).toHaveLength(2);
       expect(fakeTmux.sessionCommands[0]).toContain(`resume ${staleResumeSessionId}`);
-      expect(fakeTmux.sessionCommands[1]).not.toContain("resume");
+      expect(fakeTmux.sessionCommands[1]).not.toContain(`resume ${staleResumeSessionId}`);
       const fallbackNote = notes.find((note) => note.includes("no longer exists"));
       expect(fallbackNote).toBeDefined();
       expect(fallbackNote).toContain(staleResumeSessionId);

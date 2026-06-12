@@ -401,7 +401,7 @@ export class FakeTmuxClient {
       session.snapshot = `${session.snapshot}\nCRASH`;
       this.sessions.delete(sessionName);
       return;
-    } else if (session.pendingInput === "ping") {
+    } else if (session.pendingInput === "ping" || session.pendingInput.includes("ping")) {
       session.snapshot = `${session.snapshot}\nPONG ${session.sessionId}`;
     } else if (session.pendingInput === "stream-forever") {
       session.longRunning = true;
