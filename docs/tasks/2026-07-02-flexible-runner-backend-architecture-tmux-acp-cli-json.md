@@ -29,9 +29,17 @@ In progress (2026-07-02)
   runtime-shutdown adapter cleanup. Config: `runner.backend: tmux | acp` per
   agent plus `env`. Regression suite drives a scripted raw-ndjson fake ACP
   agent (`test/fixtures/fake-acp-agent.ts`).
-- Remaining before Phase 1 exit: live validation with the real
-  `@agentclientprotocol/codex-acp` adapter on the configured shared test
-  surfaces (operator-gated, high blast radius).
+- Real-adapter smoke passed locally (2026-07-02): `AcpRunnerBackend` against
+  pinned `@agentclientprotocol/codex-acp@1.0.2` completed a real Codex
+  prompt end-to-end (adapter spawn, initialize, `session/new` with a real
+  session id, streamed message-delta and usage events, rendered completion,
+  adapter restart plus `session/load` resume replaying the prior turn with
+  the session id preserved). Auth note: machines using a custom gateway
+  provider in `~/.codex/config.toml` need `runner.env.OPENAI_API_KEY`;
+  ChatGPT-subscription machines use `runner.acp.authMethodId: "chat-gpt"`
+  (interactive browser login if not yet logged in).
+- Remaining before Phase 1 exit: routed chat validation on the configured
+  shared test surfaces (operator-gated, high blast radius).
 - Deferred: the SessionService-owned continuity API cleanup (backends still
   record ids via `SessionMapping`), Phase 2 structured UX, Phase 3 operator
   surfaces for pane-less backends, Phase 4 breadth, Phase 5 docs/defaults.

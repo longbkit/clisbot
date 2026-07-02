@@ -297,6 +297,12 @@ export class AcpRunnerBackend implements RunnerBackend {
         `Runner session "${sessionName}" lost its ACP adapter process. Your run could not continue; resend the message to retry. If this keeps happening, verify the adapter command starts cleanly in the workspace and inspect clisbot logs.${evidence}`,
       );
     }
+    const detail = extractJsonRpcErrorDetail(error);
+    if (detail) {
+      return new Error(
+        `Runner session "${sessionName}" failed over ACP: ${detail}`,
+      );
+    }
     return error instanceof Error ? error : new Error(String(error));
   }
 
@@ -418,4 +424,21 @@ export class AcpRunnerBackend implements RunnerBackend {
     }
     return session.newSession();
   }
+}
+
+// JSON-RPC errors from agents often bury the actionable message (auth
+// failures, provider errors) inside error.data; surface it truthfully.
+function extractJsonRpcErrorDetail(error: unknown) {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+  const data = (error as { data?: { message?: unknown; additionalDetails?: unknown } }).data;
+  const detail =
+    (typeof data?.message === "string" && data.message.trim()) ||
+    (typeof data?.additionalDetails === "string" && data.additionalDetails.trim()) ||
+    "";
+  if (!detail) {
+    return null;
+  }
+  return detail === error.message.trim() ? detail : `${error.message.trim()}: ${detail}`;
 }
