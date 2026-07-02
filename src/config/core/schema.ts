@@ -67,11 +67,16 @@ const runnerStartupBlockerSchema = z.object({
 // defaults to "tmux" so existing configs keep their exact persisted shape.
 const runnerBackendSchema = z.enum(RUNNER_BACKEND_IDS);
 
+const runnerAcpSchema = z.object({
+  permissionPolicy: z.enum(["auto-allow", "deny"]).optional(),
+});
+
 const runnerLaunchSchema = z.object({
   backend: runnerBackendSchema.optional(),
   command: z.string().min(1),
   args: z.array(z.string()).default([]),
   env: z.record(z.string(), z.string()).optional(),
+  acp: runnerAcpSchema.optional(),
   startupDelayMs: z.number().int().positive().optional(),
   startupRetryCount: z.number().int().min(0).optional(),
   startupRetryDelayMs: z.number().int().min(0).optional(),
@@ -147,6 +152,7 @@ const runnerFamilyOverrideSchema = z.object({
   command: z.string().min(1).optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  acp: runnerAcpSchema.optional(),
   startupDelayMs: z.number().int().positive().optional(),
   startupRetryCount: z.number().int().min(0).optional(),
   startupRetryDelayMs: z.number().int().min(0).optional(),
@@ -334,6 +340,7 @@ const agentRunnerOverrideSchema = z.object({
   command: z.string().min(1).optional(),
   args: z.array(z.string()).optional(),
   env: z.record(z.string(), z.string()).optional(),
+  acp: runnerAcpSchema.optional(),
   startupDelayMs: z.number().int().positive().optional(),
   startupRetryCount: z.number().int().min(0).optional(),
   startupRetryDelayMs: z.number().int().min(0).optional(),

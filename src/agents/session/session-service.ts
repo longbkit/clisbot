@@ -444,6 +444,9 @@ export class SessionService {
   }
 
   canSteerActiveRun(target: AgentSessionTarget) {
+    if (!this.runnerSessions.capabilitiesFor(target).steer) {
+      return false;
+    }
     return this.activeRuns.get(target.sessionKey)?.steeringReady ?? false;
   }
 

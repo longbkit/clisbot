@@ -97,6 +97,10 @@ export class TmuxRunnerBackend implements RunnerBackend {
     return this.tmux.hasSession(resolved.sessionName);
   }
 
+  async shutdown() {
+    // tmux sessions deliberately survive runtime restarts; nothing to release.
+  }
+
   async runSessionCleanup() {
     if (this.cleanupInFlight) {
       return;

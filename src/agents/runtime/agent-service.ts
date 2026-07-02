@@ -209,6 +209,7 @@ export class AgentService {
     this.managedLoops.clear();
     this.managedQueues.clear();
     await this.activeRuns.stop();
+    await this.runnerSessions.shutdown();
   }
 
   async cleanupStaleSessions() {
@@ -347,6 +348,10 @@ export class AgentService {
 
   canSteerActiveRun(target: AgentSessionTarget) {
     return this.activeRuns.canSteerActiveRun(target);
+  }
+
+  runnerCapabilities(target: AgentSessionTarget) {
+    return this.runnerSessions.capabilitiesFor(target);
   }
 
   async submitSessionInput(target: AgentSessionTarget, text: string) {

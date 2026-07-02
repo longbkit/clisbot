@@ -16,6 +16,7 @@ import type {
   RunnerBackend,
   ShellCommandResult,
 } from "../../runners/contract/runner-backend.ts";
+import { AcpRunnerBackend } from "../../runners/acp/backend.ts";
 import { TmuxRunnerBackend } from "../../runners/tmux/backend.ts";
 import type { TmuxClient } from "../../runners/tmux/client.ts";
 
@@ -33,6 +34,7 @@ export class RunnerService {
     this.registerBackend(
       new TmuxRunnerBackend(loadedConfig, tmux, resolveTarget, sessionMapping),
     );
+    this.registerBackend(new AcpRunnerBackend(resolveTarget, sessionMapping));
   }
 
   registerBackend(backend: RunnerBackend) {
@@ -50,6 +52,12 @@ export class RunnerService {
   async runSessionCleanup() {
     for (const backend of this.backends.values()) {
       await backend.runSessionCleanup();
+    }
+  }
+
+  async shutdown() {
+    for (const backend of this.backends.values()) {
+      await backend.shutdown();
     }
   }
 

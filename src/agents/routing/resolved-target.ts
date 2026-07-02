@@ -91,6 +91,12 @@ function resolveAgentTargetInternal(
         ...(runnerFamily.env ?? {}),
         ...(override?.runner?.env ?? {}),
       },
+      acp: {
+        permissionPolicy:
+          override?.runner?.acp?.permissionPolicy ??
+          runnerFamily.acp?.permissionPolicy ??
+          "auto-allow",
+      },
       trustWorkspace:
         override?.runner?.defaults?.trustWorkspace ??
         runnerDefaults.trustWorkspace,

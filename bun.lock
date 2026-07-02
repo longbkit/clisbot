@@ -5,6 +5,7 @@
     "": {
       "name": "clisbot",
       "dependencies": {
+        "@agentclientprotocol/sdk": "1.1.0",
         "@slack/bolt": "^4.6.0",
         "pngjs": "^7.0.0",
         "proper-lockfile": "^4.1.2",
@@ -18,6 +19,8 @@
     },
   },
   "packages": {
+    "@agentclientprotocol/sdk": ["@agentclientprotocol/sdk@1.1.0", "", { "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" } }, "sha512-NT2KqphUJ3w6EksUL51ZhJgIYgq/ZLGcBPkyMKgRSO5PMVwe9DnKKX+Htnvk6KHh6dUuh34UHK4gKp+4te1Mdg=="],
+
     "@slack/bolt": ["@slack/bolt@4.6.0", "", { "dependencies": { "@slack/logger": "^4.0.0", "@slack/oauth": "^3.0.4", "@slack/socket-mode": "^2.0.5", "@slack/types": "^2.18.0", "@slack/web-api": "^7.12.0", "axios": "^1.12.0", "express": "^5.0.0", "path-to-regexp": "^8.1.0", "raw-body": "^3", "tsscmp": "^1.0.6" }, "peerDependencies": { "@types/express": "^5.0.0" } }, "sha512-xPgfUs2+OXSugz54Ky07pA890+Qydk22SYToi8uGpXeHSt1JWwFJkRyd/9Vlg5I1AdfdpGXExDpwnbuN9Q/2dQ=="],
 
     "@slack/logger": ["@slack/logger@4.0.1", "", { "dependencies": { "@types/node": ">=18" } }, "sha512-6cmdPrV/RYfd2U0mDGiMK8S7OJqpCTm7enMLRR3edccsPX8j7zXTLnaEF4fhxxJJTAIOil6+qZrnUPTuaLvwrQ=="],

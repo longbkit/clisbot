@@ -130,6 +130,13 @@ function renderStartupSteeringUnavailableMessage() {
   ].join("\n");
 }
 
+function renderBackendSteeringUnsupportedMessage() {
+  return [
+    "This agent's runner backend cannot steer into a running turn.",
+    "Use `/queue <message>` to run it after the current turn, or `/stop` and resend a combined prompt.",
+  ].join("\n");
+}
+
 function renderNewSessionFailureMessage(error: unknown) {
   const details =
     error instanceof Error && error.message.trim()
@@ -1976,7 +1983,13 @@ export async function processChannelInteraction<TChunk>(params: {
     }
 
     if (!canSteerActiveRun) {
-      await params.postText(renderStartupSteeringUnavailableMessage());
+      const backendCanSteer =
+        params.agentService.runnerCapabilities?.(params.sessionTarget)?.steer !== false;
+      await params.postText(
+        backendCanSteer
+          ? renderStartupSteeringUnavailableMessage()
+          : renderBackendSteeringUnsupportedMessage(),
+      );
       await params.agentService.recordConversationReply(params.sessionTarget);
       return interactionResult;
     }

@@ -37,12 +37,12 @@ describe("RunnerService recovery classification", () => {
     expect(runner.canRecoverMidRun(target, new Error("tmux pane state unavailable"))).toBe(true);
   });
 
-  test("rejects unknown runner backends truthfully", () => {
+  test("rejects unregistered runner backends truthfully", () => {
     const resolved = {
       agentId: "default",
       sessionKey: "session-1",
       runner: {
-        backend: "acp",
+        backend: "cli-json",
       },
     };
     const runner = new RunnerService(
@@ -53,7 +53,7 @@ describe("RunnerService recovery classification", () => {
     );
 
     expect(() => runner.backendFor({ agentId: "default", sessionKey: "session-1" })).toThrow(
-      'Runner backend "acp" is not available for agent "default"',
+      'Runner backend "cli-json" is not available for agent "default"',
     );
   });
 });

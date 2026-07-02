@@ -117,6 +117,13 @@ export interface RunnerBackend {
   /** Sunset stale idle sessions per session policy. */
   runSessionCleanup(): Promise<void>;
 
+  /**
+   * Release backend resources owned by this process on runtime shutdown.
+   * Backends whose sessions deliberately outlive the runtime (tmux panes)
+   * treat this as a no-op.
+   */
+  shutdown(): Promise<void>;
+
   // --- input ---
 
   /** Submit input into the live session (steer path and follow-up input). */
