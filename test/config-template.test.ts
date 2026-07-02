@@ -189,7 +189,7 @@ describe("renderDefaultConfigTemplate", () => {
 
     expect(config.meta.schemaVersion).toBe("0.1.53");
     expect(Object.keys(config)).toEqual(["meta", "app", "bots", "agents"]);
-    expect(config.agents.defaults.runner.defaults.startupDelayMs).toBe(60000);
+    expect(config.agents.defaults.runner.defaults.startupDelayMs).toBe(120000);
     expect(config.bots.slack.defaults.defaultBotId).toBe("default");
     expect(config.bots.telegram.defaults.defaultBotId).toBe("default");
     expect(parsed.bots.slack.defaults.channelPolicy).toBe("allowlist");

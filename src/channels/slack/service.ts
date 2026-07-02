@@ -173,6 +173,8 @@ function mergeSlackDisplayIdentity(
 
 const SEEN_MESSAGE_TTL_MS = 60_000;
 const THREAD_TS_CACHE_TTL_MS = 60_000;
+const STARTUP_STATUS_CLEAR_LIMIT = 25;
+const STARTUP_STATUS_CLEAR_CONCURRENCY = 2;
 
 function debugSlackEvent(message: string, details: Record<string, unknown> = {}) {
   if (process.env.CLISBOT_DEBUG_SLACK_EVENTS !== "1") {
@@ -261,7 +263,10 @@ export class SlackSocketService {
 
   private async clearStaleAssistantStatusesOnStart() {
     const entries = await this.agentService.listSessionEntries();
-    const targets = new Map<string, { channel: string; threadTs: string }>();
+    const targets = new Map<
+      string,
+      { channel: string; threadTs: string; updatedAt: number }
+    >();
     for (const entry of entries) {
       if (entry.runtime?.state !== "idle") {
         continue;
@@ -269,13 +274,38 @@ export class SlackSocketService {
 
       const target = resolveSlackThreadTargetFromSessionKey(entry.sessionKey);
       if (target) {
-        targets.set(`${target.channel}:${target.threadTs}`, target);
+        const key = `${target.channel}:${target.threadTs}`;
+        const updatedAt = entry.updatedAt ?? 0;
+        const existing = targets.get(key);
+        if (!existing || updatedAt > existing.updatedAt) {
+          targets.set(key, { ...target, updatedAt });
+        }
       }
     }
 
-    await Promise.all([...targets.values()].map(async (target) => {
-      await clearSlackAssistantThreadStatus(this.app.client, target);
-    }));
+    const sortedTargets = [...targets.values()]
+      .sort((left, right) => right.updatedAt - left.updatedAt);
+    const selectedTargets = sortedTargets.slice(0, STARTUP_STATUS_CLEAR_LIMIT);
+    const skippedCount = sortedTargets.length - selectedTargets.length;
+    if (skippedCount > 0) {
+      console.warn(
+        `slack startup assistant status cleanup limited to ${STARTUP_STATUS_CLEAR_LIMIT} newest idle threads; skipped ${skippedCount} older persisted thread(s)`,
+      );
+    }
+
+    for (
+      let index = 0;
+      index < selectedTargets.length;
+      index += STARTUP_STATUS_CLEAR_CONCURRENCY
+    ) {
+      const batch = selectedTargets.slice(
+        index,
+        index + STARTUP_STATUS_CLEAR_CONCURRENCY,
+      );
+      await Promise.all(batch.map(async (target) => {
+        await clearSlackAssistantThreadStatus(this.app.client, target);
+      }));
+    }
   }
 
   private markMessageSeen(channelId: string | undefined, ts?: string) {

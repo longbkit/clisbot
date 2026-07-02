@@ -5,6 +5,7 @@ import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
 
 function createLoadedConfig() {
   const config = clisbotConfigSchema.parse(JSON.parse(renderDefaultConfigTemplate()));
+  config.app.auth.roles.owner.users = ["slack:UOWNER"];
   config.app.auth.roles.admin.users = ["slack:UADMIN"];
   config.bots.slack.defaults.enabled = true;
   config.bots.slack.default.enabled = true;
@@ -79,6 +80,54 @@ describe("SlackSocketService shared audience enforcement", () => {
         thread_ts: "1778930330.832089",
         status: "",
       },
+    ]);
+  });
+
+  test("limits startup assistant status cleanup to newest idle Slack threads", async () => {
+    const calls: Array<{ channel_id: string; thread_ts: string; status: string }> = [];
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (message?: unknown) => {
+      warnings.push(String(message));
+    };
+
+    try {
+      await (SlackSocketService.prototype as any).clearStaleAssistantStatusesOnStart.call({
+        agentService: {
+          listSessionEntries: async () =>
+            Array.from({ length: 30 }, (_, index) => ({
+              agentId: "default",
+              sessionKey: `agent:default:slack:channel:c123:thread:${1000 + index}`,
+              runtime: { state: "idle" },
+              updatedAt: index,
+            })),
+        },
+        app: {
+          client: {
+            assistant: {
+              threads: {
+                setStatus: async (payload: {
+                  channel_id: string;
+                  thread_ts: string;
+                  status: string;
+                }) => {
+                  calls.push(payload);
+                },
+              },
+            },
+          },
+        },
+      });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(calls).toHaveLength(25);
+    expect(calls.map((call) => call.thread_ts)).toEqual(
+      Array.from({ length: 25 }, (_, index) => String(1029 - index)),
+    );
+    expect(warnings).toEqual([
+      "slack startup assistant status cleanup limited to 25 newest idle threads; skipped 5 older persisted thread(s)",
     ]);
   });
 

@@ -49,6 +49,8 @@ hardening from earlier betas.
 - Changed tmux session handshake recovery so blocked/rejected startup states
   remain truthful while preserving stored session ids when automatic recovery
   would risk losing conversation context.
+- Changed the source-code default interactive runner startup window from 60
+  seconds to 120 seconds for Codex, Claude, and Gemini runner families.
 
 ## Non-Functional Changes
 

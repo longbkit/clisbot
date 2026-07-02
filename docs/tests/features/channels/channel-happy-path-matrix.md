@@ -314,7 +314,8 @@ Steps:
 4. Repeat with `/detach` or an interaction that enters detached sparse-follow
    mode.
 5. Restart the dev runtime and confirm stale indicators are cleared where the
-   provider exposes a clear API.
+   provider exposes a clear API without issuing an unbounded startup cleanup
+   burst.
 
 Expected:
 
@@ -322,7 +323,8 @@ Expected:
 - Indicator send/edit/clear failures are logged as channel-local failures, not
   runner failures.
 - Indicators clear on terminal completion and on detached sparse-follow.
-- Restart cleanup clears stale provider-visible status when supported.
+- Restart cleanup clears stale provider-visible status when supported, with a
+  bounded provider-request budget.
 - The channel does not leave `Working...`, typing, reactions, or assistant
   status visible after `Active runs: none`.
 

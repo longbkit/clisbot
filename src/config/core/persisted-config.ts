@@ -1,6 +1,7 @@
 import {
   buildRunnerFromToolTemplate,
   DEFAULT_AGENT_TOOL_TEMPLATES,
+  INTERACTIVE_CLI_STARTUP_DELAY_MS,
   inferAgentCliToolId,
   type AgentCliToolId,
 } from "../runtime/agent-tool-presets.ts";
@@ -26,7 +27,7 @@ const defaultOwnedRunnerFields: Partial<Record<AgentCliToolId, string[]>> = {
   ],
 };
 const defaultOwnedRunnerDefaultFields: Record<string, unknown> = {
-  startupDelayMs: 60000,
+  startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
 };
 
 function isRecord(value: unknown): value is MutableRecord {
