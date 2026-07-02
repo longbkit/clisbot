@@ -25,8 +25,11 @@ The current runtime naming should stay explicit:
 Short version:
 
 - `SessionService` decides which `sessionId` is active for one `sessionKey`
-- `RunnerService` uses that decision to start, capture, or resume the backend
-- `src/runners/tmux/*` contains lower-level tmux mechanics, not continuity decisions
+- `RunnerService` is a thin dispatcher over the code-level `RunnerBackend`
+  contract in `src/runners/contract/`, selecting the configured backend per
+  agent target
+- `src/runners/tmux/*` and `src/runners/acp/*` are the backend
+  implementations; they contain backend mechanics, not continuity decisions
 
 Ownership intent:
 
@@ -42,28 +45,20 @@ Ownership intent:
 Current implementation gap:
 
 - the target ownership split above is the architecture contract
-- current code is not fully converged yet
-- `src/agents/runtime/runner-service.ts` still mixes backend execution work with some
-  `SessionService`-owned responsibilities such as:
-  - deciding explicit `sessionId` creation for explicit-id launch paths through
-    the current `SessionMapping` helper
-  - mutating active `sessionId` continuity through `SessionMapping` instead of a
-    `SessionService`-owned API
-  - deciding some continuity changes directly during retry, restart, and
-    `/new` flows
-- that means `RunnerService` is currently a mixed-owner implementation, even
-  though the target architecture keeps continuity and `sessionId` source
-  ownership in `SessionService`
+- `RunnerService` itself is now a thin dispatcher; backend mechanics live in
+  `src/runners/<backend>/`
+- backend implementations still mutate active `sessionId` continuity through
+  the `SessionMapping` helper (record captured ids, clear rejected resumes,
+  rotate on `/new`) instead of a `SessionService`-owned API
 - future cleanup should move active-mapping changes and explicit-id creation
-  behind a `SessionService`-owned API while keeping tmux or backend launch or
-  capture or resume mechanics runner-owned
+  behind a `SessionService`-owned API while keeping backend launch, capture,
+  and resume mechanics runner-owned
 
 In plain language:
 
-- `RunnerService` currently does too much
 - the architecture does not need to change
 - the code needs one more cleanup pass so `SessionService` chooses continuity
-  and runner code only executes backend mechanics
+  and backend code only executes backend mechanics
 
 The old names `ActiveRunManager` and `RunnerSessionService` are no longer part of the architecture vocabulary.
 
@@ -120,17 +115,25 @@ stored active mapping.
 
 ## Standard Runner Contract
 
-At minimum, a runner should provide:
+The contract is code-level: `RunnerBackend` in
+`src/runners/contract/runner-backend.ts`, with the normalized `RunEvent`
+model and the declared capability matrix beside it. At minimum, a runner
+backend provides:
 
-- start
-- stop
+- start (ensure session ready)
+- stop and shutdown
 - submit input
 - capture snapshot
-- stream output updates
+- stream output updates (monitor run, structured events where supported)
 - surface lifecycle state
-- surface backend errors
+- surface backend errors (loss, recoverability, truthful mapping)
+- backend-specific `sessionId` mechanics
+- declared capabilities (steer, interrupt, resume, attach view, permission
+  requests, structured events, native slash commands, shell, nudge)
 
-Backend quirks belong inside runner implementations, not Agents.
+Channel and control features degrade by declared capability instead of by
+CLI-family string checks. Backend quirks belong inside runner
+implementations, not Agents.
 
 ## Run Supervision Rule
 

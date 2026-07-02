@@ -12,7 +12,27 @@ This task covers the architecture review (problems and gaps), the target design,
 
 ## Status
 
-Planned
+In progress (2026-07-02)
+
+- Phase 0 shipped: code-level `RunnerBackend` contract + `RunEvent` model in
+  `src/runners/contract/`; tmux mechanics refactored into
+  `src/runners/tmux/` as the first implementation; `RunnerService` is a thin
+  dispatcher; `SessionService` no longer imports tmux; oversized
+  `runner-service.ts` and `session-handshake.ts` split under the limits.
+- Phase 1 shipped (code + regression): `src/runners/acp/` backend on pinned
+  `@agentclientprotocol/sdk@1.1.0` with adapter-per-session, structured
+  events, `session/load` resume with truthful fresh-start fallback,
+  first-class cancel, policy-resolved permissions
+  (`runner.acp.permissionPolicy`), capability-gated steer degradation, and
+  runtime-shutdown adapter cleanup. Config: `runner.backend: tmux | acp` per
+  agent plus `env`. Regression suite drives a scripted raw-ndjson fake ACP
+  agent (`test/fixtures/fake-acp-agent.ts`).
+- Remaining before Phase 1 exit: live validation with the real
+  `@agentclientprotocol/codex-acp` adapter on the configured shared test
+  surfaces (operator-gated, high blast radius).
+- Deferred: the SessionService-owned continuity API cleanup (backends still
+  record ids via `SessionMapping`), Phase 2 structured UX, Phase 3 operator
+  surfaces for pane-less backends, Phase 4 breadth, Phase 5 docs/defaults.
 
 ## Related Docs
 

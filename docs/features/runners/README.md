@@ -13,13 +13,24 @@ Short boundary rule:
 - runners do not own that mapping
 - runners only know how to launch, capture, resume, and normalize one concrete backend
 
-Common confusion to avoid:
+Code-level shape:
 
-- `src/agents/runtime/runner-service.ts` is the runner-facing adapter that
-  `SessionService` calls today
-- `src/runners/tmux/*` is lower-level backend code used by that adapter
-- neither of those should decide whether the active mapping is set, cleared, or
-  rotated
+- `src/runners/contract/` defines the `RunnerBackend` interface, the
+  normalized `RunEvent` model, and the declared capability matrix
+- `src/agents/runtime/runner-service.ts` is the thin dispatcher that selects
+  the configured backend per agent target and delegates
+- `src/runners/tmux/*` implements the contract for tmux-backed interactive
+  CLIs (pane mechanics, prompt handshakes, snapshot-diff monitoring)
+- `src/runners/acp/*` implements the contract for ACP agents (one adapter
+  process per session, structured `session/update` events, `session/load`
+  resume, first-class cancel, policy-resolved permission requests)
+- none of those decide whether the active mapping is set, cleared, or
+  rotated; they record runner-provided ids through the session-owned mapping
+
+Backend selection is per agent in config (`runner.backend: tmux | acp`),
+defaulting to tmux. Capabilities that a backend cannot express (mid-turn
+steering, pane attach, shell panes, Enter-nudges on ACP) degrade with
+truthful guidance instead of pretending.
 
 ## State
 
@@ -27,20 +38,26 @@ Active
 
 ## Why It Exists
 
-Today the project uses tmux-backed Codex sessions.
+The project runs tmux-backed interactive CLI sessions and ACP-backed agent
+sessions behind one code-level runner contract.
 
-Later it may support ACP, Codex SDK, Claude SDK, or other execution backends.
+tmux stays the universal fallback and the subscription-cost path for Claude;
+ACP is the structured path for the growing set of ACP-capable agents
+(Codex-first via the official adapter). Future SDK or CLI-JSON backends join
+by implementing the same contract.
 
-That only stays coherent if backend-specific behavior is isolated behind a standard runner interface.
+That only stays coherent if backend-specific behavior is isolated behind the
+standard runner contract in `src/runners/contract/`.
 
 ## Scope
 
-- tmux runner behavior today
-- future ACP runners
-- future SDK runners
+- tmux runner behavior
+- ACP runner behavior (adapter process per session, structured events)
+- future SDK and CLI-JSON runners
 - standardized input, output, snapshot, and streaming contract
+- backend capability declaration and truthful degradation
 - backend-specific lifecycle hooks and quirks
-- runner onboarding checklist for new interactive CLIs
+- runner onboarding checklist for new interactive CLIs and ACP agents
 
 ## Non-Goals
 
