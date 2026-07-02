@@ -4,6 +4,7 @@
 //
 // Behavior knobs (env vars):
 // - FAKE_ACP_SUPPORTS_LOAD=0        advertise no session/load capability
+// - FAKE_ACP_REQUIRE_AUTH=1         reject session/new until authenticate
 // - FAKE_ACP_REQUIRE_PERMISSION=1   request permission before finishing
 // - FAKE_ACP_PROMPT_DELAY_MS=<n>    hold the turn open (cancel testing)
 // - FAKE_ACP_EXIT_MID_PROMPT=1      die mid-turn (adapter-loss testing)
@@ -18,12 +19,14 @@ type JsonRpcMessage = {
 };
 
 const supportsLoad = process.env.FAKE_ACP_SUPPORTS_LOAD !== "0";
+const requireAuth = process.env.FAKE_ACP_REQUIRE_AUTH === "1";
 const requirePermission = process.env.FAKE_ACP_REQUIRE_PERMISSION === "1";
 const promptDelayMs = Number(process.env.FAKE_ACP_PROMPT_DELAY_MS ?? "0");
 const exitMidPrompt = process.env.FAKE_ACP_EXIT_MID_PROMPT === "1";
 
 let nextSessionNumber = 1;
 let nextRequestId = 1;
+let authenticatedMethodId = "";
 const cancelledSessions = new Set<string>();
 const pendingResponses = new Map<number | string, (message: JsonRpcMessage) => void>();
 
@@ -144,9 +147,24 @@ async function handleMessage(message: JsonRpcMessage) {
         agentCapabilities: {
           loadSession: supportsLoad,
         },
+        authMethods: [
+          { id: "fake-auth", name: "Fake auth", description: "Test auth method" },
+        ],
       });
       return;
+    case "authenticate":
+      authenticatedMethodId = String(params.methodId ?? "");
+      respond(message.id!, {});
+      return;
     case "session/new":
+      if (requireAuth && authenticatedMethodId !== "fake-auth") {
+        send({
+          jsonrpc: "2.0",
+          id: message.id!,
+          error: { code: -32000, message: "Authentication required" },
+        });
+        return;
+      }
       respond(message.id!, { sessionId: `fake-session-${nextSessionNumber++}` });
       return;
     case "session/load": {

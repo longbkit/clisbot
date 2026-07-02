@@ -23,7 +23,9 @@ In progress (2026-07-02)
   `@agentclientprotocol/sdk@1.1.0` with adapter-per-session, structured
   events, `session/load` resume with truthful fresh-start fallback,
   first-class cancel, policy-resolved permissions
-  (`runner.acp.permissionPolicy`), capability-gated steer degradation, and
+  (`runner.acp.permissionPolicy`), ACP `authenticate` support
+  (`runner.acp.authMethodId`; codex-acp advertises `chat-gpt` for
+  subscription auth and `api-key`), capability-gated steer degradation, and
   runtime-shutdown adapter cleanup. Config: `runner.backend: tmux | acp` per
   agent plus `env`. Regression suite drives a scripted raw-ndjson fake ACP
   agent (`test/fixtures/fake-acp-agent.ts`).

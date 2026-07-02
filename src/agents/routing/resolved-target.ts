@@ -96,6 +96,8 @@ function resolveAgentTargetInternal(
           override?.runner?.acp?.permissionPolicy ??
           runnerFamily.acp?.permissionPolicy ??
           "auto-allow",
+        authMethodId:
+          override?.runner?.acp?.authMethodId ?? runnerFamily.acp?.authMethodId,
       },
       trustWorkspace:
         override?.runner?.defaults?.trustWorkspace ??

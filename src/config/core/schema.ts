@@ -69,6 +69,7 @@ const runnerBackendSchema = z.enum(RUNNER_BACKEND_IDS);
 
 const runnerAcpSchema = z.object({
   permissionPolicy: z.enum(["auto-allow", "deny"]).optional(),
+  authMethodId: z.string().min(1).optional(),
 });
 
 const runnerLaunchSchema = z.object({

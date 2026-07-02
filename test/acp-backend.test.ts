@@ -25,7 +25,10 @@ type Harness = {
 
 const activeHarnesses: Harness[] = [];
 
-function createHarness(env: Record<string, string> = {}): Harness {
+function createHarness(
+  env: Record<string, string> = {},
+  acp: { permissionPolicy?: string; authMethodId?: string } = {},
+): Harness {
   const tempDir = mkdtempSync(join(tmpdir(), "clisbot-acp-test-"));
   const sessionMapping = new SessionMapping(
     new AgentSessionState(new SessionStore(join(tempDir, "sessions.json"))),
@@ -43,6 +46,7 @@ function createHarness(env: Record<string, string> = {}): Harness {
       env,
       acp: {
         permissionPolicy: "auto-allow",
+        ...acp,
       },
       sessionId: {
         create: { mode: "runner", args: [] },
@@ -265,6 +269,33 @@ describe("ACP backend", () => {
     const mapped = await harness.backend.mapRunError(error, "acp-test-session");
     expect(mapped.message).toContain("lost its ACP adapter process");
     expect(await harness.backend.hasLiveSession(harness.target)).toBe(false);
+  });
+
+  test("authenticates with the configured auth method before opening a session", async () => {
+    const harness = createHarness(
+      { FAKE_ACP_REQUIRE_AUTH: "1" },
+      { authMethodId: "fake-auth" },
+    );
+
+    const ready = await harness.backend.ensureRunnerReady(harness.target);
+
+    expect(ready.resolved.sessionName).toBe("acp-test-session");
+    const entry = await harness.sessionMapping.get(harness.target.sessionKey);
+    expect(entry?.sessionId).toBe("fake-session-1");
+  });
+
+  test("fails truthfully when the configured auth method is not advertised", async () => {
+    const harness = createHarness({}, { authMethodId: "missing-method" });
+
+    const error = await harness.backend
+      .ensureRunnerReady(harness.target)
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain(
+      'does not advertise auth method "missing-method"',
+    );
+    expect((error as Error).message).toContain("fake-auth");
   });
 
   test("triggerNewSession rotates to a fresh ACP session id", async () => {

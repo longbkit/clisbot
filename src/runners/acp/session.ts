@@ -140,6 +140,18 @@ export class AcpSession {
     return this.initializeResponse;
   }
 
+  /** Authenticate with one of the agent's advertised auth methods. */
+  async authenticate(methodId: string) {
+    const advertised = this.initializeResponse?.authMethods ?? [];
+    if (!advertised.some((method) => method.id === methodId)) {
+      const available = advertised.map((method) => method.id).join(", ") || "none";
+      throw new Error(
+        `ACP agent for "${this.params.sessionName}" does not advertise auth method "${methodId}". Advertised methods: ${available}.`,
+      );
+    }
+    await this.connection.authenticate({ methodId });
+  }
+
   async newSession() {
     const response = await this.connection.newSession({
       cwd: this.params.workspacePath,

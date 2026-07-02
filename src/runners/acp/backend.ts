@@ -361,6 +361,10 @@ export class AcpRunnerBackend implements RunnerBackend {
 
     try {
       await session.initialize();
+      const authMethodId = resolved.runner.acp.authMethodId;
+      if (authMethodId) {
+        await session.authenticate(authMethodId);
+      }
       const prepared = await this.sessionMapping.prepareStartup(resolved);
       const sessionId = await this.openAcpSession(session, resolved, prepared, startupNotes);
       await this.sessionMapping.setActive(resolved, {
