@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bản đồ ổn định: từ tin nhắn tới runner</title>
+  <style>
+    :root {
+      --bg:#f5f7f4; --card:#fff; --soft:#f8faf7; --ink:#17201c; --muted:#5b6861;
+      --line:#d7dfda; --line2:#b7c4bd; --green:#167248; --green2:#def2e7;
+      --amber:#986300; --amber2:#fff0c9; --red:#a23b36; --red2:#f8dddd;
+      --blue:#235f91; --blue2:#dcecf8; --shadow:0 12px 28px rgba(24,32,28,.08);
+      --mono:"SFMono-Regular","Consolas","Liberation Mono",monospace;
+      --sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.48}
+    h1,h2,h3,p{margin:0;letter-spacing:0} h1{font-size:clamp(30px,4vw,52px);line-height:1.1}
+    h2{font-size:clamp(22px,2.3vw,30px);line-height:1.14} h3{font-size:17px;line-height:1.2}
+    button,input,select{font:inherit} code,pre,.mono{font-family:var(--mono)}
+    code{padding:1px 4px;border-radius:4px;background:#edf1ee} pre{overflow:auto;padding:12px;border-radius:8px;background:#101612;color:#e8f4ec;font-size:12px}
+    .page{width:min(1680px,calc(100% - 28px));margin:0 auto;padding:20px 0 48px}
+    .hero,.panel,.mini,.phase,.action,.field{border:1px solid var(--line);border-radius:8px;background:var(--card);box-shadow:var(--shadow)}
+    .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,.55fr);gap:18px;padding:20px}
+    .eyebrow{color:var(--muted);font:800 12px var(--mono);text-transform:uppercase;letter-spacing:.06em}
+    .lead{max-width:980px;margin-top:10px;color:var(--muted);font-size:15px}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stat{padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}
+    .stat span,.field span{display:block;color:var(--muted);font:800 11px var(--mono);text-transform:uppercase;letter-spacing:.05em}.stat strong{display:block;margin-top:5px;font-size:22px}
+    .nav{position:sticky;top:8px;z-index:10;display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.95);box-shadow:var(--shadow)}
+    .nav a,.button{min-height:34px;padding:7px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);text-decoration:none;font-size:13px;font-weight:800;cursor:pointer}
+    .button.active,.nav a:hover,.button:hover{border-color:var(--line2);background:#eef5f1}
+    .panel{margin-top:12px;padding:18px}.head{display:flex;justify-content:space-between;gap:12px;align-items:start;margin-bottom:14px}.note{color:var(--muted);font-size:14px}
+    .grid{display:grid;gap:10px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .mini{padding:14px;background:var(--soft)}.mini strong{display:block;margin-bottom:6px}
+    .insight{border-left:5px solid var(--red);background:#fffdf9}.insight:nth-child(2){border-left-color:var(--amber)}.insight:nth-child(3){border-left-color:var(--blue)}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}.toolbar label{display:inline-flex;gap:6px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--muted);font-size:13px;font-weight:800}
+    select,input[type=search]{min-height:34px;border:1px solid var(--line2);border-radius:8px;background:var(--card);padding:6px 9px}input[type=search]{width:min(360px,100%)}
+    .workspace{display:grid;grid-template-columns:minmax(620px,1.4fr) minmax(380px,.8fr);gap:12px}.flow{display:grid;grid-template-columns:repeat(5,minmax(175px,1fr));gap:10px;min-width:960px}.flowwrap,.tablewrap,.timeline{overflow-x:auto}
+    .phase{min-height:126px;padding:12px;text-align:left;cursor:pointer;background:var(--soft);border-left:5px solid var(--line2)}
+    .phase.selected{outline:3px solid rgba(35,95,145,.2);border-color:var(--blue);background:#f6fbff}.phase.hidden{opacity:.25}
+    .step{color:var(--muted);font:800 11px var(--mono);text-transform:uppercase}.title{margin-top:6px;font-weight:850}.owner{margin-top:6px;color:var(--muted);font:12px var(--mono)}
+    .badges{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.badge{display:inline-flex;align-items:center;min-height:22px;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:850;white-space:nowrap}
+    .p0{background:var(--red2);color:var(--red)}.p1{background:var(--amber2);color:var(--amber)}.p2{background:var(--blue2);color:var(--blue)}.ok{background:var(--green2);color:var(--green)}.neutral{background:#e9eeeb;color:var(--muted)}
+    .detail{position:sticky;top:74px;align-self:start;max-height:calc(100vh - 92px);overflow:auto}.detail .panel{margin:0}.field{padding:10px;background:var(--soft);box-shadow:none}.field strong{display:block;margin-top:4px;font-size:13px}
+    details{border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:10px}summary{cursor:pointer;font-weight:850}details[open]{background:#fbfdfb}
+    table{width:100%;min-width:980px;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}th{background:var(--card);color:var(--muted);font:800 11px var(--mono);text-transform:uppercase}
+    .meter{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:10px 0}.meter span{height:8px;border-radius:999px;background:#dfe6e2}.meter .on.p0{background:var(--red)}.meter .on.p1{background:var(--amber)}.meter .on.p2{background:var(--blue)}
+    .timeline{display:grid;grid-template-columns:repeat(12,minmax(110px,1fr));gap:8px}.tick{min-height:78px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--soft);font-size:12px}.tick strong{display:block;margin-bottom:5px}
+    .action{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;padding:12px;background:var(--soft);box-shadow:none}.empty{padding:16px;border:1px dashed var(--line2);border-radius:8px;background:var(--soft);color:var(--muted)}
+    @media(max-width:1120px){.hero,.workspace,.grid.three,.grid.two{grid-template-columns:1fr}.detail{position:static;max-height:none}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:640px){.page{width:min(100% - 16px,1680px)}.hero,.panel{padding:14px}.stats{grid-template-columns:1fr}.nav{position:static}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">bản đồ ổn định · từ chat tới native CLI</div>
+        <h1>Vì sao người dùng phải nhắn lại?</h1>
+        <p class="lead">Trang này giải thích hành trình của một tin nhắn trong clisbot bằng ngôn ngữ dễ hiểu. Mục tiêu là nhìn ra lỗ hổng lớn nhất, chỗ cần đơn giản hóa, và chỗ cần thêm logic để hệ thống ổn định hơn.</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>Điểm nghẽn lớn</span><strong>3</strong></div>
+        <div class="stat"><span>Bước chính</span><strong>10</strong></div>
+        <div class="stat"><span>Nhóm lỗi</span><strong>7</strong></div>
+        <div class="stat"><span>Việc P0</span><strong>3</strong></div>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <a href="#quick">Đọc nhanh</a><a href="#questions">Câu hỏi</a><a href="#flow">Bản đồ</a><a href="#errors">Lỗi</a><a href="#timeline">Timeline</a><a href="#actions">Action</a>
+    </nav>
+
+    <section id="quick" class="panel">
+      <div class="head"><div><h2>Đọc nhanh trong 2 phút</h2><p class="note">Nếu chưa biết codebase, bắt đầu từ 3 insight này.</p></div></div>
+      <div class="grid three">
+        <article class="mini insight"><strong>1. Lỗi nguy hiểm nhất xảy ra trước khi prompt thật sự chạy.</strong><p class="note">Runner chưa ready, resume sai session id, hoặc tmux biến mất. Người dùng tưởng bot nhận prompt rồi, nhưng thật ra prompt chưa được submit an toàn.</p></article>
+        <article class="mini insight"><strong>2. clisbot đang fail đúng, nhưng chưa giải thích đủ.</strong><p class="note">Ví dụ submit không confirm là quyết định đúng để tránh nói dối. Vấn đề là user/admin chưa thấy state, nguyên nhân, và bước tiếp theo.</p></article>
+        <article class="mini insight"><strong>3. Nên đo theo từng bước, không đo theo cảm giác.</strong><p class="note">Mỗi message cần timeline: nhận tin, route, start runner, ready, capture session id, submit, chạy, recover, gửi trả lời.</p></article>
+      </div>
+    </section>
+
+    <section id="questions" class="panel">
+      <div class="head"><div><h2>Chọn câu hỏi để lọc bản đồ</h2><p class="note">Các nút này là progressive disclosure: bấm câu hỏi đang quan tâm, rồi xem các bước liên quan sáng lên.</p></div></div>
+      <div class="toolbar" id="questionButtons"></div>
+    </section>
+
+    <section id="flow" class="panel">
+      <div class="head"><div><h2>Bản đồ từ tin nhắn tới câu trả lời</h2><p class="note">Bấm từng bước để xem giải thích cho người mới, dấu hiệu ổn, dấu hiệu lỗi, và action nên có.</p></div></div>
+      <div class="workspace">
+        <div>
+          <div class="toolbar">
+            <label>Mức độ <select id="severity"><option value="all">Tất cả</option><option value="p0">P0</option><option value="p1">P1</option><option value="p2">P2</option></select></label>
+            <label>Owner <select id="owner"><option value="all">Tất cả</option><option>channels</option><option>agents</option><option>runners</option><option>control</option></select></label>
+            <input id="search" type="search" placeholder="Tìm: /new, session id, submit, delivery..." />
+            <button id="reset" class="button" type="button">Reset</button>
+          </div>
+          <div class="flowwrap"><div id="flowNodes" class="flow"></div></div>
+        </div>
+        <aside class="detail"><div class="panel">
+          <h2 id="detailTitle">Chọn một bước</h2>
+          <p id="detailText" class="note"></p>
+          <div id="detailBadges" class="badges"></div>
+          <div id="detailFields" class="grid"></div>
+        </div></aside>
+      </div>
+    </section>
+
+    <section id="errors" class="panel">
+      <div class="head"><div><h2>Ma trận lỗi: người dùng thấy gì, admin cần gì</h2><p class="note">Mỗi lỗi có phần tóm tắt trước; mở ra mới thấy root cause và logic nên thêm.</p></div></div>
+      <div class="toolbar"><input id="errorSearch" type="search" placeholder="Tìm lỗi: disappeared, resume, submit, session id..." /></div>
+      <div id="errorCards" class="grid"></div>
+    </section>
+
+    <section id="timeline" class="panel">
+      <div class="head"><div><h2>Timeline artifact nên lưu cho mỗi message</h2><p class="note">Chỉ cần lưu nhỏ gọn, nhưng đủ để biết lỗi dồn ở bước nào.</p></div></div>
+      <div id="timelineSteps" class="timeline"></div>
+    </section>
+
+    <section id="actions" class="panel">
+      <div class="head"><div><h2>Action plan để tăng ổn định rõ rệt</h2><p class="note">Ưu tiên theo tác động giảm resend-loop và giảm phụ thuộc admin.</p></div></div>
+      <div id="actionList" class="grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="head"><div><h2>Diagnostic envelope mẫu</h2><p class="note">Mỗi lỗi runtime nên render từ object này thay vì string tự do.</p></div></div>
+      <pre id="diagnostic"></pre>
+    </section>
+  </main>
+
+  <script>
+    const phases = [
+      ["ingress","01","Nhận tin từ channel","channels","p2","received","Slack/Telegram/Zalo/API gửi event vào clisbot.","Nếu bước này lỗi, bot có thể im lặng hoặc trả lời trùng.","Có provider event, sender, surface, message id.","Duplicate, malformed event, thiếu sender/surface.","Log event id và surface để debug được retry/trùng."],
+      ["route","02","Route và quyền","channels/auth","p1","routed","clisbot quyết định tin này thuộc bot/agent nào và người gửi có quyền gì.","Nếu thiếu route/quyền, user cần biết tự xử lý hay gọi admin.","Agent target, principal, route id rõ ràng.","No route, pairing required, permission denied.","Thông báo owner: user/admin/clisbot và command admin cần chạy."],
+      ["prompt","03","Biến tin nhắn thành prompt hoặc command","channels/message","p1","prompt-ready","Tin nhắn có thể là lệnh clisbot, lệnh native CLI, hoặc prompt thường.","Lỗi ở đây dễ làm slash command đi nhầm xuống CLI.","Prompt envelope hoặc command result rõ ràng.","Slash conflict, attachment lỗi, command bị disable.","Hiển thị clisbot handled/pass-through để user hiểu."],
+      ["admit","04","Nhận prompt vào session","agents/session","p1","admitted","Session là cuộc hội thoại logic. Bước này tạo active run hoặc queue.","Nếu bận mà không nói rõ, user sẽ nhắn lại.","lastAdmittedPromptAt, active run, observer có state.","Active run conflict, queue/steer mơ hồ.","Luôn gửi receipt: queued/running/startup/rejected."],
+      ["startup","05","Mở hoặc resume runner","agents/runtime runners","p0","starting","Runner là native CLI trong tmux. Nó phải ready trước khi nhận prompt.","Đây là điểm nghẽn lớn nhất: chưa ready nhưng user tưởng đã chạy.","tmux sống, CLI ready, blocker được classify.","session disappeared, auth/trust/update/hook, timeout.","Startup classifier trước khi submit prompt."],
+      ["identity","06","Bắt session id bền vững","agents/session runners","p0","session-id","session id giúp resume đúng cuộc hội thoại native CLI sau restart/mất pane.","Nếu mất hoặc stale, lần sau resume có thể fail và bắt /new.","sessionId captured/injected và persisted.","No saved session found, capture drift, pending quá lâu.","Quarantine bad id, retry capture nền, báo continuity state."],
+      ["submit","07","Paste và Enter vào tmux","runners/tmux","p0","submitted","clisbot chỉ coi prompt đã gửi khi pane thật sự đổi sau paste/Enter.","Fail ở đây là đúng để không nói dối, nhưng cần giải thích dễ hiểu hơn.","Paste visible, Enter làm pane đổi.","Enter no effect, input mất focus, blocked prompt.","Tách paste-visible và enter-no-effect."],
+      ["observe","08","Theo dõi runner chạy","agents/session","p1","running","Monitor đọc pane, gửi progress, chờ final answer hoặc recovery.","Nếu observer/delivery lỗi, runner có thể chạy xong mà user không thấy.","Meaningful delta, final settle, observer sống.","runner lost, observer detached, stale active run.","Lưu transition và last pane snapshot."],
+      ["recover","09","Recovery khi mất runner","agents/session","p0","recovering","clisbot cố resume cùng context; nếu không chắc, không replay prompt bừa.","Đúng về an toàn, nhưng user cần root cause và action rõ.","Resume ok hoặc fallback explicit.","resume failed, fresh replay unsafe, manual /new.","Nói resume command đã thử và vì sao /new là safe."],
+      ["deliver","10","Gửi câu trả lời về channel","channels/control","p1","delivered","Kết quả cần quay lại đúng thread/topic/DM, hoặc ít nhất có diagnostic cho admin.","Nếu delivery fail, user tưởng bot không làm gì.","Final delivered, delivery state persisted.","Provider edit/send fail, message quá dài.","Retry/degrade theo observer, lưu delivery status."]
+    ].map(([id,step,title,owner,severity,state,plain,impact,healthy,failure,action]) => ({id,step,title,owner,severity,state,plain,impact,healthy,failure,action}));
+    const questions = [
+      ["Vì sao phải nhắn lại hoài?","startup identity submit observe deliver"],
+      ["Khi nào nên dùng /new?","identity recover startup"],
+      ["Admin cần xem gì trước?","route startup identity submit recover deliver"],
+      ["Chỗ nào cần thêm logic tự recover?","startup identity submit recover"],
+      ["Chỗ nào cần đơn giản hóa UX?","admit observe deliver route"]
+    ];
+    const errors = [
+      ["Runner session disappeared during startup","Runner mất trước khi prompt chạy.","startup","tmux/CLI exit, update, path lỗi, blocker startup.","Classify startup-lost, kèm last pane và retry safety."],
+      ["Previous runner session could not be resumed","Không resume được cuộc hội thoại cũ.","identity recover","Stored session id stale/expired hoặc native CLI không còn id đó.","Quarantine id lỗi, nói rõ /new tạo conversation mới."],
+      ["TmuxSubmitUnconfirmedError","Enter không làm pane đổi nên prompt chưa chắc đã chạy.","submit","Focus sai, prompt box bị block, timing, alternate mode.","Tách paste-visible vs enter-no-effect và retry có giới hạn."],
+      ["Ready timeout + No saved session found","Đây không nên là timeout chung; là resume id not found.","startup identity","Codex không tìm thấy native session id đã lưu.","Classify resume-session-id-not-found, đề xuất /new."],
+      ["Could not capture durable session id yet","Session đang chạy nhưng chưa resumable.","identity","Status command/capture pattern drift hoặc id xuất hiện trễ.","Retry capture nền, báo pending/failed/captured rõ ràng."],
+      ["User thấy im lặng nên gửi lại","Không có lifecycle receipt đủ tốt.","admit observe deliver","Queue/steer mơ hồ, observer fail, final delivery fail.","Mỗi accepted message phải có trạng thái visible."],
+      ["Admin cũng không biết root cause","Thiếu diagnostic envelope.","deliver route startup","Log có string lỗi nhưng thiếu phase/rootCause/action/evidence.","Gắn diagnosticId và command inspect/logs cụ thể."]
+    ];
+    const actions = [
+      ["P0","Startup classifier","Phân biệt ready, update, trust, hook-review, auth, resume-id-not-found, startup-lost, timeout. Không submit prompt trước khi ready."],
+      ["P0","Per-message timeline","Lưu transitions nhỏ cho mỗi message để biết fail dồn ở channel, session, runner startup, submit, recovery hay delivery."],
+      ["P0","Quarantine bad session id","Khi native CLI báo id không tồn tại, ngừng auto reuse id đó; giữ evidence và hướng user /new."],
+      ["P1","Submit result giàu hơn","Không chỉ TmuxSubmitUnconfirmedError; cần paste-not-visible, enter-no-effect, blocked-prompt, pane-lost."],
+      ["P1","Lifecycle receipt","User luôn thấy queued, starting, recovering, failed-before-submit, completed, delivery-failed."],
+      ["P1","Diagnostic ID","Mọi lỗi runtime trong chat kèm diagnostic id và command admin nên chạy."]
+    ];
+    const timeline = ["received","routed","prompt-ready","admitted","runner-starting","runner-ready","session-id","paste-confirmed","submit-confirmed","running","recovered/delivered","failed"];
+    const diagnostic = {diagnosticId:"diag_2026-06-09_default_slack_1781001263",phase:"runner_startup",state:"startup-lost",rootCauseClass:"tmux-session-disappeared",owner:"clisbot",userAction:"đợi recovery hoặc gửi lại sau khi trạng thái rõ",adminAction:"clisbot runner inspect --latest --lines 120",evidence:{lastPaneSnapshot:"~/.clisbot/artifacts/runs/<id>/last-pane.txt",transitions:"~/.clisbot/artifacts/runs/<id>/transitions.json"}};
+    const $ = (s) => document.querySelector(s), badge = (t,k) => `<span class="badge ${k}">${t}</span>`;
+    function select(id){const p=phases.find(x=>x.id===id)||phases[4];document.querySelectorAll(".phase").forEach(n=>n.classList.toggle("selected",n.dataset.id===p.id));$("#detailTitle").textContent=`${p.step}. ${p.title}`;$("#detailText").textContent=p.plain;$("#detailBadges").innerHTML=badge(p.severity.toUpperCase(),p.severity)+badge(p.owner,"neutral")+badge(p.state,"ok");$("#detailFields").innerHTML=[["Người mới cần hiểu",p.impact],["Tín hiệu ổn",p.healthy],["Dấu hiệu lỗi",p.failure],["Action nên có",p.action]].map(([a,b])=>`<div class="field"><span>${a}</span><strong>${b}</strong></div>`).join("")}
+    function renderFlow(){ $("#flowNodes").innerHTML=phases.map(p=>`<button class="phase" data-id="${p.id}" type="button"><span class="step">Bước ${p.step}</span><div class="title">${p.title}</div><div class="owner">${p.owner}</div><div class="badges">${badge(p.severity.toUpperCase(),p.severity)}${badge(p.state,"neutral")}</div></button>`).join("");document.querySelectorAll(".phase").forEach(n=>n.addEventListener("click",()=>select(n.dataset.id)));select("startup");filterFlow();}
+    function filterFlow(ids){const sev=$("#severity").value,own=$("#owner").value,q=$("#search").value.toLowerCase().trim(),set=ids?new Set(ids.split(" ")):null;document.querySelectorAll(".phase").forEach(n=>{const p=phases.find(x=>x.id===n.dataset.id);const ok=(!set||set.has(p.id))&&(sev==="all"||p.severity===sev)&&(own==="all"||p.owner.includes(own))&&(!q||Object.values(p).join(" ").toLowerCase().includes(q));n.classList.toggle("hidden",!ok);});}
+    function renderQuestions(){ $("#questionButtons").innerHTML=questions.map(([label,ids])=>`<button class="button" data-ids="${ids}" type="button">${label}</button>`).join("");document.querySelectorAll("#questionButtons .button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#questionButtons .button").forEach(x=>x.classList.remove("active"));b.classList.add("active");filterFlow(b.dataset.ids);location.hash="#flow";}));}
+    function renderErrors(){const q=$("#errorSearch").value.toLowerCase().trim();const rows=errors.filter(e=>!q||e.join(" ").toLowerCase().includes(q));$("#errorCards").innerHTML=rows.length?rows.map(([title,summary,phase,cause,better])=>`<details><summary>${title} ${badge(phase,"neutral")}</summary><p class="note" style="margin-top:8px">${summary}</p><div class="grid two" style="margin-top:10px"><div class="field"><span>Root cause có thể</span><strong>${cause}</strong></div><div class="field"><span>Nên cải thiện</span><strong>${better}</strong></div></div></details>`).join(""):`<div class="empty">Không có lỗi khớp.</div>`;}
+    function renderStatic(){ $("#timelineSteps").innerHTML=timeline.map((t,i)=>`<div class="tick"><strong>${String(i+1).padStart(2,"0")}</strong><code>${t}</code></div>`).join("");$("#actionList").innerHTML=actions.map(([p,t,b])=>`<article class="action"><strong class="${p==="P0"?"p0":"p1"}">${p}</strong><div><h3>${t}</h3><p class="note">${b}</p></div></article>`).join("");$("#diagnostic").textContent=JSON.stringify(diagnostic,null,2);}
+    $("#severity").addEventListener("change",()=>filterFlow());$("#owner").addEventListener("change",()=>filterFlow());$("#search").addEventListener("input",()=>filterFlow());$("#errorSearch").addEventListener("input",renderErrors);$("#reset").addEventListener("click",()=>{$("#severity").value="all";$("#owner").value="all";$("#search").value="";document.querySelectorAll("#questionButtons .button").forEach(x=>x.classList.remove("active"));filterFlow();});
+    renderQuestions();renderFlow();renderErrors();renderStatic();
+  </script>
+</body>
+</html>

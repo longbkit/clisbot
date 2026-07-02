@@ -48,6 +48,7 @@ Examples:
 ## Related Research
 
 - [Slack Latency And Stability Audit](../../../research/channels/2026-04-10-slack-latency-and-stability-audit.md)
+- [Channel To Runner Stability Failure Map](../../../research/runners/2026-06-09-channel-to-runner-stability-failure-map.md)
 
 ## Dependencies
 

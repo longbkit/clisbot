@@ -64,6 +64,7 @@ That only stays coherent if backend-specific behavior is isolated behind a stand
 
 ## Related Research
 
+- [ACP Operational Effort And Codex Decision Inputs](../../research/runners/2026-07-02-acp-operational-effort-and-codex-decision.md)
 - [ACP Codex And Claude Support Mechanics](../../research/runners/2026-04-05-acp-codex-and-claude-support-mechanics.md)
 - [Codex Vs Claude CLI Integration Checklist](../../research/runners/2026-04-05-codex-vs-claude-cli-integration-checklist.md)
 

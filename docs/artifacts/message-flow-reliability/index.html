@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>clisbot · Message Flow Reliability Map</title>
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1d2330; --muted:#5b6577; --line:#e4e8ef;
+    --accent:#3b6ef5; --accent-soft:#eaf0ff;
+    --ok:#1f9d6b; --ok-soft:#e6f6ef;
+    --warn:#c98a00; --warn-soft:#fbf2dc;
+    --err:#d8453a; --err-soft:#fdecea;
+    --crit:#a5281f;
+    --heat0:#eef1f6; --heat1:#ffe9c7; --heat2:#ffc98a; --heat3:#ff9a6b; --heat4:#e8553f;
+    --shadow:0 1px 3px rgba(20,30,55,.06),0 6px 24px rgba(20,30,55,.06);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;font-size:14px}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 80px}
+  h1{font-size:24px;margin:0 0 4px;letter-spacing:-.4px}
+  h2{font-size:16px;margin:34px 0 12px;letter-spacing:-.2px;display:flex;align-items:center;gap:9px}
+  h2 .n{width:23px;height:23px;border-radius:7px;background:var(--accent);color:#fff;font-size:12px;display:grid;place-items:center;font-weight:700}
+  .sub{color:var(--muted);margin:0 0 6px;max-width:820px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0 6px;font-size:12px;color:var(--muted)}
+  .legend b{color:var(--ink)}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--line)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+  /* pipeline */
+  .pipe{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:6px 2px 14px}
+  .stage{flex:1 0 132px;min-width:132px;position:relative}
+  .stage .card{cursor:pointer;background:var(--panel);border:1.5px solid var(--line);border-radius:13px;padding:12px 11px;height:100%;box-shadow:var(--shadow);transition:.15s;position:relative}
+  .stage .card:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .stage.sel .card{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+  .stage .lyr{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .stage .ttl{font-weight:700;font-size:13.5px;margin:3px 0 7px;letter-spacing:-.2px}
+  .stage .path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--muted);word-break:break-all}
+  .stage .heatbar{position:absolute;left:11px;right:11px;bottom:9px;height:5px;border-radius:5px;background:var(--heat0)}
+  .stage .arrowdn{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:3;color:#aeb6c4;font-size:18px}
+  .stage:last-child .arrowdn{display:none}
+  .flowlabel{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:2px 4px 0;font-weight:600}
+  .badgecount{position:absolute;top:-7px;right:-7px;background:var(--err);color:#fff;font-size:10px;font-weight:700;border-radius:20px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px;box-shadow:var(--shadow)}
+  .badgecount.zero{background:var(--ok)}
+
+  /* detail */
+  .detail{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:0;box-shadow:var(--shadow);overflow:hidden;margin-top:4px}
+  .detail .head{padding:16px 18px;border-bottom:1px solid var(--line);background:linear-gradient(0deg,#fbfcfe,#fff)}
+  .detail .head h3{margin:0;font-size:17px;letter-spacing:-.3px}
+  .detail .head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  .cell{padding:15px 18px;border-top:1px solid var(--line)}
+  .cell:nth-child(odd){border-right:1px solid var(--line)}
+  .cell h4{margin:0 0 9px;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+  .states{display:flex;flex-wrap:wrap;gap:6px}
+  .state{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:7px;background:var(--ok-soft);color:var(--ok);border:1px solid #cdeede}
+  ul.clean{margin:0;padding-left:17px}
+  ul.clean li{margin:5px 0}
+  .tag{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:6px;margin-left:4px;vertical-align:middle}
+  .t-resend{background:var(--err-soft);color:var(--err)}
+  .t-admin{background:var(--warn-soft);color:var(--warn)}
+  .t-opaque{background:#efeaff;color:#6b46d8}
+
+  /* error catalog */
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 16px}
+  .filters button{font:inherit;font-size:12px;font-weight:600;padding:6px 13px;border-radius:9px;border:1.5px solid var(--line);background:#fff;cursor:pointer;color:var(--muted);transition:.12s}
+  .filters button.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .errs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){.errs{grid-template-columns:1fr}}
+  .ec{background:var(--panel);border:1px solid var(--line);border-left-width:5px;border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .ec.sev-crit{border-left-color:var(--crit)}
+  .ec.sev-high{border-left-color:var(--err)}
+  .ec.sev-med{border-left-color:var(--warn)}
+  .ec .ehead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .ec .etitle{font-weight:700;font-size:14px;letter-spacing:-.2px}
+  .ec .esev{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:3px 8px;border-radius:7px;white-space:nowrap}
+  .esev.sev-crit{background:#f7dedb;color:var(--crit)}
+  .esev.sev-high{background:var(--err-soft);color:var(--err)}
+  .esev.sev-med{background:var(--warn-soft);color:var(--warn)}
+  .ec code.msg{display:block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;background:#f3f5f9;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:9px 0;color:#3a4256;white-space:pre-wrap;word-break:break-word}
+  .ec .kv{margin:7px 0;font-size:12.5px}
+  .ec .kv b{color:var(--muted);font-weight:700;display:block;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;margin-bottom:1px}
+  .ec .src{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--muted);margin-top:9px}
+  .ec .tags{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px}
+  .ec .tags .tag{margin:0}
+
+  /* heat / recs */
+  .heatrow{display:flex;align-items:center;gap:12px;margin:8px 0}
+  .heatrow .lbl{width:210px;font-size:12.5px;font-weight:600;flex-shrink:0}
+  .heatrow .track{flex:1;height:22px;border-radius:7px;background:var(--heat0);position:relative;overflow:hidden}
+  .heatrow .fill{height:100%;border-radius:7px;display:flex;align-items:center;padding-left:9px;color:#fff;font-size:11px;font-weight:700}
+  .heatrow .note{width:300px;font-size:11.5px;color:var(--muted);flex-shrink:0}
+  @media(max-width:820px){.heatrow .note{display:none}.heatrow .lbl{width:130px}}
+  .recs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:820px){.recs{grid-template-columns:1fr}}
+  .reccol{background:var(--panel);border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);overflow:hidden}
+  .reccol .rh{padding:13px 15px;font-weight:700;font-size:14px;color:#fff}
+  .reccol.simplify .rh{background:#5b6577}
+  .reccol.addlogic .rh{background:var(--accent)}
+  .reccol.stabilize .rh{background:var(--ok)}
+  .reccol .rb{padding:6px 15px 14px}
+  .reccol .ri{padding:11px 0;border-bottom:1px solid var(--line)}
+  .reccol .ri:last-child{border-bottom:none}
+  .reccol .ri .rt{font-weight:700;font-size:12.5px}
+  .reccol .ri .rd{font-size:12px;color:var(--muted);margin-top:3px}
+  .reccol .ri .where{font-size:10px;font-family:ui-monospace,monospace;color:var(--accent);margin-top:5px}
+  .foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+  .note-box{background:var(--accent-soft);border:1px solid #cdd9fb;border-radius:11px;padding:13px 16px;font-size:13px;margin:14px 0}
+  .note-box b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>clisbot · Bản đồ độ ổn định luồng tin nhắn</h1>
+  <p class="sub">Từ lúc người dùng nhắn ở channel → các tầng bên dưới → trả kết quả về. Mỗi bước hiển thị <b>trạng thái</b>, <b>lỗi</b>, <b>root cause</b>, <b>người dùng làm gì tiếp</b>, <b>admin làm gì</b>, và <b>khoảng mù quan sát (observability gap)</b>. Mục tiêu: thấy lỗ hổng tập trung ở đâu, đơn giản hoá ở đâu, thêm logic ở đâu.</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--ok)"></span> <b>Trạng thái bình thường</b></span>
+    <span><span class="chip t-resend">RESEND</span> Buộc nhắn lại</span>
+    <span><span class="chip t-admin">ADMIN</span> Phụ thuộc admin</span>
+    <span><span class="chip t-opaque">ROOT-CAUSE MỜ</span> Không rõ nguyên nhân</span>
+    <span>🔥 Độ tập trung lỗi (heat) tăng dần</span>
+  </div>
+
+  <div class="note-box">
+    <b>Đọc nhanh:</b> lỗ hổng <b>tập trung gần như toàn bộ ở tầng Runner ↔ tmux</b> (bootstrap, submit, capture session-id, resume) — nơi clisbot phải "đọc màn hình terminal" và đoán trạng thái bằng cách so sánh pane. Đây là điểm cần <b>đơn giản hoá heuristic</b> + <b>thêm tín hiệu xác nhận xác định</b>, và là nguồn của hầu hết lỗi "phải nhắn lại hoài".
+  </div>
+
+  <h2><span class="n">1</span> Luồng xử lý (bấm vào từng bước để xem chi tiết)</h2>
+  <div class="flowlabel"><span>⬇ Chiều đi: tin nhắn người dùng đi xuống backend</span><span>⬆ Chiều về: kết quả render lại channel</span></div>
+  <div class="pipe" id="pipe"></div>
+  <div class="detail" id="detail"></div>
+
+  <h2><span class="n">2</span> Danh mục lỗi &amp; root cause</h2>
+  <p class="sub">5 lỗi bạn nêu + các lỗi liên quan cùng ảnh hưởng trải nghiệm. Lọc theo tác động để thấy nhóm "buộc nhắn lại" và "phụ thuộc admin".</p>
+  <div class="filters" id="filters">
+    <button data-f="all" class="on">Tất cả</button>
+    <button data-f="resend">🔁 Buộc nhắn lại</button>
+    <button data-f="admin">🛟 Phụ thuộc admin</button>
+    <button data-f="opaque">❓ Root cause mờ</button>
+    <button data-f="crit">🔴 Nghiêm trọng</button>
+  </div>
+  <div class="errs" id="errs"></div>
+
+  <h2><span class="n">3</span> Lỗ hổng tập trung ở đâu (heat theo tầng)</h2>
+  <p class="sub">Điểm số = mức độ tập trung lỗi gây gián đoạn trải nghiệm ở mỗi tầng (kết hợp số lỗi, tần suất, và mức "buộc nhắn lại / cần admin").</p>
+  <div id="heat"></div>
+
+  <h2><span class="n">4</span> Khuyến nghị: đơn giản hoá / thêm logic / ổn định hoá</h2>
+  <div class="recs" id="recs"></div>
+
+  <div class="foot">
+    Nguồn dữ liệu: <code>docs/architecture/*</code> + mã nguồn thực tế — <code>src/runners/tmux/session-handshake.ts</code>, <code>src/agents/runtime/runner-service.ts</code>, <code>src/agents/session/session-service.ts</code>, <code>src/agents/session/run-recovery.ts</code>. Bản đồ phản ánh kiến trúc 6 tầng (channels · config · auth · agents · runners · tmux) và ghi chú "RunnerService/SessionService chưa hội tụ hoàn toàn" trong runtime-architecture.md.
+  </div>
+</div>
+
+<script>
+const STAGES = [
+  {
+    id:"channel", layer:"Channel", dir:"down", heat:1,
+    title:"Channel Ingress", path:"src/channels (slack · telegram · zalo)",
+    desc:"Nhận tin nhắn vào, map thread/reply về đúng surface, nhận lệnh (/new, transcript). Lỗi transport phải ở phạm vi channel, không được giết run.",
+    states:["received","threaded","deduped","dispatched"],
+    errors:["Transport gửi/sửa tin lỗi (degrade 1 observer)","Mất kết nối bot / webhook","Mapping thread sai surface"],
+    root:"Provider API chập chờn, webhook trễ, hoặc reply map sai. Theo contract, đây KHÔNG được biến thành lỗi run.",
+    userAct:"Thường tự phục hồi; nếu không thấy phản hồi, gửi lại trong cùng thread.",
+    adminAct:"Kiểm tra route trong clisbot.json + token bot; xem log channel.",
+    gap:"Khó phân biệt 'channel im lặng' với 'run đang chạy nhưng update bị rớt'."
+  },
+  {
+    id:"config", layer:"Configuration", dir:"down", heat:1,
+    title:"Configuration", path:"src/config · src/channels/config",
+    desc:"Control plane cục bộ: resolve route → agent, chọn runner, policy session, workspace mặc định.",
+    states:["route-resolved","policy-loaded","workspace-resolved"],
+    errors:["Route không khớp agent","Config/credential thiếu hoặc sai schema","CLISBOT_HOME/path env sai"],
+    root:"clisbot.json hoặc env (CLISBOT_HOME, CLISBOT_CONFIG_PATH) không khớp; route chưa được map.",
+    userAct:"Không tự xử lý được — báo admin (đây là cấu hình hệ thống).",
+    adminAct:"Sửa route mapping / env; reload config; xác minh bằng `bun run status`.",
+    gap:"Lỗi config thường lộ ở tầng dưới (runner) chứ không báo sớm tại đây."
+  },
+  {
+    id:"auth", layer:"Auth", dir:"down", heat:0,
+    title:"Auth", path:"src/auth",
+    desc:"Resolve quyền hiệu lực, owner claim, thứ tự phân giải quyền, contract enforce.",
+    states:["role-resolved","owner-claimed","permission-granted"],
+    errors:["Chưa pair / chưa claim owner","Permission bị từ chối","Pairing hết hạn"],
+    root:"Người dùng/route chưa được cấp quyền hoặc owner claim chưa hoàn tất.",
+    userAct:"Chạy luồng pairing; hoặc nhờ owner cấp quyền.",
+    adminAct:"Xác nhận pairing store + role; cấp quyền/owner.",
+    gap:"Từ chối quyền dễ bị hiểu nhầm là 'bot lỗi' nếu thông điệp không rõ."
+  },
+  {
+    id:"agents", layer:"Agents · Session", dir:"down", heat:3,
+    title:"SessionService", path:"src/agents/session",
+    desc:"Backend-agnostic: session-key routing, admission, queue, active-run truth, run monitor, và recovery state machine (resume → fresh → manual /new).",
+    states:["idle","queued","admitted","running","detached","recovering","failed"],
+    errors:[
+      "Active run disappeared during startup (session-service.ts:282)",
+      "Runtime stopped before the active run finished startup",
+      "manual-new-required / fresh-required (recovery cạn lượt)",
+      "Stale persisted runtime: nói 'running' nhưng tmux đã mất"
+    ],
+    root:"In-memory active run bị clear trong cửa sổ bootstrap (race giữa ingress liveness probe, monitor, và stop runtime). Recovery 2 lượt: resume → nếu còn stored id thì giữ lại & yêu cầu /new; nếu không thì fresh nhưng không replay prompt.",
+    userAct:"Tuỳ thông điệp: gửi lại prompt; hoặc /new rồi gửi lại. Đây là nguồn chính của 'phải nhắn lại'.",
+    adminAct:"Xem run monitor + log; kiểm tra có ai stop runtime/đụng tmux không.",
+    gap:"Thông điệp 'disappeared during startup' rất generic — không nói VÌ SAO biến mất, nên cả user lẫn admin đều khó truy root cause."
+  },
+  {
+    id:"runner", layer:"Runner", dir:"down", heat:4,
+    title:"RunnerService", path:"src/agents/runtime/runner-service.ts",
+    desc:"Backend-specific: readiness, bootstrap/resume session, submit input, capture snapshot, capture/persist sessionId, recovery backend. (Doc ghi: hiện còn ôm cả việc của SessionService → chưa hội tụ.)",
+    states:["launching","bootstrapping","ready","capturing-id","reused","resuming"],
+    errors:[
+      "did not reach the configured ready state within 60000ms (runner-service.ts:612)",
+      "Last visible pane: ERROR: No saved session found with ID … (resume id chết)",
+      "could not capture a durable session id yet (session-service.ts:127)",
+      "tmux session \"…\" does not exist (createIfMissing=false)"
+    ],
+    root:"Launch `resume <storedSessionId>` nhưng backend (Codex) không còn session đó → CLI đứng ở màn hình ERROR → không khớp readyPattern → chờ đủ 60s rồi fail. Hoặc bắt sessionId từ output không được trong ngân sách retry → không resumable.",
+    userAct:"Thường phải /new để tạo conversation mới rồi gửi lại; chờ 60s là trải nghiệm tệ.",
+    adminAct:"Xoá/identify stored session id chết; kiểm tra startupReadyPattern + startupDelayMs; xem snapshot pane cuối.",
+    gap:"Pane error có chứa root cause ('No saved session found') NHƯNG bị chôn trong timeout 60s generic; không có pre-flight validate id trước khi launch."
+  },
+  {
+    id:"tmux", layer:"Runner · tmux", dir:"down", heat:4,
+    title:"Tmux Runner", path:"src/runners/tmux",
+    desc:"Chạy native CLI trong tmux. Paste prompt → confirm bằng diff pane → Enter → confirm submit bằng diff pane. Capture session-id từ output. Resume/relaunch.",
+    states:["pane-spawned","trust-prompt","paste-confirmed","submit-confirmed","id-captured","settled"],
+    errors:[
+      "TmuxSubmitUnconfirmedError: submit was not confirmed after Enter",
+      "TmuxPasteUnconfirmedError: paste not confirmed after 3 attempts",
+      "TmuxBootstrapSessionLostError: can't find session / server unavailable",
+      "Trust/update prompt chặn bootstrap"
+    ],
+    root:"Xác nhận paste & submit dựa trên POLL DIFF của pane (cursor/history/snapshot) trong cửa sổ rất ngắn (≈160–320ms). Khi terminal bận/chậm/redraw, diff không đổi → coi như chưa submit dù thực tế có thể đã gửi. Đây là heuristic màn-hình mong manh.",
+    userAct:"Gửi lại prompt (clisbot không tự replay khi unconfirmed).",
+    adminAct:"Attach tmux pane xem trực tiếp; nới các hằng số timeout; kiểm tra tốc độ máy/CLI.",
+    gap:"Không có acknowledgment xác định từ runner → mọi xác nhận đều là suy đoán từ pixel/text. Rủi ro cả false-negative (đã gửi mà báo lỗi) lẫn false-positive."
+  },
+  {
+    id:"render", layer:"Channel ⬆", dir:"up", heat:1,
+    title:"Channel Render (chiều về)", path:"src/channels (chat-first)",
+    desc:"Stream nội dung mới có ý nghĩa, ẩn chrome của runner, settle về 1 câu trả lời sạch. Transcript đầy đủ chỉ qua lệnh tường minh.",
+    states:["streaming","settled","final-only-fallback"],
+    errors:["Edit/post update thất bại tạm thời (miss update giữa chừng)","Observer bị detach"],
+    root:"Lỗi gửi/sửa tin tạm thời ở provider. Theo contract: run vẫn chạy dưới supervision, channel cố phục hồi ở lần gửi sau.",
+    userAct:"Đợi update sau; yêu cầu transcript nếu nghi ngờ bị thiếu.",
+    adminAct:"Xem run còn sống không (monitor) vs channel chỉ mất hiển thị.",
+    gap:"User thấy 'im lặng' dễ tưởng treo và gửi lại → tạo run/queue thừa."
+  },
+  {
+    id:"control", layer:"Control", dir:"side", heat:1,
+    title:"Control (operator)", path:"src/control",
+    desc:"Bề mặt cho admin: inspect state, attach session, restart/stop, health/log/debug. Tiêu thụ auth cho check operator.",
+    states:["inspecting","attached","restarting","reporting"],
+    errors:["Status/diagnostic đọc state cũ (cross-process cache)","Không hiển thị root cause của lần fail gần nhất"],
+    root:"State in-memory là process-local; CLI một-shot có thể đọc cache cũ nếu không reload/validate version file.",
+    userAct:"—",
+    adminAct:"Dùng status/logs/attach; nhưng hiện thiếu 1 lệnh in 'root cause + action gợi ý' của lỗi gần nhất.",
+    gap:"Admin nhìn vào cũng khó biết root cause — đúng pain point bạn nêu. Cần error code có cấu trúc + diagnostic surface."
+  }
+];
+
+const ERRORS = [
+  {
+    title:"Active run disappeared during startup",
+    sev:"high", stage:"agents",
+    msg:'Runner session "agent-default-slack-channel-…-thread-…" disappeared during startup.',
+    rootc:"In-memory active run bị clear trong cửa sổ bootstrap — race giữa ingress liveness probe / run monitor / stop runtime. Theo doc: ingress KHÔNG nên clear active run chỉ vì 1 probe tmux fail (sẽ skip recovery path).",
+    user:"Gửi lại prompt.", admin:"Xem run monitor & log; kiểm tra có thao tác stop/restart runtime hoặc đụng tmux song song không.",
+    src:"src/agents/session/session-service.ts:282",
+    resend:true, admindep:true, opaque:true
+  },
+  {
+    title:"Previous runner session could not be resumed → /new",
+    sev:"high", stage:"agents",
+    msg:"The previous runner session could not be resumed. clisbot preserved the stored session id instead of opening a new conversation automatically. Use /new if you want to trigger a new runner conversation, then resend the prompt.",
+    rootc:"Recovery resume thất bại nhưng vẫn còn storedSessionId → clisbot CHỌN giữ id cũ thay vì tự mở mới (manual-new-required), để tránh mất context ngoài ý muốn. Hệ quả: user phải tự /new + gửi lại.",
+    user:"Gõ /new rồi gửi lại prompt.", admin:"Xác minh vì sao resume fail (id chết? backend reset?).",
+    src:"src/agents/session/run-recovery.ts:38 ← session-service.ts:837",
+    resend:true, admindep:false, opaque:false
+  },
+  {
+    title:"tmux submit was not confirmed after Enter",
+    sev:"high", stage:"tmux",
+    msg:"TmuxSubmitUnconfirmedError: tmux submit was not confirmed after Enter. The pane state did not change, so clisbot did not treat the prompt as truthfully submitted.",
+    rootc:"Sau khi gửi Enter, clisbot poll diff pane (cursor/history/snapshot) trong ~160–320ms. Nếu terminal bận/chậm/redraw, diff không đổi → coi như chưa submit (đã retry Enter 1 lần). Có thể false-negative: thực tế đã gửi.",
+    user:"Gửi lại prompt.", admin:"Attach pane xem trực tiếp; nới SUBMIT_CONFIRM_MAX_WAIT_MS; kiểm tra tải máy/CLI.",
+    src:"src/runners/tmux/session-handshake.ts:54,128–157",
+    resend:true, admindep:false, opaque:true
+  },
+  {
+    title:"Did not reach ready state in 60s · No saved session found",
+    sev:"crit", stage:"runner",
+    msg:'Runner session "…" did not reach the configured ready state within 60000ms. Last visible pane: ERROR: No saved session found with ID 019e8b71-… Run codex resume without an ID to choose from existing sessions.',
+    rootc:"clisbot launch `codex resume <storedSessionId>` nhưng backend không còn session đó → CLI đứng ở màn hình ERROR → không bao giờ khớp startupReadyPattern → chờ đủ startupDelayMs (60s) rồi abort. Root cause THẬT (id chết) nằm trong pane nhưng bị bọc bởi timeout generic.",
+    user:"/new để tạo session mới rồi gửi lại; 60s chờ là trải nghiệm rất tệ.", admin:"Pre-flight: validate stored id trước khi resume; hoặc clear stored id chết.",
+    src:"src/agents/runtime/runner-service.ts:584–615",
+    resend:true, admindep:true, opaque:true
+  },
+  {
+    title:"Could not capture a durable session id yet",
+    sev:"med", stage:"runner",
+    msg:"Runner session started, but clisbot could not capture a durable session id yet. This session is running, but it is not resumable until a session id is captured and persisted.",
+    rootc:"Session chạy được nhưng clisbot không bắt được sessionId từ output pane trong ngân sách retry (format status đổi, captureLines ít, runner in chậm). Run hiện tại OK nhưng MỌI resume sau này sẽ fail → mầm mống cho lỗi 'No saved session found' về sau.",
+    user:"Hiện không phải gửi lại; nhưng nếu mất kết nối sau đó sẽ phải /new.", admin:"Kiểm tra status command + pattern bắt id; tăng captureLines; cân nhắc đọc id từ file state/wrapper thay vì scrape.",
+    src:"src/agents/session/session-service.ts:127",
+    resend:false, admindep:true, opaque:true
+  },
+  {
+    title:"tmux paste was not confirmed (3 attempts)",
+    sev:"high", stage:"tmux",
+    msg:"TmuxPasteUnconfirmedError: tmux paste was not confirmed after 3 delivery attempts. clisbot did not send Enter because the prompt was not truthfully visible in the pane.",
+    rootc:"Cùng họ với submit-unconfirmed: xác nhận paste dựa trên diff pane; sau 3 lần không thấy thay đổi thì bỏ, không gửi Enter. An toàn (không gửi nhầm) nhưng buộc user nhắn lại.",
+    user:"Gửi lại prompt.", admin:"Nới PASTE_SETTLE_* timeout; kiểm tra prompt CLI có đang ở trạng thái nhận input.",
+    src:"src/runners/tmux/session-handshake.ts:45–52,541–594",
+    resend:true, admindep:false, opaque:true
+  },
+  {
+    title:"tmux bootstrap lost session",
+    sev:"high", stage:"tmux",
+    msg:'TmuxBootstrapSessionLostError: tmux bootstrap lost session "…": can\'t find session / failed to connect to server.',
+    rootc:"Trong lúc bootstrap, tmux server/session biến mất (server crash, bị kill, máy quá tải). Phân biệt với 'missing target' tạm thời (retry được).",
+    user:"Thường được recovery xử lý; nếu fail thì gửi lại.", admin:"Kiểm tra sức khoẻ tmux server / tài nguyên host.",
+    src:"src/runners/tmux/session-handshake.ts:35–43,736–747",
+    resend:false, admindep:true, opaque:false
+  },
+  {
+    title:"Fresh session opened, prompt not replayed",
+    sev:"med", stage:"agents",
+    msg:"clisbot opened a new fresh session, but did not replay your prompt because the prior conversation context is no longer guaranteed. Please resend the full prompt/context to continue.",
+    rootc:"Recovery cạn lượt, không còn stored id → tự mở session mới nhưng cố ý KHÔNG replay prompt (tránh chạy nhầm với context khác). User mất prompt cũ.",
+    user:"Gửi lại đầy đủ prompt/context.", admin:"—",
+    src:"src/agents/session/run-recovery.ts:40 (fresh-required)",
+    resend:true, admindep:false, opaque:false
+  }
+];
+
+const HEAT = [
+  {lbl:"Runner · tmux", score:4, note:"Submit/paste/bootstrap — xác nhận bằng diff màn hình, mong manh nhất"},
+  {lbl:"RunnerService", score:4, note:"Resume id chết, timeout 60s, capture id fail"},
+  {lbl:"Agents · Session", score:3, note:"Race startup, recovery state machine, 'disappeared'"},
+  {lbl:"Channel (đi & về)", score:1, note:"Transport degrade — đã có contract giữ surface-local"},
+  {lbl:"Configuration", score:1, note:"Lỗi config thường lộ muộn ở tầng dưới"},
+  {lbl:"Control", score:1, note:"Thiếu surface in root cause cho admin"},
+  {lbl:"Auth", score:0, note:"Ít gây gián đoạn nhắn tin lặp lại"}
+];
+
+const RECS = {
+  simplify:[
+    {rt:"Bỏ heuristic diff pane để xác nhận submit/paste", rd:"Thay xác nhận bằng poll cursor/history/snapshot bằng 1 tín hiệu xác định hơn (wrapper echo marker / sentinel). Đây là nguồn của submit/paste-unconfirmed.", where:"src/runners/tmux/session-handshake.ts"},
+    {rt:"Hội tụ RunnerService ↔ SessionService", rd:"Doc ghi runner đang ôm cả quyết định continuity/sessionId. Dồn mọi quyết định continuity về SessionService → recovery chỉ 1 owner, dễ suy luận.", where:"runtime-architecture.md · runner-service.ts"},
+    {rt:"Gom các hằng số timeout", rd:"~12 hằng PASTE/SUBMIT/SETTLE rải rác → gom thành vài 'budget' có tên & tài liệu, giảm tuning mò.", where:"session-handshake.ts:14–30"}
+  ],
+  addlogic:[
+    {rt:"Pre-flight validate stored sessionId", rd:"Trước khi launch `resume <id>`, kiểm tra backend có session đó không. Nếu không → fresh ngay + báo user, KHÔNG chờ 60s rồi fail.", where:"runner-service.ts (trước waitForTmuxSessionBootstrap)"},
+    {rt:"Error code có cấu trúc {code, layer, root, user-next, admin-next}", rd:"Mỗi lỗi mang theo nguyên nhân + hành động cho cả user lẫn admin. Giải đúng 3 pain: không biết làm gì tiếp, phụ thuộc admin, không ai biết root cause.", where:"run-recovery.ts · mapSessionError"},
+    {rt:"Auto-replay prompt (idempotent resend)", rd:"Đệm prompt người dùng; khi recovery thành công thì tự gửi lại thay vì bắt user 'nhắn lại hoài'. Giết pain point lớn nhất.", where:"session-service.ts (recovery + queue)"},
+    {rt:"Fallback bắt sessionId không qua scrape", rd:"Nếu pattern fail, đọc id từ file state/wrapper emit thay vì đọc pane → giảm 'could not capture durable id'.", where:"runner-service.ts · session-handshake.ts"}
+  ],
+  stabilize:[
+    {rt:"1 recovery state machine dùng chung", rd:"Cùng vocabulary cho channel & control: resume→fresh→manual-new. Hiển thị nhất quán cho user và admin.", where:"run-recovery.ts · control"},
+    {rt:"Diagnostic 'last failure' cho admin", rd:"Lệnh control in root cause + snapshot pane + action gợi ý của lần fail gần nhất → admin không phải đoán.", where:"src/control"},
+    {rt:"Tách 'channel im lặng' vs 'run còn sống'", rd:"Tín hiệu rõ để user không gửi lại nhầm khi run vẫn chạy → giảm run/queue rác.", where:"src/channels (render) · run monitor"}
+  ]
+};
+
+// ---- render pipeline
+const heatColors=["var(--heat0)","var(--heat1)","var(--heat2)","var(--heat3)","var(--heat4)"];
+const pipe=document.getElementById('pipe');
+STAGES.forEach((s,i)=>{
+  const errc = ERRORS.filter(e=>e.stage===s.id).length;
+  const dirArrow = s.dir==="up" ? "⬆" : (s.dir==="side"?"⬌":"");
+  const el=document.createElement('div');
+  el.className='stage'+(i===0?' sel':'');
+  el.dataset.id=s.id;
+  el.innerHTML=`
+    <div class="card">
+      ${errc?`<span class="badgecount">${errc}</span>`:`<span class="badgecount zero">0</span>`}
+      <div class="lyr">${s.layer} ${dirArrow}</div>
+      <div class="ttl">${s.title}</div>
+      <div class="path">${s.path}</div>
+      <div class="heatbar" style="background:${heatColors[s.heat]}"></div>
+    </div>
+    <div class="arrowdn">›</div>`;
+  el.querySelector('.card').onclick=()=>selectStage(s.id);
+  pipe.appendChild(el);
+});
+
+function selectStage(id){
+  document.querySelectorAll('.stage').forEach(n=>n.classList.toggle('sel',n.dataset.id===id));
+  const s=STAGES.find(x=>x.id===id);
+  document.getElementById('detail').innerHTML=`
+    <div class="head">
+      <h3>${s.title} <span style="font-size:12px;font-weight:600;color:var(--muted)">· ${s.layer}</span></h3>
+      <p>${s.desc}</p>
+    </div>
+    <div class="grid2">
+      <div class="cell">
+        <h4>Trạng thái</h4>
+        <div class="states">${s.states.map(t=>`<span class="state">${t}</span>`).join('')}</div>
+      </div>
+      <div class="cell">
+        <h4>Lỗi tại bước này</h4>
+        <ul class="clean">${s.errors.map(e=>`<li>${e}</li>`).join('')}</ul>
+      </div>
+      <div class="cell">
+        <h4>Root cause</h4>
+        <div>${s.root}</div>
+      </div>
+      <div class="cell">
+        <h4>Hành động</h4>
+        <div style="margin-bottom:8px"><span class="tag t-resend">USER</span> ${s.userAct}</div>
+        <div><span class="tag t-admin">ADMIN</span> ${s.adminAct}</div>
+      </div>
+      <div class="cell" style="grid-column:1/-1">
+        <h4>Khoảng mù quan sát (observability gap)</h4>
+        <div><span class="tag t-opaque">GAP</span> ${s.gap}</div>
+      </div>
+    </div>`;
+}
+selectStage('channel');
+
+// ---- render errors
+const errsEl=document.getElementById('errs');
+function renderErrors(filter){
+  errsEl.innerHTML='';
+  ERRORS.filter(e=>{
+    if(filter==='all')return true;
+    if(filter==='resend')return e.resend;
+    if(filter==='admin')return e.admindep;
+    if(filter==='opaque')return e.opaque;
+    if(filter==='crit')return e.sev==='crit';
+  }).forEach(e=>{
+    const tags=[];
+    if(e.resend)tags.push('<span class="tag t-resend">🔁 BUỘC NHẮN LẠI</span>');
+    if(e.admindep)tags.push('<span class="tag t-admin">🛟 PHỤ THUỘC ADMIN</span>');
+    if(e.opaque)tags.push('<span class="tag t-opaque">❓ ROOT CAUSE MỜ</span>');
+    const sevTxt={crit:'NGHIÊM TRỌNG',high:'CAO',med:'TRUNG BÌNH'}[e.sev];
+    const card=document.createElement('div');
+    card.className='ec sev-'+e.sev;
+    card.innerHTML=`
+      <div class="ehead">
+        <div class="etitle">${e.title}</div>
+        <div class="esev sev-${e.sev}">${sevTxt}</div>
+      </div>
+      <code class="msg">${e.msg.replace(/</g,'&lt;')}</code>
+      <div class="kv"><b>Root cause</b>${e.rootc}</div>
+      <div class="kv"><b>User làm gì tiếp</b>${e.user}</div>
+      <div class="kv"><b>Admin làm gì</b>${e.admin}</div>
+      <div class="tags">${tags.join('')}</div>
+      <div class="src">${e.src}</div>`;
+    errsEl.appendChild(card);
+  });
+}
+renderErrors('all');
+document.querySelectorAll('#filters button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#filters button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    renderErrors(b.dataset.f);
+  };
+});
+
+// ---- render heat
+const heatEl=document.getElementById('heat');
+const maxScore=4;
+HEAT.forEach(h=>{
+  const pct=Math.max(8,(h.score/maxScore)*100);
+  const row=document.createElement('div');
+  row.className='heatrow';
+  row.innerHTML=`
+    <div class="lbl">${h.lbl}</div>
+    <div class="track"><div class="fill" style="width:${pct}%;background:${heatColors[h.score]}">${'🔥'.repeat(h.score)||'•'}</div></div>
+    <div class="note">${h.note}</div>`;
+  heatEl.appendChild(row);
+});
+
+// ---- render recs
+const recsEl=document.getElementById('recs');
+const colMeta={simplify:['simplify','Đơn giản hoá'],addlogic:['addlogic','Thêm logic'],stabilize:['stabilize','Ổn định hoá']};
+Object.keys(RECS).forEach(k=>{
+  const [cls,title]=colMeta[k];
+  const col=document.createElement('div');
+  col.className='reccol '+cls;
+  col.innerHTML=`<div class="rh">${title}</div><div class="rb">${
+    RECS[k].map(r=>`<div class="ri"><div class="rt">${r.rt}</div><div class="rd">${r.rd}</div><div class="where">⤷ ${r.where}</div></div>`).join('')
+  }</div>`;
+  recsEl.appendChild(col);
+});
+</script>
+</body>
+</html>
