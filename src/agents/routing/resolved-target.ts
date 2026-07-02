@@ -84,8 +84,13 @@ function resolveAgentTargetInternal(
     sessionName,
     workspacePath,
     runner: {
+      backend: override?.runner?.backend ?? runnerFamily.backend ?? "tmux",
       command: override?.runner?.command ?? runnerFamily.command,
       args: override?.runner?.args ?? runnerFamily.args,
+      env: {
+        ...(runnerFamily.env ?? {}),
+        ...(override?.runner?.env ?? {}),
+      },
       trustWorkspace:
         override?.runner?.defaults?.trustWorkspace ??
         runnerDefaults.trustWorkspace,

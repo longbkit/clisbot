@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isValidLoopTimezone } from "../../agents/loops/loop-command.ts";
+import { RUNNER_BACKEND_IDS } from "../../runners/contract/capabilities.ts";
 import {
   INTERACTIVE_CLI_STARTUP_DELAY_MS,
   SUPPORTED_AGENT_CLI_TOOLS,
@@ -62,9 +63,15 @@ const runnerStartupBlockerSchema = z.object({
   message: z.string().min(1),
 });
 
+// Backend selection stays optional in persisted config; target resolution
+// defaults to "tmux" so existing configs keep their exact persisted shape.
+const runnerBackendSchema = z.enum(RUNNER_BACKEND_IDS);
+
 const runnerLaunchSchema = z.object({
+  backend: runnerBackendSchema.optional(),
   command: z.string().min(1),
   args: z.array(z.string()).default([]),
+  env: z.record(z.string(), z.string()).optional(),
   startupDelayMs: z.number().int().positive().optional(),
   startupRetryCount: z.number().int().min(0).optional(),
   startupRetryDelayMs: z.number().int().min(0).optional(),
@@ -136,8 +143,10 @@ const runnerDefaultsOverrideSchema = z.object({
 const runnerFamilySchema = runnerLaunchSchema;
 
 const runnerFamilyOverrideSchema = z.object({
+  backend: runnerBackendSchema.optional(),
   command: z.string().min(1).optional(),
   args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
   startupDelayMs: z.number().int().positive().optional(),
   startupRetryCount: z.number().int().min(0).optional(),
   startupRetryDelayMs: z.number().int().min(0).optional(),
@@ -321,8 +330,10 @@ const agentBootstrapSchema = z.object({
 
 const agentRunnerOverrideSchema = z.object({
   defaults: runnerDefaultsOverrideSchema.optional(),
+  backend: runnerBackendSchema.optional(),
   command: z.string().min(1).optional(),
   args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
   startupDelayMs: z.number().int().positive().optional(),
   startupRetryCount: z.number().int().min(0).optional(),
   startupRetryDelayMs: z.number().int().min(0).optional(),

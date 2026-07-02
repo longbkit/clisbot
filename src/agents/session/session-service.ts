@@ -6,15 +6,13 @@ import {
 } from "./run-observation.ts";
 import type { LiveSessionRuntimeInfo, AgentSessionState } from "./session-state.ts";
 import type { AgentSessionTarget, ResolvedAgentTarget } from "../routing/resolved-target.ts";
-import { deriveInteractionText, normalizePaneText } from "../../runners/transcript/index.ts";
+import { deriveInteractionText } from "../../runners/transcript/index.ts";
 import {
   buildRunRecoveryNote,
   mergeRunSnapshot,
   MID_RUN_RECOVERY_CONTINUE_PROMPT,
   MID_RUN_RECOVERY_MAX_ATTEMPTS,
 } from "./run-recovery.ts";
-import { TmuxClient } from "../../runners/tmux/client.ts";
-import { monitorTmuxRun } from "../../runners/tmux/run-monitor.ts";
 import { RunnerService } from "../runtime/runner-service.ts";
 import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 
@@ -51,24 +49,9 @@ type ActiveRun = {
 
 const OBSERVER_RETRYABLE_FAILURE_LIMIT = 3;
 const DETACHED_OBSERVER_INTERVAL_MS = 5 * 60_000;
-const TMUX_MISSING_SESSION_PATTERN = /(?:can't find session:|no server running on )/i;
-const TMUX_SERVER_UNAVAILABLE_PATTERN = /(?:No such file or directory|error connecting to|failed to connect to server)/i;
 
 function formatObserverError(error: unknown) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
-}
-
-function isMissingTmuxSessionError(error: unknown) {
-  return error instanceof Error && TMUX_MISSING_SESSION_PATTERN.test(error.message);
-}
-
-function isTmuxServerUnavailableError(error: unknown) {
-  return error instanceof Error && TMUX_SERVER_UNAVAILABLE_PATTERN.test(error.message);
-}
-
-function isBootstrapSessionLostError(error: unknown) {
-  return error instanceof Error && /tmux session disappeared before startup finished|tmux server became unavailable before startup finished/i
-    .test(error.message);
 }
 
 function listObserverErrorCodes(error: unknown): string[] {
@@ -176,7 +159,6 @@ export class SessionService {
   private stopping = false;
 
   constructor(
-    private readonly tmux: TmuxClient,
     private readonly sessionState: AgentSessionState,
     private readonly runnerSessions: RunnerService,
     private readonly resolveTarget: (target: AgentSessionTarget) => ResolvedAgentTarget,
@@ -209,12 +191,12 @@ export class SessionService {
       if (this.activeRuns.has(entry.sessionKey)) {
         continue;
       }
-      const resolved = this.resolveTarget({
+      const target = {
         agentId: entry.agentId,
         sessionKey: entry.sessionKey,
-      });
-      if (!(await this.tmux.hasSession(resolved.sessionName))) {
-        await this.sessionState.setSessionRuntime(resolved, {
+      };
+      if (!(await this.runnerSessions.hasLiveSession(target))) {
+        await this.sessionState.setSessionRuntime(this.resolveTarget(target), {
           state: "idle",
         });
       }
@@ -477,6 +459,7 @@ export class SessionService {
           target.sessionKey,
           {
             runId: run.runId,
+            target,
           },
           error,
         )
@@ -712,6 +695,7 @@ export class SessionService {
     sessionKey: string,
     params: {
       runId: string;
+      target: AgentSessionTarget;
       prompt?: string;
       startedAt: number;
       detachedAlready: boolean;
@@ -723,7 +707,7 @@ export class SessionService {
     if (
       !params.prompt ||
       params.promptRetryAttempt ||
-      !this.runnerSessions.canRetryPromptAfterFreshStart(error)
+      !this.runnerSessions.canRetryPromptAfterFreshStart(params.target, error)
     ) {
       return false;
     }
@@ -774,6 +758,7 @@ export class SessionService {
         sessionKey,
         run.runId,
         await this.runnerSessions.mapRunError(
+          target,
           restartError,
           run.resolved.sessionName,
           run.latestUpdate.fullSnapshot,
@@ -787,12 +772,13 @@ export class SessionService {
     sessionKey: string,
     params: {
       runId: string;
+      target: AgentSessionTarget;
       timingContext?: RunObserver["timingContext"];
       recoveryAttempt?: number;
     },
     error: unknown,
   ): Promise<boolean> {
-    if (!this.runnerSessions.canRecoverMidRun(error)) {
+    if (!this.runnerSessions.canRecoverMidRun(params.target, error)) {
       return false;
     }
 
@@ -847,12 +833,13 @@ export class SessionService {
     } catch (reopenError) {
       if (
         recoveryAttempt < MID_RUN_RECOVERY_MAX_ATTEMPTS &&
-        this.runnerSessions.canRecoverMidRun(reopenError)
+        this.runnerSessions.canRecoverMidRun(target, reopenError)
       ) {
         return await this.recoverLostMidRun(
           sessionKey,
           {
             runId: params.runId,
+            target,
             timingContext: params.timingContext,
             recoveryAttempt: recoveryAttempt + 1,
           },
@@ -888,6 +875,7 @@ export class SessionService {
           sessionKey,
           currentRun.runId,
           await this.runnerSessions.mapRunError(
+            target,
             freshError,
             currentRun.resolved.sessionName,
             currentRun.latestUpdate.fullSnapshot,
@@ -934,22 +922,17 @@ export class SessionService {
     }
 
     void (async () => {
+      const runTarget = {
+        agentId: run.resolved.agentId,
+        sessionKey: run.resolved.sessionKey,
+      };
       try {
         if (!params.prompt) {
           run.steeringReady = true;
         }
-        await monitorTmuxRun({
-          tmux: this.tmux,
-          sessionName: run.resolved.sessionName,
+        await this.runnerSessions.monitorRun({
+          resolved: run.resolved,
           prompt: params.prompt,
-          promptSubmitDelayMs: run.resolved.runner.promptSubmitDelayMs,
-          trustWorkspace: run.resolved.runner.trustWorkspace,
-          startupDelayMs: run.resolved.runner.startupDelayMs,
-          captureLines: run.resolved.stream.captureLines,
-          updateIntervalMs: run.resolved.stream.updateIntervalMs,
-          idleTimeoutMs: run.resolved.stream.idleTimeoutMs,
-          noOutputTimeoutMs: run.resolved.stream.noOutputTimeoutMs,
-          maxRuntimeMs: run.resolved.stream.maxRuntimeMs,
           startedAt: params.startedAt,
           initialSnapshot: params.initialSnapshot,
           detachedAlready: params.detachedAlready,
@@ -1025,6 +1008,7 @@ export class SessionService {
             sessionKey,
             {
               runId: params.runId,
+              target: runTarget,
               prompt: params.prompt,
               startedAt: params.startedAt,
               detachedAlready: params.detachedAlready,
@@ -1041,6 +1025,7 @@ export class SessionService {
             sessionKey,
             {
               runId: params.runId,
+              target: runTarget,
               timingContext: params.timingContext,
               recoveryAttempt: (params.recoveryAttempt ?? 0) + 1,
             },
@@ -1053,6 +1038,7 @@ export class SessionService {
           sessionKey,
           params.runId,
           await this.runnerSessions.mapRunError(
+            runTarget,
             error,
             run.resolved.sessionName,
             run.latestUpdate.fullSnapshot,
@@ -1078,7 +1064,7 @@ export class SessionService {
     }
 
     const resolved = this.resolveTarget(target);
-    if (!(await this.tmux.hasSession(resolved.sessionName))) {
+    if (!(await this.runnerSessions.hasLiveSession(target))) {
       await this.sessionState.setSessionRuntime(resolved, {
         state: "idle",
       });
@@ -1091,11 +1077,7 @@ export class SessionService {
         startedAt: entry.runtime.startedAt,
       });
     } catch (error) {
-      if (
-        isMissingTmuxSessionError(error) ||
-        isTmuxServerUnavailableError(error) ||
-        isBootstrapSessionLostError(error)
-      ) {
+      if (this.runnerSessions.isSessionLoss(target, error)) {
         await this.sessionState.setSessionRuntime(resolved, {
           state: "idle",
         });
@@ -1117,9 +1099,12 @@ export class SessionService {
       return existingRun;
     }
 
-    const fullSnapshot = normalizePaneText(
-      await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-    );
+    const fullSnapshot = (
+      await this.runnerSessions.captureTranscript({
+        agentId: resolved.agentId,
+        sessionKey: resolved.sessionKey,
+      })
+    ).snapshot;
     const startedAt = params.startedAt ?? Date.now();
     const runId = this.allocateRunId();
     const initialResult = createDeferred<AgentExecutionResult>();

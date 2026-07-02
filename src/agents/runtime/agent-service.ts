@@ -130,7 +130,6 @@ export class AgentService {
 
   private createSessionService() {
     return new SessionService(
-      this.tmuxClient,
       this.sessionState,
       this.runnerSessions,
       (target) => this.resolveTarget(target),

@@ -12,7 +12,6 @@ import type { AgentSessionState } from "../../src/agents/session/session-state.t
 import type { ResolvedAgentTarget } from "../../src/agents/routing/resolved-target.ts";
 import type { RunnerService } from "../../src/agents/runtime/runner-service.ts";
 import type { RunObserver, RunUpdate } from "../../src/agents/session/run-observation.ts";
-import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 import { createManager, createResolvedTarget, createRun, createUpdate } from "./session-service-support.ts";
 
 describe("SessionService active run behavior", () => {
@@ -29,7 +28,6 @@ describe("SessionService active run behavior", () => {
       workspacePath: resolved.workspacePath,
     }));
     const manager = new SessionService(
-      {} as TmuxClient,
       {
         markPromptAdmitted: async () => undefined,
         setSessionRuntime,
@@ -78,7 +76,6 @@ describe("SessionService active run behavior", () => {
       initialSnapshot: "reopened pane",
     }));
     const manager = new SessionService(
-      {} as TmuxClient,
       {
         getEntry: async () => null,
         setSessionRuntime: async () => undefined,
@@ -113,12 +110,14 @@ describe("SessionService active run behavior", () => {
 
   test("observeRun rehydrates a persisted active run before attach falls back to transcript", async () => {
     const resolved = createResolvedTarget();
-    const capturePane = mock(async () => "Still working through the repository.");
+    const captureTranscript = mock(async () => ({
+      agentId: resolved.agentId,
+      sessionKey: resolved.sessionKey,
+      sessionName: resolved.sessionName,
+      workspacePath: resolved.workspacePath,
+      snapshot: "Still working through the repository.",
+    }));
     const manager = new SessionService(
-      {
-        hasSession: async () => true,
-        capturePane,
-      } as unknown as TmuxClient,
       {
         markPromptAdmitted: async () => undefined,
         getEntry: async () => ({
@@ -132,7 +131,10 @@ describe("SessionService active run behavior", () => {
           },
         }),
       } as unknown as AgentSessionState,
-      {} as RunnerService,
+      {
+        hasLiveSession: async () => true,
+        captureTranscript,
+      } as unknown as RunnerService,
       () => resolved,
     ) as any;
     manager.startRunMonitor = mock(() => undefined);
@@ -152,7 +154,7 @@ describe("SessionService active run behavior", () => {
     expect(observation.active).toBe(true);
     expect(observation.update.status).toBe("running");
     expect(observation.update.snapshot).toContain("Still working through the repository.");
-    expect(capturePane).toHaveBeenCalledTimes(1);
+    expect(captureTranscript).toHaveBeenCalledTimes(1);
     expect(manager.startRunMonitor).toHaveBeenCalledTimes(1);
     expect(manager.activeRuns.get(resolved.sessionKey)?.observers.has("attach-thread")).toBe(true);
   });
@@ -169,9 +171,6 @@ describe("SessionService active run behavior", () => {
     }));
     const manager = new SessionService(
       {
-        hasSession: async () => false,
-      } as unknown as TmuxClient,
-      {
         markPromptAdmitted: async () => undefined,
         getEntry: async () => ({
           agentId: resolved.agentId,
@@ -186,6 +185,7 @@ describe("SessionService active run behavior", () => {
         setSessionRuntime,
       } as unknown as AgentSessionState,
       {
+        hasLiveSession: async () => false,
         captureTranscript,
       } as unknown as RunnerService,
       () => resolved,
@@ -222,9 +222,6 @@ describe("SessionService active run behavior", () => {
     const setSessionRuntime = mock(async () => undefined);
     const manager = new SessionService(
       {
-        hasSession: async (sessionName: string) => sessionName === liveResolved.sessionName,
-      } as unknown as TmuxClient,
-      {
         listEntries: async () => [
           {
             agentId: resolved.agentId,
@@ -249,7 +246,10 @@ describe("SessionService active run behavior", () => {
         ],
         setSessionRuntime,
       } as unknown as AgentSessionState,
-      {} as RunnerService,
+      {
+        hasLiveSession: async (target: { sessionKey: string }) =>
+          target.sessionKey === liveResolved.sessionKey,
+      } as unknown as RunnerService,
       (target) => target.sessionKey === liveResolved.sessionKey ? liveResolved : resolved,
     ) as any;
     manager.startRunMonitor = mock(() => undefined);
@@ -306,9 +306,6 @@ describe("SessionService active run behavior", () => {
     });
     const manager = new SessionService(
       {
-        hasSession: async () => false,
-      } as unknown as TmuxClient,
-      {
         markPromptAdmitted: async () => undefined,
         getEntry: async () => ({
           agentId: resolved.agentId,
@@ -323,6 +320,7 @@ describe("SessionService active run behavior", () => {
         setSessionRuntime,
       } as unknown as AgentSessionState,
       {
+        hasLiveSession: async () => false,
         ensureRunnerReady,
       } as unknown as RunnerService,
       () => resolved,
@@ -360,14 +358,12 @@ describe("SessionService active run behavior", () => {
     });
     const manager = new SessionService(
       {
-        hasSession: async () => false,
-      } as unknown as TmuxClient,
-      {
         markPromptAdmitted: async () => undefined,
         getEntry: async () => undefined,
         setSessionRuntime,
       } as unknown as AgentSessionState,
       {
+        hasLiveSession: async () => false,
         ensureRunnerReady,
       } as unknown as RunnerService,
       () => resolved,
@@ -402,7 +398,6 @@ describe("SessionService active run behavior", () => {
     const updates: RunUpdate[] = [];
     const setSessionRuntime = mock(async () => undefined);
     const manager = new SessionService(
-      {} as TmuxClient,
       {
         getEntry: async () => null,
         markPromptAdmitted: async () => undefined,

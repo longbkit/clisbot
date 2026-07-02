@@ -1,1330 +1,149 @@
-import { dirname } from "node:path";
+// RunnerService is the thin backend-owned orchestrator over the runner
+// contract. It selects the configured backend per agent target and delegates
+// every backend operation to that RunnerBackend implementation. Backend
+// mechanics live in src/runners/<backend>/; session continuity decisions stay
+// in SessionService.
+
 import type { AgentSessionTarget, ResolvedAgentTarget } from "../routing/resolved-target.ts";
-import { SessionMapping } from "../session/session-mapping.ts";
-import { applyTemplate, ensureDir } from "../../infra/paths.ts";
-import { sleep } from "../../infra/process.ts";
-import { normalizePaneText } from "../../runners/transcript/index.ts";
+import type { SessionMapping } from "../session/session-mapping.ts";
 import type { LoadedConfig } from "../../config/core/load-config.ts";
-import { TmuxClient } from "../../runners/tmux/client.ts";
-import { renderCliCommand } from "../../control/commands/cli-name.ts";
-import {
-  captureTmuxSessionIdentity,
-  acceptTmuxStartupContinuePromptIfPresent,
-  submitTmuxSessionInput,
-  TmuxBootstrapSessionLostError,
-  TmuxPasteUnconfirmedError,
-  TmuxSubmitUnconfirmedError,
-  tmuxPaneHasStartupContinuePrompt,
-  waitForTmuxSessionBootstrap,
-} from "../../runners/tmux/session-handshake.ts";
-import {
-  ensureTmuxShellPane,
-  runTmuxShellCommand,
-} from "../../runners/tmux/shell-command.ts";
-import {
-  paneShowsResumeRejected,
-  RunnerResumeRejectedError,
-} from "../../runners/resume-rejection.ts";
-import {
-  paneShowsRunnerStateContention,
-  paneShowsRunnerStateCorruption,
-  RunnerStateContentionError,
-  RunnerStateCorruptionError,
-} from "../../runners/runner-state-failures.ts";
-import { buildResumeRejectedFreshStartNote } from "../session/run-recovery.ts";
-import {
-  buildRunnerLaunchCommand,
-  clearRunnerExitRecord,
-  ensureClisbotWrapper,
-  ensureRunnerExitRecordDir,
-  getClisbotWrapperDir,
-  getClisbotWrapperPath,
-  readRunnerExitRecord,
-} from "../../control/commands/clisbot-wrapper.ts";
-import { paneShowsRunnerExitSentinel } from "../../control/runner/runner-exit-diagnostics.ts";
-import { logLatencyDebug, type LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
+import type { LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
+import type { RunnerBackendId } from "../../runners/contract/capabilities.ts";
+import type {
+  EnsureRunnerReadyOptions,
+  EnsureSessionReadyOptions,
+  RunMonitorParams,
+  RunnerBackend,
+  ShellCommandResult,
+} from "../../runners/contract/runner-backend.ts";
+import { TmuxRunnerBackend } from "../../runners/tmux/backend.ts";
+import type { TmuxClient } from "../../runners/tmux/client.ts";
 
-export type ShellCommandResult = {
-  agentId: string;
-  sessionKey: string;
-  sessionName: string;
-  workspacePath: string;
-  command: string;
-  output: string;
-  exitCode: number;
-  timedOut: boolean;
-};
-
-const TMUX_MISSING_SESSION_PATTERN = /(?:can't find session:|no server running on )/i;
-const TMUX_SERVER_UNAVAILABLE_PATTERN = /(?:No such file or directory|error connecting to|failed to connect to server)/i;
-const TMUX_DUPLICATE_SESSION_PATTERN = /duplicate session:/i;
-const TMUX_TRANSIENT_TARGET_PATTERN =
-  /(?:no current target|can't find pane|can't find window|no such pane|no such window|tmux pane state unavailable)/i;
-const SESSION_READY_CAPTURE_RETRY_COUNT = 5;
-const SESSION_READY_CAPTURE_RETRY_DELAY_MS = 100;
-const STARTUP_SESSION_ID_CAPTURE_RETRY_COUNT = 2;
-const STARTUP_SESSION_ID_CAPTURE_RETRY_DELAY_MS = 500;
-const SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS = 15_000;
-
-type SessionErrorAction =
-  | "during startup"
-  | "before prompt submission"
-  | "while the prompt was running";
-
-type EnsureSessionReadyOptions = {
-  allowFreshRetry?: boolean;
-  remainingFreshRetries?: number;
-  timingContext?: LatencyDebugContext;
-  startupNotes?: string[];
-};
-
-function summarizeSnapshot(snapshot: string) {
-  const compact = snapshot
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .join(" ")
-    .slice(0, 220);
-  return compact ? ` Last visible pane: ${compact}` : "";
-}
-
-function isTmuxDuplicateSessionError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return TMUX_DUPLICATE_SESSION_PATTERN.test(message);
-}
-
-function isMissingTmuxSessionError(error: unknown) {
-  return error instanceof Error && TMUX_MISSING_SESSION_PATTERN.test(error.message);
-}
-
-function isTmuxServerUnavailableError(error: unknown) {
-  return error instanceof Error && TMUX_SERVER_UNAVAILABLE_PATTERN.test(error.message);
-}
-
-function isTransientTmuxTargetError(error: unknown) {
-  return error instanceof Error && TMUX_TRANSIENT_TARGET_PATTERN.test(error.message);
-}
-
-function isBootstrapSessionLostError(error: unknown) {
-  return error instanceof TmuxBootstrapSessionLostError;
-}
-
-function isRecoverableStartupSessionLoss(error: unknown) {
-  return (
-    isMissingTmuxSessionError(error) ||
-    isTmuxServerUnavailableError(error) ||
-    isBootstrapSessionLostError(error)
-  );
-}
-
-function isFreshStartRetryablePromptDeliveryError(error: unknown) {
-  return error instanceof TmuxPasteUnconfirmedError || error instanceof TmuxSubmitUnconfirmedError;
-}
-
-function isRetryableFreshStartFault(error: unknown) {
-  return (
-    isRecoverableStartupSessionLoss(error) ||
-    isTransientTmuxTargetError(error) ||
-    isFreshStartRetryablePromptDeliveryError(error)
-  );
-}
-
-function canRestartWithStoredSessionId(resolved: ResolvedAgentTarget) {
-  return (
-    resolved.runner.sessionId.resume.mode === "command" ||
-    resolved.runner.sessionId.create.mode === "explicit"
-  );
-}
+export type { ShellCommandResult } from "../../runners/contract/runner-backend.ts";
 
 export class RunnerService {
-  private cleanupInFlight = false;
-  private readonly sessionIdentityCaptureRetryAt = new Map<string, number>();
+  private readonly backends = new Map<RunnerBackendId, RunnerBackend>();
 
   constructor(
-    private readonly loadedConfig: LoadedConfig,
-    private readonly tmux: TmuxClient,
+    loadedConfig: LoadedConfig,
+    tmux: TmuxClient,
     private readonly resolveTarget: (target: AgentSessionTarget) => ResolvedAgentTarget,
-    private readonly sessionMapping: SessionMapping,
-  ) {}
-
-  private async mapSessionError(
-    error: unknown,
-    sessionName: string,
-    action: SessionErrorAction,
-    lastSnapshot = "",
+    sessionMapping: SessionMapping,
   ) {
-    if (isRecoverableStartupSessionLoss(error)) {
-      const exitRecord = await readRunnerExitRecord(this.loadedConfig.stateDir, sessionName);
-      const paneSnapshot =
-        lastSnapshot ||
-        (error instanceof TmuxBootstrapSessionLostError ? error.lastSnapshot : "");
-      console.error("runner session disappeared", {
-        sessionName,
-        action,
-        exitCode: exitRecord?.exitCode,
-        exitedAt: exitRecord?.exitedAt,
-        runnerCommand: exitRecord?.command,
-        lastVisiblePane: paneSnapshot ? summarizeSnapshot(paneSnapshot).trim() : undefined,
-      });
-      const exitDetail =
-        typeof exitRecord?.exitCode === "number"
-          ? ` The runner process exited with code ${exitRecord.exitCode}.`
-          : "";
-      const nextStep =
-        action === "while the prompt was running"
-          ? `The prompt may have partially run; check ${renderCliCommand("watch --latest --lines 100", { inline: true })} before resending.`
-          : "Your prompt was not submitted; resend it to retry.";
-      return new Error(
-        `Runner session "${sessionName}" disappeared ${action}.${exitDetail} ${nextStep} If this keeps happening, verify the runner CLI starts cleanly in the workspace terminal and inspect ${renderCliCommand("logs", { inline: true })}.${summarizeSnapshot(paneSnapshot)}`,
-      );
-    }
-
-    if (isTransientTmuxTargetError(error)) {
-      return new Error(
-        `Runner session "${sessionName}" lost its tmux target ${action}. clisbot stayed alive, but this request could not continue cleanly. Retry once. If it keeps happening, inspect ${renderCliCommand("status", { inline: true })} and ${renderCliCommand("logs", { inline: true })}.${summarizeSnapshot(lastSnapshot)}`,
-      );
-    }
-
-    return error instanceof Error ? error : new Error(String(error));
-  }
-
-  private buildRunnerArgs(
-    resolved: ResolvedAgentTarget,
-    params: { sessionId?: string; resume?: boolean },
-  ) {
-    const values = {
-      agentId: resolved.agentId,
-      workspace: resolved.workspacePath,
-      sessionName: resolved.sessionName,
-      sessionKey: resolved.sessionKey,
-      sessionId: params.sessionId ?? "",
-    };
-    const sessionId = params.sessionId?.trim();
-
-    if (sessionId && params.resume && resolved.runner.sessionId.resume.mode === "command") {
-      return {
-        command: resolved.runner.sessionId.resume.command ?? resolved.runner.command,
-        args: resolved.runner.sessionId.resume.args.map((value) => applyTemplate(value, values)),
-      };
-    }
-
-    const args = [...resolved.runner.args];
-    if (sessionId && resolved.runner.sessionId.create.mode === "explicit") {
-      args.push(...resolved.runner.sessionId.create.args);
-    }
-
-    return {
-      command: resolved.runner.command,
-      args: args.map((value) => applyTemplate(value, values)),
-    };
-  }
-
-  private async syncActiveSessionMappingForResolvedTarget(resolved: ResolvedAgentTarget) {
-    const existing = await this.sessionMapping.get(resolved.sessionKey);
-    if (existing?.sessionId) {
-      await this.recordActiveSessionIdBestEffort(
-        resolved,
-        existing.sessionId,
-        resolved.runner.command,
-      );
-      return existing;
-    }
-
-    const retryAt = this.sessionIdentityCaptureRetryAt.get(resolved.sessionKey) ?? 0;
-    if (retryAt > Date.now()) {
-      return this.sessionMapping.touch(resolved, {
-        runnerCommand: resolved.runner.command,
-      });
-    }
-
-    let sessionId: string | null;
-    try {
-      sessionId = await this.captureSessionIdFromRunner(resolved);
-    } catch (error) {
-      if (isFreshStartRetryablePromptDeliveryError(error)) {
-        this.sessionIdentityCaptureRetryAt.set(
-          resolved.sessionKey,
-          Date.now() + SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS,
-        );
-      }
-      throw error;
-    }
-    if (sessionId) {
-      await this.recordActiveSessionIdBestEffort(
-        resolved,
-        sessionId,
-        resolved.runner.command,
-      );
-      return {
-        sessionId,
-      };
-    }
-
-    this.deferSessionIdCapture(resolved.sessionKey);
-    return this.sessionMapping.touch(resolved, {
-      runnerCommand: resolved.runner.command,
-    });
-  }
-
-  private recordActiveSessionId(
-    resolved: ResolvedAgentTarget,
-    sessionId: string,
-    runnerCommand = resolved.runner.command,
-  ) {
-    this.sessionIdentityCaptureRetryAt.delete(resolved.sessionKey);
-    return this.sessionMapping.setActive(resolved, {
-      sessionId,
-      runnerCommand,
-    });
-  }
-
-  private async recordActiveSessionIdBestEffort(
-    resolved: ResolvedAgentTarget,
-    sessionId: string,
-    runnerCommand = resolved.runner.command,
-  ) {
-    try {
-      await this.recordActiveSessionId(resolved, sessionId, runnerCommand);
-      return true;
-    } catch (error) {
-      this.warnStartupSessionIdentityDegraded(resolved, error);
-      return false;
-    }
-  }
-
-  private deferSessionIdCapture(sessionKey: string) {
-    this.sessionIdentityCaptureRetryAt.set(
-      sessionKey,
-      Date.now() + SESSION_ID_CAPTURE_FAILURE_COOLDOWN_MS,
+    this.registerBackend(
+      new TmuxRunnerBackend(loadedConfig, tmux, resolveTarget, sessionMapping),
     );
   }
 
-  private async captureSessionIdFromRunner(
-    resolved: ResolvedAgentTarget,
-    options: { forceStatusCommand?: boolean } = {},
-  ) {
-    const capture = resolved.runner.sessionId.capture;
-    if (capture.mode !== "status-command" && !options.forceStatusCommand) {
-      return null;
-    }
-
-    return captureTmuxSessionIdentity({
-      tmux: this.tmux,
-      sessionName: resolved.sessionName,
-      promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
-      captureLines: resolved.stream.captureLines,
-      statusCommand: capture.statusCommand,
-      pattern: capture.pattern,
-      timeoutMs: capture.timeoutMs,
-      pollIntervalMs: capture.pollIntervalMs,
-    });
+  registerBackend(backend: RunnerBackend) {
+    this.backends.set(backend.id, backend);
   }
 
-  private async retryRunnerRestartPreservingSessionId(
-    target: AgentSessionTarget,
-    resolved: ResolvedAgentTarget,
-    remainingFreshRetries: number,
-    startupNotes?: string[],
-  ) {
-    if (remainingFreshRetries <= 0) {
-      return null;
-    }
-
-    await this.killRunnerAndPreserveSessionId(resolved);
-    if (resolved.runner.startupRetryDelayMs > 0) {
-      await sleep(resolved.runner.startupRetryDelayMs);
-    }
-    return this.ensureSessionReady(target, {
-      remainingFreshRetries: remainingFreshRetries - 1,
-      startupNotes,
-    });
+  backendFor(target: AgentSessionTarget): RunnerBackend {
+    return this.backendForResolved(this.resolveTarget(target));
   }
 
-  // Maps a lingering post-exit pane to the truthful failure class. State-db
-  // contention is transient (retry with the preserved session id), state-db
-  // corruption is permanent (operator repair), anything else flows into the
-  // existing recoverable startup-loss handling with the pane as evidence.
-  private classifyRunnerStartupExit(resolved: ResolvedAgentTarget, snapshot: string) {
-    if (paneShowsRunnerStateCorruption(snapshot)) {
-      return new RunnerStateCorruptionError(resolved.sessionName, snapshot);
-    }
-    if (paneShowsRunnerStateContention(snapshot)) {
-      return new RunnerStateContentionError(resolved.sessionName, snapshot);
-    }
-    return new TmuxBootstrapSessionLostError(
-      resolved.sessionName,
-      "runner exited during startup",
-      snapshot,
-    );
-  }
-
-  private async retryAfterStateContention(
-    target: AgentSessionTarget,
-    resolved: ResolvedAgentTarget,
-    remainingFreshRetries: number,
-    startupNotes?: string[],
-  ) {
-    if (remainingFreshRetries <= 0) {
-      return null;
-    }
-
-    const attempt = resolved.runner.startupRetryCount - remainingFreshRetries + 1;
-    const backoffMs =
-      resolved.runner.startupRetryDelayMs * attempt + Math.floor(Math.random() * 250);
-    console.log(
-      `clisbot runner state database contention for ${resolved.sessionName}; retrying startup with the preserved session id in ${backoffMs}ms`,
-    );
-    await this.killRunnerAndPreserveSessionId(resolved);
-    if (backoffMs > 0) {
-      await sleep(backoffMs);
-    }
-    return this.ensureSessionReady(target, {
-      remainingFreshRetries: remainingFreshRetries - 1,
-      startupNotes,
-    });
-  }
-
-  private async retryAfterStartupFault(
-    target: AgentSessionTarget,
-    resolved: ResolvedAgentTarget,
-    error: unknown,
-    remainingFreshRetries: number,
-    allowFreshResumeFallback: boolean,
-    startupNotes?: string[],
-  ) {
-    if (error instanceof RunnerStateContentionError) {
-      return this.retryAfterStateContention(
-        target,
-        resolved,
-        remainingFreshRetries,
-        startupNotes,
-      );
-    }
-    if (error instanceof RunnerStateCorruptionError) {
-      return null;
-    }
-
-    if (allowFreshResumeFallback) {
-      const fallback = await this.fallBackToFreshAfterRejectedResume(
-        target,
-        resolved,
-        error,
-        remainingFreshRetries,
-        startupNotes,
-      );
-      if (fallback) {
-        return fallback;
-      }
-    }
-
-    if (!isRetryableFreshStartFault(error)) {
-      return null;
-    }
-
-    return this.retryRunnerRestartPreservingSessionId(
-      target,
-      resolved,
-      remainingFreshRetries,
-      startupNotes,
-    );
-  }
-
-  // Decides whether a startup failure means the stored session id can no
-  // longer be resumed. "rejected" is definitive runner output; "exit" means
-  // the resume launch kept dying after the preserved-session-id retries.
-  private async classifyRejectedResumeStartup(
-    resolved: ResolvedAgentTarget,
-    error: unknown,
-    remainingFreshRetries: number,
-  ): Promise<{ storedSessionId: string; reason: "rejected" | "exit" } | null> {
-    const storedSessionId =
-      (await this.sessionMapping.get(resolved.sessionKey))?.sessionId?.trim() || "";
-    if (!storedSessionId) {
-      return null;
-    }
-
-    if (error instanceof RunnerResumeRejectedError) {
-      return { storedSessionId, reason: "rejected" };
-    }
-    if (
-      error instanceof TmuxBootstrapSessionLostError &&
-      paneShowsResumeRejected(error.lastSnapshot)
-    ) {
-      return { storedSessionId, reason: "rejected" };
-    }
-
-    if (!isRecoverableStartupSessionLoss(error)) {
-      return null;
-    }
-    if (
-      resolved.runner.sessionId.resume.mode !== "command" ||
-      resolved.runner.sessionId.create.mode !== "runner"
-    ) {
-      return null;
-    }
-    if (remainingFreshRetries > 0) {
-      // Let the preserved-session-id resume retries run first; fall back to a
-      // fresh conversation only when resume keeps dying.
-      return null;
-    }
-
-    const exitRecord = await readRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-    if (!exitRecord || exitRecord.exitCode === 0) {
-      return null;
-    }
-    return { storedSessionId, reason: "exit" };
-  }
-
-  private async fallBackToFreshAfterRejectedResume(
-    target: AgentSessionTarget,
-    resolved: ResolvedAgentTarget,
-    error: unknown,
-    remainingFreshRetries: number,
-    startupNotes?: string[],
-  ) {
-    const rejection = await this.classifyRejectedResumeStartup(
-      resolved,
-      error,
-      remainingFreshRetries,
-    );
-    if (!rejection) {
-      return null;
-    }
-
-    console.log(
-      `clisbot resume rejected for ${resolved.sessionName}; opening a fresh runner conversation`,
-      {
-        storedSessionId: rejection.storedSessionId,
-        reason: rejection.reason,
-      },
-    );
-    await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
-    await this.sessionMapping.clearActive(resolved, {
-      runnerCommand: resolved.runner.command,
-    });
-    startupNotes?.push(
-      buildResumeRejectedFreshStartNote({
-        storedSessionId: rejection.storedSessionId,
-        reason: rejection.reason,
-        resumeCommand: this.renderRunnerResumeCommand(resolved, rejection.storedSessionId),
-      }),
-    );
-    return this.ensureSessionReady(target, {
-      remainingFreshRetries: resolved.runner.startupRetryCount,
-      startupNotes,
-    });
-  }
-
-  private renderRunnerResumeCommand(resolved: ResolvedAgentTarget, sessionId: string) {
-    if (resolved.runner.sessionId.resume.mode !== "command") {
-      return undefined;
-    }
-    const launch = this.buildRunnerArgs(resolved, { sessionId, resume: true });
-    return [launch.command, ...launch.args].join(" ");
-  }
-
-  private async retryAfterStartupTimeout(
-    target: AgentSessionTarget,
-    resolved: ResolvedAgentTarget,
-    remainingFreshRetries: number,
-    startupNotes?: string[],
-  ) {
-    return this.retryRunnerRestartPreservingSessionId(
-      target,
-      resolved,
-      remainingFreshRetries,
-      startupNotes,
-    );
-  }
-
-  private resolveRemainingFreshRetries(
-    resolved: ResolvedAgentTarget,
-    options: {
-      allowFreshRetry?: boolean;
-      remainingFreshRetries?: number;
-    },
-  ) {
-    if (typeof options.remainingFreshRetries === "number") {
-      return options.remainingFreshRetries;
-    }
-    if (options.allowFreshRetry === false) {
-      return 0;
-    }
-    return resolved.runner.startupRetryCount;
-  }
-
-  private async abortUnreadySession(
-    resolved: ResolvedAgentTarget,
-    reason: string,
-    snapshot: string,
-  ) {
-    await this.tmux.killSession(resolved.sessionName);
-    throw new Error(`${reason}${summarizeSnapshot(snapshot)}`);
-  }
-
-  private async verifySessionReady(resolved: ResolvedAgentTarget) {
-    if (!(await this.tmux.isServerRunning())) {
-      throw new TmuxBootstrapSessionLostError(
-        resolved.sessionName,
-        "tmux server became unavailable before startup finished",
-      );
-    }
-
-    if (!(await this.tmux.hasSession(resolved.sessionName))) {
-      throw new TmuxBootstrapSessionLostError(
-        resolved.sessionName,
-        "tmux session disappeared before startup finished",
-      );
-    }
-
-    for (let attempt = 0; attempt < SESSION_READY_CAPTURE_RETRY_COUNT; attempt += 1) {
-      try {
-        const snapshot = await this.captureSessionSnapshot(resolved);
-        if (
-          tmuxPaneHasStartupContinuePrompt(snapshot, {
-            trustWorkspace: resolved.runner.trustWorkspace,
-          })
-        ) {
-          await this.acceptVisibleStartupContinuePrompt(resolved);
-          continue;
-        }
-        return;
-      } catch (error) {
-        if (isRecoverableStartupSessionLoss(error)) {
-          throw new TmuxBootstrapSessionLostError(
-            resolved.sessionName,
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-        if (
-          !isTransientTmuxTargetError(error) ||
-          attempt === SESSION_READY_CAPTURE_RETRY_COUNT - 1
-        ) {
-          throw error;
-        }
-      }
-
-      await sleep(SESSION_READY_CAPTURE_RETRY_DELAY_MS);
-    }
+  capabilitiesFor(target: AgentSessionTarget) {
+    return this.backendFor(target).capabilities;
   }
 
   async runSessionCleanup() {
-    if (this.cleanupInFlight) {
-      return;
-    }
-
-    this.cleanupInFlight = true;
-    try {
-      const entries = await this.sessionMapping.listEntries();
-      const liveSessionNames = new Set(await this.tmux.listSessions());
-      const now = Date.now();
-
-      for (const entry of entries) {
-        const resolved = this.resolveTarget({
-          agentId: entry.agentId,
-          sessionKey: entry.sessionKey,
-        });
-        const staleAfterMinutes = resolved.session.staleAfterMinutes;
-        if (staleAfterMinutes <= 0) {
-          continue;
-        }
-
-        if (now - entry.updatedAt < staleAfterMinutes * 60_000) {
-          continue;
-        }
-
-        if (entry.runtime?.state === "running" || entry.runtime?.state === "detached") {
-          continue;
-        }
-
-        if (!liveSessionNames.has(resolved.sessionName)) {
-          continue;
-        }
-
-        await this.tmux.killSession(resolved.sessionName);
-        console.log(
-          `clisbot sunset stale session ${resolved.sessionName} after ${staleAfterMinutes}m idle`,
-        );
-      }
-    } finally {
-      this.cleanupInFlight = false;
+    for (const backend of this.backends.values()) {
+      await backend.runSessionCleanup();
     }
   }
 
-  async ensureSessionReady(
-    target: AgentSessionTarget,
-    options: EnsureSessionReadyOptions = {},
-  ): Promise<ResolvedAgentTarget> {
-    await ensureClisbotWrapper();
-    const resolved = this.resolveTarget(target);
-    const timingContext = {
-      ...options.timingContext,
-      agentId: resolved.agentId,
-      sessionKey: resolved.sessionKey,
-      sessionName: resolved.sessionName,
-    };
-    const remainingFreshRetries = this.resolveRemainingFreshRetries(resolved, options);
-    logLatencyDebug("ensure-session-ready-start", timingContext);
-    await ensureDir(resolved.workspacePath);
-    await ensureDir(dirname(this.loadedConfig.raw.tmux.socketPath));
-    await ensureRunnerExitRecordDir(this.loadedConfig.stateDir, resolved.sessionName);
-    const preparedMapping = await this.sessionMapping.prepareStartup(resolved);
-    const serverRunning = await this.tmux.isServerRunning();
-
-    if (serverRunning && (await this.tmux.hasSession(resolved.sessionName))) {
-      const lingeringExitSnapshot = await this.captureSessionSnapshot(resolved).catch(() => "");
-      if (paneShowsRunnerExitSentinel(lingeringExitSnapshot)) {
-        // A failed runner is lingering for post-mortem reads only; never
-        // reuse it or submit into it. Clear it and start normally below.
-        await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
-      } else {
-        logLatencyDebug("ensure-session-ready-existing-session", timingContext, {
-          hasStoredSessionId: Boolean(preparedMapping.storedSessionId),
-        });
-        try {
-          await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-          await this.acceptStartupContinuePromptIfPresent(resolved);
-          await this.syncActiveSessionMappingForResolvedTarget(resolved);
-        } catch (error) {
-          throw await this.mapSessionError(error, resolved.sessionName, "during startup");
-        }
-        logLatencyDebug("ensure-session-ready-complete", timingContext, {
-          startupDelayMs: 0,
-          reusedSession: true,
-        });
-        return resolved;
-      }
-    }
-
-    if (!resolved.session.createIfMissing) {
-      throw new Error(`tmux session "${resolved.sessionName}" does not exist`);
-    }
-
-    const storedOrExplicitSessionId = preparedMapping.sessionId ?? "";
-    const resumingExistingSession = preparedMapping.resume;
-    const runnerLaunch = this.buildRunnerArgs(resolved, {
-      sessionId: storedOrExplicitSessionId || undefined,
-      resume: resumingExistingSession,
-    });
-    await clearRunnerExitRecord(this.loadedConfig.stateDir, resolved.sessionName);
-    const command = buildRunnerLaunchCommand({
-      command: runnerLaunch.command,
-      args: runnerLaunch.args,
-      wrapperDir: getClisbotWrapperDir(),
-      wrapperPath: getClisbotWrapperPath(),
-      sessionName: resolved.sessionName,
-      stateDir: this.loadedConfig.stateDir,
-    });
-
-    try {
-      try {
-        await this.tmux.newSession({
-          sessionName: resolved.sessionName,
-          cwd: resolved.workspacePath,
-          command,
-        });
-      } catch (error) {
-        const hasSession = await this.tmux.hasSession(resolved.sessionName);
-        if (!isTmuxDuplicateSessionError(error) || !hasSession) {
-          throw error;
-        }
-      }
-
-      logLatencyDebug("ensure-session-ready-new-session", timingContext, {
-        startupDelayMs: resolved.runner.startupDelayMs,
-        resumingExistingSession,
-        hasStoredSessionId: Boolean(preparedMapping.storedSessionId),
-      });
-      const bootstrapResult = await waitForTmuxSessionBootstrap({
-        tmux: this.tmux,
-        sessionName: resolved.sessionName,
-        captureLines: resolved.stream.captureLines,
-        startupDelayMs: resolved.runner.startupDelayMs,
-        trustWorkspace: resolved.runner.trustWorkspace,
-        readyPattern: resolved.runner.startupReadyPattern,
-        blockers: resolved.runner.startupBlockers,
-        resumeRejection:
-          resumingExistingSession && storedOrExplicitSessionId
-            ? { detect: paneShowsResumeRejected }
-            : undefined,
-        exitDetection: { detect: paneShowsRunnerExitSentinel },
-      });
-      if (bootstrapResult.status === "exited") {
-        await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
-        throw this.classifyRunnerStartupExit(resolved, bootstrapResult.snapshot);
-      }
-      if (bootstrapResult.status === "resume-rejected") {
-        // Kill the dead resume pane so a later prompt can never be submitted
-        // into the runner's session picker. Caught below: either falls back to
-        // a fresh conversation with a user-visible note, or propagates
-        // truthfully to recovery callers.
-        await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
-        throw new RunnerResumeRejectedError(
-          resolved.sessionName,
-          storedOrExplicitSessionId,
-          bootstrapResult.snapshot,
-        );
-      }
-      if (bootstrapResult.status === "blocked") {
-        await this.abortUnreadySession(
-          resolved,
-          bootstrapResult.message,
-          bootstrapResult.snapshot,
-        );
-      }
-
-      if (bootstrapResult.status === "timeout" && resolved.runner.startupReadyPattern) {
-        const retried = await this.retryAfterStartupTimeout(
-          target,
-          resolved,
-          remainingFreshRetries,
-          options.startupNotes,
-        );
-        if (retried) {
-          return retried;
-        }
-        await this.abortUnreadySession(
-          resolved,
-          `Runner session "${resolved.sessionName}" did not reach the configured ready state within ${resolved.runner.startupDelayMs}ms, so your prompt was not submitted. Verify that \`${resolved.runner.command}\` starts cleanly in the workspace terminal, then resend. Inspect ${renderCliCommand("runner inspect --latest --lines 120", { inline: true })} and ${renderCliCommand("logs", { inline: true })} if it keeps happening.`,
-          bootstrapResult.snapshot,
-        );
-      }
-
-      await this.finalizeSessionStartup(resolved, {
-        storedOrExplicitSessionId,
-        runnerCommand: runnerLaunch.command,
-      });
-    } catch (error) {
-      const retried = await this.retryAfterStartupFault(
-        target,
-        resolved,
-        error,
-        remainingFreshRetries,
-        options.allowFreshRetry !== false,
-        options.startupNotes,
-      );
-      if (retried) {
-        return retried;
-      }
-      throw await this.mapSessionError(error, resolved.sessionName, "during startup");
-    }
-
-    logLatencyDebug("ensure-session-ready-complete", timingContext, {
-      startupDelayMs: resolved.runner.startupDelayMs,
-      reusedSession: false,
-    });
-    return resolved;
+  ensureSessionReady(target: AgentSessionTarget, options: EnsureSessionReadyOptions = {}) {
+    return this.backendFor(target).ensureSessionReady(target, options);
   }
 
-  private async finalizeSessionStartup(
-    resolved: ResolvedAgentTarget,
-    params: {
-      storedOrExplicitSessionId: string;
-      runnerCommand: string;
-    },
-  ) {
-    await this.acceptStartupContinuePromptIfPresent(resolved);
-    await this.verifySessionReady(resolved);
-
-    // Startup may already know the runner-side sessionId from one of two
-    // sources: a previously storedSessionId used for continuity, or an explicit
-    // sessionId created before launch. In that branch there is nothing to
-    // capture from runner output, only to record through the session-owned
-    // continuity mapping.
-    if (params.storedOrExplicitSessionId) {
-      await this.recordActiveSessionIdBestEffort(
-        resolved,
-        params.storedOrExplicitSessionId,
-        params.runnerCommand,
-      );
-      return;
-    }
-
-    // Runner-created session ids do not exist in persistence until clisbot
-    // captures them from live runner output and records them through the
-    // session-owned continuity mapping.
-    const entry = await this.syncActiveSessionMappingForResolvedTarget(resolved);
-    if (entry?.sessionId) {
-      return;
-    }
-
-    await this.retryMissingStoredSessionIdAfterStartup(resolved);
+  ensureRunnerReady(target: AgentSessionTarget, options: EnsureRunnerReadyOptions = {}) {
+    return this.backendFor(target).ensureRunnerReady(target, options);
   }
 
-  private warnStartupSessionIdentityDegraded(
-    resolved: ResolvedAgentTarget,
-    error: unknown,
-  ) {
-    console.warn(
-      `clisbot could not persist or confirm a durable sessionId after startup for ${resolved.sessionName}; continuing without resumable state`,
-      error,
-    );
+  hasLiveSession(target: AgentSessionTarget) {
+    return this.backendFor(target).hasLiveSession(target);
   }
 
-  private async retryMissingStoredSessionIdAfterStartup(resolved: ResolvedAgentTarget) {
-    for (let attempt = 0; attempt < STARTUP_SESSION_ID_CAPTURE_RETRY_COUNT; attempt += 1) {
-      await sleep(STARTUP_SESSION_ID_CAPTURE_RETRY_DELAY_MS);
-
-      let sessionId: string | null = null;
-      try {
-        sessionId = await this.captureSessionIdFromRunner(resolved);
-      } catch (error) {
-        if (
-          isRecoverableStartupSessionLoss(error) ||
-          isTransientTmuxTargetError(error) ||
-          isFreshStartRetryablePromptDeliveryError(error)
-        ) {
-          continue;
-        }
-        return;
-      }
-
-      if (!sessionId) {
-        continue;
-      }
-
-      await this.recordActiveSessionIdBestEffort(resolved, sessionId);
-      return;
-    }
+  submitSessionInput(target: AgentSessionTarget, text: string) {
+    return this.backendFor(target).submitSessionInput(target, text);
   }
 
-  private async acceptStartupContinuePromptIfPresent(resolved: ResolvedAgentTarget) {
-    await this.acceptVisibleStartupContinuePrompt(resolved);
+  interruptSession(target: AgentSessionTarget) {
+    return this.backendFor(target).interruptSession(target);
   }
 
-  private async acceptVisibleStartupContinuePrompt(resolved: ResolvedAgentTarget) {
-    await acceptTmuxStartupContinuePromptIfPresent({
-      tmux: this.tmux,
-      sessionName: resolved.sessionName,
-      captureLines: resolved.stream.captureLines,
-      startupDelayMs: resolved.runner.startupDelayMs,
-      trustWorkspace: resolved.runner.trustWorkspace,
-    });
+  nudgeSession(target: AgentSessionTarget) {
+    return this.backendFor(target).nudgeSession(target);
   }
 
-  private async captureSessionSnapshot(resolved: ResolvedAgentTarget) {
-    return normalizePaneText(
-      await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-    );
+  triggerNewSession(target: AgentSessionTarget) {
+    return this.backendFor(target).triggerNewSession(target);
   }
 
-  async ensureRunnerReady(
-    target: AgentSessionTarget,
-    options: {
-      allowFreshRetryBeforePrompt?: boolean;
-      timingContext?: LatencyDebugContext;
-    } = {},
-  ) {
-    const startupNotes: string[] = [];
-    let resolved = await this.ensureSessionReady(target, {
-      allowFreshRetry: options.allowFreshRetryBeforePrompt,
-      timingContext: options.timingContext,
-      startupNotes,
-    });
-
-    try {
-      return {
-        resolved,
-        initialSnapshot: await this.captureSessionSnapshot(resolved),
-        startupNotes,
-      };
-    } catch (error) {
-      if (
-        options.allowFreshRetryBeforePrompt === false ||
-        !isRecoverableStartupSessionLoss(error)
-      ) {
-        throw await this.mapSessionError(
-          error,
-          resolved.sessionName,
-          "before prompt submission",
-          resolved.sessionName ? await this.captureSessionSnapshot(resolved).catch(() => "") : "",
-        );
-      }
-
-      const retried = await this.retryRunnerRestartPreservingSessionId(
-        target,
-        resolved,
-        resolved.runner.startupRetryCount,
-        startupNotes,
-      );
-      if (!retried) {
-        throw await this.mapSessionError(
-          error,
-          resolved.sessionName,
-          "before prompt submission",
-          resolved.sessionName ? await this.captureSessionSnapshot(resolved).catch(() => "") : "",
-        );
-      }
-
-      resolved = retried;
-      return {
-        resolved,
-        initialSnapshot: await this.captureSessionSnapshot(resolved),
-        startupNotes,
-      };
-    }
+  runShellCommand(target: AgentSessionTarget, command: string): Promise<ShellCommandResult> {
+    return this.backendFor(target).runShellCommand(target, command);
   }
 
-  // Post-run capture point: the pane is idle after a run settles, so this is
-  // the safest moment to retry a missed session id capture and make the
-  // conversation resumable. Deliberately bypasses the in-run capture cooldown.
-  async recaptureSessionIdAfterRun(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
-    if (resolved.runner.sessionId.capture.mode !== "status-command") {
-      return null;
-    }
-    const existing = await this.sessionMapping.get(resolved.sessionKey);
-    if (existing?.sessionId) {
-      return existing.sessionId;
-    }
-    if (!(await this.tmux.hasSession(resolved.sessionName))) {
-      return null;
-    }
-
-    let sessionId: string | null = null;
-    try {
-      sessionId = await this.captureSessionIdFromRunner(resolved);
-    } catch (error) {
-      console.warn(
-        `clisbot post-run session id recapture failed for ${resolved.sessionName}`,
-        error,
-      );
-      this.deferSessionIdCapture(resolved.sessionKey);
-      return null;
-    }
-    if (!sessionId) {
-      this.deferSessionIdCapture(resolved.sessionKey);
-      return null;
-    }
-
-    const recorded = await this.recordActiveSessionIdBestEffort(resolved, sessionId);
-    if (!recorded) {
-      return null;
-    }
-    console.log(
-      `clisbot captured durable session id after run completion for ${resolved.sessionName}`,
-    );
-    return sessionId;
+  captureTranscript(target: AgentSessionTarget) {
+    return this.backendFor(target).captureTranscript(target);
   }
 
-  canRecoverMidRun(error: unknown) {
-    return isRecoverableStartupSessionLoss(error) || isTransientTmuxTargetError(error);
+  monitorRun(params: RunMonitorParams) {
+    return this.backendForResolved(params.resolved).monitorRun(params);
   }
 
-  canRetryPromptAfterFreshStart(error: unknown) {
-    return isFreshStartRetryablePromptDeliveryError(error);
+  reopenRunContext(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
+    return this.backendFor(target).reopenRunContext(target, timingContext);
   }
 
-  async reopenRunContext(target: AgentSessionTarget, timingContext?: LatencyDebugContext) {
-    const resolved = this.resolveTarget(target);
-    const existing = await this.sessionMapping.get(resolved.sessionKey);
-    if (!existing?.sessionId || !canRestartWithStoredSessionId(resolved)) {
-      throw new Error(`Runner session "${resolved.sessionName}" cannot reopen the same conversation context.`);
-    }
-    return this.ensureRunnerReady(target, { allowFreshRetryBeforePrompt: false, timingContext });
-  }
-
-  async restartRunnerWithFreshSessionId(
+  restartRunnerPreservingSessionId(
     target: AgentSessionTarget,
     timingContext?: LatencyDebugContext,
   ) {
-    const resolved = this.resolveTarget(target);
-    await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
-    console.log(
-      `clisbot clearing stored sessionId for explicit fresh session ${resolved.sessionName}`,
-    );
-    await this.sessionMapping.clearActive(resolved, {
-      runnerCommand: resolved.runner.command,
-    });
-    return this.ensureRunnerReady(target, {
-      allowFreshRetryBeforePrompt: false,
-      timingContext,
-    });
+    return this.backendFor(target).restartRunnerPreservingSessionId(target, timingContext);
   }
 
-  async triggerNewSession(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
-    if (!(await this.tmux.hasSession(resolved.sessionName))) {
-      return this.restartRunnerWithFreshSessionIdForNewCommand(target);
-    }
-    return this.triggerNewSessionInLiveRunner(resolved);
-  }
-
-  async restartRunnerPreservingSessionId(
+  restartRunnerWithFreshSessionId(
     target: AgentSessionTarget,
     timingContext?: LatencyDebugContext,
   ) {
-    const resolved = this.resolveTarget(target);
-    await this.killRunnerAndPreserveSessionId(resolved);
-    return this.ensureRunnerReady(target, {
-      allowFreshRetryBeforePrompt: false,
-      timingContext,
-    });
+    return this.backendFor(target).restartRunnerWithFreshSessionId(target, timingContext);
   }
 
-  private async triggerNewSessionInLiveRunner(resolved: ResolvedAgentTarget) {
-    const oldSessionId = (await this.sessionMapping.get(resolved.sessionKey))?.sessionId;
-    const command = this.resolveNewSessionCommand(resolved);
-    await this.acceptStartupContinuePromptIfPresent(resolved);
-    let submitUnconfirmedError: TmuxSubmitUnconfirmedError | null = null;
-    try {
-      await this.submitNewSessionCommand(resolved, command);
-    } catch (error) {
-      if (error instanceof TmuxSubmitUnconfirmedError) {
-        submitUnconfirmedError = error;
-      } else {
-        throw error;
-      }
-    }
-    const sessionId = await this.captureNewSessionIdentityAfterTrigger(resolved, oldSessionId);
-    if (!sessionId) {
-      if (submitUnconfirmedError) {
-        throw submitUnconfirmedError;
-      }
-      this.throwNewSessionCaptureFailure(command, oldSessionId);
-    }
-    try {
-      await this.sessionMapping.setActive(resolved, {
-        sessionId,
-        runnerCommand: resolved.runner.command,
-        runtime: {
-          state: "idle",
-        },
-      });
-    } catch (error) {
-      this.throwNewSessionPersistFailure(command, sessionId, error);
-    }
-    return {
-      agentId: resolved.agentId,
-      sessionKey: resolved.sessionKey,
-      sessionName: resolved.sessionName,
-      workspacePath: resolved.workspacePath,
-      command,
-      sessionId,
-      restartedRunner: false,
-    };
+  recaptureSessionIdAfterRun(target: AgentSessionTarget) {
+    return this.backendFor(target).recaptureSessionIdAfterRun(target);
   }
 
-  private async restartRunnerWithFreshSessionIdForNewCommand(target: AgentSessionTarget) {
-    const { resolved } = await this.restartRunnerWithFreshSessionId(target);
-    const entry = await this.sessionMapping.get(resolved.sessionKey);
-    return {
-      agentId: resolved.agentId,
-      sessionKey: resolved.sessionKey,
-      sessionName: resolved.sessionName,
-      workspacePath: resolved.workspacePath,
-      command: "(fresh runner)",
-      sessionId: entry?.sessionId,
-      restartedRunner: true,
-    };
+  isSessionLoss(target: AgentSessionTarget, error: unknown) {
+    return this.backendFor(target).isSessionLoss(error);
   }
 
-  private async submitNewSessionCommand(
-    resolved: ResolvedAgentTarget,
-    command: string,
-  ) {
-    await submitTmuxSessionInput({
-      tmux: this.tmux,
-      sessionName: resolved.sessionName,
-      text: command,
-      promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
-      timingContext: undefined,
-    });
+  canRecoverMidRun(target: AgentSessionTarget, error: unknown) {
+    return this.backendFor(target).canRecoverMidRun(error);
   }
 
-  private async captureNewSessionIdentityAfterTrigger(
-    resolved: ResolvedAgentTarget,
-    oldSessionId?: string,
-  ) {
-    for (let attempt = 0; attempt < SESSION_READY_CAPTURE_RETRY_COUNT; attempt += 1) {
-      const sessionId = await this.captureSessionIdFromRunner(resolved, {
-        forceStatusCommand: true,
-      });
-      if (sessionId && sessionId !== oldSessionId) {
-        return sessionId;
-      }
-      if (attempt < SESSION_READY_CAPTURE_RETRY_COUNT - 1) {
-        await sleep(SESSION_READY_CAPTURE_RETRY_DELAY_MS);
-      }
-    }
-    return null;
+  canRetryPromptAfterFreshStart(target: AgentSessionTarget, error: unknown) {
+    return this.backendFor(target).canRetryPromptAfterFreshStart(error);
   }
 
-  private throwNewSessionCaptureFailure(
-    command: string,
-    oldSessionId?: string,
-  ): never {
-    console.log(
-      `clisbot preserved the previous stored sessionId after ${command} because status capture returned no id`,
-    );
-    throw new Error(
-      oldSessionId
-        ? `${command} completed, but clisbot could not confirm the rotated session id. The previous stored session id was preserved instead of being cleared automatically.`
-        : `${command} completed, but clisbot could not capture a new session id from the runner status command.`,
-    );
-  }
-
-  private throwNewSessionPersistFailure(
-    command: string,
-    sessionId: string,
+  mapRunError(
+    target: AgentSessionTarget,
     error: unknown,
-  ): never {
-    console.error(`clisbot failed to persist rotated sessionId after ${command}`, {
-      sessionId,
-      error,
-    });
-    const details =
-      error instanceof Error && error.message.trim()
-        ? ` Persist error: ${error.message.trim()}`
-        : "";
-    throw new Error(
-      `${command} completed and clisbot captured session id ${sessionId}, but could not persist it. The durable session mapping was left unchanged.${details}`,
-    );
+    sessionName: string,
+    lastSnapshot = "",
+  ) {
+    return this.backendFor(target).mapRunError(error, sessionName, lastSnapshot);
   }
 
-  private async killRunnerAndPreserveSessionId(resolved: ResolvedAgentTarget) {
-    // The session may already be gone (runner exited, server lost); a missing
-    // target must not abort the preserved-session-id retry itself.
-    await this.tmux.killSession(resolved.sessionName).catch(() => undefined);
-    await this.sessionMapping.touch(resolved, {
-      runnerCommand: resolved.runner.command,
-    });
-  }
-
-  private resolveNewSessionCommand(resolved: ResolvedAgentTarget) {
-    return resolved.runner.command.toLowerCase().includes("gemini") ? "/clear" : "/new";
-  }
-
-  async captureTranscript(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
-    if (!(await this.tmux.hasSession(resolved.sessionName))) {
-      return {
-        agentId: resolved.agentId,
-        sessionKey: resolved.sessionKey,
-        sessionName: resolved.sessionName,
-        workspacePath: resolved.workspacePath,
-        snapshot: "",
-      };
+  private backendForResolved(resolved: ResolvedAgentTarget): RunnerBackend {
+    const backendId = resolved.runner.backend ?? "tmux";
+    const backend = this.backends.get(backendId);
+    if (!backend) {
+      throw new Error(
+        `Runner backend "${backendId}" is not available for agent "${resolved.agentId}". Configured backends: ${[...this.backends.keys()].join(", ")}.`,
+      );
     }
-
-    try {
-      return {
-        agentId: resolved.agentId,
-        sessionKey: resolved.sessionKey,
-        sessionName: resolved.sessionName,
-        workspacePath: resolved.workspacePath,
-        snapshot: normalizePaneText(
-          await this.tmux.capturePane(resolved.sessionName, resolved.stream.captureLines),
-        ),
-      };
-    } catch (error) {
-      if (isMissingTmuxSessionError(error)) {
-        return {
-          agentId: resolved.agentId,
-          sessionKey: resolved.sessionKey,
-          sessionName: resolved.sessionName,
-          workspacePath: resolved.workspacePath,
-          snapshot: "",
-        };
-      }
-
-      throw error;
-    }
-  }
-
-  async interruptSession(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
-    const existed = await this.tmux.hasSession(resolved.sessionName);
-    if (existed) {
-      await this.sessionMapping.touch(resolved, {
-        runtime: {
-          state: "idle",
-        },
-      });
-      try {
-        await this.tmux.sendKey(resolved.sessionName, "Escape");
-      } catch {
-        // Ignore interrupt failures and return the session state.
-      }
-    }
-
-    return {
-      agentId: resolved.agentId,
-      sessionKey: resolved.sessionKey,
-      sessionName: resolved.sessionName,
-      workspacePath: resolved.workspacePath,
-      interrupted: existed,
-    };
-  }
-
-  async nudgeSession(target: AgentSessionTarget) {
-    const resolved = this.resolveTarget(target);
-    const existed = await this.tmux.hasSession(resolved.sessionName);
-    if (existed) {
-      await this.tmux.sendKey(resolved.sessionName, "Enter");
-      await this.sessionMapping.touch(resolved);
-    }
-
-    return {
-      agentId: resolved.agentId,
-      sessionKey: resolved.sessionKey,
-      sessionName: resolved.sessionName,
-      workspacePath: resolved.workspacePath,
-      nudged: existed,
-    };
-  }
-
-  private async ensureShellPane(target: AgentSessionTarget) {
-    const resolved = await this.ensureSessionReady(target);
-    const paneId = await ensureTmuxShellPane({
-      tmux: this.tmux,
-      session: resolved,
-    });
-    return {
-      ...resolved,
-      paneId,
-    };
-  }
-
-  async runShellCommand(target: AgentSessionTarget, command: string): Promise<ShellCommandResult> {
-    const resolved = await this.ensureShellPane(target);
-    return runTmuxShellCommand({
-      tmux: this.tmux,
-      session: resolved,
-      paneId: resolved.paneId,
-      command,
-    });
-  }
-
-  async submitSessionInput(target: AgentSessionTarget, text: string) {
-    const resolved = this.resolveTarget(target);
-    if (!(await this.tmux.hasSession(resolved.sessionName))) {
-      throw new Error(`tmux session "${resolved.sessionName}" does not exist`);
-    }
-
-    await this.acceptStartupContinuePromptIfPresent(resolved);
-    await submitTmuxSessionInput({
-      tmux: this.tmux,
-      sessionName: resolved.sessionName,
-      text,
-      promptSubmitDelayMs: resolved.runner.promptSubmitDelayMs,
-      timingContext: undefined,
-    });
-    await this.sessionMapping.touch(resolved);
-    return {
-      agentId: resolved.agentId,
-      sessionKey: resolved.sessionKey,
-      sessionName: resolved.sessionName,
-      workspacePath: resolved.workspacePath,
-    };
-  }
-
-  async mapRunError(error: unknown, sessionName: string, lastSnapshot = "") {
-    return await this.mapSessionError(
-      error,
-      sessionName,
-      "while the prompt was running",
-      lastSnapshot,
-    );
+    return backend;
   }
 }

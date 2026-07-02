@@ -3,7 +3,6 @@ import type { AgentSessionState } from "../../src/agents/session/session-state.t
 import type { ResolvedAgentTarget } from "../../src/agents/routing/resolved-target.ts";
 import type { RunObserver, RunUpdate } from "../../src/agents/session/run-observation.ts";
 import type { RunnerService } from "../../src/agents/runtime/runner-service.ts";
-import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 
 export function createResolvedTarget(): ResolvedAgentTarget {
   return {
@@ -72,12 +71,11 @@ export function createUpdate(
 export function createManager(resolved: ResolvedAgentTarget) {
   return new SessionService(
     {
-      hasSession: async () => true,
-    } as unknown as TmuxClient,
-    {
       getEntry: async () => null,
     } as unknown as AgentSessionState,
-    {} as RunnerService,
+    {
+      hasLiveSession: async () => true,
+    } as unknown as RunnerService,
     () => resolved,
   );
 }

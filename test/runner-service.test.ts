@@ -1,25 +1,64 @@
 import { describe, expect, test } from "bun:test";
 import type { SessionMapping } from "../src/agents/session/session-mapping.ts";
 import { RunnerService } from "../src/agents/runtime/runner-service.ts";
+import { TmuxRunnerBackend } from "../src/runners/tmux/backend.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
+import { TmuxSessionIdMechanics } from "../src/runners/tmux/session-id-mechanics.ts";
 import { TmuxSubmitUnconfirmedError } from "../src/runners/tmux/session-handshake.ts";
+
+function createTmuxBackend(resolved: unknown, tmux: Partial<TmuxClient> = {}) {
+  return new TmuxRunnerBackend(
+    {} as any,
+    tmux as TmuxClient,
+    (() => resolved) as any,
+    {} as SessionMapping,
+  );
+}
 
 describe("RunnerService recovery classification", () => {
   test("treats lost tmux targets as recoverable mid-run faults", () => {
+    const resolved = {
+      agentId: "default",
+      sessionKey: "session-1",
+      runner: {
+        backend: "tmux",
+      },
+    };
     const runner = new RunnerService(
       {} as any,
       {} as TmuxClient,
-      (() => ({})) as any,
+      (() => resolved) as any,
+      {} as SessionMapping,
+    );
+    const target = { agentId: "default", sessionKey: "session-1" };
+
+    expect(runner.canRecoverMidRun(target, new Error("no such pane: %1"))).toBe(true);
+    expect(runner.canRecoverMidRun(target, new Error("can't find window: 1"))).toBe(true);
+    expect(runner.canRecoverMidRun(target, new Error("tmux pane state unavailable"))).toBe(true);
+  });
+
+  test("rejects unknown runner backends truthfully", () => {
+    const resolved = {
+      agentId: "default",
+      sessionKey: "session-1",
+      runner: {
+        backend: "acp",
+      },
+    };
+    const runner = new RunnerService(
+      {} as any,
+      {} as TmuxClient,
+      (() => resolved) as any,
       {} as SessionMapping,
     );
 
-    expect(runner.canRecoverMidRun(new Error("no such pane: %1"))).toBe(true);
-    expect(runner.canRecoverMidRun(new Error("can't find window: 1"))).toBe(true);
-    expect(runner.canRecoverMidRun(new Error("tmux pane state unavailable"))).toBe(true);
+    expect(() => runner.backendFor({ agentId: "default", sessionKey: "session-1" })).toThrow(
+      'Runner backend "acp" is not available for agent "default"',
+    );
   });
 });
 
-describe("RunnerService new session handling", () => {
+describe("tmux backend new session handling", () => {
   test("submits the new-session command once and retries capture until the session id changes", async () => {
     const resolved = {
       agentId: "default",
@@ -30,14 +69,9 @@ describe("RunnerService new session handling", () => {
         command: "codex",
       },
     } as any;
-    const runner = new RunnerService(
-      {} as any,
-      {
-        hasSession: async () => true,
-      } as unknown as TmuxClient,
-      (() => resolved) as any,
-      {} as SessionMapping,
-    );
+    const runner = createTmuxBackend(resolved, {
+      hasSession: async () => true,
+    });
     let submitCount = 0;
     let persistedSessionId = "";
     let captureCount = 0;
@@ -55,11 +89,11 @@ describe("RunnerService new session handling", () => {
         persistedSessionId = params.sessionId;
       },
     };
-    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
+    (runner as any).startup.acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => {
       submitCount += 1;
     };
-    (runner as any).captureSessionIdFromRunner = async () => {
+    (runner as any).sessionIds.captureSessionIdFromRunner = async () => {
       captureCount += 1;
       return captureCount < 3
         ? "11111111-1111-1111-1111-111111111111"
@@ -87,14 +121,9 @@ describe("RunnerService new session handling", () => {
         command: "codex",
       },
     } as any;
-    const runner = new RunnerService(
-      {} as any,
-      {
-        hasSession: async () => true,
-      } as unknown as TmuxClient,
-      (() => resolved) as any,
-      {} as SessionMapping,
-    );
+    const runner = createTmuxBackend(resolved, {
+      hasSession: async () => true,
+    });
 
     (runner as any).sessionMapping = {
       get: async () => ({
@@ -104,7 +133,7 @@ describe("RunnerService new session handling", () => {
         throw new Error("disk full");
       },
     };
-    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
+    (runner as any).startup.acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => undefined;
     (runner as any).captureNewSessionIdentityAfterTrigger = async () =>
       "22222222-2222-2222-2222-222222222222";
@@ -130,14 +159,9 @@ describe("RunnerService new session handling", () => {
         command: "codex",
       },
     } as any;
-    const runner = new RunnerService(
-      {} as any,
-      {
-        hasSession: async () => true,
-      } as unknown as TmuxClient,
-      (() => resolved) as any,
-      {} as SessionMapping,
-    );
+    const runner = createTmuxBackend(resolved, {
+      hasSession: async () => true,
+    });
     let persistedSessionId = "";
 
     (runner as any).sessionMapping = {
@@ -153,7 +177,7 @@ describe("RunnerService new session handling", () => {
         persistedSessionId = params.sessionId;
       },
     };
-    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
+    (runner as any).startup.acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => {
       throw new TmuxSubmitUnconfirmedError();
     };
@@ -179,14 +203,9 @@ describe("RunnerService new session handling", () => {
         command: "codex",
       },
     } as any;
-    const runner = new RunnerService(
-      {} as any,
-      {
-        hasSession: async () => true,
-      } as unknown as TmuxClient,
-      (() => resolved) as any,
-      {} as SessionMapping,
-    );
+    const runner = createTmuxBackend(resolved, {
+      hasSession: async () => true,
+    });
 
     (runner as any).sessionMapping = {
       get: async () => ({
@@ -194,7 +213,7 @@ describe("RunnerService new session handling", () => {
       }),
       setActive: async () => undefined,
     };
-    (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
+    (runner as any).startup.acceptStartupContinuePromptIfPresent = async () => undefined;
     (runner as any).submitNewSessionCommand = async () => {
       throw new TmuxSubmitUnconfirmedError();
     };
@@ -210,7 +229,7 @@ describe("RunnerService new session handling", () => {
   });
 });
 
-describe("RunnerService startup session identity handling", () => {
+describe("tmux backend startup session identity handling", () => {
   test("does not fail startup when durable session id persistence degrades after the runner is ready", async () => {
     const resolved = {
       agentId: "default",
@@ -222,11 +241,13 @@ describe("RunnerService startup session identity handling", () => {
         trustWorkspace: true,
       },
     } as any;
-    const runner = new RunnerService(
-      {} as any,
-      {} as unknown as TmuxClient,
-      (() => resolved) as any,
-      {} as SessionMapping,
+    const sessionIds = new TmuxSessionIdMechanics(
+      {} as TmuxClient,
+      {
+        setActive: async () => {
+          throw new Error("disk full");
+        },
+      } as unknown as SessionMapping,
     );
     let warned = "";
     const consoleWarn = console.warn;
@@ -234,18 +255,13 @@ describe("RunnerService startup session identity handling", () => {
       warned = String(message ?? "");
     };
     try {
-      (runner as any).acceptStartupContinuePromptIfPresent = async () => undefined;
-      (runner as any).verifySessionReady = async () => undefined;
-      (runner as any).persistStoredSessionId = async () => {
-        throw new Error("disk full");
-      };
-
       await expect(
-        (runner as any).finalizeSessionStartup(resolved, {
-          storedOrExplicitSessionId: "11111111-1111-1111-1111-111111111111",
-          runnerCommand: "codex",
-        }),
-      ).resolves.toBeUndefined();
+        sessionIds.recordActiveSessionIdBestEffort(
+          resolved,
+          "11111111-1111-1111-1111-111111111111",
+          "codex",
+        ),
+      ).resolves.toBe(false);
 
       expect(warned).toContain("continuing without resumable state");
     } finally {
