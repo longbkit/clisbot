@@ -2,12 +2,18 @@ import { describe, expect, test } from "bun:test";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 import {
   captureTmuxSessionIdentity,
+} from "../../src/runners/tmux/identity-capture.ts";
+import {
   acceptTmuxTrustPromptIfPresent,
-  submitTmuxSessionInput,
-  TmuxBootstrapSessionLostError,
   tmuxPaneHasTrustPrompt,
   waitForTmuxSessionBootstrap,
-} from "../../src/runners/tmux/session-handshake.ts";
+} from "../../src/runners/tmux/startup-prompts.ts";
+import {
+  submitTmuxSessionInput,
+} from "../../src/runners/tmux/submit-input.ts";
+import {
+  TmuxBootstrapSessionLostError,
+} from "../../src/runners/tmux/errors.ts";
 import { monitorTmuxRun } from "../../src/runners/tmux/run-monitor.ts";
 
 describe("tmux runner latency behavior", () => {

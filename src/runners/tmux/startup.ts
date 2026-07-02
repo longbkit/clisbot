@@ -44,14 +44,14 @@ import {
   isTransientTmuxTargetError,
   mapTmuxSessionError,
   summarizeSnapshot,
+  TmuxBootstrapSessionLostError,
 } from "./errors.ts";
 import { buildRunnerArgs, renderRunnerResumeCommand } from "./launch-command.ts";
 import {
   acceptTmuxStartupContinuePromptIfPresent,
-  TmuxBootstrapSessionLostError,
   tmuxPaneHasStartupContinuePrompt,
   waitForTmuxSessionBootstrap,
-} from "./session-handshake.ts";
+} from "./startup-prompts.ts";
 import type { TmuxSessionIdMechanics } from "./session-id-mechanics.ts";
 
 const SESSION_READY_CAPTURE_RETRY_COUNT = 5;

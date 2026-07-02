@@ -14,10 +14,8 @@ import {
   isActiveTimerStatusLine,
 } from "../transcript/index.ts";
 import type { TmuxClient } from "./client.ts";
-import {
-  acceptTmuxStartupContinuePromptIfPresent,
-  submitTmuxSessionInput,
-} from "./session-handshake.ts";
+import { acceptTmuxStartupContinuePromptIfPresent } from "./startup-prompts.ts";
+import { submitTmuxSessionInput } from "./submit-input.ts";
 import { logLatencyDebug, type LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
 
 const FIRST_OUTPUT_POLL_INTERVAL_MS = 250;

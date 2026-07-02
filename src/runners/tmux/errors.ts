@@ -10,17 +10,49 @@ import {
   RunnerStateContentionError,
   RunnerStateCorruptionError,
 } from "../runner-state-failures.ts";
-import {
-  TmuxBootstrapSessionLostError,
-  TmuxPasteUnconfirmedError,
-  TmuxSubmitUnconfirmedError,
-} from "./session-handshake.ts";
 
 const TMUX_MISSING_SESSION_PATTERN = /(?:can't find session:|no server running on )/i;
 const TMUX_SERVER_UNAVAILABLE_PATTERN = /(?:No such file or directory|error connecting to|failed to connect to server)/i;
 const TMUX_DUPLICATE_SESSION_PATTERN = /duplicate session:/i;
 const TMUX_TRANSIENT_TARGET_PATTERN =
   /(?:no current target|can't find pane|can't find window|no such pane|no such window|tmux pane state unavailable)/i;
+// Narrower than the transient-target pattern above: bootstrap polling only
+// retries on targets that may still be materializing, not on generic pane
+// state failures.
+const TMUX_MISSING_TARGET_PATTERN = /(?:no current target|can't find pane|can't find window)/i;
+
+export class TmuxBootstrapSessionLostError extends Error {
+  constructor(
+    readonly sessionName: string,
+    detail: string,
+    readonly lastSnapshot = "",
+  ) {
+    super(`tmux bootstrap lost session "${sessionName}": ${detail}`);
+    this.name = "TmuxBootstrapSessionLostError";
+  }
+}
+
+export class TmuxPasteUnconfirmedError extends Error {
+  constructor(readonly attempts: number) {
+    super(
+      `tmux paste was not confirmed after ${attempts} delivery attempts. clisbot did not send Enter because the prompt was not truthfully visible in the pane.`,
+    );
+    this.name = "TmuxPasteUnconfirmedError";
+  }
+}
+
+export class TmuxSubmitUnconfirmedError extends Error {
+  constructor() {
+    super(
+      [
+        "tmux submit was not confirmed after Enter: the pane did not change, so clisbot does not treat the prompt as truthfully submitted.",
+        "The runner may be busy, redrawing slowly, or showing a blocking prompt.",
+        "Check the live pane with `clisbot watch --latest --lines 100`; if your text is sitting unsubmitted there, send /nudge, otherwise resend the message.",
+      ].join(" "),
+    );
+    this.name = "TmuxSubmitUnconfirmedError";
+  }
+}
 
 export type SessionErrorAction =
   | "during startup"
@@ -76,6 +108,32 @@ export function isRetryableFreshStartFault(error: unknown) {
     isTransientTmuxTargetError(error) ||
     isFreshStartRetryablePromptDeliveryError(error)
   );
+}
+
+// Bootstrap-time polling classification: targets that may still be
+// materializing are retryable; a gone session or server is a loss. These
+// intentionally match on stringified messages because tmux client failures
+// can surface as non-Error values.
+export function isRetryableBootstrapTargetError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return TMUX_MISSING_TARGET_PATTERN.test(message);
+}
+
+export function isBootstrapSessionGoneError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    TMUX_MISSING_SESSION_PATTERN.test(message) ||
+    TMUX_SERVER_UNAVAILABLE_PATTERN.test(message)
+  );
+}
+
+export function buildBootstrapSessionLostError(
+  sessionName: string,
+  error: unknown,
+  lastSnapshot = "",
+) {
+  const message = error instanceof Error ? error.message : String(error);
+  return new TmuxBootstrapSessionLostError(sessionName, message, lastSnapshot);
 }
 
 // Maps a lingering post-exit pane to the truthful failure class. State-db

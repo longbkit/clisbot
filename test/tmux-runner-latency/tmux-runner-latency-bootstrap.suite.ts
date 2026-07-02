@@ -1,15 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import type { TmuxClient } from "../../src/runners/tmux/client.ts";
 import {
-  acceptTmuxStartupContinuePromptIfPresent,
   captureTmuxSessionIdentity,
+} from "../../src/runners/tmux/identity-capture.ts";
+import {
+  acceptTmuxStartupContinuePromptIfPresent,
   acceptTmuxTrustPromptIfPresent,
-  submitTmuxSessionInput,
-  TmuxBootstrapSessionLostError,
   tmuxPaneHasCodexUpdatePrompt,
   tmuxPaneHasTrustPrompt,
   waitForTmuxSessionBootstrap,
-} from "../../src/runners/tmux/session-handshake.ts";
+} from "../../src/runners/tmux/startup-prompts.ts";
+import {
+  submitTmuxSessionInput,
+} from "../../src/runners/tmux/submit-input.ts";
+import {
+  TmuxBootstrapSessionLostError,
+} from "../../src/runners/tmux/errors.ts";
 import { monitorTmuxRun } from "../../src/runners/tmux/run-monitor.ts";
 import { paneShowsResumeRejected } from "../../src/runners/resume-rejection.ts";
 import { paneShowsRunnerExitSentinel } from "../../src/control/runner/runner-exit-diagnostics.ts";

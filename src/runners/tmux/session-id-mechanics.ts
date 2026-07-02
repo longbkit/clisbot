@@ -8,7 +8,7 @@ import type { SessionMapping } from "../../agents/session/session-mapping.ts";
 import type { ResolvedAgentTarget } from "../../agents/routing/resolved-target.ts";
 import { sleep } from "../../infra/process.ts";
 import type { TmuxClient } from "./client.ts";
-import { captureTmuxSessionIdentity } from "./session-handshake.ts";
+import { captureTmuxSessionIdentity } from "./identity-capture.ts";
 import {
   isFreshStartRetryablePromptDeliveryError,
   isRecoverableStartupSessionLoss,

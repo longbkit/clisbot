@@ -30,13 +30,11 @@ import {
   isMissingTmuxSessionError,
   isRecoverableStartupSessionLoss,
   isTransientTmuxTargetError,
+  TmuxSubmitUnconfirmedError,
 } from "./errors.ts";
 import { canRestartWithStoredSessionId } from "./launch-command.ts";
 import { monitorTmuxRun } from "./run-monitor.ts";
-import {
-  submitTmuxSessionInput,
-  TmuxSubmitUnconfirmedError,
-} from "./session-handshake.ts";
+import { submitTmuxSessionInput } from "./submit-input.ts";
 import { TmuxSessionIdMechanics } from "./session-id-mechanics.ts";
 import { ensureTmuxShellPane, runTmuxShellCommand } from "./shell-command.ts";
 import { TmuxSessionStartup } from "./startup.ts";

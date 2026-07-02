@@ -4,7 +4,7 @@ import { RunnerService } from "../src/agents/runtime/runner-service.ts";
 import { TmuxRunnerBackend } from "../src/runners/tmux/backend.ts";
 import type { TmuxClient } from "../src/runners/tmux/client.ts";
 import { TmuxSessionIdMechanics } from "../src/runners/tmux/session-id-mechanics.ts";
-import { TmuxSubmitUnconfirmedError } from "../src/runners/tmux/session-handshake.ts";
+import { TmuxSubmitUnconfirmedError } from "../src/runners/tmux/errors.ts";
 
 function createTmuxBackend(resolved: unknown, tmux: Partial<TmuxClient> = {}) {
   return new TmuxRunnerBackend(
