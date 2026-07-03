@@ -209,7 +209,24 @@ Nguyên tắc đã giữ: **field mới đều optional, không đổi shape con
 - Adapter chết: *"Runner session "x" lost its ACP adapter process... resend the message to retry... Adapter stderr: <400 ký tự cuối>"*
 - Lỗi JSON-RPC từ agent (vd 401 provider): unwrap `error.data.message` để hiện đúng nguyên nhân thay vì "Internal error"
 
-🔶 **D4 — Hành vi steer-mode route trên ACP.** Hiện tại: message thứ hai khi đang bận sẽ đi vào admission flow (user thấy hướng dẫn `/queue`). Options: (a) giữ — minh bạch, user chủ động (**đề xuất**); (b) tự động chuyển message đó thành queue item (im lặng, tiện hơn nhưng ngầm); (c) tự động cancel-plus-reprompt (nguy hiểm — mất công việc đang chạy). Anh chọn?
+🔶 **D4 — Steering trên ACP (ĐÃ KIỂM CHỨNG LẠI 2026-07-03).** Kết quả xác minh 4 tầng:
+
+1. **Protocol ACP (SDK 1.1.0)**: toàn bộ agent methods không có primitive inject input mid-turn; kênh duy nhất khi turn chạy là `session/cancel`
+2. **Spec chính thức** (prompt-turn): turn tuần tự; cancel → prompt mới là đường thiết kế, context được giữ
+3. **Adapter codex-acp 1.0.2 (đọc source)**: App Server chỉ có `turn/start`/`turn/interrupt`, không `turn/input`; concurrent prompt overwrite state không guard
+4. **Thực nghiệm trên adapter thật**:
+   - Prompt thứ 2 khi turn đang chạy → **treo vô hạn** (không lỗi, không steer, kể cả sau khi turn 1 xong) → guard `AcpTurnAlreadyActiveError` của clisbot là bắt buộc
+   - **Cancel → reprompt: PASS** — `stopReason=cancelled` settle ngay, reprompt "tôi vừa nhờ gì?" trả lời đúng chủ đề cũ → **context giữ nguyên sau cancel**
+
+Kết luận: steering thật (fold input vào turn đang chạy như tmux) là **không thể** trên ACP hôm nay. Nhưng **auto-steer = cancel + reprompt là khả thi, đã chứng minh trên adapter thật**, và là pattern chuẩn ecosystem (Zed interrupt-and-send).
+
+Options cập nhật:
+- (a) giữ hiện tại: từ chối + hướng dẫn `/queue` / `/stop` thủ công
+- (c-mới, **đề xuất mới**): `/steer <msg>` trên ACP tự động thực hiện `session/cancel` → đợi settle → `session/prompt` với wrapper "[Steering update] <msg> — continue the interrupted work with this new direction", báo user truthful *"Đã ngắt turn hiện tại và chuyển hướng"*.
+- Trade-off phải nói rõ với user: phần generation/tool-call đang dở của turn bị hủy sẽ mất (side effects đã xong thì còn — file đã edit vẫn edit); khác tmux steer giữ nguyên đà chạy. Với mục đích "đổi hướng" thì tương đương hoặc tốt hơn; với mục đích "bổ sung thông tin giữ nguyên đà" thì lossy.
+- Route `additionalMessageMode: "steer"` khi bận: đề xuất áp cùng hành vi (c-mới) cho nhất quán, hoặc giữ degrade sang admission nếu anh muốn message thường không bao giờ tự ngắt run.
+
+Anh chọn: (a) hay (c-mới)? Và steer-mode route có auto-ngắt không?
 
 🔶 **D5 — Default `permissionPolicy: "auto-allow"`.** Lý do đề xuất: parity với tmux preset hiện tại (codex chạy `--dangerously-bypass-approvals-and-sandbox`, claude `--dangerously-skip-permissions`) — cùng trust model. Khi Phase 2 có interactive approval trong chat, có thể thêm mode `"ask"` và cân nhắc đổi default cho team-bot. Anh đồng ý auto-allow là default hiện tại?
 
