@@ -34,6 +34,7 @@ const ACP_SHELL_UNSUPPORTED_MESSAGE =
   "This agent runs on the ACP backend, which has no shell pane. Run shell commands through a tmux-backed agent or directly in the workspace terminal.";
 
 const INTERRUPT_TURN_SETTLE_TIMEOUT_MS = 10_000;
+const STARTUP_EXIT_OBSERVATION_WINDOW_MS = 250;
 
 export class AcpRunnerBackend implements RunnerBackend {
   readonly id = "acp" as const;
@@ -371,7 +372,12 @@ export class AcpRunnerBackend implements RunnerBackend {
         runnerCommand: resolved.runner.command,
       });
     } catch (error) {
-      const adapterDied = !session.alive;
+      // A dying adapter can reject the in-flight request before its exit
+      // event is observed; give the exit state a short window so startup
+      // crashes classify as adapter loss with stderr evidence.
+      const adapterDied = !(await session.waitForProcessAlive(
+        STARTUP_EXIT_OBSERVATION_WINDOW_MS,
+      ));
       session.stop();
       if (error instanceof AcpAdapterProcessError) {
         throw error;

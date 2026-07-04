@@ -325,6 +325,95 @@ describe("ACP backend", () => {
     expect((error as Error).message).toContain("fake-auth");
   });
 
+  test("deny permission policy rejects the tool call and surfaces the refusal truthfully", async () => {
+    const harness = createHarness(
+      { FAKE_ACP_REQUIRE_PERMISSION: "1" },
+      { permissionPolicy: "deny" },
+    );
+    const events: RunEvent[] = [];
+
+    const { completed } = await runPrompt(harness, "guarded work", {
+      onEvent: async (event) => {
+        events.push(event);
+      },
+    });
+
+    expect(events.some((event) => event.type === "permission-request")).toBe(true);
+    expect(completed!.snapshot).toContain("⏺ Read project files [✗]");
+    expect(completed!.snapshot).toContain("The agent declined to continue this request.");
+    expect(completed!.snapshot).not.toContain("done ->");
+  });
+
+  test("streams plan events without polluting the rendered transcript", async () => {
+    const harness = createHarness({ FAKE_ACP_EMIT_PLAN: "1" });
+    const events: RunEvent[] = [];
+
+    const { completed } = await runPrompt(harness, "planned work", {
+      onEvent: async (event) => {
+        events.push(event);
+      },
+    });
+
+    const plan = events.find((event) => event.type === "plan");
+    expect(plan).toBeDefined();
+    expect(plan!.type === "plan" && plan!.entries[0]?.title).toBe("Analyze the request");
+    expect(plan!.type === "plan" && plan!.entries[0]?.status).toBe("in-progress");
+    expect(completed!.snapshot).not.toContain("Analyze the request");
+    expect(completed!.snapshot).toContain("done -> planned work");
+  });
+
+  test("ignores unknown update types and command advertisements (protocol drift)", async () => {
+    const harness = createHarness({
+      FAKE_ACP_EMIT_UNKNOWN_UPDATE: "1",
+      FAKE_ACP_EMIT_COMMANDS: "1",
+    });
+
+    const { completed } = await runPrompt(harness, "drifted work");
+
+    expect(completed).not.toBeNull();
+    expect(completed!.snapshot).toContain("done -> drifted work");
+    expect(completed!.snapshot).not.toContain("totally_unknown_update_type");
+  });
+
+  test("classifies an adapter crash at initialize with stderr evidence", async () => {
+    const harness = createHarness({ FAKE_ACP_EXIT_AT_INITIALIZE: "1" });
+
+    const error = await harness.backend
+      .ensureRunnerReady(harness.target)
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(harness.backend.isSessionLoss(error)).toBe(true);
+    const mapped = await harness.backend.mapRunError(error, "acp-test-session");
+    expect(mapped.message).toContain("simulated init crash");
+  });
+
+  test("retains conversation context across interrupt (steer-redirect foundation)", async () => {
+    const harness = createHarness({
+      FAKE_ACP_CONTEXT_RECALL: "1",
+      FAKE_ACP_PROMPT_DELAY_MS: "3000",
+    });
+    await harness.backend.ensureRunnerReady(harness.target);
+
+    const firstMonitor = harness.backend.monitorRun({
+      resolved: harness.resolved,
+      prompt: "write the quarterly report",
+      startedAt: Date.now(),
+      initialSnapshot: "",
+      detachedAlready: false,
+      onRunning: async () => undefined,
+      onDetached: async () => undefined,
+      onCompleted: async () => undefined,
+    });
+    await Bun.sleep(150);
+    await harness.backend.interruptSession(harness.target);
+    await firstMonitor;
+
+    const { completed } = await runPrompt(harness, "what was I asking you to do?");
+
+    expect(completed!.snapshot).toContain("You were asking: write the quarterly report");
+  });
+
   test("triggerNewSession rotates to a fresh ACP session id", async () => {
     const harness = createHarness();
     await harness.backend.ensureRunnerReady(harness.target);

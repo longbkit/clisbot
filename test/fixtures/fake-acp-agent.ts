@@ -1,6 +1,8 @@
-// Scripted fake ACP agent speaking raw ndjson JSON-RPC 2.0 on stdio. It
-// exists so the ACP backend is validated against the wire protocol itself,
-// not against the SDK's own agent implementation.
+// Scripted fake ACP agent — the ACP simulator — speaking raw ndjson JSON-RPC
+// 2.0 on stdio. It exists so the ACP backend is validated against the wire
+// protocol itself, not against the SDK's own agent implementation, and so
+// hard behaviors (approvals, cancels, crashes, protocol drift) are testable
+// without a real agent or model.
 //
 // Behavior knobs (env vars):
 // - FAKE_ACP_SUPPORTS_LOAD=0        advertise no session/load capability
@@ -8,6 +10,13 @@
 // - FAKE_ACP_REQUIRE_PERMISSION=1   request permission before finishing
 // - FAKE_ACP_PROMPT_DELAY_MS=<n>    hold the turn open (cancel testing)
 // - FAKE_ACP_EXIT_MID_PROMPT=1      die mid-turn (adapter-loss testing)
+// - FAKE_ACP_EXIT_AT_INITIALIZE=1   die before answering initialize
+// - FAKE_ACP_EMIT_PLAN=1            emit plan updates during the turn
+// - FAKE_ACP_EMIT_COMMANDS=1        emit available_commands_update after new
+// - FAKE_ACP_EMIT_UNKNOWN_UPDATE=1  emit an unknown update type (drift test)
+// - FAKE_ACP_CONTEXT_RECALL=1       reply with the previous prompt when a
+//                                   prompt contains "what was I asking"
+//                                   (simulates post-cancel context retention)
 
 type JsonRpcMessage = {
   jsonrpc: "2.0";
@@ -23,10 +32,16 @@ const requireAuth = process.env.FAKE_ACP_REQUIRE_AUTH === "1";
 const requirePermission = process.env.FAKE_ACP_REQUIRE_PERMISSION === "1";
 const promptDelayMs = Number(process.env.FAKE_ACP_PROMPT_DELAY_MS ?? "0");
 const exitMidPrompt = process.env.FAKE_ACP_EXIT_MID_PROMPT === "1";
+const exitAtInitialize = process.env.FAKE_ACP_EXIT_AT_INITIALIZE === "1";
+const emitPlan = process.env.FAKE_ACP_EMIT_PLAN === "1";
+const emitCommands = process.env.FAKE_ACP_EMIT_COMMANDS === "1";
+const emitUnknownUpdate = process.env.FAKE_ACP_EMIT_UNKNOWN_UPDATE === "1";
+const contextRecall = process.env.FAKE_ACP_CONTEXT_RECALL === "1";
 
 let nextSessionNumber = 1;
 let nextRequestId = 1;
 let authenticatedMethodId = "";
+const lastPromptBySession = new Map<string, string>();
 const cancelledSessions = new Set<string>();
 const pendingResponses = new Map<number | string, (message: JsonRpcMessage) => void>();
 
@@ -63,6 +78,35 @@ async function handlePrompt(id: number | string, params: Record<string, unknown>
   cancelledSessions.delete(sessionId);
   const promptBlocks = params.prompt as Array<{ type: string; text?: string }>;
   const promptText = promptBlocks?.find((block) => block.type === "text")?.text ?? "";
+
+  if (contextRecall && /what was i asking/i.test(promptText)) {
+    const previous = lastPromptBySession.get(sessionId) ?? "(nothing)";
+    sessionUpdate(sessionId, {
+      sessionUpdate: "agent_message_chunk",
+      content: { type: "text", text: `You were asking: ${previous}` },
+    });
+    respond(id, { stopReason: "end_turn" });
+    return;
+  }
+  lastPromptBySession.set(sessionId, promptText);
+
+  if (emitUnknownUpdate) {
+    // Protocol drift: newer agents may emit update types this client does
+    // not know. A conservative client must ignore them and keep going.
+    sessionUpdate(sessionId, {
+      sessionUpdate: "totally_unknown_update_type",
+      payload: { anything: true },
+    });
+  }
+  if (emitPlan) {
+    sessionUpdate(sessionId, {
+      sessionUpdate: "plan",
+      entries: [
+        { content: "Analyze the request", priority: "high", status: "in_progress" },
+        { content: "Apply the change", priority: "medium", status: "pending" },
+      ],
+    });
+  }
 
   sessionUpdate(sessionId, {
     sessionUpdate: "agent_message_chunk",
@@ -142,6 +186,10 @@ async function handleMessage(message: JsonRpcMessage) {
   const params = message.params ?? {};
   switch (message.method) {
     case "initialize":
+      if (exitAtInitialize) {
+        process.stderr.write("fake adapter refused to start: simulated init crash\n");
+        process.exit(7);
+      }
       respond(message.id!, {
         protocolVersion: params.protocolVersion ?? 1,
         agentCapabilities: {
@@ -156,7 +204,7 @@ async function handleMessage(message: JsonRpcMessage) {
       authenticatedMethodId = String(params.methodId ?? "");
       respond(message.id!, {});
       return;
-    case "session/new":
+    case "session/new": {
       if (requireAuth && authenticatedMethodId !== "fake-auth") {
         send({
           jsonrpc: "2.0",
@@ -165,8 +213,19 @@ async function handleMessage(message: JsonRpcMessage) {
         });
         return;
       }
-      respond(message.id!, { sessionId: `fake-session-${nextSessionNumber++}` });
+      const sessionId = `fake-session-${nextSessionNumber++}`;
+      respond(message.id!, { sessionId });
+      if (emitCommands) {
+        sessionUpdate(sessionId, {
+          sessionUpdate: "available_commands_update",
+          availableCommands: [
+            { name: "review", description: "Review the current changes" },
+            { name: "compact", description: "Compact the conversation" },
+          ],
+        });
+      }
       return;
+    }
     case "session/load": {
       const sessionId = String(params.sessionId);
       sessionUpdate(sessionId, {

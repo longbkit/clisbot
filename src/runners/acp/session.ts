@@ -226,6 +226,18 @@ export class AcpSession {
     return !this.turnActive;
   }
 
+  /**
+   * Observe whether the adapter process is (still) alive, allowing a short
+   * window for a racing exit event to land. Resolves the final liveness.
+   */
+  async waitForProcessAlive(observationWindowMs: number) {
+    const deadline = Date.now() + observationWindowMs;
+    while (this.alive && Date.now() < deadline) {
+      await sleep(TURN_SETTLE_POLL_INTERVAL_MS);
+    }
+    return this.alive;
+  }
+
   /** Rotate to a fresh ACP conversation on the same adapter process. */
   async rotateToNewSession() {
     await this.cancel().catch(() => undefined);
