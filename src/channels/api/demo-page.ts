@@ -54,7 +54,11 @@ const botId = ${JSON.stringify(encodedBotId)};
 const tokenInput = document.getElementById("token");
 const sessionsPane = document.getElementById("sessions");
 const streamPane = document.getElementById("stream");
-tokenInput.value = localStorage.getItem("clisbot-demo-token") || "";
+// Deep links: ?token=... prefills auth, ?follow=<sessionKey|first> opens a
+// session immediately (shareable read-only view of a live run).
+const pageParams = new URLSearchParams(location.search);
+tokenInput.value = pageParams.get("token") || localStorage.getItem("clisbot-demo-token") || "";
+let autoFollow = pageParams.get("follow");
 let eventSource = null;
 let activeKey = null;
 let liveUpdateCard = null;
@@ -85,6 +89,13 @@ async function loadSessions() {
   }
   if (!body.sessions.length) {
     sessionsPane.innerHTML = '<div class="session">No sessions yet.</div>';
+  }
+  if (autoFollow && body.sessions.length) {
+    const wanted = autoFollow === "first"
+      ? body.sessions[0].sessionKey
+      : (body.sessions.find((s) => s.sessionKey === autoFollow) || body.sessions[0]).sessionKey;
+    autoFollow = null;
+    follow(wanted);
   }
 }
 

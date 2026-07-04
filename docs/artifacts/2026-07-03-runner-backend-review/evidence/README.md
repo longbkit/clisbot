@@ -14,6 +14,7 @@ recorded transcripts.
 | [scenario-transcripts.md](scenario-transcripts.md) | 8 hành vi thật ở ca khó + finding SDK log-noise |
 | [real-adapter-smoke.md](real-adapter-smoke.md) | Adapter + model thật: streaming, cancel-note, resume, id preserved |
 | [web-view-live-check.md](web-view-live-check.md) | SSE/demo qua node listener thật |
+| [images/](images/) | Screenshot web demo từ e2e Playwright (`test/web-demo.e2e.test.ts`): replay, live SSE completion, mobile |
 
 ## 1. Real codex-acp smoke — PASS (2026-07-02)
 

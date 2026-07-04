@@ -40,6 +40,31 @@ timing đã chứng minh pass 3/3 khi chạy riêng. **Không có regression nà
 | `zalo-personal zca-js > refreshes the stored session ...` | `mock.module` leak giữa các file test khi chạy chung — **pass khi chạy riêng**; có sẵn từ baseline | đã tạo background task fix riêng (2026-07-02) |
 | `agent-service > does not let a new prompt jump ahead ...` | Flake timing theo thứ tự suite (tmux integration) | pass **3/3** khi chạy riêng (chụp 2026-07-04, ngay trước file này); pass cả full-dir run 64/64 ngày 2026-07-03 |
 
+## Bằng chứng hình ảnh — web demo trong browser thật
+
+E2E Playwright ([test/web-demo.e2e.test.ts](../../../../test/web-demo.e2e.test.ts),
+chạy trong `bun test`, dùng system Chrome, skip truthful nếu máy không có
+Chrome) — screenshot là artifact của test, tái tạo mỗi lần chạy:
+
+**Replay khi mở giữa hội thoại** — session list 3 kênh 3 trạng thái
+(running/detached/idle), permission-request card với allow/reject options,
+tool calls, usage:
+
+![Web demo replay](images/web-demo-replay.png)
+
+**Completion đến LIVE qua SSE** (publish sau khi browser đã kết nối — chứng
+minh đường live, không phải replay) — card `run completed` viền xanh với
+final reply + 3 tool `[✓]`:
+
+![Web demo live completion](images/web-demo-live-completion.png)
+
+**Mobile viewport 430px**: [images/web-demo-mobile.png](images/web-demo-mobile.png).
+Assertions kèm theo: đủ 3 session đúng state, replay đủ plan/permission/tool,
+live completion arrive < 10s, token sai → `Error 401` ngay trong UI.
+
+Xem tay: `bun run scripts/web-demo-evidence-server.ts` rồi mở
+`http://127.0.0.1:8787/api/bots/demo/demo?token=demo-token&follow=first`.
+
 ## Ngóc ngách đã có bằng chứng hành vi thật (không chỉ pass/fail)
 
 Xem [scenario-transcripts.md](scenario-transcripts.md) — output thật user nhìn thấy:
