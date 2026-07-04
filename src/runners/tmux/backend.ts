@@ -10,7 +10,7 @@ import type { SessionMapping } from "../../agents/session/session-mapping.ts";
 import type { LoadedConfig } from "../../config/core/load-config.ts";
 import type { LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
 import { sleep } from "../../infra/process.ts";
-import type { RunnerCapabilities } from "../contract/capabilities.ts";
+import { TMUX_RUNNER_CAPABILITIES } from "../contract/capabilities.ts";
 import type {
   EnsureSessionReadyOptions,
   InterruptResult,
@@ -41,18 +41,6 @@ import { TmuxSessionStartup } from "./startup.ts";
 
 const NEW_SESSION_CAPTURE_RETRY_COUNT = 5;
 const NEW_SESSION_CAPTURE_RETRY_DELAY_MS = 100;
-
-export const TMUX_RUNNER_CAPABILITIES: RunnerCapabilities = {
-  steer: true,
-  interrupt: true,
-  resume: true,
-  attachView: true,
-  permissionRequests: false,
-  structuredEvents: false,
-  nativeSlashCommands: true,
-  shellCommands: true,
-  nudge: true,
-};
 
 export class TmuxRunnerBackend implements RunnerBackend {
   readonly id = "tmux" as const;
@@ -461,6 +449,6 @@ export class TmuxRunnerBackend implements RunnerBackend {
   }
 
   private resolveNewSessionCommand(resolved: ResolvedAgentTarget) {
-    return resolved.runner.command.toLowerCase().includes("gemini") ? "/clear" : "/new";
+    return resolved.runner.newSessionCommand ?? "/new";
   }
 }

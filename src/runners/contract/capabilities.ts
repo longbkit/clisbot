@@ -28,3 +28,30 @@ export type RunnerCapabilities = {
   /** An Enter-style nudge can unstick a waiting interactive prompt (`/nudge`). */
   nudge: boolean;
 };
+
+// Declared capability matrices live with the contract so catalog and control
+// surfaces can read them without importing backend implementations.
+
+export const TMUX_RUNNER_CAPABILITIES: RunnerCapabilities = {
+  steer: true,
+  interrupt: true,
+  resume: true,
+  attachView: true,
+  permissionRequests: false,
+  structuredEvents: false,
+  nativeSlashCommands: true,
+  shellCommands: true,
+  nudge: true,
+};
+
+export const ACP_RUNNER_CAPABILITIES: RunnerCapabilities = {
+  steer: false,
+  interrupt: true,
+  resume: true,
+  attachView: false,
+  permissionRequests: true,
+  structuredEvents: true,
+  nativeSlashCommands: true,
+  shellCommands: false,
+  nudge: false,
+};

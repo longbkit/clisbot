@@ -10,7 +10,7 @@ import type {
 } from "../../agents/routing/resolved-target.ts";
 import type { SessionMapping } from "../../agents/session/session-mapping.ts";
 import type { LatencyDebugContext } from "../../control/runtime/latency-debug.ts";
-import type { RunnerCapabilities } from "../contract/capabilities.ts";
+import { ACP_RUNNER_CAPABILITIES } from "../contract/capabilities.ts";
 import type {
   EnsureSessionReadyOptions,
   InterruptResult,
@@ -26,18 +26,6 @@ import type {
 import { AcpAdapterProcessError } from "./adapter-process.ts";
 import { monitorAcpRun } from "./run-monitor.ts";
 import { AcpSession } from "./session.ts";
-
-export const ACP_RUNNER_CAPABILITIES: RunnerCapabilities = {
-  steer: false,
-  interrupt: true,
-  resume: true,
-  attachView: false,
-  permissionRequests: true,
-  structuredEvents: true,
-  nativeSlashCommands: true,
-  shellCommands: false,
-  nudge: false,
-};
 
 export const ACP_STEER_UNSUPPORTED_MESSAGE =
   "This agent runs on the ACP backend, which cannot steer into a running turn. Use `/queue <message>` to run it after the current turn, or `/stop` and resend a combined prompt.";

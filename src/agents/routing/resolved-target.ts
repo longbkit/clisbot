@@ -6,6 +6,7 @@ import {
 } from "../../config/core/load-config.ts";
 import { clisbotConfigSchema } from "../../config/core/schema.ts";
 import { applyTemplate } from "../../infra/paths.ts";
+import { getCliProvider } from "../../runners/catalog/index.ts";
 import { buildTmuxSessionName, normalizeMainKey } from "../session/session-key.ts";
 
 export type AgentSessionTarget = {
@@ -76,6 +77,22 @@ function resolveAgentTargetInternal(
     ...(override?.runner?.defaults?.stream ?? {}),
   };
 
+  const provider = getCliProvider(resolvedCli);
+  const backend = override?.runner?.backend ?? runnerFamily.backend ?? "tmux";
+  // Family command/args in config describe the interactive tmux launch. On
+  // the ACP backend an unoverridden agent launches the provider's catalog
+  // adapter preset instead, so `backend: "acp"` alone is a working config.
+  const catalogAcpLaunch = backend === "acp" ? provider.acp?.launch : undefined;
+  const command =
+    override?.runner?.command ?? catalogAcpLaunch?.command ?? runnerFamily.command;
+  const args =
+    override?.runner?.args ??
+    (backend === "acp"
+      ? override?.runner?.command
+        ? []
+        : catalogAcpLaunch?.args ?? []
+      : runnerFamily.args);
+
   return {
     agentId: target.agentId,
     sessionKey: target.sessionKey,
@@ -84,20 +101,26 @@ function resolveAgentTargetInternal(
     sessionName,
     workspacePath,
     runner: {
-      backend: override?.runner?.backend ?? runnerFamily.backend ?? "tmux",
-      command: override?.runner?.command ?? runnerFamily.command,
-      args: override?.runner?.args ?? runnerFamily.args,
+      backend,
+      command,
+      args,
       env: {
         ...(runnerFamily.env ?? {}),
         ...(override?.runner?.env ?? {}),
       },
+      newSessionCommand:
+        override?.runner?.newSessionCommand ??
+        runnerFamily.newSessionCommand ??
+        provider.newSessionCommand,
       acp: {
         permissionPolicy:
           override?.runner?.acp?.permissionPolicy ??
           runnerFamily.acp?.permissionPolicy ??
           "auto-allow",
         authMethodId:
-          override?.runner?.acp?.authMethodId ?? runnerFamily.acp?.authMethodId,
+          override?.runner?.acp?.authMethodId ??
+          runnerFamily.acp?.authMethodId ??
+          provider.acp?.defaultAuthMethodId,
       },
       trustWorkspace:
         override?.runner?.defaults?.trustWorkspace ??

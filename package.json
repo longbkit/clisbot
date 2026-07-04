@@ -38,6 +38,7 @@
     "print-config-path": "bun run src/main.ts print-config-path",
     "pairing": "bash ./scripts/run-dev-cli.sh pairing",
     "typecheck": "bunx tsc --noEmit",
+    "docs:capability-matrix": "bun run scripts/generate-capability-matrix.ts",
     "test": "env -u SLACK_APP_TOKEN -u SLACK_BOT_TOKEN -u TELEGRAM_BOT_TOKEN -u TELEGRAM_CONTROL_BOT_TOKEN -u TELEGRAM_DEV_BOT_TOKEN bun test --preload ./test/preload-env.ts",
     "prepack": "bun run build",
     "check": "bun run typecheck && bun test --timeout 30000"
