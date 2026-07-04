@@ -14,6 +14,7 @@ import {
   MID_RUN_RECOVERY_MAX_ATTEMPTS,
 } from "./run-recovery.ts";
 import { RunnerService } from "../runtime/runner-service.ts";
+import type { SessionEventFeed } from "./run-event-feed.ts";
 import { logLatencyDebug } from "../../control/runtime/latency-debug.ts";
 
 export type AgentExecutionResult = {
@@ -162,6 +163,7 @@ export class SessionService {
     private readonly sessionState: AgentSessionState,
     private readonly runnerSessions: RunnerService,
     private readonly resolveTarget: (target: AgentSessionTarget) => ResolvedAgentTarget,
+    private readonly eventFeed?: SessionEventFeed,
   ) {}
 
   async recoverPersistedRuns() {
@@ -590,6 +592,10 @@ export class SessionService {
 
   private async notifyRunObservers(run: ActiveRun, update: RunUpdate) {
     run.latestUpdate = update;
+    this.eventFeed?.publishUpdate(
+      { sessionKey: run.resolved.sessionKey, agentId: run.resolved.agentId },
+      { status: update.status, snapshot: update.snapshot, note: update.note },
+    );
     const now = Date.now();
 
     for (const [observerId, observer] of run.observers.entries()) {
@@ -943,6 +949,9 @@ export class SessionService {
           initialSnapshot: params.initialSnapshot,
           detachedAlready: params.detachedAlready,
           timingContext: params.timingContext,
+          onEvent: async (event) => {
+            this.eventFeed?.publishRunEvent(runTarget, event);
+          },
           onPromptSubmitted: async () => {
             const currentRun = this.getRun(sessionKey, params.runId);
             if (!currentRun) {

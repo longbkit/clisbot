@@ -61,3 +61,21 @@ Generated doc: [capability-matrix.md](../../../features/runners/capability-matri
 [failure-mode-matrix.md](../../../tests/features/runners/failure-mode-matrix.md)
 maps every known failure scenario → detection → handling → user-facing outcome
 → solved / fails-well / open, each row anchored to a simulator-backed test.
+
+## 6. Web view live check — PASS (2026-07-03)
+
+Real node HTTP listener + `handleApiRequest`, scripted feed
+(`scratchpad/web-view-live-check.ts`, rerunnable):
+
+```text
+[live] sessions: 200 "agent:default:web:demo"
+[live] demo page: 200 has EventSource
+[live] sse status: 200 text/event-stream
+[live] replay received: true
+[live] live update received: true
+[live] structured event received: true
+[live] RESULT: PASS
+```
+
+Covers the streaming path unit tests bypass: `writeWebResponse` chunk
+pumping, SSE replay + live fan-out, and the demo page route.

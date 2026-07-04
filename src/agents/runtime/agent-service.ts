@@ -47,6 +47,7 @@ import {
   ActiveRunInProgressError,
   SessionService,
 } from "../session/session-service.ts";
+import { SessionEventFeed, type SessionFeedEntry } from "../session/run-event-feed.ts";
 export { ActiveRunInProgressError };
 import {
   SurfaceRuntime,
@@ -80,6 +81,7 @@ export type SessionDiagnostics = {
 export class AgentService {
   private tmuxClient: TmuxClient;
   private readonly queue = new AgentJobQueue();
+  private readonly sessionEvents = new SessionEventFeed();
   private readonly sessionState: AgentSessionState;
   private readonly sessionMapping: SessionMapping;
   private runnerSessions: RunnerService;
@@ -133,7 +135,19 @@ export class AgentService {
       this.sessionState,
       this.runnerSessions,
       (target) => this.resolveTarget(target),
+      this.sessionEvents,
     );
+  }
+
+  readSessionEvents(sessionKey: string, sinceSeq = 0) {
+    return this.sessionEvents.read(sessionKey, sinceSeq);
+  }
+
+  subscribeSessionEvents(
+    sessionKey: string,
+    listener: (entry: SessionFeedEntry) => void,
+  ) {
+    return this.sessionEvents.subscribe(sessionKey, listener);
   }
 
   private createManagedQueueController() {

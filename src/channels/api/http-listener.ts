@@ -61,7 +61,30 @@ async function writeWebResponse(response: Response, target: ServerResponse) {
     target.end();
     return;
   }
-  target.end(Buffer.from(await response.arrayBuffer()));
+  // Stream chunk-by-chunk so long-lived bodies (SSE) flush as they are
+  // produced; buffered JSON bodies behave exactly as before.
+  target.flushHeaders?.();
+  const reader = response.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (value) {
+        const flushed = target.write(Buffer.from(value));
+        if (!flushed) {
+          await new Promise<void>((resolve) => target.once("drain", resolve));
+        }
+      }
+      if (target.destroyed) {
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+    }
+  } finally {
+    target.end();
+  }
 }
 
 function closeServer(server: Server, force: boolean) {

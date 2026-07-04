@@ -1,7 +1,7 @@
 # Web Chat Channel Architecture (Design)
 
 - **Created**: 2026-07-03
-- **Status**: Design ready; implementation not started (deliberately light until backend Phases 2-3 land)
+- **Status**: Design ready; W-1 (SessionEventFeed + sessions/SSE endpoints) and W-2 (built-in read-only demo page) shipped 2026-07-03; W-3+ deliberately wait for backend Phases 2-3
 - **Purpose**: make clisbot's own web chat a first-class channel — a cowork-style React surface that is *less* limited than external chat platforms because we own both ends — with cross-surface session sync (a Slack conversation is visible and continuable from the web view when the viewer has permission).
 
 ## Product Framing (principal product view)
@@ -76,15 +76,20 @@ Interaction rules: permission cards block only their own turn; queue vs steer is
 
 ## Delivery Plan
 
-| Step | Scope | Depends on |
-| --- | --- | --- |
-| W-1 | `RunEventFeed` + SSE endpoint on the API channel, auth-gated; evidence via curl transcript | none (contract already ships events) |
-| W-2 | Minimal read-only demo page (single static HTML/React, session list + live stream) | W-1 |
-| W-3 | Send + stop/steer/queue controls, capability-gated | Phase 2 chat-native parity |
-| W-4 | Permission approval cards | Phase 2 interactive permissions |
-| W-5 | Full React app package, session panel, cost/usage | Phase 3 operator surfaces |
+| Step | Scope | Depends on | Status |
+| --- | --- | --- | --- |
+| W-1 | `SessionEventFeed` (`src/agents/session/run-event-feed.ts`) + `GET /api/bots/:botId/sessions` + `GET .../sessions/:sessionKey/events` SSE, auth-gated (bearer header or `?token=` for EventSource) | none | **shipped 2026-07-03** (unit + live-listener evidence) |
+| W-2 | Built-in read-only demo page at `GET /api/bots/:botId/demo` (session list + live stream, token stored locally) | W-1 | **shipped 2026-07-03** |
+| W-3 | Send + stop/steer/queue controls, capability-gated | Phase 2 chat-native parity | planned |
+| W-4 | Permission approval cards | Phase 2 interactive permissions | planned |
+| W-5 | Full React app package, session panel, cost/usage | Phase 3 operator surfaces | planned |
 
 The demo stays deliberately tiny (W-2) until backend Phases 2-3 stabilize the event vocabulary; investing in the full app before that would bake in churn.
+
+Try it (dev): enable an API bot, start the runtime, then open
+`http://<listener-host>:<port>/api/bots/<botId>/demo` and paste the bot's
+bearer token. Every conversation on any channel streams live into the page
+through the same feed.
 
 ## Risks
 

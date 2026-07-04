@@ -4,7 +4,10 @@ export type ApiPath =
   | { kind: "event-ingress"; botId: string }
   | { kind: "event-result"; botId: string; eventId: string }
   | { kind: "event-stop"; botId: string; eventId: string }
-  | { kind: "surface-stop"; botId: string; surfaceId: string };
+  | { kind: "surface-stop"; botId: string; surfaceId: string }
+  | { kind: "sessions-list"; botId: string }
+  | { kind: "session-events"; botId: string; sessionKey: string }
+  | { kind: "demo-page"; botId: string };
 
 export function jsonResponse(body: unknown, init: ResponseInit = {}) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -36,6 +39,22 @@ export function parseApiPath(pathname: string): ApiPath | null {
       botId: decodeURIComponent(surfaceStop[1]!),
       surfaceId: decodeURIComponent(surfaceStop[2]!),
     };
+  }
+  const sessionsRoot = /^\/api\/bots\/([^/]+)\/sessions$/.exec(pathname);
+  if (sessionsRoot) {
+    return { kind: "sessions-list", botId: decodeURIComponent(sessionsRoot[1]!) };
+  }
+  const sessionEvents = /^\/api\/bots\/([^/]+)\/sessions\/([^/]+)\/events$/.exec(pathname);
+  if (sessionEvents) {
+    return {
+      kind: "session-events",
+      botId: decodeURIComponent(sessionEvents[1]!),
+      sessionKey: decodeURIComponent(sessionEvents[2]!),
+    };
+  }
+  const demoPage = /^\/api\/bots\/([^/]+)\/demo$/.exec(pathname);
+  if (demoPage) {
+    return { kind: "demo-page", botId: decodeURIComponent(demoPage[1]!) };
   }
   return null;
 }

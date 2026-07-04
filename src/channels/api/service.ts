@@ -9,7 +9,9 @@ import { buildSurfacePromptContext } from "../surface/surface-prompt-context.ts"
 import { ChannelResultStore, type ChannelResultRecord } from "../results/result-store.ts";
 import { authorizeApiBotRequest } from "./auth.ts";
 import { listApiBotIds, resolveApiBotConfig, resolveApiProviderConfig } from "./config.ts";
+import { renderWebDemoPage } from "./demo-page.ts";
 import { buildAcceptanceBody, jsonResponse, parseApiPath } from "./http-contract.ts";
+import { handleSessionEventsRequest, handleSessionsListRequest } from "./web-view.ts";
 import { startApiHttpListener, type ApiHttpListener } from "./http-listener.ts";
 import { evaluateApiFilter, evaluateApiMapObject, normalizeMappedString } from "./mapper.ts";
 import { resolveApiConversationRoute } from "./route-config.ts";
@@ -145,6 +147,29 @@ export async function handleApiRequest(params: {
   }
   if (route.kind === "surface-stop") {
     return handleSurfaceStopRequest({ ...params, botId: route.botId, surfaceId: route.surfaceId, botConfig });
+  }
+  if (route.kind === "sessions-list") {
+    return handleSessionsListRequest({
+      request: params.request,
+      remoteAddress: params.remoteAddress,
+      agentService: params.agentService,
+      auth: botConfig.ingress.auth,
+    });
+  }
+  if (route.kind === "session-events") {
+    return handleSessionEventsRequest({
+      request: params.request,
+      remoteAddress: params.remoteAddress,
+      agentService: params.agentService,
+      auth: botConfig.ingress.auth,
+      sessionKey: route.sessionKey,
+    });
+  }
+  if (route.kind === "demo-page") {
+    return new Response(renderWebDemoPage(route.botId), {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
   }
   if (params.request.method !== "POST") {
     return jsonResponse({ error: "method_not_allowed" }, { status: 405 });
