@@ -1,5 +1,8 @@
 # Runner Backend Review: Config, Hành Vi, Kiến Trúc, Quyết Định
 
+> **Hiện trạng nhanh**: xem [evidence/STATUS.md](evidence/STATUS.md) — scorecard
+> 1 trang với per-area pass/fail, transcript ngóc ngách, lệnh re-verify.
+
 - **Ngày**: 2026-07-03
 - **Phạm vi**: toàn bộ hệ runner đa backend (tmux / ACP / cli-json) sau khi ship Phase 0 + Phase 1
 - **Mục đích**: một tài liệu duy nhất từ tổng quan đến chi tiết để anh review và comment vào từng mục — đặc biệt các điểm đánh dấu 🔶 **D#** là điểm cần anh quyết định

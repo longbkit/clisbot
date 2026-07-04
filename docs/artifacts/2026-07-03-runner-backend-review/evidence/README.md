@@ -1,8 +1,19 @@
 # Evidence Snapshots
 
+**Bắt đầu từ [STATUS.md](STATUS.md)** — scorecard 1 trang: pass/fail theo 13
+khu vực, giải thích từng fail, link transcript ngóc ngách, lệnh re-verify.
+
 Captured outputs backing the review claims. Regenerate any of them with the
 listed command; live-adapter runs consume real model quota and are kept as
 recorded transcripts.
+
+| File | What it proves |
+| --- | --- |
+| [STATUS.md](STATUS.md) | Trạng thái tổng: 1020/1024, 4 fail giải thích đủ, không regression |
+| [test-run-acp-and-web.md](test-run-acp-and-web.md) | 159 test tên đầy đủ cho các khu mới |
+| [scenario-transcripts.md](scenario-transcripts.md) | 8 hành vi thật ở ca khó + finding SDK log-noise |
+| [real-adapter-smoke.md](real-adapter-smoke.md) | Adapter + model thật: streaming, cancel-note, resume, id preserved |
+| [web-view-live-check.md](web-view-live-check.md) | SSE/demo qua node listener thật |
 
 ## 1. Real codex-acp smoke — PASS (2026-07-02)
 
