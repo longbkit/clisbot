@@ -13,6 +13,7 @@ import {
   type SessionNotification,
   type StopReason,
 } from "@agentclientprotocol/sdk";
+import { sleep } from "../../infra/process.ts";
 import { getClisbotVersion } from "../../version.ts";
 import type { RunEvent } from "../contract/run-event.ts";
 import { AcpAdapterProcess, AcpAdapterProcessError } from "./adapter-process.ts";
@@ -25,6 +26,8 @@ import {
 } from "./events.ts";
 
 export type AcpPermissionPolicy = "auto-allow" | "deny";
+
+const TURN_SETTLE_POLL_INTERVAL_MS = 25;
 
 export type AcpSessionParams = {
   sessionName: string;
@@ -208,6 +211,19 @@ export class AcpSession {
     }
     await this.connection.cancel({ sessionId: this.acpSessionId });
     return true;
+  }
+
+  /**
+   * Wait until the active prompt turn settles (used after cancel so the next
+   * prompt cannot race into AcpTurnAlreadyActiveError). Resolves true when
+   * settled, false on timeout or adapter death.
+   */
+  async waitForTurnSettled(timeoutMs: number) {
+    const deadline = Date.now() + timeoutMs;
+    while (this.turnActive && this.alive && Date.now() < deadline) {
+      await sleep(TURN_SETTLE_POLL_INTERVAL_MS);
+    }
+    return !this.turnActive;
   }
 
   /** Rotate to a fresh ACP conversation on the same adapter process. */

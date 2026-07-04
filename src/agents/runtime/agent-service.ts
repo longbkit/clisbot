@@ -232,9 +232,12 @@ export class AgentService {
     return this.runnerSessions.captureTranscript(target);
   }
 
-  async interruptSession(target: AgentSessionTarget) {
+  async interruptSession(
+    target: AgentSessionTarget,
+    options: { reason?: string } = {},
+  ) {
     const runner = await this.runnerSessions.interruptSession(target);
-    const activeRun = await this.activeRuns.interruptActiveRun(target);
+    const activeRun = await this.activeRuns.interruptActiveRun(target, options);
     return {
       ...runner,
       interrupted: runner.interrupted || activeRun.interrupted,

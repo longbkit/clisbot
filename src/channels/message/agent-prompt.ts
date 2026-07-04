@@ -47,6 +47,21 @@ Adjust your current work if needed and continue.
 {{message_body}}
 </user>`;
 
+// Used when the backend cannot inject into a running turn: the previous turn
+// was cancelled first, and this arrives as the next prompt in the same
+// conversation (context from the interrupted turn is retained).
+export const STEER_REDIRECT_TEMPLATE = `<system>
+Your previous turn was interrupted so this steering update could be applied.
+The conversation context from the interrupted work is still available.
+Continue that work, adjusted to the user's new direction below.
+
+{{message_context}}{{permission_guidance}}{{protected_control_suffix}}
+</system>
+
+<user>
+{{message_body}}
+</user>`;
+
 export const DELIVERY_INTRO =
   "To send a user-visible {{progress_phrase}}final reply, use the following CLI command:";
 
@@ -80,7 +95,7 @@ export const EMPTY_REPLY_COMMAND = "";
 export const EMPTY_REPLY_RULES = "";
 export const EMPTY_REPLY_STYLE_HINT = "";
 
-type ChannelPromptMode = "message" | "steer";
+type ChannelPromptMode = "message" | "steer" | "steer-redirect";
 
 export function buildAgentPromptText(params: {
   text: string;
@@ -122,6 +137,25 @@ export function buildSteeringPromptText(params: {
   });
 }
 
+export function buildSteerRedirectPromptText(params: {
+  text: string;
+  identity?: ChannelIdentity;
+  agentId?: string;
+  time?: number | string | Date;
+  promptContext?: SurfacePromptContext;
+  protectedControlMutationRule?: string;
+}) {
+  return buildChannelPromptText({
+    text: params.text,
+    identity: params.identity,
+    agentId: params.agentId,
+    time: params.time,
+    promptContext: params.promptContext,
+    mode: "steer-redirect",
+    protectedControlMutationRule: params.protectedControlMutationRule,
+  });
+}
+
 function buildChannelPromptText(params: {
   text: string;
   identity?: ChannelIdentity;
@@ -141,16 +175,19 @@ function buildChannelPromptText(params: {
     return params.text;
   }
 
-  if (params.mode === "steer") {
+  if (params.mode === "steer" || params.mode === "steer-redirect") {
     const context = resolvePromptContext(params);
-    return renderTemplate(STEERING_TEMPLATE, {
-      message_context: renderSurfacePromptContext(context),
-      permission_guidance: renderPermissionGuidanceWithPrefix(context),
-      message_body: params.text,
-      protected_control_suffix: renderProtectedControlSuffix(
-        params.protectedControlMutationRule,
-      ),
-    });
+    return renderTemplate(
+      params.mode === "steer" ? STEERING_TEMPLATE : STEER_REDIRECT_TEMPLATE,
+      {
+        message_context: renderSurfacePromptContext(context),
+        permission_guidance: renderPermissionGuidanceWithPrefix(context),
+        message_body: params.text,
+        protected_control_suffix: renderProtectedControlSuffix(
+          params.protectedControlMutationRule,
+        ),
+      },
+    );
   }
 
   const promptParts = renderMessagePromptParts({

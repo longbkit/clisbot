@@ -202,6 +202,33 @@ describe("ACP backend", () => {
     expect(completed!.snapshot).toContain("The run was cancelled.");
   });
 
+  test("interrupt settles the turn so an immediate follow-up prompt succeeds (steer redirect)", async () => {
+    const harness = createHarness({ FAKE_ACP_PROMPT_DELAY_MS: "3000" });
+    await harness.backend.ensureRunnerReady(harness.target);
+
+    const firstMonitor = harness.backend.monitorRun({
+      resolved: harness.resolved,
+      prompt: "long running work",
+      startedAt: Date.now(),
+      initialSnapshot: "",
+      detachedAlready: false,
+      onRunning: async () => undefined,
+      onDetached: async () => undefined,
+      onCompleted: async () => undefined,
+    });
+    await Bun.sleep(150);
+
+    const interrupt = await harness.backend.interruptSession(harness.target);
+    expect(interrupt.interrupted).toBe(true);
+
+    // Immediately submit the redirect prompt on the same session: the settle
+    // wait inside interruptSession must prevent AcpTurnAlreadyActiveError.
+    const { completed } = await runPrompt(harness, "redirected direction");
+    expect(completed).not.toBeNull();
+    expect(completed!.snapshot).toContain("done -> redirected direction");
+    await firstMonitor;
+  });
+
   test("resumes a stored session over session/load", async () => {
     const harness = createHarness();
     await harness.backend.ensureRunnerReady(harness.target);

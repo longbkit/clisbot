@@ -58,7 +58,7 @@ import {
   type SurfaceNotificationMode,
   type SurfaceNotificationsConfig,
 } from "../config/surface-notifications.ts";
-import { buildSteeringPromptText } from "./agent-prompt.ts";
+import { buildSteeringPromptText, buildSteerRedirectPromptText } from "./agent-prompt.ts";
 import type { RunObserverMode, RunUpdate } from "../../agents/session/run-observation.ts";
 import {
   getConversationResponseMode,
@@ -136,6 +136,16 @@ function renderBackendSteeringUnsupportedMessage() {
     "Use `/queue <message>` to run it after the current turn, or `/stop` and resend a combined prompt.",
   ].join("\n");
 }
+
+function renderSteerRedirectNotice() {
+  return [
+    "This backend cannot inject into a running turn, so clisbot interrupted the current turn and is applying your steering message as the next prompt.",
+    "Conversation context from the interrupted work is retained; in-flight output from the interrupted turn is discarded.",
+  ].join("\n");
+}
+
+const STEER_REDIRECT_INTERRUPT_REASON =
+  "Run interrupted to apply a steering update.";
 
 function renderNewSessionFailureMessage(error: unknown) {
   const details =
@@ -1983,8 +1993,50 @@ export async function processChannelInteraction<TChunk>(params: {
     }
 
     if (!canSteerActiveRun) {
-      const backendCanSteer =
-        params.agentService.runnerCapabilities?.(params.sessionTarget)?.steer !== false;
+      const capabilities = params.agentService.runnerCapabilities?.(params.sessionTarget);
+      const backendCanSteer = capabilities?.steer !== false;
+      if (!backendCanSteer && capabilities?.interrupt === true) {
+        // Interrupt-and-redirect: cancel keeps the conversation context on
+        // these backends, so the steering message continues the interrupted
+        // work as the next prompt.
+        await params.agentService.interruptSession(params.sessionTarget, {
+          reason: STEER_REDIRECT_INTERRUPT_REASON,
+        });
+        await params.postText(renderSteerRedirectNotice());
+        const redirectText = buildSteerRedirectPromptText({
+          text:
+            params.transformSessionInputText?.(explicitSteerMessage) ?? explicitSteerMessage,
+          identity: params.identity,
+          agentId: params.route.agentId,
+          time: Date.now(),
+          promptContext: params.promptContext
+            ? {
+                ...params.promptContext,
+                time: new Date().toISOString(),
+              }
+            : undefined,
+          protectedControlMutationRule: params.protectedControlMutationRule,
+        });
+        await executePromptDelivery({
+          agentService: params.agentService,
+          sessionTarget: params.sessionTarget,
+          identity: params.identity,
+          route: params.route,
+          maxChars: params.maxChars,
+          promptText: () => redirectText,
+          queueText: explicitSteerMessage,
+          queueStartMode: params.route.surfaceNotifications.queueStart,
+          notificationPromptSummary: summarizeSurfaceNotificationText(explicitSteerMessage),
+          postText: params.postText,
+          reconcileText: params.reconcileText,
+          canUpdateLiveReply: params.canUpdateLiveReply,
+          observerId,
+          timingContext: params.timingContext,
+          queuedPromptRequested: false,
+          onPromptAccepted: params.onPromptAccepted,
+        });
+        return interactionResult;
+      }
       await params.postText(
         backendCanSteer
           ? renderStartupSteeringUnavailableMessage()

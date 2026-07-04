@@ -166,6 +166,85 @@ describe("processChannelInteraction queue and steer", () => {
     expect(result.processingIndicatorLifecycle).toBe("active-run");
   });
 
+  test("explicit steer on a non-steer backend interrupts and redirects the message as the next prompt", async () => {
+    const posted: string[] = [];
+    const interrupts: Array<{ reason?: string }> = [];
+    let observedPrompt = "";
+    let submitCalls = 0;
+
+    const result = await processChannelInteraction({
+      agentService: {
+        hasActiveRun: () => true,
+        canSteerActiveRun: () => false,
+        runnerCapabilities: () => ({
+          steer: false,
+          interrupt: true,
+          resume: true,
+          attachView: false,
+          permissionRequests: true,
+          structuredEvents: true,
+          nativeSlashCommands: true,
+          shellCommands: false,
+          nudge: false,
+        }),
+        interruptSession: async (_target: AgentSessionTarget, options?: { reason?: string }) => {
+          interrupts.push({ reason: options?.reason });
+          return { interrupted: true };
+        },
+        submitSessionInput: async () => {
+          submitCalls += 1;
+        },
+        enqueuePrompt: (_target: AgentSessionTarget, prompt: string) => {
+          observedPrompt = renderCapturedPrompt(prompt);
+          return {
+            positionAhead: 0,
+            result: Promise.resolve({
+              status: "completed",
+              agentId: "default",
+              sessionKey: createTarget().sessionKey,
+              sessionName: "session",
+              workspacePath: "/tmp/workspace",
+              snapshot: "redirected steering applied",
+              fullSnapshot: "redirected steering applied",
+              initialSnapshot: "",
+            }),
+          };
+        },
+        recordConversationReply: async () => undefined,
+      } as any,
+      sessionTarget: createTarget(),
+      identity: createIdentity(),
+      senderId: "U123",
+      text: "/steer switch to the auth bug first",
+      protectedControlMutationRule: "Refuse protected control changes.",
+      route: createRoute({
+        responseMode: "message-tool",
+        additionalMessageMode: "steer",
+        streaming: "off",
+        surfaceNotifications: {
+          queueStart: "none",
+          loopStart: "brief",
+        },
+      }),
+      maxChars: 4000,
+      postText: async (text) => {
+        posted.push(text);
+        return [text];
+      },
+      reconcileText: async (_chunks, text) => [text],
+    });
+
+    expect(submitCalls).toBe(0);
+    expect(interrupts).toHaveLength(1);
+    expect(interrupts[0]?.reason).toContain("steering update");
+    expect(posted[0]).toContain("interrupted the current turn");
+    expect(observedPrompt).toContain("Your previous turn was interrupted");
+    expect(observedPrompt).toContain("switch to the auth bug first");
+    expect(observedPrompt).toContain("Refuse protected control changes.");
+    expect(posted.some((text) => text.includes("redirected steering applied"))).toBe(true);
+    expect(result.processingIndicatorLifecycle).toBe("handler");
+  });
+
   test("explicit steer is blocked while the active run is still starting", async () => {
     const posted: string[] = [];
     let submitCalls = 0;

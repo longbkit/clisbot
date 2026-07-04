@@ -45,6 +45,8 @@ export const ACP_STEER_UNSUPPORTED_MESSAGE =
 const ACP_SHELL_UNSUPPORTED_MESSAGE =
   "This agent runs on the ACP backend, which has no shell pane. Run shell commands through a tmux-backed agent or directly in the workspace terminal.";
 
+const INTERRUPT_TURN_SETTLE_TIMEOUT_MS = 10_000;
+
 export class AcpRunnerBackend implements RunnerBackend {
   readonly id = "acp" as const;
   readonly capabilities = ACP_RUNNER_CAPABILITIES;
@@ -160,6 +162,9 @@ export class AcpRunnerBackend implements RunnerBackend {
       },
     });
     await session.cancel().catch(() => undefined);
+    // Let the cancelled turn settle so an immediate follow-up prompt (e.g.
+    // steer-redirect) cannot race into the still-active turn.
+    await session.waitForTurnSettled(INTERRUPT_TURN_SETTLE_TIMEOUT_MS);
     return {
       ...this.describeTarget(resolved),
       interrupted: true,

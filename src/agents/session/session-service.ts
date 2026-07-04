@@ -399,7 +399,10 @@ export class SessionService {
     };
   }
 
-  async interruptActiveRun(target: AgentSessionTarget) {
+  async interruptActiveRun(
+    target: AgentSessionTarget,
+    options: { reason?: string } = {},
+  ) {
     const run =
       this.activeRuns.get(target.sessionKey) ??
       (await this.reconcilePersistedActiveRun(target));
@@ -409,7 +412,7 @@ export class SessionService {
       };
     }
 
-    const error = new Error("Run interrupted by /stop.");
+    const error = new Error(options.reason ?? "Run interrupted by /stop.");
     const update = this.createRunUpdate({
       resolved: run.resolved,
       status: "error",
