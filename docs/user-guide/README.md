@@ -24,6 +24,7 @@ Related pages:
 - [Codex CLI Guide](codex-cli.md)
 - [Claude CLI Guide](claude-cli.md)
 - [Gemini CLI Guide](gemini-cli.md)
+- [Runner Backends: tmux And ACP](runner-backends.md)
 - [Telegram Bot Setup](telegram-setup.md)
 - [Zalo Bot Setup](zalo-bot-setup.md)
 - [Zalo Personal](zalo-personal.md)
@@ -45,6 +46,7 @@ If you are choosing a default coding CLI or debugging routed behavior, start her
 - [Codex CLI Guide](codex-cli.md)
 - [Claude CLI Guide](claude-cli.md)
 - [Gemini CLI Guide](gemini-cli.md)
+- [Runner Backends: tmux And ACP](runner-backends.md)
 
 ## Platform Support
 

@@ -318,21 +318,33 @@ Backends vẫn ghi id qua `SessionMapping` (setActive/clearActive) thay vì mộ
 
 ## 6. 🔶 Bảng quyết định tổng hợp (điểm cần anh comment)
 
-| # | Câu hỏi | Đề xuất của tôi | Quyết định của anh |
+Cập nhật 2026-07-03: theo chỉ đạo "hiện thực đi", các mục đánh dấu **[đã áp]**
+được hiện thực theo đề xuất; anh vẫn có thể đảo lại bằng comment.
+
+| # | Câu hỏi | Đề xuất của tôi | Trạng thái / Quyết định của anh |
 | --- | --- | --- | --- |
-| D1 | Xác nhận định hướng 3 backend (tmux default, ACP structured, cli-json chờ demand) | Giữ nguyên | |
-| D2 | Schema phẳng (hiện tại) hay tách nhóm `tmux:`/`acp:` | Giữ phẳng, docs ma trận; xét lại ở Phase 5 | |
-| D3 | Secret trong `runner.env` | Plain + caution docs bây giờ; task riêng nối credential-ref trước khi public | |
-| D4 | Steer-mode route trên ACP | Degrade sang admission/`/queue`, không auto-convert ngầm | |
-| D5 | Default `permissionPolicy` | `auto-allow` (parity bypass-mode tmux); thêm `ask` ở Phase 2 | |
-| D6 | Cleanup continuity-API (SessionService-owned) | Sau Phase 2/3 | |
-| D7 | Thứ tự phase tiếp theo | Routed-chat validation (đóng Phase 1) → Phase 2 (permission interactive + slash pass-through) → Phase 3 → Phase 4 | |
-| D8 | `env` cho tmux backend (per-agent CODEX_HOME isolation — task backlog 2026-06-11) | Làm riêng theo task đó, không gộp (schema đã sẵn field) | |
-| D9 | ACP có cần startup retry knobs không | Chưa — RPC fail nhanh, recovery flow đã phủ; thêm nếu thực tế cần | |
-| D10 | Claude qua ACP (`claude-agent-acp`) | KHÔNG làm preset đến khi Anthropic chốt billing split; tmux là đường Claude | |
-| D11 | Điều kiện flip Codex default → ACP | Định nghĩa ở Phase 5: N tuần chạy ổn trên test surfaces + smoke matrix xanh + operator surfaces (Phase 3) xong | |
-| D12 | Adapter version pin | Pin exact trong preset (`@1.0.2`), bump = ritual bump+smoke; user override được qua args | |
-| D13 | Live validation kế tiếp | Chạy dev runtime + `SLACK_TEST_CHANNEL` / Telegram test topics với 1 agent `backend: acp`; tôi thực hiện khi anh gật | |
+| D1 | Xác nhận định hướng 3 backend (tmux default, ACP structured, cli-json chờ demand) | Giữ nguyên | **[đã áp]** |
+| D2 | Schema phẳng (hiện tại) hay tách nhóm `tmux:`/`acp:` | Giữ phẳng; provider catalog + capability matrix là nguồn truth; xét lại ở Phase 5 | **[đã áp]** catalog tại `src/runners/catalog/` |
+| D3 | Secret trong `runner.env` | Plain + caution docs bây giờ; task riêng nối credential-ref trước khi public | **[đã áp]** caution trong user guide; task credential-ref còn mở |
+| D4 | Steering trên ACP | (c-mới) `/steer` = interrupt-and-redirect (đã kiểm chứng context giữ nguyên); message thường KHÔNG bao giờ tự ngắt run | **[đã áp + test]** |
+| D5 | Default `permissionPolicy` | `auto-allow` (parity bypass-mode tmux) + `deny` đã test; thêm `ask` ở Phase 2 | **[đã áp]** |
+| D6 | Cleanup continuity-API (SessionService-owned) | Sau Phase 2/3 | chờ anh xác nhận |
+| D7 | Thứ tự phase tiếp theo | Routed-chat validation (đóng Phase 1) → Phase 2 → Phase 3 → Phase 4; web demo (W-2) sau khi Phase 2 ổn định event vocabulary | chờ anh xác nhận |
+| D8 | `env` cho tmux backend (per-agent CODEX_HOME isolation — task backlog 2026-06-11) | Làm riêng theo task đó, không gộp (schema đã sẵn field) | chờ anh xác nhận |
+| D9 | ACP có cần startup retry knobs không | Chưa — RPC fail nhanh + crash-at-init đã classify truthful; thêm nếu thực tế cần | **[đã áp]** |
+| D10 | Claude qua ACP (`claude-agent-acp`) | Preset pinned trong catalog nhưng maturity `not-recommended` đến khi billing split chốt; tmux là đường Claude | **[đã áp]** |
+| D11 | Điều kiện flip Codex default → ACP | Định nghĩa ở Phase 5: N tuần chạy ổn trên test surfaces + smoke matrix xanh + operator surfaces (Phase 3) xong | chờ anh xác nhận |
+| D12 | Adapter version pin | Pin exact trong catalog preset; drift-guard test bắt buộc pin dạng `@x.y.z`; bump = ritual bump+smoke | **[đã áp + test]** |
+| D13 | Live validation kế tiếp | Chạy dev runtime + `SLACK_TEST_CHANNEL` / Telegram test topics với 1 agent `backend: acp` (giờ chỉ cần 1 dòng config) | chờ anh gật là chạy |
+
+Bổ sung sau vòng hiện thực 2026-07-03 (xem evidence/):
+
+- Provider catalog: `src/runners/catalog/` — thêm CLI mới = 1 file định nghĩa + 1 dòng registry; `backend: "acp"` một dòng là đủ chạy Codex ACP
+- Bảng năng lực backend × provider: [capability-matrix.md](../../features/runners/capability-matrix.md) (generated + drift-guard test)
+- Ma trận failure-mode với evidence từng dòng: [failure-mode-matrix.md](../../tests/features/runners/failure-mode-matrix.md)
+- ACP simulator scenario-driven: `test/fixtures/fake-acp-agent.ts` (approval allow/deny, plan, drift, crash, context recall)
+- Kiến trúc web chat channel (cowork-style, sync Slack↔Web): [2026-07-03-web-chat-channel-architecture.md](../../features/channels/2026-07-03-web-chat-channel-architecture.md)
+- User guide backend: [runner-backends.md](../../user-guide/runner-backends.md)
 
 ---
 

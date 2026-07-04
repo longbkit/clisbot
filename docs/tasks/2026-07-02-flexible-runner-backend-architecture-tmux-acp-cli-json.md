@@ -38,6 +38,20 @@ In progress (2026-07-02)
   provider in `~/.codex/config.toml` need `runner.env.OPENAI_API_KEY`;
   ChatGPT-subscription machines use `runner.acp.authMethodId: "chat-gpt"`
   (interactive browser login if not yet logged in).
+- 2026-07-03 increment: `/steer` on ACP ships as interrupt-and-redirect
+  (verified against protocol, spec, adapter source, and live experiments:
+  cancel retains conversation context; concurrent prompts hang); CLI provider
+  catalog in `src/runners/catalog/` (one file per provider; `backend: "acp"`
+  alone launches the pinned catalog adapter preset; newSessionCommand moved
+  out of tmux string checks); generated backend-by-provider
+  [capability matrix](../features/runners/capability-matrix.md) with a
+  drift-guard test; scenario-driven ACP simulator (approvals allow/deny,
+  plans, protocol drift, crash-at-init, context recall) plus the
+  [failure-mode matrix](../tests/features/runners/failure-mode-matrix.md)
+  mapping every known scenario to detection/handling/user outcome with test
+  evidence; web chat channel
+  [architecture design](../features/channels/2026-07-03-web-chat-channel-architecture.md);
+  user guide [runner-backends.md](../user-guide/runner-backends.md).
 - Remaining before Phase 1 exit: routed chat validation on the configured
   shared test surfaces (operator-gated, high blast radius).
 - Deferred: the SessionService-owned continuity API cleanup (backends still

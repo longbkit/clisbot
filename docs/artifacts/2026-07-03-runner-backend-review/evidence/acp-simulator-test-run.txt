@@ -1,0 +1,40 @@
+        "Invalid input: expected \"plan_update\"", "Invalid input: expected \"plan_removed\"",
+        "Invalid input: expected \"available_commands_update\"", "Invalid input: expected \"current_mode_update\"",
+        "Invalid input: expected \"config_option_update\"", "Invalid input: expected \"session_info_update\"",
+        "Invalid input: expected \"usage_update\""
+      ],
+    },
+    toolCallId: {
+      _errors: [ "Invalid input: expected string, received undefined", "Invalid input: expected string, received undefined" ],
+    },
+    title: {
+      _errors: [ "Invalid input: expected string, received undefined" ],
+    },
+    entries: {
+      _errors: [ "Required value is missing" ],
+    },
+    id: {
+      _errors: [ "Invalid input: expected string, received undefined" ],
+    },
+    availableCommands: {
+      _errors: [ "Required value is missing" ],
+    },
+    currentModeId: {
+      _errors: [ "Invalid input: expected string, received undefined" ],
+    },
+    configOptions: {
+      _errors: [ "Required value is missing" ],
+    },
+    used: {
+      _errors: [ "Invalid input: expected number, received undefined" ],
+    },
+    size: {
+      _errors: [ "Invalid input: expected number, received undefined" ],
+    },
+  },
+}
+
+ 24 pass
+ 0 fail
+ 100 expect() calls
+Ran 24 tests across 3 files. [4.82s]
