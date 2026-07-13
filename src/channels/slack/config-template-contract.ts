@@ -18,6 +18,7 @@ const slackChannelTemplateContract = defineChannelTemplateContract({
           ackReaction: "",
           typingReaction: "",
           replyToMode: "thread",
+          dmSessionScope: "peer",
           processingStatus: {
             enabled: true,
             status: "Working...",

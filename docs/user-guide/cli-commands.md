@@ -145,6 +145,8 @@ Core commands:
 - `clisbot bots set-credentials --channel slack [--bot <id>] --app-token <ENV_NAME|${ENV_NAME}|literal> --bot-token <ENV_NAME|${ENV_NAME}|literal> [--persist]`
 - `clisbot bots get-dm-policy --channel <channel-name> [--bot <id>]`
 - `clisbot bots set-dm-policy --channel <channel-name> [--bot <id>] --policy <disabled|pairing|allowlist|open>`
+- `clisbot bots get-dm-session-scope --channel slack [--bot <id>]`
+- `clisbot bots set-dm-session-scope --channel slack [--bot <id>] --scope <peer|thread>`
 
 Token aliases:
 
@@ -163,6 +165,7 @@ Important behavior:
 - `bots enable` and `bots disable` are the fast toggle when you want to keep config but stop or resume handling
 - `bots remove` fails while any route still references that bot
 - `bots set-agent` defines the bot-specific fallback agent
+- Slack `dmSessionScope: thread` gives each DM root thread its own agent session; `peer` keeps one session per DM peer
 - if no bot-specific fallback agent is set, routing falls back to the app default agent
 - if `--agent` is passed on `bots add`, it binds an existing agent
 - if `--cli` and `--bot-type` are passed on `bots add`, the command creates and bootstraps a new agent for that bot
