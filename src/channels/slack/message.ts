@@ -63,7 +63,8 @@ export function getSlackEventSkipReason(event: SlackEventLike): "missing-user" |
   if (
     typeof event.subtype === "string" &&
     event.subtype.length > 0 &&
-    event.subtype !== "bot_message"
+    event.subtype !== "bot_message" &&
+    event.subtype !== "file_share"
   ) {
     return "subtype";
   }
