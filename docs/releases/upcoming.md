@@ -56,6 +56,9 @@ hardening from earlier betas.
 
 ### Stability
 
+- Fixed detached runtime lifecycle commands so stale monitor and worker pids
+  reused by unrelated processes cannot trap container startup in an
+  `already running` restart loop or make `stop` signal the wrong process.
 - Fixed channel result persistence so concurrent result-store writers do not
   lose records or outputs.
 - Increased the shared JSON file lock retry budget so high-contention result
