@@ -15,6 +15,7 @@ Historical or exploratory material may still exist under subfolders such as `v0.
 - [Persistence Store Inventory](persistence-stores.md)
 - [Transcript Presentation And Streaming](transcript-presentation-and-streaming.md)
 - [Domain Language](domain-language.md)
+- [Naming Conventions](naming-conventions.md)
 - [Architecture Design Decisions](decisions/README.md)
 - [Session Key And Session Id Continuity Decision](decisions/2026-05-01-session-key-and-session-id-continuity-decision.md)
 - [Canonical Surface Concepts And Provider Capabilities](decisions/2026-05-10-canonical-surface-concepts-and-provider-capabilities.md)
@@ -22,6 +23,7 @@ Historical or exploratory material may still exist under subfolders such as `v0.
 - [Channel-Native Replaces Message Custom](decisions/2026-05-24-channel-native-replaces-message-custom.md)
 - [Static Built-In Channel Installation Inventory](decisions/2026-05-13-static-built-in-channel-installation-inventory.md)
 - [Owned Helper Boundaries And Infra Primitives](decisions/2026-05-13-owned-helper-boundaries-and-infra-primitives.md)
+- [Naming Is Architecture](decisions/2026-08-14-naming-is-architecture.md)
 
 ## What Belongs Here
 

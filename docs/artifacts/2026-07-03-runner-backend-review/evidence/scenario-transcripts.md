@@ -82,7 +82,7 @@ Events (note the plan; the unknown type never crashes the client):
 {"type":"tool-call","callId":"call-1","title":"","status":"completed"}
 ```
 Finding (captured while generating this transcript): the pinned
-`@agentclientprotocol/sdk@1.1.0` validates `session/update` strictly and
+`@agentclientprotocol/sdk@1.3.0` validates `session/update` strictly and
 logs a zod validation error object to the console when it drops an
 unknown update type. Behavior is safe (the run is unaffected; the update
 never reaches clisbot code) but a newer agent emitting new update types

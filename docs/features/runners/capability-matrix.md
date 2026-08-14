@@ -26,15 +26,15 @@ truthful guidance.
 ### Codex CLI (`codex`)
 
 - new-session command: `/new`
-- ACP adapter: `@agentclientprotocol/codex-acp@1.0.2` (maturity: validated)
+- ACP adapter: `@agentclientprotocol/codex-acp@1.1.14` (maturity: validated)
 - ACP auth methods: `chat-gpt` (subscription), `api-key` (api-key), `gateway` (gateway)
 - cost: ChatGPT subscription auth carries no extra cost versus the tmux path.
-- Primary provider; the ACP preset passed the real-adapter smoke (prompt, streaming, cancel, session/load resume) on 2026-07-02.
+- Primary provider; the ACP preset passed the real-adapter smoke (prompt, streaming, session/load resume) on 2026-08-11.
 
 ### Claude Code (`claude`)
 
 - new-session command: `/new`
-- ACP adapter: `@agentclientprotocol/claude-agent-acp@0.55.0` (maturity: not-recommended)
+- ACP adapter: `@agentclientprotocol/claude-agent-acp@0.66.0` (maturity: not-recommended)
 - ACP auth methods: `claude-login` (subscription)
 - cost: claude-agent-acp is built on the Claude Agent SDK: when Anthropic's paused billing split takes effect, this path draws from the metered programmatic budget instead of the subscription. tmux stays the subscription-cost path.
 - tmux is the deliberate default for Claude until the Anthropic billing split is settled; the ACP preset exists for users who accept Agent SDK metering.

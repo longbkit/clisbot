@@ -48,9 +48,9 @@ export const codexProvider: CliProviderDefinition = {
   acp: {
     launch: {
       command: "bunx",
-      args: ["@agentclientprotocol/codex-acp@1.0.2"],
+      args: ["@agentclientprotocol/codex-acp@1.1.14"],
     },
-    adapterPin: "@agentclientprotocol/codex-acp@1.0.2",
+    adapterPin: "@agentclientprotocol/codex-acp@1.1.14",
     authMethods: [
       {
         id: "chat-gpt",
@@ -78,6 +78,6 @@ export const codexProvider: CliProviderDefinition = {
     maturity: "validated",
   },
   notes: [
-    "Primary provider; the ACP preset passed the real-adapter smoke (prompt, streaming, cancel, session/load resume) on 2026-07-02.",
+    "Primary provider; the ACP preset passed the real-adapter smoke (prompt, streaming, session/load resume) on 2026-08-11.",
   ],
 };

@@ -41,9 +41,9 @@ export const claudeProvider: CliProviderDefinition = {
   acp: {
     launch: {
       command: "bunx",
-      args: ["@agentclientprotocol/claude-agent-acp@0.55.0"],
+      args: ["@agentclientprotocol/claude-agent-acp@0.66.0"],
     },
-    adapterPin: "@agentclientprotocol/claude-agent-acp@0.55.0",
+    adapterPin: "@agentclientprotocol/claude-agent-acp@0.66.0",
     authMethods: [
       {
         id: "claude-login",

@@ -12,14 +12,20 @@ recorded transcripts.
 | [STATUS.md](STATUS.md) | Trạng thái tổng: 1020/1024, 4 fail giải thích đủ, không regression |
 | [test-run-acp-and-web.md](test-run-acp-and-web.md) | 159 test tên đầy đủ cho các khu mới |
 | [scenario-transcripts.md](scenario-transcripts.md) | 8 hành vi thật ở ca khó + finding SDK log-noise |
-| [real-adapter-smoke.md](real-adapter-smoke.md) | Adapter + model thật: streaming, cancel-note, resume, id preserved |
+| [real-adapter-smoke.md](real-adapter-smoke.md) | Adapter + model thật: 1.1.14 ChatGPT-auth smoke mới nhất, cùng transcript 1.0.2 lịch sử |
 | [web-view-live-check.md](web-view-live-check.md) | SSE/demo qua node listener thật |
 | [images/](images/) | Screenshot web demo từ e2e Playwright (`test/web-demo.e2e.test.ts`): replay, live SSE completion, mobile |
 
-## 1. Real codex-acp smoke — PASS (2026-07-02)
+## 1. Real codex-acp smoke — PASS (latest: 2026-08-11)
 
-`AcpRunnerBackend` against pinned `@agentclientprotocol/codex-acp@1.0.2` and a
-real Codex model (local machine, gateway auth via `runner.env.OPENAI_API_KEY`):
+Current catalog pin `@agentclientprotocol/codex-acp@1.1.14` passed with
+ChatGPT auth: `ACP_SMOKE_OK`, structured usage, restart + `session/load`
+replay, and preserved session id. See [real-adapter-smoke.md](real-adapter-smoke.md)
+for the current transcript and the preserved 1.0.2 historical run.
+
+The initial 2026-07-02 validation used pinned
+`@agentclientprotocol/codex-acp@1.0.2` with a real Codex model and local
+gateway auth via `runner.env.OPENAI_API_KEY`:
 
 ```text
 [smoke] session id: 019f2173-9ef9-7f91-a7e1-1c5cb6e878f3

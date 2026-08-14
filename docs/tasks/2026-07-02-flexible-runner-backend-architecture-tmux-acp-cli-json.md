@@ -20,7 +20,7 @@ In progress (2026-07-02)
   dispatcher; `SessionService` no longer imports tmux; oversized
   `runner-service.ts` and `session-handshake.ts` split under the limits.
 - Phase 1 shipped (code + regression): `src/runners/acp/` backend on pinned
-  `@agentclientprotocol/sdk@1.1.0` with adapter-per-session, structured
+  `@agentclientprotocol/sdk@1.3.0` with adapter-per-session, structured
   events, `session/load` resume with truthful fresh-start fallback,
   first-class cancel, policy-resolved permissions
   (`runner.acp.permissionPolicy`), ACP `authenticate` support
@@ -38,6 +38,11 @@ In progress (2026-07-02)
   provider in `~/.codex/config.toml` need `runner.env.OPENAI_API_KEY`;
   ChatGPT-subscription machines use `runner.acp.authMethodId: "chat-gpt"`
   (interactive browser login if not yet logged in).
+- Adapter upgrade revalidated locally (2026-08-11): the catalog now pins
+  `@agentclientprotocol/codex-acp@1.1.14`, which bundles a Codex version new
+  enough for `gpt-5.6-sol`. ChatGPT-auth smoke passed prompt streaming,
+  usage events, adapter restart, `session/load` replay, and session-id
+  preservation. The 1.0.2 result above remains as historical evidence.
 - 2026-07-03 increment: `/steer` on ACP ships as interrupt-and-redirect
   (verified against protocol, spec, adapter source, and live experiments:
   cancel retains conversation context; concurrent prompts hang); CLI provider

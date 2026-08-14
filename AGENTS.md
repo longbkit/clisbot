@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## How To Code
+
+Your work must go beyond satisfying functional and non-functional requirements with comprehensive tests: relentlessly raise code quality to the highest practical standard, making it readable, readily understandable, and maintainable. Use familiar, explicit logic and mental models so readers can infer behavior directly from the code; centralize genuinely shared behavior so each change is made once and benefits every consumer; and design for extension with abstractions at the right level, proactively creating or extending a shared abstraction when the product vision identifies a definite future consumer so later expansion reduces rather than compounds complexity. Treat naming and terminology as architecture: always consult [`docs/architecture/domain-language.md`](docs/architecture/domain-language.md) and [`docs/architecture/naming-conventions.md`](docs/architecture/naming-conventions.md), update the appropriate canonical document when domain language or naming rules evolve, and use the `naming-expert` skill when choosing or changing names.
+
 ## Scope
 These rules apply to everything inside this repository.
 
@@ -9,6 +13,7 @@ The stable implementation contract lives in:
 - `docs/architecture/runtime-architecture.md`
 - `docs/architecture/persistence-stores.md`
 - `docs/architecture/domain-language.md`
+- `docs/architecture/naming-conventions.md`
 
 If implementation conflicts with those docs:
 1. stop

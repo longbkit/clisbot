@@ -28,8 +28,8 @@ RunnerBackend contract (src/runners/contract/ — interface + RunEvent + capabil
 ```
 
 - Phase 0: contract hoá + tách 2 file quá hạn (`runner-service.ts` 1330 dòng, `session-handshake.ts` 990 dòng) thành các module < 700 dòng
-- Phase 1: ACP backend hoàn chỉnh, 11 regression test với fake wire-protocol agent, smoke PASS với adapter `@agentclientprotocol/codex-acp@1.0.2` thật + model thật
-- Mọi bước `bun run check` xanh (999 pass; 3 fail là baseline có sẵn không liên quan)
+- Phase 1: ACP backend hoàn chỉnh, 17 regression test với fake wire-protocol agent, smoke PASS với adapter `@agentclientprotocol/codex-acp@1.1.14` thật + model thật
+- ACP targeted gate xanh 24/24; full gate 2026-08-11 đạt 1025/1028, với 3 fail baseline có sẵn không liên quan ACP
 
 ### 1.2 Định hướng dài hạn (đã chốt trong task doc — nhắc lại để anh xác nhận)
 
@@ -113,7 +113,7 @@ RunnerBackend contract (src/runners/contract/ — interface + RunEvent + capabil
         "runner": {                          // per-agent override — cùng shape với family
           "backend": "acp",
           "command": "bunx",
-          "args": ["@agentclientprotocol/codex-acp@1.0.2"],
+          "args": ["@agentclientprotocol/codex-acp@1.1.14"],
           "env": { "OPENAI_API_KEY": "..." },
           "acp": { "permissionPolicy": "auto-allow" }
         }
@@ -159,7 +159,7 @@ Nguyên tắc đã giữ: **field mới đều optional, không đổi shape con
 "runner": {
   "backend": "acp",
   "command": "bunx",
-  "args": ["@agentclientprotocol/codex-acp@1.0.2"],
+  "args": ["@agentclientprotocol/codex-acp@1.1.14"],
   "acp": { "authMethodId": "chat-gpt" }
 }
 ```
@@ -169,7 +169,7 @@ Nguyên tắc đã giữ: **field mới đều optional, không đổi shape con
 "runner": {
   "backend": "acp",
   "command": "bunx",
-  "args": ["@agentclientprotocol/codex-acp@1.0.2"],
+  "args": ["@agentclientprotocol/codex-acp@1.1.14"],
   "env": { "OPENAI_API_KEY": "<proxy-key>" }
   // KHÔNG set authMethodId — authenticate chat-gpt sẽ treo chờ browser OAuth
 }

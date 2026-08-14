@@ -58,7 +58,7 @@ describe("resolved target backend selection", () => {
 
     expect(resolved.runner.backend).toBe("acp");
     expect(resolved.runner.command).toBe("bunx");
-    expect(resolved.runner.args).toEqual(["@agentclientprotocol/codex-acp@1.0.2"]);
+    expect(resolved.runner.args).toEqual(["@agentclientprotocol/codex-acp@1.1.14"]);
     expect(resolved.runner.acp.permissionPolicy).toBe("auto-allow");
     expect(resolved.runner.acp.authMethodId).toBeUndefined();
   });
@@ -84,6 +84,26 @@ describe("resolved target backend selection", () => {
     expect(resolved.runner.args).toEqual([]);
     expect(resolved.runner.env.OPENAI_API_KEY).toBe("test-key");
     expect(resolved.runner.acp.authMethodId).toBe("chat-gpt");
+  });
+
+  test("claude ACP resolves to the pinned catalog adapter", async () => {
+    const loaded = await loadConfigWith({
+      id: "default",
+      default: true,
+      cli: "claude",
+      runner: { backend: "acp" },
+    });
+
+    const resolved = resolveAgentTarget(loaded, {
+      agentId: "default",
+      sessionKey: "main",
+    });
+
+    expect(resolved.runner.backend).toBe("acp");
+    expect(resolved.runner.command).toBe("bunx");
+    expect(resolved.runner.args).toEqual([
+      "@agentclientprotocol/claude-agent-acp@0.66.0",
+    ]);
   });
 
   test("gemini resolves /clear as the new-session command from the catalog", async () => {

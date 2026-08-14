@@ -62,6 +62,7 @@ Channels is where those surfaces live.
 
 ## Related Research
 
+- [T3 Code And clisbot Unified Product Options](../../research/channels/2026-08-12-t3code-clisbot-unified-product-options.md)
 - [Slack Thread Follow-Up Behavior](../../research/channels/2026-04-05-slack-thread-follow-up-behavior.md)
 - [OpenClaw Telegram Topics And Slack-Parity Plan](../../research/channels/2026-04-05-openclaw-telegram-topics-and-parity-plan.md)
 - [OpenClaw Pairing Implementation](../../research/channels/2026-04-06-openclaw-pairing-implementation.md)
@@ -76,6 +77,8 @@ Channels is where those surfaces live.
 
 ## Related Feature Docs
 
+- [T3 Unified Channel Control Plane](t3code-unified-channel-control-plane.md)
+- [T3 Source Integration And Release Workflow](t3code-source-integration-workflow.md)
 - [Channel Integration Playbook](channel-integration-playbook.md)
 - [Message Actions And Bot Routing](message-actions-and-channel-accounts.md)
 - [Message Command Formatting And Render Modes](message-command-formatting-and-render-modes.md)
