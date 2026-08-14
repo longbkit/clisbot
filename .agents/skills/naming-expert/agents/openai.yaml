@@ -1,0 +1,4 @@
+interface:
+  display_name: "Naming Expert"
+  short_description: "Plan, decide, and review names with evidence"
+  default_prompt: "Use $naming-expert in review mode to find naming drift and duplicated concepts in this change."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architect"
+  short_description: "Ask, plan, decide, and implement architecture"
+  default_prompt: "Use $architect in ask mode to route through current contracts, trace the executable owner chain, and recommend the smallest correct extension."
