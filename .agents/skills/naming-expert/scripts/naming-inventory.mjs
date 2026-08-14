@@ -64,9 +64,9 @@ Options:
   --help                   Show this help
 
 Examples:
-  node naming-inventory.mjs --query RecordQuickDetail packages/core/ui-engine
-  node naming-inventory.mjs --query data-source --query connection packages/core/server-runtime/src
-  node naming-inventory.mjs --json packages/plugins/page-builder`;
+  node naming-inventory.mjs --query sessionKey src/agents/session
+  node naming-inventory.mjs --query channel-installation --query plugin src/channels src/config
+  node naming-inventory.mjs --json src/runners`;
 }
 
 function parseArgs(argv) {
@@ -105,7 +105,7 @@ function parseArgs(argv) {
     if (arg.startsWith('--')) throw new Error(`unknown option: ${arg}`);
     options.scopes.push(arg);
   }
-  if (options.scopes.length === 0) options.scopes.push('packages');
+  if (options.scopes.length === 0) options.scopes.push('src');
   return options;
 }
 

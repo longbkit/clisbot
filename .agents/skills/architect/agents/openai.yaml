@@ -1,4 +1,4 @@
 interface:
   display_name: "Architect"
-  short_description: "Ask, plan, decide, and implement architecture"
-  default_prompt: "Use $architect in ask mode to route through current contracts, trace the executable owner chain, and recommend the smallest correct extension."
+  short_description: "Trace and evolve clisbot architecture"
+  default_prompt: "Use $architect in ask mode to trace clisbot's current contracts and executable owner chain, then recommend the smallest correct extension."

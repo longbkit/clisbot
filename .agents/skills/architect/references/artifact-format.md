@@ -1,102 +1,90 @@
-# Architecture artifact format
+# Architecture artifact routing and format
 
-Use plain language before internal terms. A plan audit records investigation and
-recommendation; an ADR records one accepted decision; canonical contracts state
-the current or explicitly labeled target rule. None substitutes for the others.
+Use plain language before internal terms. Research records investigation;
+feature docs own stable feature intent; task docs own execution; decision records
+preserve accepted rationale; architecture docs own the implementation contract.
+None substitutes for the others.
 
-## Plan audit
+## Choose the artifact owner
 
-Name the file:
+| Need | Location |
+| --- | --- |
+| Source-driven or exploratory analysis | `docs/research/<feature>/` |
+| Architecture conformance snapshot | `docs/audits/architecture-conformance/` |
+| Stable feature scope and behavior | `docs/features/<feature>/` |
+| Active implementation plan and status | `docs/tasks/` or `docs/tasks/features/<feature>/` |
+| Repository-wide accepted architecture decision | `docs/architecture/decisions/` |
+| Feature-local accepted decision | `docs/features/<feature>/decisions/` |
+| Canonical repository architecture | the relevant `docs/architecture/*.md` file |
 
-```text
-docs/audit/YYYY-MM-DDThhmm+TZ-<scope>-architecture-plan.md
-```
+Prefer links over repeated context. Update `docs/tasks/backlog.md` for task state
+and `docs/features/feature-tables.md` for feature state when applicable.
 
-Required header:
+## Plan or research artifact
 
-```md
-# <timestamp> architecture plan — <scope>
+Use a dated `yyyy-MM-dd-short-slug.md` filename. Include only applicable
+sections:
 
-- Mode: plan | decide | auto
-- Status: proposed | accepted | implemented | superseded
-- Scope: <complete owner chain and exclusions>
-- Baseline: <commit plus dirty-tree note>
-- User outcome: <observable job>
-- Canonical sources: <contracts and accepted ADRs>
-- Current proof: <code paths, tests, commands>
-- Decision: pending | [ADR-NNN](../adr/ADR-NNN-....md)
-```
+1. Status and scope.
+2. Executive conclusion.
+3. Concrete current user or operator flow.
+4. Current proof from contracts, code, tests, and runtime evidence.
+5. Owner map: identity, lifecycle, authority, process, and persistence.
+6. `CURRENT`, `TARGET`, `GAP`, and `HISTORICAL` ledger.
+7. Consumer pressure tests.
+8. Options, trade-offs, recommendation, and non-goals.
+9. Open decisions.
+10. Migration, compatibility, verification, rollout, and rollback.
+11. Measurable Definition of Done.
 
-Required sections:
+A proposal is not accepted architecture and must say so explicitly.
 
-1. Executive answer.
-2. Concrete current user flow.
-3. Current capability proof from code and tests.
-4. Owner map: identity, State/Data/Command, lifecycle, persistence, authority.
-5. Contract-versus-code ledger with `CURRENT`, `TARGET`, `GAP`, or `HISTORICAL`.
-6. Consumer pressure tests.
-7. Options and trade-offs.
-8. Recommendation and non-goals.
-9. Open-decision ledger.
-10. Wire/code/package impact and migration order.
-11. Verification and Definition of Done.
-12. Status history.
+## Decision record
 
-Decision ledger:
-
-| Decision | Status | Recommendation or accepted outcome | Owner | ADR | Proof |
-|---|---|---|---|---|---|
-
-Use `open`, `accepted`, `rejected`, or `superseded`. Never mark a row accepted
-before an ADR or an already-existing canonical decision owns it.
-
-## ADR
-
-Allocate the next number only after listing current `docs/adr/ADR-*.md` files.
-Recheck immediately before writing to avoid a collision.
+Use a dated `yyyy-MM-dd-short-slug.md` filename and the local folder's index.
 
 ```md
-# ADR-NNN — <decision title>
+---
+title: <Decision title>
+status: proposed | accepted | superseded
+date: YYYY-MM-DD
+---
 
-**Status:** Accepted
-**Date:** YYYY-MM-DD
-**Plan audit:** [<label>](../audit/<file>.md)
-**Scope:** <owner chain>
+# Context
 
-## Context
+<Current behavior, user need, and evidence.>
 
-<Current behavior, user need, and exact gap.>
+# Problem
 
-## Decision
+<The exact decision required.>
 
-<Numbered decisions with identity, owner, lifecycle, authority, persistence,
-wire compatibility, and migration policy.>
+# Considered Options
 
-## Consequences
+<Options and concrete trade-offs.>
 
-<Positive consequences, costs, and operational implications.>
+# Decision
 
-## Rejected alternatives
+<Chosen owner, contract, lifecycle, persistence, compatibility, and migration.>
 
-<Alternative plus evidence-based rejection reason.>
+# Rationale
 
-## Implementation and proof
+<Why this option best fits the evidence and product direction.>
 
-<Order, tests, gates, rollout, rollback, and completion condition.>
+# Consequences
+
+<Benefits, costs, operational effects, tests, rollout, and rollback.>
+
+# Supersession And Conflict Notes
+
+<Prior/later decisions and explicit cross-links, or state that none exist.>
+
+# Links
+
+<Canonical docs, feature docs, research, tasks, and proof.>
 ```
 
-An ADR says `Accepted`, not `Implemented`. The plan audit carries implementation
-status. If an accepted decision is replaced, create a new ADR, mark the old ADR
-`Superseded by ADR-NNN`, and update both links.
+Accepted is not implemented. Feature/task state and verification evidence must
+state whether consumers, migrations, docs, and runtime behavior actually ship.
 
-## Status transitions
-
-```text
-plan created             -> audit: proposed, decision: pending
-decision accepted        -> audit: accepted, ADR: Accepted, links both ways
-implementation started   -> audit remains accepted; record work item/status
-all proof passes         -> audit: implemented; record verification
-decision replaced        -> audit: superseded; old ADR points to replacement
-```
-
-Do not rewrite history to make a proposal look accepted earlier than it was.
+Never erase an earlier accepted decision. Mark it superseded, link both records,
+and update canonical architecture to the new current rule.
