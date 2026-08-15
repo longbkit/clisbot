@@ -60,6 +60,7 @@ describe("loadConfig", () => {
     config.bots.defaults.dmScope = "main";
     config.bots.slack.defaults.ackReaction = ":eyes:";
     config.bots.slack.defaults.typingReaction = ":hourglass_flowing_sand:";
+    config.bots.slack.defaults.dmSessionScope = "thread";
     config.bots.slack.defaults.processingStatus = {
       enabled: true,
       status: "Summarizing findings...",
@@ -131,6 +132,7 @@ describe("loadConfig", () => {
     expect(loaded.raw.session.identityLinks.alice).toEqual(["slack:U123"]);
     expect(resolvedSlackBot.ackReaction).toBe(":eyes:");
     expect(resolvedSlackBot.typingReaction).toBe(":hourglass_flowing_sand:");
+    expect(resolvedSlackBot.dmSessionScope).toBe("thread");
     expect(resolvedSlackBot.processingStatus.status).toBe("Summarizing findings...");
     expect(resolvedSlackBot.processingStatus.loadingMessages).toEqual([
       "Reviewing context...",

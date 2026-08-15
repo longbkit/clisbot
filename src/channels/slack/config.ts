@@ -17,6 +17,8 @@ export type SlackBotCredentialConfig = {
   botToken: string;
 };
 
+export type SlackDmSessionScope = "peer" | "thread";
+
 type SlackProcessingStatusConfig = {
   enabled: boolean;
   status: string;
@@ -29,6 +31,7 @@ type SlackProviderDefaults = ChannelProviderDefaults & {
   ackReaction?: string;
   typingReaction?: string;
   replyToMode?: "thread" | "all";
+  dmSessionScope?: SlackDmSessionScope;
   processingStatus?: SlackProcessingStatusConfig;
 };
 
@@ -37,6 +40,7 @@ type SlackBotRecord = ChannelBotRecord & {
   ackReaction?: string;
   typingReaction?: string;
   replyToMode?: "thread" | "all";
+  dmSessionScope?: SlackDmSessionScope;
   processingStatus?: SlackProcessingStatusConfig;
 };
 
@@ -48,6 +52,7 @@ export type ResolvedSlackBotConfig = ResolvedChannelBotConfig & {
   ackReaction: string;
   typingReaction: string;
   replyToMode: "thread" | "all";
+  dmSessionScope: SlackDmSessionScope;
   processingStatus: SlackProcessingStatusConfig;
 };
 
@@ -79,6 +84,8 @@ export function resolveSlackBotConfig(
     ackReaction: botConfig.ackReaction ?? providerDefaults.ackReaction ?? "",
     typingReaction: botConfig.typingReaction ?? providerDefaults.typingReaction ?? "",
     replyToMode: botConfig.replyToMode ?? providerDefaults.replyToMode ?? "thread",
+    dmSessionScope:
+      botConfig.dmSessionScope ?? providerDefaults.dmSessionScope ?? "peer",
     processingStatus:
       botConfig.processingStatus ??
       providerDefaults.processingStatus ?? {

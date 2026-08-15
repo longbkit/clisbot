@@ -23,6 +23,7 @@ const slackChannelSchemaContract = defineChannelSchemaContract({
       ackReaction: z.string().optional(),
       typingReaction: z.string().optional(),
       replyToMode: z.enum(["thread", "all"]).optional(),
+      dmSessionScope: z.enum(["peer", "thread"]).optional(),
       processingStatus: processingStatusSchema.optional(),
       groups: z.record(z.string(), params.botRouteSchema).default({}),
     });
@@ -31,6 +32,7 @@ const slackChannelSchemaContract = defineChannelSchemaContract({
       ackReaction: "",
       typingReaction: "",
       replyToMode: "thread",
+      dmSessionScope: "peer",
       processingStatus: {
         enabled: true,
         status: "Working...",
@@ -44,6 +46,7 @@ const slackChannelSchemaContract = defineChannelSchemaContract({
       ackReaction: z.string().default(""),
       typingReaction: z.string().default(""),
       replyToMode: z.enum(["thread", "all"]).default("thread"),
+      dmSessionScope: z.enum(["peer", "thread"]).default("peer"),
       processingStatus: processingStatusSchema.default({
         enabled: true,
         status: "Working...",

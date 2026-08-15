@@ -8,6 +8,7 @@ const slackLegacyConfigMigrationContract = {
     "ackReaction",
     "typingReaction",
     "replyToMode",
+    "dmSessionScope",
     "processingStatus",
   ],
   botFields: [
@@ -17,6 +18,7 @@ const slackLegacyConfigMigrationContract = {
     "ackReaction",
     "typingReaction",
     "replyToMode",
+    "dmSessionScope",
     "processingStatus",
   ],
   legacyGroupKey: "channels",

@@ -129,6 +129,7 @@ const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
         "                     get-agent|set-agent|clear-agent",
         "                     get-credentials-source|set-credentials",
         "                     get-dm-policy|set-dm-policy",
+        "                     get-dm-session-scope|set-dm-session-scope (Slack)",
         "                     See `bots --help` for examples and credential behavior.",
       ],
       passthroughArgs: true,

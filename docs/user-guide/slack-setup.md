@@ -222,6 +222,22 @@ After the route is bound, `/whoami` is also a quick session check because it
 shows `sessionId` plus whether that value is already persisted for that
 conversation.
 
+### Optional: isolate Slack DMs by root thread
+
+Slack DMs keep one agent session per peer by default. To give each DM root thread its own session while preserving context inside that thread, run:
+
+```bash
+clisbot bots set-dm-session-scope --channel slack --bot default --scope thread
+```
+
+Inspect the effective setting with:
+
+```bash
+clisbot bots get-dm-session-scope --channel slack --bot default
+```
+
+Set the scope back to `peer` to restore one session per DM peer. Changing the scope does not delete existing session state; it only changes how later Slack DM messages select a session key.
+
 ## Step 6: Add The Bot To A Public Channel
 
 Invite the bot into the target Slack channel.

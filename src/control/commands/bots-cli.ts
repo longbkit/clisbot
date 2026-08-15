@@ -108,6 +108,8 @@ function renderBotsHelp() {
     ...renderZaloPersonalLifecycleHelpLines().map((line) => `  ${line}`),
     `  ${renderCliCommand(`bots get-dm-policy --channel ${channelName} [--bot <id>]`)}`,
     `  ${renderCliCommand(`bots set-dm-policy --channel ${channelName} [--bot <id>] --policy <disabled|pairing|allowlist|open>`)}`,
+    `  ${renderCliCommand("bots get-dm-session-scope --channel slack [--bot <id>]")}`,
+    `  ${renderCliCommand("bots set-dm-session-scope --channel slack [--bot <id>] --scope <peer|thread>")}`,
     "",
     "Notes:",
     "  - `add` creates only; if the bot already exists, use `set-agent`, `set-credentials`, or another `set-<key>` command",
@@ -117,6 +119,7 @@ function renderBotsHelp() {
     "  - prefer app, agent, or route timezone first; bot timezone is an advanced concrete-bot fallback",
     "  - raw token input without `--persist` requires a running clisbot runtime",
     "  - Zalo Personal login is QR-only; `--qr-path` only saves the QR image while the QR is still printed in the console",
+    "  - Slack `dmSessionScope: thread` gives each DM root thread its own agent session; `peer` keeps one session per DM peer",
     "  - normal shared-route admission now follows the bot's `group:*` default plus any exact `group:<id>` override",
     `  - ${renderSupportedChannelsNote()}`,
   ].join("\n");
@@ -404,6 +407,34 @@ async function getOrSetBotPolicy(args: string[], action: string) {
   throw new Error(renderBotsHelp());
 }
 
+async function getOrSetSlackDmSessionScope(args: string[], action: string) {
+  const provider = parseProvider(args);
+  if (provider !== "slack") {
+    throw new Error("DM session scope is supported only for Slack bots.");
+  }
+
+  const botId = getBotId(args);
+  const { config, configPath } = await readEditableConfig(getEditableConfigPath());
+  const bot = requireChannelBotRecord(config, provider, botId);
+  const defaults = getChannelProviderDefaults(config, provider);
+
+  if (action === "get-dm-session-scope") {
+    const scope = bot.dmSessionScope ?? defaults.dmSessionScope ?? "peer";
+    console.log(`${provider}/${botId} dmSessionScope: ${scope}`);
+    console.log(`config: ${configPath}`);
+    return;
+  }
+
+  const scope = parseOptionValue(args, "--scope");
+  if (scope !== "peer" && scope !== "thread") {
+    throw new Error(renderBotsHelp());
+  }
+  bot.dmSessionScope = scope;
+  await writeEditableConfig(configPath, config);
+  console.log(`set dmSessionScope for ${provider}/${botId} to ${scope}`);
+  console.log(`config: ${configPath}`);
+}
+
 async function getCredentialSource(args: string[]) {
   const provider = parseProvider(args);
   const botId = getBotId(args);
@@ -501,6 +532,14 @@ export async function runBotsCli(
     action === "set-dm-policy"
   ) {
     await getOrSetBotPolicy(args.slice(1), action);
+    return;
+  }
+
+  if (
+    action === "get-dm-session-scope" ||
+    action === "set-dm-session-scope"
+  ) {
+    await getOrSetSlackDmSessionScope(args.slice(1), action);
     return;
   }
 
