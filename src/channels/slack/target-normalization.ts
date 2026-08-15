@@ -1,9 +1,20 @@
+import type { ChannelIdentity } from "../surface/channel-identity.ts";
+
 export type SlackSurfaceTarget = {
   conversationKind: "dm" | "group" | "channel";
   channelType: "im" | "mpim" | "channel";
   channelId: string;
   userId?: string;
 };
+
+export function resolveSlackAgentReplyTarget(
+  identity: Pick<ChannelIdentity, "conversationKind" | "senderId" | "channelId">,
+) {
+  if (identity.conversationKind === "dm" && identity.senderId) {
+    return `user:${identity.senderId}`;
+  }
+  return identity.channelId ? `channel:${identity.channelId}` : null;
+}
 
 export function renderSlackTargetSyntax() {
   return "`group:<id>`, `dm:<user-or-channel-id>`, or raw `C...` / `G...` / `D...` ids";
