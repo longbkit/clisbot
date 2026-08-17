@@ -1,6 +1,6 @@
-import { execFileSync, spawn } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
+import { closeSync, existsSync, openSync, rmSync, statSync } from "node:fs";
+import { dirname } from "node:path";
 import { kill } from "node:process";
 import { loadConfig } from "../../config/core/load-config.ts";
 import { renderDefaultConfigTemplate } from "../../config/core/template.ts";
@@ -12,11 +12,6 @@ import { readTextFile, readTextFileSlice, writeTextFile } from "../../infra/fs.t
 import {
   ensureDir,
   expandHomePath,
-  getDefaultConfigPath,
-  getDefaultRuntimeLogPath,
-  getDefaultRuntimeMonitorStatePath,
-  getDefaultRuntimeCredentialsPath,
-  getDefaultRuntimePidPath,
   getDefaultTmuxSocketPath,
 } from "../../infra/paths.ts";
 import { sleep } from "../../infra/process.ts";
@@ -27,187 +22,73 @@ import {
   writeRuntimeMonitorState,
   type RuntimeMonitorState,
 } from "./runtime-monitor.ts";
+import {
+  getProcessLiveness,
+  processMatchesRuntimeRole,
+  type ProcessLiveness,
+  type RuntimeProcessRole,
+} from "./process-inspection.ts";
+import {
+  resolveRuntimeConfigPath,
+  resolveRuntimeCredentialsPath,
+  resolveRuntimeLogPath,
+  resolveRuntimeMonitorStatePath,
+  resolveRuntimePidPath,
+} from "./runtime-paths.ts";
+
+export { getProcessLiveness } from "./process-inspection.ts";
 
 const START_WAIT_TIMEOUT_MS = 10_000;
 const STOP_WAIT_TIMEOUT_MS = 10_000;
 const PROCESS_POLL_INTERVAL_MS = 100;
 
-function resolveConfigPath(configPath?: string) {
-  return expandHomePath(configPath ?? process.env.CLISBOT_CONFIG_PATH ?? getDefaultConfigPath());
-}
-
-function deriveRuntimeSiblingPath(
-  configPath: string | undefined,
-  filename: string,
-) {
-  if (!configPath) {
-    return null;
-  }
-
-  return join(dirname(expandHomePath(configPath)), "state", filename);
-}
-
-function resolvePidPath(
-  pidPath?: string,
-  configPath?: string,
-  options: {
-    preferConfigSibling?: boolean;
-  } = {},
-) {
-  if (pidPath) {
-    return expandHomePath(pidPath);
-  }
-
-  if (options.preferConfigSibling) {
-    const derivedFromExplicitConfig = deriveRuntimeSiblingPath(configPath, "clisbot.pid");
-    if (derivedFromExplicitConfig) {
-      return derivedFromExplicitConfig;
-    }
-  }
-
-  if (process.env.CLISBOT_PID_PATH) {
-    return expandHomePath(process.env.CLISBOT_PID_PATH);
-  }
-
-  const derivedFromConfig = deriveRuntimeSiblingPath(
-    configPath ?? process.env.CLISBOT_CONFIG_PATH,
-    "clisbot.pid",
-  );
-  if (derivedFromConfig) {
-    return derivedFromConfig;
-  }
-
-  return expandHomePath(getDefaultRuntimePidPath());
-}
-
-function resolveLogPath(
-  logPath?: string,
-  configPath?: string,
-  options: {
-    preferConfigSibling?: boolean;
-  } = {},
-) {
-  if (logPath) {
-    return expandHomePath(logPath);
-  }
-
-  if (options.preferConfigSibling) {
-    const derivedFromExplicitConfig = deriveRuntimeSiblingPath(configPath, "clisbot.log");
-    if (derivedFromExplicitConfig) {
-      return derivedFromExplicitConfig;
-    }
-  }
-
-  if (process.env.CLISBOT_LOG_PATH) {
-    return expandHomePath(process.env.CLISBOT_LOG_PATH);
-  }
-
-  const derivedFromConfig = deriveRuntimeSiblingPath(
-    configPath ?? process.env.CLISBOT_CONFIG_PATH,
-    "clisbot.log",
-  );
-  if (derivedFromConfig) {
-    return derivedFromConfig;
-  }
-
-  return expandHomePath(getDefaultRuntimeLogPath());
-}
-
-function resolveMonitorStatePath(
-  monitorStatePath?: string,
-  configPath?: string,
-  options: {
-    preferConfigSibling?: boolean;
-  } = {},
-) {
-  if (monitorStatePath) {
-    return expandHomePath(monitorStatePath);
-  }
-
-  if (options.preferConfigSibling) {
-    const derivedFromExplicitConfig = deriveRuntimeSiblingPath(
-      configPath,
-      "clisbot-monitor.json",
-    );
-    if (derivedFromExplicitConfig) {
-      return derivedFromExplicitConfig;
-    }
-  }
-
-  if (process.env.CLISBOT_RUNTIME_MONITOR_STATE_PATH) {
-    return expandHomePath(process.env.CLISBOT_RUNTIME_MONITOR_STATE_PATH);
-  }
-
-  const derivedFromConfig = deriveRuntimeSiblingPath(
-    configPath ?? process.env.CLISBOT_CONFIG_PATH,
-    "clisbot-monitor.json",
-  );
-  if (derivedFromConfig) {
-    return derivedFromConfig;
-  }
-
-  return expandHomePath(getDefaultRuntimeMonitorStatePath());
-}
+type RuntimeProcessMatcher = (params: {
+  pid: number;
+  expectedStartedAt?: string;
+  role: RuntimeProcessRole;
+}) => boolean;
 
 function resolveLiveMonitorPid(params: {
   pidFromFile: number | null;
   monitorState: RuntimeMonitorState | null;
   processLiveness?: (pid: number) => ProcessLiveness;
+  processMatcher?: RuntimeProcessMatcher;
 }) {
-  const processLiveness = params.processLiveness ?? getProcessLiveness;
-  if (params.pidFromFile && processLiveness(params.pidFromFile) === "running") {
-    return params.pidFromFile;
-  }
-
   const monitorPid = params.monitorState?.monitorPid;
-  if (monitorPid && processLiveness(monitorPid) === "running") {
-    return monitorPid;
+  const processLiveness = params.processLiveness ?? getProcessLiveness;
+  const processMatcher = params.processMatcher ?? ((candidate) =>
+    processMatchesRuntimeRole(candidate, { processLiveness }));
+  if (!monitorPid) {
+    const pidFromFile = params.pidFromFile;
+    return pidFromFile && processMatcher({
+      pid: pidFromFile,
+      role: "serve-monitor",
+    }) ? pidFromFile : null;
   }
-
-  return null;
+  return processMatcher({
+    pid: monitorPid,
+    expectedStartedAt: params.monitorState!.startedAt,
+    role: "serve-monitor",
+  }) ? monitorPid : null;
 }
 
-function resolveKnownMonitorPid(params: {
-  pidFromFile: number | null;
+function resolveLiveRuntimePid(params: {
   monitorState: RuntimeMonitorState | null;
+  processLiveness?: (pid: number) => ProcessLiveness;
+  processMatcher?: RuntimeProcessMatcher;
 }) {
-  return params.pidFromFile ?? params.monitorState?.monitorPid ?? null;
-}
-
-function resolveRuntimeCredentialsPath(
-  runtimeCredentialsPath?: string,
-  configPath?: string,
-  options: {
-    preferConfigSibling?: boolean;
-  } = {},
-) {
-  if (runtimeCredentialsPath) {
-    return expandHomePath(runtimeCredentialsPath);
+  const runtimePid = params.monitorState?.runtimePid;
+  if (!runtimePid || params.monitorState?.phase !== "active") {
+    return null;
   }
-
-  if (options.preferConfigSibling) {
-    const derivedFromExplicitConfig = deriveRuntimeSiblingPath(
-      configPath,
-      "runtime-credentials.json",
-    );
-    if (derivedFromExplicitConfig) {
-      return derivedFromExplicitConfig;
-    }
-  }
-
-  if (process.env.CLISBOT_RUNTIME_CREDENTIALS_PATH) {
-    return expandHomePath(process.env.CLISBOT_RUNTIME_CREDENTIALS_PATH);
-  }
-
-  const derivedFromConfig = deriveRuntimeSiblingPath(
-    configPath ?? process.env.CLISBOT_CONFIG_PATH,
-    "runtime-credentials.json",
-  );
-  if (derivedFromConfig) {
-    return derivedFromConfig;
-  }
-
-  return expandHomePath(getDefaultRuntimeCredentialsPath());
+  const processLiveness = params.processLiveness ?? getProcessLiveness;
+  const processMatcher = params.processMatcher ?? ((candidate) =>
+    processMatchesRuntimeRole(candidate, { processLiveness }));
+  return processMatcher({
+    pid: runtimePid,
+    expectedStartedAt: params.monitorState.updatedAt,
+    role: "serve-foreground",
+  }) ? runtimePid : null;
 }
 
 export type RuntimeStartResult = {
@@ -258,24 +139,10 @@ type WaitForStartResult =
       childPid: number;
     };
 
-export type ProcessLiveness = "running" | "zombie" | "missing";
-
-type ProcessLivenessDependencies = {
-  platform: NodeJS.Platform;
-  signalCheck: (pid: number) => boolean;
-  readLinuxProcStat: (pid: number) => ProcessLiveness | "unknown";
-  readPsStat: (pid: number) => ProcessLiveness | "unknown";
-};
-
-const DEFAULT_PROCESS_LIVENESS_DEPENDENCIES: ProcessLivenessDependencies = {
-  platform: process.platform,
-  signalCheck: signalCheckProcess,
-  readLinuxProcStat: readLinuxProcStatLiveness,
-  readPsStat: readPsStatLiveness,
-};
+export type { ProcessLiveness } from "./process-inspection.ts";
 
 export function readRuntimePid(pidPath?: string) {
-  const expandedPidPath = resolvePidPath(pidPath);
+  const expandedPidPath = resolveRuntimePidPath(pidPath);
   if (!existsSync(expandedPidPath)) {
     return null;
   }
@@ -291,42 +158,12 @@ export function isProcessRunning(pid: number) {
   return getProcessLiveness(pid) === "running";
 }
 
-export function getProcessLiveness(
-  pid: number,
-  dependencies: Partial<ProcessLivenessDependencies> = {},
-): ProcessLiveness {
-  const resolvedDependencies = {
-    ...DEFAULT_PROCESS_LIVENESS_DEPENDENCIES,
-    ...dependencies,
-  } satisfies ProcessLivenessDependencies;
-
-  if (!resolvedDependencies.signalCheck(pid)) {
-    return "missing";
-  }
-
-  if (resolvedDependencies.platform === "win32") {
-    return "running";
-  }
-
-  const linuxState = resolvedDependencies.readLinuxProcStat(pid);
-  if (linuxState !== "unknown") {
-    return linuxState;
-  }
-
-  const psState = resolvedDependencies.readPsStat(pid);
-  if (psState !== "unknown") {
-    return psState;
-  }
-
-  return "running";
-}
-
 export async function ensureConfigFile(
   configPath?: string,
   options: ConfigBootstrapOptions = {},
 ) {
   await ensureClisbotWrapper();
-  const expandedConfigPath = resolveConfigPath(configPath);
+  const expandedConfigPath = resolveRuntimeConfigPath(configPath);
   await ensureDir(dirname(expandedConfigPath));
 
   if (existsSync(expandedConfigPath)) {
@@ -355,11 +192,11 @@ export async function startDetachedRuntime(params: {
   runtimeCredentialsPath?: string;
   monitorStatePath?: string;
 }) {
-  const configPath = resolveConfigPath(params.configPath);
+  const configPath = resolveRuntimeConfigPath(params.configPath);
   const preferConfigSibling = params.configPath != null;
-  const pidPath = resolvePidPath(params.pidPath, configPath, { preferConfigSibling });
-  const logPath = resolveLogPath(params.logPath, configPath, { preferConfigSibling });
-  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath, configPath, {
+  const pidPath = resolveRuntimePidPath(params.pidPath, configPath, { preferConfigSibling });
+  const logPath = resolveRuntimeLogPath(params.logPath, configPath, { preferConfigSibling });
+  const monitorStatePath = resolveRuntimeMonitorStatePath(params.monitorStatePath, configPath, {
     preferConfigSibling,
   });
   const runtimeCredentialsPath = resolveRuntimeCredentialsPath(
@@ -390,12 +227,15 @@ export async function startDetachedRuntime(params: {
     rmSync(pidPath, { force: true });
   }
 
-  if (existingMonitorState?.runtimePid && isProcessRunning(existingMonitorState.runtimePid)) {
-    kill(existingMonitorState.runtimePid, "SIGTERM");
-    const exited = await waitForProcessExit(existingMonitorState.runtimePid, STOP_WAIT_TIMEOUT_MS);
+  const orphanedRuntimePid = resolveLiveRuntimePid({
+    monitorState: existingMonitorState,
+  });
+  if (orphanedRuntimePid && existingMonitorState) {
+    kill(orphanedRuntimePid, "SIGTERM");
+    const exited = await waitForProcessExit(orphanedRuntimePid, STOP_WAIT_TIMEOUT_MS);
     if (!exited) {
       throw new Error(
-        `A stale clisbot runtime worker (${existingMonitorState.runtimePid}) is still running without its monitor; stop it before starting a new service.`,
+        `A stale clisbot runtime worker (${orphanedRuntimePid}) is still running without its monitor; stop it before starting a new service.`,
       );
     }
     await writeRuntimeMonitorState(monitorStatePath, {
@@ -467,13 +307,14 @@ export async function stopDetachedRuntime(params: {
   monitorStatePath?: string;
 }, dependencies: {
   processLiveness?: (pid: number) => ProcessLiveness;
+  processMatcher?: RuntimeProcessMatcher;
   sendSignal?: typeof kill;
   sleep?: typeof sleep;
 } = {}) {
-  const configPath = resolveConfigPath(params.configPath);
+  const configPath = resolveRuntimeConfigPath(params.configPath);
   const preferConfigSibling = params.configPath != null;
-  const pidPath = resolvePidPath(params.pidPath, configPath, { preferConfigSibling });
-  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath, configPath, {
+  const pidPath = resolveRuntimePidPath(params.pidPath, configPath, { preferConfigSibling });
+  const monitorStatePath = resolveRuntimeMonitorStatePath(params.monitorStatePath, configPath, {
     preferConfigSibling,
   });
   const runtimeCredentialsPath = resolveRuntimeCredentialsPath(
@@ -485,15 +326,22 @@ export async function stopDetachedRuntime(params: {
   const monitorState = await readRuntimeMonitorState(monitorStatePath);
   let stopped = false;
   const processLiveness = dependencies.processLiveness ?? getProcessLiveness;
+  const processMatcher = dependencies.processMatcher ?? ((candidate) =>
+    processMatchesRuntimeRole(candidate, { processLiveness }));
   const sendSignal = dependencies.sendSignal ?? kill;
   const sleepFn = dependencies.sleep ?? sleep;
 
-  const monitorPid = resolveKnownMonitorPid({
+  const monitorPid = resolveLiveMonitorPid({
     pidFromFile: existingPid,
     monitorState,
+    processLiveness,
+    processMatcher,
   });
-  const monitorLiveness = monitorPid ? processLiveness(monitorPid) : "missing";
-  if (monitorPid && monitorLiveness === "running") {
+  const knownMonitorPid = monitorState?.monitorPid ?? existingPid;
+  const knownMonitorLiveness = knownMonitorPid
+    ? processLiveness(knownMonitorPid)
+    : "missing";
+  if (monitorPid) {
     sendSignal(monitorPid, "SIGTERM");
     const exited = await waitForProcessExit(monitorPid, STOP_WAIT_TIMEOUT_MS, {
       processLiveness,
@@ -503,12 +351,16 @@ export async function stopDetachedRuntime(params: {
       throw new Error(`clisbot did not stop within ${STOP_WAIT_TIMEOUT_MS}ms`);
     }
     stopped = true;
-  } else if (monitorPid && monitorLiveness === "zombie") {
+  } else if (knownMonitorPid && knownMonitorLiveness === "zombie") {
     stopped = true;
   }
 
-  const runtimePid = monitorState?.runtimePid;
-  if (runtimePid && processLiveness(runtimePid) === "running") {
+  const runtimePid = resolveLiveRuntimePid({
+    monitorState,
+    processLiveness,
+    processMatcher,
+  });
+  if (runtimePid) {
     try {
       sendSignal(runtimePid, "SIGTERM");
       const exited = await waitForProcessExit(runtimePid, STOP_WAIT_TIMEOUT_MS, {
@@ -520,7 +372,7 @@ export async function stopDetachedRuntime(params: {
       }
       stopped = true;
     } catch (error) {
-      if (!(monitorPid && monitorLiveness === "running")) {
+      if (!monitorPid) {
         throw error;
       }
     }
@@ -555,7 +407,7 @@ export async function stopDetachedRuntime(params: {
 }
 
 async function disableExpiredMemAccountsInConfig(configPath?: string) {
-  const resolvedConfigPath = resolveConfigPath(configPath);
+  const resolvedConfigPath = resolveRuntimeConfigPath(configPath);
   if (!existsSync(resolvedConfigPath)) {
     return;
   }
@@ -570,13 +422,13 @@ async function disableExpiredMemAccountsInConfig(configPath?: string) {
 }
 
 export async function writeRuntimePid(pidPath?: string, pid = process.pid) {
-  const expandedPidPath = resolvePidPath(pidPath);
+  const expandedPidPath = resolveRuntimePidPath(pidPath);
   await ensureDir(dirname(expandedPidPath));
   await writeTextFile(expandedPidPath, `${pid}\n`);
 }
 
 export function removeRuntimePid(pidPath?: string) {
-  rmSync(resolvePidPath(pidPath), { force: true });
+  rmSync(resolveRuntimePidPath(pidPath), { force: true });
 }
 
 export async function getRuntimeStatus(params: {
@@ -585,11 +437,11 @@ export async function getRuntimeStatus(params: {
   logPath?: string;
   monitorStatePath?: string;
 } = {}): Promise<RuntimeStatus> {
-  const configPath = resolveConfigPath(params.configPath);
+  const configPath = resolveRuntimeConfigPath(params.configPath);
   const preferConfigSibling = params.configPath != null;
-  const pidPath = resolvePidPath(params.pidPath, configPath, { preferConfigSibling });
-  const logPath = resolveLogPath(params.logPath, configPath, { preferConfigSibling });
-  const monitorStatePath = resolveMonitorStatePath(params.monitorStatePath, configPath, {
+  const pidPath = resolveRuntimePidPath(params.pidPath, configPath, { preferConfigSibling });
+  const logPath = resolveRuntimeLogPath(params.logPath, configPath, { preferConfigSibling });
+  const monitorStatePath = resolveRuntimeMonitorStatePath(params.monitorStatePath, configPath, {
     preferConfigSibling,
   });
   const pid = await readRuntimePid(pidPath);
@@ -598,6 +450,7 @@ export async function getRuntimeStatus(params: {
     pidFromFile: pid,
     monitorState,
   });
+  const liveRuntimePid = resolveLiveRuntimePid({ monitorState });
 
   return {
     running: liveMonitorPid != null,
@@ -609,10 +462,7 @@ export async function getRuntimeStatus(params: {
     monitorStatePath,
     serviceMode: "monitor",
     serviceState: monitorState?.phase,
-    runtimePid:
-      monitorState?.runtimePid && getProcessLiveness(monitorState.runtimePid) === "running"
-        ? monitorState.runtimePid
-        : undefined,
+    runtimePid: liveRuntimePid ?? undefined,
     nextRestartAt: monitorState?.restart?.nextRestartAt,
     restartNumber: monitorState?.restart?.restartNumber,
     restartMode: monitorState?.restart?.mode,
@@ -626,7 +476,7 @@ export async function readRuntimeLog(params: {
   lines?: number;
   startOffset?: number;
 } = {}) {
-  const logPath = resolveLogPath(params.logPath);
+  const logPath = resolveRuntimeLogPath(params.logPath);
   const lines = params.lines ?? 200;
   if (!existsSync(logPath)) {
     return {
@@ -759,7 +609,7 @@ function renderStartFailureReason(
 }
 
 async function resolveTmuxSocketPath(configPath?: string) {
-  const expandedConfigPath = resolveConfigPath(configPath);
+  const expandedConfigPath = resolveRuntimeConfigPath(configPath);
   if (!existsSync(expandedConfigPath)) {
     return getDefaultTmuxSocketPath();
   }
@@ -780,71 +630,4 @@ async function resolveTmuxSocketPath(configPath?: string) {
   }
 
   return getDefaultTmuxSocketPath();
-}
-
-function signalCheckProcess(pid: number) {
-  try {
-    kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function readLinuxProcStatLiveness(pid: number): ProcessLiveness | "unknown" {
-  if (process.platform !== "linux") {
-    return "unknown";
-  }
-
-  try {
-    const raw = readFileSync(`/proc/${pid}/stat`, "utf8");
-    const state = extractLinuxProcState(raw);
-    if (!state) {
-      return "unknown";
-    }
-    return state.includes("Z") ? "zombie" : "running";
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
-      return "missing";
-    }
-    return "unknown";
-  }
-}
-
-function readPsStatLiveness(pid: number): ProcessLiveness | "unknown" {
-  try {
-    const raw = execFileSync("ps", ["-o", "stat=", "-p", String(pid)], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    if (!raw) {
-      return "missing";
-    }
-    return raw.includes("Z") ? "zombie" : "running";
-  } catch (error) {
-    const commandError = error as NodeJS.ErrnoException & { status?: number | null };
-    if (commandError.code === "ENOENT") {
-      return "unknown";
-    }
-    if (commandError.status === 1) {
-      return "missing";
-    }
-    return "unknown";
-  }
-}
-
-function extractLinuxProcState(raw: string) {
-  const closingParenIndex = raw.lastIndexOf(")");
-  if (closingParenIndex < 0) {
-    return null;
-  }
-
-  const remainder = raw.slice(closingParenIndex + 1).trim();
-  if (!remainder) {
-    return null;
-  }
-
-  const [state] = remainder.split(/\s+/, 1);
-  return state?.trim() || null;
 }
