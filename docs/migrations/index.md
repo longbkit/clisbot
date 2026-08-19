@@ -3,10 +3,10 @@
 Read this file first during package updates. It exists only to answer whether manual migration is required.
 
 ```text
-Path: 0.1.53, 0.1.54-beta.1, or 0.1.54-beta.2 -> 0.1.54-beta.3
+Path: 0.1.53, 0.1.54-beta.1, 0.1.54-beta.2, or 0.1.54-beta.3 -> 0.1.54-beta.4
 Update path: direct
 Manual action: none
-Risk: medium for runner recovery / Codex users; medium for API channel adopters; low for other users
+Risk: medium for ACP and OpenCode adopters; low for existing tmux users
 Automatic config update: no new schema migration in this beta
 Breaking change: no
 Migration runbook: none
@@ -14,20 +14,14 @@ Read next: ../updates/update-guide.md
 Release note: ../releases/upcoming.md
 ```
 
-`0.1.54-beta.3` does not require manual config edits. It does not introduce a
-new schema migration beyond the already-shipped `0.1.53` automatic config
-update.
+`0.1.54-beta.4` does not require manual config edits. It adds optional runner
+fields (`backend`, `env`, `newSessionCommand`, `acp`) that existing configs do
+not need to set: an unset `backend` resolves to `tmux`, so current tmux behavior
+is unchanged unless an agent opts into `acp`.
 
-API channel operators should note that the default API listener port is now
-`6868`. Existing explicit listener config wins. The API channel result store is
-hardened for concurrent writes, but global runner/session admission caps are
-still planned rather than implemented.
-
-The packaged API listener now runs on Node's built-in HTTP server, so API bots
-do not require Bun at runtime when installed from npm.
-
-Runner operators should note that rejected native resume ids and Codex state
-database startup failures now produce clearer recovery guidance, but no config
-or state-file migration is required.
+The default interactive runner startup window moves from `60` to `120` seconds.
+Installs that pinned a stale `startupDelayMs: 60000` override on Codex, Gemini,
+or OpenCode have it pruned on first read so they inherit the new default, as
+with the earlier `0.1.52` startup-delay pruning.
 
 Rule: if `Manual action: none`, do not read or invent a migration runbook.
