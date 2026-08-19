@@ -73,7 +73,7 @@ function renderBotsHelp() {
   const channelName = renderChannelNamePlaceholder();
   const addExamples = listChannelBotCredentialContracts().map((contract) =>
     renderCliCommand(
-      `bots add --channel ${contract.channel} [--bot <id>] ${renderChannelBotCredentialUsage(contract.channel)} [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--persist]`,
+      `bots add --channel ${contract.channel} [--bot <id>] ${renderChannelBotCredentialUsage(contract.channel)} [--agent <id>] [--cli <codex|claude|gemini|opencode> --bot-type <personal|team>] [--persist]`,
     )
   );
   addExamples.push(renderZaloPersonalAddHelpLine());

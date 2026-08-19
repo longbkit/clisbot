@@ -7,13 +7,18 @@
 // entry in index.ts. Nothing outside src/runners/catalog should need to
 // change for a standard onboarding.
 
-export const SUPPORTED_AGENT_CLI_TOOLS = ["codex", "claude", "gemini"] as const;
+export const SUPPORTED_AGENT_CLI_TOOLS = ["codex", "claude", "gemini", "opencode"] as const;
 export type AgentCliToolId = (typeof SUPPORTED_AGENT_CLI_TOOLS)[number];
 
 export const INTERACTIVE_CLI_STARTUP_DELAY_MS = 120_000;
 
 export const RUNNER_SESSION_ID_PATTERN =
   "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b";
+
+// opencode session ids are `ses_` plus a 22-character base62-like token, not
+// a UUID. Used for tmux capture/resume patterns only; the ACP backend reads
+// the id directly from `session/new`.
+export const OPENCODE_SESSION_ID_PATTERN = "ses_[A-Za-z0-9]+";
 
 /** tmux interactive launch template for one provider. */
 export type AgentToolTemplate = {

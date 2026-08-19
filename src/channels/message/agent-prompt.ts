@@ -1,5 +1,6 @@
 import type { ChannelIdentity } from "../surface/channel-identity.ts";
 import { resolveChannelIdentityBotId } from "../surface/channel-identity.ts";
+import type { AgentCliToolId } from "../../config/runtime/agent-tool-presets.ts";
 import {
   renderAgentReplyCommandBase,
   renderScopedQueueHelpCommand,
@@ -101,7 +102,7 @@ export function buildAgentPromptText(params: {
   text: string;
   identity: ChannelIdentity;
   config: ChannelAgentPromptConfig;
-  cliTool?: "codex" | "claude" | "gemini";
+  cliTool?: AgentCliToolId;
   responseMode?: "capture-pane" | "message-tool";
   streaming?: "off" | "latest" | "all";
   protectedControlMutationRule?: string;

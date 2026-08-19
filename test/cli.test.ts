@@ -278,7 +278,7 @@ describe("renderCliHelp", () => {
     expect(help).toContain("clisbot runner --help");
     expect(help).toContain("runner shortcuts");
     expect(help).toContain("clisbot pairing --help");
-    expect(help).toContain("clisbot init [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]");
+    expect(help).toContain("clisbot init [--cli <codex|claude|gemini|opencode>] [--bot-type <personal|team>] [--persist]");
     expect(help).not.toContain("print-config-path");
     expect(help).toContain("npx clisbot start");
     expect(help).toContain("npm install -g clisbot && clisbot start");

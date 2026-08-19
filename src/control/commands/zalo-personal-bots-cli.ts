@@ -34,7 +34,7 @@ type ZaloPersonalStatusConnection = RuntimeChannelConnection | "not-running" | "
 
 export function renderZaloPersonalAddHelpLine() {
   return renderCliCommand(
-    "bots add --channel zalo-personal [--bot <id>] [--qr-path <path>] [--agent <id>] [--cli <codex|claude|gemini> --bot-type <personal|team>] [--confirm]",
+    "bots add --channel zalo-personal [--bot <id>] [--qr-path <path>] [--agent <id>] [--cli <codex|claude|gemini|opencode> --bot-type <personal|team>] [--confirm]",
   );
 }
 
