@@ -87,7 +87,7 @@ browser login that never comes on gateway machines.
 - **Restarts**: adapter processes stop with clisbot and conversations resume
   automatically via the stored session id on the next start.
 
-## Claude And Gemini On ACP
+## Claude, Gemini, And OpenCode On ACP
 
 - **Claude**: keep tmux. Interactive CLI usage stays on your subscription;
   the ACP path is built on the Agent SDK, which Anthropic has slated for
@@ -95,6 +95,11 @@ browser login that never comes on gateway machines.
   until that settles.
 - **Gemini**: native ACP behind `gemini --experimental-acp`, marked
   experimental — validate on your installed CLI version before relying on it.
+- **OpenCode**: native ACP behind `opencode acp`, and the recommended path.
+  It advertises `session/load`, so resume is validated end-to-end. This is the
+  one provider that defaults to `acp` instead of `tmux`, because the opencode
+  TUI exposes no status command that prints its session id — tmux works for
+  live chat but cannot auto-resume a conversation across a runner restart.
 
 ## Troubleshooting
 

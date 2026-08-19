@@ -70,6 +70,36 @@ export function buildRunnerFromToolTemplate(
     };
   }
 
+  if (toolId === "opencode") {
+    // opencode resumes with `--session {sessionId}` (not `--resume`); keep the
+    // template's own resume args so the tmux fallback stays truthful.
+    return {
+      command: template.command,
+      args: [...options],
+      trustWorkspace: template.trustWorkspace,
+      startupDelayMs: template.startupDelayMs,
+      startupRetryCount: template.startupRetryCount,
+      startupRetryDelayMs: template.startupRetryDelayMs,
+      startupReadyPattern: template.startupReadyPattern,
+      startupBlockers: template.startupBlockers?.map((entry) => ({ ...entry })),
+      promptSubmitDelayMs: template.promptSubmitDelayMs,
+      sessionId: {
+        ...template.sessionId,
+        create: {
+          ...template.sessionId.create,
+          args: [...template.sessionId.create.args],
+        },
+        capture: {
+          ...template.sessionId.capture,
+        },
+        resume: {
+          ...template.sessionId.resume,
+          args: [...template.sessionId.resume.args],
+        },
+      },
+    };
+  }
+
   return {
     command: template.command,
     args: [...options],

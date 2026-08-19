@@ -40,6 +40,8 @@ Read these when the user asks what is new, what to try, or what to watch:
 - [v0.1.52 release note](../releases/v0.1.52.md)
 - [v0.1.51 release note](../releases/v0.1.51.md)
 - [Release guides](README.md)
+- [v0.1.54-beta.4 release guide](releases/v0.1.54-beta.4-release-guide.md)
+- [v0.1.54-beta.3 release guide](releases/v0.1.54-beta.3-release-guide.md)
 - [v0.1.54-beta.1 release guide](releases/v0.1.54-beta.1-release-guide.md)
 - [v0.1.53 release guide](releases/v0.1.53-release-guide.md)
 - [v0.1.52 release guide](releases/v0.1.52-release-guide.md)
@@ -53,17 +55,17 @@ For deeper questions that the migration index, update guide, and release docs do
 ## Current Beta Path
 
 ```text
-Path: 0.1.53 -> 0.1.54-beta.1
-Target: clisbot@0.1.54-beta.1 or clisbot@beta
+Path: 0.1.53, 0.1.54-beta.1, 0.1.54-beta.2, or 0.1.54-beta.3 -> 0.1.54-beta.4
+Target: clisbot@0.1.54-beta.4 or clisbot@beta
 Update path: direct
 Manual action: none
-Risk: medium for API channel adopters; low for non-API-channel users
+Risk: medium for ACP and OpenCode adopters; low for existing tmux users
 Automatic config update: no new schema migration in this beta
 Breaking change: no
 Command: npm install -g clisbot@beta && clisbot restart
 Verify: clisbot status
 Release note: ../releases/upcoming.md
-Release guide: releases/v0.1.54-beta.1-release-guide.md
+Release guide: releases/v0.1.54-beta.4-release-guide.md
 ```
 
 ## Current Stable Path

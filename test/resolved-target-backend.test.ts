@@ -117,4 +117,37 @@ describe("resolved target backend selection", () => {
     expect(resolved.runner.newSessionCommand).toBe("/clear");
     expect(resolved.runner.command).toBe("gemini");
   });
+
+  test("opencode defaults to the acp backend with the native adapter preset", async () => {
+    const loaded = await loadConfigWith({ id: "default", default: true, cli: "opencode" });
+
+    const resolved = resolveAgentTarget(loaded, {
+      agentId: "default",
+      sessionKey: "main",
+    });
+
+    expect(resolved.runner.backend).toBe("acp");
+    expect(resolved.runner.command).toBe("opencode");
+    expect(resolved.runner.args).toEqual(["acp"]);
+    expect(resolved.runner.newSessionCommand).toBe("/new");
+  });
+
+  test("opencode tmux override uses --auto and /new", async () => {
+    const loaded = await loadConfigWith({
+      id: "default",
+      default: true,
+      cli: "opencode",
+      runner: { backend: "tmux" },
+    });
+
+    const resolved = resolveAgentTarget(loaded, {
+      agentId: "default",
+      sessionKey: "main",
+    });
+
+    expect(resolved.runner.backend).toBe("tmux");
+    expect(resolved.runner.command).toBe("opencode");
+    expect(resolved.runner.args).toEqual(["--auto"]);
+    expect(resolved.runner.newSessionCommand).toBe("/new");
+  });
 });

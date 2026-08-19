@@ -2,11 +2,12 @@
 
 ## Summary
 
-This page maps the current launch-trio CLIs to the v0 CLI compatibility contract:
+This page maps the current launch CLIs to the v0 CLI compatibility contract:
 
 - Codex
 - Claude
 - Gemini
+- OpenCode
 
 The goal is not to restate every runner implementation detail.
 
@@ -22,15 +23,16 @@ Use these support levels:
 
 ## Comparison Matrix
 
-| CLI    | Start  | Probe Ready / Waiting Input | Session Id Strategy                       | Resume | Recover After Pane Loss | Attach Observe | Interrupt | Main Drift Risk                                                      |
-| --------| --------| -----------------------------| -------------------------------------------| --------| -------------------------| ----------------| -----------| ----------------------------------------------------------------------|
-| Codex  | Strong | Partial                     | runner-created + `/status` capture        | Strong | Strong                  | Strong         | Partial   | no explicit ready pattern                                            |
-| Claude | Strong | Partial                     | explicit `--session-id`                   | Strong | Strong                  | Strong         | Partial   | no explicit ready pattern plus Claude-owned plan and auto-mode drift |
-| Gemini | Strong | Strong                      | runner-created + `/stats session` capture | Strong | Strong                  | Strong         | Partial   | auth/setup blockers and upstream screen drift                        |
+| CLI      | Start  | Probe Ready / Waiting Input | Session Id Strategy                       | Resume | Recover After Pane Loss | Attach Observe | Interrupt | Main Drift Risk                                                      |
+| ----------| --------| -----------------------------| -------------------------------------------| --------| -------------------------| ----------------| -----------| ----------------------------------------------------------------------|
+| Codex    | Strong | Partial                     | runner-created + `/status` capture        | Strong | Strong                  | Strong         | Partial   | no explicit ready pattern                                            |
+| Claude   | Strong | Partial                     | explicit `--session-id`                   | Strong | Strong                  | Strong         | Partial   | no explicit ready pattern plus Claude-owned plan and auto-mode drift |
+| Gemini   | Strong | Strong                      | runner-created + `/stats session` capture | Strong | Strong                  | Strong         | Partial   | auth/setup blockers and upstream screen drift                        |
+| OpenCode | Strong | Strong (acp) / Partial (tmux) | acp `session/new`; tmux no capture       | Strong (acp) / Partial (tmux) | Strong (acp) / Partial (tmux) | Strong (tmux) / Partial (acp) | Partial | tmux exposes no session-id status command; opencode auth lives outside clisbot |
 
 ## Current Cross-CLI Truth
 
-All three current CLIs share these runtime truths:
+All four current CLIs share these runtime truths:
 
 - execution is hosted by the tmux runner today
 - trust prompts are runner-owned
@@ -52,9 +54,11 @@ That means Gemini currently has the clearest machine-readable readiness contract
 - `Codex` is the current most stable recommendation for routed coding work.
 - `Claude` is usable, but operators should expect occasional Claude-owned plan approval and auto-mode classifier behavior that is not disabled by the current `clisbot` launch args.
 - `Gemini` is usable when auth is already in good shape, but startup and routed delivery remain more environment-sensitive than Codex.
+- `OpenCode` is ACP-native and the recommended ACP path; its tmux backend is usable for live chat but cannot auto-resume a session across runner restarts.
 
 ## CLI Profiles
 
 - [Codex](./profiles/codex.md)
 - [Claude](./profiles/claude.md)
 - [Gemini](./profiles/gemini.md)
+- [OpenCode](./profiles/opencode.md)
