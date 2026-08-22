@@ -9,6 +9,9 @@
 // - FAKE_ACP_REQUIRE_AUTH=1         reject session/new until authenticate
 // - FAKE_ACP_REQUIRE_PERMISSION=1   request permission before finishing
 // - FAKE_ACP_PROMPT_DELAY_MS=<n>    hold the turn open (cancel testing)
+// - FAKE_ACP_GO_SILENT=1            go silent mid-turn for prompts containing
+//                                   "stall" and ignore cancels (stalled-turn
+//                                   testing); other prompts behave normally
 // - FAKE_ACP_EXIT_MID_PROMPT=1      die mid-turn (adapter-loss testing)
 // - FAKE_ACP_EXIT_AT_INITIALIZE=1   die before answering initialize
 // - FAKE_ACP_EMIT_PLAN=1            emit plan updates during the turn
@@ -31,6 +34,7 @@ const supportsLoad = process.env.FAKE_ACP_SUPPORTS_LOAD !== "0";
 const requireAuth = process.env.FAKE_ACP_REQUIRE_AUTH === "1";
 const requirePermission = process.env.FAKE_ACP_REQUIRE_PERMISSION === "1";
 const promptDelayMs = Number(process.env.FAKE_ACP_PROMPT_DELAY_MS ?? "0");
+const goSilent = process.env.FAKE_ACP_GO_SILENT === "1";
 const exitMidPrompt = process.env.FAKE_ACP_EXIT_MID_PROMPT === "1";
 const exitAtInitialize = process.env.FAKE_ACP_EXIT_AT_INITIALIZE === "1";
 const emitPlan = process.env.FAKE_ACP_EMIT_PLAN === "1";
@@ -113,6 +117,12 @@ async function handlePrompt(id: number | string, params: Record<string, unknown>
     content: { type: "text", text: "Working on: " },
   });
   await sleep(10);
+
+  if (goSilent && /stall/i.test(promptText)) {
+    // Simulate a wedged agent (provider failure it never reported): the turn
+    // never settles and cancel is ignored, like the real-world stall.
+    return;
+  }
   sessionUpdate(sessionId, {
     sessionUpdate: "tool_call",
     toolCallId: "call-1",

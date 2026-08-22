@@ -84,6 +84,12 @@ browser login that never comes on gateway machines.
 - **Tool permissions** are auto-resolved by policy
   (`runner.acp.permissionPolicy`: `auto-allow` default, or `deny`).
   Interactive in-chat approvals are on the roadmap.
+- **Stalled turns** are bounded: if a turn produces no activity for
+  `runner.acp.turnStallTimeoutMs` (default 5 minutes), clisbot cancels it and
+  posts a failure notice instead of waiting forever. This covers agents that
+  wedge silently on provider quota/auth failures. The adapter is stopped when
+  it ignores the cancel; the next message starts a fresh adapter and resumes
+  the stored conversation.
 - **Restarts**: adapter processes stop with clisbot and conversations resume
   automatically via the stored session id on the next start.
 
@@ -109,4 +115,5 @@ browser login that never comes on gateway machines.
 | Startup hangs on first ACP run | `authMethodId: "chat-gpt"` on a machine that never logged in | run the browser login once, or switch to the env-key shape |
 | "does not advertise auth method" | adapter/agent version changed | error lists the advertised ids; set one of those |
 | "lost its ACP adapter process" | adapter crashed; message includes stderr tail | resend to retry; verify the adapter command runs in a terminal |
+| "produced no activity for … and was cancelled" | turn wedged silently (provider quota/auth failure the agent never reported) | resend to retry; check the agent CLI's own logs and credentials |
 | Stored conversation not resumed | agent lacks `session/load` | truthful note is posted; conversation restarts fresh |
