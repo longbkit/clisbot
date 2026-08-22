@@ -6,24 +6,29 @@ For beta or pre-release builds, keep notes here until the public version ships. 
 
 ## Summary
 
-`0.1.54-beta.4` continues the `0.1.54` beta line after `0.1.54-beta.3`.
+`0.1.54-beta.5` continues the `0.1.54` beta line after `0.1.54-beta.4`.
 
-It ships the flexible runner backend architecture: a shared `RunnerBackend`
-contract with `tmux` and `acp` implementations, a one-file provider catalog,
-and a generated capability matrix. It adds the OpenCode provider on the ACP
-backend, `/steer` via interrupt-and-redirect for backends that cannot inject
-mid-turn, and the first session event feed plus built-in web view/demo surface.
+It fixes ACP-backed agents (OpenCode) wedging a session forever when the
+underlying provider fails without reporting: a turn that produces no activity
+for `runner.acp.turnStallTimeoutMs` (default 5 minutes) is now cancelled and
+fails with a visible error notice, and the next message recovers on a fresh
+adapter while resuming the stored conversation.
+
+The beta line ships the flexible runner backend architecture: a shared
+`RunnerBackend` contract with `tmux` and `acp` implementations, a one-file
+provider catalog, and a generated capability matrix. It adds the OpenCode
+provider on the ACP backend, `/steer` via interrupt-and-redirect for backends
+that cannot inject mid-turn, and the first session event feed plus built-in web
+view/demo surface.
 
 ## Operator Impact
 
 - Required action: none.
-- Behavior users should notice: a new `opencode` CLI choice; Codex/Gemini can
-  switch to structured `acp` backend with one config line; `/steer` on ACP now
-  interrupts and redirects instead of being unavailable.
-- Compatibility notes: default interactive runner startup window is now `120`
-  seconds (was `60`) for Codex, Claude, Gemini, and OpenCode.
-- Compatibility notes: existing configs keep `backend` unset, which resolves to
-  `tmux`, so current tmux behavior is unchanged unless you opt into `acp`.
+- Behavior users should notice: an ACP run that used to hang silently (for
+  example on model-provider quota or auth failures) now posts a truthful
+  failure notice within minutes and accepts new messages immediately after.
+- Compatibility notes: `runner.acp.turnStallTimeoutMs` is additive and
+  optional; unset configs keep tmux behavior unchanged.
 - Known risks: ACP is opt-in; Claude-over-ACP remains `not-recommended` until
   Anthropic's subscription/SDK billing split settles. `runner.env` values are
   plain text in `clisbot.json` today.
@@ -49,6 +54,12 @@ mid-turn, and the first session event feed plus built-in web view/demo surface.
   prompt in the same conversation, with a truthful notice.
 - Added the OpenCode CLI provider, defaulting to the `acp` backend, with
   validated `session/load` resume.
+- Fixed ACP turns wedging a session forever when the agent never settles a
+  prompt (provider quota/auth failures it never reports): turns with no
+  activity for `runner.acp.turnStallTimeoutMs` (default 5 minutes) are
+  cancelled and fail with a visible error notice; when the adapter ignores the
+  cancel it is stopped, and the next message starts a fresh adapter that
+  resumes the stored conversation.
 - Changed the default interactive runner startup window from `60` to `120`
   seconds for the Codex, Claude, and Gemini runner families (and OpenCode).
 - Refactored the tmux session handshake into focused modules while preserving
@@ -63,7 +74,7 @@ mid-turn, and the first session event feed plus built-in web view/demo surface.
 ### Configuration
 
 - Added optional runner fields: `backend`, `env`, `newSessionCommand`, and
-  `acp` (`permissionPolicy`, `authMethodId`).
+  `acp` (`permissionPolicy`, `authMethodId`, `turnStallTimeoutMs`).
 - Added the `opencode` provider default to the schema and template.
 - Changed the runner `startupDelayMs` default to `120000` and prunes stale
   `60000` overrides for Codex, Gemini, and OpenCode so upgraded installs inherit
@@ -96,10 +107,11 @@ mid-turn, and the first session event feed plus built-in web view/demo surface.
 
 ## Update Notes
 
-- Update path: direct from `0.1.53`, `0.1.54-beta.1`, `0.1.54-beta.2`, or
-  `0.1.54-beta.3` to `0.1.54-beta.4`.
+- Update path: direct from `0.1.53`, `0.1.54-beta.1`, `0.1.54-beta.2`,
+  `0.1.54-beta.3`, or `0.1.54-beta.4` to `0.1.54-beta.5`.
 - Manual action: none.
-- Risk level: medium for ACP and OpenCode adopters; low for existing tmux users.
+- Risk level: low; the only behavior change bounds previously unbounded ACP
+  turns and is configurable.
 - Automatic config update: no new schema migration in this beta; new runner
   fields are additive and optional.
 
@@ -120,17 +132,21 @@ mid-turn, and the first session event feed plus built-in web view/demo surface.
   tmux + ACP, provider catalog, capability matrix), OpenCode provider on ACP,
   ACP `/steer` via interrupt-and-redirect, session event feed plus web
   view/demo, and a `60s` to `120s` default startup window.
+- `0.1.54-beta.5`: stalled ACP turns are bounded — no-activity turns fail with
+  a visible notice after `runner.acp.turnStallTimeoutMs` (default 5 minutes),
+  ignored cancels stop the adapter, and the next message recovers on a fresh
+  adapter that resumes the stored conversation.
 
 ## Validation
 
-- `bun run check` ran 1033 tests across 122 files: 1030 pass, 3 pre-existing
-  failures unrelated to this release (agent prompt envelope heredoc edge case,
-  AgentService queue ordering, and the zalo-personal zca-js session-refresh
-  wrapper).
+- `bun run check` ran 1034 tests across 122 files: 1031 pass, the same 3
+  pre-existing failures already documented for this line (agent prompt
+  envelope heredoc edge case, tmux Gemini trust-prompt latency suite, and the
+  zalo-personal zca-js session-refresh wrapper); all three fail without this
+  change too.
 - `bun run build` passed.
 - `git diff --check` passed.
-- `npm publish --dry-run --access public` passed for `clisbot@0.1.54-beta.4`;
-  tarball size 1.0 MB, unpacked size 5.0 MB.
+- `npm publish --dry-run --access public` passed for `clisbot@0.1.54-beta.5`.
 
 ## Links
 
