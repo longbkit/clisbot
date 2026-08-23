@@ -182,3 +182,59 @@ The app runs on iOS, Android, web (browser), and web (Electron desktop). Code is
 ## Debugging
 
 Find the complete daemon logs and traces in the $PASEO_HOME/daemon.log
+
+## Clisbot PaseoClaw code standards
+
+Carried forward from the Clisbot T3Claw fusion `AGENTS.md`, re-targeted at the Paseo foundation. These apply **on top of** everything above and on top of `docs/coding-standards.md`; where they overlap, the stricter rule wins.
+
+### Upstream compatibility first
+
+This stage prioritizes maximum compatibility with upstream Paseo. Every Clisbot change must stay in its own scope — a dedicated package, folder, module, file, or function where possible — and be gated behind a feature flag that can switch it fully on or off. The target for any change: with it in place, an unmodified Paseo app can still pair with the daemon and use it normally, and with the flag off the base Paseo experience remains available. Verify both states before calling a change done.
+
+### Readability first
+
+Go beyond "works + has tests": raise code to the point where **reading it is understanding it** — familiar, explicit logic and mental models, so a reader infers behavior directly from the code. Centralize genuinely shared behavior so each change is made once and benefits every consumer. Put abstractions at the right level; proactively create or extend a shared abstraction **when the product vision (`docs/overview/product-vision.md`) identifies a definite future consumer**, so later expansion reduces rather than compounds complexity. Treat naming and terminology as architecture — use the `naming-expert` skill when choosing or changing names, and keep `docs/glossary.md` canonical.
+
+### Hard limits
+
+Line-of-code guide. Strict rules, not suggestions:
+
+- File: target under **500** lines; hard limit **700**.
+- Backend logic/service function: target under **40** lines; hard limit **50**.
+- Frontend React component or render function: target under **60** lines; hard limit **100**.
+- Frontend stateful hook or UI controller: target under **40** lines; hard limit **70**.
+- Nesting depth: maximum **3** (matches `docs/coding-standards.md`).
+
+Crossing a _target_ triggers a cohesion review, not an automatic extraction. Refactor when the split makes responsibilities, reuse, or testing clearer; do not create helper fragments merely to satisfy a line count. Crossing a hard limit requires a refactor or a documented exception.
+
+These apply to PaseoClaw Fusion-owned code — new channel/bridge modules, Clisbot-specific packages or directories, and new UI components. Upstream Paseo files are exempt: never reformat or split upstream files to satisfy a limit; that fights mergeability with `upstream/main`.
+
+### DRY and naming
+
+DRY applies across: logic, files, functions, state transitions, **concepts**, **naming**, wrappers, and data contracts. If you copy something once, treat that as a refactoring signal.
+
+- Prefer boring, obvious names. One concept has one name; one name refers to one concept.
+- Reuse established product and architecture terms where they already fit; do not invent a new naming convention when the repo already has one (`docs/glossary.md`, `docs/rpc-namespacing.md`).
+- Public CLI flags: kebab-case only on the command line; keep aliases explicit; no camelCase flags.
+
+Refactor when you see: duplicated logic or duplicated file purpose; duplicated mutation or command paths; repeated wrappers or transformations that should be shared; ambiguous, overloaded, misleading, or inconsistent names. Ask the user before a refactor that changes visible behavior, a public interface, or forces a real compatibility/doc tradeoff.
+
+### Design defaults
+
+- KISS: the smallest change that keeps architecture, runtime truthfulness, and operator flow clear.
+- One shared implementation path over parallel wrappers or duplicated mutations.
+- Do not leak transient runtime state into persistence contracts.
+- Document intentional architecture exceptions before implementing them.
+
+### Docs as contract
+
+If implementation conflicts with `docs/` or the plans in `docs/overview/product-vision.md`: stop → refactor toward the docs if the fix is clear → ask the user if the conflict changes behavior, architecture, or scope. **No silent drift.** When an architecture-level decision is made or changed, record it (context, problem, options considered, decision, rationale) and cross-link anything it supersedes — preserve history, never erase it.
+
+### Done criteria
+
+Work is done only when the matching bundle is complete:
+
+- Code change: implementation + targeted tests + **updated docs/help when behavior or a contract changed**.
+- Runtime/control change: implementation + **truthful** status/logs/CLI surfaces + regression coverage.
+- Doc change: consistent with current code, examples truthful.
+- Do not claim completion from static inspection alone when runtime validation is practical.
