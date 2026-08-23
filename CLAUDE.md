@@ -24,6 +24,8 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | Doc                                                                | What's in it                                                                                                                   |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | [docs/product.md](docs/product.md)                                 | What Paseo is, who it's for, where it's going                                                                                  |
+| [docs/overview/product-vision.md](docs/overview/product-vision.md) | Clisbot PaseoClaw fusion: ambition, capability directions, delivery posture                                                   |
+| [docs/audits/](docs/audits/)                                       | Date-stamped research audits — Paseo Hub architecture/limits, Clisbot T3Claw fusion state                                      |
 | [docs/architecture.md](docs/architecture.md)                       | System design, package layering, WebSocket protocol, agent lifecycle, data flow                                                |
 | [docs/agent-lifecycle.md](docs/agent-lifecycle.md)                 | Agent states, parent/child relationships, archive semantics, tabs vs archive, subagents track                                  |
 | [docs/data-model.md](docs/data-model.md)                           | File-based JSON persistence, Zod schemas, atomic writes, no migrations                                                         |
@@ -189,7 +191,7 @@ Carried forward from the Clisbot T3Claw fusion `AGENTS.md`, re-targeted at the P
 
 ### Upstream compatibility first
 
-This stage prioritizes maximum compatibility with upstream Paseo. Every Clisbot change must stay in its own scope — a dedicated package, folder, module, file, or function where possible — and be gated behind a feature flag that can switch it fully on or off. The target for any change: with it in place, an unmodified Paseo app can still pair with the daemon and use it normally, and with the flag off the base Paseo experience remains available. Verify both states before calling a change done.
+This stage prioritizes maximum compatibility with upstream Paseo — see the [Upstream-Friendly Evolution principle](docs/overview/product-vision.md#upstream-friendly-evolution) in the product vision. Every Clisbot change must stay in its own scope — a dedicated package, folder, module, file, or function where possible — and be gated behind a feature flag that can switch it fully on or off. The target for any change: with it in place, an unmodified Paseo app can still pair with the daemon and use it normally, and with the flag off the base Paseo experience remains available. Verify both states before calling a change done.
 
 ### Readability first
 
