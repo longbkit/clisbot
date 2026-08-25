@@ -1,0 +1,134 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "options": {
+    "typeAware": true,
+    "typeCheck": true
+  },
+  "ignorePatterns": ["src/routeTree.gen.ts", ".output/**", "dist/**"],
+  "plugins": [
+    "unicorn",
+    "typescript",
+    "oxc",
+    "import",
+    "promise",
+    "react",
+    "react-perf",
+    "jsx-a11y"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    "no-console": "error",
+    "no-await-in-loop": "off",
+    "no-unused-expressions": "error",
+    "no-useless-catch": "error",
+    "preserve-caught-error": "error",
+    "require-await": "off",
+    "no-async-promise-executor": "error",
+    "no-useless-escape": "error",
+    "no-empty-pattern": "error",
+    "no-self-assign": "error",
+    "no-shadow": "error",
+    "no-nested-ternary": "error",
+    "no-unneeded-ternary": "error",
+    "complexity": ["error", { "max": 20 }],
+    "max-depth": ["error", { "max": 4 }],
+    "max-nested-callbacks": ["error", { "max": 3 }],
+
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-useless-spread": "error",
+    "unicorn/no-useless-fallback-in-spread": "error",
+    "unicorn/no-new-array": "error",
+    "unicorn/no-empty-file": "error",
+
+    "promise/always-return": "error",
+    "promise/no-multiple-resolved": "error",
+
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/jsx-key": "error",
+    "react/jsx-no-useless-fragment": "error",
+    "react/no-array-index-key": "error",
+    "react/no-danger": "error",
+    "react/self-closing-comp": "error",
+    "react/react-in-jsx-scope": "off",
+
+    "react-perf/jsx-no-new-array-as-prop": "error",
+    "react-perf/jsx-no-new-function-as-prop": "error",
+    "react-perf/jsx-no-new-object-as-prop": "error",
+
+    "oxc/no-map-spread": "error",
+    "oxc/no-async-endpoint-handlers": "error",
+    "oxc/only-used-in-recursion": "error",
+
+    "typescript/no-explicit-any": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/consistent-type-definitions": ["error", "interface"],
+    "typescript/await-thenable": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": ["**/*.css", "**/styles.entry.js"]
+      }
+    ],
+
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["**/billing", "**/billing/**"],
+            "message": "src/billing/ is the hosted billing boundary — only the composition roots (src/index.ts, src/application-runtime.ts, src/server/runtime.ts, src/e2e/harness/browser-child.ts) and the billing dashboard route (src/routes/_shell/o/$organizationSlug/billing.tsx, the feature's mount point) may import it. See the 'Open source vs hosted' section of the entitlements/billing plan."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/index.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": [
+        "src/index.ts",
+        "src/application-runtime.ts",
+        "src/server/runtime.ts",
+        "src/billing/**",
+        "src/routes/_shell/o/$organizationSlug/billing.tsx",
+        "src/e2e/harness/browser-child.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/e2e/harness/acp-agent.mjs"],
+      "rules": {
+        "no-new": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off"
+      }
+    }
+  ]
+}

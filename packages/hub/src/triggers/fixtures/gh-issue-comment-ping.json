@@ -1,0 +1,36 @@
+{
+  "source": "github",
+  "deliveryId": "fixture-gh-issue-comment-ping",
+  "payload": {
+    "id": "fixture-gh-issue-comment-ping",
+    "type": "issue_comment",
+    "repo": "boudra/faro",
+    "installationId": 42,
+    "createdAt": "2026-05-08T06:10:00.000Z",
+    "payload": {
+      "action": "created",
+      "sender": {
+        "login": "boudra"
+      },
+      "comment": {
+        "id": 987,
+        "body": "@paseo please take a look",
+        "user": {
+          "login": "boudra"
+        }
+      },
+      "issue": {
+        "number": 17,
+        "pull_request": {
+          "url": "https://api.github.com/repos/boudra/faro/pulls/17"
+        }
+      },
+      "repository": {
+        "full_name": "boudra/faro"
+      },
+      "installation": {
+        "id": 42
+      }
+    }
+  }
+}

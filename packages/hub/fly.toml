@@ -1,0 +1,25 @@
+app = 'paseo-cloud'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3000'
+  PASEO_HUB_APP_URL = 'https://hub.paseo.sh'
+  PASEO_HUB_TRUSTED_CLIENT_IP_HEADER = 'fly-client-ip'
+  PASEO_REGISTRATION_MODE = 'disabled'
+  PASEO_ORGANIZATION_CREATION = 'disabled'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1

@@ -1,0 +1,21 @@
+environments:
+  repository:
+    kind: daemon
+    daemon: your-daemon
+    cwd: /absolute/path/to/your/repository
+    worktree:
+      mode: branch-off
+      base: origin/main
+      newBranch: hub-request
+
+agents:
+  classifier:
+    provider: codex
+    options:
+      approval_policy: never
+      sandbox_mode: read-only
+      web_search: disabled
+
+  worker:
+    provider: codex
+    mode: full-access

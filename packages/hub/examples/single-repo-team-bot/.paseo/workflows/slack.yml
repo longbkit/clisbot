@@ -1,0 +1,63 @@
+name: slack-mention
+on: slack.mention
+max_runtime: 2h
+filters:
+  from_users: [YOUR_SLACK_USER_ID]
+steps:
+  - id: classify
+    environment: repository
+    max_runtime: 2m
+    idle_timeout: 30s
+    auto_archive: true
+    agent: classifier
+    prompt:
+      - include: partials/safety.md
+      - include: partials/classifier.md
+      - text: |
+          <user-prompt>
+          ${{ paseo.prompt }}
+          </user-prompt>
+    output:
+      schema:
+        type: object
+        additionalProperties: false
+        required: [kind, summary]
+        properties:
+          kind: { type: string, enum: [question, change, review] }
+          summary: { type: string }
+
+  - id: work
+    environment: repository
+    max_runtime: 90m
+    idle_timeout: 10m
+    auto_archive: true
+    agent: worker
+    github:
+      connection: your-github-connection
+      repositories: [your-org/your-repo]
+      permissions:
+        checks: read
+        contents: write
+        issues: write
+        metadata: read
+        pull_requests: write
+      duration: 1h
+    prompt:
+      - include: partials/safety.md
+      - include: partials/progress.md
+      - include: partials/worker.md
+      - text: |
+          <classification>
+          kind: ${{ steps.classify.outputs.kind }}
+          summary: ${{ steps.classify.outputs.summary }}
+          </classification>
+
+          <context>
+          ${{ paseo.context }}
+          </context>
+
+          <user-prompt>
+          ${{ paseo.prompt }}
+          </user-prompt>
+    allow_outputs:
+      - { type: slack.reply, max: 5 }

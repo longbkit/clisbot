@@ -1,0 +1,9 @@
+base/
+dist/
+node_modules/
+.dev/
+.env
+*.pem
+PLAN.md
+AGENTS.override.md
+CLAUDE.local.md

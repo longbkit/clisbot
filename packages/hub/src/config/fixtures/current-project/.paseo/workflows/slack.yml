@@ -1,0 +1,35 @@
+name: slack-request
+on: slack.mention
+max_runtime: 2h
+filters:
+  workspace: paseo
+  from_users: [maintainer]
+values:
+  selected_environment: ${{ steps.classify.outputs.environment }}
+  selected_agent: ${{ steps.classify.outputs.agent }}
+steps:
+  - id: classify
+    environment: hub
+    max_runtime: 10m
+    idle_timeout: 2m
+    agent: claude
+    prompt:
+      - include: partials/classify.md
+      - text: ${{ paseo.prompt }}
+    output:
+      schema:
+        type: object
+        required: [environment, agent]
+        properties:
+          environment: { enum: [paseo, hub] }
+          agent: { enum: [codex, claude] }
+        additionalProperties: false
+  - id: work
+    environment: ${{ values.selected_environment }}
+    max_runtime: 1h
+    idle_timeout: 10m
+    agent: ${{ values.selected_agent }}
+    prompt:
+      - text: ${{ paseo.prompt }}
+    allow_outputs:
+      - { type: slack.reply, max: 1, required: true }

@@ -1,0 +1,1 @@
+ALTER TABLE "trigger_runs" DROP COLUMN "raw_prompt";

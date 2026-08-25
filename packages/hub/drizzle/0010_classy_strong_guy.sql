@@ -1,0 +1,1 @@
+ALTER TABLE "agent_executions" ADD COLUMN "reply_claimed_at" timestamp with time zone;

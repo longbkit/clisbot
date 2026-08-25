@@ -1,0 +1,36 @@
+{
+  "source": "github",
+  "deliveryId": "fixture-gh-pr-review-comment",
+  "payload": {
+    "id": "fixture-gh-pr-review-comment",
+    "type": "pull_request_review_comment",
+    "repo": "boudra/faro",
+    "installationId": 42,
+    "createdAt": "2026-05-08T06:11:00.000Z",
+    "payload": {
+      "action": "created",
+      "sender": {
+        "login": "boudra"
+      },
+      "comment": {
+        "id": 654,
+        "body": "@paseo please address this",
+        "user": {
+          "login": "boudra"
+        }
+      },
+      "pull_request": {
+        "number": 18,
+        "head": {
+          "ref": "review-comment-branch"
+        }
+      },
+      "repository": {
+        "full_name": "boudra/faro"
+      },
+      "installation": {
+        "id": 42
+      }
+    }
+  }
+}

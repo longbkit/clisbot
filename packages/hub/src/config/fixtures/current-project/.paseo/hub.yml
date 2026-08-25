@@ -1,0 +1,21 @@
+environments:
+  paseo:
+    kind: daemon
+    daemon: local
+    cwd: /workspace/paseo
+  hub:
+    kind: daemon
+    daemon: local
+    cwd: /workspace/hub
+agents:
+  codex:
+    provider: codex
+    model: gpt-5.5
+    thinkingOptionId: xhigh
+    options:
+      sandbox_workspace_write:
+        writable_roots: [/var/cache/npm]
+        network_access: false
+  claude:
+    provider: claude
+    mode: bypassPermissions

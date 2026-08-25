@@ -1,0 +1,16 @@
+name: github-hub
+on: github.issue_comment
+max_runtime: 2h
+filters:
+  repo: getpaseo/hub
+  from_users: [maintainer]
+steps:
+  - id: work
+    environment: hub
+    max_runtime: 1h
+    idle_timeout: 10m
+    agent: codex
+    github:
+      connection: getpaseo
+    prompt:
+      - text: ${{ paseo.prompt }}

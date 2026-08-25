@@ -1,0 +1,40 @@
+name: Release Notes Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - CHANGELOG.md
+
+concurrency:
+  group: release-notes-sync
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Read release notes
+        id: release
+        env:
+          RELEASE_NOTES_PATH: ${{ runner.temp }}/release-notes.md
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node scripts/release-metadata.mjs "v${version}" "$RELEASE_NOTES_PATH"
+
+      - name: Update existing GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NOTES_PATH: ${{ runner.temp }}/release-notes.md
+          RELEASE_TAG: v${{ steps.release.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_PATH"
+          else
+            echo "Release $RELEASE_TAG does not exist yet; nothing to sync."
+          fi

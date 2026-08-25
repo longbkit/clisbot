@@ -1,0 +1,176 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Palette ported from the Paseo app (packages/app/src/styles/theme.ts) so the hub
+ * reads as the same product. Light mirrors `lightSemanticColors`; dark mirrors
+ * `paseoDarkColors`, the green-tinted default theme.
+ *
+ * Naming trap: Paseo's `accent` is the brand CTA colour, while shadcn's `--accent`
+ * is the subtle hover surface. They are different concepts. Paseo `accent` maps to
+ * `--primary` here; `--accent` stays a surface. Do not collide the two again.
+ *
+ * A brand colour needs two values, not one. `--primary` is the fill behind
+ * `--primary-foreground`; `--link` is the same brand read as text on a surface. On
+ * dark, one value cannot do both — the fill that carries white text sits at 2.8:1 as
+ * text. `--link` is Paseo's `accentBright` for exactly this reason.
+ */
+
+:root {
+  --radius: 0.5rem;
+
+  --background: #ffffff;
+  --foreground: #1a1a1e;
+  --card: #ffffff;
+  --card-foreground: #1a1a1e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1e;
+  --primary: #20744a;
+  --primary-foreground: #ffffff;
+  --link: #20744a;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #1a1a1e;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #1a1a1e;
+  --destructive: #b04138;
+  --destructive-foreground: #ffffff;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #20744a;
+
+  /* Status signals. Pills pair the foreground with the matching 10%-alpha surface. */
+  --success: #166534;
+  --success-surface: rgb(22 101 52 / 10%);
+  --warning: #92400e;
+  --warning-surface: rgb(146 64 14 / 10%);
+  --danger: #991b1b;
+  --danger-surface: rgb(153 27 27 / 10%);
+  --neutral: #52525b;
+  --neutral-surface: rgb(82 82 91 / 10%);
+
+  --chart-1: #20744a;
+  --chart-2: #2563eb;
+  --chart-3: #d97706;
+  --chart-4: #9333ea;
+  --chart-5: #0891b2;
+
+  --sidebar: #f4f4f5;
+  --sidebar-foreground: #1a1a1e;
+  --sidebar-primary: #20744a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9e9ec;
+  --sidebar-accent-foreground: #1a1a1e;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #20744a;
+}
+
+.dark {
+  --background: #181b1a;
+  --foreground: #fafafa;
+  --card: #1e2120;
+  --card-foreground: #fafafa;
+  --popover: #1e2120;
+  --popover-foreground: #fafafa;
+  --primary: #20744a;
+  --primary-foreground: #ffffff;
+  --link: #7ccba0;
+  --secondary: #272a29;
+  --secondary-foreground: #fafafa;
+  --muted: #272a29;
+  --muted-foreground: #a1a5a4;
+  --accent: #272a29;
+  --accent-foreground: #fafafa;
+  --destructive: #e8837a;
+  --destructive-foreground: #ffffff;
+  --border: #252b2a;
+  --input: #2f3534;
+  --ring: #7ccba0;
+
+  --success: #4ade80;
+  --success-surface: rgb(74 222 128 / 12%);
+  --warning: #fbbf24;
+  --warning-surface: rgb(251 191 36 / 12%);
+  --danger: #fca5a5;
+  --danger-surface: rgb(252 165 165 / 12%);
+  --neutral: #d4d4d8;
+  --neutral-surface: rgb(212 212 216 / 12%);
+
+  --chart-1: #7ccba0;
+  --chart-2: #6a9de0;
+  --chart-3: #d4a44a;
+  --chart-4: #b07ad0;
+  --chart-5: #4aabb8;
+
+  --sidebar: #141716;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #20744a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1c1f1e;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #252b2a;
+  --sidebar-ring: #7ccba0;
+}
+
+@theme inline {
+  /* Matches Paseo's BORDER_RADIUS scale: sm 4, md 6, lg 8, xl 12. */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-link: var(--link);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-neutral: var(--neutral);
+  --color-neutral-surface: var(--neutral-surface);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+}

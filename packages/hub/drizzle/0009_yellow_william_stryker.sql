@@ -1,0 +1,1 @@
+ALTER TABLE "agent_executions" ALTER COLUMN "machine_id" DROP NOT NULL;

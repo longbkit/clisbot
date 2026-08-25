@@ -1,0 +1,1 @@
+ALTER TABLE "agent_executions" ADD COLUMN "output_delivery_attempts" jsonb DEFAULT '{}'::jsonb NOT NULL;

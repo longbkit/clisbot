@@ -1,0 +1,1 @@
+ALTER TABLE "provider_event_receipts" ADD COLUMN "accepted_routes" jsonb;

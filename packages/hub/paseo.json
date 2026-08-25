@@ -1,0 +1,16 @@
+{
+  "worktree": {
+    "setup": ["npm install", "node ./scripts/paseo-workspace.mjs setup"],
+    "teardown": "node ./scripts/paseo-workspace.mjs teardown"
+  },
+  "scripts": {
+    "app": {
+      "type": "service",
+      "command": "node ./scripts/paseo-workspace.mjs dev"
+    },
+    "evidence": {
+      "type": "service",
+      "command": "node ./scripts/paseo-workspace.mjs evidence"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+.env
+.dev/
+*.pem
+dist/
+.output/
+.typecheck/
+playwright-report/
+test-results/
+e2e/screenshots/
+node_modules/
+AGENTS.override.md
+CLAUDE.local.md

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "allowArbitraryExtensions": true,
+    "noUncheckedSideEffectImports": false,
+    "verbatimModuleSyntax": false,
+    "rootDir": ".",
+    "outDir": ".typecheck/start",
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "drizzle.config.ts"]
+}

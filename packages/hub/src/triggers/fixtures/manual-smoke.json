@@ -1,0 +1,8 @@
+{
+  "source": "github.issue_comment",
+  "deliveryId": "fixture-manual-smoke",
+  "payload": {
+    "repo": "owner/test",
+    "comment": "@paseo ping"
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "agent_executions" ADD COLUMN "idle_deadline_at" timestamp with time zone;

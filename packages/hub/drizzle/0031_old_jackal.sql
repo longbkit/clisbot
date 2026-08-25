@@ -1,0 +1,1 @@
+ALTER TABLE "user" ADD COLUMN "is_instance_operator" boolean DEFAULT false NOT NULL;

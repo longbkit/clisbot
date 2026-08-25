@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+# Replace this marker with the accepted companion commit immediately after the
+# companion PR creator commits it. Source-built jobs deliberately fail until it
+# is one exact 40-character SHA; mutable refs and repository variables are forbidden.
+env:
+  PASEO_E2E_COMMIT: 5f127d1b4a2c8d98fa18ef2b9c82309ab0d39750
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check Docker build definition
+        run: docker build --check .
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+  test:
+    runs-on: ubuntu-latest
+    env:
+      RUN_RUNG_E_E2E: ${{ vars.RUN_RUNG_E_E2E }}
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install E2E agent CLIs
+        run: npm install -g @getpaseo/cli opencode-ai
+
+      - name: Run tests
+        run: npm test
+
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - name: Check Drizzle migrations for drift
+        run: npm run db:check
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - name: Build production application
+        run: npm run build
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    env:
+      PASEO_E2E_WORKTREE: ${{ github.workspace }}/paseo-source
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Require the exact Paseo companion commit
+        run: |
+          [[ "$PASEO_E2E_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Fill PASEO_E2E_COMMIT with the accepted companion commit before review"
+            exit 1
+          }
+
+      - name: Check out exact Paseo source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: getpaseo/paseo
+          ref: ${{ env.PASEO_E2E_COMMIT }}
+          path: paseo-source
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Build exact Paseo source
+        working-directory: paseo-source
+        run: |
+          npm ci
+          npm run build:server
+
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run built-app browser tests
+        run: npm run test:e2e:browser
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build and smoke-test production image
+        run: npm run docker:smoke
+
+  hub-e2e:
+    runs-on: ubuntu-latest
+    env:
+      PASEO_E2E_WORKTREE: ${{ github.workspace }}/paseo-source
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Require the exact Paseo companion commit
+        run: |
+          [[ "$PASEO_E2E_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Fill PASEO_E2E_COMMIT with the accepted companion commit before review"
+            exit 1
+          }
+
+      - name: Check out exact Paseo source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: getpaseo/paseo
+          ref: ${{ env.PASEO_E2E_COMMIT }}
+          path: paseo-source
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Build exact Paseo source
+        working-directory: paseo-source
+        run: |
+          npm ci
+          npm run build:server
+
+      - name: Install Hub dependencies
+        run: npm ci
+
+      - name: Install provider CLIs for bundle validation
+        run: npm install -g @anthropic-ai/claude-code@2.1.226 @openai/codex@0.144.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Hub production application
+        run: npm run build
+
+      - name: Run Hub E2E against source-built Paseo
+        run: npm run test:e2e:hub:source

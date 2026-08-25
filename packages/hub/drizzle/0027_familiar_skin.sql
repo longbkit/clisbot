@@ -1,0 +1,1 @@
+ALTER TABLE "organization_usage" ADD CONSTRAINT "organization_usage_used_non_negative" CHECK ("organization_usage"."used" >= 0);

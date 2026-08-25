@@ -1,0 +1,1 @@
+ALTER TABLE "slack_connections" ADD COLUMN "scopes" jsonb DEFAULT '[]'::jsonb NOT NULL;

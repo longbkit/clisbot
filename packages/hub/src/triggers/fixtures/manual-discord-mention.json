@@ -1,0 +1,10 @@
+{
+  "source": "discord.mention",
+  "deliveryId": "fixture-manual-discord-mention",
+  "payload": {
+    "guildId": "guild-1",
+    "channelId": "channel-1",
+    "messageId": "message-1",
+    "content": "@paseo ping"
+  }
+}
