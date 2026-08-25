@@ -25,7 +25,7 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | [docs/product.md](docs/product.md)                                 | What Paseo is, who it's for, where it's going                                                                                  |
 | [docs/overview/product-vision.md](docs/overview/product-vision.md) | Clisbot PaseoClaw fusion: ambition, capability directions, delivery posture                                                   |
-| [docs/audits/](docs/audits/)                                       | Date-stamped research audits — Paseo Hub architecture/limits, Clisbot T3Claw fusion state                                      |
+| [docs/audits/](docs/audits/)                                       | Date-stamped research audits — Paseo Hub architecture/limits, Clisbot T3Claw fusion state, the 2026-08-23 fusion gap analysis with proposed improvements, the OpenClaw channel-reuse plan, and its build/publish/onboarding/source-change implementation doc                                  |
 | [docs/architecture.md](docs/architecture.md)                       | System design, package layering, WebSocket protocol, agent lifecycle, data flow                                                |
 | [docs/agent-lifecycle.md](docs/agent-lifecycle.md)                 | Agent states, parent/child relationships, archive semantics, tabs vs archive, subagents track                                  |
 | [docs/data-model.md](docs/data-model.md)                           | File-based JSON persistence, Zod schemas, atomic writes, no migrations                                                         |
@@ -184,6 +184,74 @@ The app runs on iOS, Android, web (browser), and web (Electron desktop). Code is
 ## Debugging
 
 Find the complete daemon logs and traces in the $PASEO_HOME/daemon.log
+
+## Live validation guardrails (channel E2E)
+
+Carried forward from the Clisbot T3Claw fusion `AGENTS.md`, re-targeted at the Paseo foundation. Channel verticals follow the [OpenClaw channel-reuse plan](docs/audits/2026-08-23-openclaw-channel-reuse-plan.md); these are the guardrails for validating them against real Slack/Telegram surfaces.
+
+A working `.env` sits at the repo root (gitignored; copied from the Clisbot repo, byte-identical to the T3Claw fusion's) with **live, verified** credentials:
+
+- Slack: `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_APP_NAME`, `SLACK_TEST_CHANNEL`, `SLACK_TEST_DM_CHANNEL`
+- Telegram: `TELEGRAM_DEV_BOT_TOKEN`, `TELEGRAM_DEV_BOT_USERNAME`, `TELEGRAM_MASTER_BOT_TOKEN`, `TELEGRAM_MASTER_BOT_USERNAME`, `TELEGRAM_TEST_GROUP_ID`, `TELEGRAM_TEST_GROUP_NAME` (basic group, no topics), `TELEGRAM_TEST_TOPIC_GROUP_ID`, `TELEGRAM_TEST_TOPIC_GROUP_NAME`, `TELEGRAM_TEST_TOPIC_GENERAL_ID`, `TELEGRAM_TEST_TOPIC_1_ID`, `TELEGRAM_TEST_TOPIC_2_ID` (forum group with topics)
+- Zalo: `ZALO_PERSONAL_TEST_CLISBOT_USER_ID`, `ZALO_PERSONAL_TEST_LONG_USER_ID`
+- Dev home: `CLISBOT_HOME` (`~/.clisbot-dev`), `CLISBOT_CLI_NAME` (`clisbot-dev`)
+
+Slack was verified end-to-end on 2026-08-21 in the T3Claw fusion (`auth.test` → `chat.postMessage` to `SLACK_TEST_CHANNEL` → `conversations.history` read-back matched).
+
+- Raw connectivity checks (curl against the Slack/Telegram APIs with these creds) are allowed **at any stage** — you don't need the channel host implemented to verify a send/read path.
+- Always **self-verify** a live send: post, then read the history back and match the returned `ts`/message id. A send without read-back is not a verified send.
+- Use only these configured test surfaces; keep `.env` authoritative — never hardcode channel ids in instruction files, and never switch to ad-hoc Slack channels/DMs or Telegram groups/topics/DMs unless the user explicitly asks.
+- Never print token values into output or commit `.env`; reference vars by name.
+
+### Required Slack and Telegram E2E roles
+
+When validating a channel vertical, a direct adapter `send` is only an outbound
+smoke test. It does **not** prove the channel host. The required proof is:
+external sender → channel host → real agent thread/turn → agent reply →
+same external conversation, followed by an API/CLI read-back matching the sent
+message id or timestamp.
+
+- **Telegram:** `TELEGRAM_DEV_BOT_TOKEN` is the bot under test
+  (`@longluong3bot`). `TELEGRAM_MASTER_BOT_TOKEN` is only the test driver that
+  plays the external sender; never configure the channel host with the master
+  token and never report the master bot as the bot under test. Send the marker
+  from the master bot into the test group, addressing the bot under
+  test, then verify its reply by reading the same group back.
+- **Telegram test surfaces:** two groups are configured, pick the one that
+  matches the surface under test:
+  - **No topics (basic group):** `TELEGRAM_TEST_GROUP_ID`
+    (`TELEGRAM_TEST_GROUP_NAME`). Use for tests that must not involve forum
+    topics.
+  - **Topics (forum supergroup):** `TELEGRAM_TEST_TOPIC_GROUP_ID`
+    (`TELEGRAM_TEST_TOPIC_GROUP_NAME`). Topic thread ids (`message_thread_id`):
+    General = `TELEGRAM_TEST_TOPIC_GENERAL_ID`, topic-1 =
+    `TELEGRAM_TEST_TOPIC_1_ID`, topic-2 = `TELEGRAM_TEST_TOPIC_2_ID`. Use for
+    anything that touches topic targeting, per-topic state, or forum routing.
+    A forum group also accepts messages without a `message_thread_id` (they
+    land in General), but a basic group always rejects topic addressing.
+- **Slack:** use `slack-cli conversations-add-message --channel-id
+  "$SLACK_TEST_CHANNEL" --text "<@BOT_USER_ID> …"` as the external sender.
+  If the installed write command reports its known `tool ... not found`
+  error, post through the Slack Web API with a configured **user**
+  credential and continue to use `slack-cli` for read-back; never substitute
+  `SLACK_BOT_TOKEN` as the inbound driver. The channel runtime admits
+  bot-authored Slack traffic only in explicit-mention mode; an unmentioned
+  `slack-cli` message must be ignored. Resolve `BOT_USER_ID` from
+  `SLACK_BOT_TOKEN` with `auth.test`; do not hardcode it. Read the resulting
+  thread back with `slack-cli conversations-replies --channel-id
+  "$SLACK_TEST_CHANNEL" --thread-ts <ROOT_TS>` (or the channel with
+  `conversations-history --channel-id "$SLACK_TEST_CHANNEL"`) and match the
+  timestamp and reply. Raw `chat.postMessage` with `SLACK_BOT_TOKEN` tests
+  outbound connectivity only and must not be presented as inbound E2E
+  evidence.
+- **Real agent:** use provider `codex` with model `gpt-5.6-luna` for live
+  channel E2E unless the developer requests another provider/model.
+- Keep channel E2E on the fixed isolated dev home from `.env`
+  (`CLISBOT_HOME` = `~/.clisbot-dev`) and reuse it across runs so offsets,
+  bindings, approval state, and agent threads remain inspectable. Do not
+  create a random home for each run, and never run live tests against
+  `~/.paseo` (the packaged desktop app / production-style daemon home) or
+  this checkout's `PASEO_HOME` (`$PASEO_HOME`, `.dev/paseo-home` in dev).
 
 ## Clisbot PaseoClaw code standards
 

@@ -16,7 +16,7 @@ The initial product should remain compatible with the Paseo environment model. I
 
 ### Relationship to Clisbot T3Claw Fusion
 
-This exploration is the successor in direction to the sibling Clisbot T3Claw Fusion project, which lives in the `clisbot-t3claw-fusion` folder (reference material in `clisbot-t3claw-fusion/docs`, especially `docs/overview/product-vision.md`, `docs/internals/clisbot-channels.md`, and `docs/operations/clisbot-channels.md`).
+This exploration is the successor in direction to the sibling Clisbot T3Claw Fusion project, which lives in the `clisbot-t3claw-fusion` folder (reference material in `clisbot-t3claw-fusion/docs`, especially `docs/overview/product-vision.md`, `docs/internals/clisbot-channels.md`, and `docs/operations/clisbot-channels.md`). A state audit of that project is at [audits/2026-08-23-clisbot-t3claw-fusion.md](../audits/2026-08-23-clisbot-t3claw-fusion.md).
 
 The T3Claw Fusion exploration validated the product direction but exposed limits of the T3 Code foundation, and the Paseo codebase now appears the more promising base: a mature client-server agent environment with a first-class multi-provider model (Claude Code, Codex, Copilot, OpenCode, Pi), cross-device clients (iOS, Android, desktop, web, CLI), a stable WebSocket timeline, worktree-based workspace isolation, plugins, and an optional encrypted relay — with an active upstream.
 
@@ -46,6 +46,9 @@ This new generation of Clisbot is motivated by limitations in the previous archi
 - Clisbot does not yet provide an approval workflow. This limits important safety-sensitive workflows, including DevOps workflows that must pause for explicit human authorization.
 - When a team is doing coding work, chat alone is insufficient. People also need to review code changes, view and compare documents, inspect files, and collaborate through views such as charts.
 - Paseo needs stronger security controls for team environments. A user without the required permissions must not be able to view another agent session, access another project or workspace, or run a terminal on someone else's host.
+- Separating the Hub from the daemon is the right call for team management with a separately deployed Hub, but it makes simple use cases harder to promote. Starting the daemon should immediately give you a working agent for a one-person setup, and the product must scale to a professional team-managed Hub without a rewrite.
+- The Paseo client interaction is strong, but day-to-day capabilities are missing: pane maximize, file search, diff viewing in markdown display mode, and direct annotation and editing of documents.
+- The Paseo Hub trigger model is limited compared to Clisbot and OpenClaw. Triggers must always name explicit allowed users; there is no notion of "all users in this channel may trigger". There is no mapping of a channel thread to an agent session, so a follow-up message cannot continue the same session. The number of channels is limited, and a channel cannot connect multiple accounts (one Slack account, one GitHub, one Discord, not two). There is no granular permission layer — who may start new conversations, who may approve which tool types — of the kind Clisbot already supports and `clisbot-t3claw-fusion` is improving. See [audits/2026-08-23-paseo-hub.md](../audits/2026-08-23-paseo-hub.md).
 
 ## Product and Architecture Principles
 
@@ -96,7 +99,7 @@ The product should support both a Lite edition and a more professional Premium e
 - Lite should remain simple enough for one-person teams and small teams.
 - Even Lite should expose a Slack-like API when another system or agent needs to interact with the workspace.
 - A channel should be able to contain multiple agents, mirroring Paseo's model of multiple agent sessions in one workspace.
-- Users should be able to interact with agents in the shared channel or within a specific thread.
+- Many humans and many agents should be able to interact together in the same channel and its threads — humans to humans, humans to agents, agents to agents — not just one person driving one agent.
 - Premium should extend this foundation for more demanding professional team and workspace needs.
 
 ### 3. Portable Queue, Loop, and Goal Workflows
@@ -133,8 +136,10 @@ Improve on the previous Clisbot implementation by exposing agent workspace state
 Build more capable native work views than the current Paseo experience, including:
 
 - richer document viewing;
-- native document diff viewing;
-- stronger file viewing;
+- native document diff viewing, including diff in markdown display mode;
+- stronger file viewing, with file search;
+- direct annotation and editing of documents;
+- pane maximize for focused, single-pane work;
 - code-change review (extending Paseo's existing side-panel and forge change-request support); and
 - collaborative visual views such as charts.
 
@@ -146,9 +151,15 @@ Add task-management capabilities in both Lite and Premium forms. The goal is to 
 
 Task management may be provided natively in the application or connected to external task-management systems. The product should support both directions as it evolves.
 
+### 10. Flexible Deployment Shapes
+
+Support both ends of the deployment spectrum without a rewrite. A one-person setup starts the daemon and immediately has a working agent, with no separate Hub to run or enroll. A team adds a separately deployed, professionally managed Hub for centralized control, approval boundaries, and multi-user access. The daemon-to-Hub relationship is the only difference between the two; the agent, workspace, and channel model stay the same.
+
 ## Initial Delivery Posture
 
 The first stage is not a wholesale rewrite of every Paseo surface. It is a careful exploration of the fusion architecture while maintaining an operable Paseo-compatible base.
+
+The dated gap analysis [audits/2026-08-23-paseoclaw-fusion-gaps.md](../audits/2026-08-23-paseoclaw-fusion-gaps.md) turns this posture into sequenced proposals — workspace init templates, a same-machine channel path, and the Hub trigger-model fixes that follow them — each with its code seam, isolation flags, and verification criteria. The channel proposal it spawned is owned by the [channel-reuse plan](../audits/2026-08-23-openclaw-channel-reuse-plan.md): the channel control plane lives in the Hub, every Hub form drives the daemon as an ordinary client through the existing trusted-client RPCs with a zero P0 daemon diff (embedded over loopback, team/remote over the relay; the upstream scoped channel is frozen legacy-compat — plan §14.7), and the build/publish/onboarding details are in the [hub-integration implementation doc](../audits/2026-08-24-hub-integration-implementation.md).
 
 Initial changes should prioritize:
 
