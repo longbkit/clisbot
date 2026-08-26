@@ -41,6 +41,12 @@ import {
 import { createManualRunProvider } from "./triggers/manual/provider.js";
 import { DaemonRegistration } from "./daemons/registration.js";
 import { CliAuthorizations } from "./cli-authorizations/index.js";
+// COMPAT(clisbot-control-plane): the channel control-plane ops (implementation
+// doc §1.4, §3.2) — self-authenticating, gated per request, degraded when the
+// composition root did not build a supervisor.
+import { createChannelControlPlaneOps } from "./channels/http/operations.js";
+import type { ChannelSupervisor } from "./channels/supervisor/types.js";
+import type { DatabaseRuntime } from "./db/runtime/index.js";
 import type { BrowserOrganizationAccess } from "./auth/browser-organization-access.js";
 import { createPublicApi, type PublicApi, type PublicApiComposition } from "./public-api/index.js";
 import { createPublicOperations } from "./public-operations/index.js";
@@ -61,6 +67,15 @@ export interface HubRuntimeOptions {
   outputRegistry?: OutputExecutorRegistry;
   publicApi: PublicApiComposition;
   completionTokenSecret?: string;
+  /**
+   * COMPAT(clisbot-control-plane): the database runtime handle, threaded so the
+   * control-plane scope can reach runtime-backed channel state; unused by P0 ops.
+   */
+  databaseRuntime?: DatabaseRuntime;
+  /** COMPAT(clisbot-control-plane): the Hub data directory operator secrets mirror into. */
+  hubDataDir?: string;
+  /** COMPAT(clisbot-control-plane): the channel supervisor, or null to degrade the transport step. */
+  channelSupervisor?: ChannelSupervisor | null;
   publicBaseUrl?: string;
   daemonClock?: DaemonClock;
   executionDeadlineClock?: ExecutionDeadlineClock;
@@ -97,6 +112,14 @@ export interface HubOperations {
     attachmentId: string,
   ): Promise<Response>;
   handleManualTrigger(request: Request, entrypoint: "trigger" | "smoke"): Promise<Response>;
+  // COMPAT(clisbot-control-plane): the channel control-plane ops.
+  handleChannelAdd(request: Request): Promise<Response>;
+  handleChannelList(request: Request): Promise<Response>;
+  handleChannelStatus(request: Request): Promise<Response>;
+  handleUsersList(request: Request): Promise<Response>;
+  handleUserShow(request: Request, username: string): Promise<Response>;
+  handleUserAdd(request: Request): Promise<Response>;
+  handleUserEdit(request: Request, username: string): Promise<Response>;
 }
 
 export interface HubApplication {
@@ -165,6 +188,9 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
           options.publicBaseUrl,
         );
 
+  // COMPAT(clisbot-control-plane): one ops holder, built synchronously; the
+  // kill-switch and database precedence are applied per request inside it.
+  const channelControlPlane = createChannelControlPlaneOpsFor(options, storeForProject);
   const manualSource =
     options.database === null ? undefined : createManualTriggerSource(options.database);
   const durableDispatchHandler =
@@ -286,6 +312,13 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       manualSource === undefined
         ? databaseUnavailable()
         : handleManualTriggerRequest(request, manualSource, entrypoint),
+    handleChannelAdd: (request) => channelControlPlane.addChannel(request),
+    handleChannelList: (request) => channelControlPlane.listChannels(request),
+    handleChannelStatus: (request) => channelControlPlane.channelStatus(request),
+    handleUsersList: (request) => channelControlPlane.listUsers(request),
+    handleUserShow: (request, username) => channelControlPlane.showUser(request, username),
+    handleUserAdd: (request) => channelControlPlane.addUser(request),
+    handleUserEdit: (request, username) => channelControlPlane.editUser(request, username),
   };
   return { hub, operations, publicApi, configurationForProject: storeForProject };
 }
@@ -351,6 +384,23 @@ function createAttachmentRegistry(
 
 function databaseUnavailable(): Promise<Response> {
   return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
+}
+
+// COMPAT(clisbot-control-plane): the ops holder's options, factored out of
+// `createHubApplication` so the composition function stays under its complexity
+// budget. The kill-switch and database precedence are applied per request
+// inside the ops.
+function createChannelControlPlaneOpsFor(
+  options: HubRuntimeOptions,
+  storeForProject: (projectId: string) => ProjectConfigurationStore,
+): ReturnType<typeof createChannelControlPlaneOps> {
+  return createChannelControlPlaneOps({
+    database: options.database,
+    completionTokenSecret: options.completionTokenSecret,
+    dataDir: options.hubDataDir,
+    supervisor: options.channelSupervisor ?? null,
+    storeForProject,
+  });
 }
 
 function connectDaemonLifecycle(

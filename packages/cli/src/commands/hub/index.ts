@@ -19,6 +19,9 @@ import { processHubReporter, type HubReporter } from "./reporter.js";
 import { hubStatusResult } from "./status-output.js";
 import { addHubResolutionHelp } from "./help.js";
 import { addHubInitCommand, continueHubGuidedSetup } from "./init.js";
+// COMPAT(clisbot-hub-local): embedded-Hub lifecycle + discovery (implementation doc §3.2).
+import { startCommand as startLocalHubCommand } from "./start.js";
+import { stopCommand as stopLocalHubCommand } from "./stop.js";
 
 interface HubCommandEnvironment {
   env: Readonly<Record<string, string | undefined>>;
@@ -50,6 +53,10 @@ function productionEnvironment(): HubCommandEnvironment {
 export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {}): Command {
   const environment = { ...productionEnvironment(), ...overrides };
   const hub = addHubResolutionHelp(new Command("hub").description("Manage Paseo Hub"));
+
+  // COMPAT(clisbot-hub-local): embedded-Hub lifecycle before the remote verbs.
+  hub.addCommand(startLocalHubCommand());
+  hub.addCommand(stopLocalHubCommand());
 
   addHubLoginCommand(hub, {
     env: environment.env,

@@ -1,6 +1,6 @@
 # Hub integration: build, publish, onboarding, and source changes
 
-Implementation companion to [2026-08-23-openclaw-channel-reuse-plan.md](2026-08-23-openclaw-channel-reuse-plan.md). The plan owns *what* and *why* (control plane in the Hub, in-process verticals §14.5; **P0: the Hub reaches the daemon as an ordinary client — both forms: embedded pairs over loopback, team/remote over the relay, `scopes: ["*"]`, existing RPCs — zero daemon diff; P1: a flag-gated per-resource grant engine in the daemon** — plan §4-S3/§14.6/§14.7). This doc owns *how it is built, shipped, installed, and where every source change lands*. Verified against both codebases 2026-08-24/25.
+Implementation companion to [2026-08-23-openclaw-channel-reuse-plan.md](2026-08-23-openclaw-channel-reuse-plan.md). The plan owns _what_ and _why_ (control plane in the Hub, in-process verticals §14.5; **P0: the Hub reaches the daemon as an ordinary client — both forms: embedded pairs over loopback, team/remote over the relay, `scopes: ["*"]`, existing RPCs — zero daemon diff; P1: a flag-gated per-resource grant engine in the daemon** — plan §4-S3/§14.6/§14.7). This doc owns _how it is built, shipped, installed, and where every source change lands_. Verified against both codebases 2026-08-24/25.
 
 ## 1. Building process and package publish
 
@@ -35,12 +35,12 @@ Upstream tracking: `packages/hub` tracks the Hub mainline (`getpaseo/hub`) the s
 
 Both codebases use the same tooling family (TypeScript via `tsgo`, Biome-adjacent lint via `oxlint`, `oxfmt`), so no toolchain conflict. Differences that matter:
 
-| | Monorepo (Paseo) | `packages/hub` |
-| --- | --- | --- |
-| Node | 22.20.0 (`.tool-versions`) | same (module customization hooks need ≥20.6; 22 is the floor) |
-| Build | `npm run build:server` (protocol→relay→client→server→cli) | `npm run build --workspace=@clisbot/hub` = `tsgo` (node runtime → `dist/`) + `vite build` (web UI → `.output/`) |
-| DB | JSON files, no migrations | Drizzle + PGlite/Postgres; migrations in `packages/hub/drizzle/` |
-| Wire schema | `packages/protocol/src/messages.ts` (incl. `hub.execution.*`) | Hub's own copies: `src/hub/protocol.ts`, `src/daemons/protocol.ts` |
+|             | Monorepo (Paseo)                                              | `packages/hub`                                                                                                  |
+| ----------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Node        | 22.20.0 (`.tool-versions`)                                    | same (module customization hooks need ≥20.6; 22 is the floor)                                                   |
+| Build       | `npm run build:server` (protocol→relay→client→server→cli)     | `npm run build --workspace=@clisbot/hub` = `tsgo` (node runtime → `dist/`) + `vite build` (web UI → `.output/`) |
+| DB          | JSON files, no migrations                                     | Drizzle + PGlite/Postgres; migrations in `packages/hub/drizzle/`                                                |
+| Wire schema | `packages/protocol/src/messages.ts` (incl. `hub.execution.*`) | Hub's own copies: `src/hub/protocol.ts`, `src/daemons/protocol.ts`                                              |
 
 The Hub has **zero imports of `@getpaseo/*`** today (verified: only its own `@getpaseo/hub` self-reference and e2e harnesses that spawn the monorepo daemon as a child process). Keep it that way — the Hub package must build standalone, which is what makes it promotable (§14.3) and keeps the two build systems from tangling. (The embedded Hub's P0 connection to the daemon is a **runtime** trusted-client WebSocket, not an import — same boundary as a CLI or app client, so the rule is unchanged.)
 
@@ -83,7 +83,7 @@ scripts/publish-clisbot.mjs     # NEW — the only place the two name worlds mee
 
 Why not rename in source: 632 source files import `@getpaseo/*` (app 302, server 175, cli 47, desktop 9, client 8, plus 11 `package.json` files and root scripts). Renaming them is a mechanical one-hour change, but it turns every import line into a Clisbot diff — every future `upstream/main` merge would conflict on every upstream-touched file. Publishing as a renamed copy keeps the source byte-identical to upstream on all import lines and confines the name change to the release script.
 
-**The unified `clisbot` binary.** All CLI commands live in `packages/cli` (commander v12, ~70 verbs across 14 groups, tree assembled in the exported `createCli(): Command` — `packages/cli/src/cli.ts:50`); each group is mounted with the repo's existing factory pattern (`addXxxCommand(parent, dependencies)` + an injected environment, e.g. `packages/cli/src/commands/hub/index.ts`). The Hub package today contributes **zero** commands — it is a server binary whose `runHubCommandLine()` only starts the server. The CLI already carries a `hub` group (8 verbs: connect, init, status, deploy, …) implemented as thin HTTP clients to a running Hub (`HubHttpClient` → `/api/v1/...`), and `paseo start` already *spawns* the daemon (`local-daemon.ts` → `spawnProcess` from `@getpaseo/server`). The unified binary reuses that exact model:
+**The unified `clisbot` binary.** All CLI commands live in `packages/cli` (commander v12, ~70 verbs across 14 groups, tree assembled in the exported `createCli(): Command` — `packages/cli/src/cli.ts:50`); each group is mounted with the repo's existing factory pattern (`addXxxCommand(parent, dependencies)` + an injected environment, e.g. `packages/cli/src/commands/hub/index.ts`). The Hub package today contributes **zero** commands — it is a server binary whose `runHubCommandLine()` only starts the server. The CLI already carries a `hub` group (8 verbs: connect, init, status, deploy, …) implemented as thin HTTP clients to a running Hub (`HubHttpClient` → `/api/v1/...`), and `paseo start` already _spawns_ the daemon (`local-daemon.ts` → `spawnProcess` from `@getpaseo/server`). The unified binary reuses that exact model:
 
 - **`@clisbot/cli` owns the `clisbot` bin** (the publish transform renames the bin key; source keeps the upstream key). It gains new groups on the same factory pattern: `hub start|stop` (spawn/detach the Hub server process — the `daemon start` pattern applied to the Hub's already-exported `runHubCommandLine` entry), `channels add|list|status`, `users list|show|add|edit` (+ `users pairing`, §4-S4) as **thin HTTP clients** to the running Hub's control-plane API (`/api/v1/channels/...`) — the `hub deploy` pattern applied to the new endpoints — and the `bot start|init|stop|status` group (§2.1), which composes the daemon/Hub spawn + starter config + those same control-plane calls into the one-line bootstrap. `users add|edit` mutate the `users:` section of the active revision and deploy it (§4.3.2).
 - **`@clisbot/hub` is a server package with no bin** (analog of `@getpaseo/server`): it contributes a spawn-able server entry and the control-plane HTTP API, nothing else. Its source keeps the upstream Hub shape, so merges against `getpaseo/hub` stay clean.
@@ -178,7 +178,7 @@ That single line does, in order: (1) start the daemon if not running (`daemon st
 
 **Channel credentials, learned from Clisbot's `start`/`init`.** `--slack-bot-token`/`--slack-app-token` (+ optional `--slack-account <id>`, default `default`) and `--telegram-bot-token` (+ optional `--telegram-account <id>`) accept a literal value, an `${ENV_REF}`, or a secret-file path — the same three kinds Clisbot's `parseTokenInput` uses. Without `--persist` the token is **runtime-only** (in-memory for this Hub run); with `--persist` it is written to the Hub-owned secrets file (`secretRef`, 0600, §4.3.9) so a later plain `bot start`/`hub start` reuses it. At least one channel credential is required on first create.
 
-**`start` vs `init` vs `stop` (the hub/daemon split, made explicit).** The user-visible split is by *what the verb owns*, which removes the "is `hub init` a Hub thing or a daemon thing?" ambiguity:
+**`start` vs `init` vs `stop` (the hub/daemon split, made explicit).** The user-visible split is by _what the verb owns_, which removes the "is `hub init` a Hub thing or a daemon thing?" ambiguity:
 
 - `clisbot bot start` — owns the whole bundle; may spawn the daemon and the Hub; runs the starter config if absent. **No prior `hub init` required** — this is the one-line path.
 - `clisbot bot init` — same bundle creation but **requires a running Hub** (it will not spawn one); use it when the Hub is already up and you only want to add/reconfigure a bot. Fails with "run `clisbot bot start` first" if the Hub is down.
@@ -188,13 +188,13 @@ That single line does, in order: (1) start the daemon if not running (`daemon st
 
 **Naming record (proposed; glossary entries land when the module does).**
 
-| Concept | Name | Rejected |
-| --- | --- | --- |
-| The composite bundle | **bot** | "assistant" (too generic, collides with `--bot-type`'s `*-assistant` template names); "agent-bot" (redundant) |
-| Template choice flag | `--bot-type` (`personal` \| `team`) | kept from Clisbot unchanged |
-| Composite name flag | `--bot-name` | — |
-| Agent-title override | `--agent-name` | not `--title` (that is `run`'s word for the bare agent) |
-| Per-channel credential | `--slack-bot-token` / `--telegram-bot-token` | kept from Clisbot's per-channel `tokenFlags` |
+| Concept                | Name                                         | Rejected                                                                                                      |
+| ---------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| The composite bundle   | **bot**                                      | "assistant" (too generic, collides with `--bot-type`'s `*-assistant` template names); "agent-bot" (redundant) |
+| Template choice flag   | `--bot-type` (`personal` \| `team`)          | kept from Clisbot unchanged                                                                                   |
+| Composite name flag    | `--bot-name`                                 | —                                                                                                             |
+| Agent-title override   | `--agent-name`                               | not `--title` (that is `run`'s word for the bare agent)                                                       |
+| Per-channel credential | `--slack-bot-token` / `--telegram-bot-token` | kept from Clisbot's per-channel `tokenFlags`                                                                  |
 
 The bot manifest (new artifact) lives at `$CLISBOT_HOME/bots/<bot-name>.json` (bot name → workspace path + agent id + channel account id + route id + credential kind); it is Clisbot-owned, additive, and the only new persistence this feature introduces.
 
@@ -220,15 +220,15 @@ The whole change splits into **one new package** and **a small additive diff in 
 
 ### 3.1 New (Clisbot-owned, zero upstream surface)
 
-| Location | What |
-| --- | --- |
-| `packages/hub/src/channels/**` | Channel control plane: config block, multi-account connections, thread bindings + continuous execution, outbound relay + delivery ledger, approval rules, RBAC policy (user records + assignments, §4.3.2), per-account ingress routes, resource grants + pairing-link minting |
-| `packages/hub/src/channels/loader/**` | Vertical loader: Node module customization hooks (resolve/load), the alias seam table, load-trace check at load (§6 of the plan), the two loading modes (published with alias surface, bundled Telegram with none) |
-| `packages/hub/src/channels/install/**` | Per-channel install: reads `channel-pins.json`, fetches the pinned tarball from public npm, verifies `dist.integrity`, installs to `<CLISBOT_HUB_DATA_DIR>/channels/<accountId>/` (default `~/.clisbot`) |
-| `packages/hub/drizzle/*` (new migrations) | Additive tables: channel accounts, thread bindings, delivery ledger, resource grants (user records live in the config bundle, not the DB — §4.3.2) |
-| `packages/hub/channel-pins.json`, `seam-matrix/` | Pin manifest + generated subpath classification |
-| `packages/hub/src/env-alias.ts` (new module) | the `CLISBOT_*` → `PASEO_*` alias shim (§4.5): a fixed table applied at process entry — copies each `CLISBOT_X` into `PASEO_X` when `PASEO_X` is unset; explicit `PASEO_X` always wins. Fork-owned; the internal code keeps reading upstream `PASEO_*` names, so no upstream merge re-fights a rename |
-| `THIRD_PARTY_NOTICES` entry | OpenClaw bundled deps, per channel (plan §9 step 7) |
+| Location                                         | What                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/hub/src/channels/**`                   | Channel control plane: config block, multi-account connections, thread bindings + continuous execution, outbound relay + delivery ledger, approval rules, RBAC policy (user records + assignments, §4.3.2), per-account ingress routes, resource grants + pairing-link minting                        |
+| `packages/hub/src/channels/loader/**`            | Vertical loader: Node module customization hooks (resolve/load), the alias seam table, load-trace check at load (§6 of the plan), the two loading modes (published with alias surface, bundled Telegram with none)                                                                                    |
+| `packages/hub/src/channels/install/**`           | Per-channel install: reads `channel-pins.json`, fetches the pinned tarball from public npm, verifies `dist.integrity`, installs to `<CLISBOT_HUB_DATA_DIR>/channels/<accountId>/` (default `~/.clisbot`)                                                                                              |
+| `packages/hub/drizzle/*` (new migrations)        | Additive tables: channel accounts, thread bindings, delivery ledger, resource grants (user records live in the config bundle, not the DB — §4.3.2)                                                                                                                                                    |
+| `packages/hub/channel-pins.json`, `seam-matrix/` | Pin manifest + generated subpath classification                                                                                                                                                                                                                                                       |
+| `packages/hub/src/env-alias.ts` (new module)     | the `CLISBOT_*` → `PASEO_*` alias shim (§4.5): a fixed table applied at process entry — copies each `CLISBOT_X` into `PASEO_X` when `PASEO_X` is unset; explicit `PASEO_X` always wins. Fork-owned; the internal code keeps reading upstream `PASEO_*` names, so no upstream merge re-fights a rename |
+| `THIRD_PARTY_NOTICES` entry                      | OpenClaw bundled deps, per channel (plan §9 step 7)                                                                                                                                                                                                                                                   |
 
 All of it is flag-gated: the `CLISBOT_HUB_CHANNELS_ENABLED` env (read by the Hub at startup; set in the supervisor's environment — it is a process-level "load the channel code at all" switch, so changing it needs a restart) + `channels/policy.yml` `enabled: false` in the active config revision (plan S7; §4.6). The config levels below it are live-reloaded with the revision. Flag off, the Hub loads no channel code, ingests no channel events, opens no per-account routes — byte-equivalent to today's Hub.
 
@@ -238,41 +238,41 @@ All of it is flag-gated: the `CLISBOT_HUB_CHANNELS_ENABLED` env (read by the Hub
 
 **Monorepo — daemon stack — P1: the per-resource grant engine** (the daemon's only channel-related addition; plan §4-S3/§14.6; the fork's largest upstream surface):
 
-| File | Change | Gate |
-| --- | --- | --- |
-| `packages/protocol/src/messages.ts` | + optional pairing-grant field on the offer; + optional grant-binding handshake message; + `server_info.features.grants` flag. No new steer/permission RPCs: both Hub forms use the existing trusted-client RPCs (§14.7), so the grant engine only binds a principal + grants to a session that is already calling `send_agent_message_request`/`agent_permission_response` | optional fields only, pure wire schemas (`docs/protocol-compatibility.md`); `COMPAT(grant-engine)` tags; no semantic narrowing for ungranted sessions |
-| new `packages/server/src/server/grants/` (dedicated module) | grant store + principal binding + enforcement helpers: verify Hub signature + nonce + TTL, bind principal + grants to the session; per-resource checks over daemon→project→agent-session→surfaces | flag-gated + capability-gated; sessions without a bound principal keep today's trust semantics; off-by-default = byte-equivalent to upstream (verified per CLAUDE.md "verify both states") |
-| additive hunks at upstream hook sites | `websocket-server.ts` / `session.ts` (bind principal on the grant handshake; consult the grant module at resource boundaries); `agent-manager.ts`, workspace registry, terminal manager, file service, config store, checkout (thread the session principal through the resource ops) | additive cases only; each hunk stays a minimal extractable change so the module stays liftable (plan §14.1) |
-| new `packages/server/src/server/managed-processes/supervisor.ts` (optional) | spawn + restart-with-backoff + crash-loop-breaker for a daemon-managed embedded Hub (registry reuse: `createManagedProcessRegistry` records; the new module supervises) | off by default; plan §14.5 condition 2's built-in form; independent of the grant engine |
+| File                                                                        | Change                                                                                                                                                                                                                                                                                                                                                                      | Gate                                                                                                                                                                                       |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/protocol/src/messages.ts`                                         | + optional pairing-grant field on the offer; + optional grant-binding handshake message; + `server_info.features.grants` flag. No new steer/permission RPCs: both Hub forms use the existing trusted-client RPCs (§14.7), so the grant engine only binds a principal + grants to a session that is already calling `send_agent_message_request`/`agent_permission_response` | optional fields only, pure wire schemas (`docs/protocol-compatibility.md`); `COMPAT(grant-engine)` tags; no semantic narrowing for ungranted sessions                                      |
+| new `packages/server/src/server/grants/` (dedicated module)                 | grant store + principal binding + enforcement helpers: verify Hub signature + nonce + TTL, bind principal + grants to the session; per-resource checks over daemon→project→agent-session→surfaces                                                                                                                                                                           | flag-gated + capability-gated; sessions without a bound principal keep today's trust semantics; off-by-default = byte-equivalent to upstream (verified per CLAUDE.md "verify both states") |
+| additive hunks at upstream hook sites                                       | `websocket-server.ts` / `session.ts` (bind principal on the grant handshake; consult the grant module at resource boundaries); `agent-manager.ts`, workspace registry, terminal manager, file service, config store, checkout (thread the session principal through the resource ops)                                                                                       | additive cases only; each hunk stays a minimal extractable change so the module stays liftable (plan §14.1)                                                                                |
+| new `packages/server/src/server/managed-processes/supervisor.ts` (optional) | spawn + restart-with-backoff + crash-loop-breaker for a daemon-managed embedded Hub (registry reuse: `createManagedProcessRegistry` records; the new module supervises)                                                                                                                                                                                                     | off by default; plan §14.5 condition 2's built-in form; independent of the grant engine                                                                                                    |
 
 > Obsolete (pre-pivot plan): this section previously listed the P0 daemon diff as two new `hub.execution.*` RPCs (`agent.steer`, `agent.permission.respond`) + `pairing-grant.ts` + the managed-process slot + a `server_info.features` flag. All of that is superseded by plan §14.6: the two RPCs are no longer needed (existing trusted-client RPCs cover steer + permission-respond), and the pairing-grant verification moves into the P1 grant engine.
 
 **Monorepo — CLI** (new additive groups under `packages/cli`, §1.4):
 
-| File | Change | Gate |
-| --- | --- | --- |
-| new `packages/cli/src/commands/hub/start.ts` + `stop.ts` | `hub start|stop`: spawn/detach the Hub server via `spawnProcess` from `@getpaseo/server` — the existing `daemon start` pattern (`local-daemon.ts`) applied to the Hub's exported `runHubCommandLine` entry. The spawned Hub binds loopback `:6868` (the fork's default port, distinct from upstream `:3000`) and `start` writes a `hub-local.json` state file in `$CLISBOT_HOME` (url, pid) that the local verbs read; the `CLISBOT_*` → `PASEO_*` alias shim (§4.5) is applied at spawn. `hub stop` kills the Hub (which, since the verticals run in-process, stops every channel too) **and discards runtime-only channel credentials** — the non-`--persist` tokens, mirroring Clisbot's `stop` → `removeRuntimeCredentials()`; `--persist`-ed secret files survive. `bot stop` (§2.1) is `hub stop` plus the bot-manifest cleanup, so the two never diverge | `COMPAT` tag at the mount site |
-| new `packages/cli/src/commands/channels/` + `users/` groups | `channels add|list|status`, `users`, `pairing` — thin HTTP clients to the running Hub's control-plane API (`/api/v1/channels/...`), the `hub deploy`/`HubHttpClient` pattern. Local verbs auto-discover the Hub from `hub-local.json` — no `CLISBOT_HUB_URL`/`CLISBOT_HUB_API_KEY` to set; the embedded control plane trusts loopback | inert against a stock Hub: the endpoints 404 with a clear message; zero daemon impact |
-| new `packages/cli/src/commands/bot/` group (+ `templates/` seed set shipped with the CLI, §2.1) | `bot start|init|stop|status` — the one-line bootstrap: spawns daemon + Hub as needed (`daemon start` / `hub start` patterns, reused, not forked), runs the starter config if absent, seeds the bot workspace, creates the idle agent via trusted `create_agent_request` (no prompt — `FirstAgentContextSchema.prompt` is optional), adds the channel account + route through the same control-plane API `channels add` uses, and writes the bot manifest (`$CLISBOT_HOME/bots/<bot-name>.json`). Flags: `--provider`/`--model`/`--mode` (run vocabulary), `--bot-type <personal\|team>`, `--bot-name`, `--agent-name`, `--workspace`/`--new-workspace`, per-channel token flags + `--persist` (§2.1). `bot stop` discards runtime-only credentials (Clisbot `removeRuntimeCredentials` analog) | reuses the daemon/Hub spawn + control-plane paths; zero new wire; zero daemon impact; inert against a stock Hub (the control-plane endpoints 404 with a clear message) |
-| `packages/cli/src/commands/hub/index.ts` + `cli.ts` | mount the new sub-verbs + groups in the existing factory wiring (`addHubCommand` et al.) | additive cases only |
-| `packages/cli/package.json` | + `@getpaseo/hub` workspace dependency | inert: the Hub server is only ever spawned as a child process, never imported at runtime |
+| File                                                                                            | Change                                                                                   | Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| new `packages/cli/src/commands/hub/start.ts` + `stop.ts`                                        | `hub start                                                                               | stop`: spawn/detach the Hub server via `spawnProcess`from`@getpaseo/server`— the existing`daemon start` pattern (`local-daemon.ts`) applied to the Hub's exported `runHubCommandLine`entry. The spawned Hub binds loopback`:6868`(the fork's default port, distinct from upstream`:3000`) and `start`writes a`hub-local.json`state file in`$CLISBOT*HOME`(url, pid) that the local verbs read; the`CLISBOT*\_`→`PASEO\_\_`alias shim (§4.5) is applied at spawn.`hub stop` kills the Hub (which, since the verticals run in-process, stops every channel too) **and discards runtime-only channel credentials** — the non-`--persist`tokens, mirroring Clisbot's`stop`→`removeRuntimeCredentials()`; `--persist`-ed secret files survive. `bot stop`(§2.1) is`hub stop` plus the bot-manifest cleanup, so the two never diverge | `COMPAT` tag at the mount site                                                                                                                                                                                                                                                                                 |
+| new `packages/cli/src/commands/channels/` + `users/` groups                                     | `channels add                                                                            | list                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | status`, `users`, `pairing` — thin HTTP clients to the running Hub's control-plane API (`/api/v1/channels/...`), the `hub deploy`/`HubHttpClient`pattern. Local verbs auto-discover the Hub from`hub-local.json`— no`CLISBOT_HUB_URL`/`CLISBOT_HUB_API_KEY` to set; the embedded control plane trusts loopback | inert against a stock Hub: the endpoints 404 with a clear message; zero daemon impact                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| new `packages/cli/src/commands/bot/` group (+ `templates/` seed set shipped with the CLI, §2.1) | `bot start                                                                               | init                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | stop                                                                                                                                                                                                                                                                                                           | status` — the one-line bootstrap: spawns daemon + Hub as needed (`daemon start`/`hub start`patterns, reused, not forked), runs the starter config if absent, seeds the bot workspace, creates the idle agent via trusted`create_agent_request`(no prompt —`FirstAgentContextSchema.prompt`is optional), adds the channel account + route through the same control-plane API`channels add` uses, and writes the bot manifest (`$CLISBOT_HOME/bots/<bot-name>.json`). Flags: `--provider`/`--model`/`--mode`(run vocabulary),`--bot-type <personal\|team>`, `--bot-name`, `--agent-name`, `--workspace`/`--new-workspace`, per-channel token flags + `--persist`(§2.1).`bot stop`discards runtime-only credentials (Clisbot`removeRuntimeCredentials` analog) | reuses the daemon/Hub spawn + control-plane paths; zero new wire; zero daemon impact; inert against a stock Hub (the control-plane endpoints 404 with a clear message) |
+| `packages/cli/src/commands/hub/index.ts` + `cli.ts`                                             | mount the new sub-verbs + groups in the existing factory wiring (`addHubCommand` et al.) | additive cases only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `packages/cli/package.json`                                                                     | + `@getpaseo/hub` workspace dependency                                                   | inert: the Hub server is only ever spawned as a child process, never imported at runtime                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 **Root:**
 
-| File | Change | Gate |
-| --- | --- | --- |
+| File                | Change                                               | Gate                                     |
+| ------------------- | ---------------------------------------------------- | ---------------------------------------- |
 | root `package.json` | `workspaces += "packages/hub"`; + `build:hub` script | zero runtime effect on existing packages |
-| `CLAUDE.md` | docs-table row for this doc | docs only |
+| `CLAUDE.md`         | docs-table row for this doc                          | docs only                                |
 
 **Inside `packages/hub`** (the Hub-side half of the same seams; the Hub fork is where most new code lives, deliberately):
 
-| Location | Change |
-| --- | --- |
-| `src/config/compiler.ts` + bundle | the `.paseo/channels/` authored directory on the existing compiler (validation, revision, audit hash reused — plan S2; §4.3) |
-| `src/db/schema.ts` + `drizzle/` | additive tables (§3.1); the one global-unique index relaxation for multi-account (plan P4) is a migration, additive |
-| `src/daemons/lifecycle.ts` + new channel session consumers | Relay + approval input, **one code path for both forms** (plan §14.7): the Hub's ordinary trusted session (loopback for embedded, relay-paired for team/remote) receives the ordinary client agent-update / timeline events — including `permission_requested`/`permission_resolved` — for its bound `agentId` (the same events the app renders, gated by the same per-agent subscription), and drives `create_agent_request` / `send_agent_message_request` (`activeTurnBehavior: "steer"`) / `agent_permission_response` — existing RPCs, no new wire (plan §4-S3 P0). The legacy `hub.execution.agent.stream` consumer (today it only refreshes the idle deadline — plan P5/P6) is kept only for the frozen legacy-compat scoped path; it is not a P0 relay or approval input |
-| `src/provider-applications/internal/runtime-owner.ts` + routes | per-account channel ingress routes generalize the existing named-request ingress (plan gap 11) |
-| `src/triggers/manual/` dispatch path | channel-originated turns ride the existing `manual.run`-shaped dispatch as another event source (generalized entrypoint, not a new invoke API) |
+| Location                                                       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/config/compiler.ts` + bundle                              | the `.paseo/channels/` authored directory on the existing compiler (validation, revision, audit hash reused — plan S2; §4.3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `src/db/schema.ts` + `drizzle/`                                | additive tables (§3.1); the one global-unique index relaxation for multi-account (plan P4) is a migration, additive                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `src/daemons/lifecycle.ts` + new channel session consumers     | Relay + approval input, **one code path for both forms** (plan §14.7): the Hub's ordinary trusted session (loopback for embedded, relay-paired for team/remote) receives the ordinary client agent-update / timeline events — including `permission_requested`/`permission_resolved` — for its bound `agentId` (the same events the app renders, gated by the same per-agent subscription), and drives `create_agent_request` / `send_agent_message_request` (`activeTurnBehavior: "steer"`) / `agent_permission_response` — existing RPCs, no new wire (plan §4-S3 P0). The legacy `hub.execution.agent.stream` consumer (today it only refreshes the idle deadline — plan P5/P6) is kept only for the frozen legacy-compat scoped path; it is not a P0 relay or approval input |
+| `src/provider-applications/internal/runtime-owner.ts` + routes | per-account channel ingress routes generalize the existing named-request ingress (plan gap 11)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `src/triggers/manual/` dispatch path                           | channel-originated turns ride the existing `manual.run`-shaped dispatch as another event source (generalized entrypoint, not a new invoke API)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 **The two wire-schema sources** — notice, not a change: the `hub.execution.*` schemas exist in both the monorepo (`packages/protocol/src/messages.ts`) and the Hub (`src/hub/protocol.ts`), and upstream keeps them in sync by hand. At **P0 there is no new RPC on either side, and no form uses the `hub.execution.*` schemas** — both forms use the existing trusted-client schemas (plan §14.7), so lockstep is vacuously satisfied. The `hub.execution.*` lockstep discipline applies only to the frozen legacy-compat scoped path. When the **P1 grant engine** adds wire (the optional handshake message, the optional offer field), each addition lands in **both** sources with matching `COMPAT` tags, and the conformance tests assert the two copies agree.
 
@@ -280,7 +280,7 @@ All of it is flag-gated: the `CLISBOT_HUB_CHANNELS_ENABLED` env (read by the Hub
 
 1. **One new package carries the feature.** All channel code (control plane + verticals + loader + install) is inside `@clisbot/hub`. Deleting `packages/hub` from the workspace deletes the entire channel capability; the monorepo diff is what remains.
 2. **The monorepo diff is additive and thin — and zero in the daemon at P0.** P0: the daemon is **untouched** (the embedded Hub's trusted-client path is the stock local-client path, plan §14.6); the only monorepo diff is the CLI — new group directories + a workspace dependency + wiring in `createCli()`, inert against a stock Hub (the endpoints 404 clearly). P1 adds the grant engine: optional wire fields, one dedicated `server/grants/` module, additive hunks at upstream hook sites, and an optional supervisor module. `rg "COMPAT\("` is the complete list of sites that can differ from upstream in either phase.
-3. **No dependency edge daemon → Hub package.** The daemon sees channel traffic only as stock client traffic — ordinary trusted-client RPCs from an ordinary trusted session, both forms (loopback for embedded, relay-paired for team/remote; plan §14.7). It cannot know or care that the Hub is running third-party channel code (plan §4-S3: "the daemon never learns *why* a call arrived"). A channel fault (including an event-loop hang) can take down the Hub; it can never reach the daemon or any agent session (plan §14.5, P13).
+3. **No dependency edge daemon → Hub package.** The daemon sees channel traffic only as stock client traffic — ordinary trusted-client RPCs from an ordinary trusted session, both forms (loopback for embedded, relay-paired for team/remote; plan §14.7). It cannot know or care that the Hub is running third-party channel code (plan §4-S3: "the daemon never learns _why_ a call arrived"). A channel fault (including an event-loop hang) can take down the Hub; it can never reach the daemon or any agent session (plan §14.5, P13).
 4. **Kill switches, split by phase, both verified in acceptance** (plan S7, §10): **P0** — Hub-side, three config levels plus the env flag: global env `CLISBOT_HUB_CHANNELS_ENABLED` > org-level `channels/policy.yml` `enabled` > per-channel `channels.<channel>.enabled` > per-account `enabled` (§4.3.2); the daemon needs none because it has no channel code (flag-off byte-equivalence is vacuously true). **P1** adds the daemon side: the grant engine is off-by-default and flag-gated; off, the daemon is byte-equivalent to upstream.
 5. **Third-party bytes stay bounded even in-process** (plan §14.5 condition 1): per-channel install dir, integrity-pinned, own tokens only, load-trace-checked at load; the loader's resolve hook refuses anything outside the matrix allowlist, so a pinned channel cannot pull extra `openclaw/*` modules into the Hub process.
 
@@ -298,6 +298,7 @@ All of it is flag-gated: the `CLISBOT_HUB_CHANNELS_ENABLED` env (read by the Hub
 - Resolve hook: `openclaw/plugin-sdk/<subpath>` → **bound** subpaths map to the `src/channels/loader/hosts/**` modules (inbound/outbound/state/gateway per the seam table, plan §7); **passthrough** subpaths resolve to the pinned main package inside the channel's install dir; anything else is a typed throw (T3Claw's unsupported pattern) — it fails the channel's account at load, never mid-conversation.
 - Load hook: records every `openclaw/*` / `@openclaw/*` module loaded for that channel; at load completion the loader asserts the set ⊆ {channel's own dist + bundled `node_modules` + allowlisted pure subpaths} (plan §6 load-trace check). Telegram (bundled, inlined SDK, zero `plugin-sdk` imports) loads by `file://` URL against the installed main package and skips the alias surface entirely — the loader still records its load-trace (allowlist = its own dist dir).
 - Host contract: each channel entry injects its runtime via its setter (`setSlackRuntime`, `setChannelRuntime` — verified on both). The "host runtime" object is the loader's bound-subpath provider; it exposes nothing but the seam surfaces.
+- **The pinned supply's actual contract is §4.8** (dist-verified: entry vs plugin objects, the drive seam, `startAccount`/`outbound` shapes, the bundled-Telegram host monitor, the routing lifetime, the one-account-per-process boundary). §4.8 supersedes any conflicting statement in this section or in the reuse plan's seam table where the plan described third-party code as hypothesis.
 
 ### 4.2 Per-channel install and state layout
 
@@ -336,13 +337,13 @@ Channel configuration is a **directory, not a block**: authored files under `.pa
 
 Rules: an account file must live at `channels/<channel>/<accountId>.yml` and its `channel:`/`accountId:` keys must match the path (mismatch = compile error). `policy.yml` is a reserved filename, not a channel (precedent: `workflows/partials/` — the compiler treats it separately, it is not scanned as an account).
 
-**Chat channels do not carry trigger blocks in account files.** A chat conversation either runs a *continuous agent session* (create + steer, plan §S2 execution model) or hands off to an existing upstream `workflows/<name>.yml`. A route expresses that with two mutually-exclusive keys — `agent` + `environment` for a continuous session, or `workflow` for a hand-off — never an inline trigger, which avoids duplicating the trigger block across accounts. §4.3.4 shows both, including how messages map to sessions and where replies land.
+**Chat channels do not carry trigger blocks in account files.** A chat conversation either runs a _continuous agent session_ (create + steer, plan §S2 execution model) or hands off to an existing upstream `workflows/<name>.yml`. A route expresses that with two mutually-exclusive keys — `agent` + `environment` for a continuous session, or `workflow` for a hand-off — never an inline trigger, which avoids duplicating the trigger block across accounts. §4.3.4 shows both, including how messages map to sessions and where replies land.
 
 #### 4.3.1 `hub.yml` — all workspaces + all agents, defined once
 
 ```yaml
 name: clisbot-hub
-environments:                        # = workspaces
+environments: # = workspaces
   repo-app:
     kind: daemon
     daemon: local
@@ -357,8 +358,8 @@ environments:                        # = workspaces
     daemon: local
     cwd: /home/node/lab
 
-agents:                              # = named agent profiles (upstream AgentSchema:
-                                     #   provider, model?, mode?, thinkingOptionId?, options?)
+agents: # = named agent profiles (upstream AgentSchema:
+  #   provider, model?, mode?, thinkingOptionId?, options?)
   classifier:
     provider: codex
     options:
@@ -373,13 +374,13 @@ agents:                              # = named agent profiles (upstream AgentSch
       sandbox_workspace_write: { network_access: false }
   worker-infra:
     provider: codex
-    mode: auto                       # preset ≈ on-request + workspace-write
+    mode: auto # preset ≈ on-request + workspace-write
   assistant-personal:
     provider: claude
-    mode: acceptEdits                # Claude has NO approval_policy/sandbox_mode — it has mode
+    mode: acceptEdits # Claude has NO approval_policy/sandbox_mode — it has mode
   telegram-butler:
     provider: claude
-    mode: default                    # "Always Ask" — fits the approval-required posture
+    mode: default # "Always Ask" — fits the approval-required posture
 ```
 
 Channel files only **reference** these names (`routes[].agent`, `routes[].environment`) — one definition, many references. P0 does not support per-route inline agent overrides: the upstream compiler already forbids dynamic inline agent config in steps ("dynamic inline agent configurations are not allowed"), and a P1 override would extend the route schema, not redefine agents.
@@ -469,67 +470,70 @@ defaults:
 The file reads top-to-bottom in the order the Hub uses it: **identity** (what this bot is) → **`transport`** (how it talks to the provider) → **`policy`** (who holds which roles here) → **`defaults`** (how it behaves, inherited by every route) → **`routes`** (per-conversation overrides + target) → **`fallback`**.
 
 ```yaml
-channel: slack                    # must match the directory
-accountId: work                   # must match the filename
-enabled: true                     # kill switch; false → new revision stops this transport
-secretRef: ~/.config/clisbot/secrets/slack-work.json   # 0600: { botToken, appToken }
+channel: slack # must match the directory
+accountId: work # must match the filename
+enabled: true # kill switch; false → new revision stops this transport
+secretRef: ~/.config/clisbot/secrets/slack-work.json # 0600: { botToken, appToken }
 
-transport:                        # channel-native block, passed to the pinned vertical
-                                  # (equivalent of OpenClaw channels.slack.accounts.work.*).
-                                  # `channels add` materializes the vertical's full default
-                                  # block here, so the file shows every knob — review it.
-  mode: socket                    # socket | webhook (P0.5)
-  errorPolicy: once               # delivery errors → chat: always | once | silent
-  inlineButtons: dm               # P0.5 approval cards; P0 prompts are text + command
+transport: # channel-native block, passed to the pinned vertical
+  # (equivalent of OpenClaw channels.slack.accounts.work.*).
+  # `channels add` materializes the vertical's full default
+  # block here, so the file shows every knob — review it.
+  mode: socket # socket | webhook (P0.5)
+  errorPolicy: once # delivery errors → chat: always | once | silent
+  inlineButtons: dm # P0.5 approval cards; P0 prompts are text + command
 
-policy:                           # who holds which role in this account
-  defaultRoles: [user]            # [] = deny-by-default; [user] = all mapped members may trigger
-  assignments:                    # account scope: roles that apply ONLY in this bot;
-    - identities: [user:minh.pham]  # values = user:<username> or a raw identity (§4.3.2)
+policy: # who holds which role in this account
+  defaultRoles: [user] # [] = deny-by-default; [user] = all mapped members may trigger
+  assignments: # account scope: roles that apply ONLY in this bot;
+    - identities: [user:minh.pham] # values = user:<username> or a raw identity (§4.3.2)
       roles: [operator]
 
-defaults:                         # account baseline for every route; inherits the
-                                  # policy.yml defaults above. Every knob is restated so
-                                  # the file is self-reviewable; values equal to the org
-                                  # default are just spelled out, not overrides.
-  interaction:                    # how the bot engages
-    requireMention: true          # (org default) channel messages without a mention ignored
+defaults: # account baseline for every route; inherits the
+  # policy.yml defaults above. Every knob is restated so
+  # the file is self-reviewable; values equal to the org
+  # default are just spelled out, not overrides.
+  interaction: # how the bot engages
+    requireMention: true # (org default) channel messages without a mention ignored
     followUp:
-      mode: auto                  # auto: unmentioned follow-ups in a bound conversation
-                                  #   keep steering the same session until it idles out;
-                                  #   mention-only: every message must mention the bot again
-      ttlMinutes: 60              # "idles out" = no turn for this long
-  binding: { key: thread }        # which level gets its own agent session (§4.3.4);
-                                  # thread is the org default — shown here so the file
-                                  # reads as a full, reviewable config
-  reply: { anchor: thread }       # where the bot's posts land (§4.3.4)
-  sync: { threadLink: full }      # account override; other keys inherit policy defaults
-  approval:                       # account rules, prepended to defaults (first-match)
+      mode:
+        auto # auto: unmentioned follow-ups in a bound conversation
+        #   keep steering the same session until it idles out;
+        #   mention-only: every message must mention the bot again
+      ttlMinutes: 60 # "idles out" = no turn for this long
+  binding:
+    { key: thread } # which level gets its own agent session (§4.3.4);
+    # thread is the org default — shown here so the file
+    # reads as a full, reviewable config
+  reply: { anchor: thread } # where the bot's posts land (§4.3.4)
+  sync: { threadLink: full } # account override; other keys inherit policy defaults
+  approval: # account rules, prepended to defaults (first-match)
     - { match: command.destructive, mode: require, initiatorOnly: true }
 
-routes:                           # ORDERED; first match wins
+routes: # ORDERED; first match wins
   - match: { kind: channel, ids: [C0APP] }
-    agent: worker-app             # → continuous agent session (the default target, §4.3.4)
-    environment: repo-app         # the fixed folder the session works in (hub.yml)
-    template: team                # workspace template applied at first-mention mint
+    agent: worker-app # → continuous agent session (the default target, §4.3.4)
+    environment: repo-app # the fixed folder the session works in (hub.yml)
+    template: team # workspace template applied at first-mention mint
     policy:
-      assignments:                # route scope — narrowest, additive
+      assignments: # route scope — narrowest, additive
         - identities: [slack:U0CAROL]
           roles: [approver]
   - match: { kind: channel, ids: [C0INFRA] }
     agent: worker-infra
     environment: repo-infra
-    binding: { key: channel }     # whole #infra = one session, incl. all its threads
-    reply: { anchor: channel }    # ... and the bot posts at channel level, no threads
+    binding: { key: channel } # whole #infra = one session, incl. all its threads
+    reply: { anchor: channel } # ... and the bot posts at channel level, no threads
   - match: { kind: thread, ids: [C0THREAD] }
-    workflow: infra-runbook       # → hand off to workflows/infra-runbook.yml
+    workflow: infra-runbook # → hand off to workflows/infra-runbook.yml
   - match: { kind: dm }
     agent: assistant-personal
     environment: personal-lab
     template: personal
 
-fallback: { deny: true }          # conversation matches no route → silent
-                                  # (or: fallback: { agent: ..., environment: ... })
+fallback:
+  { deny: true } # conversation matches no route → silent
+  # (or: fallback: { agent: ..., environment: ... })
 ```
 
 Rules for `routes[]`: exactly one of `agent` (+ `environment`) or `workflow` — a route either drives a continuous agent session or hands off to an existing workflow; on a workflow route the session keys are absent. Every `defaults:` key (`binding`, `reply`, `interaction`, `sync`, `approval`) may be overridden per route; route `policy.assignments` add to the account's. A message admitted into a running session is **steered** into the active turn (the daemon's `activeTurnBehavior: "steer"`); queueing behind a turn is not a P0 behavior.
@@ -538,48 +542,48 @@ Rules for `routes[]`: exactly one of `agent` (+ `environment`) or `workflow` —
 
 The two keys that decide "how many sessions does this conversation create, and where does the bot post" are `binding.key` and `reply.anchor`, both in `defaults` (overridable per route).
 
-This is a distillation of the two reference implementations, each of which bakes the thread/topic into the session key **per channel, by that channel's own native mapping** — i.e. the native thread is the unit by default, on every channel. OpenClaw computes an agent session key per conversation: Telegram forum group → peer id `<chatId>:topic:<topicId>`, so every topic (including General, id 1) is its own session; Slack thread reply → `…:channel:<id>:thread:<ts>` (a top-level channel message stays on the per-channel session, and Slack DM threads are *not* a boundary); Discord thread → its own channel id; Telegram plain-group reply → the replied-to root message. The split is structural — the thread/topic id is in the key, and there is **no config that collapses a conversation's threads into one session** (its `dmScope` knob only reshapes DM keys). Replies land back in the originating thread/topic (`message_thread_id` for Telegram topics; General is sent as a plain chat message because Telegram rejects `thread_id=1`; Slack `thread_ts`; Discord thread channel), and a different axis, `replyToMode` (`off`/`first`/`all`/`batched`), only decides whether the reply additionally *quotes* the triggering message. T3Claw's host keeps the same two axes as runtime objects: an `external_thread_key` built from the conversation (the topic id for Telegram topics, the thread root `ts` for Slack threads, the peer id for DMs) and a `thread_binding` row — one external thread ↔ one agent thread, the outbound reply reconstructed from the stored row so it posts back into that same thread. The fusion keeps the same per-channel native mapping but lifts the decision into two **channel-generic config keys**: `binding.key` is the granularity axis (where OpenClaw and T3Claw are fixed per-thread, the fusion makes it selectable so `channel` can collapse a whole conversation into one session) and `reply.anchor` is the reply-location axis (both references default to "the thread"; `channel` is the new option). Each channel's vertical translates the generic values to its native structures (the mapping table below); both default to "the thread is the unit," the shape every channel-native use case wants.
+This is a distillation of the two reference implementations, each of which bakes the thread/topic into the session key **per channel, by that channel's own native mapping** — i.e. the native thread is the unit by default, on every channel. OpenClaw computes an agent session key per conversation: Telegram forum group → peer id `<chatId>:topic:<topicId>`, so every topic (including General, id 1) is its own session; Slack thread reply → `…:channel:<id>:thread:<ts>` (a top-level channel message stays on the per-channel session, and Slack DM threads are _not_ a boundary); Discord thread → its own channel id; Telegram plain-group reply → the replied-to root message. The split is structural — the thread/topic id is in the key, and there is **no config that collapses a conversation's threads into one session** (its `dmScope` knob only reshapes DM keys). Replies land back in the originating thread/topic (`message_thread_id` for Telegram topics; General is sent as a plain chat message because Telegram rejects `thread_id=1`; Slack `thread_ts`; Discord thread channel), and a different axis, `replyToMode` (`off`/`first`/`all`/`batched`), only decides whether the reply additionally _quotes_ the triggering message. T3Claw's host keeps the same two axes as runtime objects: an `external_thread_key` built from the conversation (the topic id for Telegram topics, the thread root `ts` for Slack threads, the peer id for DMs) and a `thread_binding` row — one external thread ↔ one agent thread, the outbound reply reconstructed from the stored row so it posts back into that same thread. The fusion keeps the same per-channel native mapping but lifts the decision into two **channel-generic config keys**: `binding.key` is the granularity axis (where OpenClaw and T3Claw are fixed per-thread, the fusion makes it selectable so `channel` can collapse a whole conversation into one session) and `reply.anchor` is the reply-location axis (both references default to "the thread"; `channel` is the new option). Each channel's vertical translates the generic values to its native structures (the mapping table below); both default to "the thread is the unit," the shape every channel-native use case wants.
 
 **`binding.key` — the level at which one agent session is kept.** The Hub records one durable **thread binding** per key; a follow-up message resumes the bound session instead of starting one (plan P3). The key is built from the native conversation shape. The values are channel-generic: `thread` and `channel` are the channel's two native conversation levels, and each channel maps them to its own structure:
 
-| Channel | `thread` means | `channel` means |
-| --- | --- | --- |
-| Slack | a message thread (thread root `ts`) | the channel / MPIM |
-| Telegram | a forum topic (`message_thread_id`) | the group / supergroup |
-| Google Chat | a message thread | the space |
-| Discord | a thread channel (its own id under the parent channel) | the parent channel / category |
-| Zalo | — (no thread level) | the conversation (`thread` behaves as `channel`) |
-| DMs on any channel | — (no thread level) | the DM peer |
+| Channel            | `thread` means                                         | `channel` means                                  |
+| ------------------ | ------------------------------------------------------ | ------------------------------------------------ |
+| Slack              | a message thread (thread root `ts`)                    | the channel / MPIM                               |
+| Telegram           | a forum topic (`message_thread_id`)                    | the group / supergroup                           |
+| Google Chat        | a message thread                                       | the space                                        |
+| Discord            | a thread channel (its own id under the parent channel) | the parent channel / category                    |
+| Zalo               | — (no thread level)                                    | the conversation (`thread` behaves as `channel`) |
+| DMs on any channel | — (no thread level)                                    | the DM peer                                      |
 
-| `binding.key` | Sessions | The binding key is | Use when |
-| --- | --- | --- | --- |
-| `thread` (default) | one per native thread/topic | conversation id **plus** native thread id | each conversation thread is its own unit of work (the default; matches OpenClaw's per-topic session keys and T3Claw's `thread_binding`) |
-| `channel` | one per conversation | conversation id only — threads collapse into it | one running session per Slack channel / Telegram group regardless of which thread a message arrives in |
-| `dm` | one per peer | the DM peer (no thread level on DMs; `thread` and `dm` behave the same there) | stated explicitly to document intent |
+| `binding.key`      | Sessions                    | The binding key is                                                            | Use when                                                                                                                                |
+| ------------------ | --------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `thread` (default) | one per native thread/topic | conversation id **plus** native thread id                                     | each conversation thread is its own unit of work (the default; matches OpenClaw's per-topic session keys and T3Claw's `thread_binding`) |
+| `channel`          | one per conversation        | conversation id only — threads collapse into it                               | one running session per Slack channel / Telegram group regardless of which thread a message arrives in                                  |
+| `dm`               | one per peer                | the DM peer (no thread level on DMs; `thread` and `dm` behave the same there) | stated explicitly to document intent                                                                                                    |
 
 **`reply.anchor` — where the bot's outbound posts land.** The inbound side (which session a message reaches) and the outbound side (where replies are posted) are independent, and channel-generic in the same sense: `thread` is "the native thread the turn started in" and `channel` is "the conversation root", each resolved by the channel's own posting API:
 
-| `reply.anchor` | Outbound posts go to |
-| --- | --- |
+| `reply.anchor`     | Outbound posts go to                                                                                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `thread` (default) | the native thread of the message that started the turn — Slack thread reply (`thread_ts`), Telegram `message_thread_id`, Google Chat reply-in-thread, Discord thread channel |
-| `channel` | the conversation root / channel level — replies never open or use threads |
+| `channel`          | the conversation root / channel level — replies never open or use threads                                                                                                    |
 
 Four working configurations, each a `defaults:` block:
 
-| `binding.key` | `reply.anchor` | Effect |
-| --- | --- | --- |
-| `thread` | `thread` | **Default.** One session per thread/topic; replies stay in the thread. The Telegram-group-with-topics / Slack-thread use case. |
-| `channel` | `channel` | **One session per whole channel**; every thread in it (and channel-level messages) is one continuous session; replies post at channel level. The "bot owns this channel" use case. |
-| `channel` | `thread` | One session per channel, but the bot answers in the thread the message came from. Memory is shared across the channel's threads; the reply follows the asker. |
-| `thread` | `channel` | One session per thread, but replies post at channel level. Rare; kept so both axes are independently configurable. |
+| `binding.key` | `reply.anchor` | Effect                                                                                                                                                                             |
+| ------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `thread`      | `thread`       | **Default.** One session per thread/topic; replies stay in the thread. The Telegram-group-with-topics / Slack-thread use case.                                                     |
+| `channel`     | `channel`      | **One session per whole channel**; every thread in it (and channel-level messages) is one continuous session; replies post at channel level. The "bot owns this channel" use case. |
+| `channel`     | `thread`       | One session per channel, but the bot answers in the thread the message came from. Memory is shared across the channel's threads; the reply follows the asker.                      |
+| `thread`      | `channel`      | One session per thread, but replies post at channel level. Rare; kept so both axes are independently configurable.                                                                 |
 
 Worked example — Telegram forum group where each topic is a separate task but the bot answers at the top of the group:
 
 ```yaml
 # channels/telegram/support.yml
 defaults:
-  binding: { key: thread }   # topic -100245 → session A, topic -100377 → session B, …
-  reply:   { anchor: channel }
+  binding: { key: thread } # topic -100245 → session A, topic -100377 → session B, …
+  reply: { anchor: channel }
 ```
 
 Worked example — Slack `#infra` where the operator wants one long-running session for the whole channel, no threads:
@@ -590,10 +594,10 @@ routes:
     agent: worker-infra
     environment: repo-infra
     binding: { key: channel }
-    reply:   { anchor: channel }
+    reply: { anchor: channel }
 ```
 
-Interaction with `target`: a route's `workflow` target is unaffected — the workflow execution owns its own session lifecycle, so `binding`/`reply` apply only to `agent` routes. `interaction.followUp.mode` still gates *whether* an unmentioned follow-up is admitted into the bound session; `binding` decides *which* session it lands in.
+Interaction with `target`: a route's `workflow` target is unaffected — the workflow execution owns its own session lifecycle, so `binding`/`reply` apply only to `agent` routes. `interaction.followUp.mode` still gates _whether_ an unmentioned follow-up is admitted into the bound session; `binding` decides _which_ session it lands in.
 
 #### 4.3.5 Variants — the rest of the cases
 
@@ -606,12 +610,12 @@ enabled: true
 secretRef: ~/.config/clisbot/secrets/slack-personal.json
 transport: { mode: socket }
 policy:
-  defaultRoles: []              # deny-all: only assigned identities may trigger
+  defaultRoles: [] # deny-all: only assigned identities may trigger
   assignments:
     - identities: [slack:U0PERSONAL]
       roles: [admin]
 defaults:
-  binding: { key: dm }          # one session per DM peer; reply.anchor is a no-op for DMs
+  binding: { key: dm } # one session per DM peer; reply.anchor is a no-op for DMs
 routes:
   - match: { kind: dm }
     agent: assistant-personal
@@ -629,7 +633,7 @@ enabled: true
 secretRef: ~/.config/clisbot/secrets/slack-ops.json
 transport:
   mode: webhook
-  webhookPath: /channels/slack/ops/webhook     # per-account ingress route (§4.4), auto-registered
+  webhookPath: /channels/slack/ops/webhook # per-account ingress route (§4.4), auto-registered
 # ... policy / defaults / routes as above
 ```
 
@@ -639,16 +643,16 @@ transport:
 channel: telegram
 accountId: support
 enabled: true
-secretRef: ~/.config/clisbot/secrets/telegram-bot-token.json   # { botToken }
+secretRef: ~/.config/clisbot/secrets/telegram-bot-token.json # { botToken }
 transport:
-  mode: polling                # polling (P0) | webhook (P0.5)
+  mode: polling # polling (P0) | webhook (P0.5)
   errorPolicy: once
 policy:
   defaultRoles: [user]
 defaults:
   interaction: { requireMention: false, followUp: { mode: auto, ttlMinutes: 120 } }
-  binding: { key: thread }     # each topic -100… → its own agent session (§4.3.4)
-  reply: { anchor: channel }   # ... but replies post at the group root, not in-topic
+  binding: { key: thread } # each topic -100… → its own agent session (§4.3.4)
+  reply: { anchor: channel } # ... but replies post at the group root, not in-topic
 routes:
   - match: { kind: dm, ids: [123456789] }
     agent: telegram-butler
@@ -660,18 +664,18 @@ routes:
 fallback: { deny: true }
 ```
 
-*(P0.5 Google Chat / Zalo: same shape; secret = the whole service-account JSON file; `transport.mode: webhook`. Google Chat spaces have message threads → `binding.key: thread`; Zalo has no threads → `binding.key: channel` is a no-op.)*
+_(P0.5 Google Chat / Zalo: same shape; secret = the whole service-account JSON file; `transport.mode: webhook`. Google Chat spaces have message threads → `binding.key: thread`; Zalo has no threads → `binding.key: channel` is a no-op.)_
 
 **Secret-file contents per channel/transport** (0600 JSON object, channel-native field names):
 
-| Channel / transport | Fields |
-| --- | --- |
-| Slack socket | `botToken`, `appToken` |
-| Slack webhook | `clientId`, `clientSecret`, `signingSecret` |
-| Telegram polling | `botToken` |
-| Telegram webhook | `botToken`, `webhookSecret` |
-| GitHub App | `appId`, `clientId`, `clientSecret`, `privateKey`, `webhookSecret` |
-| Discord | `applicationId`, `clientSecret`, `botToken` |
+| Channel / transport | Fields                                                             |
+| ------------------- | ------------------------------------------------------------------ |
+| Slack socket        | `botToken`, `appToken`                                             |
+| Slack webhook       | `clientId`, `clientSecret`, `signingSecret`                        |
+| Telegram polling    | `botToken`                                                         |
+| Telegram webhook    | `botToken`, `webhookSecret`                                        |
+| GitHub App          | `appId`, `clientId`, `clientSecret`, `privateKey`, `webhookSecret` |
+| Discord             | `applicationId`, `clientSecret`, `botToken`                        |
 
 Operator-managed location is XDG (`~/.config/clisbot/secrets/`, `channels add --secret-file`); the Hub mirrors into `<CLISBOT_HUB_DATA_DIR>/secrets/` under its ownership. No token ever appears in any yml.
 
@@ -679,70 +683,70 @@ Operator-managed location is XDG (`~/.config/clisbot/secrets/`, `channels add --
 
 `hub.yml` (upstream schemas, verbatim):
 
-| Key | Values | Meaning |
-| --- | --- | --- |
+| Key                            | Values                                             | Meaning                                                                                                |
+| ------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `environments.*.worktree.mode` | `branch-off` \| `checkout-branch` \| `checkout-pr` | run in a worktree: new branch from `base` (`newBranch`, supports expressions) / existing branch / a PR |
-| `agents.*.provider` | `claude`, `codex`, `copilot`, `opencode`, `pi`, … | Paseo provider (see §4.3.8 options table) |
-| `agents.*.mode` | provider-specific (see §4.3.8) | provider operational mode |
+| `agents.*.provider`            | `claude`, `codex`, `copilot`, `opencode`, `pi`, …  | Paseo provider (see §4.3.8 options table)                                                              |
+| `agents.*.mode`                | provider-specific (see §4.3.8)                     | provider operational mode                                                                              |
 
 `channels/policy.yml`:
 
-| Key | Values | Meaning |
-| --- | --- | --- |
-| `enabled` | bool | org-level kill switch; `false` disables the whole channel control plane on the next revision |
-| `channels.<channel>.enabled` | bool (default `true`) | per-channel kill switch; `false` stops every account of that channel (transports, ingress routes, relay) |
-| `users.<username>` | `{ name?, identities[] }` | one user record; the username is the principal key; each identity belongs to exactly one user |
-| `assignments[].identities` | `user:<username>` or raw `<channel>:<id>` | raw identities resolve to their user when mapped; unmapped ones stay anonymous principals |
-| `roles.*.grants` / `deny` | privilege names + wildcards `*`, `<family>.*` | from the privilege catalog (§4.3.7) |
-| `roles.*.extends` | role names | compose privileges; no rank |
-| `defaults.defaultRoles` | role list | roles for a mapped identity with no assignment; `[]` = deny-by-default |
-| `defaults.interaction.requireMention` | bool (default `true`) | org default: ignore channel messages without a mention |
-| `defaults.interaction.followUp.mode` | `auto` \| `mention-only` (default `auto`) | org default follow-up behavior (§4.3.4) |
-| `defaults.interaction.followUp.ttlMinutes` | int (default `60`) | org default idle window |
-| `defaults.binding.key` | `thread` \| `channel` \| `dm` (default `thread`) | org default session granularity (§4.3.4) |
-| `defaults.reply.anchor` | `thread` \| `channel` (default `thread`) | org default reply location (§4.3.4) |
-| `defaults.sync.finalAnswers/progress/toolCalls` | bool | which timeline slices relay into the thread |
-| `defaults.sync.threadLink` | `full` \| `final-only` \| `none` | link that opens the session in the client / link with the final answer only / no link |
-| `approval[] .match` | tool class / privilege + `*` wildcards | first-match; a `match: "*"` fallback rule is required |
-| `approval[] .mode` | `auto-allow` \| `auto-deny` \| `require` | run without asking / always refuse / prompt in the bound thread (two authority checks) |
-| `approval[] .initiatorOnly` | bool | only the thread's initiator may approve |
+| Key                                             | Values                                           | Meaning                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `enabled`                                       | bool                                             | org-level kill switch; `false` disables the whole channel control plane on the next revision             |
+| `channels.<channel>.enabled`                    | bool (default `true`)                            | per-channel kill switch; `false` stops every account of that channel (transports, ingress routes, relay) |
+| `users.<username>`                              | `{ name?, identities[] }`                        | one user record; the username is the principal key; each identity belongs to exactly one user            |
+| `assignments[].identities`                      | `user:<username>` or raw `<channel>:<id>`        | raw identities resolve to their user when mapped; unmapped ones stay anonymous principals                |
+| `roles.*.grants` / `deny`                       | privilege names + wildcards `*`, `<family>.*`    | from the privilege catalog (§4.3.7)                                                                      |
+| `roles.*.extends`                               | role names                                       | compose privileges; no rank                                                                              |
+| `defaults.defaultRoles`                         | role list                                        | roles for a mapped identity with no assignment; `[]` = deny-by-default                                   |
+| `defaults.interaction.requireMention`           | bool (default `true`)                            | org default: ignore channel messages without a mention                                                   |
+| `defaults.interaction.followUp.mode`            | `auto` \| `mention-only` (default `auto`)        | org default follow-up behavior (§4.3.4)                                                                  |
+| `defaults.interaction.followUp.ttlMinutes`      | int (default `60`)                               | org default idle window                                                                                  |
+| `defaults.binding.key`                          | `thread` \| `channel` \| `dm` (default `thread`) | org default session granularity (§4.3.4)                                                                 |
+| `defaults.reply.anchor`                         | `thread` \| `channel` (default `thread`)         | org default reply location (§4.3.4)                                                                      |
+| `defaults.sync.finalAnswers/progress/toolCalls` | bool                                             | which timeline slices relay into the thread                                                              |
+| `defaults.sync.threadLink`                      | `full` \| `final-only` \| `none`                 | link that opens the session in the client / link with the final answer only / no link                    |
+| `approval[] .match`                             | tool class / privilege + `*` wildcards           | first-match; a `match: "*"` fallback rule is required                                                    |
+| `approval[] .mode`                              | `auto-allow` \| `auto-deny` \| `require`         | run without asking / always refuse / prompt in the bound thread (two authority checks)                   |
+| `approval[] .initiatorOnly`                     | bool                                             | only the thread's initiator may approve                                                                  |
 
 Account files (`channels/<channel>/<accountId>.yml`):
 
-| Key | Values | Meaning |
-| --- | --- | --- |
-| `enabled` | bool | kill switch; false stops the transport on the next revision |
-| `transport` — slack `mode` | `socket` \| `webhook` | Socket Mode (P0) / HTTP events (P0.5, plus `webhookPath`) |
-| `transport` — telegram `mode` | `polling` \| `webhook` | long-polling (P0) / webhook (P0.5) |
-| `transport` — `errorPolicy` | `always` \| `once` \| `silent` | (+`errorCooldownMs`) how delivery errors surface in the chat |
-| `transport` — `inlineButtons` | `off` \| `dm` \| `group` \| `all` \| `allowlist` | P0.5: where native approval cards may appear |
-| `policy.defaultRoles` | role list | account-level roles; `[]` = deny-by-default |
-| `policy.assignments` | `{ identities, roles }` list | roles that apply only in this account |
-| `defaults.interaction.requireMention` | bool (default `true`) | ignore channel messages without a mention |
-| `defaults.interaction.followUp.mode` | `auto` \| `mention-only` | `auto`: unmentioned follow-ups steer the bound session until it idles; `mention-only`: every message re-mentions |
-| `defaults.interaction.followUp.ttlMinutes` | int | idle window for `followUp.mode: auto` |
-| `defaults.binding.key` | `thread` \| `channel` \| `dm` | level that gets its own agent session (§4.3.4) |
-| `defaults.reply.anchor` | `thread` \| `channel` | where the bot's outbound posts land (§4.3.4) |
-| `defaults.sync.*` / `defaults.approval` | same as `policy.yml` defaults | account overrides |
-| `routes[].match.kind` | `dm` \| `channel` \| `thread` \| `group` \| `topic` | conversation kind; `ids` = native provider ids |
-| `routes[].agent` + `environment` | names into `hub.yml` | the route runs a **continuous agent session** (the default target, §4.3.4) |
-| `routes[].workflow` | name under `workflows/` | the route hands off to that workflow; mutually exclusive with `agent` |
-| `routes[].binding` / `reply` | same as `defaults` | per-route override of session mapping / reply location |
-| `fallback` | `{ deny: true }` \| route object | no route matched → silent / catch-all route |
+| Key                                        | Values                                              | Meaning                                                                                                          |
+| ------------------------------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `enabled`                                  | bool                                                | kill switch; false stops the transport on the next revision                                                      |
+| `transport` — slack `mode`                 | `socket` \| `webhook`                               | Socket Mode (P0) / HTTP events (P0.5, plus `webhookPath`)                                                        |
+| `transport` — telegram `mode`              | `polling` \| `webhook`                              | long-polling (P0) / webhook (P0.5)                                                                               |
+| `transport` — `errorPolicy`                | `always` \| `once` \| `silent`                      | (+`errorCooldownMs`) how delivery errors surface in the chat                                                     |
+| `transport` — `inlineButtons`              | `off` \| `dm` \| `group` \| `all` \| `allowlist`    | P0.5: where native approval cards may appear                                                                     |
+| `policy.defaultRoles`                      | role list                                           | account-level roles; `[]` = deny-by-default                                                                      |
+| `policy.assignments`                       | `{ identities, roles }` list                        | roles that apply only in this account                                                                            |
+| `defaults.interaction.requireMention`      | bool (default `true`)                               | ignore channel messages without a mention                                                                        |
+| `defaults.interaction.followUp.mode`       | `auto` \| `mention-only`                            | `auto`: unmentioned follow-ups steer the bound session until it idles; `mention-only`: every message re-mentions |
+| `defaults.interaction.followUp.ttlMinutes` | int                                                 | idle window for `followUp.mode: auto`                                                                            |
+| `defaults.binding.key`                     | `thread` \| `channel` \| `dm`                       | level that gets its own agent session (§4.3.4)                                                                   |
+| `defaults.reply.anchor`                    | `thread` \| `channel`                               | where the bot's outbound posts land (§4.3.4)                                                                     |
+| `defaults.sync.*` / `defaults.approval`    | same as `policy.yml` defaults                       | account overrides                                                                                                |
+| `routes[].match.kind`                      | `dm` \| `channel` \| `thread` \| `group` \| `topic` | conversation kind; `ids` = native provider ids                                                                   |
+| `routes[].agent` + `environment`           | names into `hub.yml`                                | the route runs a **continuous agent session** (the default target, §4.3.4)                                       |
+| `routes[].workflow`                        | name under `workflows/`                             | the route hands off to that workflow; mutually exclusive with `agent`                                            |
+| `routes[].binding` / `reply`               | same as `defaults`                                  | per-route override of session mapping / reply location                                                           |
+| `fallback`                                 | `{ deny: true }` \| route object                    | no route matched → silent / catch-all route                                                                      |
 
 #### 4.3.7 Open vocabulary (referential, not enum)
 
-| Key | Validation |
-| --- | --- |
-| role names | free; grants/extends checked against the privilege catalog; unknown → contributes nothing |
-| `users.<username>` | free (lowercase, dot-separated); the principal key |
-| `users.*.identities` | `<channel>:<provider-id>` — email is `email:<address>`; each identity belongs to exactly one user |
+| Key                               | Validation                                                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| role names                        | free; grants/extends checked against the privilege catalog; unknown → contributes nothing                                  |
+| `users.<username>`                | free (lowercase, dot-separated); the principal key                                                                         |
+| `users.*.identities`              | `<channel>:<provider-id>` — email is `email:<address>`; each identity belongs to exactly one user                          |
 | `assignments[].identities` values | `user:<username>` (must exist) or raw `<channel>:<id>` (a mapped one resolves to its user; unmapped → anonymous principal) |
-| `agent` / `environment` | must exist in `hub.yml` |
-| `template` | built-in catalog (`coding`, `assistant`, `team-assistant`) or `$CLISBOT_HOME/templates/<id>` |
-| `routes[].workflow` | must exist under `workflows/` |
-| `channel` / `accountId` | must match the file path; unique pair; one Slack app ↔ one account (socket) |
-| `secretRef` | 0600 file; Hub-owned after mirror |
+| `agent` / `environment`           | must exist in `hub.yml`                                                                                                    |
+| `template`                        | built-in catalog (`coding`, `assistant`, `team-assistant`) or `$CLISBOT_HOME/templates/<id>`                               |
+| `routes[].workflow`               | must exist under `workflows/`                                                                                              |
+| `channel` / `accountId`           | must match the file path; unique pair; one Slack app ↔ one account (socket)                                                |
+| `secretRef`                       | 0600 file; Hub-owned after mirror                                                                                          |
 
 **Privilege catalog** (closed): `bot.interact` (may start/take part in a conversation) · `approval.file` / `approval.config` / `approval.command` / `approval.command.destructive` / `approval.channel` (may approve that tool class) · `tool.*`, `channel.tool.<name>` (P1 channel agent tools) · `*`. Algebra: `extends` composes without rank; `*` and `<family>.*` wildcards; `deny`/`!x` subtract within the same role only; unknown role names contribute nothing (fail-closed); effective privileges are **recomputed on every message**, so an edit is effective from the next message, no reload.
 
@@ -754,17 +758,17 @@ Account files (`channels/<channel>/<accountId>.yml`):
 
 `options` is the provider's native contract (Hub passes it through; the daemon validates against the provider's strict schema — `docs/providers.md`). The table below is what each profile in `hub.yml` may set. "Mode" values are what `agents.*.mode` may take; "Options" what `agents.*.options` may contain.
 
-| Provider | `mode` values (plain meaning) | `options` (keys a Hub profile uses) |
-| --- | --- | --- |
-| **codex** | presets: `read-only` (ask + read-only sandbox) · `auto` (ask + workspace-write) · `auto-review` (ask + workspace-write, reviewer subagent) · `full-access` (never ask, full sandbox) | `approval_policy`: `never` (ask nothing — agent runs unattended) · `on-request` (ask whenever the agent wants to act; this is what a human-in-the-loop session needs) · `untrusted` (stricter asks on untrusted repos) · or `{ granular: { sandbox_approval?, rules?, mcp_elicitations?, request_permissions?, skill_approval? } }` (toggle asking per category). `sandbox_mode`: `read-only` / `workspace-write` / `danger-full-access`. `sandbox_workspace_write.{writable_roots, network_access, …}`. `web_search`: `disabled`/`cached`/`indexed`/`live`. `features.multi_agent_v2` |
-| **claude** | `plan` (analyze, no edits) · `default` ("Always Ask" — prompts on first use of each tool) · `acceptEdits` (auto-approve file edits, ask for the rest) · `auto` (a model classifier answers permission prompts) · `bypassPermissions` (no prompts — use with caution) | NO `approval_policy`/`sandbox_mode`. Instead: `allowedTools`/`disallowedTools`, `additionalDirectories`, `sandbox` (filesystem read/write + network domain allow/deny lists), `settings` (native `permissions.{allow,ask,deny}` + sandbox settings) |
-| **opencode** | `build` (edits + tool execution) · `plan` (read-only planning) — provider may discover more modes at runtime | `permission`: one `ask`/`allow`/`deny` action, or the native per-tool rule object over `read, edit, bash, task, webfetch, websearch, codesearch, repo_clone, …`. OpenCode permissions are application policy, not an OS sandbox |
-| **copilot** (ACP) | `agent` (conversational default) · `plan` (multi-step plans) · `allow-all` (auto-approve every tool/path/URL request) | provider features via config options (e.g. custom agent profile `agent`); no options schema beyond ACP config |
-| **cursor** (ACP, generic) | no static mode list — modes come from the ACP session at runtime | none in `hub.yml`; the only first-class feature today is `fast` (Cursor fast mode) as a provider feature, not a profile option |
-| **grok** (xAI, custom ACP) | not a built-in provider — add via `config.json` `extends: "acp"` (see note under the table); modes come from the CLI at runtime through ACP | none in `hub.yml`; auth lives in `~/.grok/auth.json` (quota fetcher reads it) |
-| **pi** | no permission modes (model-centric provider) | model + reasoning effort only (reasoning: `off/minimal/low/medium/high/xhigh/max`) — no approval/sandbox surface of its own |
+| Provider                   | `mode` values (plain meaning)                                                                                                                                                                                                                                        | `options` (keys a Hub profile uses)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **codex**                  | presets: `read-only` (ask + read-only sandbox) · `auto` (ask + workspace-write) · `auto-review` (ask + workspace-write, reviewer subagent) · `full-access` (never ask, full sandbox)                                                                                 | `approval_policy`: `never` (ask nothing — agent runs unattended) · `on-request` (ask whenever the agent wants to act; this is what a human-in-the-loop session needs) · `untrusted` (stricter asks on untrusted repos) · or `{ granular: { sandbox_approval?, rules?, mcp_elicitations?, request_permissions?, skill_approval? } }` (toggle asking per category). `sandbox_mode`: `read-only` / `workspace-write` / `danger-full-access`. `sandbox_workspace_write.{writable_roots, network_access, …}`. `web_search`: `disabled`/`cached`/`indexed`/`live`. `features.multi_agent_v2` |
+| **claude**                 | `plan` (analyze, no edits) · `default` ("Always Ask" — prompts on first use of each tool) · `acceptEdits` (auto-approve file edits, ask for the rest) · `auto` (a model classifier answers permission prompts) · `bypassPermissions` (no prompts — use with caution) | NO `approval_policy`/`sandbox_mode`. Instead: `allowedTools`/`disallowedTools`, `additionalDirectories`, `sandbox` (filesystem read/write + network domain allow/deny lists), `settings` (native `permissions.{allow,ask,deny}` + sandbox settings)                                                                                                                                                                                                                                                                                                                                    |
+| **opencode**               | `build` (edits + tool execution) · `plan` (read-only planning) — provider may discover more modes at runtime                                                                                                                                                         | `permission`: one `ask`/`allow`/`deny` action, or the native per-tool rule object over `read, edit, bash, task, webfetch, websearch, codesearch, repo_clone, …`. OpenCode permissions are application policy, not an OS sandbox                                                                                                                                                                                                                                                                                                                                                        |
+| **copilot** (ACP)          | `agent` (conversational default) · `plan` (multi-step plans) · `allow-all` (auto-approve every tool/path/URL request)                                                                                                                                                | provider features via config options (e.g. custom agent profile `agent`); no options schema beyond ACP config                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **cursor** (ACP, generic)  | no static mode list — modes come from the ACP session at runtime                                                                                                                                                                                                     | none in `hub.yml`; the only first-class feature today is `fast` (Cursor fast mode) as a provider feature, not a profile option                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **grok** (xAI, custom ACP) | not a built-in provider — add via `config.json` `extends: "acp"` (see note under the table); modes come from the CLI at runtime through ACP                                                                                                                          | none in `hub.yml`; auth lives in `~/.grok/auth.json` (quota fetcher reads it)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **pi**                     | no permission modes (model-centric provider)                                                                                                                                                                                                                         | model + reasoning effort only (reasoning: `off/minimal/low/medium/high/xhigh/max`) — no approval/sandbox surface of its own                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
-*Grok (xAI) is not a built-in provider — it is configured like any ACP-capable coding CLI via `docs/custom-providers.md`: a `grok` entry under `agents.providers` in `$CLISBOT_HOME/config.json` with `extends: "acp"` + the CLI `command` (Hub's `provider:` is a free string, `AgentSchema`; the daemon resolves built-in and custom providers alike). In-repo evidence that the toolchain expects the Grok CLI on the machine: the quota fetcher reads `~/.grok/auth.json` (`services/quota-fetcher/providers/grok.ts`), so the usage badge works once the CLI is installed and authenticated. Modes/options: surfaced by the binary at runtime through ACP, none declared statically in `hub.yml` — same posture as cursor. All custom/ACP providers follow their binary's own contract (`docs/custom-providers.md`).*
+_Grok (xAI) is not a built-in provider — it is configured like any ACP-capable coding CLI via `docs/custom-providers.md`: a `grok` entry under `agents.providers` in `$CLISBOT_HOME/config.json` with `extends: "acp"` + the CLI `command` (Hub's `provider:` is a free string, `AgentSchema`; the daemon resolves built-in and custom providers alike). In-repo evidence that the toolchain expects the Grok CLI on the machine: the quota fetcher reads `~/.grok/auth.json` (`services/quota-fetcher/providers/grok.ts`), so the usage badge works once the CLI is installed and authenticated. Modes/options: surfaced by the binary at runtime through ACP, none declared statically in `hub.yml` — same posture as cursor. All custom/ACP providers follow their binary's own contract (`docs/custom-providers.md`)._
 
 **Hub's unattended-execution rule** (`docs/providers.md`): a provider must fail closed for unattended runs until it can pre-approve one exact injected MCP server + tool without approving native tools — the `approval.*` privileges above are the channel-side expression of that boundary.
 
@@ -783,14 +787,14 @@ The fork changes two things operators actually type: the env prefix is `CLISBOT_
 
 **The `CLISBOT_` → `PASEO_` alias shim.** Operators set `CLISBOT_*`; the internal code keeps reading upstream `PASEO_*` names. Renaming every `process.env["PASEO_…"]` read across the forked Hub and the upstream daemon would be a large diff that re-fights on every `upstream/main` / `getpaseo` merge, so the namespace is aliased at the boundary instead of renamed in place. One small module (a fixed table, applied at each process entry — the `clisbot` CLI at every spawn and local verb, and the Hub's own entry for the deployed form) copies `CLISBOT_X` into `PASEO_X` when `PASEO_X` is unset. `PASEO_X` set explicitly always wins; `CLISBOT_X` only fills the gap. The table:
 
-| Operator sets | Maps to (internal) | Default | Meaning |
-| --- | --- | --- | --- |
-| `CLISBOT_HOME` | `PASEO_HOME` | `~/.clisbot` | daemon home |
-| `CLISBOT_HUB_DATA_DIR` | `PASEO_HUB_DATA_DIR` | `~/.clisbot` (the shared home) | Hub data dir |
-| `CLISBOT_HUB_DATABASE_URL` | `DATABASE_URL` | unset (embedded PGlite) | team-form Postgres |
-| `CLISBOT_HUB_CHANNELS_ENABLED` | `PASEO_HUB_CHANNELS_ENABLED` | on | channel kill switch (supervisor env, restart) |
-| `CLISBOT_HUB_BIND` | `PASEO_HUB_BIND` | `127.0.0.1` (loopback, not upstream `0.0.0.0`) | Hub listen address |
-| `CLISBOT_HUB_URL` / `CLISBOT_HUB_API_KEY` | `PASEO_HUB_URL` / `PASEO_HUB_API_KEY` | — | team/remote Hub target (local verbs auto-discover, below) |
+| Operator sets                             | Maps to (internal)                    | Default                                        | Meaning                                                   |
+| ----------------------------------------- | ------------------------------------- | ---------------------------------------------- | --------------------------------------------------------- |
+| `CLISBOT_HOME`                            | `PASEO_HOME`                          | `~/.clisbot`                                   | daemon home                                               |
+| `CLISBOT_HUB_DATA_DIR`                    | `PASEO_HUB_DATA_DIR`                  | `~/.clisbot` (the shared home)                 | Hub data dir                                              |
+| `CLISBOT_HUB_DATABASE_URL`                | `DATABASE_URL`                        | unset (embedded PGlite)                        | team-form Postgres                                        |
+| `CLISBOT_HUB_CHANNELS_ENABLED`            | `PASEO_HUB_CHANNELS_ENABLED`          | on                                             | channel kill switch (supervisor env, restart)             |
+| `CLISBOT_HUB_BIND`                        | `PASEO_HUB_BIND`                      | `127.0.0.1` (loopback, not upstream `0.0.0.0`) | Hub listen address                                        |
+| `CLISBOT_HUB_URL` / `CLISBOT_HUB_API_KEY` | `PASEO_HUB_URL` / `PASEO_HUB_API_KEY` | —                                              | team/remote Hub target (local verbs auto-discover, below) |
 
 **Shared home `~/.clisbot`.** The daemon (`CLISBOT_HOME`) and the Hub (`CLISBOT_HUB_DATA_DIR`) both default to `~/.clisbot` — one directory, two writers, no conflict (verified: the daemon writes `agents/`, `projects/`, `worktrees/`, `config.json`, `daemon.log`, …; the Hub writes `hub.db`, `secrets/`, `channels/`, `.paseo-hub.lock` — no top-level entry overlaps). Upstream kept them separate (`~/.paseo` and `$XDG_DATA_HOME/paseo-hub`); the fork merges them so there is one mental home and one place to back up. The **project-local** `.paseo/` config dir (CWD-relative, upstream-defined: `hub.yml` + `workflows/` + `channels/`, `bundle-contract.ts`) is a different thing — it lives in the operator's project repo, not the machine home, and keeps the `.paseo` name. Do not conflate the machine home with the project config dir.
 
@@ -806,9 +810,26 @@ The fork changes two things operators actually type: the env prefix is `CLISBOT_
 2. **The supervisor is part of P0 acceptance, not a nicety** (plan §14.5 condition 2): in-process means a channel hang kills the Hub and nothing inside it can restart it. Acceptance (§10 of the plan) includes the demonstrated kill/restart/resume case with no double-post.
 3. **Two wire-schema sources must stay in lockstep** (§3.2): vacuous at P0 (no new RPC on either side, and no form uses the `hub.execution.*` schemas — both forms reuse the existing trusted-client schemas, plan §14.7); every **P1** grant-engine wire addition is a two-sided change (monorepo `packages/protocol` + Hub `src/hub/protocol.ts`) with matching `COMPAT` tags; the conformance test fails CI on drift.
 4. **Node floor is 22** for the whole onboarding path: module customization hooks need ≥20.6, and the monorepo pins 22.20.0 — one version for the daemon and the Hub.
-5. **Data-dir separation from an upstream Hub.** The Clisbot Hub defaults to `~/.clisbot` (internal `CLISBOT_HUB_DATA_DIR` → `PASEO_HUB_DATA_DIR`, §4.5) and port 6868; an upstream `paseo-hub` defaults to `$XDG_DATA_HOME/paseo-hub` and port 3000. The fork's defaults are disjoint, so an upgrade (one Hub, data dir moved to `~/.clisbot`) is clean. Pointing two Hub instances at the *same* data dir is not supported — one Hub owns a data dir; parallel instances need distinct `CLISBOT_HUB_DATA_DIR` (and the one-owner-per-account rule, plan §11, still applies across instances).
+5. **Data-dir separation from an upstream Hub.** The Clisbot Hub defaults to `~/.clisbot` (internal `CLISBOT_HUB_DATA_DIR` → `PASEO_HUB_DATA_DIR`, §4.5) and port 6868; an upstream `paseo-hub` defaults to `$XDG_DATA_HOME/paseo-hub` and port 3000. The fork's defaults are disjoint, so an upgrade (one Hub, data dir moved to `~/.clisbot`) is clean. Pointing two Hub instances at the _same_ data dir is not supported — one Hub owns a data dir; parallel instances need distinct `CLISBOT_HUB_DATA_DIR` (and the one-owner-per-account rule, plan §11, still applies across instances).
 6. **The Hub build is not in `build:server`.** Desktop/mobile/daemon builds do not pay for the Hub's `vite build`; `build:hub` is explicit (§1.2).
 7. **e2e tests are cross-repo by design.** The Hub's e2e harness (`src/e2e/harness/`) spawns a real monorepo daemon; fork CI must build the monorepo stack before Hub e2e. At P0 the harness exercises the stock daemon — **both forms** connect through the existing trusted-client path (embedded over loopback, team/remote relay-paired, plan §14.7), so the harness pins no fork-added wire. From P1, any grant-engine daemon-side behavior the e2e asserts is pinned by the conformance test, not by the harness.
 8. **Fork artifacts are identifiable by scope, not suffix.** Everything this repo publishes is `@clisbot/*` (upstream names survive only inside the fork's source tree and `npm link` dev installs). Diagnostics and support triage should report the installed scope + version (`@clisbot/cli@0.5.0`), so "is this machine running the fork or upstream" is a one-line answer. (The P1 grant engine's pairing-grant verification reports through the same channel: grant checks and their outcomes are daemon diagnostics, not a separate surface.)
 9. **Third-party notices ship with the pin manifest.** Each channel's bundled `node_modules` licenses land in `THIRD_PARTY_NOTICES` at channel-add time (plan §9 step 7); the install step refuses a channel whose notices are missing.
 10. **The OpenClaw supply stays public and pinned** (plan §14.4): no mirroring, no private registry for `openclaw`/`@openclaw/*`; the integrity pin is the trust boundary, and the fallback for a vanished pin is re-pin (CI proves it) or the public git repo at the recorded `gitHead`.
+11. **The pinned main tarball ships no `node_modules`** — verified against the integrity-matched registry bytes, it ships declared deps + a resolved `npm-shrinkwrap.json`, and `npm ci` on it crashes arborist on this lockfile's peer-set shape. The install plane provisions the main dir's production closure from the shipped shrinkwrap (fetch → verify against the lockfile-recorded integrity → extract → `node_modules/provision.lock` marker), all inside the pin's trust boundary. The Slack tarball shape (ships its own tree) is left alone. Contract + verification: `docs/audits/pinned-vertical-contracts/install-supply.md`.
+12. **The live Hub runs the Vite bundle, not `dist/` — so two builds coexist in one running process.** `bin/paseo-hub.js` imports `dist/index.js`, whose `loadBuiltStartServer()` loads `.output/server/start-server.js` (the Vite build). The supervisor / plane / daemon-client code that runs live is therefore the `build:hub` (Vite) output, while the loader's host modules (seam, runtime store) are served from tsgo `dist/` by default (`hostBaseDir`) — bridged by the `Symbol.for("@getpaseo/hub/channel-runtimes")` store. Consequences: `build:node` (tsgo) refreshes the host modules but not the live runtime; a runtime-code fix reaches the live Hub only through `build:hub`, and the Vite build OOMs while the Hub is resident, so `scripts/e2e-dev.sh build` stops it first. "My new log line did not appear" → grep the string in `.output/server/assets/*.js`, not `dist/`.
+
+### 4.7 Known P1 residuals from the P0 build
+
+Decisions made while landing the P0 modules; each is out of the P0 acceptance path by construction, and each names the layer that owns its fix.
+
+- **Null-thread-key pending markers are not insert-conflict-protected.** `thread_bindings_account_thread_unique` is a plain unique index, so its four key columns include `external_thread_id`, and Postgres treats NULLs as distinct. With `binding.key: channel`/`dm` (a null thread id — e.g. a Telegram basic group), two concurrent first-mentions of the same conversation both insert pending markers and both create agents: the schema comment defers the null-key uniqueness decision to the account/runtime layer. The thread-scoped keys (`binding.key: thread`, non-null thread id) are protected: the index collates there, and the bindings engine catches the store's conflict on the race loser and drives the winner's marker instead of creating a second agent. Owner: the account install/start path (P1) — dedup pending markers for null-key threads, or close it with a partial unique index where `external_thread_id IS NULL`.
+- **In-flight relay turn state is not durable.** The per-turn sequence counter and accumulated assistant text live in the relay engine's memory; a Hub restart mid-turn resets them to zero. The delivery ledger still dedupes on `(org, account, conversation, externalThreadId, eventTurnId, sequence)`, and the event/turn id is stable across the restart, so the _no-double-post_ acceptance case holds — the residual is loss of in-flight progress snapshots and of the pre-restart portion of a turn's accumulated answer text if the stream re-delivers from turn start. A durable turn cursor is P1 (the plan §10 supervisor demonstration accepts this: resume proves no double-post, not no loss).
+- **The load-trace allowlist is directory-granular.** The check asserts each loaded `openclaw/*` module file lies inside the channel's pinned dist directory; it does not fingerprint individual module contents inside that directory. The integrity pin (tarball `dist.integrity` + `gitHead`) plus the resolve hook's fail-closed throw on out-of-allowlist specifiers are the trust boundary; per-file content pinning is P1 hardening if the pin's threat model ever widens.
+- **`openKeyedStore` is a per-account in-Hub store, not OpenClaw's SQLite.** The pinned verticals use `state.openKeyedStore` / `openSyncKeyedStore` for durable per-key state (Telegram's long-poll offset, Slack's send-dedupe cache). The P0 host runtime supplies a real stateful store backed by a JSON file in the account's channel dir (`channels/<accountId>/state/`), so restarts keep the poll offset and the dedupe cache — but the OpenClaw SQLite-backed contract (row limits, TTL eviction semantics, `overflowPolicy`) is approximated, not implemented. The P0 verticals only call `register` / `lookup` / `registerIfAbsent` / `consume` / `clear`; a vertical that depends on eviction limits or TTL expiry is out of P0 scope. The Telegram host monitor (§4.8 D4) owns its poll offset through this store; the native SQLite-backed ingress queue (`openChannelIngressQueue`, `$OPENCLAW_STATE_DIR/state/openclaw.sqlite`) never loads at P0, so **no SQLite file is created by the P0 host** — persistence is JSON keyed-store files under `channels/<accountId>/state/`.
+
+### 4.8 Pinned vertical contracts (dist-verified)
+
+The plan's seam table (§7 of the reuse plan) is a hypothesis about third-party code; the verified contract lives in its own maintained folder: [`docs/audits/pinned-vertical-contracts/`](pinned-vertical-contracts/README.md) — one topic per file (entry vs plugin, `startAccount`, outbound, the inbound ctxPayload + native→plane mapping, the bundled-Telegram host-monitor decision, the loader alias routing, seam result + process limits, install supply). Facts there were read out of the pinned dist (`openclaw@2026.7.1-2`, `@openclaw/slack@2026.7.1`, the pins in `packages/hub/channel-pins.json`; file:line refs valid for that pin only).
+
+Writer rule: read the matching topic file before writing loader / supervisor / monitor / test code against the verticals — do not re-derive, and if code disagrees with the folder, stop and re-verify against the dist before touching either. When a fact changes (re-pin, a drive-time miss found in live E2E), edit the owning topic file; this section keeps only the pointer.

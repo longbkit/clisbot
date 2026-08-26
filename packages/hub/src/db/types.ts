@@ -1,4 +1,12 @@
-import type { AgentExecutionStatus, MachineSource, MachineStatus } from "./schema.js";
+// COMPAT(clisbot-channels): fork-owned channel control plane status enums (schema.ts).
+import type {
+  AgentExecutionStatus,
+  ChannelAccountStatus,
+  DeliveryLedgerStatus,
+  MachineSource,
+  MachineStatus,
+  ThreadBindingStatus,
+} from "./schema.js";
 import type { JsonValue } from "../config/compiler.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { InvocationRejection } from "../triggers/invocation.js";
@@ -1410,3 +1418,152 @@ export interface Database {
   removeDiscordConnection(guildId: string): Promise<void>;
   close(): Promise<void>;
 }
+
+// --- Channel control plane (P0: Slack + Telegram) -------------------------------------
+//
+// COMPAT(clisbot-channels): fork-owned channel control plane records (plan P3/P4/P5,
+// implementation doc §3.1/§4.2/§4.3.4). The query functions live in src/db/channels.ts;
+// this block holds only their record/input shapes. Additive; an unmodified upstream
+// Hub never imports these types.
+
+/** Runtime record for one channel account (one Slack app, one Telegram bot). */
+export interface ChannelAccountRecord {
+  id: string;
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  status: ChannelAccountStatus;
+  pinVersion: string | null;
+  distIntegrity: string | null;
+  gitHead: string | null;
+  installDir: string | null;
+  installedAt: Date | null;
+  secretRef: string | null;
+  providerApplicationId: string | null;
+  externalIdentity: unknown | null;
+  transport: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UpsertChannelAccountInput {
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  status: ChannelAccountStatus;
+  pinVersion?: string | null;
+  distIntegrity?: string | null;
+  gitHead?: string | null;
+  installDir?: string | null;
+  installedAt?: Date | null;
+  secretRef?: string | null;
+  providerApplicationId?: string | null;
+  externalIdentity?: unknown | null;
+  transport: unknown;
+}
+
+/** Durable external-thread ↔ agent-session binding (one per account + thread key). */
+export interface ThreadBindingRecord {
+  id: string;
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  status: ThreadBindingStatus;
+  pendingExecutionId: string | null;
+  agentId: string | null;
+  daemonId: string | null;
+  initiator: string;
+  route: unknown;
+  createdAt: Date;
+  resolvedAt: Date | null;
+}
+
+export interface PendingThreadBindingInput {
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  pendingExecutionId: string;
+  initiator: string;
+  route: unknown;
+}
+
+/**
+ * Turn a `pending` binding into `bound` after the create RPC returns. Resolves the
+ * pre-create marker atomically: a replayed create returns the existing row.
+ */
+export interface ResolveThreadBindingInput {
+  organizationId: string;
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  agentId: string;
+  daemonId?: string | null;
+  resolvedAt: Date;
+}
+
+/** Abandon a `pending` binding that crashed before the agent id was recorded. */
+export interface AbandonThreadBindingInput {
+  organizationId: string;
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  resolvedAt: Date;
+}
+
+/** One outbound delivery attempt, recorded before the channel post (dedupe key). */
+export interface DeliveryLedgerRecord {
+  id: string;
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  eventTurnId: string;
+  sequence: number;
+  status: DeliveryLedgerStatus;
+  recordedAt: Date;
+  postedAt: Date | null;
+  nativeMessageId: string | null;
+  failureReason: string | null;
+}
+
+export interface RecordDeliveryInput {
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  eventTurnId: string;
+  sequence: number;
+}
+
+export interface ConfirmDeliveryInput {
+  organizationId: string;
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  eventTurnId: string;
+  sequence: number;
+  nativeMessageId: string;
+  postedAt: Date;
+}
+
+/** Mark a recorded delivery that failed to post; a later retry re-confirms it. */
+export interface FailDeliveryInput {
+  organizationId: string;
+  accountId: string;
+  conversationId: string;
+  externalThreadId: string | null;
+  eventTurnId: string;
+  sequence: number;
+  failureReason: string;
+}
+
+/** Result of recording a delivery: created when the attempt is new, duplicate on replay. */
+export type RecordDeliveryResult =
+  | { record: DeliveryLedgerRecord; created: true }
+  | { record: DeliveryLedgerRecord; created: false };

@@ -90,13 +90,13 @@ A workspace template carries an optional default agent profile (provider, model,
 
 Proposed, not yet canonical; glossary entries land when the modules do.
 
-| Concept | Name | Rejected alternatives |
-| --- | --- | --- |
-| Instruction-file seed set | **workspace template** | "workspace bootstrap" — "bootstrap" is already the daemon-startup family in this repo; "agent workspace" — OpenClaw's AgentId concept, provider-biased; "paseo init" — a CLI verb, and `init` is already overloaded (`plugin init`, `hub init`) |
-| External conversation surface domain | **channel** | "platform" (Hermes) — a platform is a vendor, a channel is the surface; "integration" — Hub already owns that word for provider connections |
-| Daemon module owning channels | **channel host** | "gateway" — Hermes' word, blurs with the Hub relationship |
-| External thread ↔ agent session record | **thread binding** | "route" — poisoned by Expo Router in this repo |
-| Config root / env switch | `channels.*` / `PASEO_CHANNELS_ENABLED` | follows the existing `PASEO_*_ENABLED` pattern |
+| Concept                                | Name                                    | Rejected alternatives                                                                                                                                                                                                                           |
+| -------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Instruction-file seed set              | **workspace template**                  | "workspace bootstrap" — "bootstrap" is already the daemon-startup family in this repo; "agent workspace" — OpenClaw's AgentId concept, provider-biased; "paseo init" — a CLI verb, and `init` is already overloaded (`plugin init`, `hub init`) |
+| External conversation surface domain   | **channel**                             | "platform" (Hermes) — a platform is a vendor, a channel is the surface; "integration" — Hub already owns that word for provider connections                                                                                                     |
+| Daemon module owning channels          | **channel host**                        | "gateway" — Hermes' word, blurs with the Hub relationship                                                                                                                                                                                       |
+| External thread ↔ agent session record | **thread binding**                      | "route" — poisoned by Expo Router in this repo                                                                                                                                                                                                  |
+| Config root / env switch               | `channels.*` / `PASEO_CHANNELS_ENABLED` | follows the existing `PASEO_*_ENABLED` pattern                                                                                                                                                                                                  |
 
 No new RPCs at P0 (plan §14.6/§14.7 — the channel capability rides the existing trusted-client RPCs; config is managed through the persisted `channels` root + CLI). If a future RPC is ever added (the P1 grant engine is the only candidate), it uses dotted namespaces per [../rpc-namespacing.md](../rpc-namespacing.md) (e.g. `grant.session.bind.request`).
 

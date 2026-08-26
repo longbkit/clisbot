@@ -1,0 +1,46 @@
+{
+  "registry": "https://registry.npmjs.org/",
+  "note": "Pinned OpenClaw supply for the Hub channel verticals (plan §14.4: public npm, no mirror; the integrity pin is the trust boundary). Each channel pins the shared main package + its own channel package. Integrity is the tarball `dist.integrity` (npm `sha512-…`); the channel packages additionally pin `gitHead` (the main package does not record one on the registry). Telegram is inlined in the main package's dist (no separate channel package), so its `channel` pins the main package itself and its loadMode is `bundled` (file:// URL, no alias surface — plan §7 / table-top finding #0).",
+  "main": {
+    "package": "openclaw",
+    "version": "2026.7.1-2",
+    "dist": {
+      "integrity": "sha512-ycF3yPcbjN6bUPeaUx6Mh6vze1hQWoD3CT/wWcmD7a8xaHHHRUaAlaq+lFxMHf1ssEgODVAwjlzYqp2twkYZ7g=="
+    }
+  },
+  "channels": {
+    "slack": {
+      "channel": {
+        "package": "@openclaw/slack",
+        "version": "2026.7.1",
+        "dist": {
+          "integrity": "sha512-dwVGEVCmoTQrOIeZaSCIOPg8pT7hB883QQEXdp9EZUDzTGuvSc+KxH2iERSOV/59hROQctYdcobGn/vdB1H4XA==",
+          "gitHead": "2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4"
+        }
+      },
+      "loadMode": "published",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/channel-plugin-api.js",
+        "exportName": "slackPlugin"
+      },
+      "notices": "slack"
+    },
+    "telegram": {
+      "channel": {
+        "package": "openclaw",
+        "version": "2026.7.1-2",
+        "dist": {
+          "integrity": "sha512-ycF3yPcbjN6bUPeaUx6Mh6vze1hQWoD3CT/wWcmD7a8xaHHHRUaAlaq+lFxMHf1ssEgODVAwjlzYqp2twkYZ7g=="
+        }
+      },
+      "loadMode": "bundled",
+      "entry": "./dist/extensions/telegram/index.js",
+      "plugin": {
+        "specifier": "./dist/extensions/telegram/channel-plugin-api.js",
+        "exportName": "telegramPlugin"
+      },
+      "notices": "telegram"
+    }
+  }
+}

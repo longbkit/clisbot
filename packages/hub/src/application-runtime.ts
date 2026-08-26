@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createHubApplication } from "./app.js";
+import type { HubRuntimeOptions } from "./app.js";
 import type { AuthServer } from "./auth/server.js";
 import { selectActivePlanPrice, type BillingRuntime } from "./billing/index.js";
 import { reportFailure } from "./failures/index.js";
@@ -16,6 +17,7 @@ import { OutputExecutorRegistry } from "./execution-capabilities/outputs.js";
 import type {
   ProviderIntegrationRegistration,
   ProviderRegistration,
+  TriggerProviderResources,
 } from "./providers/registration.js";
 import { createExecutionAuthority } from "./execution-authority/index.js";
 import type { ExecutionAuthority } from "./execution-authority/index.js";
@@ -29,9 +31,18 @@ import {
 import { ProjectDashboard } from "./projects/dashboard.js";
 import { CompositionResources } from "./composition-resources.js";
 import type { ProviderApplications } from "./provider-applications/index.js";
+// COMPAT(clisbot-control-plane): the pino logger for the channel supervisor seam +
+// the kill-switch the composition consults.
+import { logger } from "./logger.js";
+import { isChannelsEnabled } from "./channels/loader/channel-gate.js";
+import { runtimeFile } from "./runtime-files.js";
 
 export interface ApplicationCompositionOptions {
   database: Database | null;
+  /** COMPAT(clisbot-control-plane): the database runtime handle, threaded to the channel supervisor. */
+  databaseRuntime?: import("./db/runtime/index.js").DatabaseRuntime;
+  /** COMPAT(clisbot-control-plane): the Hub data directory the channel plane owns. */
+  hubDataDir?: string;
   auth: AuthServer | null;
   /** The composition root's single EntitlementsService; present whenever a database is. */
   entitlements: EntitlementsService | null;
@@ -86,36 +97,24 @@ async function createOwnedApplicationRuntime(
   for (const output of registrations.flatMap((registration) => registration.outputs)) {
     outputRegistry.register(output);
   }
+  const channelSupervisor = await createChannelSupervisorAtComposition(options);
 
-  const application = createHubApplication({
-    database: options.database,
-    entitlements: options.entitlements,
-    providerFactories: registrations.flatMap((registration) => registration.triggerProviders),
-    ...(executionAuthority === undefined ? {} : { executionAuthority }),
-    attachmentResolvers: Object.fromEntries(
-      registrations.flatMap((registration) =>
-        registration.attachment === undefined
-          ? []
-          : [[registration.attachment.provider, registration.attachment.resolve] as const],
-      ),
+  const application = createHubApplication(
+    hubApplicationOptions(
+      options,
+      registrations,
+      executionAuthority,
+      connectionsForProject,
+      outputRegistry,
+      channelSupervisor,
     ),
-    connectionsForProject,
-    ...(options.auth === null ? {} : { browserOrganizationAccess: options.auth }),
-    publicApi:
-      options.auth?.publicCredentials === undefined
-        ? { status: "unavailable" }
-        : { status: "enabled", authenticator: options.auth.publicCredentials },
-    ...(options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl }),
-    ...(options.completionTokenSecret === undefined
-      ? {}
-      : { completionTokenSecret: options.completionTokenSecret }),
-    outputRegistry,
-    ...(options.daemonConnectionForId === undefined
-      ? {}
-      : { daemonConnectionForId: options.daemonConnectionForId }),
-  });
+  );
   ownership.own(() => application.hub.stop());
   await application.hub.start(registrations.flatMap((registration) => registration.sources));
+  // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
+  // channel account. Isolated per account (failures never abort the boot);
+  // the supervisor is null whenever the kill-switch is off.
+  await channelSupervisor?.startAll();
 
   const resources = options.database === null ? null : new OrganizationResources(options.database);
   const requests = new Map<string, (incoming: Request) => Promise<Response>>();
@@ -327,6 +326,94 @@ async function createOwnedApplicationRuntime(
     stop: () => ownership.close(),
   };
 }
+
+// COMPAT(clisbot-control-plane): build the channel supervisor at composition
+// time, only when the kill-switch is on and the runtime + data dir are
+// threaded. The factory loads through a literal dynamic import: Vite bundles
+// the production entry into one start-server file, where a variable
+// specifier `import()` has no file to resolve at runtime and the whole plane
+// degrades to "supervisor unavailable". Any construction failure still
+// degrades the plane (the ops layer reports the supervisor as unavailable)
+// instead of failing the instance.
+async function createChannelSupervisorAtComposition(
+  options: ApplicationCompositionOptions,
+): Promise<import("./channels/supervisor/types.js").ChannelSupervisor | null> {
+  if (!isChannelsEnabled()) return null;
+  if (
+    options.database === null ||
+    options.databaseRuntime === undefined ||
+    options.hubDataDir === undefined
+  ) {
+    return null;
+  }
+  const { database, databaseRuntime, hubDataDir } = options;
+  try {
+    const factory = await import("./channels/supervisor/index.js");
+    return factory.createChannelSupervisor({
+      database,
+      databaseRuntime,
+      dataDir: hubDataDir,
+      // The packaged pins file lives at the Hub package root; in the Vite
+      // bundle `import.meta.url` points into `.output/`, so pin it explicitly.
+      pinsPath: runtimeFile("channel-pins.json"),
+      logger: channelLogger,
+    });
+  } catch (error) {
+    reportFailure(error, { operation: "channel_supervisor.compose", component: "channels" });
+    return null;
+  }
+}
+
+/** The `HubRuntimeOptions` the composition threads to the application hub. */
+function hubApplicationOptions(
+  options: ApplicationCompositionOptions,
+  registrations: readonly ProviderRegistration[],
+  executionAuthority: ExecutionAuthority | undefined,
+  connectionsForProject: TriggerProviderResources["connectionsForProject"],
+  outputRegistry: OutputExecutorRegistry,
+  channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
+): HubRuntimeOptions {
+  return {
+    database: options.database,
+    entitlements: options.entitlements,
+    providerFactories: registrations.flatMap((registration) => registration.triggerProviders),
+    ...(executionAuthority === undefined ? {} : { executionAuthority }),
+    attachmentResolvers: Object.fromEntries(
+      registrations.flatMap((registration) =>
+        registration.attachment === undefined
+          ? []
+          : [[registration.attachment.provider, registration.attachment.resolve] as const],
+      ),
+    ),
+    connectionsForProject,
+    ...(options.auth === null ? {} : { browserOrganizationAccess: options.auth }),
+    publicApi:
+      options.auth?.publicCredentials === undefined
+        ? { status: "unavailable" }
+        : { status: "enabled", authenticator: options.auth.publicCredentials },
+    ...(options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl }),
+    ...(options.completionTokenSecret === undefined
+      ? {}
+      : { completionTokenSecret: options.completionTokenSecret }),
+    outputRegistry,
+    ...(options.daemonConnectionForId === undefined
+      ? {}
+      : { daemonConnectionForId: options.daemonConnectionForId }),
+    // COMPAT(clisbot-control-plane): the channel ops mirror operator secrets
+    // into the same data directory the embedded database lives in.
+    ...(options.hubDataDir === undefined ? {} : { hubDataDir: options.hubDataDir }),
+    channelSupervisor,
+  };
+}
+
+/** pino's logger satisfies the plane's `PlaneLogger` seam (every level; a
+ * warn-only seam made the monitor-failure detail invisible in hub.log). */
+const channelLogger: import("./channels/plane/types.js").PlaneLogger = {
+  debug: (message, meta) => logger.debug(meta, message),
+  info: (message, meta) => logger.info(meta, message),
+  warn: (message, meta) => logger.warn(meta, message),
+  error: (message, meta) => logger.error(meta, message),
+};
 
 function providerApplicationsFor(
   options: ApplicationCompositionOptions,

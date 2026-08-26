@@ -22,6 +22,7 @@ import {
 } from "./prompt-partial-limits.js";
 import { projectSlugSchema } from "../project-slug.js";
 import {
+  CHANNELS_DIRECTORY,
   compareBundlePaths,
   HUB_RESOURCE_PATH,
   WORKFLOW_DIRECTORY,
@@ -30,6 +31,7 @@ import {
 } from "./bundle-contract.js";
 
 export {
+  CHANNELS_DIRECTORY,
   HUB_RESOURCE_PATH,
   WORKFLOW_DIRECTORY,
   WORKFLOW_PARTIAL_DIRECTORY,
@@ -44,6 +46,9 @@ export interface HubBundleIssue {
 export interface CompiledHubBundle {
   name?: string;
   configuration: CompiledHubConfig;
+  /** Every named agent in `hub.yml`, keyed by name (workflow targets + channel
+   * route targets both resolve into this map). */
+  agents: Readonly<Record<string, CompiledAgent>>;
   agentValidationTargets: readonly HubBundleAgentValidationTarget[];
   files: readonly HubBundleFile[];
   authoredHash: string;
@@ -134,6 +139,7 @@ export function compileHubBundle(input: readonly HubBundleFile[]): CompiledHubBu
   return {
     ...(bundleName === undefined ? {} : { name: bundleName }),
     configuration,
+    agents,
     agentValidationTargets: collectAgentValidationTargets(triggers, configuration, agents),
     files: authoredFiles,
     authoredHash: hashAuthoredFiles(authoredFiles),
@@ -220,6 +226,22 @@ function validateBundlePath(path: string): void {
       throw issue([path], "workflow files must use the .yml extension");
     }
     if (relative.endsWith(".yml")) return;
+  }
+  // COMPAT(clisbot-channels): fork-owned channel directory layout (implementation
+  // doc §4.3): `policy.yml` plus one account file per bot at
+  // `channels/<channel>/<accountId>.yml`. Structure is checked here; semantics
+  // (reserved names, key/path agreement, enums) are the channel compiler's.
+  if (path.startsWith(`${CHANNELS_DIRECTORY}/`)) {
+    const relative = path.slice(`${CHANNELS_DIRECTORY}/`.length);
+    if (relative === "policy.yml") return;
+    const segments = relative.split("/");
+    if (segments.length !== 2 || !segments[1]?.endsWith(".yml")) {
+      throw issue(
+        [path],
+        "channel files are policy.yml or one account per channels/<channel>/<accountId>.yml",
+      );
+    }
+    return;
   }
   throw issue([path], "file is outside the canonical Hub bundle layout");
 }

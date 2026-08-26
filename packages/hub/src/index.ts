@@ -44,6 +44,7 @@ import {
 } from "./provider-applications/index.js";
 import { createSlackSocketInstallationVerifier } from "./providers/slack/installation.js";
 import { resolveHubDataDirectory } from "./data-directory.js";
+import { applyClisbotEnvDefaults } from "./env-alias.js";
 
 export function startProductionRuntime(): Promise<ApplicationRuntime> {
   return startApplication(createProductionRuntime);
@@ -70,7 +71,11 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
   const resources = new CompositionResources();
   try {
     const config = loadRuntimeConfig();
-    const { database, runtime, locks } = await createDatabaseHandle();
+    // COMPAT(clisbot-control-plane): the channel plane's data dir must exist
+    // before the database handle resolves it for the embedded runtime, so the
+    // same directory is threaded to the application composition.
+    const hubDataDirectory = resolveHubDataDirectory();
+    const { database, runtime, locks } = await createDatabaseHandle(hubDataDirectory);
     resources.own(() => database.close());
     const identity = await resolveHubIdentity(runtime, readPort());
     const entitlements = composeEntitlements(database, runtime);
@@ -139,6 +144,10 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     });
     const application = await createApplicationRuntime({
       database,
+      // COMPAT(clisbot-control-plane): runtime + data dir threaded to the channel
+      // supervisor; the kill-switch is consulted at composition.
+      databaseRuntime: runtime,
+      hubDataDir: hubDataDirectory,
       auth,
       entitlements: entitlements.service,
       billing,
@@ -198,7 +207,9 @@ function createProductionAuthServer(
   });
 }
 
-async function createDatabaseHandle(): Promise<DatabaseRuntimeBundle & { database: Database }> {
+async function createDatabaseHandle(
+  hubDataDirectory: string,
+): Promise<DatabaseRuntimeBundle & { database: Database }> {
   const databaseUrl = process.env["DATABASE_URL"];
   if (databaseUrl !== undefined && databaseUrl.length > 0) {
     return initializeDatabaseRuntime(
@@ -207,10 +218,9 @@ async function createDatabaseHandle(): Promise<DatabaseRuntimeBundle & { databas
     );
   }
 
-  const dataDirectory = resolveHubDataDirectory();
   return initializeDatabaseRuntime(
-    () => embeddedDatabaseRuntime(dataDirectory),
-    `database runtime ready: embedded (${dataDirectory})`,
+    () => embeddedDatabaseRuntime(hubDataDirectory),
+    `database runtime ready: embedded (${hubDataDirectory})`,
   );
 }
 
@@ -284,6 +294,10 @@ function nonEmptyEnvironment(value: string | undefined): string | undefined {
 
 async function main(): Promise<void> {
   const removeProcessFailureHandlers = installProcessFailureHandlers();
+  // COMPAT(clisbot-env-alias): fork operator namespace + shared home, applied at
+  // process entry (implementation doc §4.5 / plan §14.8). No-op unless the operator
+  // set a CLISBOT_* var or left the fork defaults unset.
+  applyClisbotEnvDefaults();
   const build = await loadBuiltStartServer();
   await build.startProductionRuntime();
   const config = loadRuntimeConfig();

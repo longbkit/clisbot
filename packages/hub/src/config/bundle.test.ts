@@ -292,10 +292,23 @@ describe("Hub configuration bundle", () => {
     [".paseo/workflows/run.yaml", "must use the .yml extension"],
     [".paseo/workflows/partials/safety.txt", "must use the .md extension"],
     ["../hub.yml", "unsafe bundle path"],
+    // COMPAT(clisbot-channels): the channel directory is fork-owned (§4.3).
+    [".paseo/channels/slack/deep/work.yml", "channel files are policy.yml"],
+    [".paseo/channels/slack/work.yaml", "channel files are policy.yml"],
+    [".paseo/channels/stray.yml", "channel files are policy.yml"],
   ])("rejects non-canonical bundle path %s", (path, message) => {
     assert.throws(
       () => compileHubBundle([...canonicalFiles(), { path, content: "name: ignored" }]),
       new RegExp(message, "iu"),
     );
+  });
+
+  it("accepts the fork channel directory layout (policy.yml + one account file)", () => {
+    const channelFiles = [
+      { path: ".paseo/channels/policy.yml", content: "enabled: true" },
+      { path: ".paseo/channels/slack/work.yml", content: "enabled: true" },
+      { path: ".paseo/channels/telegram/personal.yml", content: "enabled: true" },
+    ];
+    assert.doesNotThrow(() => compileHubBundle([...canonicalFiles(), ...channelFiles]));
   });
 });

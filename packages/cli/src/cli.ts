@@ -13,6 +13,9 @@ import { createWorktreeCommand } from "./commands/worktree/index.js";
 import { createWorkspaceCommand } from "./commands/workspace/index.js";
 import { createHeartbeatCommand } from "./commands/heartbeat/index.js";
 import { createHubCommand } from "./commands/hub/index.js";
+// COMPAT(clisbot-control-plane): additive channel/user control-plane groups (implementation doc §3.2).
+import { createChannelsCommand } from "./commands/channels/index.js";
+import { createUsersCommand } from "./commands/users/index.js";
 import { createHooksCommand } from "./commands/hooks.js";
 import { startCommand as daemonStartCommand } from "./commands/daemon/start.js";
 import { runStatusCommand as runDaemonStatusCommand } from "./commands/daemon/status.js";
@@ -171,6 +174,9 @@ export function createCli(): Command {
   // Daemon commands
   program.addCommand(createDaemonCommand());
   program.addCommand(createHubCommand());
+  // COMPAT(clisbot-control-plane): channel control-plane verbs (implementation doc §3.2).
+  program.addCommand(createChannelsCommand());
+  program.addCommand(createUsersCommand());
 
   // Chat commands
 

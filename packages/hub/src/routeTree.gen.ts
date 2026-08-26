@@ -23,7 +23,9 @@ import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as ShellOperatorRouteImport } from './routes/_shell/operator'
 import { Route as ShellCliLoginRouteImport } from './routes/_shell/cli-login'
 import { Route as ShellAppsRouteImport } from './routes/_shell/apps'
+import { Route as ApiV1UsersRouteImport } from './routes/api/v1/users'
 import { Route as ApiV1CliAuthorizationsRouteImport } from './routes/api/v1/cli-authorizations'
+import { Route as ApiV1ChannelsRouteImport } from './routes/api/v1/channels'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 import { Route as ApiDaemonsEnrollRouteImport } from './routes/api/daemons/enroll'
 import { Route as ApiDaemonsDaemonIdRouteImport } from './routes/api/daemons/$daemonId'
@@ -31,7 +33,9 @@ import { Route as ApiBillingWebhookRouteImport } from './routes/api/billing/webh
 import { Route as ApiBillingPlansRouteImport } from './routes/api/billing/plans'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as AgentExecutionsExecutionIdMcpRouteImport } from './routes/agent-executions/$executionId/mcp'
+import { Route as ApiV1UsersUsernameRouteImport } from './routes/api/v1/users/$username'
 import { Route as ApiV1CliAuthorizationsPollRouteImport } from './routes/api/v1/cli-authorizations/poll'
+import { Route as ApiV1ChannelsStatusRouteImport } from './routes/api/v1/channels/status'
 import { Route as ApiIntegrationsSlackEventsRouteImport } from './routes/api/integrations/slack/events'
 import { Route as ApiIntegrationsSlackCallbackRouteImport } from './routes/api/integrations/slack/callback'
 import { Route as ApiIntegrationsGithubSetupRouteImport } from './routes/api/integrations/github/setup'
@@ -123,9 +127,19 @@ const ShellAppsRoute = ShellAppsRouteImport.update({
   path: '/apps',
   getParentRoute: () => ShellRoute,
 } as any)
+const ApiV1UsersRoute = ApiV1UsersRouteImport.update({
+  id: '/api/v1/users',
+  path: '/api/v1/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1CliAuthorizationsRoute = ApiV1CliAuthorizationsRouteImport.update({
   id: '/api/v1/cli-authorizations',
   path: '/api/v1/cli-authorizations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1ChannelsRoute = ApiV1ChannelsRouteImport.update({
+  id: '/api/v1/channels',
+  path: '/api/v1/channels',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
@@ -164,12 +178,22 @@ const AgentExecutionsExecutionIdMcpRoute =
     path: '/agent-executions/$executionId/mcp',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiV1UsersUsernameRoute = ApiV1UsersUsernameRouteImport.update({
+  id: '/$username',
+  path: '/$username',
+  getParentRoute: () => ApiV1UsersRoute,
+} as any)
 const ApiV1CliAuthorizationsPollRoute =
   ApiV1CliAuthorizationsPollRouteImport.update({
     id: '/poll',
     path: '/poll',
     getParentRoute: () => ApiV1CliAuthorizationsRoute,
   } as any)
+const ApiV1ChannelsStatusRoute = ApiV1ChannelsStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => ApiV1ChannelsRoute,
+} as any)
 const ApiIntegrationsSlackEventsRoute =
   ApiIntegrationsSlackEventsRouteImport.update({
     id: '/api/integrations/slack/events',
@@ -320,7 +344,9 @@ export interface FileRoutesByFullPath {
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
+  '/api/v1/users': typeof ApiV1UsersRouteWithChildren
   '/o/$organizationSlug/api-keys': typeof ShellOOrganizationSlugApiKeysRoute
   '/o/$organizationSlug/billing': typeof ShellOOrganizationSlugBillingRoute
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
@@ -335,7 +361,9 @@ export interface FileRoutesByFullPath {
   '/api/integrations/github/setup': typeof ApiIntegrationsGithubSetupRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
+  '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
   '/o/$organizationSlug/projects/': typeof ShellOOrganizationSlugProjectsIndexRoute
   '/o/$organizationSlug/projects/$projectSlug/activity': typeof ShellOOrganizationSlugProjectsProjectSlugActivityRouteWithChildren
   '/o/$organizationSlug/projects/$projectSlug/configuration': typeof ShellOOrganizationSlugProjectsProjectSlugConfigurationRoute
@@ -365,7 +393,9 @@ export interface FileRoutesByTo {
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
+  '/api/v1/users': typeof ApiV1UsersRouteWithChildren
   '/o/$organizationSlug/api-keys': typeof ShellOOrganizationSlugApiKeysRoute
   '/o/$organizationSlug/billing': typeof ShellOOrganizationSlugBillingRoute
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
@@ -379,7 +409,9 @@ export interface FileRoutesByTo {
   '/api/integrations/github/setup': typeof ApiIntegrationsGithubSetupRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
+  '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
   '/o/$organizationSlug/projects': typeof ShellOOrganizationSlugProjectsIndexRoute
   '/o/$organizationSlug/projects/$projectSlug/configuration': typeof ShellOOrganizationSlugProjectsProjectSlugConfigurationRoute
   '/o/$organizationSlug/projects/$projectSlug/overview': typeof ShellOOrganizationSlugProjectsProjectSlugOverviewRoute
@@ -410,7 +442,9 @@ export interface FileRoutesById {
   '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
+  '/api/v1/users': typeof ApiV1UsersRouteWithChildren
   '/_shell/o/$organizationSlug/api-keys': typeof ShellOOrganizationSlugApiKeysRoute
   '/_shell/o/$organizationSlug/billing': typeof ShellOOrganizationSlugBillingRoute
   '/_shell/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
@@ -425,7 +459,9 @@ export interface FileRoutesById {
   '/api/integrations/github/setup': typeof ApiIntegrationsGithubSetupRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
+  '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
   '/_shell/o/$organizationSlug/projects/': typeof ShellOOrganizationSlugProjectsIndexRoute
   '/_shell/o/$organizationSlug/projects/$projectSlug/activity': typeof ShellOOrganizationSlugProjectsProjectSlugActivityRouteWithChildren
   '/_shell/o/$organizationSlug/projects/$projectSlug/configuration': typeof ShellOOrganizationSlugProjectsProjectSlugConfigurationRoute
@@ -457,7 +493,9 @@ export interface FileRouteTypes {
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
     | '/api/v1/$'
+    | '/api/v1/channels'
     | '/api/v1/cli-authorizations'
+    | '/api/v1/users'
     | '/o/$organizationSlug/api-keys'
     | '/o/$organizationSlug/billing'
     | '/o/$organizationSlug/connections'
@@ -472,7 +510,9 @@ export interface FileRouteTypes {
     | '/api/integrations/github/setup'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
+    | '/api/v1/users/$username'
     | '/o/$organizationSlug/projects/'
     | '/o/$organizationSlug/projects/$projectSlug/activity'
     | '/o/$organizationSlug/projects/$projectSlug/configuration'
@@ -502,7 +542,9 @@ export interface FileRouteTypes {
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
     | '/api/v1/$'
+    | '/api/v1/channels'
     | '/api/v1/cli-authorizations'
+    | '/api/v1/users'
     | '/o/$organizationSlug/api-keys'
     | '/o/$organizationSlug/billing'
     | '/o/$organizationSlug/connections'
@@ -516,7 +558,9 @@ export interface FileRouteTypes {
     | '/api/integrations/github/setup'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
+    | '/api/v1/users/$username'
     | '/o/$organizationSlug/projects'
     | '/o/$organizationSlug/projects/$projectSlug/configuration'
     | '/o/$organizationSlug/projects/$projectSlug/overview'
@@ -546,7 +590,9 @@ export interface FileRouteTypes {
     | '/api/daemons/$daemonId'
     | '/api/daemons/enroll'
     | '/api/v1/$'
+    | '/api/v1/channels'
     | '/api/v1/cli-authorizations'
+    | '/api/v1/users'
     | '/_shell/o/$organizationSlug/api-keys'
     | '/_shell/o/$organizationSlug/billing'
     | '/_shell/o/$organizationSlug/connections'
@@ -561,7 +607,9 @@ export interface FileRouteTypes {
     | '/api/integrations/github/setup'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
+    | '/api/v1/users/$username'
     | '/_shell/o/$organizationSlug/projects/'
     | '/_shell/o/$organizationSlug/projects/$projectSlug/activity'
     | '/_shell/o/$organizationSlug/projects/$projectSlug/configuration'
@@ -589,7 +637,9 @@ export interface RootRouteChildren {
   ApiDaemonsDaemonIdRoute: typeof ApiDaemonsDaemonIdRoute
   ApiDaemonsEnrollRoute: typeof ApiDaemonsEnrollRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
+  ApiV1ChannelsRoute: typeof ApiV1ChannelsRouteWithChildren
   ApiV1CliAuthorizationsRoute: typeof ApiV1CliAuthorizationsRouteWithChildren
+  ApiV1UsersRoute: typeof ApiV1UsersRouteWithChildren
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute: typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
   ApiIntegrationsDiscordCallbackRoute: typeof ApiIntegrationsDiscordCallbackRoute
   ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
@@ -698,11 +748,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellAppsRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/api/v1/users': {
+      id: '/api/v1/users'
+      path: '/api/v1/users'
+      fullPath: '/api/v1/users'
+      preLoaderRoute: typeof ApiV1UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/cli-authorizations': {
       id: '/api/v1/cli-authorizations'
       path: '/api/v1/cli-authorizations'
       fullPath: '/api/v1/cli-authorizations'
       preLoaderRoute: typeof ApiV1CliAuthorizationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/channels': {
+      id: '/api/v1/channels'
+      path: '/api/v1/channels'
+      fullPath: '/api/v1/channels'
+      preLoaderRoute: typeof ApiV1ChannelsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/v1/$': {
@@ -754,12 +818,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentExecutionsExecutionIdMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/v1/users/$username': {
+      id: '/api/v1/users/$username'
+      path: '/$username'
+      fullPath: '/api/v1/users/$username'
+      preLoaderRoute: typeof ApiV1UsersUsernameRouteImport
+      parentRoute: typeof ApiV1UsersRoute
+    }
     '/api/v1/cli-authorizations/poll': {
       id: '/api/v1/cli-authorizations/poll'
       path: '/poll'
       fullPath: '/api/v1/cli-authorizations/poll'
       preLoaderRoute: typeof ApiV1CliAuthorizationsPollRouteImport
       parentRoute: typeof ApiV1CliAuthorizationsRoute
+    }
+    '/api/v1/channels/status': {
+      id: '/api/v1/channels/status'
+      path: '/status'
+      fullPath: '/api/v1/channels/status'
+      preLoaderRoute: typeof ApiV1ChannelsStatusRouteImport
+      parentRoute: typeof ApiV1ChannelsRoute
     }
     '/api/integrations/slack/events': {
       id: '/api/integrations/slack/events'
@@ -990,6 +1068,18 @@ const ShellRouteChildren: ShellRouteChildren = {
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
+interface ApiV1ChannelsRouteChildren {
+  ApiV1ChannelsStatusRoute: typeof ApiV1ChannelsStatusRoute
+}
+
+const ApiV1ChannelsRouteChildren: ApiV1ChannelsRouteChildren = {
+  ApiV1ChannelsStatusRoute: ApiV1ChannelsStatusRoute,
+}
+
+const ApiV1ChannelsRouteWithChildren = ApiV1ChannelsRoute._addFileChildren(
+  ApiV1ChannelsRouteChildren,
+)
+
 interface ApiV1CliAuthorizationsRouteChildren {
   ApiV1CliAuthorizationsPollRoute: typeof ApiV1CliAuthorizationsPollRoute
 }
@@ -1003,6 +1093,18 @@ const ApiV1CliAuthorizationsRouteWithChildren =
   ApiV1CliAuthorizationsRoute._addFileChildren(
     ApiV1CliAuthorizationsRouteChildren,
   )
+
+interface ApiV1UsersRouteChildren {
+  ApiV1UsersUsernameRoute: typeof ApiV1UsersUsernameRoute
+}
+
+const ApiV1UsersRouteChildren: ApiV1UsersRouteChildren = {
+  ApiV1UsersUsernameRoute: ApiV1UsersUsernameRoute,
+}
+
+const ApiV1UsersRouteWithChildren = ApiV1UsersRoute._addFileChildren(
+  ApiV1UsersRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   ShellRoute: ShellRouteWithChildren,
@@ -1022,7 +1124,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDaemonsDaemonIdRoute: ApiDaemonsDaemonIdRoute,
   ApiDaemonsEnrollRoute: ApiDaemonsEnrollRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
+  ApiV1ChannelsRoute: ApiV1ChannelsRouteWithChildren,
   ApiV1CliAuthorizationsRoute: ApiV1CliAuthorizationsRouteWithChildren,
+  ApiV1UsersRoute: ApiV1UsersRouteWithChildren,
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute:
     AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute,
   ApiIntegrationsDiscordCallbackRoute: ApiIntegrationsDiscordCallbackRoute,

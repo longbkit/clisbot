@@ -45,7 +45,7 @@ This is the concept the Paseo-based fusion needs to match or exceed: a trigger s
 
 ## Gaps — why a Paseo-based fusion supersedes the foundation
 
-1. **Foreign foundation, pinned forever.** The bridge rides a vendored OpenClaw slice (checksums, sync script, audit gate, surface matrix, golden traces) *and* a T3 Code fork. Every T3/OpenClaw bump is a manual re-sync exercise.
+1. **Foreign foundation, pinned forever.** The bridge rides a vendored OpenClaw slice (checksums, sync script, audit gate, surface matrix, golden traces) _and_ a T3 Code fork. Every T3/OpenClaw bump is a manual re-sync exercise.
 2. **T3's coarse primitives force bolt-on layers.** Binary-only approval answers (no param/scope editing), no per-tool modes, no per-resource ACL upstream. The fusion must tap `streamEvents` args in memory and wrap the WS handler layer (`RpcResourceAcl`) to approximate what a first-party foundation could give natively.
 3. **Phase 1 is two channels, no webhooks.** Socket Mode + polling only; HTTP receiver, Google Chat/Zalo, and a channel marketplace are P2-deferred.
 4. **No native collaboration surface.** Multi-human/multi-agent rooms, presence, and human-to-human messages are explicitly deferred; the conversation-directory module is only a seed.

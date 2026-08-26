@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
 import { open, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -100,10 +101,23 @@ function parseLockOwner(value: string): LockOwner | undefined {
 function processIsRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
     return !hasCode(error, "ESRCH");
   }
+  // The probe passes for zombies: the task still exists, it has merely
+  // exited. Under an init that does not reap (a container whose pid 1 does
+  // not waitpid on detached children) a SIGKILL'd hub leaves a zombie and a
+  // stale lock forever — without this check the next start would refuse to
+  // run on its own data directory. Where /proc is available the kernel
+  // state is authoritative; only `Z` (zombie) means exited.
+  try {
+    const status = fs.readFileSync(`/proc/${pid}/status`, "utf8");
+    return !/State:\s+Z(\s|$)/u.test(status);
+  } catch {
+    // /proc unavailable, or the process exited between the probe and the
+    // read: the probe stands.
+  }
+  return true;
 }
 
 function hasCode(error: unknown, code: string): boolean {

@@ -5,7 +5,8 @@ import { hubRequestFailure } from "./problem.js";
 interface HubRequest<T> {
   origin: string;
   path: string;
-  method: "GET" | "POST";
+  // "PUT" added for the `users edit` control-plane verb (implementation doc §3.2).
+  method: "GET" | "POST" | "PUT";
   apiKey?: string;
   body?: unknown;
   successStatus: number;

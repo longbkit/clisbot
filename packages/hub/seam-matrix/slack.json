@@ -1,0 +1,797 @@
+{
+  "$generated": "2026-08-26T04:20:12.486Z",
+  "channel": "slack",
+  "mainPackage": "openclaw@2026.7.1-2",
+  "counts": {
+    "bound": 1,
+    "passthrough": 95,
+    "unsupported": 0
+  },
+  "subpaths": {
+    "openclaw/plugin-sdk/account-helpers": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["describeAccountSnapshot"]
+    },
+    "openclaw/plugin-sdk/account-id": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["DEFAULT_ACCOUNT_ID"]
+    },
+    "openclaw/plugin-sdk/account-resolution": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "DEFAULT_ACCOUNT_ID",
+        "createAccountListHelpers",
+        "hasConfiguredAccountValue",
+        "normalizeAccountId",
+        "resolveMergedAccountConfig"
+      ]
+    },
+    "openclaw/plugin-sdk/agent-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "loadModelCatalog",
+        "resolveDefaultAgentId",
+        "resolveDefaultModelForAgent",
+        "resolveHumanDelayConfig"
+      ]
+    },
+    "openclaw/plugin-sdk/allow-from": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "addAllowlistUserEntriesFromConfigEntry",
+        "buildAllowlistResolutionSummary",
+        "compileAllowlist",
+        "formatAllowFromLowercase",
+        "formatAllowlistMatchMeta",
+        "mergeAllowlist",
+        "patchAllowlistUsersInConfigEntries",
+        "resolveCompiledAllowlistMatch",
+        "summarizeMapping"
+      ]
+    },
+    "openclaw/plugin-sdk/allowlist-config-edit": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildLegacyDmAccountAllowlistAdapter",
+        "createAccountScopedAllowlistNameResolver",
+        "createFlatAllowlistOverrideResolver"
+      ]
+    },
+    "openclaw/plugin-sdk/approval-auth-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createResolvedApproverActionAuthAdapter", "resolveApprovalApprovers"]
+    },
+    "openclaw/plugin-sdk/approval-client-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "createChannelExecApprovalProfile",
+        "isChannelExecApprovalClientEnabledFromConfig",
+        "isChannelExecApprovalTargetRecipient",
+        "matchesApprovalRequestFilters"
+      ]
+    },
+    "openclaw/plugin-sdk/approval-delivery-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createApproverRestrictedNativeApprovalCapability"]
+    },
+    "openclaw/plugin-sdk/approval-gateway-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["resolveApprovalOverGateway"]
+    },
+    "openclaw/plugin-sdk/approval-handler-adapter-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "CHANNEL_APPROVAL_NATIVE_RUNTIME_CONTEXT_CAPABILITY",
+        "createLazyChannelApprovalNativeRuntimeAdapter"
+      ]
+    },
+    "openclaw/plugin-sdk/approval-handler-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createChannelApprovalNativeRuntimeAdapter"]
+    },
+    "openclaw/plugin-sdk/approval-native-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildChannelApprovalNativeTargetKey",
+        "createChannelNativeOriginTargetResolver",
+        "createNativeApprovalChannelRouteGates",
+        "createNativeApprovalForwardingFallbackSuppressor",
+        "doesApprovalRequestMatchChannelAccount",
+        "resolveApprovalRequestSessionConversation"
+      ]
+    },
+    "openclaw/plugin-sdk/approval-reply-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildApprovalPresentationFromActionDescriptors",
+        "parseExecApprovalCommandText"
+      ]
+    },
+    "openclaw/plugin-sdk/boolean-param": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["readBooleanParam"]
+    },
+    "openclaw/plugin-sdk/bundled-channel-config-schema": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["SlackConfigSchema", "buildChannelConfigSchema"]
+    },
+    "openclaw/plugin-sdk/channel-actions": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "createActionGate",
+        "imageResultFromFile",
+        "jsonResult",
+        "readPositiveIntegerParam",
+        "readReactionParams",
+        "readStringParam",
+        "resolveReactionMessageId",
+        "withNormalizedTimestamp"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-config-helpers": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "adaptScopedAccountAccessor",
+        "createScopedChannelConfigAdapter",
+        "createScopedDmSecurityResolver",
+        "mapAllowFromEntries",
+        "normalizeChannelDmPolicy",
+        "resolveChannelDmAllowFrom",
+        "resolveChannelDmPolicy"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-config-writes": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["resolveChannelConfigWrites"]
+    },
+    "openclaw/plugin-sdk/channel-core": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["buildThreadAwareOutboundSessionRoute", "createChatChannelPlugin"]
+    },
+    "openclaw/plugin-sdk/channel-entry-contract": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["defineBundledChannelEntry", "defineBundledChannelSetupEntry"]
+    },
+    "openclaw/plugin-sdk/channel-feedback": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "DEFAULT_TIMING",
+        "createStatusReactionController",
+        "logAckFailure",
+        "logTypingFailure",
+        "removeAckReactionAfterReply",
+        "resolveAckReaction",
+        "shouldAckReaction"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-inbound": {
+      "classification": "bound",
+      "reason": "Inbound dispatch to the Hub (plan §7): the vertical's prepared message is handed the host through dispatchChannelInboundReply; the host drives the real agent + relay. The pure normalizers in the same subpath stay OpenClaw's.",
+      "hostModule": "hosts/channel-inbound.ts",
+      "hostExports": [
+        "dispatchChannelInboundReply",
+        "runChannelInboundEvent",
+        "runPreparedInboundReply",
+        "dispatchReplyFromConfigWithSettledDispatcher"
+      ],
+      "namedImports": [
+        "buildChannelInboundEventContext",
+        "buildMentionRegexes",
+        "classifyChannelInboundEvent",
+        "createChannelInboundDebouncer",
+        "dispatchChannelInboundReply",
+        "formatInboundEnvelope",
+        "hasVisibleInboundReplyDispatch",
+        "implicitMentionKindWhen",
+        "logInboundDrop",
+        "matchesMentionWithExplicit",
+        "recordDroppedChannelInboundHistory",
+        "resolveEnvelopeFormatOptions",
+        "resolveUnmentionedGroupInboundPolicy",
+        "shouldDebounceTextInbound",
+        "toInboundMediaFacts"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-ingress-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "createChannelIngressResolver",
+        "defineStableChannelIngressIdentity",
+        "readChannelIngressStoreAllowFromForDmPolicy"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-outbound": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildChannelProgressDraftLine",
+        "buildChannelProgressDraftLineForEntry",
+        "createChannelMessageAdapterFromOutbound",
+        "createChannelMessageReplyPipeline",
+        "createChannelProgressDraftGate",
+        "createDraftStreamLoop",
+        "createMessageReceiptFromOutboundResults",
+        "createRuntimeOutboundDelegates",
+        "defineFinalizableLivePreviewAdapter",
+        "deliverWithFinalizableLivePreviewAdapter",
+        "formatChannelProgressDraftText",
+        "getChannelStreamingConfigObject",
+        "isChannelProgressDraftWorkToolName",
+        "mergeChannelProgressDraftLine",
+        "resolveAgentOutboundIdentity",
+        "resolveChannelMessageSourceReplyDeliveryMode",
+        "resolveChannelProgressDraftConfig",
+        "resolveChannelProgressDraftMaxLineChars",
+        "resolveChannelProgressDraftMaxLines",
+        "resolveChannelProgressDraftRender",
+        "resolveChannelStreamingBlockEnabled",
+        "resolveChannelStreamingNativeTransport",
+        "resolveChannelStreamingPreviewToolProgress",
+        "resolveChannelStreamingSuppressDefaultToolProgressMessages",
+        "resolveOutboundSendDep"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-pairing": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createChannelPairingChallengeIssuer", "createPairingPrefixStripper"]
+    },
+    "openclaw/plugin-sdk/channel-plugin-common": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": []
+    },
+    "openclaw/plugin-sdk/channel-policy": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "coerceNativeSetting",
+        "createDangerousNameMatchingMutableAllowlistWarningCollector",
+        "createOpenProviderConfiguredRouteWarningCollector",
+        "normalizeAllowFromList",
+        "resolveToolsBySender"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-route": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["channelRouteTargetsMatchExact", "stringifyRouteThreadId"]
+    },
+    "openclaw/plugin-sdk/channel-runtime-context": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["registerChannelRuntimeContext"]
+    },
+    "openclaw/plugin-sdk/channel-secret-basic-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "collectConditionalChannelFieldAssignments",
+        "collectNestedChannelFieldAssignments",
+        "collectSimpleChannelFieldAssignments",
+        "getChannelSurface",
+        "hasOwnProperty"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-send-result": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["attachChannelToResult", "createAttachedChannelResultAdapter"]
+    },
+    "openclaw/plugin-sdk/channel-status": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "PAIRING_APPROVED_MESSAGE",
+        "projectCredentialSnapshotFields",
+        "resolveConfiguredFromRequiredCredentialStatuses"
+      ]
+    },
+    "openclaw/plugin-sdk/channel-targets": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "applyChannelMatchMeta",
+        "buildChannelKeyCandidates",
+        "buildMessagingTarget",
+        "ensureTargetId",
+        "parseMentionPrefixOrAtUserTarget",
+        "requireTargetKind",
+        "resolveChannelEntryMatchWithFallback"
+      ]
+    },
+    "openclaw/plugin-sdk/collection-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["pruneMapToMaxSize"]
+    },
+    "openclaw/plugin-sdk/command-auth-native": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildCommandTextFromArgs",
+        "findCommandByNativeName",
+        "formatCommandArgMenuTitle",
+        "listNativeCommandSpecsForConfig",
+        "listProviderPluginCommandSpecs",
+        "listSkillCommandsForAgents",
+        "parseCommandArgs",
+        "resolveCommandArgMenu",
+        "resolveCommandAuthorization",
+        "resolveEffectiveAgentRuntime",
+        "resolveNativeCommandSessionTargets",
+        "resolveStoredModelOverride"
+      ]
+    },
+    "openclaw/plugin-sdk/command-detection": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["hasControlCommand"]
+    },
+    "openclaw/plugin-sdk/command-primitives-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["isAbortRequestText"]
+    },
+    "openclaw/plugin-sdk/command-surface": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["shouldHandleTextCommands"]
+    },
+    "openclaw/plugin-sdk/concurrency-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["runTasksWithConcurrency"]
+    },
+    "openclaw/plugin-sdk/config-mutation": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["mutateConfigFile"]
+    },
+    "openclaw/plugin-sdk/context-visibility-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["resolveChannelContextVisibilityMode"]
+    },
+    "openclaw/plugin-sdk/conversation-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildPluginBindingResolvedText",
+        "ensureConfiguredBindingRouteReady",
+        "parsePluginBindingApprovalCustomId",
+        "readChannelAllowFromStore",
+        "recordInboundSession",
+        "recordInboundSessionMetaSafe",
+        "resolveConfiguredBindingRoute",
+        "resolveConversationLabel",
+        "resolvePluginConversationBindingApproval",
+        "resolveRuntimeConversationBindingRoute",
+        "upsertChannelPairingRequest"
+      ]
+    },
+    "openclaw/plugin-sdk/dangerous-name-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["isDangerousNameMatchingEnabled"]
+    },
+    "openclaw/plugin-sdk/dedupe-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createDedupeCache", "createPersistentDedupeCache"]
+    },
+    "openclaw/plugin-sdk/directory-config-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createResolvedDirectoryEntriesLister"]
+    },
+    "openclaw/plugin-sdk/directory-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createChannelDirectoryAdapter", "createRuntimeDirectoryLiveAdapter"]
+    },
+    "openclaw/plugin-sdk/error-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["collectErrorGraphCandidates", "formatErrorMessage"]
+    },
+    "openclaw/plugin-sdk/extension-shared": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": []
+    },
+    "openclaw/plugin-sdk/fetch-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createNodeProxyAgent", "withTrustedEnvProxyGuardedFetchMode"]
+    },
+    "openclaw/plugin-sdk/heartbeat-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["requestHeartbeat"]
+    },
+    "openclaw/plugin-sdk/hook-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildCanonicalSentMessageHookContext",
+        "createInternalHookEvent",
+        "fireAndForgetHook",
+        "toInternalMessageSentContext",
+        "toPluginMessageContext",
+        "toPluginMessageSentEvent",
+        "triggerInternalHook"
+      ]
+    },
+    "openclaw/plugin-sdk/host-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["normalizeHostname"]
+    },
+    "openclaw/plugin-sdk/interactive-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "normalizeInteractiveReply",
+        "normalizeMessagePresentation",
+        "reduceInteractiveReply",
+        "renderMessagePresentationFallbackText",
+        "resolveInteractiveTextFallback",
+        "resolveMessagePresentationControlValue"
+      ]
+    },
+    "openclaw/plugin-sdk/keyed-async-queue": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["KeyedAsyncQueue"]
+    },
+    "openclaw/plugin-sdk/lazy-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createLazyRuntimeModule"]
+    },
+    "openclaw/plugin-sdk/logging-core": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["logError", "redactSensitiveText"]
+    },
+    "openclaw/plugin-sdk/markdown-table-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["resolveMarkdownTableMode"]
+    },
+    "openclaw/plugin-sdk/media-mime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["mimeTypeFromFilePath"]
+    },
+    "openclaw/plugin-sdk/media-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["saveRemoteMedia"]
+    },
+    "openclaw/plugin-sdk/native-command-config-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["resolveNativeCommandsEnabled", "resolveNativeSkillsEnabled"]
+    },
+    "openclaw/plugin-sdk/number-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "asDateTimestampMs",
+        "asFiniteNumberInRange",
+        "parseFiniteNumber",
+        "parseStrictFiniteNumber",
+        "resolveExpiresAtMsFromDurationMs",
+        "timestampMsToIsoString"
+      ]
+    },
+    "openclaw/plugin-sdk/outbound-media": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["loadOutboundMediaFromUrl"]
+    },
+    "openclaw/plugin-sdk/pair-loop-guard-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["mergePairLoopGuardConfig"]
+    },
+    "openclaw/plugin-sdk/param-readers": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["readPositiveIntegerParam", "readStringParam"]
+    },
+    "openclaw/plugin-sdk/plugin-config-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["requireRuntimeConfig"]
+    },
+    "openclaw/plugin-sdk/plugin-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "createInteractiveConversationBindingHelpers",
+        "dispatchPluginInteractiveHandler",
+        "getGlobalHookRunner"
+      ]
+    },
+    "openclaw/plugin-sdk/reply-chunking": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "SILENT_REPLY_TOKEN",
+        "chunkMarkdownTextWithMode",
+        "isSilentReplyText",
+        "resolveChunkMode",
+        "resolveTextChunkLimit"
+      ]
+    },
+    "openclaw/plugin-sdk/reply-history": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["DEFAULT_GROUP_HISTORY_LIMIT", "createChannelHistoryWindow"]
+    },
+    "openclaw/plugin-sdk/reply-payload": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildTtsSupplementMediaPayload",
+        "deliverTextOrMediaReply",
+        "getReplyPayloadTtsSupplement",
+        "resolvePayloadMediaUrls",
+        "resolveSendableOutboundReplyParts",
+        "resolveTextChunksWithFallback",
+        "sendPayloadMediaSequenceAndFinalize",
+        "sendTextMediaPayload"
+      ]
+    },
+    "openclaw/plugin-sdk/reply-reference": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createReplyReferencePlanner", "isSingleUseReplyToMode"]
+    },
+    "openclaw/plugin-sdk/reply-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "dispatchReplyWithBufferedBlockDispatcher",
+        "dispatchReplyWithDispatcher",
+        "finalizeInboundContext",
+        "resolveChunkMode"
+      ]
+    },
+    "openclaw/plugin-sdk/request-url": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["resolveRequestUrl"]
+    },
+    "openclaw/plugin-sdk/routing": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildOutboundBaseSessionKey",
+        "normalizeAccountId",
+        "normalizeMainKey",
+        "normalizeMessageChannel",
+        "resolveAccountEntry",
+        "resolveAgentRoute",
+        "resolveInboundLastRouteSessionKey",
+        "resolveThreadSessionKeys"
+      ]
+    },
+    "openclaw/plugin-sdk/runtime-config-snapshot": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["getRuntimeConfig", "getRuntimeConfigSnapshot"]
+    },
+    "openclaw/plugin-sdk/runtime-doctor": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "asObjectRecord",
+        "hasLegacyAccountStreamingAliases",
+        "hasLegacyStreamingAliases",
+        "normalizeLegacyChannelAliases"
+      ]
+    },
+    "openclaw/plugin-sdk/runtime-env": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "computeBackoff",
+        "createNonExitingRuntime",
+        "createSubsystemLogger",
+        "danger",
+        "getChildLogger",
+        "logVerbose",
+        "shouldLogVerbose",
+        "sleep",
+        "sleepWithAbort",
+        "warn"
+      ]
+    },
+    "openclaw/plugin-sdk/runtime-fetch": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["fetchWithRuntimeDispatcher"]
+    },
+    "openclaw/plugin-sdk/runtime-group-policy": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "resolveDefaultGroupPolicy",
+        "resolveOpenProviderRuntimeGroupPolicy",
+        "warnMissingProviderGroupPolicyFallbackOnce"
+      ]
+    },
+    "openclaw/plugin-sdk/runtime-store": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createPluginRuntimeStore"]
+    },
+    "openclaw/plugin-sdk/secret-input": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "hasConfiguredSecretInput",
+        "normalizeResolvedSecretInputString",
+        "normalizeSecretInputString"
+      ]
+    },
+    "openclaw/plugin-sdk/secure-random-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["generateSecureToken"]
+    },
+    "openclaw/plugin-sdk/security-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "buildUntrustedChannelMetadata",
+        "filterSupplementalContextItems",
+        "resolvePinnedMainDmOwnerFromAllowlist",
+        "shouldIncludeSupplementalContext"
+      ]
+    },
+    "openclaw/plugin-sdk/session-store-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "getSessionEntry",
+        "readSessionUpdatedAt",
+        "resolveChannelResetConfig",
+        "resolveSessionKey",
+        "resolveStorePath",
+        "updateLastRoute"
+      ]
+    },
+    "openclaw/plugin-sdk/setup-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "DEFAULT_ACCOUNT_ID",
+        "createAccountScopedAllowFromSection",
+        "createAccountScopedGroupAccessSection",
+        "createAllowlistSetupWizardProxy",
+        "createEnvPatchedAccountSetupAdapter",
+        "createLegacyCompatChannelDmPolicy",
+        "createSetupTranslator",
+        "createStandardChannelSetupStatus",
+        "noteChannelLookupFailure",
+        "noteChannelLookupSummary",
+        "parseMentionOrPrefixedId",
+        "patchChannelConfigForAccount",
+        "promptLegacyChannelAllowFromForAccount",
+        "resolveEntriesWithOptionalToken",
+        "setSetupChannelEnabled"
+      ]
+    },
+    "openclaw/plugin-sdk/setup-tools": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["formatDocsLink"]
+    },
+    "openclaw/plugin-sdk/ssrf-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["fetchWithSsrFGuard"]
+    },
+    "openclaw/plugin-sdk/status-helpers": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["createComputedAccountStatusAdapter", "createDefaultChannelRuntimeState"]
+    },
+    "openclaw/plugin-sdk/string-coerce-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "asOptionalRecord",
+        "isRecord",
+        "normalizeLowercaseStringOrEmpty",
+        "normalizeOptionalLowercaseString",
+        "normalizeOptionalString",
+        "normalizeStringEntries",
+        "normalizeStringEntriesLower",
+        "normalizeStringifiedOptionalString",
+        "normalizeUniqueTrimmedStringList",
+        "readStringValue",
+        "sortUniqueStrings",
+        "uniqueStrings"
+      ]
+    },
+    "openclaw/plugin-sdk/string-normalization-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "normalizeHyphenSlug",
+        "normalizeStringEntries",
+        "normalizeStringEntriesLower"
+      ]
+    },
+    "openclaw/plugin-sdk/system-event-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["enqueueSystemEvent"]
+    },
+    "openclaw/plugin-sdk/target-resolver-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": []
+    },
+    "openclaw/plugin-sdk/text-chunking": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": [
+        "chunkItems",
+        "markdownToIR",
+        "renderMarkdownIRChunksWithinLimit",
+        "renderMarkdownWithMarkers",
+        "sanitizeAssistantVisibleText",
+        "stripReasoningTagsFromText"
+      ]
+    },
+    "openclaw/plugin-sdk/text-utility-runtime": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["sliceUtf16Safe", "truncateUtf16Safe", "withTimeout"]
+    },
+    "openclaw/plugin-sdk/tool-send": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["extractToolSend"]
+    },
+    "openclaw/plugin-sdk/webhook-request-guards": {
+      "classification": "passthrough",
+      "reason": "Pure OpenClaw SDK logic; loads from the pinned main package.",
+      "namedImports": ["installRequestBodyLimitGuard"]
+    }
+  },
+  "conformance": {
+    "checked": 96,
+    "missing": []
+  }
+}

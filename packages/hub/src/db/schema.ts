@@ -1201,6 +1201,163 @@ export const billingPlanPrices = pgTable(
 // from the subscription's price at webhook time — never dereferenced by enforcement, which reads
 // only `organization_entitlements`. `status` carries Stripe's own vocabulary verbatim, so no
 // check constraint drifts against it. Self-hosted instances never write here.
+// --- Channel control plane (P0: Slack + Telegram) -------------------------------------
+//
+// COMPAT(clisbot-channels): fork-owned channel control plane (plan P3/P4/P5,
+// implementation doc §3.1/§4.2/§4.3.4). Additive tables only: channel accounts,
+// durable thread bindings, and the outbound delivery ledger. An unmodified
+// upstream Hub ignores these tables entirely; deleting this block plus its
+// migration returns the schema to its upstream state.
+
+export const CHANNEL_NAMES = ["slack", "telegram"] as const;
+export const CHANNEL_ACCOUNT_STATUSES = ["installing", "active", "suspended", "failed"] as const;
+export const THREAD_BINDING_STATUSES = ["pending", "bound", "abandoned"] as const;
+export const DELIVERY_LEDGER_STATUSES = ["recorded", "posted", "failed"] as const;
+
+export type ChannelName = (typeof CHANNEL_NAMES)[number];
+export type ChannelAccountStatus = (typeof CHANNEL_ACCOUNT_STATUSES)[number];
+export type ThreadBindingStatus = (typeof THREAD_BINDING_STATUSES)[number];
+export type DeliveryLedgerStatus = (typeof DELIVERY_LEDGER_STATUSES)[number];
+
+/** One runtime record per channel account (e.g. one Slack app, one Telegram bot). */
+export const channelAccounts = pgTable(
+  "channel_accounts",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<ChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    status: text().$type<ChannelAccountStatus>().notNull(),
+    pinVersion: text("pin_version"),
+    distIntegrity: text("dist_integrity"),
+    gitHead: text("git_head"),
+    installDir: text("install_dir"),
+    installedAt: timestamp("installed_at", { withTimezone: true }),
+    secretRef: text("secret_ref"),
+    providerApplicationId: text("provider_application_id"),
+    externalIdentity: jsonb("external_identity"),
+    transport: jsonb().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // One account per (organization, channel, account id); a second org may reuse an id.
+    uniqueIndex("channel_accounts_organization_channel_account_unique").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+    ),
+    check(
+      "channel_accounts_status_check",
+      sql`${table.status} in ('installing', 'active', 'suspended', 'failed')`,
+    ),
+    check("channel_accounts_channel_check", sql`${table.channel} in ('slack', 'telegram')`),
+  ],
+);
+
+/**
+ * Durable external-thread ↔ agent-session binding (plan P3, §4.3.4). One row per
+ * (account, external thread key); it survives Hub and daemon restarts so a follow-up
+ * message resumes the bound session instead of creating a new one.
+ */
+export const threadBindings = pgTable(
+  "thread_bindings",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<ChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    // Native thread id (Slack thread root ts / Telegram message_thread_id); NULL when the
+    // binding key is the whole conversation (binding.key: channel/dm).
+    externalThreadId: text("external_thread_id"),
+    status: text().$type<ThreadBindingStatus>().notNull(),
+    // Pre-create pending marker: the create RPC was issued before the agent id was known.
+    // Carries the execution id the daemon echoes back so orphan recovery can rebind
+    // instead of re-create (plan §4-S2 "Same-machine deployment").
+    pendingExecutionId: text("pending_execution_id"),
+    agentId: text("agent_id"),
+    daemonId: uuid("daemon_id"),
+    // Principal that started the thread; approval and route policy re-derive from it.
+    initiator: text().notNull(),
+    // Route summary at bind time (agent/environment/template/sync/approval), so a restart
+    // can resume without re-resolving the config revision.
+    route: jsonb().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    // NULLs are distinct on purpose: two `binding.key: channel` rows in one conversation
+    // would differ only in their NULL thread id, and a NULLS DISTINCT unique index lets the
+    // account/runtime layer decide whether that is legal.
+    uniqueIndex("thread_bindings_account_thread_unique").on(
+      table.organizationId,
+      table.accountId,
+      table.conversationId,
+      table.externalThreadId,
+    ),
+    index("thread_bindings_agent_idx").on(table.agentId),
+    index("thread_bindings_account_created_idx").on(table.accountId, table.createdAt.desc()),
+    check(
+      "thread_bindings_status_check",
+      sql`${table.status} in ('pending', 'bound', 'abandoned')`,
+    ),
+    check("thread_bindings_channel_check", sql`${table.channel} in ('slack', 'telegram')`),
+    check(
+      "thread_bindings_shape_check",
+      sql`(${table.status} = 'bound' and ${table.agentId} is not null and ${table.pendingExecutionId} is null and ${table.resolvedAt} is not null)
+        or (${table.status} = 'pending' and ${table.agentId} is null and ${table.pendingExecutionId} is not null and ${table.resolvedAt} is null)
+        or (${table.status} = 'abandoned' and ${table.agentId} is null and ${table.resolvedAt} is not null)`,
+    ),
+  ],
+);
+
+/**
+ * Record-before-post idempotency for the outbound relay (plan §S5). One row per
+ * (account, external thread, event/turn id, seq), written before the channel post;
+ * a replayed stream event or a Hub restart cannot double-post.
+ */
+export const deliveryLedger = pgTable(
+  "delivery_ledger",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<ChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    externalThreadId: text("external_thread_id"),
+    // Event/turn identity + ordinal: the dedupe key for replayed stream events.
+    eventTurnId: text("event_turn_id").notNull(),
+    sequence: integer().notNull(),
+    status: text().$type<DeliveryLedgerStatus>().notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    // Native confirmation of the post (Slack ts / Telegram message id).
+    nativeMessageId: text("native_message_id"),
+    failureReason: text("failure_reason"),
+  },
+  (table) => [
+    uniqueIndex("delivery_ledger_event_turn_sequence_unique").on(
+      table.organizationId,
+      table.accountId,
+      table.conversationId,
+      table.externalThreadId,
+      table.eventTurnId,
+      table.sequence,
+    ),
+    index("delivery_ledger_account_created_idx").on(table.accountId, table.recordedAt.desc()),
+    check("delivery_ledger_status_check", sql`${table.status} in ('recorded', 'posted', 'failed')`),
+    check("delivery_ledger_channel_check", sql`${table.channel} in ('slack', 'telegram')`),
+    check("delivery_ledger_sequence_check", sql`${table.sequence} >= 0`),
+  ],
+);
+
 export const organizationSubscriptions = pgTable("organization_subscriptions", {
   organizationId: text("organization_id")
     .primaryKey()

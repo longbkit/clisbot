@@ -1,0 +1,21 @@
+# Bundled Telegram — the host-supplied monitor (option A)
+
+## Why the host must supply the monitor
+
+The 2294-chunk import closure of `main/dist/extensions/telegram/channel-plugin-api.js` contains **zero** `openclaw/plugin-sdk/*` specifiers (BFS-verified), so the aliased seam (`loader-routing.md`) cannot intercept Telegram's inbound dispatch. The native dispatch chain is fully relative: spool `telegram-ingress-spool-Dd3cDhXe.js` → `runChannelInboundEvent` (relative `inbound-reply-dispatch-C8SZBmZG.js` → `kernel-BMsNZe7F.js`) → `telegramDeps.dispatchReplyWithBufferedBlockDispatcher` (hardcoded `bot-deps-BBncur2u.js` unless injected) → `reply-dispatch-runtime-Bq8vXD2i.js` → `provider-dispatcher-C5sNmVHv.js` → `dispatch-DnzGTpPs.js` (OpenClaw's `auto-reply/reply/dispatch-from-config` runtime). Driving the inlined default monitor would answer channel messages with **OpenClaw's own agent/model loop** — exactly what plan §7 excludes.
+
+Options considered: (A) Hub-owned `getUpdates` long-polling monitor installed as the host override; (B) loader-hook interception by resolved URL of the relative dispatch chunks (~50 LoC but keyed on hashed names that change per re-pin, and still loads the excluded agent-loop chunks); (C) defer Telegram to P0.5. **Decision: (A)** — the monitor is the one seam plan §7 already names as the host contract for bundled Telegram, and it keeps the seam surface identical to Slack's. Consequences: the native ingress worker (worker-thread polling, SQLite spool at `$OPENCLAW_STATE_DIR/state/openclaw.sqlite`) never loads, so P0 persistence is the JSON keyed-store only; the monitor runs until `abortSignal` fires (the native lifecycle, `start-account.md`).
+
+## The host-override read sites
+
+All in `main/dist/channel-DP5CkqKN.js`, each shaped `getOptionalTelegramRuntime()?.channel?.telegram?.X ?? nativeDefault` (= `getTelegramRuntime()` in try/catch, `:522-575` + `:620-629`): `probeTelegram` (`:522`), `collectTelegramUnmentionedGroupIds` (`:550`), `auditTelegramGroupMembership` (`:553`), **`monitorTelegramProvider` (`:555-556`)**, `sendMessageTelegram` (`:571`, after the `resolveOutboundSendDep` fallback), `resolveTelegramToken` (`:574`), `messageActions.*` (`:620-629`). The Hub installs **only** `monitorTelegramProvider` (the native probe/token/send stay native — see `outbound.md`, `start-account.md`).
+
+The override is read through the plugin runtime store that `entry.setChannelRuntime(hostRuntime)` fills — so the host monitor function goes on the **HostRuntime** the loader injects, at `channel["telegram"]["monitorTelegramProvider"]`.
+
+## The native monitor's contract (the function the Hub replaces)
+
+`monitorTelegramProvider` (`main/dist/probe-bGTVpKvS.js:388-470`) opts: `{token, accountId, config, runtime, channelRuntime, abortSignal, useWebhook, webhook*, botInfo, setStatus}`. `config` falls back to `getRuntimeConfig()` when absent; the account resolves from `config` + `accountId`; the token is `opts.token?.trim() || account.token` and **throws when missing**; the polling path (`loadTelegramMonitorPollingRuntime()`) provides `TelegramPollingSession` + the offset accessors `readTelegramUpdateOffset` / `writeTelegramUpdateOffset` / `deleteTelegramUpdateOffset` plus `acquireTelegramPollingLease({token, accountId, abortSignal})`.
+
+## The Hub monitor's contract
+
+Installed as `monitorTelegramProvider`; resolves only on `abortSignal` (D2). It owns: `getUpdates` long-polling against the bot token (direct fetch, no grammy — grammy is main's bundled dep but the Hub loop is ~150-250 LoC and stays Hub code); the poll offset in the keyed-store seam (`state.openKeyedStore`, namespace per account); dedupe of already-seen update ids; build the **flat ctxPayload** per `inbound.md` (the plane's normalizer reads it; `ChatType: "direct" | "group"`, `ChatId`, `MessageThreadId` for topics, `Timestamp` ms, `MessageSid`); hand off to `hostRuntime.onInboundReply`; post replies via `plugin.outbound.sendText` (`outbound.md`). No SQLite: the native offset SQLite path lives in the native monitor and never loads.
