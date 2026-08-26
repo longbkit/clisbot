@@ -1,10 +1,12 @@
-// Supervisor boot against REAL supply + a FAKE daemon — the Step 1 test the
-// 2026-08-26 review prescribed: boot the supervisor with the provisioned live
-// install dir (copied from the dev home), the real node:module loader hooks,
-// and a loopback fake daemon; assert both P0 accounts reach `started`, then
-// push one real-shape Slack ctxPayload through the seam and assert the fake
-// daemon received `create_agent_request` with the right provider/model + the
-// first prompt as an interrupt.
+// Supervisor boot against the REAL in-repo verticals + a FAKE daemon — the
+// Step 1 test the 2026-08-26 review prescribed, re-pointed at the in-repo pull
+// (blueprint §6.5): boot the supervisor with the real node:module loader
+// hooks, the in-repo install (the Hub's own built workspace packages — no
+// tarball, no integrity gate), and a loopback fake daemon; assert both P0
+// accounts reach `started` through the in-repo markers, then push one
+// real-shape Slack ctxPayload through the seam and assert the fake daemon
+// received `create_agent_request` with the right provider/model + the first
+// prompt as an interrupt.
 //
 // Why native (node:test + tsx) rather than vitest: the loader's node:module
 // `registerHooks` only manifest under the real ESM loader — vitest's vite-node
@@ -15,17 +17,19 @@
 // store is exercised the same way.
 //
 // Runs: `npm run test:supervisor:native` (builds `dist/` first so the host
-// module + runtime-store singleton are current). Skips cleanly when the live
-// provisioned install, the mirror secrets, or `.env` are absent.
+// module + runtime-store singleton are current). Skips cleanly when the
+// in-repo verticals are not built, the mirror secrets, or `.env` are absent.
 
 import assert from "node:assert/strict";
 import {
   chmodSync,
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -47,12 +51,21 @@ import type { ChannelSupervisor } from "./types.js";
 // --- Fixed dev state (e2e-dev.sh): never ~/.paseo, never .dev/paseo-home -----
 
 const DEV_HOME = process.env["CLISBOT_HOME"] ?? join(homedir(), ".clisbot-dev");
-const LIVE_ROOT = join(DEV_HOME, "channels", "work");
 // The test file's location: packages/hub/src/channels/supervisor/ — six
 // levels up (the file itself is the first) reaches the repo root.
 const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url));
 const HUB_DIST_LOADER = join(REPO_ROOT, "packages", "hub", "dist", "channels", "loader");
 const PINS_PATH = join(REPO_ROOT, "packages", "hub", "channel-pins.json");
+
+/** The in-repo workspace package dirs (blueprint §6.5): the workspace
+ * symlinks under the repo root node_modules, real-pathed to the package
+ * dirs — the same resolution the installer's `resolveInRepoPackageDir`
+ * lands on. */
+function inRepoPackageDir(packageName: string): string {
+  return realpathSync(join(REPO_ROOT, "node_modules", packageName));
+}
+const SLACK_IN_REPO = inRepoPackageDir("@getpaseo/channels-slack");
+const TELEGRAM_IN_REPO = inRepoPackageDir("@getpaseo/channels-telegram");
 
 // Every hub-side log line (info/warn/error), captured for assertions: a
 // dropped marker must be named by a log line, never asserted by silence.
@@ -112,11 +125,13 @@ function envVar(name: string): string | undefined {
 }
 
 function supplyPresent(): boolean {
-  const mainDir = join(LIVE_ROOT, "openclaw@2026.7.1-2");
+  // In-repo (blueprint §6.5): the supply is the Hub's own built workspace
+  // packages — no provisioned install dir, no tarball, no integrity gate.
   return (
-    existsSync(join(mainDir, "dist", "extensions", "telegram", "index.js")) &&
-    existsSync(join(mainDir, "node_modules")) &&
-    existsSync(join(LIVE_ROOT, "@openclaw", "slack@2026.7.1", "dist", "index.js")) &&
+    existsSync(join(SLACK_IN_REPO, "dist", "index.js")) &&
+    existsSync(join(SLACK_IN_REPO, "dist", "plugin.js")) &&
+    existsSync(join(TELEGRAM_IN_REPO, "dist", "index.js")) &&
+    existsSync(join(TELEGRAM_IN_REPO, "dist", "plugin.js")) &&
     existsSync(join(DEV_HOME, "secrets", "slack--work")) &&
     existsSync(join(DEV_HOME, "secrets", "telegram--work")) &&
     existsSync(join(HUB_DIST_LOADER, "hosts", "channel-inbound.js")) &&
@@ -126,8 +141,8 @@ function supplyPresent(): boolean {
 
 const SKIP = supplyPresent()
   ? false
-  : `live provisioned supply not present under ${DEV_HOME} (or .env missing); ` +
-    "run the live provisioning first — the live E2E covers this surface";
+  : "in-repo channel verticals not built (@getpaseo/channels-{slack,telegram} dist missing), " +
+    `or the mirror secrets / .env are absent under ${DEV_HOME} (build the workspace packages first)`;
 
 // --- Fake daemon (the stock local-client wire, trimmed to the P0 surface) ---
 
@@ -399,29 +414,17 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     daemon = new FakeDaemon();
     await daemon.listen();
 
-    // 1. The provisioned live install, copied into the test's dataDir. The live
-    // root still carries the legacy shared `install.lock` (pre per-channel-marker
-    // fix): drop it and write the per-channel markers from the real pins, which
-    // is exactly what a fresh `ensureChannelInstalled` run would have recorded.
-    const mainVersionDir = "openclaw@2026.7.1-2";
-    cpSync(join(LIVE_ROOT, mainVersionDir), join(dataDir, "channels", "work", mainVersionDir), {
-      recursive: true,
-    });
-    cpSync(join(LIVE_ROOT, "@openclaw"), join(dataDir, "channels", "work", "@openclaw"), {
-      recursive: true,
-    });
-    if (existsSync(join(LIVE_ROOT, "state"))) {
-      cpSync(join(LIVE_ROOT, "state"), join(dataDir, "channels", "work", "state"), {
-        recursive: true,
-      });
-    }
-    rmSync(join(dataDir, "channels", "work", "install.lock"), { force: true });
+    // 1. The in-repo install (blueprint §6.5): no supply copy — the Hub drives
+    // its OWN built workspace packages. Pre-seed the per-channel markers exactly
+    // as a fresh `ensureChannelInstalled` in-repo run would have recorded them
+    // (sync-reference pin + resolved package dir), so the boot's install step
+    // recognizes the install as pin-matching and skips to the load.
     const pins = JSON.parse(readFileSync(PINS_PATH, "utf8")) as {
       main: { package: string; version: string; dist: { integrity: string } };
       channels: Record<
         string,
         {
-          loadMode: "published" | "bundled";
+          loadMode: "published" | "bundled" | "in-repo";
           entry: string;
           channel: {
             package: string;
@@ -441,9 +444,22 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     if (slackPin === undefined || telegramPin === undefined) {
       throw new Error("channel-pins.json must carry both P0 verticals");
     }
+    if (slackPin.loadMode !== "in-repo" || telegramPin.loadMode !== "in-repo") {
+      throw new Error("channel-pins.json must pull both P0 verticals in-repo");
+    }
+    const workAccountRoot = join(dataDir, "channels", "work");
+    mkdirSync(workAccountRoot, { recursive: true });
+    // The live dev home's persisted per-account state (poll offsets, dedupe
+    // caches) — reused across runs (CLAUDE.md channel E2E guardrail) so a
+    // fresh boot does not replay the dev bot's whole update history from
+    // offset 0 into the fake daemon.
+    const liveState = join(DEV_HOME, "channels", "work", "state");
+    if (existsSync(liveState)) {
+      cpSync(liveState, join(workAccountRoot, "state"), { recursive: true });
+    }
     const installedAt = "2026-08-26T00:00:00.000Z";
     writeFileSync(
-      join(dataDir, "channels", "work", "install-slack.lock"),
+      join(workAccountRoot, "install-slack.lock"),
       `${JSON.stringify(
         {
           channel: "slack",
@@ -457,6 +473,7 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
             gitHead: slackPin.channel.dist.gitHead,
           },
           entry: slackPin.entry,
+          inRepoPackageDir: SLACK_IN_REPO,
           installedAt,
         },
         null,
@@ -465,14 +482,20 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
       { mode: 0o600 },
     );
     writeFileSync(
-      join(dataDir, "channels", "work", "install-telegram.lock"),
+      join(workAccountRoot, "install-telegram.lock"),
       `${JSON.stringify(
         {
           channel: "telegram",
           accountId: "work",
           loadMode: telegramPin.loadMode,
           main: mainRef,
+          channelPackage: {
+            package: telegramPin.channel.package,
+            version: telegramPin.channel.version,
+            integrity: telegramPin.channel.dist.integrity,
+          },
           entry: telegramPin.entry,
+          inRepoPackageDir: TELEGRAM_IN_REPO,
           installedAt,
         },
         null,
@@ -665,7 +688,7 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
    */
   it(
     "drives a real marker through the vertical's live Slack socket into the fake daemon",
-    { skip: liveSkipReason(), timeout: 120_000 },
+    { skip: liveSkipReason(), timeout: 180_000 },
     async function liveSocketPipeline() {
       const userToken = process.env["SLACK_MCP_XOXP_TOKEN"] ?? envVar("SLACK_MCP_XOXP_TOKEN");
       assert.ok(userToken !== undefined, "SLACK_MCP_XOXP_TOKEN missing");
@@ -677,11 +700,15 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
 
       // The vertical's socket connection is async behind startAll: wait for
       // its "slack socket mode connected" before posting (Slack delivers a
-      // socket event to the connected client only).
+      // socket event to the connected client only). 60s, not 30: the
+      // SocketModeClient's initial handshake has no connect timeout, and a
+      // transient Slack-side stall sits in `client.start()` with ZERO vertical
+      // log lines (the first line lands on success or reject) — observed
+      // 2026-08-26: a stall here is transient, the vertical connects on retry.
       const startedAt = Date.now();
       while (!hubLogLines.some((line) => line.includes("slack socket mode connected"))) {
         assert.ok(
-          Date.now() - startedAt < 30_000,
+          Date.now() - startedAt < 60_000,
           `no socket connect; log:\n${hubLogLines.join("\n")}`,
         );
         await new Promise((resolve) => setImmediate(resolve));
@@ -725,9 +752,18 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
       const config = create["config"] as Record<string, unknown>;
       assert.equal(config["provider"], "codex");
       assert.equal(config["model"], "gpt-5.6-luna");
-      const send = markerFrames().find(
-        (message) => message["type"] === "send_agent_message_request",
-      );
+      // The first prompt lands AFTER the create round-trip settles (the fake
+      // daemon's agent_created response, then the plane's ledger consume +
+      // post) — poll it like the create, never check it synchronously: create
+      // and the first prompt are not guaranteed adjacent in the fake daemon's
+      // frame log (observed 2026-08-26: create recorded, send still in flight
+      // at the synchronous check).
+      let send: RecordedMessage | undefined;
+      while (Date.now() < deadline) {
+        send = markerFrames().find((message) => message["type"] === "send_agent_message_request");
+        if (send !== undefined) break;
+        await new Promise((resolve) => setImmediate(resolve));
+      }
       assert.ok(
         send !== undefined,
         `no first prompt after create; log:\n${recentLog}\n${nativeLogTail()}`,

@@ -32,7 +32,10 @@
     "packages/website",
     "packages/desktop",
     "packages/cli",
-    "packages/hub"
+    "packages/hub",
+    "packages/channels/shared",
+    "packages/channels/telegram",
+    "packages/channels/slack"
   ],
   "scripts": {
     "dev": "npm run dev:server",

@@ -63,7 +63,7 @@ export class ChannelLoaderError extends Error {
 export interface LoadedChannelInfo {
   channel: string;
   accountId: string;
-  loadMode: "published" | "bundled";
+  loadMode: "published" | "bundled" | "in-repo";
   /** The channel's install root (`<dataDir>/channels/<accountId>`). */
   installRoot: string;
   /** The pinned main package's install dir (shared across channels pinning it). */

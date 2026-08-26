@@ -247,6 +247,8 @@ Skips cleanly when the pinned supply is not staged under `OPENCLAW_SCOUT` (defau
 
 ## 6.5 The pull blueprint (implementation contract for the agent doing the pull)
 
+**Status (2026-08-26): pull executed.** The wiring checklist landed: pins gained `loadMode: "in-repo"` with the no-tarball install branch (`pins.ts` / `install-channel.ts`); the loader admits the in-repo package dirs as load-trace allowlist roots (`load-channel.ts`); the supervisor dropped the `channel.telegram.monitorTelegramProvider` override and wires the shared L3's `inboundLedger` (record + consume-mark); `channel-pins.json` flipped both channels to `in-repo`, keeping their `channel` pins as upstream sync references. Deviations are recorded in `packages/channels/slack/DEVIATIONS.md` and `packages/channels/telegram/DEVIATIONS.md`. Verification: live E2E pending. The plan text below is the historical record.
+
 Self-contained enough to work from without re-deriving. Hard rules first:
 
 1. **Zero OpenClaw imports in either package** — no `openclaw/*` / `openclaw/plugin-sdk/*` specifier, static or dynamic, and no loader alias-route applied to them. Inbound of both packages calls `hostRuntime.onInboundReply` directly (model: `hosts/telegram-monitor.ts`, alias-free). After the pull, the bound `channel-inbound` seam and the alias-route in `loader/hooks.ts` serve **zalouser pinned only** — Slack's seam routing disappears with its vertical.

@@ -288,6 +288,13 @@
       "when": 1787654851452,
       "tag": "0040_channel_control_plane",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1787760463828,
+      "tag": "0041_channel_ledger_bidirectional",
+      "breakpoints": true
     }
   ]
 }

@@ -50,7 +50,7 @@ function defaults(overrides: Partial<EffectiveDefaults> = {}): EffectiveDefaults
 function context(
   overrides: {
     route?: CompiledRoute;
-    conversationId?: string;
+    externalConversationId?: string;
     externalThreadId?: string | null;
   } = {},
 ): StreamContext {
@@ -80,7 +80,7 @@ function context(
     agentId: AGENT_ID,
     channel: "slack",
     accountId: "work",
-    conversationId: overrides.conversationId ?? CONVERSATION,
+    externalConversationId: overrides.externalConversationId ?? CONVERSATION,
     externalThreadId:
       overrides.externalThreadId === undefined ? THREAD : overrides.externalThreadId,
     initiator: "slack:U0ALICE",
@@ -131,9 +131,9 @@ describe("relay final answer", () => {
     const posted: string[] = [];
     const engine = makeEngine(store, async (p) => {
       posted.push(p.text);
-      return { ok: true, nativeMessageId: "1720000000.000001" };
+      return { ok: true, externalMessageId: "1720000000.000001" };
     });
-    const ctx = context({ conversationId: "C0A", externalThreadId: "1.0" });
+    const ctx = context({ externalConversationId: "C0A", externalThreadId: "1.0" });
     engine.attach(ctx);
 
     await engine.onStream(AGENT_ID, {
@@ -157,7 +157,7 @@ describe("relay final answer", () => {
       posted.push(p);
       return { ok: true };
     });
-    const ctx = context({ conversationId: "C0B", externalThreadId: "2.0" });
+    const ctx = context({ externalConversationId: "C0B", externalThreadId: "2.0" });
     engine.attach(ctx);
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
@@ -177,7 +177,7 @@ describe("relay final answer", () => {
       return { ok: true };
     });
     const ctx = context({
-      conversationId: "C0C",
+      externalConversationId: "C0C",
       externalThreadId: "3.0",
       route: {
         ...context().route,
@@ -202,7 +202,7 @@ describe("relay progress + tool calls", () => {
     const clock = new ManualClock(0);
     const posted: string[] = [];
     const ctx = context({
-      conversationId: "C0D",
+      externalConversationId: "C0D",
       externalThreadId: "4.0",
       route: {
         ...context().route,
@@ -248,7 +248,7 @@ describe("relay progress + tool calls", () => {
   it("posts a terminal tool-call line when sync.toolCalls is on", async () => {
     const posted: string[] = [];
     const ctx = context({
-      conversationId: "C0E",
+      externalConversationId: "C0E",
       externalThreadId: "5.0",
       route: {
         ...context().route,
@@ -277,9 +277,9 @@ describe("ledger dedupe (restart / replay)", () => {
     let posts = 0;
     const post = async (): Promise<OutboundPostResult> => {
       posts += 1;
-      return { ok: true, nativeMessageId: "1720000000.000001" };
+      return { ok: true, externalMessageId: "1720000000.000001" };
     };
-    const ctx = context({ conversationId: "C0F", externalThreadId: "6.0" });
+    const ctx = context({ externalConversationId: "C0F", externalThreadId: "6.0" });
     const first = makeEngine(store, post);
     first.attach(ctx);
     await first.onStream(AGENT_ID, {
@@ -306,10 +306,10 @@ describe("ledger dedupe (restart / replay)", () => {
     let posts = 0;
     const post = async (): Promise<OutboundPostResult> => {
       posts += 1;
-      return { ok: true, nativeMessageId: "1720000000.000002" };
+      return { ok: true, externalMessageId: "1720000000.000002" };
     };
     const ctx = context({
-      conversationId: "C0G",
+      externalConversationId: "C0G",
       externalThreadId: "7.0",
       route: {
         ...context().route,

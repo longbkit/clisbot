@@ -2,6 +2,7 @@
 import type {
   AgentExecutionStatus,
   ChannelAccountStatus,
+  ChannelLedgerDirection,
   DeliveryLedgerStatus,
   MachineSource,
   MachineStatus,
@@ -1468,7 +1469,7 @@ export interface ThreadBindingRecord {
   organizationId: string;
   channel: "slack" | "telegram";
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   status: ThreadBindingStatus;
   pendingExecutionId: string | null;
@@ -1484,7 +1485,7 @@ export interface PendingThreadBindingInput {
   organizationId: string;
   channel: "slack" | "telegram";
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   pendingExecutionId: string;
   initiator: string;
@@ -1498,7 +1499,7 @@ export interface PendingThreadBindingInput {
 export interface ResolveThreadBindingInput {
   organizationId: string;
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   agentId: string;
   daemonId?: string | null;
@@ -1509,25 +1510,36 @@ export interface ResolveThreadBindingInput {
 export interface AbandonThreadBindingInput {
   organizationId: string;
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   resolvedAt: Date;
 }
 
-/** One outbound delivery attempt, recorded before the channel post (dedupe key). */
+/**
+ * One channel event ledger row (blueprint §2.4: the ledger is bidirectional).
+ * `out` rows are the outbound relay's record-before-post (one per
+ * (account, external thread, event/turn id, seq); `attempts` counts retries).
+ * `in` rows are the shared L3 monitor's record-before-handoff (one per
+ * (channel, account, external conversation, external message id);
+ * `consumedAt` + `turnId` reference the plane turn the row dispatched to).
+ */
 export interface DeliveryLedgerRecord {
   id: string;
   organizationId: string;
   channel: "slack" | "telegram";
   accountId: string;
-  conversationId: string;
+  direction: ChannelLedgerDirection;
+  externalConversationId: string;
   externalThreadId: string | null;
   eventTurnId: string;
   sequence: number;
   status: DeliveryLedgerStatus;
   recordedAt: Date;
   postedAt: Date | null;
-  nativeMessageId: string | null;
+  externalMessageId: string | null;
+  consumedAt: Date | null;
+  turnId: string | null;
+  attempts: number;
   failureReason: string | null;
 }
 
@@ -1535,7 +1547,7 @@ export interface RecordDeliveryInput {
   organizationId: string;
   channel: "slack" | "telegram";
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   eventTurnId: string;
   sequence: number;
@@ -1544,19 +1556,20 @@ export interface RecordDeliveryInput {
 export interface ConfirmDeliveryInput {
   organizationId: string;
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   eventTurnId: string;
   sequence: number;
-  nativeMessageId: string;
+  externalMessageId: string;
   postedAt: Date;
 }
 
-/** Mark a recorded delivery that failed to post; a later retry re-confirms it. */
+/** Mark a recorded delivery that failed to post; a later retry re-confirms it
+ * (the `attempts` counter increments on every failed attempt). */
 export interface FailDeliveryInput {
   organizationId: string;
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   eventTurnId: string;
   sequence: number;
@@ -1567,3 +1580,28 @@ export interface FailDeliveryInput {
 export type RecordDeliveryResult =
   | { record: DeliveryLedgerRecord; created: true }
   | { record: DeliveryLedgerRecord; created: false };
+
+/** Record an inbound event row (the shared L3 monitor, blueprint §2.4). Dedupe
+ * key: (channel, account, external conversation, external message id). */
+export interface RecordInboundInput {
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  externalConversationId: string;
+  externalMessageId: string;
+}
+
+export type RecordInboundResult =
+  | { record: DeliveryLedgerRecord; created: true }
+  | { record: DeliveryLedgerRecord; created: false };
+
+/** Mark a recorded inbound row consumed, referencing the plane turn it
+ * dispatched to. */
+export interface ConsumeInboundInput {
+  organizationId: string;
+  accountId: string;
+  externalConversationId: string;
+  externalMessageId: string;
+  turnId: string;
+  consumedAt: Date;
+}

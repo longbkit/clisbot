@@ -204,7 +204,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         await reattachBinding(
           channelStore,
           marker.accountId,
-          marker.conversationId,
+          marker.externalConversationId,
           marker.externalThreadId,
         );
       }
@@ -255,7 +255,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       const binding = await store?.findThreadBinding(
         deps.organizationId,
         account.accountId,
-        key.conversationId,
+        key.externalConversationId,
         key.externalThreadId,
       );
       if (
@@ -280,7 +280,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     const binding = await store?.findThreadBinding(
       deps.organizationId,
       account.accountId,
-      key.conversationId,
+      key.externalConversationId,
       key.externalThreadId,
     );
     if (binding === undefined || binding.status !== "bound" || binding.agentId === null) {
@@ -318,13 +318,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   async function reattachBinding(
     channelStore: ChannelStore,
     accountId: string,
-    conversationId: string,
+    externalConversationId: string,
     externalThreadId: string | null,
   ): Promise<void> {
     const binding = await channelStore.findThreadBinding(
       deps.organizationId,
       accountId,
-      conversationId,
+      externalConversationId,
       externalThreadId,
     );
     if (binding === undefined || binding.status !== "bound" || binding.agentId === null) return;
@@ -375,7 +375,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       agentId: binding.agentId ?? "",
       channel: channelName(account),
       accountId: account.accountId,
-      conversationId: binding.conversationId,
+      externalConversationId: binding.externalConversationId,
       externalThreadId: binding.externalThreadId,
       initiator: binding.initiator,
       account,
@@ -413,7 +413,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (account === undefined) return undefined;
     const descriptor = parseStoredRouteSummary(binding.route) ?? {
       kind: "channel" as const,
-      id: binding.conversationId,
+      id: binding.externalConversationId,
     };
     const match = matchRoute(descriptor, account);
     if (match.route !== null) return match.route;

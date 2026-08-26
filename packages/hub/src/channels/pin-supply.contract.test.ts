@@ -77,20 +77,40 @@ function sdkSubpaths(pkg: string): string[] {
 }
 
 describe.skipIf(!SUPPLY_PRESENT)("pin-supply contract (static, audit 2026-08-26)", () => {
-  it("carries the pin manifest: slack published, telegram bundled, drive pins intact", () => {
+  it("carries the pin manifest: both verticals pulled in-repo, drive pins intact, sync references kept", () => {
     const pins = loadChannelPins(PINS_PATH);
     const slack = pins.channels["slack"];
     const telegram = pins.channels["telegram"];
     assert.ok(slack !== undefined && telegram !== undefined, "both verticals pinned");
-    assert.equal(slack.loadMode, "published");
-    assert.equal(telegram.loadMode, "bundled");
-    // Slack's pin is a separate package; Telegram's pin IS the main package.
-    assert.equal(slack.channel.package, "@openclaw/slack");
-    assert.equal(telegram.channel.package, pins.main.package);
-    assert.equal(telegram.channel.version, pins.main.version);
-    // The drive pins: entry + a separate plugin chunk with a named export.
+    // In-repo pull (blueprint §6.5): the Hub drives its OWN workspace packages
+    // — no tarball fetch, no integrity gate at load.
+    assert.equal(slack.loadMode, "in-repo");
+    assert.equal(telegram.loadMode, "in-repo");
+    assert.equal(slack.inRepoPackage, "@getpaseo/channels-slack");
+    assert.equal(telegram.inRepoPackage, "@getpaseo/channels-telegram");
+    // The loader's import targets: the built workspace package's entry + a
+    // separate plugin chunk under the pinned export names.
+    assert.equal(slack.entry, "./dist/index.js");
+    assert.equal(telegram.entry, "./dist/index.js");
+    assert.equal(slack.plugin.specifier, "./dist/plugin.js");
+    assert.equal(telegram.plugin.specifier, "./dist/plugin.js");
     assert.equal(slack.plugin.exportName, "slackPlugin");
     assert.equal(telegram.plugin.exportName, "telegramPlugin");
+    // The `channel` pins stay the UPSTREAM SYNC REFERENCES (integrity +
+    // gitHead for the published channel package) for the re-sync loop: Slack's
+    // is a separate package; Telegram's pin IS the main package (its supply
+    // shape stays bundled — no alias surface, table-top finding #0).
+    assert.equal(slack.channel.package, "@openclaw/slack");
+    assert.equal(slack.channel.version, "2026.7.1");
+    assert.match(slack.channel.dist.integrity, /^sha512-/u, "slack sync reference integrity");
+    assert.match(
+      slack.channel.dist.gitHead ?? "",
+      /^[0-9a-f]{40}$/u,
+      "slack sync reference gitHead",
+    );
+    assert.equal(telegram.channel.package, pins.main.package);
+    assert.equal(telegram.channel.version, pins.main.version);
+    assert.equal(telegram.channel.dist.integrity, pins.main.dist.integrity);
   });
 
   it("slack entry is a defineBundledChannelEntry result; plugin chunk re-exports the drive surface", () => {

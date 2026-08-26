@@ -192,7 +192,7 @@ export class ApprovalEngine {
       organizationId: this.context.organizationId,
       channel: context.channel,
       accountId: context.accountId,
-      conversationId: context.conversationId,
+      externalConversationId: context.externalConversationId,
       externalThreadId: context.externalThreadId,
       eventTurnId,
       sequence: 0,
@@ -210,18 +210,18 @@ export class ApprovalEngine {
         await this.context.store.confirmDelivery({
           organizationId: this.context.organizationId,
           accountId: context.accountId,
-          conversationId: context.conversationId,
+          externalConversationId: context.externalConversationId,
           externalThreadId: context.externalThreadId,
           eventTurnId,
           sequence: 0,
-          nativeMessageId: result.nativeMessageId ?? "",
+          externalMessageId: result.externalMessageId ?? "",
           postedAt: new Date(),
         });
       } else {
         await this.context.store.failDelivery({
           organizationId: this.context.organizationId,
           accountId: context.accountId,
-          conversationId: context.conversationId,
+          externalConversationId: context.externalConversationId,
           externalThreadId: context.externalThreadId,
           eventTurnId,
           sequence: 0,

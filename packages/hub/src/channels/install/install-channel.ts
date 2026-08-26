@@ -13,11 +13,21 @@
 // package); a `bundled` channel (Telegram) ships the main package only, its
 // entry living inside the main dist. All registry I/O flows through the
 // injectable `fetch` so the whole install path runs offline against local bytes.
+//
+// An `in-repo` channel (blueprint §6.5) skips the supply path entirely: no
+// tarball fetch, no integrity gate, no main-dir provisioning — the Hub drives
+// its OWN workspace package (`inRepoPackage`, workspace-linked into the root
+// node_modules). The install step only resolves that package's directory from
+// the Hub's own node_modules, refuses when the pinned entry module is not built
+// yet, and records the per-channel marker the loader reads. The pin's `channel`
+// entry stays the upstream SYNC REFERENCE (integrity + gitHead intact).
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { sha512Integrity } from "./integrity.js";
-import type { ChannelPins, LoadMode, MainPin } from "./pins.js";
+import type { ChannelPinEntry, ChannelPins, LoadMode, MainPin } from "./pins.js";
 import { fetchTarball, resolveTarballUrl } from "./registry.js";
 import { extractNpmTarball } from "./tarball.js";
 import { assertNoticesPresent } from "./notices.js";
@@ -33,6 +43,8 @@ export interface InstallMarker {
   main: { package: string; version: string; integrity: string };
   channelPackage?: { package: string; version: string; integrity: string; gitHead?: string };
   entry: string;
+  /** The resolved in-repo workspace package dir (`in-repo` loadMode only). */
+  inRepoPackageDir?: string;
   installedAt: string;
 }
 
@@ -50,6 +62,9 @@ export interface ChannelInstallResult {
   /** The channel entry module path relative to the channel install dir. */
   entry: string;
   loadMode: LoadMode;
+  /** The in-repo workspace package's dir on disk (`in-repo` loadMode only) —
+   * where the `entry` path and the loader's allowlist resolve. */
+  inRepoPackageDir?: string;
   /** True when this call performed a fresh install; false when an existing,
    * pin-matching install was skipped (idempotent re-run). */
   installed: boolean;
@@ -126,6 +141,127 @@ function installMatches(
   return got.gitHead === desiredHead;
 }
 
+/**
+ * Resolve the in-repo channel's workspace package dir from the Hub's own
+ * node_modules (blueprint §6.5: the vertical is workspace-linked into the root
+ * node_modules, so `createRequire` from this hub file resolves the symlink;
+ * `realpath` follows it to the package dir). Falls back to the repo's
+ * `node_modules/<pkg>` when the require resolution misses (a hub installed
+ * without its workspace links).
+ */
+function resolveInRepoPackageDir(packageName: string): string {
+  const require = createRequire(import.meta.url);
+  try {
+    // `dirname` of the resolved `<pkg>/package.json` IS the package dir;
+    // `realpath` follows the workspace symlink out of node_modules.
+    return realpathSync(dirname(require.resolve(`${packageName}/package.json`)));
+  } catch {
+    return realpathSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        "..",
+        "..",
+        "..",
+        "..",
+        "..",
+        "node_modules",
+        packageName,
+      ),
+    );
+  }
+}
+
+/** An in-repo marker matches when its loadMode + sync-reference pin + resolved
+ * package dir are all the ones the desired pin carries. */
+function inRepoInstallMatches(
+  marker: InstallMarker,
+  entry: ChannelPinEntry,
+  mainPin: MainPin,
+  packageDir: string,
+): boolean {
+  if (marker.loadMode !== "in-repo" || marker.inRepoPackageDir !== packageDir) return false;
+  if (marker.main.package !== mainPin.package || marker.main.integrity !== mainPin.dist.integrity)
+    return false;
+  const got = marker.channelPackage;
+  if (got === undefined) return false;
+  if (got.package !== entry.channel.package || got.version !== entry.channel.version) return false;
+  if (got.integrity !== entry.channel.dist.integrity) return false;
+  return got.gitHead === entry.channel.dist.gitHead;
+}
+
+/**
+ * The in-repo install (blueprint §6.5): no tarball, no integrity, no main-dir
+ * provisioning. Resolve the workspace package dir, REFUSE when the pinned
+ * entry module is not built yet (the vertical's dist is missing), and record
+ * the per-channel marker the loader reads. Idempotent: a matching marker
+ * skips the write; the result is `installed: false` either way — there is
+ * nothing to install.
+ */
+function ensureInRepoChannel(
+  pins: ChannelPins,
+  channel: string,
+  entry: ChannelPinEntry,
+  accountId: string,
+  dataDir: string,
+): ChannelInstallResult {
+  const packageName = entry.inRepoPackage;
+  if (packageName === undefined) {
+    // Unreachable — the caller only routes here for `in-repo`, whose pin schema
+    // sets `inRepoPackage` — but guard so a malformed pin fails closed, not at
+    // `resolveInRepoPackageDir(undefined)`.
+    throw new InstallError(`in-repo channel ${channel}: pin is missing inRepoPackage`, { channel });
+  }
+  const { root } = resolveInstallDirs(dataDir, accountId, pins, channel);
+  const mainPin = pins.main;
+  const packageDir = resolveInRepoPackageDir(packageName);
+  // The entry path is relative to the package root; refuse before the marker
+  // when the vertical's dist has not been built yet (`npm run build` pending).
+  const entryPath = join(packageDir, entry.entry.replace(/^\.?\/?/u, ""));
+  if (!existsSync(entryPath)) {
+    throw new InstallError(
+      `in-repo channel ${channel}: entry module ${entryPath} is not built yet (build the ${entry.inRepoPackage} workspace package first)`,
+      { channel },
+    );
+  }
+  const existing = readMarker(root, channel);
+  const skipped =
+    existing !== undefined && inRepoInstallMatches(existing, entry, mainPin, packageDir);
+  if (!skipped) {
+    writeMarker(root, channel, {
+      channel,
+      accountId,
+      loadMode: "in-repo",
+      main: {
+        package: mainPin.package,
+        version: mainPin.version,
+        integrity: mainPin.dist.integrity,
+      },
+      channelPackage: {
+        package: entry.channel.package,
+        version: entry.channel.version,
+        integrity: entry.channel.dist.integrity,
+        ...(entry.channel.dist.gitHead !== undefined
+          ? { gitHead: entry.channel.dist.gitHead }
+          : {}),
+      },
+      entry: entry.entry,
+      inRepoPackageDir: packageDir,
+      installedAt: new Date().toISOString(),
+    });
+  }
+  return {
+    channel,
+    accountId,
+    installDir: root,
+    mainInstallDir: packageDir,
+    channelInstallDir: packageDir,
+    entry: entry.entry,
+    loadMode: "in-repo",
+    inRepoPackageDir: packageDir,
+    installed: false,
+  };
+}
+
 /** Fetch one pinned tarball and verify its integrity before returning the
  * buffer. Refuses on any digest mismatch (plan §14.4 — the pin is the boundary). */
 async function fetchVerifiedTarball(
@@ -188,6 +324,11 @@ export async function ensureChannelInstalled(
 ): Promise<ChannelInstallResult> {
   const entry = pins.channels[channel];
   if (!entry) throw new InstallError(`unknown channel: ${channel}`, { channel });
+  // The in-repo vertical (blueprint §6.5) skips the supply path entirely: it
+  // resolves the Hub's own workspace package instead of fetching tarballs.
+  if (entry.loadMode === "in-repo") {
+    return ensureInRepoChannel(pins, channel, entry, accountId, dataDir);
+  }
   const mainPin = pins.main;
   const channelIsMain =
     entry.channel.package === mainPin.package && entry.channel.version === mainPin.version;

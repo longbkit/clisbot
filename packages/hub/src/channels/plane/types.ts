@@ -87,7 +87,7 @@ export interface OutboundPostParams {
 export interface OutboundPostResult {
   ok: boolean;
   /** The native message id the channel assigned (Slack `ts`, Telegram id). */
-  nativeMessageId?: string | undefined;
+  externalMessageId?: string | undefined;
   error?: string | undefined;
 }
 
@@ -134,7 +134,7 @@ export interface ChannelPlaneDeps {
 
 /** The binding's thread location + initiator, enough to post into its thread. */
 export interface ThreadRef {
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   /** The channel identity that started the thread (approval `initiatorOnly`). */
   initiator: string;
@@ -145,7 +145,7 @@ export interface StreamContext {
   agentId: string;
   channel: P0ChannelName;
   accountId: string;
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
   /** The channel identity that started the thread (approval `initiatorOnly`). */
   initiator: string;

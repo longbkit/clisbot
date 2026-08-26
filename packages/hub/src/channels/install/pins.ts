@@ -52,11 +52,21 @@ export const ChannelPinSchema = z
   .strict();
 export type ChannelPin = z.infer<typeof ChannelPinSchema>;
 
-/** The two loading modes (plan §7): `published` (dist imports
+/** The three loading modes: `published` (dist imports
  * `openclaw/plugin-sdk/*` externally, alias surface) and `bundled` (SDK inlined in
- * the main package, no alias surface, loads by `file://` URL). */
-export const LoadModeSchema = z.enum(["published", "bundled"]);
+ * the main package, no alias surface, loads by `file://` URL) are the pinned-OpenClaw
+ * supply forms; `in-repo` (blueprint §6.5) loads the Hub's OWN workspace package
+ * (`inRepoPackage`) — trusted first-party code, no tarball, no integrity gate. The
+ * `channel` pin on an in-repo entry stays the UPSTREAM SYNC REFERENCE (integrity +
+ * gitHead intact) so re-syncs keep their provenance. */
+export const LoadModeSchema = z.enum(["published", "bundled", "in-repo"]);
 export type LoadMode = z.infer<typeof LoadModeSchema>;
+
+/** The in-repo channel package name (`@getpaseo/channels-<channel>`). Present
+ * exactly when `loadMode` is `in-repo`. */
+const inRepoPackageSchema = z
+  .string()
+  .regex(/^@getpaseo\/channels-[a-z0-9-]+$/, "in-repo packages are @getpaseo/channels-<channel>");
 
 /** The channel's plugin chunk reference (implementation doc §4.8 D1): the entry
  * object is a `defineBundledChannelEntry` result whose plugin lives at a
@@ -78,6 +88,8 @@ export const ChannelPinEntrySchema = z
   .object({
     channel: ChannelPinSchema,
     loadMode: LoadModeSchema,
+    /** The in-repo workspace package (`in-repo` loadMode only). */
+    inRepoPackage: inRepoPackageSchema.optional(),
     /** Path of the channel entry module relative to the installed package root
      * (where the `defineBundledChannelEntry` object is the default export). */
     entry: z.string().min(1),
@@ -87,7 +99,10 @@ export const ChannelPinEntrySchema = z
      * to run when the channel's section is missing (implementation doc §4.6 n9). */
     notices: z.string().min(1),
   })
-  .strict();
+  .strict()
+  .refine((entry) => (entry.loadMode === "in-repo") === (entry.inRepoPackage !== undefined), {
+    message: 'inRepoPackage must be set exactly when loadMode is "in-repo"',
+  });
 export type ChannelPinEntry = z.infer<typeof ChannelPinEntrySchema>;
 
 export const ChannelPinsSchema = z

@@ -158,14 +158,14 @@ function makeEngine(
     daemon,
     post: async (p) => {
       posted.push(p.text);
-      return { ok: true, nativeMessageId: "1720000000.000001" };
+      return { ok: true, externalMessageId: "1720000000.000001" };
     },
   });
   const context: StreamContext = {
     agentId: "agent-1",
     channel: "slack",
     accountId: ACCOUNT_ID,
-    conversationId: "C0APP",
+    externalConversationId: "C0APP",
     externalThreadId: null,
     initiator: INITIATOR,
     account,

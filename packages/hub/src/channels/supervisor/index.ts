@@ -38,11 +38,11 @@ import { isChannelsEnabled } from "../loader/channel-gate.js";
 import {
   createHostRuntime,
   type HostRuntime,
+  type InboundLedgerSink,
   type InboundReplyParams,
   type InboundReplyResult,
   type StartAccountContext,
 } from "../loader/host.js";
-import { startHostTelegramMonitor } from "../loader/hosts/telegram-monitor.js";
 import { loadChannelVertical, type LoadedChannelVertical } from "../loader/load-channel.js";
 import { setChannelSeamLogger } from "../loader/seam-logger.js";
 import { isEnabled } from "../policy.js";
@@ -176,7 +176,7 @@ function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: Pl
         // check fails) — P0 posts numeric chat ids, no legacy rewrite (outbound.md).
         ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
       });
-      return { ok: true, nativeMessageId: String(result.messageId) };
+      return { ok: true, externalMessageId: String(result.messageId) };
     } catch (error) {
       logger.warn("channel post failed", {
         channel: handle.channel,
@@ -352,7 +352,13 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       handle.install = install;
       handle.integrity = "ok";
       handle.pin = `${pins.main.package}@${pins.main.version}`;
-      const loaded = await this.loadVertical(channel, accountId, install, pinEntry);
+      const loaded = await this.loadVertical(
+        channel,
+        accountId,
+        install,
+        pinEntry,
+        snapshot.organizationId,
+      );
       handle.vertical = loaded.vertical;
       handle.loadTrace = "ok";
       await this.startTransport(handle, snapshot, compiled, loaded);
@@ -483,6 +489,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     accountId: string,
     install: ChannelInstallResult,
     pinEntry: ChannelPinEntry,
+    organizationId: string,
   ): Promise<LoadedVerticalBundle> {
     let inbound: InboundReplyHandler = async () => ({ dispatched: false });
     const hostRuntime = createHostRuntime({
@@ -506,25 +513,17 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
           error: (message, meta) => this.logger.error?.(message, metaFor(meta)),
         };
       },
-      // Bundled Telegram only (telegram-monitor.md, option A): the native
-      // dispatch chain is relative (zero alias specifiers), so the monitor is
-      // the host's own — a getUpdates long-poll installed as the native
-      // `monitorTelegramProvider` override. Slack has no host override.
-      ...(channel === "telegram"
-        ? {
-            channel: {
-              telegram: {
-                monitorTelegramProvider: (opts: Record<string, unknown>) =>
-                  startHostTelegramMonitor({
-                    hostRuntime,
-                    accountId,
-                    options: opts,
-                    logger: this.logger,
-                  }),
-              },
-            },
-          }
-        : {}),
+      // The in-repo verticals own their monitors: Telegram's getUpdates
+      // long-poll and Slack's Socket Mode live inside the package (L2), driven
+      // by `plugin.gateway.startAccount`. The host exposes no
+      // `monitorTelegramProvider` override any more — the vertical's L2 owns
+      // the poll loop and hands each native event to its L3 processor.
+      //
+      // The shared L3 processor records + consume-marks its inbound rows
+      // through this sink (blueprint §2.4): the adapter below writes them to
+      // the channel event ledger via the account's orgId. Without it the L3
+      // silently skips the ledger steps (blueprint §6 item 7).
+      inboundLedger: this.inboundLedgerSink(organizationId, channel, accountId),
     });
     const vertical = await loadChannelVertical({
       channel,
@@ -797,6 +796,45 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
 
   private stateDir(accountId: string): string {
     return join(this.options.dataDir, "channels", accountId, "state");
+  }
+
+  /**
+   * The inbound ledger sink the shared L3 processor records into (blueprint
+   * §2.4 / §6 item 7). An adapter over the channel event ledger: `record`
+   * writes the pre-handoff `in` row (dedupe on the external message id) and
+   * `consume` marks it consumed when the dispatch settles, referencing the
+   * plane's turn. `orgId` comes from the account's row; `consumedAt` is now.
+   * A ledger fault is logged, not thrown into the transport (P13).
+   */
+  private inboundLedgerSink(
+    organizationId: string,
+    channel: string,
+    accountId: string,
+  ): InboundLedgerSink {
+    const store = this.store;
+    const channelKey = channel as "slack" | "telegram";
+    return {
+      record: async (params) => {
+        const { created } = await store.recordInbound({
+          organizationId,
+          channel: channelKey,
+          accountId,
+          externalConversationId: params.externalConversationId,
+          externalMessageId: params.externalMessageId,
+        });
+        return { created };
+      },
+      consume: async (params) => {
+        await store.consumeInbound({
+          organizationId,
+          accountId,
+          externalConversationId: params.externalConversationId,
+          externalMessageId: params.externalMessageId,
+          turnId: params.turnId,
+          consumedAt: new Date(),
+        });
+      },
+    };
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "registry": "https://registry.npmjs.org/",
-  "note": "Pinned OpenClaw supply for the Hub channel verticals (plan §14.4: public npm, no mirror; the integrity pin is the trust boundary). Each channel pins the shared main package + its own channel package. Integrity is the tarball `dist.integrity` (npm `sha512-…`); the channel packages additionally pin `gitHead` (the main package does not record one on the registry). Telegram is inlined in the main package's dist (no separate channel package), so its `channel` pins the main package itself and its loadMode is `bundled` (file:// URL, no alias surface — plan §7 / table-top finding #0).",
+  "note": "Pinned OpenClaw supply for the Hub channel verticals (plan §14.4: public npm, no mirror; the integrity pin is the trust boundary for pinned supply). Each channel pins the shared main package + its own channel package. Integrity is the tarball `dist.integrity` (npm `sha512-…`); the channel packages additionally pin `gitHead` (the main package does not record one on the registry). Telegram is inlined in the main package's dist (no separate channel package), so its `channel` pins the main package itself (file:// URL, no alias surface — plan §7 / table-top finding #0). Slack and Telegram are pulled IN-REPO (blueprint docs/audits/2026-08-26-in-repo-channel-verticals.md §6.5): their loadMode is `in-repo` and the Hub drives the built workspace package (`inRepoPackage`) — trusted first-party, no tarball fetch, no integrity gate at load; the `channel` pins stay as the UPSTREAM SYNC REFERENCES (integrity + gitHead intact) for the re-sync loop.",
   "main": {
     "package": "openclaw",
     "version": "2026.7.1-2",
@@ -18,10 +18,11 @@
           "gitHead": "2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4"
         }
       },
-      "loadMode": "published",
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-slack",
       "entry": "./dist/index.js",
       "plugin": {
-        "specifier": "./dist/channel-plugin-api.js",
+        "specifier": "./dist/plugin.js",
         "exportName": "slackPlugin"
       },
       "notices": "slack"
@@ -34,10 +35,11 @@
           "integrity": "sha512-ycF3yPcbjN6bUPeaUx6Mh6vze1hQWoD3CT/wWcmD7a8xaHHHRUaAlaq+lFxMHf1ssEgODVAwjlzYqp2twkYZ7g=="
         }
       },
-      "loadMode": "bundled",
-      "entry": "./dist/extensions/telegram/index.js",
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-telegram",
+      "entry": "./dist/index.js",
       "plugin": {
-        "specifier": "./dist/extensions/telegram/channel-plugin-api.js",
+        "specifier": "./dist/plugin.js",
         "exportName": "telegramPlugin"
       },
       "notices": "telegram"

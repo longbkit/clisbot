@@ -148,7 +148,7 @@ describe("thread_bindings", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       pendingExecutionId: "execution-1",
       initiator: INITIATOR,
@@ -163,7 +163,7 @@ describe("thread_bindings", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       pendingExecutionId: "execution-1",
       initiator: INITIATOR,
@@ -174,7 +174,7 @@ describe("thread_bindings", () => {
     const bound = await store.resolvePendingThreadBinding({
       organizationId: ORGANIZATION_ID,
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       agentId: "agent-42",
       resolvedAt: new Date("2026-08-25T01:00:00Z"),
@@ -202,7 +202,7 @@ describe("thread_bindings", () => {
         organizationId: ORGANIZATION_ID,
         channel: "slack",
         accountId: SLACK_ACCOUNT,
-        conversationId: SLACK_CONVERSATION,
+        externalConversationId: SLACK_CONVERSATION,
         externalThreadId: SLACK_THREAD,
         pendingExecutionId: "execution-2",
         initiator: INITIATOR,
@@ -217,7 +217,7 @@ describe("thread_bindings", () => {
       store.resolvePendingThreadBinding({
         organizationId: ORGANIZATION_ID,
         accountId: SLACK_ACCOUNT,
-        conversationId: SLACK_CONVERSATION,
+        externalConversationId: SLACK_CONVERSATION,
         externalThreadId: null,
         agentId: "agent-42",
         resolvedAt: new Date(),
@@ -231,7 +231,7 @@ describe("thread_bindings", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: null,
       pendingExecutionId: "execution-3",
       initiator: INITIATOR,
@@ -253,7 +253,7 @@ describe("thread_bindings", () => {
       organizationId: ORGANIZATION_ID,
       channel: "telegram",
       accountId: TELEGRAM_ACCOUNT,
-      conversationId: TELEGRAM_CONVERSATION,
+      externalConversationId: TELEGRAM_CONVERSATION,
       externalThreadId: TELEGRAM_TOPIC,
       pendingExecutionId: "execution-9",
       initiator: "telegram:123456789",
@@ -262,7 +262,7 @@ describe("thread_bindings", () => {
     const abandoned = await store.abandonPendingThreadBinding({
       organizationId: ORGANIZATION_ID,
       accountId: TELEGRAM_ACCOUNT,
-      conversationId: TELEGRAM_CONVERSATION,
+      externalConversationId: TELEGRAM_CONVERSATION,
       externalThreadId: TELEGRAM_TOPIC,
       resolvedAt: new Date("2026-08-25T02:00:00Z"),
     });
@@ -281,7 +281,7 @@ describe("delivery_ledger", () => {
     organizationId: ORGANIZATION_ID,
     channel: "slack" as const,
     accountId: SLACK_ACCOUNT,
-    conversationId: SLACK_CONVERSATION,
+    externalConversationId: SLACK_CONVERSATION,
     externalThreadId: SLACK_THREAD,
   };
 
@@ -289,7 +289,7 @@ describe("delivery_ledger", () => {
     const first = await store.recordDelivery({ ...key, eventTurnId: "turn-1", sequence: 0 });
     assert.equal(first.created, true);
     assert.equal(first.record.status, "recorded");
-    assert.equal(first.record.nativeMessageId, null);
+    assert.equal(first.record.externalMessageId, null);
 
     const replay = await store.recordDelivery({ ...key, eventTurnId: "turn-1", sequence: 0 });
     assert.equal(replay.created, false, "a replayed stream event must not re-record");
@@ -304,32 +304,33 @@ describe("delivery_ledger", () => {
     const posted = await store.confirmDelivery({
       organizationId: ORGANIZATION_ID,
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       eventTurnId: "turn-1",
       sequence: 0,
-      nativeMessageId: "1720000000.000001",
+      externalMessageId: "1720000000.000001",
       postedAt: new Date("2026-08-25T03:00:00Z"),
     });
     assert.equal(posted.status, "posted");
-    assert.equal(posted.nativeMessageId, "1720000000.000001");
+    assert.equal(posted.externalMessageId, "1720000000.000001");
 
     const again = await store.confirmDelivery({
       organizationId: ORGANIZATION_ID,
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       eventTurnId: "turn-1",
       sequence: 0,
-      nativeMessageId: "1720000000.000002",
+      externalMessageId: "1720000000.000002",
       postedAt: new Date("2026-08-25T03:00:01Z"),
     });
     assert.equal(again.id, posted.id, "re-confirm returns the stored row");
-    assert.equal(again.nativeMessageId, "1720000000.000001");
+    assert.equal(again.externalMessageId, "1720000000.000001");
 
     const found = await store.findDeliveryLedgerRecord(
       ORGANIZATION_ID,
       SLACK_ACCOUNT,
+      "out",
       SLACK_CONVERSATION,
       SLACK_THREAD,
       "turn-1",
@@ -357,7 +358,7 @@ describe("delivery_ledger", () => {
     const failed = await store.failDelivery({
       organizationId: ORGANIZATION_ID,
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       eventTurnId: "turn-2",
       sequence: 0,
@@ -365,7 +366,7 @@ describe("delivery_ledger", () => {
     });
     assert.equal(failed.status, "failed");
     assert.equal(failed.failureReason, "rate limited");
-    assert.equal(failed.nativeMessageId, null, "a failed post has no native id yet");
+    assert.equal(failed.externalMessageId, null, "a failed post has no native id yet");
 
     // The row is not "posted", so it does not count toward the replay cursor.
     const listed = await store.listPostedDeliveries(
@@ -383,16 +384,16 @@ describe("delivery_ledger", () => {
     const posted = await store.confirmDelivery({
       organizationId: ORGANIZATION_ID,
       accountId: SLACK_ACCOUNT,
-      conversationId: SLACK_CONVERSATION,
+      externalConversationId: SLACK_CONVERSATION,
       externalThreadId: SLACK_THREAD,
       eventTurnId: "turn-2",
       sequence: 0,
-      nativeMessageId: "1720000000.000003",
+      externalMessageId: "1720000000.000003",
       postedAt: new Date("2026-08-25T03:00:02Z"),
     });
     assert.equal(posted.id, failed.id, "the retry reuses the failed record");
     assert.equal(posted.status, "posted");
-    assert.equal(posted.nativeMessageId, "1720000000.000003");
+    assert.equal(posted.externalMessageId, "1720000000.000003");
     assert.equal(posted.failureReason, null, "confirming clears the failure reason");
   });
 
@@ -405,13 +406,14 @@ describe("delivery_ledger", () => {
     const found = await store.findDeliveryLedgerRecord(
       ORGANIZATION_ID,
       SLACK_ACCOUNT,
+      "out",
       SLACK_CONVERSATION,
       SLACK_THREAD,
       "turn-3",
       0,
     );
     assert.equal(found?.status, "recorded");
-    assert.equal(found?.nativeMessageId, null);
+    assert.equal(found?.externalMessageId, null);
 
     // It is not posted, so the replay cursor does not advance past it.
     const listed = await store.listPostedDeliveries(
@@ -431,11 +433,99 @@ describe("delivery_ledger", () => {
       store.failDelivery({
         organizationId: ORGANIZATION_ID,
         accountId: SLACK_ACCOUNT,
-        conversationId: SLACK_CONVERSATION,
+        externalConversationId: SLACK_CONVERSATION,
         externalThreadId: SLACK_THREAD,
         eventTurnId: "turn-none",
         sequence: 0,
         failureReason: "rate limited",
+      }),
+      ChannelDeliveryRecordNotFoundError,
+    );
+  });
+});
+
+describe("delivery_ledger inbound (direction = 'in')", () => {
+  const inbound = {
+    organizationId: ORGANIZATION_ID,
+    channel: "telegram" as const,
+    accountId: TELEGRAM_ACCOUNT,
+    externalConversationId: TELEGRAM_CONVERSATION,
+  };
+
+  it("records an inbound event once; a replayed event does not create a second row", async () => {
+    const first = await store.recordInbound({ ...inbound, externalMessageId: "1001" });
+    assert.equal(first.created, true);
+    assert.equal(first.record.direction, "in");
+    assert.equal(first.record.status, "recorded");
+    assert.equal(first.record.externalMessageId, "1001");
+    assert.equal(first.record.eventTurnId, "");
+    assert.equal(first.record.sequence, 0);
+    assert.equal(first.record.turnId, null);
+
+    const replay = await store.recordInbound({ ...inbound, externalMessageId: "1001" });
+    assert.equal(replay.created, false, "a transport replay must not re-record");
+    assert.equal(replay.record.id, first.record.id);
+  });
+
+  it("consumes an inbound row, referencing the plane turn; re-consume is a no-op", async () => {
+    await store.recordInbound({ ...inbound, externalMessageId: "1002" });
+    const consumed = await store.consumeInbound({
+      organizationId: ORGANIZATION_ID,
+      accountId: TELEGRAM_ACCOUNT,
+      externalConversationId: TELEGRAM_CONVERSATION,
+      externalMessageId: "1002",
+      turnId: "telegram:1002",
+      consumedAt: new Date("2026-08-25T04:00:00Z"),
+    });
+    assert.equal(consumed.status, "consumed");
+    assert.equal(consumed.turnId, "telegram:1002");
+    assert.ok(consumed.consumedAt instanceof Date);
+
+    const again = await store.consumeInbound({
+      organizationId: ORGANIZATION_ID,
+      accountId: TELEGRAM_ACCOUNT,
+      externalConversationId: TELEGRAM_CONVERSATION,
+      externalMessageId: "1002",
+      turnId: "telegram:other-turn",
+      consumedAt: new Date("2026-08-25T04:00:01Z"),
+    });
+    assert.equal(again.id, consumed.id, "re-consume returns the stored row");
+    assert.equal(again.turnId, "telegram:1002", "the first turn reference wins");
+  });
+
+  it("keeps a declined inbound row at 'recorded' until it is consumed", async () => {
+    await store.recordInbound({ ...inbound, externalMessageId: "1003" });
+    const found = await store.findDeliveryLedgerRecord(
+      ORGANIZATION_ID,
+      TELEGRAM_ACCOUNT,
+      "in",
+      TELEGRAM_CONVERSATION,
+      null,
+      "",
+      0,
+    );
+    assert.equal(found?.status, "recorded", "the plane declined it; it stays recorded");
+    assert.equal(found?.turnId, null);
+
+    // Inbound rows never enter the outbound replay cursor.
+    const listed = await store.listPostedDeliveries(
+      ORGANIZATION_ID,
+      TELEGRAM_ACCOUNT,
+      TELEGRAM_CONVERSATION,
+      null,
+    );
+    assert.equal(listed.length, 0);
+  });
+
+  it("rejects consuming an inbound message that was never recorded", async () => {
+    await assert.rejects(
+      store.consumeInbound({
+        organizationId: ORGANIZATION_ID,
+        accountId: TELEGRAM_ACCOUNT,
+        externalConversationId: TELEGRAM_CONVERSATION,
+        externalMessageId: "4004",
+        turnId: "telegram:4004",
+        consumedAt: new Date(),
       }),
       ChannelDeliveryRecordNotFoundError,
     );

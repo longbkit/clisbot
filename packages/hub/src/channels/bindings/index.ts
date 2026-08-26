@@ -31,7 +31,7 @@ import type {
 
 /** The durable thread key (conversation + native thread id) a binding is keyed by. */
 export interface ThreadKey {
-  conversationId: string;
+  externalConversationId: string;
   externalThreadId: string | null;
 }
 
@@ -47,7 +47,7 @@ export function deriveBindingKey(
   bindingKey: EffectiveDefaults["bindingKey"],
 ): ThreadKey {
   const externalThreadId = bindingKey === "thread" ? conversation.threadId : null;
-  return { conversationId: conversation.rootConversationId, externalThreadId };
+  return { externalConversationId: conversation.rootConversationId, externalThreadId };
 }
 
 /** The marker the plane stamps on a created agent so orphan recovery can match it. */
@@ -95,7 +95,7 @@ export class BindingEngine {
     const binding = await this.context.store.findThreadBinding(
       this.context.organizationId,
       account.accountId,
-      key.conversationId,
+      key.externalConversationId,
       key.externalThreadId,
     );
     if (binding === undefined) return this.firstMention(message, account, route, key);
@@ -137,7 +137,7 @@ export class BindingEngine {
       await this.context.store.resolvePendingThreadBinding({
         organizationId: marker.organizationId,
         accountId: marker.accountId,
-        conversationId: marker.conversationId,
+        externalConversationId: marker.externalConversationId,
         externalThreadId: marker.externalThreadId,
         agentId: agent.id,
         resolvedAt: new Date(),
@@ -173,7 +173,7 @@ export class BindingEngine {
         organizationId: this.context.organizationId,
         channel: account.channel as P0ChannelName,
         accountId: account.accountId,
-        conversationId: key.conversationId,
+        externalConversationId: key.externalConversationId,
         externalThreadId: key.externalThreadId,
         pendingExecutionId: executionId,
         initiator: message.senderIdentity,
@@ -189,7 +189,7 @@ export class BindingEngine {
       const existing = await this.context.store.findThreadBinding(
         this.context.organizationId,
         account.accountId,
-        key.conversationId,
+        key.externalConversationId,
         key.externalThreadId,
       );
       if (existing?.status === "pending") {
@@ -214,7 +214,7 @@ export class BindingEngine {
     await this.context.store.resolvePendingThreadBinding({
       organizationId: this.context.organizationId,
       accountId: account.accountId,
-      conversationId: key.conversationId,
+      externalConversationId: key.externalConversationId,
       externalThreadId: key.externalThreadId,
       agentId: created.agentId,
       resolvedAt: new Date(),
@@ -259,7 +259,7 @@ export class BindingEngine {
     await this.context.store.resolvePendingThreadBinding({
       organizationId: this.context.organizationId,
       accountId: account.accountId,
-      conversationId: key.conversationId,
+      externalConversationId: key.externalConversationId,
       externalThreadId: key.externalThreadId,
       agentId: surviving.id,
       resolvedAt: new Date(),

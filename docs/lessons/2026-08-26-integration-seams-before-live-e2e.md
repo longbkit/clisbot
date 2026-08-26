@@ -52,7 +52,7 @@ Two generalizations:
 - A success path disarms the watchdog armed for its failure path. A timer armed at socket open to force reconnect when the daemon never answers the hello must clear at the moment the answer arrives.
 - When an integration test flakes inside a timing window, suspect a production timer before the test's sequencing. The flake reproduced the production bug exactly; a shared `[t+ms]` clock on hub log lines plus fake-daemon close events made the diagnosis arithmetic instead of guessing.
 
-Also found while looping: `OPENCLAW_LOG_LEVEL=debug` makes the vertical's inbound drop gates log to OpenClaw's file log. The file never materializing in a live drop was itself evidence — the drop was hub-side, before the vertical's gates.
+Also found while looping: `OPENCLAW_LOG_LEVEL=debug` makes the vertical's inbound drop gates log to OpenClaw's file log. The file never materializing in a live drop was itself evidence — the drop was hub-side, before the vertical's gates. The full gate-stack map (allowBots / owner-presence / mention gating, and why a marker posted by the bot under test itself is dropped by default) is [pinned-vertical-contracts/ingress-gates.md](../audits/pinned-vertical-contracts/ingress-gates.md).
 
 ## Known open items carried out of the session
 

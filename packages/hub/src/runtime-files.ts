@@ -18,3 +18,10 @@ export function configureRuntimeRoot(root: string): () => void {
 export function runtimeFile(...segments: string[]): string {
   return join((globalThis as RuntimeGlobal)[RUNTIME_ROOT] ?? process.cwd(), ...segments);
 }
+
+/** The pinned runtime root, or `undefined` when no packaged asset root was
+ * pinned (source/dev runs). Callers that need a packaged-asset-only path
+ * (not the cwd fallback `runtimeFile` gives) branch on this. */
+export function runtimeRoot(): string | undefined {
+  return (globalThis as RuntimeGlobal)[RUNTIME_ROOT];
+}

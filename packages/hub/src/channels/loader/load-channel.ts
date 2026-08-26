@@ -21,8 +21,9 @@
 // import keep resolving to this channel's main dir (§4.8 D5); `dispose()` forgets
 // it.
 
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runtimeFile } from "../../runtime-files.js";
 import { assertChannelsEnabled } from "./channel-gate.js";
@@ -64,7 +65,7 @@ export interface LoadChannelVerticalOptions {
   entry: string;
   /** The plugin chunk + named export to drive (pin's `plugin`, §4.8 D1). */
   plugin: { specifier: string; exportName: string };
-  loadMode: "published" | "bundled";
+  loadMode: "published" | "bundled" | "in-repo";
   hostRuntime: HostRuntime;
   /** Base dir of the in-repo host modules (defaults to the compiled `hosts/`). */
   hostBaseDir?: string;
@@ -110,7 +111,14 @@ export class LoadTraceError extends ChannelLoaderError {
  * (the allowlisted pure subpaths resolve into it), and the in-repo host module
  * dir (the bound seam's own code — Hub-owned, not channel supply). For a bundled
  * channel the two install dirs are the same. The synthetic seam URL sits under
- * the channel dir, so it is admitted by the channel-root check. */
+ * the channel dir, so it is admitted by the channel-root check.
+ *
+ * An `in-repo` channel (blueprint §6.5) adds three explicit roots: its own
+ * workspace package dir (already the channel root above), the shared in-repo
+ * contract package (`@getpaseo/channels-shared`, workspace-linked — its module
+ * URLs are the symlink's REALPATH, which resolves OUTSIDE the channel install
+ * dir), and the hoisted npm deps under the repo's root node_modules (the
+ * vertical's pinned third-party deps — grammy, @slack/* — hoist to the root). */
 function allowlistRoots(options: LoadChannelVerticalOptions): string[] {
   const channel = pathToFileURL(options.channelInstallDir).toString();
   const roots = [channel, pathToFileURL(options.hostBaseDir ?? defaultHostBaseDir()).toString()];
@@ -118,7 +126,35 @@ function allowlistRoots(options: LoadChannelVerticalOptions): string[] {
     const main = pathToFileURL(options.mainInstallDir).toString();
     if (main !== channel) roots.push(main);
   }
+  if (options.loadMode === "in-repo") {
+    for (const root of inRepoDependencyRoots()) {
+      const url = pathToFileURL(root).toString();
+      if (!roots.includes(url)) roots.push(url);
+    }
+  }
   return roots;
+}
+
+/** The in-repo dependency roots:
+ * (a) the shared in-repo contract package's dir — `require.resolve` from this
+ * hub file resolves the workspace link; `realpathSync` normalizes it to the
+ * real package dir, where shared's module URLs actually land;
+ * (b) the repo's root `node_modules` — the hoisted npm deps (grammy,
+ * @slack/*) live there, OUTSIDE the channel package dir.
+ * Both are derived from this file's own location: this file sits at
+ * `<root>/packages/hub/{src,dist}/channels/loader/`, so six `dirname` calls
+ * on its URL path land on the repo root — the layout math holds in source/dev
+ * runs (tsx, vitest) and in the compiled `dist/` run alike. A missing shared
+ * package throws — the vertical cannot be admitted to an unknown supply tree
+ * (fail closed at load, like every other load-trace miss). */
+function inRepoDependencyRoots(): string[] {
+  const require = createRequire(import.meta.url);
+  const sharedPackageJson = require.resolve("@getpaseo/channels-shared/package.json");
+  const sharedDir = realpathSync(dirname(sharedPackageJson));
+  const repoRoot = dirname(
+    dirname(dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))))),
+  );
+  return [sharedDir, join(repoRoot, "node_modules")];
 }
 
 /** Node builtins are trusted stdlib, not third-party supply: a channel may import

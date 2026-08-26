@@ -1212,12 +1212,17 @@ export const billingPlanPrices = pgTable(
 export const CHANNEL_NAMES = ["slack", "telegram"] as const;
 export const CHANNEL_ACCOUNT_STATUSES = ["installing", "active", "suspended", "failed"] as const;
 export const THREAD_BINDING_STATUSES = ["pending", "bound", "abandoned"] as const;
-export const DELIVERY_LEDGER_STATUSES = ["recorded", "posted", "failed"] as const;
+export const DELIVERY_LEDGER_STATUSES = ["recorded", "posted", "failed", "consumed"] as const;
+export const CHANNEL_LEDGER_DIRECTIONS = ["in", "out"] as const;
 
 export type ChannelName = (typeof CHANNEL_NAMES)[number];
 export type ChannelAccountStatus = (typeof CHANNEL_ACCOUNT_STATUSES)[number];
 export type ThreadBindingStatus = (typeof THREAD_BINDING_STATUSES)[number];
 export type DeliveryLedgerStatus = (typeof DELIVERY_LEDGER_STATUSES)[number];
+/** The ledger's direction (blueprint §2.4): `out` rows are the outbound relay's
+ * record-before-post; `in` rows are the shared L3 monitor's inbound
+ * record-before-handoff (status flow `recorded → consumed`). */
+export type ChannelLedgerDirection = (typeof CHANNEL_LEDGER_DIRECTIONS)[number];
 
 /** One runtime record per channel account (e.g. one Slack app, one Telegram bot). */
 export const channelAccounts = pgTable(
@@ -1271,7 +1276,9 @@ export const threadBindings = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     channel: text().$type<ChannelName>().notNull(),
     accountId: text("account_id").notNull(),
-    conversationId: text("conversation_id").notNull(),
+    // The channel-assigned conversation id (blueprint §2.4.4 vendor-id rename:
+    // the channel assigns it, so it is `external_`).
+    externalConversationId: text("external_conversation_id").notNull(),
     // Native thread id (Slack thread root ts / Telegram message_thread_id); NULL when the
     // binding key is the whole conversation (binding.key: channel/dm).
     externalThreadId: text("external_thread_id"),
@@ -1297,7 +1304,7 @@ export const threadBindings = pgTable(
     uniqueIndex("thread_bindings_account_thread_unique").on(
       table.organizationId,
       table.accountId,
-      table.conversationId,
+      table.externalConversationId,
       table.externalThreadId,
     ),
     index("thread_bindings_agent_idx").on(table.agentId),
@@ -1317,9 +1324,25 @@ export const threadBindings = pgTable(
 );
 
 /**
- * Record-before-post idempotency for the outbound relay (plan §S5). One row per
- * (account, external thread, event/turn id, seq), written before the channel post;
- * a replayed stream event or a Hub restart cannot double-post.
+ * The channel event ledger — bidirectional (blueprint §2.4, decided §7.5):
+ * one pglite ledger for both directions instead of two concepts' worth of
+ * tables.
+ *
+ * `out` rows: record-before-post idempotency for the outbound relay (plan §S5).
+ * One row per (account, external thread, event/turn id, seq), written before
+ * the channel post; a replayed stream event or a Hub restart cannot
+ * double-post. Status flow `recorded → posted | failed`; `attempts` counts the
+ * post tries (a failed post retries without a new row).
+ *
+ * `in` rows: the shared L3 monitor's record-before-handoff (blueprint §2.4).
+ * One row per (channel, account, external conversation, external message id),
+ * written before the `onInboundReply` handoff; a transport replay or a Hub
+ * restart cannot dispatch the same inbound message twice. Status flow
+ * `recorded → consumed` (`consumedAt` + `turnId` reference the plane turn the
+ * row dispatched to; an inbound the plane declined stays `recorded`). The
+ * inbound uniqueness is a PARTIAL unique index on `direction = 'in'` — the
+ * `out` dedupe key (event turn + sequence) is a different concept and keeps
+ * its own index; inbound rows carry `eventTurnId = ''`, `sequence = 0`.
  */
 export const deliveryLedger = pgTable(
   "delivery_ledger",
@@ -1330,31 +1353,80 @@ export const deliveryLedger = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     channel: text().$type<ChannelName>().notNull(),
     accountId: text("account_id").notNull(),
-    conversationId: text("conversation_id").notNull(),
+    /** `in` = inbound event (L3 monitor), `out` = outbound post (relay). */
+    direction: text().$type<ChannelLedgerDirection>().notNull(),
+    // The channel-assigned conversation id (blueprint §2.4.4 vendor-id rename).
+    externalConversationId: text("external_conversation_id").notNull(),
     externalThreadId: text("external_thread_id"),
-    // Event/turn identity + ordinal: the dedupe key for replayed stream events.
+    // Event/turn identity + ordinal: the `out` dedupe key for replayed stream
+    // events. Inbound rows carry `''` / `0` (their dedupe key is the
+    // external message id, below).
     eventTurnId: text("event_turn_id").notNull(),
     sequence: integer().notNull(),
     status: text().$type<DeliveryLedgerStatus>().notNull(),
     recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
     postedAt: timestamp("posted_at", { withTimezone: true }),
-    // Native confirmation of the post (Slack ts / Telegram message id).
-    nativeMessageId: text("native_message_id"),
+    // The channel-assigned message id: the post's confirmation (`out`: Slack ts
+    // / Telegram message id) or the inbound event's own id (`in`).
+    externalMessageId: text("external_message_id"),
+    // Inbound only: when the dispatch settled and the row went `consumed`.
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    // Inbound only: the plane turn the row dispatched to (the turn reference,
+    // §2.4).
+    turnId: text("turn_id"),
+    // Outbound only: the post attempts (recorded=1 after the first failed
+    // attempt; a retry re-posts under the same row).
+    attempts: integer().notNull().default(1),
     failureReason: text("failure_reason"),
   },
   (table) => [
-    uniqueIndex("delivery_ledger_event_turn_sequence_unique").on(
-      table.organizationId,
-      table.accountId,
-      table.conversationId,
-      table.externalThreadId,
-      table.eventTurnId,
-      table.sequence,
-    ),
+    // `out` dedupe: one row per (account, external thread, event/turn id, seq).
+    // The inbound rows' constant (`''`, 0) keys keep this index usable for
+    // lookups but never unique across inbound rows — that is the partial
+    // index's job.
+    uniqueIndex("delivery_ledger_event_turn_sequence_unique")
+      .on(
+        table.organizationId,
+        table.accountId,
+        table.externalConversationId,
+        table.externalThreadId,
+        table.eventTurnId,
+        table.sequence,
+      )
+      .where(sql`${table.direction} = 'out'`),
+    // `in` dedupe: one row per (channel, account, external conversation,
+    // external message id). NULLs never appear (the inbound message id is the
+    // dedupe key), so a plain partial unique index is exact.
+    uniqueIndex("delivery_ledger_inbound_message_unique")
+      .on(
+        table.organizationId,
+        table.accountId,
+        table.externalConversationId,
+        table.externalMessageId,
+      )
+      .where(sql`${table.direction} = 'in'`),
     index("delivery_ledger_account_created_idx").on(table.accountId, table.recordedAt.desc()),
-    check("delivery_ledger_status_check", sql`${table.status} in ('recorded', 'posted', 'failed')`),
+    check(
+      "delivery_ledger_status_check",
+      sql`${table.status} in ('recorded', 'posted', 'failed', 'consumed')`,
+    ),
+    check("delivery_ledger_direction_check", sql`${table.direction} in ('in', 'out')`),
     check("delivery_ledger_channel_check", sql`${table.channel} in ('slack', 'telegram')`),
     check("delivery_ledger_sequence_check", sql`${table.sequence} >= 0`),
+    check("delivery_ledger_attempts_check", sql`${table.attempts} >= 1`),
+    // Inbound rows are shape-pinned: constant out-keys, message id present.
+    check(
+      "delivery_ledger_inbound_shape_check",
+      sql`(${table.direction} = 'in'
+        and ${table.eventTurnId} = ''
+        and ${table.sequence} = 0
+        and ${table.externalMessageId} is not null
+        and ${table.status} in ('recorded', 'consumed')
+        and ${table.consumedAt} is not null = (${table.status} = 'consumed')
+        and ${table.turnId} is not null = (${table.status} = 'consumed'))
+        or (${table.direction} = 'out'
+        and ${table.status} in ('recorded', 'posted', 'failed'))`,
+    ),
   ],
 );
 

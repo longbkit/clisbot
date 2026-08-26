@@ -31,7 +31,7 @@ export function replyLocationFor(context: StreamContext): {
   const threadId =
     context.route.defaults.replyAnchor === "thread" ? context.externalThreadId : null;
   return {
-    to: context.conversationId,
+    to: context.externalConversationId,
     ...(threadId !== null ? { threadId } : {}),
   };
 }
@@ -225,7 +225,7 @@ export class RelayEngine {
       organizationId: this.relay.organizationId,
       channel: context.channel,
       accountId: context.accountId,
-      conversationId: context.conversationId,
+      externalConversationId: context.externalConversationId,
       externalThreadId: context.externalThreadId,
       eventTurnId,
       sequence,
@@ -243,11 +243,11 @@ export class RelayEngine {
       await this.relay.store.confirmDelivery({
         organizationId: this.relay.organizationId,
         accountId: context.accountId,
-        conversationId: context.conversationId,
+        externalConversationId: context.externalConversationId,
         externalThreadId: context.externalThreadId,
         eventTurnId,
         sequence,
-        nativeMessageId: result.nativeMessageId ?? "",
+        externalMessageId: result.externalMessageId ?? "",
         postedAt: new Date(),
       });
       return;
@@ -255,7 +255,7 @@ export class RelayEngine {
     await this.relay.store.failDelivery({
       organizationId: this.relay.organizationId,
       accountId: context.accountId,
-      conversationId: context.conversationId,
+      externalConversationId: context.externalConversationId,
       externalThreadId: context.externalThreadId,
       eventTurnId,
       sequence,

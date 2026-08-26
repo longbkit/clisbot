@@ -59,6 +59,35 @@ export interface InboundReplyResult {
   [key: string]: unknown;
 }
 
+/** The inbound ledger sink the in-repo verticals' shared L3 monitor records
+ * into (packages/channels/shared host contract, blueprint §2.4): the monitor
+ * writes the inbound row BEFORE the `onInboundReply` handoff and marks it
+ * consumed when the dispatch settles. Hub-owned — the supervisor wires one
+ * backed by the channel event ledger; absent, the monitor skips the ledger
+ * steps. Structurally the same shape as the shared contract's
+ * `InboundLedgerSink` (the Hub's concrete runtime is structurally compatible
+ * with the shared host interface; the verticals never see Hub types). */
+export interface InboundLedgerSink {
+  /** Record the inbound event (dedupe on the external message id). `created`
+   * is true when THIS call created the row; false on a replay hit — the
+   * monitor must NOT dispatch in that case. */
+  record(params: {
+    channel: string;
+    accountId: string;
+    externalConversationId: string;
+    externalMessageId: string;
+    senderIdentity?: string;
+  }): Promise<{ created: boolean }>;
+  /** Mark the recorded event consumed, referencing the plane's turn. */
+  consume(params: {
+    channel: string;
+    accountId: string;
+    externalConversationId: string;
+    externalMessageId: string;
+    turnId: string;
+  }): Promise<void>;
+}
+
 /** Minimal structured logger OpenClaw's `logging.getChildLogger` returns. */
 export interface HostChildLogger {
   debug?: (message: string, meta?: unknown) => void;
@@ -102,6 +131,10 @@ export interface HostRuntime {
   /** Outbound relay hook (P0: transport-level send is the vertical's own; this is
    * where the Hub relay posts final answers). May be undefined pre-wiring. */
   outbound?: ChannelHostOutbound;
+  /** The inbound ledger sink (Hub-owned; the in-repo verticals' shared L3
+   * monitor records/consumes inbound rows through it). Absent = the monitor
+   * skips the ledger steps. */
+  inboundLedger?: InboundLedgerSink | undefined;
 }
 
 /** The OpenClaw `RuntimeEnv` a channel account's monitor receives (verified on
@@ -152,6 +185,9 @@ export function createHostRuntime(options: {
    * `ctx.log?.info(...)` et al., so a level that is absent (not just quiet)
    * crashes the monitor. */
   childLogger?: (options?: Record<string, unknown>) => HostChildLogger;
+  /** The inbound ledger sink (Hub-owned). Omitted until the supervisor wires
+   * one over the channel event ledger. */
+  inboundLedger?: InboundLedgerSink;
 }): HostRuntime {
   const silentLogger: HostChildLogger = {
     debug: () => undefined,
@@ -168,6 +204,7 @@ export function createHostRuntime(options: {
     },
     channel: options.channel ?? {},
     ...(options.outbound !== undefined ? { outbound: options.outbound } : {}),
+    ...(options.inboundLedger !== undefined ? { inboundLedger: options.inboundLedger } : {}),
   };
 }
 

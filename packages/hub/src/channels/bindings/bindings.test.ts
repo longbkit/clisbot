@@ -86,14 +86,14 @@ const DEFAULTS = {
 };
 
 function makeRoute(
-  conversationId = CONVERSATION,
+  externalConversationId = CONVERSATION,
   overrides: {
     approval?: CompiledRoute["approval"];
     defaults?: Partial<CompiledRoute["defaults"]>;
   } = {},
 ): CompiledRoute {
   return {
-    match: { kind: "channel", ids: [conversationId] },
+    match: { kind: "channel", ids: [externalConversationId] },
     target: { kind: "agent", agent: "worker", environment: "repo", template: null },
     defaultRoles: ["interactor"],
     assignments: [
@@ -211,7 +211,7 @@ describe("deriveBindingKey", () => {
       { kind: "thread", id: "172.0", rootConversationId: CONVERSATION, threadId: "172.0" },
       "thread",
     );
-    assert.deepEqual(key, { conversationId: CONVERSATION, externalThreadId: "172.0" });
+    assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: "172.0" });
   });
 
   it("collapses threads for binding.key = channel", () => {
@@ -219,7 +219,7 @@ describe("deriveBindingKey", () => {
       { kind: "thread", id: "172.0", rootConversationId: CONVERSATION, threadId: "172.0" },
       "channel",
     );
-    assert.deepEqual(key, { conversationId: CONVERSATION, externalThreadId: null });
+    assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
   });
 });
 
@@ -296,26 +296,26 @@ describe("bind (first mention)", () => {
 // --- follow-up (resume / steer) --------------------------------------------
 
 describe("follow-up (resume / steer)", () => {
-  function conversationOf(conversationId: string): InboundConversationDetail {
+  function conversationOf(externalConversationId: string): InboundConversationDetail {
     return {
       kind: "channel",
-      id: conversationId,
-      rootConversationId: conversationId,
+      id: externalConversationId,
+      rootConversationId: externalConversationId,
       threadId: null,
     };
   }
 
-  async function bindFirst(conversationId: string) {
+  async function bindFirst(externalConversationId: string) {
     const fake = makeFakeDaemon();
     const engine = makeEngine(store, fake.daemon);
-    const route = makeRoute(conversationId);
+    const route = makeRoute(externalConversationId);
     const outcome = await engine.bindOrSteer(
-      message({ conversation: conversationOf(conversationId) }),
+      message({ conversation: conversationOf(externalConversationId) }),
       makeAccount(route),
       route,
     );
     assert.equal(outcome.kind, "bound");
-    return { engine, route, conversation: conversationOf(conversationId), fake };
+    return { engine, route, conversation: conversationOf(externalConversationId), fake };
   }
 
   it("steers an unmentioned follow-up into the bound session in auto mode", async () => {
@@ -408,7 +408,7 @@ describe("orphan recovery (restart / resume)", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0ORPHAN",
+      externalConversationId: "C0ORPHAN",
       externalThreadId: null,
       pendingExecutionId: executionId,
       initiator: INITIATOR,
@@ -433,7 +433,7 @@ describe("orphan recovery (restart / resume)", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0GHOST",
+      externalConversationId: "C0GHOST",
       externalThreadId: null,
       pendingExecutionId: "execution-ghost",
       initiator: INITIATOR,
@@ -455,7 +455,7 @@ describe("orphan recovery (restart / resume)", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0INLINE",
+      externalConversationId: "C0INLINE",
       externalThreadId: null,
       pendingExecutionId: executionId,
       initiator: INITIATOR,
@@ -487,7 +487,7 @@ describe("orphan recovery (restart / resume)", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0GATE",
+      externalConversationId: "C0GATE",
       externalThreadId: null,
       pendingExecutionId: executionId,
       initiator: INITIATOR,
@@ -537,7 +537,7 @@ describe("orphan recovery (restart / resume)", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0UNM",
+      externalConversationId: "C0UNM",
       externalThreadId: null,
       pendingExecutionId: executionId,
       initiator: INITIATOR,
@@ -585,7 +585,7 @@ describe("orphan recovery (restart / resume)", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0RACE",
+      externalConversationId: "C0RACE",
       externalThreadId: THREAD_TS,
       pendingExecutionId: executionId,
       initiator: INITIATOR,
@@ -601,12 +601,17 @@ describe("orphan recovery (restart / resume)", () => {
     raceStore.findThreadBinding = async (
       organizationId,
       accountId,
-      conversationId,
+      externalConversationId,
       externalThreadId,
     ) => {
       lookups += 1;
       if (lookups === 1 && externalThreadId === THREAD_TS) return undefined; // the race window
-      return store.findThreadBinding(organizationId, accountId, conversationId, externalThreadId);
+      return store.findThreadBinding(
+        organizationId,
+        accountId,
+        externalConversationId,
+        externalThreadId,
+      );
     };
     const account = makeAccount(makeRoute());
     const engine = new BindingEngine({

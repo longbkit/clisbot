@@ -5,13 +5,20 @@
 // — runs with no network and no real npm.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { sha512Integrity } from "./integrity.js";
-import { loadChannelPins } from "./pins.js";
+import { loadChannelPins, parseChannelPins } from "./pins.js";
 import type { ChannelPins } from "./pins.js";
 import { ensureChannelInstalled, InstallError, resolveInstallDirs } from "./install-channel.js";
 
@@ -107,6 +114,35 @@ function buildFakeRegistry(
 }
 
 // --- pin fixture --------------------------------------------------------------
+
+/** An in-repo (blueprint §6.5) pin document: slack points at the Hub's OWN
+ * workspace package (`@getpaseo/channels-shared` — the one with a built
+ * `dist/` in this repo), no tarball supply; the `channel` pin stays the
+ * upstream sync reference. Parsed through the real manifest schema so the
+ * in-repo entry validation (inRepoPackage ⇔ loadMode) runs. */
+function makeInRepoPins(mainIntegrity: string, channelIntegrity: string): ChannelPins {
+  return parseChannelPins({
+    registry: "https://registry.npmjs.org/",
+    main: { package: "openclaw", version: "2026.7.1-2", dist: { integrity: mainIntegrity } },
+    channels: {
+      slack: {
+        channel: {
+          package: "@openclaw/slack",
+          version: "2026.7.1",
+          dist: {
+            integrity: channelIntegrity,
+            gitHead: "2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4",
+          },
+        },
+        loadMode: "in-repo",
+        inRepoPackage: "@getpaseo/channels-shared",
+        entry: "./dist/index.js",
+        plugin: { specifier: "./dist/plugin.js", exportName: "slackPlugin" },
+        notices: "slack",
+      },
+    },
+  });
+}
 
 function makePins(overrides: {
   mainIntegrity?: string;
@@ -440,12 +476,58 @@ describe("ensureChannelInstalled", () => {
     assert.ok(!existsSync(join(root, "install.lock")));
   });
 
-  it("resolves the real channel-pins.json manifest clean (P0 trust boundary)", () => {
+  it("installs an in-repo channel: resolves the workspace package, marker, no fetch", async () => {
+    // in-repo (blueprint §6.5): the Hub drives its OWN workspace package — no
+    // tarball fetch, no integrity gate, no main-dir provisioning. The entry
+    // module must already be built; a matching marker makes a re-run a no-op.
+    const mainIntegrity = "sha512-" + "D".repeat(86) + "==";
+    const slackIntegrity = "sha512-" + "C".repeat(86) + "==";
+    const inRepoPins = makeInRepoPins(mainIntegrity, slackIntegrity);
+    const dataDir = join(workDir, "acc-inrepo");
+    let calls = 0;
+    const counting = ((input: string | URL | Request) => {
+      calls += 1;
+      return buildFakeRegistry(inRepoPins, makeTarball(MAIN_FILES), {
+        slack: makeTarball(SLACK_FILES),
+      })(input);
+    }) as typeof fetch;
+    const first = await ensureChannelInstalled(inRepoPins, "slack", "acc-inrepo", dataDir, {
+      fetchImpl: counting,
+    });
+    assert.equal(first.installed, false); // nothing to install — resolution only
+    assert.equal(first.loadMode, "in-repo");
+    assert.equal(first.inRepoPackageDir, first.channelInstallDir);
+    // The workspace link's realpath: packages/channels/shared (4 up from this
+    // file's dir is the repo's packages/).
+    assert.equal(
+      first.inRepoPackageDir,
+      realpathSync(new URL("../../../..", import.meta.url).pathname + join("channels", "shared")),
+    );
+    assert.equal(calls, 0); // zero registry fetches (no tarball path at all)
+    const marker = JSON.parse(
+      readFileSync(join(dataDir, "channels", "acc-inrepo", "install-slack.lock"), "utf8"),
+    ) as { loadMode: string; inRepoPackageDir?: string };
+    assert.equal(marker.loadMode, "in-repo");
+    assert.equal(marker.inRepoPackageDir, first.inRepoPackageDir);
+    // Matching re-run: idempotent no-op, no second write.
+    const second = await ensureChannelInstalled(inRepoPins, "slack", "acc-inrepo", dataDir, {
+      fetchImpl: counting,
+    });
+    assert.equal(second.installed, false);
+    assert.equal(calls, 0);
+  });
+
+  it("resolves the real channel-pins.json manifest clean (trust boundary)", () => {
     const pins = loadChannelPins(new URL("../../../channel-pins.json", import.meta.url).pathname);
     assert.equal(pins.main.package, "openclaw");
-    assert.equal(pins.channels["slack"]?.loadMode, "published");
-    assert.equal(pins.channels["telegram"]?.loadMode, "bundled");
-    // The entry the loader will import for the published channel.
+    // Both verticals are pulled in-repo (blueprint §6.5): the `channel` pins
+    // stay the upstream SYNC REFERENCES, but the loadMode + inRepoPackage point
+    // at the Hub's own workspace packages.
+    assert.equal(pins.channels["slack"]?.loadMode, "in-repo");
+    assert.equal(pins.channels["slack"]?.inRepoPackage, "@getpaseo/channels-slack");
+    assert.equal(pins.channels["telegram"]?.loadMode, "in-repo");
+    assert.equal(pins.channels["telegram"]?.inRepoPackage, "@getpaseo/channels-telegram");
+    // The entry the loader will import for the in-repo channel.
     assert.equal(pins.channels["slack"]?.entry, "./dist/index.js");
   });
 

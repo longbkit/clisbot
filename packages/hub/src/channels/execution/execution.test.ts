@@ -180,7 +180,7 @@ function makeHarness(
     logger: SILENT,
     post: async (p) => {
       posted.push(p.text);
-      return { ok: true, nativeMessageId: "1720000000.000001" };
+      return { ok: true, externalMessageId: "1720000000.000001" };
     },
     resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
   });
@@ -262,14 +262,14 @@ describe("first-mention bind (flag on)", () => {
 });
 
 describe("shared stream consumer", () => {
-  async function bindAgent(conversationId: string) {
+  async function bindAgent(externalConversationId: string) {
     const harness = makeHarness();
     await harness.plane.start(harness.fake.daemon, store);
     harness.next.message = message({
       conversation: {
         kind: "channel",
-        id: conversationId,
-        rootConversationId: conversationId,
+        id: externalConversationId,
+        rootConversationId: externalConversationId,
         threadId: null,
       },
     });
@@ -332,7 +332,7 @@ describe("start-time recovery + posture", () => {
       organizationId: ORGANIZATION_ID,
       channel: "slack",
       accountId: ACCOUNT_ID,
-      conversationId: "C0REC",
+      externalConversationId: "C0REC",
       externalThreadId: null,
       pendingExecutionId: executionId,
       initiator: INITIATOR,

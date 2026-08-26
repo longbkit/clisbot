@@ -10,11 +10,14 @@ import type {
   AbandonThreadBindingInput,
   ChannelAccountRecord,
   ConfirmDeliveryInput,
+  ConsumeInboundInput,
   DeliveryLedgerRecord,
   FailDeliveryInput,
   PendingThreadBindingInput,
   RecordDeliveryInput,
   RecordDeliveryResult,
+  RecordInboundInput,
+  RecordInboundResult,
   ResolveThreadBindingInput,
   ThreadBindingRecord,
   UpsertChannelAccountInput,
@@ -131,7 +134,7 @@ export class ChannelStore {
           organizationId: input.organizationId,
           channel: input.channel,
           accountId: input.accountId,
-          conversationId: input.conversationId,
+          externalConversationId: input.externalConversationId,
           externalThreadId: input.externalThreadId,
           status: "pending",
           pendingExecutionId: input.pendingExecutionId,
@@ -148,7 +151,7 @@ export class ChannelStore {
         transaction,
         input.organizationId,
         input.accountId,
-        input.conversationId,
+        input.externalConversationId,
         input.externalThreadId,
       );
       if (existing === undefined) throw new ChannelThreadBindingNotFoundError();
@@ -171,7 +174,7 @@ export class ChannelStore {
         transaction,
         input.organizationId,
         input.accountId,
-        input.conversationId,
+        input.externalConversationId,
         input.externalThreadId,
       );
       if (row === undefined) throw new ChannelThreadBindingNotFoundError();
@@ -204,7 +207,7 @@ export class ChannelStore {
         transaction,
         input.organizationId,
         input.accountId,
-        input.conversationId,
+        input.externalConversationId,
         input.externalThreadId,
       );
       if (row === undefined) throw new ChannelThreadBindingNotFoundError();
@@ -221,14 +224,14 @@ export class ChannelStore {
   async findThreadBinding(
     organizationId: string,
     accountId: string,
-    conversationId: string,
+    externalConversationId: string,
     externalThreadId: string | null,
   ): Promise<ThreadBindingRecord | undefined> {
     const row = await findThreadBindingRow(
       this.database,
       organizationId,
       accountId,
-      conversationId,
+      externalConversationId,
       externalThreadId,
     );
     return row === undefined ? undefined : toThreadBinding(row);
@@ -250,9 +253,9 @@ export class ChannelStore {
   }
 
   /**
-   * Record-before-post: write the ledger row before the channel post. Replayed
-   * stream events (same thread + event/turn id + sequence) return the stored row
-   * with `created: false`, so a replay or restart cannot double-post.
+   * Record-before-post: write the `out` ledger row before the channel post.
+   * Replayed stream events (same thread + event/turn id + sequence) return the
+   * stored row with `created: false`, so a replay or restart cannot double-post.
    */
   async recordDelivery(input: RecordDeliveryInput): Promise<RecordDeliveryResult> {
     const [recorded] = await this.database
@@ -261,7 +264,8 @@ export class ChannelStore {
         organizationId: input.organizationId,
         channel: input.channel,
         accountId: input.accountId,
-        conversationId: input.conversationId,
+        direction: "out",
+        externalConversationId: input.externalConversationId,
         externalThreadId: input.externalThreadId,
         eventTurnId: input.eventTurnId,
         sequence: input.sequence,
@@ -275,7 +279,8 @@ export class ChannelStore {
     const existing = await this.findDeliveryLedgerRecord(
       input.organizationId,
       input.accountId,
-      input.conversationId,
+      "out",
+      input.externalConversationId,
       input.externalThreadId,
       input.eventTurnId,
       input.sequence,
@@ -284,7 +289,7 @@ export class ChannelStore {
     return { record: existing, created: false };
   }
 
-  /** Confirm a recorded delivery with the native message id; idempotent on replay. */
+  /** Confirm a recorded delivery with the channel message id; idempotent on replay. */
   async confirmDelivery(input: ConfirmDeliveryInput): Promise<DeliveryLedgerRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
@@ -292,7 +297,8 @@ export class ChannelStore {
         transaction,
         input.organizationId,
         input.accountId,
-        input.conversationId,
+        "out",
+        input.externalConversationId,
         input.externalThreadId,
         input.eventTurnId,
         input.sequence,
@@ -304,7 +310,7 @@ export class ChannelStore {
         .set({
           status: "posted",
           postedAt: input.postedAt,
-          nativeMessageId: input.nativeMessageId,
+          externalMessageId: input.externalMessageId,
           failureReason: null,
         })
         .where(eq(schema.deliveryLedger.id, row.id))
@@ -314,7 +320,8 @@ export class ChannelStore {
     });
   }
 
-  /** Mark a recorded delivery that failed to post; a later confirm re-posts it. */
+  /** Mark a recorded delivery that failed to post (increments `attempts`); a
+   * later retry re-posts under the same row. */
   async failDelivery(input: FailDeliveryInput): Promise<DeliveryLedgerRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
@@ -322,7 +329,8 @@ export class ChannelStore {
         transaction,
         input.organizationId,
         input.accountId,
-        input.conversationId,
+        "out",
+        input.externalConversationId,
         input.externalThreadId,
         input.eventTurnId,
         input.sequence,
@@ -331,7 +339,77 @@ export class ChannelStore {
       if (row.status === "posted") return toDeliveryLedger(row);
       const [updated] = await transaction
         .update(schema.deliveryLedger)
-        .set({ status: "failed", failureReason: input.failureReason })
+        .set({
+          status: "failed",
+          failureReason: input.failureReason,
+          attempts: sql`${schema.deliveryLedger.attempts} + 1`,
+        })
+        .where(eq(schema.deliveryLedger.id, row.id))
+        .returning();
+      if (updated === undefined) throw new ChannelDeliveryRecordNotFoundError();
+      return toDeliveryLedger(updated);
+    });
+  }
+
+  /**
+   * Record-before-handoff: write the `in` ledger row before the `onInboundReply`
+   * handoff (blueprint §2.4). Replayed events (same external message id) return
+   * the stored row with `created: false`, so the caller must NOT dispatch.
+   */
+  async recordInbound(input: RecordInboundInput): Promise<RecordInboundResult> {
+    const [recorded] = await this.database
+      .insert(schema.deliveryLedger)
+      .values({
+        organizationId: input.organizationId,
+        channel: input.channel,
+        accountId: input.accountId,
+        direction: "in",
+        externalConversationId: input.externalConversationId,
+        externalThreadId: null,
+        eventTurnId: "",
+        sequence: 0,
+        status: "recorded",
+        externalMessageId: input.externalMessageId,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (recorded !== undefined) {
+      return { record: toDeliveryLedger(recorded), created: true };
+    }
+    const existing = await findInboundRow(
+      this.database,
+      input.organizationId,
+      input.accountId,
+      input.externalConversationId,
+      input.externalMessageId,
+    );
+    if (existing === undefined) throw new ChannelDeliveryRecordNotFoundError();
+    return { record: existing, created: false };
+  }
+
+  /**
+   * Mark a recorded inbound row consumed, referencing the plane turn it
+   * dispatched to. Idempotent: an already-consumed row returns as-is.
+   */
+  async consumeInbound(input: ConsumeInboundInput): Promise<DeliveryLedgerRecord> {
+    return this.runtime.transaction(async (runtimeTransaction) => {
+      const transaction = runtimeTransaction.drizzle();
+      const row = await lockInboundRow(
+        transaction,
+        input.organizationId,
+        input.accountId,
+        input.externalConversationId,
+        input.externalMessageId,
+      );
+      if (row === undefined) throw new ChannelDeliveryRecordNotFoundError();
+      if (row.status === "consumed") return toDeliveryLedger(row);
+      const [updated] = await transaction
+        .update(schema.deliveryLedger)
+        .set({
+          status: "consumed",
+          consumedAt: input.consumedAt,
+          turnId: input.turnId,
+        })
         .where(eq(schema.deliveryLedger.id, row.id))
         .returning();
       if (updated === undefined) throw new ChannelDeliveryRecordNotFoundError();
@@ -342,7 +420,8 @@ export class ChannelStore {
   async findDeliveryLedgerRecord(
     organizationId: string,
     accountId: string,
-    conversationId: string,
+    direction: "in" | "out",
+    externalConversationId: string,
     externalThreadId: string | null,
     eventTurnId: string,
     sequence: number,
@@ -351,7 +430,8 @@ export class ChannelStore {
       this.database,
       organizationId,
       accountId,
-      conversationId,
+      direction,
+      externalConversationId,
       externalThreadId,
       eventTurnId,
       sequence,
@@ -359,11 +439,12 @@ export class ChannelStore {
     return row === undefined ? undefined : toDeliveryLedger(row);
   }
 
-  /** Posted ledger rows for a thread, in delivery order — the restart replay cursor. */
+  /** Posted `out` ledger rows for a thread, in delivery order — the restart
+   * replay cursor. */
   async listPostedDeliveries(
     organizationId: string,
     accountId: string,
-    conversationId: string,
+    externalConversationId: string,
     externalThreadId: string | null,
   ): Promise<DeliveryLedgerRecord[]> {
     const rows = await this.database
@@ -373,7 +454,8 @@ export class ChannelStore {
         and(
           eq(schema.deliveryLedger.organizationId, organizationId),
           eq(schema.deliveryLedger.accountId, accountId),
-          eq(schema.deliveryLedger.conversationId, conversationId),
+          eq(schema.deliveryLedger.direction, "out"),
+          eq(schema.deliveryLedger.externalConversationId, externalConversationId),
           deliveryThreadMatches(externalThreadId),
           eq(schema.deliveryLedger.status, "posted"),
         ),
@@ -387,7 +469,7 @@ async function findThreadBindingRow(
   database: HubDatabase,
   organizationId: string,
   accountId: string,
-  conversationId: string,
+  externalConversationId: string,
   externalThreadId: string | null,
 ) {
   const [row] = await database
@@ -397,7 +479,7 @@ async function findThreadBindingRow(
       and(
         eq(schema.threadBindings.organizationId, organizationId),
         eq(schema.threadBindings.accountId, accountId),
-        eq(schema.threadBindings.conversationId, conversationId),
+        eq(schema.threadBindings.externalConversationId, externalConversationId),
         bindingThreadMatches(externalThreadId),
       ),
     )
@@ -409,7 +491,7 @@ async function lockThreadBindingRow(
   transaction: HubTransaction,
   organizationId: string,
   accountId: string,
-  conversationId: string,
+  externalConversationId: string,
   externalThreadId: string | null,
 ) {
   const [row] = await transaction
@@ -419,7 +501,7 @@ async function lockThreadBindingRow(
       and(
         eq(schema.threadBindings.organizationId, organizationId),
         eq(schema.threadBindings.accountId, accountId),
-        eq(schema.threadBindings.conversationId, conversationId),
+        eq(schema.threadBindings.externalConversationId, externalConversationId),
         bindingThreadMatches(externalThreadId),
       ),
     )
@@ -496,7 +578,8 @@ async function findDeliveryRow(
   database: HubDatabase,
   organizationId: string,
   accountId: string,
-  conversationId: string,
+  direction: "in" | "out",
+  externalConversationId: string,
   externalThreadId: string | null,
   eventTurnId: string,
   sequence: number,
@@ -508,7 +591,8 @@ async function findDeliveryRow(
       and(
         eq(schema.deliveryLedger.organizationId, organizationId),
         eq(schema.deliveryLedger.accountId, accountId),
-        eq(schema.deliveryLedger.conversationId, conversationId),
+        eq(schema.deliveryLedger.direction, direction),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
         deliveryThreadMatches(externalThreadId),
         eq(schema.deliveryLedger.eventTurnId, eventTurnId),
         eq(schema.deliveryLedger.sequence, sequence),
@@ -522,7 +606,8 @@ async function lockDeliveryRow(
   transaction: HubTransaction,
   organizationId: string,
   accountId: string,
-  conversationId: string,
+  direction: "in" | "out",
+  externalConversationId: string,
   externalThreadId: string | null,
   eventTurnId: string,
   sequence: number,
@@ -534,10 +619,58 @@ async function lockDeliveryRow(
       and(
         eq(schema.deliveryLedger.organizationId, organizationId),
         eq(schema.deliveryLedger.accountId, accountId),
-        eq(schema.deliveryLedger.conversationId, conversationId),
+        eq(schema.deliveryLedger.direction, direction),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
         deliveryThreadMatches(externalThreadId),
         eq(schema.deliveryLedger.eventTurnId, eventTurnId),
         eq(schema.deliveryLedger.sequence, sequence),
+      ),
+    )
+    .for("update")
+    .limit(1);
+  return row;
+}
+
+async function findInboundRow(
+  database: HubDatabase,
+  organizationId: string,
+  accountId: string,
+  externalConversationId: string,
+  externalMessageId: string,
+) {
+  const [row] = await database
+    .select()
+    .from(schema.deliveryLedger)
+    .where(
+      and(
+        eq(schema.deliveryLedger.organizationId, organizationId),
+        eq(schema.deliveryLedger.accountId, accountId),
+        eq(schema.deliveryLedger.direction, "in"),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
+        eq(schema.deliveryLedger.externalMessageId, externalMessageId),
+      ),
+    )
+    .limit(1);
+  return row;
+}
+
+async function lockInboundRow(
+  transaction: HubTransaction,
+  organizationId: string,
+  accountId: string,
+  externalConversationId: string,
+  externalMessageId: string,
+) {
+  const [row] = await transaction
+    .select()
+    .from(schema.deliveryLedger)
+    .where(
+      and(
+        eq(schema.deliveryLedger.organizationId, organizationId),
+        eq(schema.deliveryLedger.accountId, accountId),
+        eq(schema.deliveryLedger.direction, "in"),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
+        eq(schema.deliveryLedger.externalMessageId, externalMessageId),
       ),
     )
     .for("update")
@@ -572,7 +705,7 @@ function toThreadBinding(row: typeof schema.threadBindings.$inferSelect): Thread
     organizationId: row.organizationId,
     channel: row.channel,
     accountId: row.accountId,
-    conversationId: row.conversationId,
+    externalConversationId: row.externalConversationId,
     externalThreadId: row.externalThreadId,
     status: row.status,
     pendingExecutionId: row.pendingExecutionId,
@@ -591,14 +724,18 @@ function toDeliveryLedger(row: typeof schema.deliveryLedger.$inferSelect): Deliv
     organizationId: row.organizationId,
     channel: row.channel,
     accountId: row.accountId,
-    conversationId: row.conversationId,
+    direction: row.direction,
+    externalConversationId: row.externalConversationId,
     externalThreadId: row.externalThreadId,
     eventTurnId: row.eventTurnId,
     sequence: row.sequence,
     status: row.status,
     recordedAt: row.recordedAt,
     postedAt: row.postedAt,
-    nativeMessageId: row.nativeMessageId,
+    externalMessageId: row.externalMessageId,
+    consumedAt: row.consumedAt,
+    turnId: row.turnId,
+    attempts: row.attempts,
     failureReason: row.failureReason,
   };
 }
