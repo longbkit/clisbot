@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { validateHeaderName, type IncomingMessage } from "node:http";
+import { validateHeaderName, type IncomingMessage, type Server } from "node:http";
 import { fileURLToPath } from "node:url";
 import type { Duplex } from "node:stream";
 import type { Logger } from "pino";
@@ -321,18 +321,7 @@ async function main(): Promise<void> {
     logger.info(`server started, available at: ${appUrl}`);
   });
 
-  const stop = async () => {
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error !== undefined) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
-    });
-    await build.stopProductionRuntime();
-  };
+  const stop = () => stopProductionServer(server, () => build.stopProductionRuntime());
   const stopAfterSignal = () => {
     void shutdownProductionServer(stop)
       .then((clean) => {
@@ -343,6 +332,39 @@ async function main(): Promise<void> {
   };
   process.once("SIGTERM", stopAfterSignal);
   process.once("SIGINT", stopAfterSignal);
+}
+
+/**
+ * The production stop sequence, extracted so it is testable: stop the runtime
+ * FIRST, then close the listener (the same order the test harnesses use —
+ * `hub-harness.ts` `stopApp`, `hub-child.ts` `shutdown`).
+ *
+ * The order is load-bearing: the daemon's accepted WebSocket is an active
+ * connection the http server-level `closeIdleConnections` / `closeAllConnections`
+ * cannot reach — an upgraded socket leaves the http connection tracker on Node
+ * 22, so a bare `server.close()` hangs on it. Stopping the runtime first lets
+ * its registry close that socket; the close then only has to drain the idle
+ * keep-alives below.
+ */
+export async function stopProductionServer(
+  server: Server,
+  stopRuntime: () => Promise<void>,
+): Promise<void> {
+  await stopRuntime();
+  // Drain the remaining sockets with the same duck-typed guard the test
+  // harnesses use. `Server` is a minimal interface, so probe with `in` before
+  // calling rather than assuming the method exists.
+  if ("closeIdleConnections" in server) server.closeIdleConnections();
+  if ("closeAllConnections" in server) server.closeAllConnections();
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error !== undefined) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
 }
 
 export async function shutdownProductionServer(

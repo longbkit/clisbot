@@ -23,6 +23,7 @@ import {
   createTelegramClientFetch,
   TELEGRAM_OUTBOUND_RETRY_AFTER_CAP_MS,
   isSafeToRetrySendError,
+  isTelegramMessageNotModifiedError,
   isTelegramRateLimitError,
   resolveTelegramApiRoot,
   type TelegramTransport,
@@ -34,7 +35,13 @@ import {
   parseTelegramTarget,
   wrapTelegramChatNotFoundError,
 } from "../leaves/coerce.js";
-import { splitTelegramPlainTextChunks } from "../leaves/rich-message.js";
+import {
+  buildTelegramReplyParams,
+  buildTelegramThreadParams,
+  splitTelegramPlainTextChunks,
+} from "../leaves/rich-message.js";
+import { markdownToTelegramHtml } from "../format.js";
+import { splitTelegramHtmlChunks } from "../telegram-html-chunk.js";
 
 /** The plane's config record (`ctx.cfg`) — `channels.telegram.accounts.<id>`
  * carries the token strings the outbound path reads (start-account.md). */
@@ -44,7 +51,10 @@ export interface TelegramAccountConfig {
   timeoutSeconds?: number;
   apiRoot?: string;
   linkPreview?: boolean;
-  richMessages?: boolean;
+  /** Markdown → Bot API HTML rendering. ON by default (D-003, amended
+   * 2026-08-29): an explicit `config.richMessages: false` opts an account
+   * back to plain text. */
+  richMessages: boolean;
 }
 
 export interface TelegramBotInfo {
@@ -80,13 +90,66 @@ export interface SendTextOptions {
 }
 
 /** The Bot API surface the L1 needs (the grammy client's `api`). Kept as a
- * narrow interface so tests can fake it without instantiating a Bot. */
+ * narrow interface so tests can fake it without instantiating a Bot.
+ * `editMessageText` mirrors grammy's positional shape (chat_id, message_id,
+ * text, other) so the cast of the real client's `api` stays truthful. */
 export interface TelegramApi {
   getMe(): Promise<TelegramBotInfo>;
   getChat(chatId: string): Promise<{ id: number; type?: string; title?: string }>;
   sendMessage(
     chatId: number,
     text: string,
+    params?: Record<string, unknown>,
+  ): Promise<{ message_id: number; chat?: { id: number } }>;
+  /** The in-place text update (`editMessageText`) — the approval card's
+   * decided state; `other` carries `reply_markup` (COMPAT
+   * (clisbot-control-plane)). */
+  editMessageText(
+    chatId: number,
+    messageId: number,
+    text: string,
+    other?: Record<string, unknown>,
+  ): Promise<unknown>;
+  /** COMPAT(clisbot-control-plane): the liveness surface (`sendChatAction`,
+   * typing.md). `"typing"` expires after ~5s, which is why the Hub re-drives a
+   * live turn's `start` on a keepalive window. */
+  sendChatAction(
+    chatId: number,
+    action: string,
+    params?: Record<string, unknown>,
+  ): Promise<unknown>;
+  /** COMPAT(clisbot-control-plane): the G7–G10 native-media send methods.
+   * `file` is a grammy `InputFile` (the local bytes + native name); the result
+   * carries the new message id. The vertical routes mime→method
+   * (outbound-media.ts) and calls exactly one of these per post. */
+  sendPhoto(
+    chatId: number,
+    file: unknown,
+    params?: Record<string, unknown>,
+  ): Promise<{ message_id: number; chat?: { id: number } }>;
+  sendDocument(
+    chatId: number,
+    file: unknown,
+    params?: Record<string, unknown>,
+  ): Promise<{ message_id: number; chat?: { id: number } }>;
+  sendAudio(
+    chatId: number,
+    file: unknown,
+    params?: Record<string, unknown>,
+  ): Promise<{ message_id: number; chat?: { id: number } }>;
+  sendVoice(
+    chatId: number,
+    file: unknown,
+    params?: Record<string, unknown>,
+  ): Promise<{ message_id: number; chat?: { id: number } }>;
+  sendVideo(
+    chatId: number,
+    file: unknown,
+    params?: Record<string, unknown>,
+  ): Promise<{ message_id: number; chat?: { id: number } }>;
+  sendAnimation(
+    chatId: number,
+    file: unknown,
     params?: Record<string, unknown>,
   ): Promise<{ message_id: number; chat?: { id: number } }>;
 }
@@ -123,7 +186,9 @@ export function resolveTelegramAccount(
       `Telegram bot token missing for account "${accountId}" (set channels.telegram.accounts.${accountId}.botToken).`,
     );
   }
-  const config: TelegramAccountConfig = {};
+  // Rich (markdown → Bot API HTML) is the default (D-003, amended 2026-08-29):
+  // plain text only when the account explicitly sets `richMessages: false`.
+  const config: TelegramAccountConfig = { richMessages: true };
   const rawConfig = entry["config"] as Record<string, unknown> | undefined;
   if (rawConfig !== undefined) {
     if (typeof rawConfig["timeoutSeconds"] === "number") {
@@ -202,6 +267,21 @@ export type TelegramApiFactory = (
  * stack loads lazily at this call site (the in-repo ESM dist cannot use a
  * sync `require`), so module load stays free of it until a real client is
  * built; tests inject a fake factory instead. */
+/** Test seam: a fake Bot API registered under a token, so the outbound path
+ * (sendText/sendMedia) picks it up instead of constructing a grammy client.
+ * The outbound tests assert on the `sendMessage` / media-method args. */
+const apiTestOverrides = new Map<string, TelegramApi>();
+
+/** Test seam: register a fake Bot API for a token (see `apiTestOverrides`). */
+export function registerTelegramApiForTest(token: string, api: TelegramApi): void {
+  apiTestOverrides.set(token, api);
+}
+
+/** Test seam: drop all registered fake Bot APIs. */
+export function clearTelegramApiForTest(): void {
+  apiTestOverrides.clear();
+}
+
 export async function createTelegramApi(
   token: string,
   options: TelegramClientOptions,
@@ -214,6 +294,10 @@ export async function createTelegramApi(
     return bot as unknown as { api: TelegramApi };
   },
 ): Promise<TelegramApi> {
+  const override = apiTestOverrides.get(token);
+  if (override !== undefined) {
+    return override;
+  }
   const built = await apiFactory(token, resolveClientOptions(options));
   return built.api;
 }
@@ -389,34 +473,41 @@ export function parseOutboundTarget(to: string): { chatId: string; messageThread
 
 const TELEGRAM_TEXT_CHUNK_LIMIT = 4000;
 
-/** The per-chunk request params: thread/reply params on the FIRST chunk only
- * (the pinned single-use reply semantics), silent flag always. */
+/** The per-chunk request params. `threadParams` (`message_thread_id` +
+ * silent — from the shared `buildTelegramThreadParams`) ride on EVERY
+ * chunk: a continuation chunk that drops `message_thread_id` lands in the
+ * forum's General (root) instead of the topic. `firstChunkParams`
+ * (`reply_parameters` + the card's `reply_markup` — from the shared
+ * `buildTelegramReplyParams`) ride on chunk 0 only (the Bot API's single
+ * reply-target rule). The `parse_mode: HTML` flag is a per-message Bot API
+ * param and applies to every chunk when the rich-HTML path is active.
+ * Both builders are shared with the media post, so the plain and rich sends
+ * derive their params from ONE source — a topic send can never drop
+ * `message_thread_id` on one path only (F-07). */
 function buildChunkParams(
-  params: {
-    threadParams?: Record<string, unknown>;
-    replyToMessageId?: number;
-    messageThreadId?: number;
-    silent?: boolean;
-  },
   index: number,
+  rich: boolean,
+  threadParams: Record<string, unknown>,
+  firstChunkParams: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (index !== 0) return {};
-  const base: Record<string, unknown> = { ...params.threadParams };
-  if (params.silent === true) base["disable_notification"] = true;
-  if (
-    params.replyToMessageId === undefined &&
-    params.messageThreadId === undefined &&
-    Object.keys(base).length === 0
-  ) {
-    return {};
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(threadParams)) out[key] = value;
+  if (index === 0) {
+    for (const [key, value] of Object.entries(firstChunkParams)) out[key] = value;
   }
-  return base;
+  if (rich) out["parse_mode"] = "HTML";
+  return out;
 }
 
-/** Send text through the pinned chunk's text path: chunk at 4000, plain
- * (rich-HTML rendering is behind the account's `richMessages` opt-in, off by
- * default), thread params from the topic id, reply-to when given, record the
- * sent message in the seam after each chunk. */
+/** Send text through the pinned chunk's text path. Plain by default: chunk at
+ * 4000 and post as-is. When `rich` (the account's `richMessages`, on by
+ * default per D-003) the text is converted markdown → Bot API HTML (C5
+ * front-end, reused — not a new
+ * converter) and chunked tag-balance-aware, then posted with
+ * `parse_mode: HTML` on every chunk (OpenClaw legacy `send-message-text.ts`:
+ * the non-rich-blocks HTML path chunks at 4000). Thread params from the topic
+ * id, reply-to when given, record the sent message in the seam after each
+ * chunk. */
 export async function sendTelegramText(
   params: {
     api: TelegramApi;
@@ -424,20 +515,43 @@ export async function sendTelegramText(
     text: string;
     log?: (message: string) => void;
   } & Pick<SendTextOptions, "replyToMessageId" | "messageThreadId" | "silent"> & {
-      threadParams?: Record<string, unknown>;
+      /** Post as Bot API `parse_mode: HTML` (the account's `richMessages`). */
+      rich?: boolean;
       recordSent?: (chatId: number, messageId: number) => Promise<void>;
+      /** COMPAT(clisbot-control-plane): the native card's inline keyboard
+       * (`reply_markup`) — rides on chunk 0 only (merged into the chunk-0
+       * first-chunk params, so the one `buildChunkParams` builder is the
+       * single place chunk-0 params are chosen — the F-07 invariant). */
+      replyMarkup?: Record<string, unknown>;
+      /** COMPAT(clisbot-control-plane): true when the post carried the native
+       * card markup (the approval card's in-place-update target). */
+      cardPosted?: boolean;
     },
 ): Promise<SendTextResult> {
   const { api, chatId, text } = params;
   if (!text.trim()) throw new Error("Message must be non-empty for Telegram sends");
-  const chunks = splitTelegramPlainTextChunks(text, TELEGRAM_TEXT_CHUNK_LIMIT);
+  const rich = params.rich === true;
+  const chunks = rich
+    ? splitTelegramHtmlChunks(markdownToTelegramHtml(text), TELEGRAM_TEXT_CHUNK_LIMIT)
+    : splitTelegramPlainTextChunks(text, TELEGRAM_TEXT_CHUNK_LIMIT);
+  const threadParams = buildTelegramThreadParams({
+    messageThreadId: params.messageThreadId,
+    silent: params.silent,
+  });
+  // `reply_parameters` and the native card's inline keyboard ride on chunk 0
+  // ONLY (a card on a later chunk would mint a second, orphaned keyboard).
+  // `buildChunkParams` stays the single place chunk-0 params are chosen.
+  const firstChunkParams = buildTelegramReplyParams({
+    replyToMessageId: params.replyToMessageId,
+  });
+  if (params.replyMarkup !== undefined) firstChunkParams["reply_markup"] = params.replyMarkup;
   let lastMessageId = "";
   let lastChatId = String(chatId);
   const log = params.log ?? (() => {});
   for (let index = 0; index < chunks.length; index += 1) {
     const chunk = chunks[index];
-    if (chunk === undefined) continue;
-    const requestParams = buildChunkParams(params, index);
+    if (chunk === undefined || chunk === "") continue;
+    const requestParams = buildChunkParams(index, rich, threadParams, firstChunkParams);
     const result = await withTelegramSendRetry(
       () =>
         Object.keys(requestParams).length > 0
@@ -455,12 +569,56 @@ export async function sendTelegramText(
   }
   if (lastMessageId === "") throw new Error("Telegram sendMessage produced no message");
   log(`telegram outbound send ok chatId=${lastChatId} messageId=${lastMessageId}`);
-  return { messageId: lastMessageId, chatId: lastChatId };
+  return {
+    messageId: lastMessageId,
+    chatId: lastChatId,
+    ...(params.cardPosted !== undefined ? { cardPosted: params.cardPosted } : {}),
+  };
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the in-place text update (`editMessageText`)
+ * — the approval card's decided state ("Approved by <sender>" / "Denied" /
+ * "Answered: <option>"). `clearCard` strips the card's inline keyboard (an
+ * EMPTY keyboard removes the buttons — omitting `reply_markup` would keep the
+ * stale card live; a stale click is inert either way — the hub's exactly-once
+ * resolver has no open prompt left — but the removed markup is the honest
+ * state). The Bot API's 400 "message is not modified" (a byte-identical edit
+ * is refused) is NOT a failure: the target text is already there. No chunking
+ * (the decided one-liner is far under the 4096 cap; a longer text fails
+ * loudly at the Bot API, which is the right signal for this path).
+ */
+export async function editTelegramMessageText(params: {
+  api: TelegramApi;
+  chatId: number;
+  messageId: number;
+  text: string;
+  clearCard?: boolean;
+  rich?: boolean;
+  log?: (message: string) => void;
+}): Promise<void> {
+  const { api, chatId, messageId, text } = params;
+  if (!text.trim()) throw new Error("Message must be non-empty for Telegram edits");
+  const other: Record<string, unknown> = {};
+  if (params.rich === true) other["parse_mode"] = "HTML";
+  if (params.clearCard === true) other["reply_markup"] = { inline_keyboard: [] };
+  const target = params.rich === true ? markdownToTelegramHtml(text) : text;
+  try {
+    await withTelegramSendRetry(
+      () =>
+        Object.keys(other).length > 0
+          ? api.editMessageText(chatId, messageId, target, other)
+          : api.editMessageText(chatId, messageId, target),
+      "editMessageText",
+      params.log ?? (() => {}),
+    );
+  } catch (err) {
+    if (isTelegramMessageNotModifiedError(err)) return; // already the target text
+    throw err;
+  }
 }
 
 /** The send-error classification re-exported for the Hub's PostFn. */
 export type { GrammyErrorType, HttpErrorType, InputFileType };
-export {
-  isTelegramMessageNotModifiedError,
-  isTelegramServerError,
-} from "../leaves/telegram-policy.js";
+export { isTelegramServerError } from "../leaves/telegram-policy.js";
+export { isTelegramMessageNotModifiedError };

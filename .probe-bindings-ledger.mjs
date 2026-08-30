@@ -1,0 +1,11 @@
+import { PGlite } from "@electric-sql/pglite";
+import { homedir } from "node:os";
+const db = new PGlite(`${homedir()}/.clisbot-dev`);
+await db.waitReady;
+const bindings = await db.query(`select * from thread_bindings order by created_at desc limit 10`);
+console.log("=== BINDINGS (latest 10) ===");
+for (const r of bindings.rows) console.log(JSON.stringify(r));
+const ledger = await db.query(`select * from delivery_ledger order by created_at desc limit 20`);
+console.log("\n=== LEDGER (latest 20) ===");
+for (const r of ledger.rows) console.log(JSON.stringify(r).slice(0, 400));
+await db.close();

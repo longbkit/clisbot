@@ -11,6 +11,8 @@ import type {
   HostKeyedStore,
 } from "@getpaseo/channels-shared";
 import { createHash } from "node:crypto";
+import type { TelegramCallbackQueryShape } from "./approval-callback.js";
+import { foldInboundTelegramMedia } from "./media.js";
 
 /** Long-poll timeout in seconds (the pinned monitor's 50s window). */
 export const TELEGRAM_POLL_TIMEOUT_SECONDS = 50;
@@ -26,12 +28,34 @@ export interface TelegramUpdateShape {
   channel_post?: TelegramMessageShape;
   edited_message?: TelegramMessageShape;
   edited_channel_post?: TelegramMessageShape;
+  /** COMPAT(clisbot-control-plane): the approval card's button click (E2 —
+   * mirrored from the Slack vertical's `block_actions` envelope). */
+  callback_query?: TelegramCallbackQueryShape;
+}
+
+/** The Bot API file carriers (photo elements and the single-carrier fields).
+ * The media fields are the inbound-media subset (group G): `file_id` for the
+ * download, `file_size` for the largest-photo pick, `file_name` for the
+ * document's saved name. Stickers are out of scope. */
+export interface TelegramFileShape {
+  file_id?: string;
+  file_unique_id?: string;
+  file_size?: number;
+  file_name?: string;
 }
 
 export interface TelegramMessageShape {
   message_id: number;
   date?: number;
   text?: string;
+  /** The media caption (group G: a caption with a mention must also steer). */
+  caption?: string;
+  photo?: TelegramFileShape[];
+  document?: TelegramFileShape;
+  audio?: TelegramFileShape;
+  voice?: TelegramFileShape;
+  video?: TelegramFileShape;
+  animation?: TelegramFileShape;
   chat?: {
     id: number;
     type?: string;
@@ -62,8 +86,19 @@ export interface TelegramPollOptions {
     tokenFingerprint: string | null;
   }>;
   onEvent: (event: ChannelInboundEvent) => Promise<void>;
+  /** COMPAT(clisbot-control-plane): one approval-card button click (E2 — the
+   * `callback_query` half of the Slack `block_actions` seam). The transport
+   * acks FIRST (silent `answerCallbackQuery`) and hands the raw update to
+   * this callback; a faulty/absent callback must never wedge the poll (the
+   * ack already stopped the redelivery). The hub's exactly-once resolver
+   * makes a stale second tap inert. Absent = no card clicks (the typed
+   * command still answers the prompt). */
+  onApprovalCallback?: (callbackQuery: TelegramCallbackQueryShape) => Promise<void>;
   fetchImpl?: typeof globalThis.fetch;
   logger?: HostChildLogger;
+  /** The account's inbound-media download dir (`<dataDir>/channels/<accountId>/downloads`).
+   * Undefined = media not downloaded (the fold is skipped; caption-only bodies). */
+  downloadDir?: string;
   /** Test hook: fake the getUpdates HTTP call. */
   pollFn?: (params: {
     offset: number;
@@ -73,7 +108,10 @@ export interface TelegramPollOptions {
 }
 
 /** `allowed_updates` for the poll: the grammy default set + reactions
- * (the pinned `allowed-updates.ts`; inlined here so the L2 loads grammy-free). */
+ * (the pinned `allowed-updates.ts`; inlined here so the L2 loads grammy-free)
+ * + `callback_query` (COMPAT(clisbot-control-plane), E2 — the approval
+ * card's button clicks arrive as `callback_query` updates, the mirror of
+ * the Slack vertical's `block_actions` envelope). */
 export function resolveTelegramAllowedUpdates(): string[] {
   return [
     "message",
@@ -87,6 +125,7 @@ export function resolveTelegramAllowedUpdates(): string[] {
     "chat_member",
     "user_chat_member",
     "message_reaction",
+    "callback_query",
   ];
 }
 
@@ -170,7 +209,10 @@ async function fetchUpdates(params: {
 }): Promise<TelegramUpdateShape[]> {
   const { botToken, apiRoot, offset, timeoutSeconds, fetchImpl } = params;
   const fetchFn = fetchImpl ?? globalThis.fetch;
-  const url = `${apiRoot}/bot${encodeURIComponent(botToken)}/getUpdates?offset=${encodeURIComponent(String(offset))}&limit=${TELEGRAM_POLL_LIMIT}&timeout=${timeoutSeconds}`;
+  const url =
+    `${apiRoot}/bot${encodeURIComponent(botToken)}/getUpdates?offset=${encodeURIComponent(String(offset))}` +
+    `&limit=${TELEGRAM_POLL_LIMIT}&timeout=${timeoutSeconds}` +
+    `&allowed_updates=${encodeURIComponent(JSON.stringify(resolveTelegramAllowedUpdates()))}`;
   const response = await fetchFn(url, { method: "GET" });
   if (!response.ok) {
     throw new Error(`Telegram getUpdates failed: HTTP ${response.status}`);
@@ -180,6 +222,60 @@ async function fetchUpdates(params: {
     throw new Error(`Telegram getUpdates failed: ${body.description ?? "malformed response"}`);
   }
   return body.result as TelegramUpdateShape[];
+}
+
+/**
+ * Silent `answerCallbackQuery` — the click's ack (E2, the mirror of the Slack
+ * half's envelope `ack()`): it clears the client's loading spinner and, with
+ * no text/alert, carries no user-visible outcome (the hub-side card update is
+ * the outcome). Best-effort: a fault is logged, never thrown — the click is
+ * still handed to the seam (P13: one click must not kill the poll).
+ */
+async function answerCallbackQuery(
+  opts: TelegramPollOptions,
+  callbackQueryId: string,
+): Promise<void> {
+  const fetchFn = opts.fetchImpl ?? globalThis.fetch;
+  const url = `${opts.apiRoot}/bot${encodeURIComponent(opts.botToken)}/answerCallbackQuery`;
+  try {
+    const response = await fetchFn(url, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: `callback_query_id=${encodeURIComponent(callbackQueryId)}`,
+    });
+    if (!response.ok) {
+      opts.logger?.warn("telegram answerCallbackQuery failed (click still dispatched)", {
+        accountId: opts.accountId,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    opts.logger?.warn("telegram answerCallbackQuery fault (click still dispatched)", {
+      accountId: opts.accountId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** COMPAT(clisbot-control-plane): one approval-card click (E2) — ack FIRST
+ * (the redelivery guard: an unacked `callback_query` is redelivered by the
+ * Bot API on the next getUpdates), then hand the raw update to the seam when
+ * one is wired. A faulty callback must not wedge the poll (mirror of Slack's
+ * "kept socket alive"): the ack already fired. */
+async function dispatchApprovalCallback(
+  opts: TelegramPollOptions,
+  callbackQuery: TelegramCallbackQueryShape,
+): Promise<void> {
+  await answerCallbackQuery(opts, callbackQuery.id);
+  if (opts.onApprovalCallback === undefined) return;
+  try {
+    await opts.onApprovalCallback(callbackQuery);
+  } catch (error) {
+    opts.logger?.warn("telegram approval-callback handoff fault (kept polling)", {
+      accountId: opts.accountId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 function pickMessage(update: TelegramUpdateShape): {
@@ -207,7 +303,9 @@ export function normalizeTelegramInboundEvent(
   const { message } = picked;
   const chat = message.chat;
   const from = message.from;
-  const text = typeof message.text === "string" ? message.text : "";
+  // Group G: a media message's text is its caption; a caption with a mention
+  // must steer exactly like `text` does.
+  const text = messageBodyText(message);
   if (chat === undefined || chat.id === undefined || from === undefined || from.id === undefined) {
     return null;
   }
@@ -239,6 +337,14 @@ export function normalizeTelegramInboundEvent(
   };
 }
 
+/** The message body the L2 normalizes: `text` when present, else the media
+ * caption (group G), else `""`. */
+export function messageBodyText(message: TelegramMessageShape): string {
+  if (typeof message.text === "string") return message.text;
+  if (typeof message.caption === "string") return message.caption;
+  return "";
+}
+
 /** Mention facts: an entity-mention of the bot, a `@username` span, or a
  * `/command` addressed to the bot. The policy decision stays on the Hub. */
 export function resolveMentioned(
@@ -250,7 +356,7 @@ export function resolveMentioned(
   for (const entity of entities) {
     if (entity.type === "mention" && entity.user?.id === botId) return true;
   }
-  const text = message.text ?? "";
+  const text = messageBodyText(message);
   if (botUsername !== undefined && botUsername !== "" && text.includes(`@${botUsername}`)) {
     return true;
   }
@@ -292,24 +398,67 @@ async function fetchBatch(
   }
 }
 
-/** Hand a batch's events to the processor (L3 swallows handoff faults) and
- * report the max update id seen. */
+/** Build the media download context for a dispatch and fold one event's
+ * media into it; `null` when the fold leaves nothing to admit. */
+async function foldBatchEvent(
+  opts: TelegramPollOptions,
+  update: TelegramUpdateShape,
+  event: ChannelInboundEvent,
+): Promise<ChannelInboundEvent | null> {
+  const picked = pickMessage(update);
+  if (picked === null) return event;
+  return foldInboundTelegramMedia(
+    {
+      accountId: opts.accountId,
+      botToken: opts.botToken,
+      apiRoot: opts.apiRoot,
+      downloadDir: opts.downloadDir!,
+      abortSignal: opts.abortSignal,
+      ...(opts.fetchImpl !== undefined ? { fetchImpl: opts.fetchImpl } : {}),
+      ...(opts.logger !== undefined ? { logger: opts.logger } : {}),
+    },
+    picked.message,
+    event,
+  );
+}
+
+/** Hand a batch's updates to the processor + the approval seam (both swallow
+ * handoff faults) and report the max update id seen. `seenUpdateIds` is the
+ * transport-level redelivery guard for the offset-persist gap: when an offset
+ * persist fails, the next poll re-serves the same updates from the same
+ * offset — the vertical must not dispatch a re-served `callback_query` twice
+ * (the hub's exactly-once latch is the second line), and remembering every
+ * update id keeps a re-served message from re-entering L3 inside that window
+ * too. */
 async function dispatchBatch(
   opts: TelegramPollOptions,
   updates: TelegramUpdateShape[],
+  seenUpdateIds: Set<number>,
 ): Promise<number> {
   let maxUpdateId = 0;
   for (const update of updates) {
     if (update.update_id === undefined || !Number.isSafeInteger(update.update_id)) continue;
     if (update.update_id > maxUpdateId) maxUpdateId = update.update_id;
+    if (seenUpdateIds.has(update.update_id)) continue;
+    seenUpdateIds.add(update.update_id);
+    // E2: a card click is not a message — ack it and hand it to the seam.
+    if (update.callback_query !== undefined) {
+      await dispatchApprovalCallback(opts, update.callback_query);
+      continue;
+    }
     const event = normalizeTelegramInboundEvent(update, {
       accountId: opts.accountId,
       botId: opts.botId,
       ...(opts.botUsername !== undefined ? { botUsername: opts.botUsername } : {}),
     });
     if (event === null) continue;
+    // Group G: fold inbound media into the event body (download + manifest).
+    // Skipped entirely without a download dir (caption-only floor).
+    const folded =
+      opts.downloadDir !== undefined ? await foldBatchEvent(opts, update, event) : event;
+    if (folded === null) continue;
     try {
-      await opts.onEvent(event);
+      await opts.onEvent(folded);
     } catch {
       // The offset persistence after the batch is what acks; a throw here
       // must not kill the loop.
@@ -323,11 +472,17 @@ async function dispatchBatch(
 export async function runTelegramPoll(opts: TelegramPollOptions): Promise<void> {
   let offset = await readUpdateOffset(opts.updateOffsetStore, opts.botToken);
   let effectiveOffset = offset === null ? 0 : offset + 1;
+  // Transport-level redelivery guard (see dispatchBatch): capped so the set
+  // cannot outgrow the poll's lifetime; L3's event-id set + ledger stay the
+  // durable dedupe.
+  const seenUpdateIds = new Set<number>();
+  const SEEN_UPDATE_IDS_CAP = 8192;
   for (;;) {
     if (opts.abortSignal.aborted) return;
     const batch = await fetchBatch(opts, effectiveOffset);
     if (batch === null) continue;
-    const maxUpdateId = await dispatchBatch(opts, batch);
+    const maxUpdateId = await dispatchBatch(opts, batch, seenUpdateIds);
+    if (seenUpdateIds.size > SEEN_UPDATE_IDS_CAP) seenUpdateIds.clear();
     if (maxUpdateId > (offset ?? 0)) {
       try {
         await writeUpdateOffset(opts.updateOffsetStore, opts.botToken, maxUpdateId);

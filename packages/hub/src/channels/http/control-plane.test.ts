@@ -137,13 +137,19 @@ function stubSupervisor(
     },
     reconcile: async () => ({ accounts: [], stopped: [] }),
     status: () => entries,
+    channelReplyPost: async () => ({ ok: false, error: "no transport started in the stub" }),
+    channelReplyMediaPost: async () => ({ ok: false, error: "no transport started in the stub" }),
   };
   return { supervisor, started };
 }
 
 function buildApp(
   database: Database | null,
-  extras: { dataDir?: string; supervisor?: ChannelSupervisor | null } = {},
+  extras: {
+    dataDir?: string;
+    supervisor?: ChannelSupervisor | null;
+    channelReplyServer?: import("../channel-reply.js").ChannelReplyServer | null;
+  } = {},
 ): HubApplication {
   return createHubApplication({
     database,
@@ -152,6 +158,9 @@ function buildApp(
     completionTokenSecret: "hub-secret",
     ...(extras.dataDir === undefined ? {} : { hubDataDir: extras.dataDir }),
     ...(extras.supervisor === undefined ? {} : { channelSupervisor: extras.supervisor }),
+    ...(extras.channelReplyServer === undefined
+      ? {}
+      : { channelReplyServer: extras.channelReplyServer }),
   });
 }
 
@@ -332,6 +341,103 @@ describe("channel control-plane ops", () => {
     );
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { accounts: [] });
+  });
+
+  it("gates the channel-reply MCP endpoint: flag-off 404, no-server 503, non-loopback 401", async () => {
+    // Flag off → the exact absent-404, before db or server state is consulted.
+    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "0";
+    {
+      const application = buildApp(null, {
+        channelReplyServer: {
+          handle: () => Promise.reject(new Error("must not be reached")),
+        },
+      });
+      const response = await application.operations.handleChannelReplyMcp(
+        jsonRequest("/mcp/channel/ref", { method: "POST" }),
+        "ref",
+      );
+      assert.equal(response.status, 404);
+      assert.equal(response.headers.get("content-type"), "application/problem+json");
+      const body = await response.json();
+      assert.equal(body.code, "not_found");
+    }
+    process.env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
+    // Flag on but the server is null (composition degraded) → the shared 503,
+    // before auth is consulted.
+    {
+      const application = buildApp(memoryDatabase(), { channelReplyServer: null });
+      const noLoopback = new Request("http://hub.test/mcp/channel/ref", {
+        method: "POST",
+        headers: { "x-paseo-client-address": "10.1.2.3" },
+      });
+      const response = await application.operations.handleChannelReplyMcp(noLoopback, "ref");
+      assert.equal(response.status, 503);
+      assert.deepEqual(await response.json(), { error: "database_unavailable" });
+    }
+    // Flag on, server present, non-loopback without a Bearer → 401 problem.
+    {
+      const application = buildApp(memoryDatabase(), {
+        channelReplyServer: {
+          handle: () => Promise.reject(new Error("must not be reached")),
+        },
+      });
+      const noLoopback = new Request("http://hub.test/mcp/channel/ref", {
+        method: "POST",
+        headers: { "x-paseo-client-address": "10.1.2.3" },
+      });
+      const response = await application.operations.handleChannelReplyMcp(noLoopback, "ref");
+      assert.equal(response.status, 401);
+      assert.equal(response.headers.get("www-authenticate"), "Bearer");
+      const body = await response.json();
+      assert.equal(body.code, "invalid_credentials");
+    }
+  });
+
+  it("forwards the channel-reply MCP request to the server and maps thrown errors to the 500 problem", async () => {
+    const saw: { request: Request; token: string }[] = [];
+    const okServer: import("../channel-reply.js").ChannelReplyServer = {
+      handle: (request, token) => {
+        saw.push({ request, token });
+        return Promise.resolve(new Response("mcp-ok", { status: 200 }));
+      },
+    };
+    const authorizedLoopback = () =>
+      jsonRequest("/mcp/channel/ref", {
+        method: "POST",
+        headers: { authorization: "Bearer hub-secret", "x-paseo-client-address": "10.1.2.3" },
+      });
+
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+
+    // Authorized (Bearer) → the server's response passes through, token intact.
+    {
+      const application = buildApp(database, { channelReplyServer: okServer });
+      const response = await application.operations.handleChannelReplyMcp(
+        authorizedLoopback(),
+        "ref-1",
+      );
+      assert.equal(response.status, 200);
+      assert.equal(await response.text(), "mcp-ok");
+      assert.equal(saw.length, 1);
+      assert.equal(saw[0]?.token, "ref-1");
+      assert.equal(saw[0]?.request.url, "http://hub.test/mcp/channel/ref");
+    }
+    // A server-side throw maps to the shared 500 problem body.
+    {
+      const failingServer: import("../channel-reply.js").ChannelReplyServer = {
+        handle: () => Promise.reject(new Error("boom")),
+      };
+      const application = buildApp(database, { channelReplyServer: failingServer });
+      const response = await application.operations.handleChannelReplyMcp(
+        authorizedLoopback(),
+        "ref-2",
+      );
+      assert.equal(response.status, 500);
+      assert.equal(response.headers.get("content-type"), "application/problem+json");
+      const body = await response.json();
+      assert.equal(body.code, "internal_error");
+    }
   });
 
   it("lists users with their roles from the org assignments", async () => {

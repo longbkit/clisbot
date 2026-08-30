@@ -1,0 +1,36 @@
+
+ RUN  v4.1.7 /home/node/projects/clisbot-paseoclaw-fusion
+
+ ❯ packages/cli/src/commands/bot/stop.test.ts (6 tests | 1 failed) 33ms
+     × stops the Hub first, then discards only the runtime-only mirror files 14ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/cli/src/commands/bot/stop.test.ts > runBotStop > stops the Hub first, then discards only the runtime-only mirror files
+AssertionError: Expected values to be strictly equal:
+
+0 !== 1
+
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ packages/cli/src/commands/bot/stop.test.ts:104:12
+    102|
+    103|     const report = await runBotStop(
+    104|       { home: "/home/op/.clisbot", env: {} },
+       |            ^
+    105|       { force: false, timeoutMs: 0, killTimeoutMs: 0 },
+    106|       instrumented,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (6)
+   Start at  08:15:33
+   Duration  23.60s (transform 14.78s, setup 0ms, import 23.08s, tests 33ms, environment 0ms)
+

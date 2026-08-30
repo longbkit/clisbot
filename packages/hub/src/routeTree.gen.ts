@@ -23,6 +23,7 @@ import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as ShellOperatorRouteImport } from './routes/_shell/operator'
 import { Route as ShellCliLoginRouteImport } from './routes/_shell/cli-login'
 import { Route as ShellAppsRouteImport } from './routes/_shell/apps'
+import { Route as McpChannelTokenRouteImport } from './routes/mcp/channel/$token'
 import { Route as ApiV1UsersRouteImport } from './routes/api/v1/users'
 import { Route as ApiV1CliAuthorizationsRouteImport } from './routes/api/v1/cli-authorizations'
 import { Route as ApiV1ChannelsRouteImport } from './routes/api/v1/channels'
@@ -126,6 +127,11 @@ const ShellAppsRoute = ShellAppsRouteImport.update({
   id: '/apps',
   path: '/apps',
   getParentRoute: () => ShellRoute,
+} as any)
+const McpChannelTokenRoute = McpChannelTokenRouteImport.update({
+  id: '/mcp/channel/$token',
+  path: '/mcp/channel/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiV1UsersRoute = ApiV1UsersRouteImport.update({
   id: '/api/v1/users',
@@ -347,6 +353,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
   '/api/v1/users': typeof ApiV1UsersRouteWithChildren
+  '/mcp/channel/$token': typeof McpChannelTokenRoute
   '/o/$organizationSlug/api-keys': typeof ShellOOrganizationSlugApiKeysRoute
   '/o/$organizationSlug/billing': typeof ShellOOrganizationSlugBillingRoute
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
@@ -396,6 +403,7 @@ export interface FileRoutesByTo {
   '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
   '/api/v1/users': typeof ApiV1UsersRouteWithChildren
+  '/mcp/channel/$token': typeof McpChannelTokenRoute
   '/o/$organizationSlug/api-keys': typeof ShellOOrganizationSlugApiKeysRoute
   '/o/$organizationSlug/billing': typeof ShellOOrganizationSlugBillingRoute
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
@@ -445,6 +453,7 @@ export interface FileRoutesById {
   '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
   '/api/v1/cli-authorizations': typeof ApiV1CliAuthorizationsRouteWithChildren
   '/api/v1/users': typeof ApiV1UsersRouteWithChildren
+  '/mcp/channel/$token': typeof McpChannelTokenRoute
   '/_shell/o/$organizationSlug/api-keys': typeof ShellOOrganizationSlugApiKeysRoute
   '/_shell/o/$organizationSlug/billing': typeof ShellOOrganizationSlugBillingRoute
   '/_shell/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/api/v1/channels'
     | '/api/v1/cli-authorizations'
     | '/api/v1/users'
+    | '/mcp/channel/$token'
     | '/o/$organizationSlug/api-keys'
     | '/o/$organizationSlug/billing'
     | '/o/$organizationSlug/connections'
@@ -545,6 +555,7 @@ export interface FileRouteTypes {
     | '/api/v1/channels'
     | '/api/v1/cli-authorizations'
     | '/api/v1/users'
+    | '/mcp/channel/$token'
     | '/o/$organizationSlug/api-keys'
     | '/o/$organizationSlug/billing'
     | '/o/$organizationSlug/connections'
@@ -593,6 +604,7 @@ export interface FileRouteTypes {
     | '/api/v1/channels'
     | '/api/v1/cli-authorizations'
     | '/api/v1/users'
+    | '/mcp/channel/$token'
     | '/_shell/o/$organizationSlug/api-keys'
     | '/_shell/o/$organizationSlug/billing'
     | '/_shell/o/$organizationSlug/connections'
@@ -640,6 +652,7 @@ export interface RootRouteChildren {
   ApiV1ChannelsRoute: typeof ApiV1ChannelsRouteWithChildren
   ApiV1CliAuthorizationsRoute: typeof ApiV1CliAuthorizationsRouteWithChildren
   ApiV1UsersRoute: typeof ApiV1UsersRouteWithChildren
+  McpChannelTokenRoute: typeof McpChannelTokenRoute
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute: typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
   ApiIntegrationsDiscordCallbackRoute: typeof ApiIntegrationsDiscordCallbackRoute
   ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
@@ -747,6 +760,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/apps'
       preLoaderRoute: typeof ShellAppsRouteImport
       parentRoute: typeof ShellRoute
+    }
+    '/mcp/channel/$token': {
+      id: '/mcp/channel/$token'
+      path: '/mcp/channel/$token'
+      fullPath: '/mcp/channel/$token'
+      preLoaderRoute: typeof McpChannelTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/v1/users': {
       id: '/api/v1/users'
@@ -1127,6 +1147,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1ChannelsRoute: ApiV1ChannelsRouteWithChildren,
   ApiV1CliAuthorizationsRoute: ApiV1CliAuthorizationsRouteWithChildren,
   ApiV1UsersRoute: ApiV1UsersRouteWithChildren,
+  McpChannelTokenRoute: McpChannelTokenRoute,
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute:
     AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute,
   ApiIntegrationsDiscordCallbackRoute: ApiIntegrationsDiscordCallbackRoute,

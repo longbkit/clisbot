@@ -11,6 +11,7 @@ export { setChannelHostRuntime, getHostRuntime, registerAccountInbound } from ".
 export * from "./client/bot-api.js";
 export * from "./client/sent-messages.js";
 export * from "./transport/poll.js";
+export * from "./transport/media.js";
 export {
   readBotInfoCache,
   writeBotInfoCache,

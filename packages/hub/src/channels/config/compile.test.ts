@@ -67,7 +67,7 @@ routes:
     agent: worker-infra
     environment: repo-infra
     binding: { key: channel }
-    reply: { anchor: channel }
+    reply: { anchor: default }
   - match: { kind: thread, ids: [C0THREAD] }
     workflow: infra-runbook
   - match: { kind: dm }
@@ -156,6 +156,41 @@ describe("compileChannelControlPlane", () => {
     assert.equal(account.fallback.deny, true);
   });
 
+  it("passes the vertical-owned account config block through verbatim", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/policy.yml"]: POLICY,
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+config:
+  richMessages: true
+  timeoutSeconds: 90
+`,
+      }),
+    );
+    // The hub never interprets these keys; the vertical's account resolution
+    // type-checks each one on read (bot-api resolveTelegramAccount).
+    assert.deepEqual(plane.accounts[0]!.config, { richMessages: true, timeoutSeconds: 90 });
+  });
+
+  it("defaults the account config block to empty when omitted", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/policy.yml"]: POLICY,
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+`,
+      }),
+    );
+    assert.deepEqual(plane.accounts[0]!.config, {});
+  });
+
   it("folds route overrides over account defaults", () => {
     const plane = compileChannelControlPlane(
       input({
@@ -164,9 +199,9 @@ describe("compileChannelControlPlane", () => {
       }),
     );
     const infra = plane.accounts[0]!.routes[1]!;
-    // binding.key/channel + reply.anchor/channel are the route's overrides.
+    // binding.key/channel + reply.anchor/default are the route's overrides.
     assert.equal(infra.defaults.bindingKey, "channel");
-    assert.equal(infra.defaults.replyAnchor, "channel");
+    assert.equal(infra.defaults.replyAnchor, "default");
     // Unset leaves inherit the account layer, then the org floor.
     assert.equal(infra.defaults.sync.threadLink, "full");
     assert.equal(infra.defaults.followUp.ttlMinutes, 60);
@@ -362,7 +397,7 @@ secretRef: /tmp/secret.json
 transport: { mode: polling }
 defaults:
   interaction: { requireMention: false, followUp: { mode: auto, ttlMinutes: 120 } }
-  reply: { anchor: channel }
+  reply: { anchor: default }
 `,
       }),
     );
@@ -370,10 +405,199 @@ defaults:
     assert.equal(account.channelEnabled, true);
     assert.equal(account.defaults.requireMention, false);
     assert.equal(account.defaults.followUp.ttlMinutes, 120);
-    assert.equal(account.defaults.replyAnchor, "channel");
+    assert.equal(account.defaults.replyAnchor, "default");
     assert.equal(account.defaults.bindingKey, "thread");
     assert.equal(account.defaults.sync.finalAnswers, true);
     assert.equal(account.defaults.sync.threadLink, "final-only");
+    // The subagent relay knobs floor off, even though root relay is on.
+    assert.deepEqual(account.defaults.sync.subagents, {
+      finalAnswers: false,
+      progress: false,
+      toolCalls: false,
+    });
+  });
+
+  it("folds an account-level sync.subagents override onto its routes", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/main.yml"]: `
+channel: slack
+accountId: main
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+defaults:
+  sync: { subagents: { finalAnswers: true } }
+routes:
+  - match: { kind: channel, ids: [C0APP] }
+    agent: worker-app
+    environment: repo-app
+    sync: { subagents: { toolCalls: true } }
+`,
+      }),
+    );
+    const route = plane.accounts[0]!.routes[0]!;
+    // Root sync is untouched; the subagent leaves fold org floor < account < route.
+    assert.equal(route.defaults.sync.finalAnswers, true);
+    assert.deepEqual(route.defaults.sync.subagents, {
+      finalAnswers: true,
+      progress: false,
+      toolCalls: true,
+    });
+  });
+
+  it("normalizes the pre-group boolean progress onto progressMessage only", () => {
+    // Every already-authored revision writes `progress: true|false`. It must
+    // keep compiling, and it must mean ONLY the relayed line — the two liveness
+    // leaves come from the floor, not from the legacy boolean.
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+defaults:
+  sync: { progress: true }
+`,
+      }),
+    );
+    assert.deepEqual(plane.accounts[0]!.defaults.sync.progress, {
+      progressMessage: true,
+      typingIndicator: true,
+      messageReaction: "off",
+    });
+  });
+
+  it("folds the sync.progress group per leaf across the layers", () => {
+    // Each leaf is inherited independently: the org turns the indicator off,
+    // the account picks a reaction emoji, the route mutes its own progress
+    // line — and none of the three disturbs the others.
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/policy.yml"]: `
+defaults:
+  sync: { progress: { typingIndicator: false } }
+`,
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+defaults:
+  sync: { progress: { messageReaction: hourglass_flowing_sand } }
+routes:
+  - match: { kind: channel, ids: [C0APP] }
+    agent: worker-app
+    environment: repo-app
+    sync: { progress: { progressMessage: false } }
+  - match: { kind: channel, ids: [C0QUIET] }
+    agent: worker-app
+    environment: repo-app
+    sync: { progress: { messageReaction: off } }
+`,
+      }),
+    );
+    const routes = plane.accounts[0]!.routes;
+    assert.deepEqual(routes[0]!.defaults.sync.progress, {
+      progressMessage: false,
+      typingIndicator: false,
+      messageReaction: "hourglass_flowing_sand",
+    });
+    // The narrowest layer wins per leaf: this route turns the reaction off and
+    // inherits the rest.
+    assert.deepEqual(routes[1]!.defaults.sync.progress, {
+      progressMessage: true,
+      typingIndicator: false,
+      messageReaction: "off",
+    });
+  });
+
+  it("rejects a malformed messageReaction emoji name", () => {
+    // The value is open (custom emoji are user-created), so the guard is the
+    // name shape: a typo fails at compile, not as a bad_emoji on every turn.
+    expectCompileError(
+      {
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+defaults:
+  sync: { progress: { messageReaction: "Hourglass Flowing Sand" } }
+`,
+      },
+      /emoji name/,
+    );
+  });
+
+  it("folds outbound like every other default leaf (org floor < account < route)", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/main.yml"]: `
+channel: slack
+accountId: main
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+defaults:
+  outbound: { path: tool }
+  sync: { threadLink: full, finalAnswers: true }
+routes:
+  - match: { kind: channel, ids: [C0APP] }
+    agent: worker-app
+    environment: repo-app
+  - match: { kind: channel, ids: [C0RELAY] }
+    agent: worker-app
+    environment: repo-app
+    outbound: { path: relay }
+`,
+      }),
+    );
+    const routes = plane.accounts[0]!.routes;
+    // Account sets path: tool; the first route inherits it.
+    assert.equal(routes[0]!.defaults.outbound.path, "tool");
+    assert.equal(routes[0]!.defaults.outbound.template, null);
+    // The tool path silences the relayed TEXT leaves (a tool post is the only
+    // user-visible answer) but not the liveness leaves: a typing indicator or a
+    // reaction is not a post, and a tool turn has less visible text than a
+    // relay turn. threadLink keeps its folded value.
+    assert.deepEqual(routes[0]!.defaults.sync, {
+      finalAnswers: false,
+      progress: {
+        progressMessage: false,
+        typingIndicator: true,
+        messageReaction: "off",
+      },
+      toolCalls: false,
+      threadLink: "full",
+      subagents: { finalAnswers: false, progress: false, toolCalls: false },
+    });
+    // The second route overrides back to relay: the sync leaves keep their fold.
+    assert.equal(routes[1]!.defaults.outbound.path, "relay");
+    assert.equal(routes[1]!.defaults.sync.finalAnswers, true);
+    assert.equal(routes[1]!.defaults.sync.threadLink, "full");
+  });
+
+  it("carries a route-level outbound.template onto the tool path", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/main.yml"]: `
+channel: slack
+accountId: main
+secretRef: /tmp/secret.json
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C0APP] }
+    agent: worker-app
+    environment: repo-app
+    outbound: { path: tool, template: "Reply only via the message tool." }
+`,
+      }),
+    );
+    const route = plane.accounts[0]!.routes[0]!;
+    assert.deepEqual(route.defaults.outbound, {
+      path: "tool",
+      template: "Reply only via the message tool.",
+    });
   });
 
   it("rejects an unsupported channel at P0", () => {

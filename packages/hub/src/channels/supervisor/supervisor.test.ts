@@ -18,7 +18,7 @@ import { ProjectConfigurationStore } from "../../configuration/store.js";
 import type { Database } from "../../db/types.js";
 import { enrollTestDaemon } from "../../test-utils/project-configuration.js";
 import type { PlaneLogger } from "../plane/types.js";
-import { createChannelSupervisor } from "./index.js";
+import { createChannelSupervisor, flatInboundNormalizer } from "./index.js";
 import type {
   ChannelAccountStatusEntry,
   ChannelSupervisor,
@@ -325,5 +325,57 @@ describe("createChannelSupervisor", () => {
       await supervisor.stopAll();
       assert.deepEqual(supervisor.status(), []);
     });
+  });
+});
+
+// --- Inbound normalizer -------------------------------------------------------
+
+describe("flatInboundNormalizer", () => {
+  it("maps MessageSid to the marker's externalMessageId", () => {
+    const message = flatInboundNormalizer({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "C0APP",
+        SenderId: "U0ALICE",
+        MessageSid: "1700000000.000001",
+      },
+    });
+    assert.equal(message?.externalMessageId, "1700000000.000001");
+  });
+
+  it("omits externalMessageId when the ctxPayload carries no MessageSid", () => {
+    const message = flatInboundNormalizer({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "C0APP",
+        SenderId: "U0ALICE",
+      },
+    });
+    assert.notEqual(message, null);
+    assert.equal(message?.externalMessageId, undefined);
+  });
+
+  it("maps MessageThreadId to the marker conversation's threadId", () => {
+    const message = flatInboundNormalizer({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "C0APP",
+        SenderId: "U0ALICE",
+        MessageThreadId: "1700000000.000002",
+        MessageSid: "1700000001.000001",
+      },
+    });
+    assert.equal(message?.conversation.kind, "thread");
+    assert.equal(message?.conversation.threadId, "1700000000.000002");
+    assert.equal(message?.externalMessageId, "1700000001.000001");
   });
 });

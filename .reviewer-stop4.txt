@@ -1,0 +1,9 @@
+
+ RUN  v4.1.7 /home/node/projects/clisbot-paseoclaw-fusion
+
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  08:38:38
+   Duration  19.93s (transform 11.88s, setup 0ms, import 19.28s, tests 13ms, environment 0ms)
+

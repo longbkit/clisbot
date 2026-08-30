@@ -8,7 +8,7 @@
 // pattern applied to the Hub's exported bin entry (implementation doc §2 step 3, §3.2).
 
 import { spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
-import fs, { existsSync, rmSync, writeFileSync } from "node:fs";
+import fs, { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -329,12 +329,36 @@ function detachedStartupWatch(
 }
 
 function buildChildEnv(home: string, port: number): NodeJS.ProcessEnv {
-  return {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     PORT: String(port),
     PASEO_HUB_BIND: FORK_HUB_BIND,
     PASEO_HOME: home,
   };
+  const password = readDaemonPasswordFile(home);
+  if (password !== undefined) env.PASEO_PASSWORD = password;
+  return env;
+}
+
+/**
+ * The daemon's WS-auth password, when the home carries `<home>/.daemon-password`.
+ * Without it a password-protected daemon rejects the Hub's trusted session at
+ * the WS upgrade ("started" hub, dead daemon link). The file is a single
+ * `PASEO_PASSWORD=<value>` line (the repo .env shape), not a bare value — split
+ * on the first `=`. An absent or unreadable file returns undefined: a daemon
+ * without a password needs none.
+ */
+export function readDaemonPasswordFile(home: string): string | undefined {
+  let raw: string;
+  try {
+    raw = readFileSync(path.join(home, ".daemon-password"), "utf8");
+  } catch {
+    return undefined;
+  }
+  const value = raw.trim();
+  if (value.length === 0) return undefined;
+  const eq = value.indexOf("=");
+  return (eq > 0 ? value.slice(eq + 1).trim() : value) || undefined;
 }
 
 export async function startLocalHubDetached(

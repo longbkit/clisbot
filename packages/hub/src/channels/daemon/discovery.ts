@@ -45,7 +45,14 @@ export function discoverLocalDaemon(
   return { url: buildWsUrl(`${DEFAULT_HOST}:${DEFAULT_PORT}`), source: "default-port" };
 }
 
-function resolveHome(
+/**
+ * The daemon/Hub shared home, by precedence: an explicit `home` (the operator
+ * override) > `PASEO_HOME` (the env-alias sets it to the shared `~/.clisbot`
+ * home, or the operator's `CLISBOT_HOME`) > the stock `~/.paseo`. Exported so
+ * the channel plane's media home-root fallback (relay media posts) resolves
+ * the home with the SAME precedence as daemon discovery — one home, one rule.
+ */
+export function resolveHome(
   home?: string,
   environment: Record<string, string | undefined> = process.env,
 ): string {

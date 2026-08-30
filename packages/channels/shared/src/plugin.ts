@@ -25,10 +25,34 @@ export type SendTextFn = (args: {
   [key: string]: unknown;
 }) => Promise<{ messageId: string; [key: string]: unknown }>;
 
+/** The outbound native-media post: `outbound.sendMedia(args)`. The Hub's relay
+ * calls it for the explicit Hub `send_file` MCP tool. One call posts ONE file
+ * (the vertical posts one message per file). `filePath` is an absolute path under
+ * the agent's home that the vertical reads + uploads. `mediaPosted` is the
+ * G11 contract: true when the file was posted natively; false when the
+ * vertical refused it (oversized — the G11 gate is size-only; both channels
+ * post arbitrary files) and posted the in-channel
+ * notice through its text path instead — `messageId` is that notice post's id.
+ * Transport faults (missing file, Bot API / Web API failure) THROW; the Hub's
+ * failDelivery owns those. */
+export type SendMediaFn = (args: {
+  cfg: Record<string, unknown>;
+  accountId: string;
+  to: string;
+  threadId?: string;
+  /** The local media file's absolute path (under the agent's home). */
+  filePath: string;
+  [key: string]: unknown;
+}) => Promise<{ messageId: string; mediaPosted: boolean; [key: string]: unknown }>;
+
 /** The plugin chunk the pin drives. Unknown keys stay open — the vertical's
- * own surface may carry more; the Hub reads only these two. */
+ * own surface may carry more; the Hub reads only these (sendText today;
+ * sendMedia is the native-media seam, G7–G11). */
 export interface ChannelPlugin {
   gateway?: { startAccount?: StartAccountFn | undefined } | undefined;
-  outbound?: { sendText?: SendTextFn | undefined } & Record<string, unknown>;
+  outbound?: {
+    sendText?: SendTextFn | undefined;
+    sendMedia?: SendMediaFn | undefined;
+  } & Record<string, unknown>;
   [key: string]: unknown;
 }

@@ -13,7 +13,24 @@ export type {
   KeyedStoreTtlOptions,
   StartAccountContext,
 } from "./host.js";
-export type { ChannelPlugin, SendTextFn, StartAccountFn } from "./plugin.js";
+export type { ChannelPlugin, SendMediaFn, SendTextFn, StartAccountFn } from "./plugin.js";
+export {
+  evaluateOutboundMedia,
+  mediaFileName,
+  mediaMaxBytesForChannel,
+  mediaNotice,
+  mimeFromExtension,
+  SLACK_MAX_MEDIA_BYTES,
+  TELEGRAM_MAX_MEDIA_BYTES,
+} from "./media-policy.js";
+export type { MediaChannel, MediaPolicyDecision, MediaRejectReason } from "./media-policy.js";
+export type { InboundAttachedFile } from "./media.js";
+export {
+  buildAttachedFilesManifest,
+  downloadMediaFile,
+  foldAttachedFilesIntoBody,
+  MEDIA_DOWNLOAD_TIMEOUT_MS,
+} from "./media.js";
 export type { ChannelEntry, ChannelEntryOptions, EntryModuleRef } from "./entry.js";
 export { createChannelEntry } from "./entry.js";
 export type {

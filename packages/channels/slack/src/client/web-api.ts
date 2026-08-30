@@ -25,8 +25,76 @@ interface WebClientInstance {
       channel: string;
       text?: string;
       thread_ts?: string;
+      blocks?: unknown;
       [key: string]: unknown;
     }): Promise<{ ts?: string; channel?: string; [key: string]: unknown }>;
+    /** COMPAT(clisbot-control-plane): the in-place message update (the
+     * approval card's decided state). Pinned @slack/web-api exposes
+     * `chat.update`, not `chat.updateMessage` — a stale name throws
+     * `client.chat.updateMessage is not a function` live. `blocks: []`
+     * strips the card's markup. */
+    update(args: {
+      channel: string;
+      ts: string;
+      text?: string;
+      blocks?: unknown;
+      [key: string]: unknown;
+    }): Promise<{ ok?: boolean; error?: string; ts?: string; [key: string]: unknown }>;
+  };
+  /** COMPAT(clisbot-control-plane): the G7–G10 external-file upload surface
+   * (the 3-step external upload — OpenClaw `client-delivery.ts`
+   * `uploadSlackFile`). `getUploadURLExternal` mints a capability-bearing
+   * upload URL + file id; `completeUploadExternal` commits the uploaded bytes
+   * into a channel/thread. */
+  files: {
+    getUploadURLExternal(args: { filename: string; length: number }): Promise<{
+      ok?: boolean;
+      error?: string;
+      upload_url?: string;
+      file_id?: string;
+      [key: string]: unknown;
+    }>;
+    completeUploadExternal(args: {
+      files: Array<{ id: string; title?: string }>;
+      channel_id: string;
+      thread_ts?: string;
+      initial_comment?: string;
+      [key: string]: unknown;
+    }): Promise<{ ok?: boolean; error?: string; [key: string]: unknown }>;
+  };
+  /** COMPAT(clisbot-control-plane): the liveness surfaces (`typing.md`).
+   * `assistant.threads.setStatus` is Slack's native "is typing..." thread
+   * status (the `loading_messages` array is what rotates through the
+   * spinner-style text); `status: ""` clears it. Needs the `assistant:write`
+   * bot scope — a workspace whose app lacks it gets `missing_scope`, which the
+   * typing adapter turns into one warning (outbound.ts). */
+  assistant: {
+    threads: {
+      setStatus(args: {
+        channel_id: string;
+        thread_ts: string;
+        status: string;
+        loading_messages?: string[];
+        [key: string]: unknown;
+      }): Promise<{ ok?: boolean; error?: string; [key: string]: unknown }>;
+    };
+  };
+  /** The reaction surface the `messageReaction` receipt uses: add on turn
+   * open, remove on turn close. `reactions.add` answers `already_reacted` for
+   * a repeat, which the adapter treats as success (typing.md). */
+  reactions: {
+    add(args: {
+      channel: string;
+      timestamp: string;
+      name: string;
+      [key: string]: unknown;
+    }): Promise<{ ok?: boolean; error?: string; [key: string]: unknown }>;
+    remove(args: {
+      channel: string;
+      timestamp: string;
+      name: string;
+      [key: string]: unknown;
+    }): Promise<{ ok?: boolean; error?: string; [key: string]: unknown }>;
   };
   [key: string]: unknown;
 }
@@ -34,6 +102,23 @@ interface WebClientInstance {
 /** The WebClient surface the vertical uses (structural subset of
  * @slack/web-api's `WebClient` — the vertical never imports OpenClaw types). */
 export type WebClient = WebClientInstance;
+
+/**
+ * Test seam: a `WebClient` whose every surface answers `ok` and records
+ * nothing. A fake that exercises ONE surface spreads this and overrides, so
+ * adding a surface here cannot break every existing client fake (the pattern
+ * the approval-card and media fakes already follow).
+ */
+export function slackWebClientStubForTest(): WebClient {
+  const ok = async () => ({ ok: true }) as unknown as never;
+  return {
+    auth: { test: ok },
+    chat: { postMessage: ok, update: ok },
+    files: { getUploadURLExternal: ok, completeUploadExternal: ok },
+    assistant: { threads: { setStatus: ok } },
+    reactions: { add: ok, remove: ok },
+  } as unknown as WebClient;
+}
 
 /** The `auth.test` response facts (structural subset of
  * @slack/web-api's `AuthTestResponse`). */
@@ -183,6 +268,13 @@ export async function getSlackWriteClient(
 /** Test seam: drop the cached write clients. */
 export function clearSlackWriteClientCacheForTest(): void {
   writeClientCache.clear();
+}
+
+/** Test seam: register a fake write client under the same cache key a real
+ * client would get, so the outbound path picks it up instead of
+ * constructing one (the outbound tests assert on the `postMessage` args). */
+export function registerSlackWriteClientForTest(token: string, client: WebClient): void {
+  writeClientCache.set(createSlackTokenCacheKey(token), client);
 }
 
 // --- auth.test probe (pinned probe-CuwRDE5j.js) -------------------------------

@@ -181,6 +181,15 @@ describe("pinned vertical contract (import + drive surface)", () => {
         "function",
         "plugin.outbound.sendText (slackPlugin)",
       );
+      // The liveness seam the Hub mounts as `typingFor` (plane/processing.ts). A
+      // plugin that ships without it silently loses the whole `sync.progress`
+      // typing surface — the Hub treats an absent drive as "no capability", so
+      // nothing else ever says it is missing.
+      assert.equal(
+        typeof loaded.plugin.outbound?.["typing"],
+        "function",
+        "plugin.outbound.typing (slackPlugin)",
+      );
       assert.equal(loaded.entry["gateway"], undefined, "the entry is not the plugin");
       // The load-trace admitted the in-repo supply: the package dir + the
       // shared contract package (the workspace link's REALPATH, OUTSIDE the
@@ -258,6 +267,11 @@ describe("pinned vertical contract (import + drive surface)", () => {
         typeof loaded.plugin.outbound?.["sendText"],
         "function",
         "plugin.outbound.sendText (telegramPlugin)",
+      );
+      assert.equal(
+        typeof loaded.plugin.outbound?.["typing"],
+        "function",
+        "plugin.outbound.typing (telegramPlugin)",
       );
       assert.equal(loaded.entry["gateway"], undefined, "the entry is not the plugin");
       assert.ok(

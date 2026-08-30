@@ -4,7 +4,7 @@
 // throttled, `sync` knobs gate each event kind, and a replayed or restarted
 // stream never double-posts (the ledger dedupes by event/turn id + sequence).
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
@@ -17,12 +17,17 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import type {
+  MediaPostFn,
   OutboundPostParams,
   OutboundPostResult,
+  P0ChannelName,
   PlaneLogger,
   StreamContext,
+  TypingParams,
 } from "../plane/types.js";
+import type { ProcessingController } from "../plane/processing.js";
 import { ManualClock } from "../plane/clock.js";
+import { createProcessingController, processingSurfaceFor } from "../plane/processing.js";
 import {
   DEFAULT_PROGRESS_THROTTLE_MS,
   RelayEngine,
@@ -36,22 +41,37 @@ const CONVERSATION = "C0APP";
 const THREAD = "1720000000.000000";
 const SILENT: PlaneLogger = { warn: () => undefined, info: () => undefined };
 
+/** The subagent relay knobs at the org floor (all off). */
+const SUBAGENTS_OFF = { finalAnswers: false, progress: false, toolCalls: false };
+
 function defaults(overrides: Partial<EffectiveDefaults> = {}): EffectiveDefaults {
   return {
     requireMention: true,
     followUp: { mode: "auto", ttlMinutes: 60 },
     bindingKey: "thread",
     replyAnchor: "thread",
-    sync: { finalAnswers: true, progress: false, toolCalls: false, threadLink: "final-only" },
+    outbound: { path: "relay", template: null },
+    sync: {
+      finalAnswers: true,
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+      toolCalls: false,
+      threadLink: "final-only",
+      subagents: { finalAnswers: false, progress: false, toolCalls: false },
+    },
     ...overrides,
   };
 }
 
 function context(
   overrides: {
+    agentId?: string;
+    channel?: P0ChannelName;
     route?: CompiledRoute;
     externalConversationId?: string;
     externalThreadId?: string | null;
+    triggerThreadId?: string | null;
+    triggerMessageId?: string;
+    rootKind?: StreamContext["rootKind"];
   } = {},
 ): StreamContext {
   const route: CompiledRoute = overrides.route ?? {
@@ -69,6 +89,7 @@ function context(
     channelEnabled: true,
     secretRef: "secret-ref",
     transport: {},
+    config: {},
     defaultRoles: [],
     assignments: [],
     defaults: route.defaults,
@@ -77,15 +98,24 @@ function context(
     fallback: { deny: true },
   };
   return {
-    agentId: AGENT_ID,
-    channel: "slack",
+    agentId: overrides.agentId ?? AGENT_ID,
+    channel: overrides.channel ?? "slack",
     accountId: "work",
     externalConversationId: overrides.externalConversationId ?? CONVERSATION,
     externalThreadId:
       overrides.externalThreadId === undefined ? THREAD : overrides.externalThreadId,
+    ...(overrides.triggerThreadId !== undefined
+      ? { triggerThreadId: overrides.triggerThreadId }
+      : {}),
+    ...(overrides.triggerMessageId !== undefined
+      ? { triggerMessageId: overrides.triggerMessageId }
+      : {}),
     initiator: "slack:U0ALICE",
     account,
     route,
+    // The binding's stored route-summary kind: a Slack thread's root is a
+    // channel.
+    rootKind: overrides.rootKind ?? "channel",
   };
 }
 
@@ -93,6 +123,12 @@ function makeEngine(
   store: ChannelStore,
   post: (p: OutboundPostParams) => Promise<OutboundPostResult>,
   clock = new ManualClock(),
+  media: {
+    mediaPost?: MediaPostFn | undefined;
+    homeRoot?: string | undefined;
+    agentCwd?: ((agentId: string) => string | undefined) | undefined;
+    processing?: ProcessingController | undefined;
+  } = {},
 ) {
   return new RelayEngine({
     organizationId: ORGANIZATION_ID,
@@ -101,6 +137,7 @@ function makeEngine(
     store,
     post,
     progressThrottleMs: DEFAULT_PROGRESS_THROTTLE_MS,
+    ...(media.processing !== undefined ? { processing: media.processing } : {}),
   });
 }
 
@@ -127,7 +164,7 @@ afterAll(async () => {
 });
 
 describe("relay final answer", () => {
-  it("posts the joined assistant text on turn_completed, once", async () => {
+  it("posts one message's coalesced items as a single post on turn_completed", async () => {
     const posted: string[] = [];
     const engine = makeEngine(store, async (p) => {
       posted.push(p.text);
@@ -136,19 +173,122 @@ describe("relay final answer", () => {
     const ctx = context({ externalConversationId: "C0A", externalThreadId: "1.0" });
     engine.attach(ctx);
 
+    // One logical message, coalesced by the daemon into two wire items with the
+    // same messageId (the 60ms window can split a message mid-word).
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
       turnId: "turn-a",
-      item: { type: "assistant_message", text: "step one" },
+      item: { type: "assistant_message", messageId: "m1", text: "step on" },
     });
     await engine.onStream(AGENT_ID, {
       kind: "timeline",
       turnId: "turn-a",
-      item: { type: "assistant_message", text: "step two" },
+      item: { type: "assistant_message", messageId: "m1", text: "e" },
     });
     await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-a" });
 
-    assert.deepEqual(posted, ["step one\n\nstep two"]);
+    assert.deepEqual(posted, ["step one"]);
+  });
+
+  it("posts two messages with different messageIds as two separate posts, in order", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    const ctx = context({ externalConversationId: "C0H", externalThreadId: "8.0" });
+    engine.attach(ctx);
+
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-h",
+      item: { type: "assistant_message", messageId: "m1", text: "first" },
+    });
+    // A new messageId closes the first message (posted first, in order).
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-h",
+      item: { type: "assistant_message", messageId: "m2", text: "second" },
+    });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-h" });
+
+    assert.deepEqual(posted, ["first", "second"]);
+  });
+
+  it("interleaves two agents' turns without leaking state between them", async () => {
+    const posted = new Map<string, string[]>();
+    const engine = makeEngine(store, async (p) => {
+      const list = posted.get(p.threadId ?? "") ?? [];
+      list.push(p.text);
+      posted.set(p.threadId ?? "", list);
+      return { ok: true };
+    });
+    engine.attach(
+      context({ agentId: "agent-A", externalConversationId: "C0I", externalThreadId: "9.0" }),
+    );
+    engine.attach(
+      context({ agentId: "agent-B", externalConversationId: "C0I", externalThreadId: "10.0" }),
+    );
+
+    // Interleave: A's message m1, B's message m1, A's next message m2, B's
+    // continuation of m1 — per-agent (and per-turn) state must not mix.
+    await engine.onStream("agent-A", {
+      kind: "timeline",
+      turnId: "turn-A",
+      item: { type: "assistant_message", messageId: "m1", text: "A one" },
+    });
+    await engine.onStream("agent-B", {
+      kind: "timeline",
+      turnId: "turn-B",
+      item: { type: "assistant_message", messageId: "m1", text: "B one" },
+    });
+    await engine.onStream("agent-A", {
+      kind: "timeline",
+      turnId: "turn-A",
+      item: { type: "assistant_message", messageId: "m2", text: "A two" },
+    });
+    await engine.onStream("agent-B", {
+      kind: "timeline",
+      turnId: "turn-B",
+      item: { type: "assistant_message", messageId: "m1", text: "B two" },
+    });
+    await engine.onStream("agent-A", { kind: "turn_completed", turnId: "turn-A" });
+    await engine.onStream("agent-B", { kind: "turn_completed", turnId: "turn-B" });
+
+    assert.deepEqual(posted.get("9.0"), ["A one", "A two"]);
+    assert.deepEqual(posted.get("10.0"), ["B oneB two"]);
+  });
+
+  it("strips the provider boundary marker, even when the message is only marker + text", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    const ctx = context({ externalConversationId: "C0J", externalThreadId: "11.0" });
+    engine.attach(ctx);
+
+    // The Codex provider prepends "\n\n---\n\n" to the first delta of each new
+    // assistant message; the relay must not surface the marker.
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-j",
+      item: { type: "assistant_message", messageId: "m1", text: "hello" },
+    });
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-j",
+      item: { type: "assistant_message", messageId: "m2", text: "\n\n---\n\nworld" },
+    });
+    // A message whose only content is the marker posts nothing.
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-j",
+      item: { type: "assistant_message", messageId: "m3", text: "\n\n---\n\n" },
+    });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-j" });
+
+    assert.deepEqual(posted, ["hello", "world"]);
   });
 
   it("posts into the native thread for reply.anchor = thread", async () => {
@@ -182,7 +322,13 @@ describe("relay final answer", () => {
       route: {
         ...context().route,
         defaults: defaults({
-          sync: { finalAnswers: false, progress: false, toolCalls: false, threadLink: "none" },
+          sync: {
+            finalAnswers: false,
+            progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+            toolCalls: false,
+            threadLink: "none",
+            subagents: SUBAGENTS_OFF,
+          },
         }),
       },
     });
@@ -207,7 +353,13 @@ describe("relay progress + tool calls", () => {
       route: {
         ...context().route,
         defaults: defaults({
-          sync: { finalAnswers: true, progress: true, toolCalls: false, threadLink: "none" },
+          sync: {
+            finalAnswers: true,
+            progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
+            toolCalls: false,
+            threadLink: "none",
+            subagents: SUBAGENTS_OFF,
+          },
         }),
       },
     });
@@ -253,7 +405,13 @@ describe("relay progress + tool calls", () => {
       route: {
         ...context().route,
         defaults: defaults({
-          sync: { finalAnswers: true, progress: false, toolCalls: true, threadLink: "none" },
+          sync: {
+            finalAnswers: true,
+            progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+            toolCalls: true,
+            threadLink: "none",
+            subagents: SUBAGENTS_OFF,
+          },
         }),
       },
     });
@@ -314,7 +472,13 @@ describe("ledger dedupe (restart / replay)", () => {
       route: {
         ...context().route,
         defaults: defaults({
-          sync: { finalAnswers: true, progress: true, toolCalls: false, threadLink: "none" },
+          sync: {
+            finalAnswers: true,
+            progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
+            toolCalls: false,
+            threadLink: "none",
+            subagents: SUBAGENTS_OFF,
+          },
         }),
       },
     });
@@ -335,6 +499,326 @@ describe("ledger dedupe (restart / replay)", () => {
       item: { type: "tool_call", name: "Bash", status: "running" },
     });
     assert.equal(posts, 1, "the replayed progress snapshot does not re-post");
+  });
+});
+
+describe("relay subagent scope", () => {
+  function subagentRoute(
+    finalAnswers: boolean,
+    extra: Partial<EffectiveDefaults["sync"]["subagents"]> = {},
+  ) {
+    return {
+      ...context().route,
+      defaults: defaults({
+        sync: {
+          finalAnswers: true,
+          progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+          toolCalls: false,
+          threadLink: "none",
+          subagents: { finalAnswers, progress: false, toolCalls: false, ...extra },
+        },
+      }),
+    };
+  }
+
+  it("posts a subagent's coalesced answer with the label prefix, into the original thread", async () => {
+    const posted: OutboundPostParams[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p);
+      return { ok: true };
+    });
+    engine.attach(
+      context({
+        externalConversationId: "C0K",
+        externalThreadId: "12.0",
+        route: subagentRoute(true),
+      }),
+    );
+
+    await engine.onSubagentStream({
+      kind: "upsert",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      label: "Research",
+      status: "running",
+    });
+    // One logical message coalesced across two wire items (same messageId).
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m1", text: "found" },
+    });
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m1", text: " it" },
+    });
+    // A second message with the provider boundary marker; `remove` closes it.
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m2", text: "\n\n---\n\ndone" },
+    });
+    await engine.onSubagentStream({
+      kind: "remove",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+    });
+
+    assert.equal(posted.length, 2);
+    assert.equal(posted[0]?.text, "▶ Research (subagent): found it");
+    assert.equal(posted[1]?.text, "▶ Research (subagent): done");
+    // The subagent posts land in the parent's conversation + thread.
+    assert.equal(posted[0]?.to, "C0K");
+    assert.equal(posted[0]?.threadId, "12.0");
+  });
+
+  it("falls back to the subagentId when the upsert carries no label", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    engine.attach(
+      context({
+        externalConversationId: "C0K1",
+        externalThreadId: "12.1",
+        route: subagentRoute(true),
+      }),
+    );
+    await engine.onSubagentStream({
+      kind: "upsert",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-9",
+      label: null,
+      status: "running",
+    });
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-9",
+      item: { type: "assistant_message", text: "x" },
+    });
+    await engine.onSubagentStream({
+      kind: "remove",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-9",
+    });
+    assert.deepEqual(posted, ["▶ sub-9 (subagent): x"]);
+  });
+
+  it("interleaves root + subagent posts in order, with separate ledger sequences; replay is safe", async () => {
+    let posts = 0;
+    const engine = makeEngine(store, async () => {
+      posts += 1;
+      return { ok: true };
+    });
+    const ctx = context({
+      externalConversationId: "C0L",
+      externalThreadId: "13.0",
+      route: subagentRoute(true),
+    });
+    engine.attach(ctx);
+
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-r",
+      item: { type: "assistant_message", messageId: "m1", text: "root one" },
+    });
+    await engine.onSubagentStream({
+      kind: "upsert",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      label: "Helper",
+      status: "running",
+    });
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m1", text: "sub one" },
+    });
+    // A new root messageId closes the root's first message (root seq 0).
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-r",
+      item: { type: "assistant_message", messageId: "m2", text: "root two" },
+    });
+    // A new subagent messageId closes the subagent's first (sub seq 0).
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m2", text: "sub two" },
+    });
+    // The subagent ends before the root turn: its close posts "sub two" (sub seq 1).
+    await engine.onSubagentStream({
+      kind: "remove",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+    });
+    // The root turn completes last: "root two" (root seq 1).
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-r" });
+
+    assert.equal(posts, 4, "root and subagent posts interleave, none lost or merged");
+
+    // A restarted plane replays the same root + subagent frames: the ledger's
+    // subagent scope key keeps the replay deduped against the subagent posts
+    // (and the root scope key against the root's).
+    const replay = makeEngine(store, async () => {
+      posts += 1;
+      return { ok: true };
+    });
+    replay.attach(ctx);
+    await replay.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-r",
+      item: { type: "assistant_message", messageId: "m1", text: "root one" },
+    });
+    await replay.onSubagentStream({
+      kind: "upsert",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      label: "Helper",
+      status: "running",
+    });
+    await replay.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m1", text: "sub one" },
+    });
+    await replay.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-r",
+      item: { type: "assistant_message", messageId: "m2", text: "root two" },
+    });
+    await replay.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", messageId: "m2", text: "sub two" },
+    });
+    await replay.onSubagentStream({
+      kind: "remove",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+    });
+    await replay.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-r" });
+
+    assert.equal(posts, 4, "replayed root + subagent frames do not re-post");
+  });
+
+  it("does not relay subagent text when sync.subagents is off (the default)", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    // Root finalAnswers on, subagents all off — the org-floor default.
+    engine.attach(context({ externalConversationId: "C0M", externalThreadId: "14.0" }));
+    await engine.onSubagentStream({
+      kind: "upsert",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      label: "Hidden",
+      status: "running",
+    });
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "assistant_message", text: "never relayed" },
+    });
+    await engine.onSubagentStream({
+      kind: "remove",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+    });
+    // The root turn still relays normally.
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-m",
+      item: { type: "assistant_message", text: "root" },
+    });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-m" });
+
+    assert.deepEqual(posted, ["root"], "the subagent's text stays off the channel");
+  });
+
+  it("posts prefixed subagent tool-call lines when sync.subagents.toolCalls is on", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (p) => {
+      posted.push(p.text);
+      return { ok: true };
+    });
+    engine.attach(
+      context({
+        externalConversationId: "C0N",
+        externalThreadId: "15.0",
+        route: subagentRoute(true, { toolCalls: true }),
+      }),
+    );
+    await engine.onSubagentStream({
+      kind: "upsert",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      label: "Worker",
+      status: "running",
+    });
+    await engine.onSubagentStream({
+      kind: "timeline",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+      item: { type: "tool_call", name: "Bash", status: "completed" },
+    });
+    await engine.onSubagentStream({
+      kind: "remove",
+      parentAgentId: AGENT_ID,
+      subagentId: "sub-1",
+    });
+    assert.deepEqual(posted, ["▶ Worker (subagent): Tool Bash: completed"]);
+  });
+});
+
+describe("relay outbound text contract (retired media heuristics)", () => {
+  /** One temp dir holding the file the final answer references. */
+  let mediaHome: string;
+
+  beforeAll(async () => {
+    mediaHome = await mkdtemp(join(tmpdir(), "hub-relay-media-"));
+    await writeFile(join(mediaHome, "chart.png"), "png");
+  });
+
+  afterAll(async () => {
+    await rm(mediaHome, { recursive: true, force: true });
+  });
+
+  it("posts local paths as plain text and never calls a media seam", async () => {
+    const posted: string[] = [];
+    const mediaPath = join(mediaHome, "chart.png");
+    const engine = makeEngine(
+      store,
+      async (p) => {
+        posted.push(p.text);
+        return { ok: true };
+      },
+      new ManualClock(),
+      // The relay never parses final-answer text for media.
+      { homeRoot: mediaHome, mediaPost: undefined },
+    );
+    engine.attach(context({ externalConversationId: "C0O", externalThreadId: "16.0" }));
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-o",
+      item: { type: "assistant_message", text: `done, see ${mediaPath}` },
+    });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-o" });
+
+    assert.deepEqual(posted, [`done, see ${mediaPath}`]);
   });
 });
 
@@ -364,14 +848,207 @@ describe("thread link + reply location (pure)", () => {
     );
   });
 
-  it("reply location honors the anchor", () => {
+  it("reply location follows the marker", () => {
+    // A thread-keyed binding (`binding.key: thread`): the persisted thread
+    // wins under either anchor.
     assert.deepEqual(replyLocationFor(context({ externalThreadId: THREAD })), {
       to: CONVERSATION,
       threadId: THREAD,
     });
-    const channelAnchor = context({
-      route: { ...context().route, defaults: defaults({ replyAnchor: "channel" }) },
+    // `default`: a thread marker follows its thread even when the binding
+    // carries no thread of its own (`binding.key: channel` collapses threads).
+    const defaultAnchor = context({
+      externalThreadId: null,
+      triggerThreadId: THREAD,
+      route: { ...context().route, defaults: defaults({ replyAnchor: "default" }) },
     });
-    assert.deepEqual(replyLocationFor(channelAnchor), { to: CONVERSATION });
+    assert.deepEqual(replyLocationFor(defaultAnchor), {
+      to: CONVERSATION,
+      threadId: THREAD,
+    });
+    // `default`: a root marker stays at the conversation root.
+    const defaultRoot = context({
+      externalThreadId: null,
+      route: { ...context().route, defaults: defaults({ replyAnchor: "default" }) },
+    });
+    assert.deepEqual(replyLocationFor(defaultRoot), { to: CONVERSATION });
+  });
+
+  it("the thread anchor mints the reply thread on a root-level Slack marker", () => {
+    // Answering the marker message itself: `thread_ts` = the marker's native ts.
+    const mint = context({
+      externalThreadId: null,
+      triggerMessageId: "1700000000.000009",
+      route: { ...context().route, defaults: defaults({ replyAnchor: "thread" }) },
+    });
+    assert.deepEqual(replyLocationFor(mint), {
+      to: CONVERSATION,
+      threadId: "1700000000.000009",
+    });
+    // The mint is the `thread` anchor's: `default` never mints a root marker.
+    const noMint = context({
+      externalThreadId: null,
+      triggerMessageId: "1700000000.000009",
+      route: { ...context().route, defaults: defaults({ replyAnchor: "default" }) },
+    });
+    assert.deepEqual(replyLocationFor(noMint), { to: CONVERSATION });
+    // DMs never mint (Slack DMs have no thread level).
+    const dm = context({
+      externalThreadId: null,
+      triggerMessageId: "1700000000.000009",
+      rootKind: "dm",
+      route: { ...context().route, defaults: defaults({ replyAnchor: "thread" }) },
+    });
+    assert.deepEqual(replyLocationFor(dm), { to: CONVERSATION });
+    // Non-Slack channels never mint (no native reply-to-mint API).
+    const telegram = context({
+      channel: "telegram",
+      externalThreadId: null,
+      triggerMessageId: "424242",
+      route: { ...context().route, defaults: defaults({ replyAnchor: "thread" }) },
+    });
+    assert.deepEqual(replyLocationFor(telegram), { to: CONVERSATION });
+    // A marker id outside the native Slack ts shape never mints.
+    const malformed = context({
+      externalThreadId: null,
+      triggerMessageId: "slash:1700000000:U0",
+      route: { ...context().route, defaults: defaults({ replyAnchor: "thread" }) },
+    });
+    assert.deepEqual(replyLocationFor(malformed), { to: CONVERSATION });
+    // A restart re-attach carries no marker message id: fall back to the root.
+    const noTrigger = context({
+      externalThreadId: null,
+      route: { ...context().route, defaults: defaults({ replyAnchor: "thread" }) },
+    });
+    assert.deepEqual(replyLocationFor(noTrigger), { to: CONVERSATION });
+  });
+});
+
+// --- The processing-lease wiring (sync.progress liveness) -------------------
+// The controller's own behavior is pinned in plane/processing.test.ts; these
+// assert what the RELAY owes it: the inbound path opened the lease, the relay
+// keeps it alive on stream events and releases it on the terminal event.
+
+describe("relay processing wiring", () => {
+  /** A controller whose wire is a recorder, plus the relay that shares it. */
+  function processingEngine(driven: TypingParams[]) {
+    const clock = new ManualClock();
+    const controller = createProcessingController({
+      logger: SILENT,
+      now: () => clock.now(),
+      drive: async (params: TypingParams) => {
+        driven.push(params);
+      },
+    });
+    const engine = makeEngine(store, async () => ({ ok: true, externalMessageId: "1" }), clock, {
+      processing: controller,
+    });
+    return { engine, controller };
+  }
+
+  /** The lease the inbound path would have opened for this context. */
+  function openLease(
+    controller: ProcessingController,
+    ctx: StreamContext,
+    reaction: "eyes" | "off",
+  ): void {
+    const surface = processingSurfaceFor({
+      channel: ctx.channel,
+      accountId: ctx.accountId,
+      sync: {
+        ...ctx.route.defaults.sync,
+        progress: {
+          progressMessage: false,
+          typingIndicator: true,
+          messageReaction: reaction,
+        },
+      },
+      to: CONVERSATION,
+      threadId: THREAD,
+      messageId: "1720000000.000001",
+    });
+    assert.ok(surface !== undefined);
+    controller.open("inbound-1", surface);
+    controller.bind("inbound-1", ctx.agentId);
+  }
+
+  function liveRouteCtx(reaction: "eyes" | "off"): StreamContext {
+    return context({
+      route: {
+        ...context().route,
+        defaults: defaults({
+          sync: {
+            ...defaults().sync,
+            progress: {
+              progressMessage: false,
+              typingIndicator: true,
+              messageReaction: reaction,
+            },
+          },
+        }),
+      },
+    });
+  }
+
+  it("turn_started never raises a surface and turn_completed closes the lease", async () => {
+    const driven: TypingParams[] = [];
+    const { engine, controller } = processingEngine(driven);
+    const ctx = liveRouteCtx("eyes");
+    engine.attach(ctx);
+    // The relay sees the turn's first event BEFORE the lease exists: an
+    // unbound agent is a no-op, which is exactly why the inbound owns opening.
+    await engine.onStream(AGENT_ID, { kind: "turn_started", turnId: "turn-a" });
+    await Promise.resolve();
+    assert.equal(driven.length, 0);
+
+    openLease(controller, ctx, "eyes");
+    await engine.onStream(AGENT_ID, { kind: "turn_started", turnId: "turn-a" });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-a" });
+    await Promise.resolve();
+    assert.deepEqual(
+      driven.map((d) => [d.action, d.to, d.threadId, d.indicator, d.reactionEmoji]),
+      [
+        ["start", CONVERSATION, THREAD, true, "eyes"],
+        ["stop", CONVERSATION, THREAD, true, "eyes"],
+      ],
+    );
+  });
+
+  it("drives nothing when both liveness leaves are off (byte-identical relay)", async () => {
+    const driven: TypingParams[] = [];
+    const { engine } = processingEngine(driven);
+    engine.attach(context());
+    await engine.onStream(AGENT_ID, { kind: "turn_started", turnId: "turn-a" });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-a" });
+    await Promise.resolve();
+    assert.equal(driven.length, 0);
+  });
+
+  it("closes the surface when a turn fails instead of completing", async () => {
+    const driven: TypingParams[] = [];
+    const { engine, controller } = processingEngine(driven);
+    const ctx = liveRouteCtx("off");
+    engine.attach(ctx);
+    openLease(controller, ctx, "off");
+    await engine.onStream(AGENT_ID, { kind: "turn_closed", turnId: "turn-a" });
+    await Promise.resolve();
+    assert.deepEqual(
+      driven.map((d) => d.action),
+      ["start", "stop"],
+    );
+  });
+
+  it("detach releases the surface a running turn left open", async () => {
+    const driven: TypingParams[] = [];
+    const { engine, controller } = processingEngine(driven);
+    const ctx = liveRouteCtx("off");
+    engine.attach(ctx);
+    openLease(controller, ctx, "off");
+    engine.detach(AGENT_ID);
+    await Promise.resolve();
+    assert.deepEqual(
+      driven.map((d) => d.action),
+      ["start", "stop"],
+    );
   });
 });

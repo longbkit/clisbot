@@ -3,12 +3,21 @@
 // hands each request to this engine. One decision path: classify the tool class
 // -> the route's first-match rule decides auto-allow / auto-deny / prompt.
 // Auto cases respond on the daemon immediately, attributed to policy; a prompt
-// posts an in-thread text command (`approve <id>` / `deny <id>`) and the
-// responder's answer is re-authorized at dispatch — the SECOND authority check
-// (the first ran on the inbound message as `mayTrigger`). An approver without
-// the class privilege is inert: zero side effect, the request stays open. The
-// approval-required posture (plan S10: routes may relax per class, never the
-// posture) is asserted at plane start for every route.
+// posts in-thread (text + command, or the native card when
+// `transport.inlineButtons` admits it — card.ts) and the responder's answer is
+// re-authorized at dispatch — the SECOND authority check (the first ran on the
+// inbound message as `mayTrigger`). An approver without the class privilege is
+// inert: zero side effect, the request stays open. The approval-required
+// posture (plan S10: routes may relax per class, never the posture) is
+// asserted at plane start for every route.
+//
+// EXACTLY-ONCE (2026-08-27 card decision): a prompt resolves to exactly one
+// `agent_permission_response` no matter how many answer paths race — card
+// click, typed command, and a paired Paseo client answer all land on this
+// engine's open-prompt entry. The entry carries a `resolved` flag set the
+// moment ANY path dispatches (or the wire reports a client resolution); every
+// later path finds the flag and is an inert no-op. The daemon's own
+// in-flight dedupe is the backstop, but the hub guarantees one frame.
 import type {
   ChannelControlPlane,
   CompiledChannelAccount,
@@ -26,28 +35,61 @@ import {
   type ApproverCheck,
 } from "../policy.js";
 import { replyLocationFor } from "../relay/index.js";
-import type { PlaneClock, PlaneLogger, PostFn, StreamContext } from "../plane/types.js";
+import type {
+  OutboundPostResult,
+  PlaneClock,
+  PlaneLogger,
+  PostFn,
+  StreamContext,
+  UpdateFn,
+} from "../plane/types.js";
+import {
+  buildSlackCardBlocks,
+  buildTelegramReplyKeyboard,
+  cardIdFor,
+  decidedPromptText,
+  inlineButtonsAllowedFor,
+  isInlineButtonsMode,
+  parseCardValue,
+  promptSurfaceKind,
+  promptText,
+  questionInfoFromRequest,
+  resolveQuestionAnswer,
+  shortIdOf,
+  type QuestionInfo,
+} from "./card.js";
 
-/** The two P0 commands a channel can answer a prompt with (text + command). */
-export type ApprovalCommand =
-  | { decision: "allow"; requestId: string }
-  | { decision: "deny"; requestId: string };
+export { decidedPromptText, promptText } from "./card.js";
 
-/** Parse `<approve|deny> <requestId>`; null for any other text. */
-export function parseApprovalCommand(text: string): ApprovalCommand | null {
-  const match = /^\s*(approve|deny)\s+([A-Za-z0-9][A-Za-z0-9._-]*)\s*$/iu.exec(text);
-  if (match === null) return null;
-  const [decision, requestId] = [match[1], match[2]];
-  if (decision === undefined || requestId === undefined) return null;
-  return decision === "approve"
-    ? { decision: "allow", requestId }
-    : { decision: "deny", requestId };
+/** The command a channel can answer a prompt with (shared parser + "latest"
+ * target — `command.ts`): `approve|deny [id] [answer…]`, with an optional
+ * leading slash and a leading @bot mention (Slack + Telegram friendly). */
+export type { ApprovalCommand } from "./command.js";
+export { parseApprovalCommand, resolveApprovalTarget } from "./command.js";
+import type { ApprovalCommand } from "./command.js";
+
+/** The card's in-place-update location (native message id + conversation). */
+interface PromptCardLocation {
+  to: string;
+  threadId?: string;
+  externalMessageId: string;
 }
 
-/** One in-thread prompt awaiting a responder's answer. */
+/** One in-thread prompt awaiting a responder's answer. `resolved` is the
+ * exactly-once latch: set by the first dispatching path (or the wire's client
+ * resolution) and read by every later one. */
 export interface OpenPrompt {
   context: StreamContext;
   request: AgentPermissionRequest;
+  /** The question shape (E5); undefined for tool-permission prompts. */
+  questions?: QuestionInfo[];
+  /** Set when the posted prompt carried native interactive markup. */
+  cardPosted: boolean;
+  /** Where the posted card lives (in-place update target); undefined when the
+   * prompt was posted text-only or the post returned no message id. */
+  cardLocation?: PromptCardLocation;
+  /** The exactly-once latch. */
+  resolved: boolean;
 }
 
 interface ApprovalEngineContext {
@@ -58,6 +100,9 @@ interface ApprovalEngineContext {
   store: ChannelStore;
   daemon: DaemonConnection;
   post: PostFn;
+  /** The in-place update adapter (the card's decided state); absent = no
+   * in-place update (the card goes stale, the resolution is unaffected). */
+  update?: UpdateFn;
 }
 
 /**
@@ -126,8 +171,12 @@ export class ApprovalEngine {
   }
 
   /** A `permission_resolved` arriving from the wire (answered in a Paseo
-   * client): the in-thread prompt is answered, so drop it. */
+   * client): the prompt is answered EXTERNALLY — latch it resolved so a racing
+   * channel-side answer (card click / typed command in flight) is an inert
+   * no-op, and drop it. */
   onPermissionResolved(agentId: string, requestId: string): void {
+    const prompt = this.openPrompts.get(this.promptKey(agentId, requestId));
+    if (prompt !== undefined) prompt.resolved = true;
     this.openPrompts.delete(this.promptKey(agentId, requestId));
   }
 
@@ -135,18 +184,42 @@ export class ApprovalEngine {
    * The approval exit: answer a prompted request from the channel. The second
    * authority check (`mayApprove`) runs HERE, at dispatch, against the current
    * rule set — a revoked role is live from this message, and a responder
-   * without the class privilege is inert (the request stays open).
+   * without the class privilege is inert (the request stays open). The
+   * exactly-once latch runs FIRST: a prompt that already resolved (another
+   * path won the race) is inert — zero side effect, zero daemon frame.
+   *
+   * Hard-limit exception (~63 lines > 50): this IS the exactly-once core —
+   * lookup, latch read, authority check, build, latch write, dispatch,
+   * in-place update, in one linear flow; splitting it would scatter the
+   * race semantics across helpers.
    */
   async answerFromChannel(
     agentId: string,
     responderIdentity: string,
-    command: ApprovalCommand,
-  ): Promise<ApproverCheck & { answered: boolean }> {
-    const prompt = this.openPrompts.get(this.promptKey(agentId, command.requestId));
+    command: ApprovalCommand & { requestId: string },
+    responderName?: string,
+  ): Promise<ApproverCheck & { answered: boolean; stale?: boolean }> {
+    // The caller resolves the "latest" target first (`resolveOpenPrompt`);
+    // the command that reaches here always names an open request id.
+    const { requestId } = command;
+    const prompt = this.openPrompts.get(this.promptKey(agentId, requestId));
     if (prompt === undefined) {
-      // Unknown request id (or the prompt was already answered elsewhere): the
-      // responder's message is inert, and nothing is posted to the daemon.
-      return { allowed: false, answered: false, reason: "class-not-approved" };
+      // Unknown request id, or a prompt already answered elsewhere (latched +
+      // deleted, or the hub restarted since it was posted): the responder's
+      // message is inert, and nothing is posted to the daemon. The reason is
+      // NOT a privilege verdict — the prompt is simply not open.
+      return { allowed: false, answered: false, reason: "prompt-not-open" };
+    }
+    if (prompt.resolved) {
+      // A later path lost the race (card click after the typed command, or a
+      // client answer in flight): exactly-once — the second response is an
+      // inert no-op.
+      this.context.logger.info?.("approval answer ignored (prompt already resolved)", {
+        agentId,
+        requestId: command.requestId,
+        responder: responderIdentity,
+      });
+      return { allowed: false, answered: false, reason: "ok", stale: true };
     }
     const { context, request } = prompt;
     const check = mayApprove(
@@ -165,10 +238,20 @@ export class ApprovalEngine {
       });
       return { ...check, answered: false };
     }
-    const response: AgentPermissionResponse =
-      command.decision === "allow"
-        ? { behavior: "allow" }
-        : { behavior: "deny", message: "denied in the channel thread" };
+    const response = this.buildResponse(prompt, command);
+    if (response === null) {
+      // A question prompt answered without an actionable answer (bare
+      // `approve <id>`, bare "Other"): inert, the prompt stays open.
+      this.context.logger.info?.("approval answer ignored (no actionable answer)", {
+        agentId,
+        requestId: command.requestId,
+        responder: responderIdentity,
+      });
+      return { ...check, answered: false, stale: true };
+    }
+    // Latch BEFORE dispatch: a concurrent path that reads the entry between
+    // here and the daemon call sees resolved and stays inert.
+    prompt.resolved = true;
     await this.respond(agentId, command.requestId, response);
     this.openPrompts.delete(this.promptKey(agentId, command.requestId));
     this.context.logger.info?.("approval answered in the channel thread", {
@@ -177,10 +260,85 @@ export class ApprovalEngine {
       decision: command.decision,
       responder: responderIdentity,
     });
+    await this.updateDecidedCard(prompt, responderIdentity, command, response, responderName);
     return { ...check, answered: true };
   }
 
   // --- Sub-decisions -------------------------------------------------------
+
+  /** Build the daemon response for a channel answer. Null when a question
+   * prompt's answer is not actionable (the prompt stays open). */
+  private buildResponse(
+    prompt: OpenPrompt,
+    command: ApprovalCommand,
+  ): AgentPermissionResponse | null {
+    if (command.decision === "deny") {
+      return { behavior: "deny", message: "denied in the channel thread" };
+    }
+    if (prompt.questions === undefined) return { behavior: "allow" };
+    const resolved = resolveQuestionAnswer(prompt.questions, command.answer);
+    if (resolved === null) return null;
+    // E5: `updatedInput.answers` keyed by the FULL question text — the daemon
+    // normalizes via normalizeClaudeAskUserQuestionUpdatedInput (question text
+    // first, header fallback). Do NOT re-key by header.
+    return {
+      behavior: "allow",
+      updatedInput: { answers: { [resolved.questionText]: resolved.value } },
+    };
+  }
+
+  /** The in-place card update (E1: "Approved by <sender>" / "Denied" /
+   * "Answered: <option>") — fired only for a channel-side answer that
+   * dispatched, against a prompt that actually posted a card. A failed update
+   * never affects the resolution (the daemon frame is already gone). */
+  private async updateDecidedCard(
+    prompt: OpenPrompt,
+    responderIdentity: string,
+    command: ApprovalCommand,
+    response: AgentPermissionResponse,
+    responderName?: string,
+  ): Promise<void> {
+    const update = this.context.update;
+    const location = prompt.cardLocation;
+    if (update === undefined || location === undefined || !prompt.cardPosted) return;
+    if (response.behavior !== "allow" && response.behavior !== "deny") return;
+    // The Slack responder is tagged with the native `<@USERID>` mention —
+    // Slack renders it as the person's name, so nobody reads a raw id. The
+    // identity is `slack:<USERID>` (monitor.ts); anything else (a channel
+    // without user ids) falls back to the display name / identity.
+    const slackUserId =
+      prompt.context.channel === "slack" && /^slack:[A-Z][A-Z0-9]+$/u.test(responderIdentity)
+        ? responderIdentity.slice("slack:".length)
+        : undefined;
+    const text = decidedPromptText({
+      request: prompt.request,
+      questions: prompt.questions,
+      decision: response.behavior,
+      ...(command.answer !== undefined ? { answer: command.answer } : {}),
+      // Slack: the prepended `<@USERID>` mention IS the who — rendering the
+      // display name again would be a duplicate. Other channels carry the
+      // name (or the identity) in the text itself.
+      responder: slackUserId !== undefined ? "" : (responderName ?? responderIdentity),
+      cardMode: true,
+    });
+    const result = await update({
+      channel: prompt.context.channel,
+      accountId: prompt.context.accountId,
+      to: location.to,
+      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
+      externalMessageId: location.externalMessageId,
+      text,
+      clearCard: true,
+      ...(slackUserId !== undefined ? { senderMention: `<@${slackUserId}>` } : {}),
+    });
+    if (!result.ok) {
+      this.context.logger.warn("approval card in-place update failed", {
+        agentId: prompt.context.agentId,
+        requestId: prompt.request.id,
+        error: result.error,
+      });
+    }
+  }
 
   private async postPrompt(
     context: StreamContext,
@@ -197,47 +355,134 @@ export class ApprovalEngine {
       eventTurnId,
       sequence: 0,
     });
-    if (recorded.created) {
-      const location = replyLocationFor(context);
-      const result = await this.context.post({
-        channel: context.channel,
-        accountId: context.accountId,
-        to: location.to,
-        ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
-        text: promptText(request, initiatorOnly),
+    if (!recorded.created) {
+      // Replayed (posted earlier, Hub restarted): track it so the responder's
+      // command can be re-authorized and dispatched. No card location survives
+      // a restart (the native message id is gone with the in-memory post) —
+      // the prompt stays text+command-answerable.
+      this.openPrompts.set(this.promptKey(context.agentId, request.id), {
+        context,
+        request,
+        cardPosted: false,
+        resolved: false,
       });
-      if (result.ok) {
-        await this.context.store.confirmDelivery({
-          organizationId: this.context.organizationId,
-          accountId: context.accountId,
-          externalConversationId: context.externalConversationId,
-          externalThreadId: context.externalThreadId,
-          eventTurnId,
-          sequence: 0,
-          externalMessageId: result.externalMessageId ?? "",
-          postedAt: new Date(),
-        });
-      } else {
-        await this.context.store.failDelivery({
-          organizationId: this.context.organizationId,
-          accountId: context.accountId,
-          externalConversationId: context.externalConversationId,
-          externalThreadId: context.externalThreadId,
-          eventTurnId,
-          sequence: 0,
-          failureReason: result.error ?? "channel post failed",
-        });
-        this.context.logger.warn("approval prompt post failed; the request stays open", {
-          agentId: context.agentId,
-          requestId: request.id,
-          error: result.error,
-        });
-        return; // not posted: leave no open prompt to answer
-      }
+      return;
     }
-    // created (posted or just posted) or replayed (posted earlier): track it so
-    // the responder's command can be re-authorized and dispatched.
-    this.openPrompts.set(this.promptKey(context.agentId, request.id), { context, request });
+    const posted = await this.postPromptMessage(context, request, initiatorOnly, eventTurnId);
+    if (posted === undefined) return; // post failed: leave no open prompt to answer
+    this.openPrompts.set(this.promptKey(context.agentId, request.id), {
+      context,
+      request,
+      ...(posted.card.questions !== undefined ? { questions: posted.card.questions } : {}),
+      cardPosted: posted.card.requested && (posted.result.cardPosted ?? true),
+      ...(posted.cardLocation !== undefined ? { cardLocation: posted.cardLocation } : {}),
+      resolved: false,
+    });
+  }
+
+  /** The record→post→confirm/fail delivery-ledger triad. `undefined` = the
+   * prompt never reached the channel (post failed, ledger row failed, no
+   * open prompt may remain). */
+  private async postPromptMessage(
+    context: StreamContext,
+    request: AgentPermissionRequest,
+    initiatorOnly: boolean,
+    eventTurnId: string,
+  ): Promise<
+    | {
+        card: ReturnType<ApprovalEngine["cardFor"]>;
+        result: OutboundPostResult;
+        cardLocation: PromptCardLocation | undefined;
+      }
+    | undefined
+  > {
+    const location = replyLocationFor(context);
+    const card = this.cardFor(context, request, initiatorOnly);
+    const result = await this.context.post({
+      channel: context.channel,
+      accountId: context.accountId,
+      to: location.to,
+      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
+      text: promptText(request, initiatorOnly, card.questions),
+      ...(card.blocks !== undefined ? { blocks: card.blocks } : {}),
+      ...(card.replyMarkup !== undefined ? { replyMarkup: card.replyMarkup } : {}),
+    });
+    if (!result.ok) {
+      await this.context.store.failDelivery({
+        organizationId: this.context.organizationId,
+        accountId: context.accountId,
+        externalConversationId: context.externalConversationId,
+        externalThreadId: context.externalThreadId,
+        eventTurnId,
+        sequence: 0,
+        failureReason: result.error ?? "channel post failed",
+      });
+      this.context.logger.warn("approval prompt post failed; the request stays open", {
+        agentId: context.agentId,
+        requestId: request.id,
+        error: result.error,
+      });
+      return undefined;
+    }
+    await this.context.store.confirmDelivery({
+      organizationId: this.context.organizationId,
+      accountId: context.accountId,
+      externalConversationId: context.externalConversationId,
+      externalThreadId: context.externalThreadId,
+      eventTurnId,
+      sequence: 0,
+      externalMessageId: result.externalMessageId ?? "",
+      postedAt: new Date(),
+    });
+    return { card, result, cardLocation: this.cardLocation(location, result) };
+  }
+
+  /** The native card payload for this prompt, gated by the account's
+   * `transport.inlineButtons` at THIS surface (E1). Absent card fields = the
+   * plain text + command post. */
+  private cardFor(
+    context: StreamContext,
+    request: AgentPermissionRequest,
+    initiatorOnly: boolean,
+  ): {
+    requested: boolean;
+    questions?: QuestionInfo[];
+    blocks?: Record<string, unknown>[];
+    replyMarkup?: Record<string, unknown>;
+  } {
+    const questions = questionInfoFromRequest(request);
+    const mode = context.account.transport["inlineButtons"];
+    const allowed = inlineButtonsAllowedFor(
+      isInlineButtonsMode(mode) ? mode : undefined,
+      promptSurfaceKind(context.rootKind),
+    );
+    if (!allowed) return { requested: false, ...(questions !== undefined ? { questions } : {}) };
+    if (context.channel === "slack") {
+      return {
+        requested: true,
+        ...(questions !== undefined ? { questions } : {}),
+        blocks: buildSlackCardBlocks(request, initiatorOnly, questions),
+      };
+    }
+    return {
+      requested: true,
+      ...(questions !== undefined ? { questions } : {}),
+      replyMarkup: buildTelegramReplyKeyboard(request, questions),
+    };
+  }
+
+  /** The in-place-update target, when the post returned a native message id. */
+  private cardLocation(
+    location: { to: string; threadId?: string | undefined },
+    result: OutboundPostResult,
+  ): PromptCardLocation | undefined {
+    const externalMessageId = result.externalMessageId;
+    if (externalMessageId === undefined || externalMessageId === "") return undefined;
+    return {
+      to: location.to,
+      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
+      externalMessageId,
+    };
   }
 
   private async respond(agentId: string, requestId: string, response: AgentPermissionResponse) {
@@ -247,7 +492,55 @@ export class ApprovalEngine {
   private promptKey(agentId: string, requestId: string): string {
     return `${agentId}:${requestId}`;
   }
+
+  /** The newest open (unresolved) prompt for an agent, or the one named by
+   * `requestId` when it is open. `requestId` undefined → the "latest" target.
+   * Undefined when nothing open matches — the caller treats the command as
+   * inert. Insertion order = prompt post order, so last = newest. */
+  resolveOpenPrompt(agentId: string, requestId?: string): AgentPermissionRequest | undefined {
+    if (requestId !== undefined) {
+      const prompt = this.openPrompts.get(this.promptKey(agentId, requestId));
+      if (prompt !== undefined && !prompt.resolved) return prompt.request;
+      // Not the full id — try the prompt's short id, or any UNIQUE PREFIX
+      // of the full id among this agent's open prompts.
+      let prefixMatch: AgentPermissionRequest | undefined;
+      for (const candidate of this.openPrompts.values()) {
+        if (candidate.resolved || candidate.context.agentId !== agentId) continue;
+        const matches =
+          shortIdOf(candidate.request.id).toLowerCase() === requestId.toLowerCase() ||
+          candidate.request.id.startsWith(requestId);
+        if (!matches) continue;
+        if (prefixMatch !== undefined && prefixMatch.id !== candidate.request.id) return undefined;
+        prefixMatch = candidate.request;
+      }
+      return prefixMatch;
+    }
+    let newest: OpenPrompt | undefined;
+    for (const prompt of this.openPrompts.values()) {
+      if (prompt.context.agentId !== agentId || prompt.resolved) continue;
+      newest = prompt;
+    }
+    return newest?.request;
+  }
+
+  /** The open prompts of one agent (newest last — the "latest" target's
+   * candidate set). Used by the facade when a typed command's id is absent. */
+  openPromptRequests(agentId: string): AgentPermissionRequest[] {
+    const out: AgentPermissionRequest[] = [];
+    for (const prompt of this.openPrompts.values()) {
+      if (prompt.context.agentId !== agentId || prompt.resolved) continue;
+      out.push(prompt.request);
+    }
+    return out;
+  }
 }
+
+// --- Card-id passthrough -------------------------------------------------------
+
+/** The card id a resolver input carries (card click / typed command). The
+ * facade maps it back to the daemon's request id through the open prompts
+ * (one card id ↔ one request id per agent). */
+export { cardIdFor, parseCardValue };
 
 // --- Posture + prompt text ------------------------------------------------------
 
@@ -286,19 +579,6 @@ export function catchAllRoute(fallback: CompiledFallback): CompiledRoute {
   };
 }
 
-/** The in-thread prompt text (P0: text + command, no native card). */
-export function promptText(request: AgentPermissionRequest, initiatorOnly: boolean): string {
-  const lines = [
-    `The agent is asking for permission to use **${request.name}**.`,
-    ...(request.description !== undefined ? [request.description] : []),
-    `Reply with \`approve ${request.id}\` to allow it, or \`deny ${request.id}\` to refuse.`,
-    ...(initiatorOnly
-      ? ["Only the person who started this thread can answer."]
-      : ["Anyone with approval rights for this tool class can answer."]),
-  ];
-  return lines.join("\n");
-}
-
 // The catch-all fallback synthesized without an account still needs a
 // well-formed defaults block for the posture check.
 function accountlessDefaults() {
@@ -307,11 +587,13 @@ function accountlessDefaults() {
     followUp: { mode: "auto" as const, ttlMinutes: 60 },
     bindingKey: "thread" as const,
     replyAnchor: "thread" as const,
+    outbound: { path: "relay" as const, template: null },
     sync: {
       finalAnswers: true,
-      progress: false,
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
       toolCalls: false,
       threadLink: "final-only" as const,
+      subagents: { finalAnswers: false, progress: false, toolCalls: false },
     },
   };
 }

@@ -66,6 +66,15 @@ export function addChannel(
   );
 }
 
+/** Find one installed account's live status by channel + account, or undefined. */
+export function findChannelStatus(
+  accounts: ChannelStatusAccount[],
+  channel: string,
+  account: string,
+): ChannelStatusAccount | undefined {
+  return accounts.find((entry) => entry.channel === channel && entry.account === account);
+}
+
 /** GET /api/v1/channels — every installed channel account. */
 export function listChannels(target: ControlPlaneTarget): Promise<ChannelAccount[]> {
   return controlPlaneRequest(async () => {

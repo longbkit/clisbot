@@ -1,0 +1,94 @@
+ M CLAUDE.md
+ M docs/audits/2026-08-23-openclaw-channel-reuse-plan.md
+ M docs/audits/2026-08-23-paseoclaw-fusion-gaps.md
+ M docs/audits/2026-08-24-hub-integration-implementation.md
+ M docs/audits/pinned-vertical-contracts/telegram-monitor.md
+ M docs/overview/product-vision.md
+ M packages/channels/shared/src/host.ts
+ M packages/channels/shared/src/index.ts
+ M packages/channels/shared/src/monitor.test.ts
+ M packages/channels/slack/DEVIATIONS.md
+ M packages/channels/slack/SYNC.md
+ M packages/channels/slack/src/client/web-api.test.ts
+ M packages/channels/slack/src/client/web-api.ts
+ M packages/channels/slack/src/lifecycle/start-account.ts
+ M packages/channels/slack/src/outbound.ts
+ M packages/channels/slack/src/plugin.ts
+ M packages/channels/slack/src/transport/socket-mode.test.ts
+ M packages/channels/slack/src/transport/socket-mode.ts
+ M packages/channels/telegram/DEVIATIONS.md
+ M packages/channels/telegram/SYNC.md
+ M packages/channels/telegram/package.json
+ M packages/channels/telegram/src/client/bot-api.ts
+ M packages/channels/telegram/src/index.ts
+ M packages/channels/telegram/src/leaves/rich-message.ts
+ M packages/channels/telegram/src/lifecycle/start-account.ts
+ M packages/channels/telegram/src/outbound.ts
+ M packages/channels/telegram/src/plugin.ts
+ M packages/channels/telegram/src/transport/poll.test.ts
+ M packages/channels/telegram/src/transport/poll.ts
+ M packages/cli/src/cli.ts
+ M packages/cli/src/commands/channels/client.ts
+ M packages/hub/src/application-runtime.ts
+ M packages/hub/src/channels/approvals/approvals.test.ts
+ M packages/hub/src/channels/approvals/index.ts
+ M packages/hub/src/channels/bindings/bindings.test.ts
+ M packages/hub/src/channels/config/compile.test.ts
+ M packages/hub/src/channels/config/compile.ts
+ M packages/hub/src/channels/config/schema.ts
+ M packages/hub/src/channels/daemon/client.ts
+ M packages/hub/src/channels/daemon/ws-client.ts
+ M packages/hub/src/channels/execution.ts
+ M packages/hub/src/channels/execution/execution.test.ts
+ M packages/hub/src/channels/loader/host.ts
+ M packages/hub/src/channels/plane/stream.ts
+ M packages/hub/src/channels/plane/types.ts
+ M packages/hub/src/channels/policy.test.ts
+ M packages/hub/src/channels/relay/index.ts
+ M packages/hub/src/channels/relay/relay.test.ts
+ M packages/hub/src/channels/supervisor/index.ts
+ M packages/hub/src/index.ts
+?? .hub-revision-write.mjs
+?? .hub-revision-write2.mjs
+?? .hub-revision.mjs
+?? .pending-dump.mjs
+?? .reviewer-bot-tests.txt
+?? .reviewer-botapi.txt
+?? .reviewer-format.txt
+?? .reviewer-list-2.txt
+?? .reviewer-list-tests.txt
+?? .reviewer-plan-tests.txt
+?? .reviewer-run-tests.txt
+?? .reviewer-run2.txt
+?? .reviewer-status-2.txt
+?? .reviewer-status-tests.txt
+?? .reviewer-stop-tests.txt
+?? .reviewer-stop2.txt
+?? .reviewer-stop3.txt
+?? .reviewer-stop4.txt
+?? .reviewer-token-tests.txt
+?? .writer-progress/
+?? docs/audits/2026-08-27-channel-config-ui-gaps.md
+?? docs/tests/
+?? packages/channels/shared/src/media.test.ts
+?? packages/channels/shared/src/media.ts
+?? packages/channels/slack/src/mrkdwn.ts
+?? packages/channels/slack/src/outbound.test.ts
+?? packages/channels/slack/src/transport/approval-card.ts
+?? packages/channels/telegram/src/client/bot-api.test.ts
+?? packages/channels/telegram/src/format-html.ts
+?? packages/channels/telegram/src/format-sanitize.ts
+?? packages/channels/telegram/src/format.test.ts
+?? packages/channels/telegram/src/format.ts
+?? packages/channels/telegram/src/html-tags.ts
+?? packages/channels/telegram/src/telegram-html-chunk.ts
+?? packages/channels/telegram/src/transport/media.test.ts
+?? packages/channels/telegram/src/transport/media.ts
+?? packages/cli/src/commands/bot/
+?? packages/hub/src/application-runtime.disposal.test.ts
+?? packages/hub/src/channels/approvals/approvals-cards.test.ts
+?? packages/hub/src/channels/approvals/card.ts
+?? packages/hub/src/channels/approvals/harness.ts
+?? packages/hub/src/channels/plane/stream.test.ts
+?? packages/hub/src/index.stop.test.ts
+?? scripts/live-trusted-client.mjs

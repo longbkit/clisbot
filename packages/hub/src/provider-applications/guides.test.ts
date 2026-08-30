@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "vitest";
 import { load } from "js-yaml";
 import { z } from "zod";
-import { SLACK_REQUIRED_BOT_SCOPES } from "../providers/slack/client.js";
+import { SLACK_OPTIONAL_BOT_SCOPES, SLACK_REQUIRED_BOT_SCOPES } from "../providers/slack/client.js";
 import {
   PROVIDER_GUIDES,
   guideFields,
@@ -31,9 +31,14 @@ function stepText(step: GuideStep): string {
   return step.segments.map((segment) => segment.value).join("");
 }
 
-test("the Slack manifest asks for exactly the scopes Hub checks installations against", () => {
+/** The manifest's ask: everything Hub verifies, plus the soft scopes it uses
+ * when the app happens to have them (never verified — an app without
+ * `assistant:write` is a working app that loses the typing indicator). */
+const MANIFEST_SCOPES = [...SLACK_REQUIRED_BOT_SCOPES, ...SLACK_OPTIONAL_BOT_SCOPES].sort();
+
+test("the Slack manifest asks for the verified scopes plus the soft ones", () => {
   const manifest = webhookManifestSchema.parse(load(slackManifest(ORIGIN, "webhook")));
-  assert.deepEqual(manifest.oauth_config.scopes.bot, [...SLACK_REQUIRED_BOT_SCOPES]);
+  assert.deepEqual(manifest.oauth_config.scopes.bot, MANIFEST_SCOPES);
   assert.deepEqual(manifest.oauth_config.redirect_urls, [
     `${ORIGIN}/api/integrations/slack/callback`,
   ]);
@@ -44,10 +49,22 @@ test("the Slack manifest asks for exactly the scopes Hub checks installations ag
   const socket = z
     .object({
       oauth_config: z.object({ scopes: z.object({ bot: z.array(z.string()) }) }),
-      settings: z.object({ socket_mode_enabled: z.literal(true) }),
+      settings: z.object({
+        socket_mode_enabled: z.literal(true),
+        // Approval-card button clicks arrive as Socket Mode `block_actions`
+        // envelopes; Slack never delivers them when the app has
+        // interactivity off, so the socket manifest must ship with it on.
+        interactivity: z.object({ is_enabled: z.literal(true) }),
+      }),
     })
     .parse(load(slackManifest(LOCAL, "socket")));
-  assert.deepEqual(socket.oauth_config.scopes.bot, [...SLACK_REQUIRED_BOT_SCOPES]);
+  assert.deepEqual(socket.oauth_config.scopes.bot, MANIFEST_SCOPES);
+  // The soft scope is the one the thread typing status needs: asked for in the
+  // manifest, and kept OUT of the hard requirement, so an app without it still
+  // verifies and simply loses the indicator (channels/slack/typing.ts).
+  assert.ok(socket.oauth_config.scopes.bot.includes("assistant:write"));
+  const required: string[] = [...SLACK_REQUIRED_BOT_SCOPES];
+  assert.ok(!required.includes("assistant:write"));
 });
 
 test("generated URLs are built from the resolved callback origin", () => {

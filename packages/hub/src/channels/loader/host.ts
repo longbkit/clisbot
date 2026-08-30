@@ -167,6 +167,10 @@ export interface StartAccountContext {
   setStatus: (status: unknown) => void;
   getStatus: () => unknown;
   log?: HostChildLogger;
+  /** Mirror of the shared host contract's `mediaDownloadDir` (group G): the
+   * account's inbound-media download dir
+   * (`<dataDir>/channels/<accountId>/downloads`); the supervisor fills it. */
+  mediaDownloadDir?: string;
   [key: string]: unknown;
 }
 

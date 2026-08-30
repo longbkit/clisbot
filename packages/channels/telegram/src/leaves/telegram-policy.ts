@@ -4,6 +4,8 @@
 // boundary (see SYNC.md). No OpenClaw specifiers; error classification is
 // duck-typed so this leaf loads without the grammy stack at type level.
 
+import { Readable } from "node:stream";
+
 /** Cap for a 429 `retry_after` delay (the pinned retry-after boundary,
  * decided at 60s — D-002). */
 export const TELEGRAM_OUTBOUND_RETRY_AFTER_CAP_MS = 60_000;
@@ -37,9 +39,33 @@ export async function createTelegramAccountThrottler(token: string): Promise<Tel
   return throttler;
 }
 
+/** Normalize a fetch init handed by grammy for undici's global fetch.
+ *
+ * grammy's `createFormDataPayload` builds the multipart body as a Node
+ * `Readable` (`stream.Readable.from`) and its *default* Node fetch is
+ * node-fetch, which streams Node `Readable`s fine. This vertical, however,
+ * always hands grammy its own fetch (undici's `globalThis.fetch` here), and
+ * undici cannot transmit a Node `Readable` as `body` — it wants a web
+ * `ReadableStream` (and requires `duplex: "half"` for a streaming body).
+ * Left alone, every file upload (the G7–G11 media path) throws while JSON
+ * calls (string bodies) succeed.
+ *
+ * Non-`Readable` bodies (JSON strings, FormData, …) pass through unchanged. */
+function normalizeFetchInit(init: RequestInit | undefined): RequestInit | undefined {
+  if (init === undefined || !(init.body instanceof Readable)) return init;
+  // `Readable.toWeb` returns the global web `ReadableStream` at runtime; the
+  // `stream/web` and DOM lib types differ structurally, so cast at the boundary
+  // (same treatment as shared/src/media.ts for undici response bodies).
+  const body = Readable.toWeb(init.body) as unknown as ReadableStream;
+  // `duplex` is required by undici for streaming bodies; the pinned lib's
+  // `RequestInit` predates it, so it is carried through a type assertion.
+  return { ...init, body, duplex: "half" } as RequestInit;
+}
+
 /** The injected fetch with a per-request timeout (the pinned
- * `resolveTelegramClientOptions` fetch half). When no timeout is configured
- * the transport's fetch (or global fetch) passes through untouched. */
+ * `resolveTelegramClientOptions` fetch half). The init is always normalized
+ * for undici first (see `normalizeFetchInit`); when no timeout is configured
+ * the transport's fetch (or global fetch) otherwise passes through untouched. */
 export function createTelegramClientFetch(options: {
   timeoutSeconds?: number;
   transport?: TelegramTransport;
@@ -51,7 +77,7 @@ export function createTelegramClientFetch(options: {
     !Number.isFinite(timeoutSeconds) ||
     timeoutSeconds <= 0
   ) {
-    return base;
+    return async (input, init) => base(input, normalizeFetchInit(init));
   }
   const timeoutMs = Math.round(timeoutSeconds * 1000);
   return async (input, init) => {
@@ -67,7 +93,8 @@ export function createTelegramClientFetch(options: {
       timeoutMs,
     );
     try {
-      return await base(input, { ...init, signal: controller.signal });
+      const normalized = normalizeFetchInit(init);
+      return await base(input, { ...normalized, signal: controller.signal });
     } finally {
       clearTimeout(timer);
     }

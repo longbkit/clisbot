@@ -45,6 +45,7 @@ import { CliAuthorizations } from "./cli-authorizations/index.js";
 // doc §1.4, §3.2) — self-authenticating, gated per request, degraded when the
 // composition root did not build a supervisor.
 import { createChannelControlPlaneOps } from "./channels/http/operations.js";
+import type { ChannelReplyServer } from "./channels/channel-reply.js";
 import type { ChannelSupervisor } from "./channels/supervisor/types.js";
 import type { DatabaseRuntime } from "./db/runtime/index.js";
 import type { BrowserOrganizationAccess } from "./auth/browser-organization-access.js";
@@ -76,6 +77,11 @@ export interface HubRuntimeOptions {
   hubDataDir?: string;
   /** COMPAT(clisbot-control-plane): the channel supervisor, or null to degrade the transport step. */
   channelSupervisor?: ChannelSupervisor | null;
+  /**
+   * COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint
+   * (E4); null degrades the `/mcp/channel/<ref>` route to a 503.
+   */
+  channelReplyServer?: ChannelReplyServer | null;
   publicBaseUrl?: string;
   daemonClock?: DaemonClock;
   executionDeadlineClock?: ExecutionDeadlineClock;
@@ -120,6 +126,8 @@ export interface HubOperations {
   handleUserShow(request: Request, username: string): Promise<Response>;
   handleUserAdd(request: Request): Promise<Response>;
   handleUserEdit(request: Request, username: string): Promise<Response>;
+  // COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint.
+  handleChannelReplyMcp(request: Request, token: string): Promise<Response>;
 }
 
 export interface HubApplication {
@@ -319,6 +327,8 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
     handleUserShow: (request, username) => channelControlPlane.showUser(request, username),
     handleUserAdd: (request) => channelControlPlane.addUser(request),
     handleUserEdit: (request, username) => channelControlPlane.editUser(request, username),
+    handleChannelReplyMcp: (request, token) =>
+      channelControlPlane.handleChannelReplyMcp(request, token),
   };
   return { hub, operations, publicApi, configurationForProject: storeForProject };
 }
@@ -399,6 +409,7 @@ function createChannelControlPlaneOpsFor(
     completionTokenSecret: options.completionTokenSecret,
     dataDir: options.hubDataDir,
     supervisor: options.channelSupervisor ?? null,
+    channelReplyServer: options.channelReplyServer ?? null,
     storeForProject,
   });
 }

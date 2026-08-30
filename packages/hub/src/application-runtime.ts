@@ -36,6 +36,9 @@ import type { ProviderApplications } from "./provider-applications/index.js";
 import { logger } from "./logger.js";
 import { isChannelsEnabled } from "./channels/loader/channel-gate.js";
 import { runtimeFile } from "./runtime-files.js";
+import { ChannelStore } from "./db/channels.js";
+import type { ChannelReplyServer } from "./channels/channel-reply.js";
+import { resolveHome } from "./channels/daemon/discovery.js";
 
 export interface ApplicationCompositionOptions {
   database: Database | null;
@@ -98,6 +101,10 @@ async function createOwnedApplicationRuntime(
     outputRegistry.register(output);
   }
   const channelSupervisor = await createChannelSupervisorAtComposition(options);
+  const channelReplyServer = await createChannelReplyServerAtComposition(
+    options,
+    channelSupervisor,
+  );
 
   const application = createHubApplication(
     hubApplicationOptions(
@@ -107,9 +114,20 @@ async function createOwnedApplicationRuntime(
       connectionsForProject,
       outputRegistry,
       channelSupervisor,
+      channelReplyServer,
     ),
   );
+  // COMPAT(clisbot-control-plane): the channel supervisor's accounts run their
+  // own transports (Slack Socket Mode, Telegram getUpdates poll) plus an
+  // outbound trusted-client daemon connection each. `startAll` boots them at
+  // composition; without a matching `stopAll` in the disposal chain a SIGTERM
+  // leaves those loops + sockets open, so the process never exits. Registered
+  // last so `CompositionResources` (reverse order) stops the channel plane —
+  // the top-most consumer — before the core hub and the outer composition close.
   ownership.own(() => application.hub.stop());
+  ownership.own(async () => {
+    await channelSupervisor?.stopAll();
+  });
   await application.hub.start(registrations.flatMap((registration) => registration.sources));
   // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
   // channel account. Isolated per account (failures never abort the boot);
@@ -364,6 +382,39 @@ async function createChannelSupervisorAtComposition(
   }
 }
 
+// COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint
+// (E4) — the hub-side `message` tool served on the loopback HTTP server at
+// `/mcp/channel/<ref>`. Built only when the channel plane is on and the
+// supervisor is present; the single provisioned organization (P0) scopes its
+// delivery-ledger rows. The post path is the supervisor's `channelReplyPost`
+// (the vertical's `sendText` through `postFor`). Any construction failure
+// degrades the plane (the endpoint answers 503) instead of failing the
+// instance.
+async function createChannelReplyServerAtComposition(
+  options: ApplicationCompositionOptions,
+  supervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
+): Promise<ChannelReplyServer | null> {
+  if (supervisor === null) return null;
+  if (options.database === null || options.databaseRuntime === undefined) {
+    return null;
+  }
+  try {
+    const organizations = await options.database.listOrganizationsForOperator();
+    if (organizations.length !== 1) return null;
+    const { createChannelReplyServer } = await import("./channels/channel-reply.js");
+    return createChannelReplyServer({
+      organizationId: organizations[0]!.id,
+      store: new ChannelStore(options.databaseRuntime),
+      post: (ref, text) => supervisor.channelReplyPost(ref, text),
+      mediaPost: (ref, filePath) => supervisor.channelReplyMediaPost(ref, filePath),
+      homeRoot: resolveHome(undefined, process.env),
+    });
+  } catch (error) {
+    reportFailure(error, { operation: "channel_reply.compose", component: "channels" });
+    return null;
+  }
+}
+
 /** The `HubRuntimeOptions` the composition threads to the application hub. */
 function hubApplicationOptions(
   options: ApplicationCompositionOptions,
@@ -372,6 +423,7 @@ function hubApplicationOptions(
   connectionsForProject: TriggerProviderResources["connectionsForProject"],
   outputRegistry: OutputExecutorRegistry,
   channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
+  channelReplyServer: ChannelReplyServer | null,
 ): HubRuntimeOptions {
   return {
     database: options.database,
@@ -403,6 +455,8 @@ function hubApplicationOptions(
     // into the same data directory the embedded database lives in.
     ...(options.hubDataDir === undefined ? {} : { hubDataDir: options.hubDataDir }),
     channelSupervisor,
+    // COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint.
+    channelReplyServer,
   };
 }
 

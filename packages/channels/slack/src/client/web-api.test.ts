@@ -4,10 +4,11 @@
 
 import assert from "node:assert/strict";
 import { describe, expect, it } from "vitest";
-import { probeSlackAuth, type WebClient } from "./web-api.js";
+import { probeSlackAuth, slackWebClientStubForTest, type WebClient } from "./web-api.js";
 
 function fakeAuthClient(result: Record<string, unknown>): WebClient {
   return {
+    ...slackWebClientStubForTest(),
     auth: {
       async test() {
         return result as never;
@@ -15,6 +16,17 @@ function fakeAuthClient(result: Record<string, unknown>): WebClient {
     },
     chat: {
       async postMessage() {
+        return { ok: true };
+      },
+      async update() {
+        return { ok: true };
+      },
+    },
+    files: {
+      async getUploadURLExternal() {
+        return { ok: true };
+      },
+      async completeUploadExternal() {
         return { ok: true };
       },
     },

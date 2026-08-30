@@ -10,6 +10,19 @@ export const SLACK_REQUIRED_BOT_SCOPES = [
   "users:read",
 ] as const;
 
+/**
+ * The scopes the Hub can USE but does not REQUIRE. An app without one is a
+ * working app: the surface that needs it degrades to a logged warning, so
+ * asking for it in the manifest costs the operator nothing while demanding it
+ * in `verifyInstallation` would fail every app installed before it existed.
+ *
+ * `assistant:write` is the compatibility scope for Slack's thread typing
+ * status (`sync.progress.typingIndicator` — `channels/slack/src/typing.ts`);
+ * `assistant.threads.setStatus` is also served by `chat:write`, which is
+ * already required, so an app without it still shows the indicator.
+ */
+export const SLACK_OPTIONAL_BOT_SCOPES = ["assistant:write"] as const;
+
 const SlackOAuthResponseSchema = z
   .object({
     ok: z.boolean(),

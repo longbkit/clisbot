@@ -13,6 +13,7 @@ Writer rule: read the topic file before writing the matching loader / supervisor
 | `entry-and-plugin.md`       | The entry object vs the plugin object; which chunk the Hub drives; why `entry.loadChannelPlugin()` is forbidden                                          |
 | `start-account.md`          | `gateway.startAccount(ctx)` — the flat account shape, token source, `cfg` requirements, promise lifetime, stop = abort                                   |
 | `outbound.md`               | `plugin.outbound.sendText` — the exact call shape for both channels, result shape, failure modes, the config-writeback guard                             |
+| `typing.md`                 | The `sync.progress` liveness surface — native typing status vs inbound reaction, per-channel expiry and repeat cost, keepalive/breaker/TTL, the scopes   |
 | `inbound.md`                | The flat `ctxPayload` (`FinalizedMsgContext`) fields; native conversation kinds; the native → plane mapping; the two-pass route-match decision           |
 | `ingress-gates.md`          | The verticals' own ingress gate stack (allowBots / owner-presence / mention gating) runs before the Hub seam; bot-stamped markers are dropped by default |
 | `telegram-monitor.md`       | The bundled-Telegram host-monitor decision (option A) + the native monitor's contract + the host-override read sites                                     |

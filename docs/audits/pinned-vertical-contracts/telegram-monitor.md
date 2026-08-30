@@ -1,5 +1,7 @@
 # Bundled Telegram — the host-supplied monitor (option A)
 
+> **Post-pull (2026-08-26):** this override is no longer installed in the live Hub — the in-repo `packages/channels/telegram` vertical owns its own L2 `getUpdates` poll (driven by its `startAccount`), and the supervisor dropped the `monitorTelegramProvider` host override. This file records the pinned bundled dist's monitor contract, which the in-repo L2/L3 port follows and the re-sync loop diffs against ([2026-08-26-in-repo-channel-verticals.md](../2026-08-26-in-repo-channel-verticals.md) §6.5; live code: `packages/hub/src/channels/loader/hosts/telegram-monitor.ts` remains only as the contract reference, its test kept).
+
 ## Why the host must supply the monitor
 
 The 2294-chunk import closure of `main/dist/extensions/telegram/channel-plugin-api.js` contains **zero** `openclaw/plugin-sdk/*` specifiers (BFS-verified), so the aliased seam (`loader-routing.md`) cannot intercept Telegram's inbound dispatch. The native dispatch chain is fully relative: spool `telegram-ingress-spool-Dd3cDhXe.js` → `runChannelInboundEvent` (relative `inbound-reply-dispatch-C8SZBmZG.js` → `kernel-BMsNZe7F.js`) → `telegramDeps.dispatchReplyWithBufferedBlockDispatcher` (hardcoded `bot-deps-BBncur2u.js` unless injected) → `reply-dispatch-runtime-Bq8vXD2i.js` → `provider-dispatcher-C5sNmVHv.js` → `dispatch-DnzGTpPs.js` (OpenClaw's `auto-reply/reply/dispatch-from-config` runtime). Driving the inlined default monitor would answer channel messages with **OpenClaw's own agent/model loop** — exactly what plan §7 excludes.

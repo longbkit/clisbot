@@ -167,5 +167,10 @@ export interface StartAccountContext {
   setStatus: (status: unknown) => void;
   getStatus: () => unknown;
   log?: HostChildLogger;
+  /** The directory the L2 transport downloads inbound media into
+   * (group G: the account's `<dataDir>/channels/<accountId>/downloads`);
+   * the Hub supervisor fills it. Absent = media not downloaded (the
+   * transport folds the caption-only body). */
+  mediaDownloadDir?: string;
   [key: string]: unknown;
 }

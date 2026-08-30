@@ -18,7 +18,7 @@ import { buildInboundCtxPayload, createInboundEventProcessor, inboundTurnId } fr
 
 function fakeKeyedStoreRoot(): HostKeyedStoreRoot {
   return {
-    openKeyedStore(options: HostKeyedStoreOptions): HostKeyedStore {
+    openKeyedStore(_options: HostKeyedStoreOptions): HostKeyedStore {
       return {
         register: async () => undefined,
         registerIfAbsent: async () => true,
@@ -175,6 +175,20 @@ describe("createInboundEventProcessor", () => {
     const decision = await processor.process(event({ body: "   " }));
     expect(decision).toEqual({ dispatched: false, reason: "empty body" });
     expect(handled).toHaveLength(0);
+  });
+
+  it("dispatches a manifest-only body (G6: media-only with attachments is admitted)", async () => {
+    const handled: InboundReplyParams[] = [];
+    const processor = createInboundEventProcessor({
+      hostRuntime: fakeRuntime(handled),
+      channel: "telegram",
+      accountId: "work",
+    });
+    const manifest = "[Attached files]\n1. photo (photo, 1024 bytes) → /dl/1-1-photo.jpg";
+    const decision = await processor.process(event({ body: manifest }));
+    expect(decision.dispatched).toBe(true);
+    expect(handled).toHaveLength(1);
+    expect(handled[0]?.ctxPayload["Body"]).toBe(manifest);
   });
 
   it("records the ledger row before the handoff and consume-marks on settle", async () => {

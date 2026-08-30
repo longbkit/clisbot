@@ -10,13 +10,15 @@ import {
   FollowUpModeSchema,
   InlineButtonsSchema,
   isApprovalMatchPattern,
+  MessageReactionSchema,
+  OutboundPathSchema,
   ReplyAnchorSchema,
   RouteMatchKindSchema,
   SlackTransportModeSchema,
   TelegramTransportModeSchema,
   ThreadLinkSchema,
 } from "./enums.js";
-import type { BindingKey, FollowUpMode, ReplyAnchor, ThreadLink } from "./enums.js";
+import type { BindingKey, FollowUpMode, OutboundPath, ReplyAnchor, ThreadLink } from "./enums.js";
 
 // --- Shared value shapes ------------------------------------------------------
 
@@ -67,15 +69,73 @@ export type BindingDefaults = z.infer<typeof BindingDefaultsSchema>;
 export const ReplyDefaultsSchema = z.object({ anchor: ReplyAnchorSchema.optional() }).strict();
 export type ReplyDefaults = z.infer<typeof ReplyDefaultsSchema>;
 
-export const SyncDefaultsSchema = z
+/**
+ * `sync.progress` — the "the bot is working" surface, as three independent
+ * leaves: `progressMessage` (a throttled relay line in the thread),
+ * `typingIndicator` (the provider's native typing status: Slack's assistant
+ * thread status, Telegram's `sendChatAction`), and `messageReaction` (the
+ * receipt — see `MessageReactionSchema`).
+ *
+ * A bare boolean is the pre-group spelling and means `progressMessage` ONLY —
+ * it never spoke about the other two surfaces, so they keep inheriting. That
+ * keeps every already-authored revision (`sync: { progress: true }`) valid
+ * without a migration.
+ */
+export const SyncProgressGroupSchema = z
+  .object({
+    progressMessage: z.boolean().optional(),
+    typingIndicator: z.boolean().optional(),
+    messageReaction: MessageReactionSchema,
+  })
+  .strict();
+export type SyncProgressGroup = z.infer<typeof SyncProgressGroupSchema>;
+
+export const SyncProgressSchema = z.union([z.boolean(), SyncProgressGroupSchema]).optional();
+export type SyncProgress = z.infer<typeof SyncProgressSchema>;
+
+/**
+ * `sync.subagents` — the same relay knobs as `sync`, scoped to the subagent
+ * (Task tool) text relayed into the thread. Off at the org floor: subagent
+ * output is opt-in per route, root `sync.*` is unaffected.
+ *
+ * `progress` stays a plain boolean here on purpose: a subagent has no typing
+ * surface of its own — the indicator and the reaction belong to the root
+ * turn's conversation, so a subagent scope can only gate its relayed text.
+ */
+export const SyncSubagentsSchema = z
   .object({
     finalAnswers: z.boolean().optional(),
     progress: z.boolean().optional(),
     toolCalls: z.boolean().optional(),
+  })
+  .strict();
+export type SyncSubagents = z.infer<typeof SyncSubagentsSchema>;
+
+export const SyncDefaultsSchema = z
+  .object({
+    finalAnswers: z.boolean().optional(),
+    progress: SyncProgressSchema,
+    toolCalls: z.boolean().optional(),
     threadLink: ThreadLinkSchema.optional(),
+    subagents: SyncSubagentsSchema.optional(),
   })
   .strict();
 export type SyncDefaults = z.infer<typeof SyncDefaultsSchema>;
+
+/**
+ * `outbound` — the reply-path toggle (E4/E6). `path` selects the surface the
+ * agent's user-visible answer is posted through; `template` overrides the
+ * injection text composed into the agent's `systemPrompt` for a `tool` path
+ * (the default is the ported OpenClaw message-tool-only block). Absent at a
+ * layer = inherit from the layer below; the org floor is `relay`.
+ */
+export const OutboundDefaultsSchema = z
+  .object({
+    path: OutboundPathSchema.optional(),
+    template: z.string().min(1).optional(),
+  })
+  .strict();
+export type OutboundDefaults = z.infer<typeof OutboundDefaultsSchema>;
 
 /**
  * The org-layer effective values for `defaults:` (§4.3.2/§4.3.6). The compiler
@@ -86,8 +146,18 @@ export const ORG_DEFAULTS = {
   defaultRoles: [],
   interaction: { requireMention: true, followUp: { mode: "auto", ttlMinutes: 60 } },
   binding: { key: "thread" },
-  reply: { anchor: "thread" },
-  sync: { finalAnswers: true, progress: false, toolCalls: false, threadLink: "final-only" },
+  reply: { anchor: "default" },
+  outbound: { path: "relay" as const, template: null },
+  sync: {
+    finalAnswers: true,
+    // The progress group's floor: the relay line and the native typing
+    // indicator are on; the inbound-message reaction is off (it leaves an
+    // artefact on the user's own message, so it stays opt-in).
+    progress: { progressMessage: true, typingIndicator: true, messageReaction: "off" },
+    toolCalls: false,
+    threadLink: "final-only",
+    subagents: { finalAnswers: false, progress: false, toolCalls: false },
+  },
 } as const;
 
 // --- Approval rules (§4.3.2, §4.3.6) -------------------------------------------
@@ -126,12 +196,20 @@ export interface DefaultsLayer {
     | undefined;
   binding?: { key?: BindingKey | undefined } | undefined;
   reply?: { anchor?: ReplyAnchor | undefined } | undefined;
+  outbound?: { path?: OutboundPath | undefined; template?: string | undefined } | undefined;
   sync?:
     | {
         finalAnswers?: boolean | undefined;
-        progress?: boolean | undefined;
+        progress?: SyncProgress | undefined;
         toolCalls?: boolean | undefined;
         threadLink?: ThreadLink | undefined;
+        subagents?:
+          | {
+              finalAnswers?: boolean | undefined;
+              progress?: boolean | undefined;
+              toolCalls?: boolean | undefined;
+            }
+          | undefined;
       }
     | undefined;
   approval?: readonly ApprovalRule[] | undefined;
@@ -147,6 +225,7 @@ export const ChannelDefaultsSchema = z
     interaction: InteractionDefaultsSchema.optional(),
     binding: BindingDefaultsSchema.optional(),
     reply: ReplyDefaultsSchema.optional(),
+    outbound: OutboundDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
   })
@@ -198,7 +277,19 @@ export const SlackTransportSchema = z
     // P0.5: per-account ingress route, auto-registered by the control plane.
     webhookPath: z.string().min(1).optional(),
     errorPolicy: ErrorPolicySchema.optional(),
+    // Where the native approval card (buttons) may appear — the approval
+    // engine's prompt-posting decision reads it (default off). `allowlist`
+    // is fail-closed at P0; no effect until the companion allowlist key lands.
     inlineButtons: InlineButtonsSchema.optional(),
+    // The app-manifest-registered NATIVE slash command name (e.g. `/paseo`)
+    // whose Socket Mode `slash_commands` events the vertical rewrites to the
+    // shared plain-text commands (`/paseo approve` → `approve`). Absent =
+    // native slash ingestion off; the in-message `/approve` + `\approve`
+    // text spellings always work with zero app setup (commands.ts).
+    slashCommand: z
+      .string()
+      .regex(/^\/[a-z][a-z0-9_]{2,31}$/u, "a Slack command name: /lowercase, 3-32 chars")
+      .optional(),
   })
   .strict();
 export type SlackTransport = z.infer<typeof SlackTransportSchema>;
@@ -207,6 +298,11 @@ export const TelegramTransportSchema = z
   .object({
     mode: TelegramTransportModeSchema,
     errorPolicy: ErrorPolicySchema.optional(),
+    // Where the native approval card (inline keyboard) may appear — the
+    // approval engine's prompt-posting decision reads it (default off).
+    // `allowlist` is fail-closed at P0; no effect until the companion
+    // allowlist key lands.
+    inlineButtons: InlineButtonsSchema.optional(),
   })
   .strict();
 export type TelegramTransport = z.infer<typeof TelegramTransportSchema>;
@@ -244,6 +340,7 @@ export const RouteSchema = z
     interaction: InteractionDefaultsSchema.optional(),
     binding: BindingDefaultsSchema.optional(),
     reply: ReplyDefaultsSchema.optional(),
+    outbound: OutboundDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
   })
@@ -263,6 +360,11 @@ export const AccountFileSchema = z
     enabled: z.boolean().default(true),
     secretRef: z.string().min(1),
     transport: z.unknown(), // channel-specific; validated against the channel's transport schema in compile
+    // Vertical-owned account settings (e.g. Telegram's `richMessages`,
+    // `timeoutSeconds`, `apiRoot`): passed through verbatim to the vertical's
+    // cfg entry, where each key is type-checked on read (bot-api
+    // resolveTelegramAccount). The hub never interprets these.
+    config: z.record(z.string(), z.unknown()).optional(),
     policy: z
       .object({
         defaultRoles: DefaultRolesSchema,

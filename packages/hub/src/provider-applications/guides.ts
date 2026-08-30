@@ -1,4 +1,4 @@
-import { SLACK_REQUIRED_BOT_SCOPES } from "../providers/slack/client.js";
+import { SLACK_OPTIONAL_BOT_SCOPES, SLACK_REQUIRED_BOT_SCOPES } from "../providers/slack/client.js";
 import type { Provider, ProviderApplicationIdentity, ProviderApplicationStatus } from "./index.js";
 
 /**
@@ -595,12 +595,16 @@ export function guideUrl(origin: string, path: string): string {
 }
 
 /**
- * The manifest Slack reads. Scopes come from the same constant the running Slack integration
- * checks installations against, so a manifest the operator pastes can never ask for less than
- * Hub needs.
+ * The manifest Slack reads. The required scopes come from the same constant the running Slack
+ * integration checks installations against, so a manifest the operator pastes can never ask for
+ * less than Hub needs. The optional ones ride along (a degraded surface beats a missing one) but
+ * stay out of verification — see SLACK_OPTIONAL_BOT_SCOPES.
  */
 export function slackManifest(origin: string, transport: "socket" | "webhook" = "socket"): string {
-  const scopes = SLACK_REQUIRED_BOT_SCOPES.map((scope) => `      - ${scope}`).join("\n");
+  const scopes = [...SLACK_REQUIRED_BOT_SCOPES, ...SLACK_OPTIONAL_BOT_SCOPES]
+    .sort()
+    .map((scope) => `      - ${scope}`)
+    .join("\n");
   const webhook =
     transport === "webhook"
       ? `  redirect_urls:\n    - ${origin}/api/integrations/slack/callback\n`
@@ -622,7 +626,7 @@ settings:
 ${requestUrl}    bot_events:
       - app_mention
   interactivity:
-    is_enabled: false
+    is_enabled: ${transport === "socket" ? "true" : "false"}
   org_deploy_enabled: false
   socket_mode_enabled: ${transport === "socket" ? "true" : "false"}
   token_rotation_enabled: false

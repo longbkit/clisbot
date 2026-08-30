@@ -16,9 +16,32 @@ import {
   ChannelAgentSpecError,
   ChannelControlPlaneError,
   createChannelAgentSpecResolver,
+  hubListenPort,
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
 } from "./control-plane.js";
+import { DEFAULT_MESSAGE_TOOL_PROMPT } from "./outbound-template.js";
+import {
+  CHANNEL_REPLY_MCP_SERVER_NAME,
+  CHANNEL_REPLY_TOOL_NAME,
+  decodeChannelReplyBindingRef,
+  encodeChannelReplyBindingRef,
+  type ChannelReplyBindingRef,
+} from "./plane/types.js";
+import type { EffectiveDefaults } from "./config/compile.js";
+
+/** The tool-path mcpServers entry the resolver composes (the daemon config's
+ * `mcpServers` values are `unknown` on the wire; this narrows the one entry
+ * under test). */
+function channelReplyServerEntry(config: { mcpServers?: Record<string, unknown> }): {
+  type: string;
+  url: string;
+} {
+  const entry = config.mcpServers?.[CHANNEL_REPLY_MCP_SERVER_NAME] as
+    | { type: string; url: string }
+    | undefined;
+  return entry ?? { type: "", url: "" };
+}
 
 const HUB_YAML = `
 environments:
@@ -89,6 +112,31 @@ fallback:
 
 const ORG_ID = "org-1";
 
+// The resolver's second argument: the route's effective defaults. The
+// tool-path tests below flip `outbound.path` to `tool`.
+const RELAY_DEFAULTS: EffectiveDefaults = {
+  requireMention: true,
+  followUp: { mode: "auto", ttlMinutes: 60 },
+  bindingKey: "thread",
+  replyAnchor: "thread",
+  outbound: { path: "relay", template: null },
+  sync: {
+    finalAnswers: true,
+    progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+    toolCalls: false,
+    threadLink: "final-only",
+    subagents: { finalAnswers: false, progress: false, toolCalls: false },
+  },
+};
+
+// The thread the agent spec's binding ref names (the create-time target).
+const BINDING_REF: ChannelReplyBindingRef = {
+  channel: "slack",
+  accountId: "work",
+  externalConversationId: "C0WORK",
+  externalThreadId: "1710000000.000001",
+};
+
 function memoryDatabase(): Database {
   return createMemoryDatabase({
     memberships: [
@@ -156,13 +204,14 @@ describe("loadChannelControlPlane", () => {
 
   it("resolves agent targets into the daemon's create fields", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
+    // OFF path: no `outbound.path: tool` in the defaults, so the config is
+    // byte-identical to today — no mcpServers, no toolPolicy, no systemPrompt.
     assert.deepEqual(
-      snapshot.resolveAgentSpec({
-        kind: "agent",
-        agent: "codex-safe",
-        environment: "work",
-        template: null,
-      }),
+      snapshot.resolveAgentSpec(
+        { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+        RELAY_DEFAULTS,
+        BINDING_REF,
+      ),
       {
         provider: "codex",
         cwd: "/workspace/app",
@@ -173,12 +222,11 @@ describe("loadChannelControlPlane", () => {
       },
     );
     assert.deepEqual(
-      snapshot.resolveAgentSpec({
-        kind: "agent",
-        agent: "claude",
-        environment: "work",
-        template: null,
-      }),
+      snapshot.resolveAgentSpec(
+        { kind: "agent", agent: "claude", environment: "work", template: null },
+        RELAY_DEFAULTS,
+        BINDING_REF,
+      ),
       {
         provider: "claude",
         cwd: "/workspace/app",
@@ -192,12 +240,11 @@ describe("loadChannelControlPlane", () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     // `claude` appears in no workflow step, so agentValidationTargets omits it;
     // a channel route targeting it must still resolve.
-    const config = snapshot.resolveAgentSpec({
-      kind: "agent",
-      agent: "claude",
-      environment: "work",
-      template: null,
-    });
+    const config = snapshot.resolveAgentSpec(
+      { kind: "agent", agent: "claude", environment: "work", template: null },
+      RELAY_DEFAULTS,
+      BINDING_REF,
+    );
     assert.equal(config.provider, "claude");
   });
 
@@ -205,22 +252,20 @@ describe("loadChannelControlPlane", () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     assert.throws(
       () =>
-        snapshot.resolveAgentSpec({
-          kind: "agent",
-          agent: "ghost",
-          environment: "work",
-          template: null,
-        }),
+        snapshot.resolveAgentSpec(
+          { kind: "agent", agent: "ghost", environment: "work", template: null },
+          RELAY_DEFAULTS,
+          BINDING_REF,
+        ),
       ChannelAgentSpecError,
     );
     assert.throws(
       () =>
-        snapshot.resolveAgentSpec({
-          kind: "agent",
-          agent: "codex-safe",
-          environment: "mirror",
-          template: null,
-        }),
+        snapshot.resolveAgentSpec(
+          { kind: "agent", agent: "codex-safe", environment: "mirror", template: null },
+          RELAY_DEFAULTS,
+          BINDING_REF,
+        ),
       (error: unknown) =>
         error instanceof ChannelAgentSpecError && /daemon environment/u.test(String(error)),
     );
@@ -284,14 +329,97 @@ describe("loadChannelControlPlane", () => {
   });
 });
 
+describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
+  it("attaches the channel-reply MCP server + grant + default injection on a tool route", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const config = snapshot.resolveAgentSpec(
+      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      { ...RELAY_DEFAULTS, outbound: { path: "tool", template: null } },
+      BINDING_REF,
+    );
+    const server = channelReplyServerEntry(config);
+    assert.equal(server.type, "http");
+    // The hub listens on PORT; the URL the agent dials is loopback hubPort
+    // (the snapshot's, threaded through the resolver options).
+    assert.equal(
+      server.url,
+      `http://127.0.0.1:${snapshot.hubPort}/mcp/channel/${encodeChannelReplyBindingRef(BINDING_REF)}`,
+    );
+    assert.deepEqual(config.toolPolicy, {
+      preapproved: [
+        {
+          kind: "mcp",
+          server: CHANNEL_REPLY_MCP_SERVER_NAME,
+          tool: CHANNEL_REPLY_TOOL_NAME,
+        },
+        {
+          kind: "mcp",
+          server: CHANNEL_REPLY_MCP_SERVER_NAME,
+          tool: "send_file",
+        },
+      ],
+    });
+    assert.equal(config.systemPrompt, DEFAULT_MESSAGE_TOOL_PROMPT);
+  });
+
+  it("honors a route template override and round-trips the binding ref in the URL", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const config = snapshot.resolveAgentSpec(
+      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      {
+        ...RELAY_DEFAULTS,
+        outbound: { path: "tool", template: "Reply only through the message tool." },
+      },
+      BINDING_REF,
+    );
+    assert.equal(config.systemPrompt, "Reply only through the message tool.");
+    const url = channelReplyServerEntry(config).url;
+    assert.ok(url.includes("/mcp/channel/"));
+    const ref = decodeChannelReplyBindingRef(
+      url.slice(url.indexOf("/mcp/channel/") + "/mcp/channel/".length),
+    );
+    assert.deepEqual(ref, BINDING_REF);
+  });
+
+  it("stays byte-identical to the relay config when the path is relay", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const target = {
+      kind: "agent" as const,
+      agent: "codex-safe",
+      environment: "work",
+      template: null,
+    };
+    const relayConfig = snapshot.resolveAgentSpec(target, RELAY_DEFAULTS, BINDING_REF);
+    const toolConfig = snapshot.resolveAgentSpec(
+      target,
+      { ...RELAY_DEFAULTS, outbound: { path: "tool", template: null } },
+      BINDING_REF,
+    );
+    // Exactly the three tool-path additions — nothing else changes.
+    const { mcpServers, toolPolicy, systemPrompt, ...base } = toolConfig;
+    assert.deepEqual(base, relayConfig);
+    assert.ok(mcpServers !== undefined && toolPolicy !== undefined && systemPrompt !== undefined);
+  });
+});
+
+describe("hubListenPort", () => {
+  it("reads PORT, falling back to 3000 for missing or invalid values", () => {
+    assert.equal(hubListenPort({ PORT: "6868" }), 6868);
+    assert.equal(hubListenPort({}), 3000);
+    assert.equal(hubListenPort({ PORT: "not-a-port" }), 3000);
+    assert.equal(hubListenPort({ PORT: "0" }), 3000);
+  });
+});
+
 describe("createChannelAgentSpecResolver", () => {
   it("is importable standalone for the supervisor's plane construction", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
-    const resolver = createChannelAgentSpecResolver(snapshot.bundle);
-    assert.equal(
-      resolver({ kind: "agent", agent: "codex-safe", environment: "work", template: null })
-        .provider,
-      "codex",
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, { hubPort: snapshot.hubPort });
+    const config = resolver(
+      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      RELAY_DEFAULTS,
+      BINDING_REF,
     );
+    assert.equal(config.provider, "codex");
   });
 });

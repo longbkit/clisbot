@@ -39,7 +39,14 @@ const DEFAULTS: EffectiveDefaults = {
   followUp: { mode: "auto", ttlMinutes: 60 },
   bindingKey: "thread",
   replyAnchor: "thread",
-  sync: { finalAnswers: true, progress: false, toolCalls: false, threadLink: "final-only" },
+  outbound: { path: "relay", template: null },
+  sync: {
+    finalAnswers: true,
+    progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+    toolCalls: false,
+    threadLink: "final-only",
+    subagents: { finalAnswers: false, progress: false, toolCalls: false },
+  },
 };
 
 /** The doc's four roles (§4.3.2), with precomputed `extends` closures. */
@@ -106,6 +113,7 @@ function makeAccount(overrides: AccountOverrides = {}): CompiledChannelAccount {
     channelEnabled: overrides.channelEnabled ?? true,
     secretRef: "secret",
     transport: { mode: "socket" },
+    config: {},
     defaultRoles: overrides.defaultRoles ?? ["user"],
     assignments: overrides.assignments ?? [],
     defaults: DEFAULTS,
@@ -468,6 +476,7 @@ describe("route matching (first match wins)", () => {
       channelEnabled: true,
       secretRef: "secret",
       transport: { mode: "socket" },
+      config: {},
       defaultRoles: ["user"],
       assignments: [],
       defaults: DEFAULTS,

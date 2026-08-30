@@ -13,6 +13,7 @@ import {
   AlreadyRunningError,
   getLocalHubStatus,
   isProcessRunning,
+  readDaemonPasswordFile,
   readHubStateFile,
   resolveHubPort,
   resolveLocalHubHome,
@@ -177,6 +178,27 @@ describe("readHubStateFile", () => {
   });
 });
 
+describe("readDaemonPasswordFile", () => {
+  test("reads a PASEO_PASSWORD=<value> line (the repo .env shape)", async () => {
+    const home = await createHome();
+    writeFileSync(path.join(home, ".daemon-password"), "PASEO_PASSWORD=secret123\n");
+    expect(readDaemonPasswordFile(home)).toBe("secret123");
+  });
+
+  test("reads a bare value (no = line)", async () => {
+    const home = await createHome();
+    writeFileSync(path.join(home, ".daemon-password"), "secret456\n");
+    expect(readDaemonPasswordFile(home)).toBe("secret456");
+  });
+
+  test("returns undefined when the file is absent or empty", async () => {
+    const home = await createHome();
+    expect(readDaemonPasswordFile(home)).toBeUndefined();
+    writeFileSync(path.join(home, ".daemon-password"), "   \n");
+    expect(readDaemonPasswordFile(home)).toBeUndefined();
+  });
+});
+
 describe("startLocalHubDetached", () => {
   test("spawns the fork bin detached and records hub-local.json at loopback :6868", async () => {
     const home = await createHome();
@@ -209,6 +231,18 @@ describe("startLocalHubDetached", () => {
 
     expect(result.url).toBe("http://127.0.0.1:7100");
     expect(readHubStateFile(home)?.port).toBe(7100);
+  });
+
+  test("passes the home's .daemon-password through as PASEO_PASSWORD", async () => {
+    const home = await createHome();
+    writeFileSync(path.join(home, ".daemon-password"), "PASEO_PASSWORD=secret789\n");
+    const runtime = new FakeHubRuntime();
+
+    await startLocalHubDetached({ home }, runtime);
+
+    expect((runtime.lastDetached?.options?.env as NodeJS.ProcessEnv)?.PASEO_PASSWORD).toBe(
+      "secret789",
+    );
   });
 
   test("refuses to start when a recorded hub pid is still alive", async () => {

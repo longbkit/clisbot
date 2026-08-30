@@ -11,8 +11,12 @@ import { z } from "zod";
 export const BindingKeySchema = z.enum(["thread", "channel", "dm"]);
 export type BindingKey = z.infer<typeof BindingKeySchema>;
 
-/** `reply.anchor` — where the bot's outbound posts land. */
-export const ReplyAnchorSchema = z.enum(["thread", "channel"]);
+/** `reply.anchor` — where the bot's outbound posts land. `default` follows the
+ * inbound marker (a thread marker → that thread, a root marker → the
+ * conversation root); `thread` follows the marker too and mints the reply
+ * thread on a root-level Slack marker — answering the marker message itself
+ * (`thread_ts` = the marker's `ts`; OpenClaw `replyToMode: all`). */
+export const ReplyAnchorSchema = z.enum(["default", "thread"]);
 export type ReplyAnchor = z.infer<typeof ReplyAnchorSchema>;
 
 // --- Interaction (§4.3.3) -----------------------------------------------------
@@ -26,6 +30,43 @@ export type FollowUpMode = z.infer<typeof FollowUpModeSchema>;
 /** `sync.threadLink` — which link (if any) opens the session in a client. */
 export const ThreadLinkSchema = z.enum(["full", "final-only", "none"]);
 export type ThreadLink = z.infer<typeof ThreadLinkSchema>;
+
+/** `sync.progress.messageReaction` — the reserved "never react" value. */
+export const MESSAGE_REACTION_OFF = "off";
+
+/**
+ * A reaction emoji name. Slack's own naming rule (lowercase letters, digits,
+ * `_`, `+`, `-`, up to 50 chars — `hourglass_flowing_sand`,
+ * `heavy_check_mark`). Custom emoji are created by users, so the value is open
+ * and the guard is the NAME SHAPE, not a closed list: a typo fails at compile
+ * instead of costing a `bad_emoji` on every turn.
+ */
+export const EMOJI_NAME_PATTERN = /^[a-z0-9][a-z0-9_+-]{0,49}$/u;
+
+/**
+ * `sync.progress.messageReaction` — `"off"` (the floor: never react) or an
+ * emoji name. The bot reacts to the SENDER'S OWN message so it is visibly
+ * taken, and removes the reaction when the turn ends. Telegram has no reaction
+ * surface and ignores the value.
+ */
+export const MessageReactionSchema = z
+  .union([
+    z.literal(MESSAGE_REACTION_OFF),
+    z.string().regex(EMOJI_NAME_PATTERN, "an emoji name: lowercase, 1-50 chars"),
+  ])
+  .optional();
+export type MessageReaction = z.infer<typeof MessageReactionSchema>;
+
+// --- Outbound (E4/E6) ----------------------------------------------------------
+
+/**
+ * `outbound.path` — which channel surface carries the agent's reply. `relay`
+ * (the org-floor default) posts the relay's sync-gated text; `tool` attaches
+ * the hub's channel-reply MCP tool to the created agent and folds the route's
+ * root `sync` knobs off, so the tool post is the only user-visible answer.
+ */
+export const OutboundPathSchema = z.enum(["relay", "tool"]);
+export type OutboundPath = z.infer<typeof OutboundPathSchema>;
 
 // --- Routes (§4.3.6) ----------------------------------------------------------
 

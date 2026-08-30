@@ -6,6 +6,12 @@
 // plane stop). The control-plane ops layer drives this through the
 // `ChannelSupervisor` contract in `types.ts`.
 //
+// Hard-limit exception (file > 700 lines, 2026-08-27): pre-existing P0-wave
+// breach (HEAD ~848 lines before the native approval-card slice); the slice
+// (E1/E2/E3/E5) is additive only — `updateFor`, the `channelRuntime.approvalAction`
+// mount, the subagent-frame path. The split decision is recorded in the
+// 2026-08-24 implementation doc §4.6 notice 12.
+//
 // Failure isolation (P13): every per-account step fails closed. A channel
 // fault — a dead daemon, a bad pin, a load-trace miss — marks the account
 // `failed` and lands in the result's `detail`; it never throws out of the
@@ -46,7 +52,20 @@ import {
 import { loadChannelVertical, type LoadedChannelVertical } from "../loader/load-channel.js";
 import { setChannelSeamLogger } from "../loader/seam-logger.js";
 import { isEnabled } from "../policy.js";
-import type { InboundMessage, PlaneInboundResult, PlaneLogger, PostFn } from "../plane/types.js";
+import type {
+  ApprovalCallbackParams,
+  ChannelReplyBindingRef,
+  InboundMessage,
+  MediaPostFn,
+  MediaPostResult,
+  OutboundPostResult,
+  PlaneInboundResult,
+  PlaneLogger,
+  PostFn,
+  UpdateFn,
+  TypingFn,
+} from "../plane/types.js";
+import { resolveHome } from "../daemon/discovery.js";
 import { createHostKeyedStoreRoot } from "../state/keyed-store.js";
 import type {
   ChannelAccountStartResult,
@@ -72,7 +91,7 @@ type InboundReplyHandler = (params: InboundReplyParams) => Promise<InboundReplyR
  * the plane's `<channel>:<provider-id>` identity (§4.3.2) — the ctxPayload
  * carries the raw native id.
  */
-function flatInboundNormalizer(params: InboundReplyParams): InboundMessage | null {
+export function flatInboundNormalizer(params: InboundReplyParams): InboundMessage | null {
   const ctx = params.ctxPayload;
   const accountId = confirmedString(params.accountId) ?? confirmedString(ctx["AccountId"]);
   if (params.channel === "" || accountId === null) return null;
@@ -87,13 +106,22 @@ function flatInboundNormalizer(params: InboundReplyParams): InboundMessage | nul
   // here — the native → plane boundary — and nowhere else.
   const rawSenderId = confirmedString(ctx["SenderId"]) ?? confirmedString(ctx["From"]);
   if (rawSenderId === null) return null;
+  const conversationLabel = confirmedString(ctx["ConversationLabel"]);
+  const senderName = confirmedString(ctx["SenderName"]);
+  // The marker's native message id (Slack `ts`): the only durable anchor the
+  // relay can mint a new reply thread on when `reply.anchor` is `thread` and
+  // the marker itself arrived at the conversation root.
+  const messageSid = confirmedString(ctx["MessageSid"]);
   return {
     channel: params.channel,
     accountId,
     senderIdentity: `${params.channel}:${rawSenderId}`,
+    ...(senderName !== null ? { senderName } : {}),
     text,
     mentionedBot: ctx["WasMentioned"] === true,
     conversation,
+    ...(conversationLabel !== null ? { conversationLabel } : {}),
+    ...(messageSid !== null ? { externalMessageId: messageSid } : {}),
   };
 }
 
@@ -165,18 +193,30 @@ function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: Pl
   return async (params) => {
     try {
       const result = await (
-        send as (args: Record<string, unknown>) => Promise<{ messageId?: unknown }>
+        send as (args: Record<string, unknown>) => Promise<{
+          messageId?: unknown;
+          cardPosted?: unknown;
+        }>
       )({
         cfg,
         to: params.to,
         text: params.text,
         accountId: handle.accountId,
         ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
+        // COMPAT(clisbot-control-plane): the native card payload (the approval
+        // card's `blocks` / `reply_markup`) — posted with the text (the text
+        // stays the fallback rendering on both verticals).
+        ...(params.blocks !== undefined ? { blocks: params.blocks } : {}),
+        ...(params.replyMarkup !== undefined ? { replyMarkup: params.replyMarkup } : {}),
         // Telegram only: disable the native config write-back (admin-scope
         // check fails) — P0 posts numeric chat ids, no legacy rewrite (outbound.md).
         ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
       });
-      return { ok: true, externalMessageId: String(result.messageId) };
+      return {
+        ok: true,
+        externalMessageId: String(result.messageId),
+        ...(result.cardPosted !== undefined ? { cardPosted: result.cardPosted === true } : {}),
+      };
     } catch (error) {
       logger.warn("channel post failed", {
         channel: handle.channel,
@@ -186,6 +226,132 @@ function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: Pl
       });
       return { ok: false, error: errorMessage(error) };
     }
+  };
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the plane's native-media post path (group G,
+ * G7–G11) — the loaded plugin's optional `outbound.sendMedia`, driven by the
+ * relay's final-answer path when an agent's reply references a local media
+ * file. Fail closed: a missing `sendMedia` returns `undefined` — the relay's
+ * media path is then a no-op (byte-identical text relay). `mediaPosted` is
+ * the vertical's G11 contract: false when the vertical refused the file and
+ * posted the in-channel notice through its text path (either way a channel
+ * message was posted, so the relay confirms the row on that message's id and
+ * never re-posts). A transport fault (the vertical throws: missing file,
+ * API failure) lands as `{ok: false, error}` — the relay's failDelivery owns
+ * it.
+ */
+function mediaPostFor(
+  handle: AccountHandle,
+  cfg: Record<string, unknown>,
+  logger: PlaneLogger,
+): MediaPostFn | undefined {
+  const send = handle.vertical?.plugin?.outbound?.["sendMedia"];
+  if (typeof send !== "function") return undefined;
+  return async (params) => {
+    try {
+      const result = await (
+        send as (args: Record<string, unknown>) => Promise<{
+          messageId?: unknown;
+          mediaPosted?: unknown;
+        }>
+      )({
+        cfg,
+        to: params.to,
+        filePath: params.filePath,
+        accountId: handle.accountId,
+        ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
+      });
+      return {
+        ok: true,
+        externalMessageId: String(result.messageId),
+        // The G11 flag rides through only when the vertical reports it (the
+        // shared SendMediaFn always does; an unknown flag is not asserted).
+        ...(typeof result.mediaPosted === "boolean" ? { mediaPosted: result.mediaPosted } : {}),
+      };
+    } catch (error) {
+      logger.warn("channel media post failed", {
+        channel: handle.channel,
+        account: handle.accountId,
+        to: params.to,
+        error: errorMessage(error),
+      });
+      return { ok: false, error: errorMessage(error) };
+    }
+  };
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the plane's in-place update path — the
+ * loaded plugin's optional `outbound.updateText` (Slack `chat.updateMessage`,
+ * Telegram `editMessageText`). The approval engine's card decides against it
+ * ("Approved by <sender>" / "Denied" / "Answered: <option>"). A missing
+ * `updateText` or a throw lands as `{ok: false}` — never a fake success, and
+ * never affecting the resolution (the daemon frame is already dispatched).
+ */
+function updateFor(
+  handle: AccountHandle,
+  cfg: Record<string, unknown>,
+  logger: PlaneLogger,
+): UpdateFn {
+  const update = handle.vertical?.plugin?.outbound?.["updateText"];
+  if (typeof update !== "function") {
+    return async () => ({
+      ok: false,
+      error: "the loaded channel plugin exposes no outbound.updateText",
+    });
+  }
+  return async (params) => {
+    try {
+      await (update as (args: Record<string, unknown>) => Promise<unknown>)({
+        cfg,
+        accountId: handle.accountId,
+        ...(params.senderMention !== undefined ? { senderMention: params.senderMention } : {}),
+        to: params.to,
+        externalMessageId: params.externalMessageId,
+        text: params.text,
+        ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
+        ...(params.clearCard !== undefined ? { clearCard: params.clearCard } : {}),
+        ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
+      });
+      return { ok: true };
+    } catch (error) {
+      logger.warn("channel in-place update failed", {
+        channel: handle.channel,
+        account: handle.accountId,
+        to: params.to,
+        error: errorMessage(error),
+      });
+      return { ok: false, error: errorMessage(error) };
+    }
+  };
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the plane's liveness path — the loaded
+ * plugin's optional `outbound.typing` (Slack's assistant thread status +
+ * inbound reaction, Telegram's `sendChatAction`). Undefined when the plugin
+ * exposes none, which leaves the seam unmounted (no timers, no warnings — an
+ * absent capability is not an error). A wire fault THROWS to the controller,
+ * which counts it and trips its breaker: typing can never disturb the reply
+ * path.
+ */
+function typingFor(handle: AccountHandle, cfg: Record<string, unknown>): TypingFn | undefined {
+  const drive = handle.vertical?.plugin?.outbound?.["typing"];
+  if (typeof drive !== "function") return undefined;
+  return async (params) => {
+    await (drive as (args: Record<string, unknown>) => Promise<unknown>)({
+      cfg,
+      accountId: handle.accountId,
+      to: params.to,
+      action: params.action,
+      indicator: params.indicator,
+      ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
+      ...(params.messageId !== undefined ? { messageId: params.messageId } : {}),
+      ...(params.reactionEmoji !== undefined ? { reactionEmoji: params.reactionEmoji } : {}),
+      ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
+    });
   };
 }
 
@@ -223,12 +389,25 @@ function accountAndCfg(
           botToken,
           ...(appToken !== undefined ? { appToken } : {}),
           config: {},
+          // The compiled transport record rides the flat carrier so the
+          // vertical's start-account can read channel-behavior knobs it owns
+          // (e.g. `slashCommand` — the native slash-command alias the L2
+          // rewrites; commands.ts). Tokens still come only from the carrier +
+          // secret file; this carries no secret.
+          transport: compiled.transport,
         }
       : { accountId, token: botToken, config: {} };
+  // The vertical-owned `config` block rides the cfg entry so the vertical's
+  // account resolution reads its own knobs (e.g. Telegram `richMessages` —
+  // D-003) from the compiled revision instead of a hardcoded default.
   const cfgAccount: Record<string, unknown> =
     compiled.channel === "slack"
-      ? { botToken, ...(appToken !== undefined ? { appToken } : {}) }
-      : { botToken, gatewayClientScopes: [] };
+      ? {
+          botToken,
+          config: compiled.config,
+          ...(appToken !== undefined ? { appToken } : {}),
+        }
+      : { botToken, gatewayClientScopes: [], config: compiled.config };
   return {
     account,
     cfg: { channels: { [compiled.channel]: { accounts: { [accountId]: cfgAccount } } } },
@@ -249,6 +428,10 @@ interface AccountHandle {
   /** The last start attempt's outcome detail (why a deferred/failed account
    * is in that state) — surfaced on `channels status`. */
   detail?: string;
+  /** The account's outbound post (the plugin's `sendText`), built with the
+   * plane and kept for the tool-path MCP endpoint (`channelReplyPost`). */
+  post?: PostFn;
+  media?: MediaPostFn | undefined;
 }
 
 /** The load step's bundle: the vertical, its host runtime, and the inbound wire. */
@@ -447,6 +630,50 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     for (const handle of handles) this.stopHandle(handle);
   }
 
+  /**
+   * The tool-path MCP endpoint's post seam (E4): resolve the decoded binding
+   * ref to a started account's outbound (`postFor`), and post through it.
+   * Fail-closed: an unstarted, unknown, or ref-less account returns
+   * `{ok: false, error}` — the endpoint maps that to a clean tool error and
+   * records a failed delivery. This is the SAME `sendText` seam the relay's
+   * post path uses, so a tool-path post and a relay post land identically.
+   */
+  async channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult> {
+    const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
+    const post = handle?.post;
+    if (handle === undefined || post === undefined || handle.transport !== "started") {
+      return {
+        ok: false,
+        error: `the ${ref.channel} account ${ref.accountId} is not started`,
+      };
+    }
+    return post({
+      channel: ref.channel,
+      accountId: ref.accountId,
+      to: ref.externalConversationId,
+      ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
+      text,
+    });
+  }
+
+  async channelReplyMediaPost(
+    ref: ChannelReplyBindingRef,
+    filePath: string,
+  ): Promise<MediaPostResult> {
+    const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
+    const media = handle?.media;
+    if (handle === undefined || media === undefined || handle.transport !== "started") {
+      return { ok: false, error: `the ${ref.channel} account ${ref.accountId} is not started` };
+    }
+    return media({
+      channel: ref.channel,
+      accountId: ref.accountId,
+      to: ref.externalConversationId,
+      ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
+      filePath,
+    });
+  }
+
   // --- Per-account lifecycle steps -------------------------------------------
 
   private enabled(): boolean {
@@ -565,16 +792,36 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     // (the plugin's sendText reads `cfg`) and the account monitor (start-account.md).
     // A missing/unreadable mirror-secret file fails the account here (P13).
     const { account, cfg } = accountAndCfg(compiled, handle.accountId);
+    // Kept on the handle: the tool-path MCP endpoint's `channelReplyPost`
+    // posts through this SAME outbound seam (the vertical's `sendText`).
+    const planePost = postFor(handle, cfg, this.logger);
+    // COMPAT(clisbot-control-plane): the account's native-media post (the
+    // plugin's outbound.sendMedia, G7–G11); undefined when the plugin has no
+    // sendMedia, which keeps the relay's media path a no-op (byte-identical).
+    // The media home-root fallback is the shared daemon/Hub home — the same
+    // home daemon discovery resolves (one home, one rule).
+    const planeMediaPost = mediaPostFor(handle, cfg, this.logger);
+    // The turn-lifecycle surface (the plugin's optional outbound.typing);
+    // undefined leaves the seam unmounted — an absent capability, not a fault.
+    const planeTyping = typingFor(handle, cfg);
     const plane = createChannelPlane({
       organizationId: snapshot.organizationId,
       normalizeInbound: flatInboundNormalizer,
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
       logger: this.logger,
-      post: postFor(handle, cfg, this.logger),
+      post: planePost,
+      mediaPost: planeMediaPost,
+      homeRoot: resolveHome(this.options.daemon?.home, this.env),
+      // The approval card's in-place update (the plugin's optional
+      // outbound.updateText; absent plugins fail closed per update).
+      update: updateFor(handle, cfg, this.logger),
+      ...(planeTyping !== undefined ? { typing: planeTyping } : {}),
       resolveAgentSpec: snapshot.resolveAgentSpec,
     });
     handle.plane = plane;
+    handle.post = planePost;
+    handle.media = planeMediaPost;
     // Every inbound's outcome is logged (truthful status surface): the plane's
     // ignore reasons were otherwise unlogged in this path, making a running
     // account that silently drops every message indistinguishable from a dead
@@ -591,6 +838,17 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         // fire-and-forget into the plane, log the miss.
         void plane.onStreamEvent(payload.agentId, payload.event).catch((error: unknown) => {
           this.logger.warn("channel stream event failed", {
+            channel: handle.channel,
+            account: handle.accountId,
+            error: errorMessage(error),
+          });
+        });
+      },
+      // The subagent frames ride the same socket, one fire-and-forget consumer
+      // like `onStream` (P13).
+      onSubagentUpdate: (frame) => {
+        void plane.onSubagentFrame(frame).catch((error: unknown) => {
+          this.logger.warn("channel subagent frame failed", {
             channel: handle.channel,
             account: handle.accountId,
             error: errorMessage(error),
@@ -647,8 +905,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     };
     switch (outcome.kind) {
       case "bound":
-        this.logger.info?.("channel inbound bound a thread", {
+        this.logger.info?.("channel inbound bound a conversation", {
           ...base,
+          ...(outcome.conversationLabel !== undefined
+            ? { conversationLabel: outcome.conversationLabel }
+            : {}),
           agentId: outcome.agentId,
           newSession: outcome.newSession,
         });
@@ -656,6 +917,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       case "steered":
         this.logger.info?.("channel inbound steered an existing session", {
           ...base,
+          ...(outcome.conversationLabel !== undefined
+            ? { conversationLabel: outcome.conversationLabel }
+            : {}),
           agentId: outcome.agentId,
         });
         break;
@@ -670,6 +934,35 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         // The message never reached the agent: the reason is the operator's
         // only lead (route miss, kill switch, mention policy, permissions).
         this.logger.warn("channel inbound ignored", { ...base, reason: outcome.reason });
+        break;
+    }
+  }
+
+  /**
+   * The native card click's structured outcome, logged like
+   * `logPlaneOutcome` — the button path otherwise has no logging surface at
+   * all: a click that dies on a route miss, unbound session, privilege
+   * check, or stale prompt is indistinguishable from a click that never
+   * arrived.
+   */
+  private logApprovalCallbackOutcome(handle: AccountHandle, result: PlaneInboundResult): void {
+    const outcome = result.outcome;
+    if (outcome === undefined) return;
+    const base = {
+      channel: handle.channel,
+      account: handle.accountId,
+      dispatched: result.dispatched,
+    };
+    switch (outcome.kind) {
+      case "command":
+        this.logger.info?.("channel card click answered an approval command", {
+          ...base,
+          handled: outcome.handled,
+          detail: outcome.detail,
+        });
+        break;
+      case "ignored":
+        this.logger.warn("channel card click ignored", { ...base, reason: outcome.reason });
         break;
     }
   }
@@ -771,6 +1064,49 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         channel: handle.channel,
         account: handle.accountId,
       }),
+      // Group G: the account's inbound-media download dir (the L2 transport
+      // streams Bot API files here; the `[Attached files]` manifest points
+      // the agent at absolute paths under it).
+      mediaDownloadDir: join(this.options.dataDir, "channels", handle.accountId, "downloads"),
+      // COMPAT(clisbot-control-plane): the native approval card's
+      // button-click seam. The vertical's L2 transport (Slack Socket Mode
+      // `interactive` events; Telegram `callback_query` — the poll loop's
+      // deferred half) hands each parsed click to the plane's
+      // onApprovalCallback: the SAME exactly-once resolver + two authority
+      // checks as a typed command. The click is data — no authority.
+      channelRuntime: {
+        approvalAction: (params: Record<string, unknown>): Promise<PlaneInboundResult> => {
+          const plane = handle.plane;
+          if (plane === undefined) {
+            return Promise.resolve({
+              dispatched: false,
+              outcome: { kind: "ignored", reason: "plane not started" },
+            } as PlaneInboundResult);
+          }
+          const callback: ApprovalCallbackParams = {
+            channel: handle.channel,
+            accountId: handle.accountId,
+            senderIdentity:
+              typeof params["senderIdentity"] === "string" ? params["senderIdentity"] : "",
+            cardValue: typeof params["cardValue"] === "string" ? params["cardValue"] : "",
+            externalConversationId:
+              typeof params["externalConversationId"] === "string"
+                ? params["externalConversationId"]
+                : "",
+            externalThreadId:
+              typeof params["externalThreadId"] === "string" ? params["externalThreadId"] : null,
+            rootKind:
+              params["rootKind"] === "dm" ||
+              params["rootKind"] === "channel" ||
+              params["rootKind"] === "group"
+                ? params["rootKind"]
+                : "channel",
+          };
+          const result = plane.onApprovalCallback(callback);
+          void result.then((outcome) => this.logApprovalCallbackOutcome(handle, outcome));
+          return result;
+        },
+      },
     };
   }
 

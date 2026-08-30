@@ -1,0 +1,7 @@
+
+ RUN  v4.1.7 /home/node/projects/clisbot-paseoclaw-fusion
+
+ ❯ packages/cli/src/commands/bot/token-input.test.ts (14 tests | 1 failed) 29ms
+     × rejects an unset env var 11ms
+Killed
+exit:137

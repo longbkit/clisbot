@@ -428,7 +428,13 @@ export function approvalDecisionFor(
 export interface ApproverCheck {
   allowed: boolean;
   /** Why the answer was refused (or "ok"); "auto-allowed" when no human answers. */
-  reason: "auto-allowed" | "auto-denied" | "not-initiator" | "class-not-approved" | "ok";
+  reason:
+    | "auto-allowed"
+    | "auto-denied"
+    | "not-initiator"
+    | "class-not-approved"
+    | "prompt-not-open"
+    | "ok";
 }
 
 /**

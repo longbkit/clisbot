@@ -14,6 +14,11 @@ import {
   type TelegramCfg,
 } from "../client/bot-api.js";
 import { registerAccountInbound } from "../runtime-store.js";
+import {
+  approvalCallbackRootKind,
+  parseApprovalCallbackClick,
+  type TelegramCallbackQueryShape,
+} from "../transport/approval-callback.js";
 import { fingerprintTelegramBotToken, runTelegramPoll } from "../transport/poll.js";
 
 export const TELEGRAM_BOT_INFO_CACHE_TTL_MS = 86_400_000;
@@ -149,6 +154,15 @@ function telegramConfiguredAccounts(cfg: TelegramCfg): Array<[string, string | n
   ]);
 }
 
+/** Group G: the account's inbound-media download dir (`<dataDir>/channels/<accountId>/downloads`,
+ * filled by the Hub supervisor as `ctx.mediaDownloadDir`). `undefined` → the L2 poll skips
+ * media downloads (caption/text-only bodies), the unit-test floor. */
+function resolveMediaDownloadDir(ctx: StartAccountContext): string | undefined {
+  return typeof ctx.mediaDownloadDir === "string" && ctx.mediaDownloadDir !== ""
+    ? ctx.mediaDownloadDir
+    : undefined;
+}
+
 /** `plugin.gateway.startAccount` — the drive surface entry. Resolves on
  * abort (D2). Steps: token → probe (cached) → duplicate guard → L2 poll. */
 export async function startTelegramAccount(
@@ -181,6 +195,14 @@ export async function startTelegramAccount(
     botUsername: botInfo.username ?? null,
   });
   const updateOffsetStore = openTelegramSeamStores(hostRuntime).updateOffsets;
+  const downloadDir = resolveMediaDownloadDir(ctx);
+  // COMPAT(clisbot-control-plane): the approval card's button-click seam (E2
+  // — the mirror of the Slack vertical's `onInteractive`). The Hub supervisor
+  // mounts `channelRuntime.approvalAction` (the plane's onApprovalCallback,
+  // the SAME exactly-once resolver as a typed command — the click is data,
+  // never authority). Absent (unit posture, pinned vertical) = no card
+  // clicks; the typed command still answers the prompt.
+  const onApprovalCallback = telegramApprovalCallback(ctx.channelRuntime, accountId);
   await runTelegramPoll({
     accountId,
     botToken: account.token,
@@ -189,11 +211,48 @@ export async function startTelegramAccount(
     ...(botInfo.username !== undefined ? { botUsername: botInfo.username } : {}),
     abortSignal,
     updateOffsetStore,
+    ...(downloadDir !== undefined ? { downloadDir } : {}),
     ...(log !== undefined ? { logger: log } : {}),
+    ...(onApprovalCallback !== undefined ? { onApprovalCallback } : {}),
     onEvent: async (event) => {
       // L3 dedupe/ledger/handoff: the shared processor this account registered.
       await inbound.handleInbound(event);
     },
   });
   ctx.setStatus({ state: "stopped", accountId });
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the approval card's button-click seam (E2).
+ * The Hub supervisor mounts `channelRuntime.approvalAction` (the plane's
+ * onApprovalCallback, the SAME exactly-once resolver as a typed command —
+ * the click is data, never authority). Absent (unit posture, pinned
+ * vertical) = no card clicks; the typed command still answers the prompt.
+ * L4 narrows the channel envelope only (approval-callback.ts); the card value
+ * (`callback_data`) stays opaque to the vertical — the hub's card parser
+ * owns its format. Returns undefined when no seam is wired.
+ */
+function telegramApprovalCallback(
+  channelRuntime: Record<string, unknown> | undefined,
+  accountId: string,
+): ((callbackQuery: TelegramCallbackQueryShape) => Promise<void>) | undefined {
+  const approvalAction = channelRuntime?.["approvalAction"];
+  if (typeof approvalAction !== "function") return undefined;
+  const invoke = approvalAction as (params: Record<string, unknown>) => Promise<unknown>;
+  return async (callbackQuery): Promise<void> => {
+    // The vertical parses the CHANNEL envelope only (who clicked, where the
+    // card sits); the card value is opaque to the vertical — the hub's card
+    // parser owns its format (one parse, hub-side).
+    const click = parseApprovalCallbackClick(callbackQuery);
+    if (click === null) return;
+    await invoke({
+      channel: "telegram",
+      accountId,
+      senderIdentity: `telegram:${click.senderId}`,
+      cardValue: click.cardValue,
+      externalConversationId: click.rootChatId,
+      externalThreadId: click.threadId ?? null,
+      rootKind: approvalCallbackRootKind(click.chatType),
+    });
+  };
 }

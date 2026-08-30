@@ -15,13 +15,28 @@
 // WebClient (client/web-api.ts).
 
 import { SocketModeClient } from "@slack/socket-mode";
-import { createInboundEventProcessor, type StartAccountContext } from "@getpaseo/channels-shared";
+import {
+  createInboundEventProcessor,
+  type HostChildLogger,
+  type StartAccountContext,
+} from "@getpaseo/channels-shared";
 import { probeSlackAuth } from "../client/web-api.js";
 import { getSlackRuntime } from "../runtime.js";
+import { approvalRootKind, parseApprovalCardClick } from "../transport/approval-card.js";
 import { createSlackSocketTransport } from "../transport/socket-mode.js";
 
 /** The pinned default account id when `ctx.account` carries no `accountId`. */
 export const SLACK_DEFAULT_ACCOUNT_ID = "default";
+
+/** COMPAT(clisbot-control-plane): the account's inbound-media download dir
+ * (`<dataDir>/channels/<accountId>/downloads`, filled by the Hub supervisor as
+ * `ctx.mediaDownloadDir`). `undefined` → the L2 skips media downloads
+ * (text-only bodies), the unit-test floor. */
+function resolveMediaDownloadDir(ctx: StartAccountContext): string | undefined {
+  return typeof ctx.mediaDownloadDir === "string" && ctx.mediaDownloadDir !== ""
+    ? ctx.mediaDownloadDir
+    : undefined;
+}
 
 /** Read one `string` field off a `Record` account/cfg entry. */
 function readStringField(record: Record<string, unknown>, key: string): string | undefined {
@@ -91,8 +106,32 @@ export function assertNoDuplicateSlackBotTokens(
   }
 }
 
+/** The shared L3 processor for one account, or undefined when the runtime
+ * is not mounted yet (unit-test posture): the inboundLedger sink is the
+ * Hub's durable dedupe when present; without a Hub the in-flight set is the
+ * whole dedupe. */
+function createSlackL3Processor(accountId: string, botId?: string) {
+  const hostRuntime = getSlackRuntime();
+  if (hostRuntime === undefined) return undefined;
+  return createInboundEventProcessor({
+    hostRuntime,
+    channel: "slack",
+    accountId,
+    ...(botId !== undefined ? { botId } : {}),
+    ...(hostRuntime.logging !== undefined
+      ? {
+          logger: hostRuntime.logging.getChildLogger({
+            channel: "slack",
+            accountId,
+          }),
+        }
+      : {}),
+  });
+}
+
 /** `plugin.gateway.startAccount` — probe the tokens, then run the Socket
  * Mode transport for the account's lifetime. */
+// eslint-disable-next-line complexity -- this is the single account lifecycle transaction.
 export async function startSlackAccount(ctx: StartAccountContext): Promise<void> {
   const log = ctx.log;
   const { accountId, botToken, appToken } = readSlackAccountTokens(ctx.account);
@@ -113,33 +152,43 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
   }
   if (probe.warning !== undefined) log?.warn?.(probe.warning);
 
-  // L3 processor (shared, channel-agnostic): the inboundLedger sink is the
-  // Hub's durable dedupe when present; without a Hub the in-flight set is
-  // the whole dedupe (unit-test posture).
-  const hostRuntime = getSlackRuntime();
-  const processor =
-    hostRuntime !== undefined
-      ? createInboundEventProcessor({
-          hostRuntime,
-          channel: "slack",
-          accountId,
-          ...(probe.botId !== undefined ? { botId: probe.botId } : {}),
-          ...(hostRuntime.logging !== undefined
-            ? {
-                logger: hostRuntime.logging.getChildLogger({
-                  channel: "slack",
-                  accountId,
-                }),
-              }
-            : {}),
-        })
-      : undefined;
+  const processor = createSlackL3Processor(accountId, probe.botId);
 
   const client = new SocketModeClient({
     appToken,
     autoReconnectEnabled: true,
     clientPingTimeout: 15000,
   });
+  // COMPAT(clisbot-control-plane): the approval card's button-click seam. The
+  // Hub supervisor mounts `channelRuntime.approvalAction` (the plane's
+  // onApprovalCallback, the SAME exactly-once resolver as a typed command —
+  // the click is data, never authority). Absent (unit posture, pinned
+  // vertical) = no card clicks; the typed command still answers the prompt.
+  // L4 narrows the channel envelope only (approval-card.ts); the card value
+  // stays opaque to the vertical — the hub's card parser owns its format.
+  const onInteractive = slackApprovalInteractive(ctx.channelRuntime, accountId, log);
+  // COMPAT(clisbot-control-plane): inbound media (F-06, G5+G6). When the Hub
+  // fills `ctx.mediaDownloadDir`, the L2 folds a message's `files[]` into the
+  // inbound body before the L3 handoff (the mirror of the Telegram vertical's
+  // `downloadDir`). Absent (unit posture, pinned vertical) = text-only.
+  // COMPAT(clisbot-control-plane): the account's registered native slash
+  // command (`transport.slashCommand`, e.g. `/paseo`). Set = the L2 rewrites
+  // matching `slash_commands` envelopes to the shared plain-text command form
+  // (the hub's commands.ts owns the verbs); absent = native ingestion off.
+  const transportRecord = ctx.account["transport"];
+  const slashCommandSetting =
+    typeof transportRecord === "object" && transportRecord !== null
+      ? (transportRecord as Record<string, unknown>)["slashCommand"]
+      : undefined;
+  const slashCommand =
+    typeof slashCommandSetting === "string" && slashCommandSetting !== ""
+      ? slashCommandSetting
+      : undefined;
+  const mediaDownloadDir = resolveMediaDownloadDir(ctx);
+  const media =
+    mediaDownloadDir !== undefined
+      ? { accountId, botToken, downloadDir: mediaDownloadDir }
+      : undefined;
   const transport = createSlackSocketTransport({
     client,
     identity: {
@@ -159,6 +208,9 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
           },
     abortSignal: ctx.abortSignal,
     ...(log !== undefined ? { logger: log } : {}),
+    ...(onInteractive !== undefined ? { onInteractive } : {}),
+    ...(slashCommand !== undefined ? { slashCommand } : {}),
+    ...(media !== undefined ? { media } : {}),
   });
 
   ctx.setStatus?.({ channel: "slack", accountId, connected: true, lifecycle: "ready" });
@@ -167,4 +219,50 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
   } finally {
     ctx.setStatus?.({ channel: "slack", accountId, connected: false });
   }
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the approval card's button-click seam. The
+ * Hub supervisor mounts `channelRuntime.approvalAction` (the plane's
+ * onApprovalCallback, the SAME exactly-once resolver as a typed command —
+ * the click is data, never authority). Absent (unit posture, pinned
+ * vertical) = no card clicks; the typed command still answers the prompt.
+ * L4 narrows the channel envelope only (approval-card.ts); the card value
+ * stays opaque to the vertical — the hub's card parser owns its format.
+ * Returns undefined when no seam is wired.
+ */
+function slackApprovalInteractive(
+  channelRuntime: Record<string, unknown> | undefined,
+  accountId: string,
+  logger?: HostChildLogger,
+): ((body: Record<string, unknown>) => Promise<void>) | undefined {
+  const approvalAction = channelRuntime?.["approvalAction"];
+  if (typeof approvalAction !== "function") return undefined;
+  const invoke = approvalAction as (params: Record<string, unknown>) => Promise<unknown>;
+  return async (body: Record<string, unknown>): Promise<void> => {
+    // The vertical parses the CHANNEL envelope only (who clicked, where the
+    // card sits); the card value is opaque to the vertical — the hub's card
+    // parser owns its format (one parse, hub-side).
+    const click = parseApprovalCardClick(body);
+    if (click === null) {
+      // A block_actions that is not a posted-card click (a modal, or a
+      // payload shape the parser does not own). Log the fingerprint so a
+      // live card that fails to parse is visible instead of a silent
+      // dead button.
+      logger?.warn?.("slack approval card click did not parse", {
+        accountId,
+        payloadKeys: Object.keys(body),
+      });
+      return;
+    }
+    await invoke({
+      channel: "slack",
+      accountId,
+      senderIdentity: `slack:${click.senderId}`,
+      cardValue: click.cardValue,
+      externalConversationId: click.rootChannelId,
+      externalThreadId: click.threadTs ?? null,
+      rootKind: approvalRootKind(click.rootChannelId),
+    });
+  };
 }

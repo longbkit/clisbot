@@ -16,6 +16,8 @@ import { createHubCommand } from "./commands/hub/index.js";
 // COMPAT(clisbot-control-plane): additive channel/user control-plane groups (implementation doc §3.2).
 import { createChannelsCommand } from "./commands/channels/index.js";
 import { createUsersCommand } from "./commands/users/index.js";
+// COMPAT(clisbot-bot): the one-line channel-bot bootstrap group (implementation doc §2.1).
+import { createBotCommand } from "./commands/bot/index.js";
 import { createHooksCommand } from "./commands/hooks.js";
 import { startCommand as daemonStartCommand } from "./commands/daemon/start.js";
 import { runStatusCommand as runDaemonStatusCommand } from "./commands/daemon/status.js";
@@ -177,6 +179,8 @@ export function createCli(): Command {
   // COMPAT(clisbot-control-plane): channel control-plane verbs (implementation doc §3.2).
   program.addCommand(createChannelsCommand());
   program.addCommand(createUsersCommand());
+  // COMPAT(clisbot-bot): one-line channel-bot bootstrap (implementation doc §2.1).
+  program.addCommand(createBotCommand());
 
   // Chat commands
 

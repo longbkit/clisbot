@@ -23,6 +23,9 @@ export interface ChannelDaemonClientOptions {
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
   /** Agent snapshot updates (`agent_update`). */
   onAgentUpdate?: (agent: unknown) => void;
+  /** Subagent wire frames (`agent.provider_subagents.update`), the
+   * `provider_subagents`-gated child descriptors + timeline. */
+  onSubagentUpdate?: (frame: unknown) => void;
   /** Observe the trusted session's state. `disconnected` includes an explicit
    * stop; the reconnect loop re-fires `connected` on recovery. */
   onStateChange?: (state: "connected" | "disconnected") => void;
@@ -67,6 +70,9 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
     ...(options.rpcTimeoutMs !== undefined ? { rpcTimeoutMs: options.rpcTimeoutMs } : {}),
     ...(options.onStream !== undefined ? { onStream: options.onStream } : {}),
     ...(options.onAgentUpdate !== undefined ? { onAgentUpdate: options.onAgentUpdate } : {}),
+    ...(options.onSubagentUpdate !== undefined
+      ? { onSubagentUpdate: options.onSubagentUpdate }
+      : {}),
     ...(options.onStateChange !== undefined ? { onStateChange: options.onStateChange } : {}),
   });
   socket.connect();

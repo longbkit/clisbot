@@ -11,7 +11,12 @@
 
 import type { Database } from "../../db/types.js";
 import type { DatabaseRuntime } from "../../db/runtime/index.js";
-import type { PlaneLogger } from "../plane/types.js";
+import type {
+  ChannelReplyBindingRef,
+  MediaPostResult,
+  OutboundPostResult,
+  PlaneLogger,
+} from "../plane/types.js";
 import type { ChannelDaemonClientOptions } from "../daemon/client.js";
 
 /** The per-account transport state the ops layer reports (`channels status`). */
@@ -88,4 +93,13 @@ export interface ChannelSupervisor {
   reconcile(): Promise<ChannelReconcileResult>;
   /** Per-account pin / integrity / load-trace / transport (the status endpoint). */
   status(): readonly ChannelAccountStatusEntry[];
+  /**
+   * The tool-path post seam (E4): the account's outbound (the vertical's
+   * `sendText` through `postFor`) addressed by the decoded binding ref. The
+   * channel-reply MCP endpoint writes its ledger row, then calls this.
+   * Fail-closed for an unstarted/unknown account (`{ok: false}`) — the
+   * endpoint maps that to a clean tool error.
+   */
+  channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult>;
+  channelReplyMediaPost(ref: ChannelReplyBindingRef, filePath: string): Promise<MediaPostResult>;
 }

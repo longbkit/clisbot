@@ -20,13 +20,16 @@ import type {
 } from "../config/compile.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import { mayTrigger, type InboundConversation } from "../policy.js";
-import type {
-  InboundConversationDetail,
-  InboundMessage,
-  InboundOutcome,
-  P0ChannelName,
-  PlaneClock,
-  PlaneLogger,
+import type { ProcessingController } from "../plane/processing.js";
+import { processingSurfaceFor } from "../plane/processing.js";
+import {
+  SLACK_THREAD_TS_PATTERN,
+  type InboundConversationDetail,
+  type InboundMessage,
+  type InboundOutcome,
+  type P0ChannelName,
+  type PlaneClock,
+  type PlaneLogger,
 } from "../plane/types.js";
 
 /** The durable thread key (conversation + native thread id) a binding is keyed by. */
@@ -41,12 +44,29 @@ export interface ThreadKey {
  * top-level channel message has no thread id and falls to the conversation
  * level, matching every channel's native "no thread = channel session" rule).
  * `channel` / `dm`: the whole conversation is one session; threads collapse.
+ *
+ * One exception — the minted-thread key: under `reply.anchor: thread` a
+ * root-level Slack marker mints its reply thread on the marker message itself
+ * (`thread_ts` = the marker's native ts, the relay's mint), so the marker is
+ * already the root of a real thread. It binds at THAT thread's key, not the
+ * conversation level: the marker's turn and the thread's follow-ups share one
+ * session, two root markers never share one, and the minted thread never
+ * re-binds a second session on its first reply.
  */
-export function deriveBindingKey(
-  conversation: InboundConversationDetail,
-  bindingKey: EffectiveDefaults["bindingKey"],
-): ThreadKey {
-  const externalThreadId = bindingKey === "thread" ? conversation.threadId : null;
+export function deriveBindingKey(message: InboundMessage, route: CompiledRoute): ThreadKey {
+  const conversation = message.conversation;
+  let externalThreadId = route.defaults.bindingKey === "thread" ? conversation.threadId : null;
+  if (
+    externalThreadId === null &&
+    route.defaults.bindingKey === "thread" &&
+    route.defaults.replyAnchor === "thread" &&
+    message.channel === "slack" &&
+    conversation.kind !== "dm" &&
+    message.externalMessageId !== undefined &&
+    SLACK_THREAD_TS_PATTERN.test(message.externalMessageId)
+  ) {
+    externalThreadId = message.externalMessageId;
+  }
   return { externalConversationId: conversation.rootConversationId, externalThreadId };
 }
 
@@ -62,10 +82,28 @@ interface BindingEngineContext {
   clock: PlaneClock;
   store: ChannelStore;
   daemon: DaemonConnection;
-  /** Resolve a route's agent target into a `create_agent_request` config. */
+  /** Resolve a route's agent target into a `create_agent_request` config.
+   * The route's effective defaults select the outbound path (E4/E6); on a
+   * `tool` path the `bindingRef` names the thread the attached MCP tool
+   * posts into (the account + the thread key being created). */
   resolveAgentSpec: (
     target: Extract<CompiledRoute["target"], { kind: "agent" }>,
+    defaults: EffectiveDefaults,
+    bindingRef: import("../plane/types.js").ChannelReplyBindingRef,
   ) => import("../daemon/types.js").CreateAgentConfig;
+  /** COMPAT(clisbot-control-plane): record a created agent's home (its
+   * create-time `cwd`) for the relay's native-media path (G7–G11). The plane
+   * owns the agentId→cwd Map; the relay resolves it through its `agentCwd`
+   * resolver. Absent = the engine records nothing (the relay's media home
+   * falls back to the shared home root). */
+  noteAgentCwd?: ((agentId: string, cwd: string) => void) | undefined;
+  /** COMPAT(clisbot-control-plane): the turn-lifecycle surface (the vertical's
+   * `outbound.typing`). The lease opens HERE, at the moment the inbound
+   * has passed every admission gate and is known to be running a turn — not
+   * later on `turn_started`, which the plane cannot reliably see because it
+   * sends the prompt before the daemon reports anything. Absent = no surface.
+   */
+  processing?: ProcessingController | undefined;
 }
 
 /**
@@ -85,20 +123,27 @@ export class BindingEngine {
    * The one inbound decision: admit, create, or steer. `account` + `route` are
    * the resolved route (the facade matches it); admission and the binding
    * lookup happen here, then the create or steer is driven on the daemon.
+   *
+   * `subscribe` runs once the agent exists and BEFORE its prompt is delivered,
+   * so the plane can register the session's stream first. Without it the first
+   * turn of a new session streams its events to nobody — the create returns,
+   * the prompt goes out, and the subscription is only registered after the
+   * whole exchange (which is why a channel turn's `turn_started` never arrived).
    */
   async bindOrSteer(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
+    subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const key = deriveBindingKey(message.conversation, route.defaults.bindingKey);
+    const key = deriveBindingKey(message, route);
     const binding = await this.context.store.findThreadBinding(
       this.context.organizationId,
       account.accountId,
       key.externalConversationId,
       key.externalThreadId,
     );
-    if (binding === undefined) return this.firstMention(message, account, route, key);
+    if (binding === undefined) return this.firstMention(message, account, route, key, subscribe);
     if (binding.status === "pending") {
       return this.recoverPending(message, account, route, key, binding.pendingExecutionId);
     }
@@ -110,7 +155,7 @@ export class BindingEngine {
     if (binding.agentId === null) {
       return { kind: "ignored", reason: "thread binding has no agent; operator recovery required" };
     }
-    return this.followUp(message, account, route, binding.agentId);
+    return this.followUp(message, account, route, binding.agentId, subscribe);
   }
 
   /**
@@ -159,6 +204,7 @@ export class BindingEngine {
     account: CompiledChannelAccount,
     route: CompiledRoute,
     key: ThreadKey,
+    subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
     const defaults = route.defaults;
     if (defaults.requireMention && !message.mentionedBot) {
@@ -168,6 +214,10 @@ export class BindingEngine {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const executionId = randomUUID();
+    // Admitted: the turn is happening. Raise the surface before any daemon
+    // call, keyed provisionally on the execution id and re-keyed to the
+    // agent once it exists.
+    this.openSurface(executionId, message, account, route, key);
     try {
       await this.context.store.recordPendingThreadBinding({
         organizationId: this.context.organizationId,
@@ -199,11 +249,18 @@ export class BindingEngine {
     }
     let created;
     try {
-      created = await this.createAgent(route, executionId, message.text);
+      created = await this.createAgent(
+        account.channel as P0ChannelName,
+        account.accountId,
+        route,
+        key,
+        executionId,
+      );
     } catch (error) {
       // Leave the marker pending: the create may have timed out rather than
       // failed, so a later inbound (or restart) can rebind the surviving
       // agent. Never re-create here — the marker is the idempotency.
+      this.context.processing?.close(executionId);
       this.context.logger.warn("agent create failed; the thread marker stays pending", {
         accountId: account.accountId,
         executionId,
@@ -220,11 +277,40 @@ export class BindingEngine {
       resolvedAt: new Date(),
     });
     this.markActive(created.agentId);
-    this.context.logger.info?.("thread bound to a new agent session", {
+    this.context.processing?.bind(executionId, created.agentId);
+    // Subscribe the session before the prompt: everything the turn emits from
+    // here on is seen, including its terminal event.
+    await subscribe?.(created.agentId);
+    try {
+      await this.context.daemon.sendAgentMessage(created.agentId, message.text, {
+        steer: false,
+      });
+    } catch (error) {
+      // The turn never started: release the surface, and say so.
+      this.context.processing?.close(executionId);
+      this.context.logger.warn("first prompt delivery failed", {
+        accountId: account.accountId,
+        agentId: created.agentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { kind: "ignored", reason: "agent did not accept the first prompt" };
+    }
+    this.context.logger.info?.("conversation bound to a new agent session", {
+      channel: account.channel,
       accountId: account.accountId,
+      ...(message.conversationLabel !== undefined
+        ? { conversationLabel: message.conversationLabel }
+        : {}),
       agentId: created.agentId,
     });
-    return { kind: "bound", agentId: created.agentId, newSession: true };
+    return {
+      kind: "bound",
+      agentId: created.agentId,
+      newSession: true,
+      ...(message.conversationLabel !== undefined
+        ? { conversationLabel: message.conversationLabel }
+        : {}),
+    };
   }
 
   /**
@@ -266,10 +352,21 @@ export class BindingEngine {
     });
     this.markActive(surviving.id);
     this.context.logger.info?.("inbound re-bound a pending marker", {
+      channel: account.channel,
       accountId: account.accountId,
+      ...(message.conversationLabel !== undefined
+        ? { conversationLabel: message.conversationLabel }
+        : {}),
       agentId: surviving.id,
     });
-    return { kind: "bound", agentId: surviving.id, newSession: false };
+    return {
+      kind: "bound",
+      agentId: surviving.id,
+      newSession: false,
+      ...(message.conversationLabel !== undefined
+        ? { conversationLabel: message.conversationLabel }
+        : {}),
+    };
   }
 
   /** A bound thread: admit the follow-up and steer the existing session. */
@@ -278,6 +375,7 @@ export class BindingEngine {
     account: CompiledChannelAccount,
     route: CompiledRoute,
     agentId: string,
+    subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
     const admission = admitFollowUp(message, route.defaults, this.isIdle(agentId, route.defaults));
     if (!admission.allowed) {
@@ -286,9 +384,24 @@ export class BindingEngine {
     if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
-    await this.context.daemon.sendAgentMessage(agentId, message.text, { steer: true });
+    const leaseId = randomUUID();
+    this.openSurface(leaseId, message, account, route, deriveBindingKey(message, route));
+    this.context.processing?.bind(leaseId, agentId);
+    await subscribe?.(agentId);
+    try {
+      await this.context.daemon.sendAgentMessage(agentId, message.text, { steer: true });
+    } catch (error) {
+      this.context.processing?.close(leaseId);
+      throw error;
+    }
     this.markActive(agentId);
-    return { kind: "steered", agentId };
+    return {
+      kind: "steered",
+      agentId,
+      ...(message.conversationLabel !== undefined
+        ? { conversationLabel: message.conversationLabel }
+        : {}),
+    };
   }
 
   // --- Idle window ----------------------------------------------------------
@@ -307,26 +420,68 @@ export class BindingEngine {
   }
 
   /**
-   * Issue the trusted `create_agent_request` with the route's agent target,
-   * then deliver the first channel message as the session's first prompt (the
-   * bot is created idle, implementation doc §2.1 — the mention is what starts
-   * the turn).
+   * Issue the trusted `create_agent_request` with the route's agent target. The
+   * bot is created IDLE (implementation doc §2.1): the caller delivers the
+   * first channel prompt only after it has subscribed the session's stream,
+   * so splitting create from send is what keeps the first turn observable.
    */
   private async createAgent(
+    channel: P0ChannelName,
+    accountId: string,
     route: CompiledRoute,
+    key: ThreadKey,
     executionId: string,
-    firstPrompt: string,
   ): Promise<{ agentId: string }> {
     const target = route.target;
     if (target.kind !== "agent") {
       throw new ChannelWorkflowTargetError(target.workflow);
     }
-    const config = this.context.resolveAgentSpec(target);
+    // The tool-path MCP endpoint's thread address: the account + the durable
+    // thread key being created (the ref embedded in the mcpServers URL is
+    // create-time-only — no daemon RPC attaches an MCP server to a session).
+    const config = this.context.resolveAgentSpec(target, route.defaults, {
+      channel,
+      accountId,
+      externalConversationId: key.externalConversationId,
+      externalThreadId: key.externalThreadId,
+    });
     const created = await this.context.daemon.createAgent(config, {
       title: executionMarker(executionId),
     });
-    await this.context.daemon.sendAgentMessage(created.agentId, firstPrompt, { steer: false });
+    // COMPAT(clisbot-control-plane): the agent's home for the relay's
+    // native-media path — the `cwd` the daemon runs it in (G7–G11).
+    this.context.noteAgentCwd?.(created.agentId, config.cwd);
     return { agentId: created.agentId };
+  }
+
+  /**
+   * Raise the turn's liveness surface for an admitted inbound. The location
+   * is the BINDING key (where the reply will be addressed, including the
+   * thread a root Slack marker mints), because the lease opens before the
+   * prompt is sent and the stream context does not exist yet.
+   *
+   * No controller, no admitted leaf, or a drive that fails on the wire all
+   * leave the turn running: the surface is decoration, never a gate.
+   */
+  private openSurface(
+    leaseId: string,
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    key: ThreadKey,
+  ): void {
+    const processing = this.context.processing;
+    if (processing === undefined) return;
+    const surface = processingSurfaceFor({
+      channel: account.channel as P0ChannelName,
+      accountId: account.accountId,
+      sync: route.defaults.sync,
+      to: key.externalConversationId,
+      ...(key.externalThreadId !== null ? { threadId: key.externalThreadId } : {}),
+      ...(message.externalMessageId !== undefined ? { messageId: message.externalMessageId } : {}),
+    });
+    if (surface === undefined) return;
+    processing.open(leaseId, surface);
   }
 }
 

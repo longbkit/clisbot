@@ -36,6 +36,12 @@ Verified 2026-08-26 against the pinned supply. The drive contract holds **3/3**:
 
 ### 2.1 The Telegram outbound layer: not import-free (correction to the working assumption)
 
+Outbound media is driven by the Hub's explicit `send_file` MCP tool. The tool
+enforces the `homeRoot` boundary and shared size policy before calling the
+vertical; relay final answers stay plain text and no longer undergo heuristic
+path extraction. The structured tool shape follows OpenClaw's media payload
+parts without importing OpenClaw's agent runtime.
+
 `send-BgA996pw.js` is **not** a zero-import leaf. It pulls **33 import specifiers: 30 relative leaf chunks** (all main-dist: `string-coerce`, `number-coercion`, `redact`, `retry-policy`, `request-timeouts`, `polls`, `markdown-tables`, `media-runtime`, `sent-message-cache`, `io`/`config` for write-back, …) **plus three bare third-party specifiers: `grammy`, `@grammyjs/runner`, `@grammyjs/transformer-throttler`**. It carries the per-account throttler, retry/timeout policy, rich markdown/HTML plan builders, inline keyboards, native-quote handling, `resolveAndPersistChatId` (×13 — the config write-back that persists resolved chat ids via `readConfigFileSnapshotForWrite`/`replaceConfigFile`), and the `telegram.sent-messages`/`telegram.message-cache` keyed-store calls (via the imported `sent-message-cache` chunk, which opens both an async and a sync keyed store).
 
 Implications:

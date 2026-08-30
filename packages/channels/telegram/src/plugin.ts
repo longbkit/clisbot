@@ -5,7 +5,8 @@
 import type { ChannelPlugin } from "@getpaseo/channels-shared";
 import { startTelegramAccount } from "./lifecycle/start-account.js";
 import { getHostRuntime } from "./runtime-store.js";
-import { sendText } from "./outbound.js";
+import { sendMedia, sendText, updateText } from "./outbound.js";
+import { telegramTyping } from "./typing.js";
 
 export const telegramPlugin: ChannelPlugin = {
   gateway: {
@@ -13,8 +14,20 @@ export const telegramPlugin: ChannelPlugin = {
   },
   outbound: {
     sendText,
+    // COMPAT(clisbot-control-plane): the approval card's in-place update
+    // (`editMessageText`); the Hub's approval engine decides against it.
+    updateText,
+    // COMPAT(clisbot-control-plane): the G7–G11 native-media post (the
+    // mime-routed Bot API media send + the shared G11 gate).
+    sendMedia,
+    // COMPAT(clisbot-control-plane): the `sync.progress` liveness surface
+    // (`sendChatAction("typing")`; typing.ts). The Bot API has no reaction
+    // surface, so that leaf is answered here as "nothing to do".
+    typing: async (args: Record<string, unknown>) => {
+      await telegramTyping(args as never);
+    },
   },
 };
 
 export { startTelegramAccount } from "./lifecycle/start-account.js";
-export { sendText } from "./outbound.js";
+export { sendMedia, sendText } from "./outbound.js";

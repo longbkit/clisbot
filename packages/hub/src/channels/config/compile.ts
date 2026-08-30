@@ -29,6 +29,8 @@ import {
   type ApprovalRule,
   type ChannelDefaults,
   type Fallback,
+  type SyncProgress,
+  type SyncProgressGroup,
   type RoleAssignment,
   type Route,
 } from "./schema.js";
@@ -60,12 +62,30 @@ export interface EffectiveDefaults {
   requireMention: boolean;
   followUp: { mode: "auto" | "mention-only"; ttlMinutes: number };
   bindingKey: "thread" | "channel" | "dm";
-  replyAnchor: "thread" | "channel";
+  replyAnchor: "default" | "thread";
+  /** The reply-path toggle (E4/E6), folded like every other default leaf;
+   * `template` stays null at the org floor (= the default injection block). */
+  outbound: { path: "relay" | "tool"; template: string | null };
   sync: {
     finalAnswers: boolean;
-    progress: boolean;
+    /** The "the bot is working" group: the relayed progress line, the
+     * provider's native typing status, and a temporary reaction on the
+     * inbound marker. Folded per leaf; an authored bare boolean normalizes to
+     * `progressMessage` only. */
+    progress: {
+      progressMessage: boolean;
+      typingIndicator: boolean;
+      /** Resolved: the reserved `"off"`, or the emoji name to react with. */
+      messageReaction: string;
+    };
     toolCalls: boolean;
     threadLink: "full" | "final-only" | "none";
+    /** The subagent (Task tool) relay knobs; off at the org floor. */
+    subagents: {
+      finalAnswers: boolean;
+      progress: boolean;
+      toolCalls: boolean;
+    };
   };
 }
 
@@ -102,6 +122,8 @@ export interface CompiledChannelAccount {
   channelEnabled: boolean;
   secretRef: string;
   transport: Record<string, unknown>;
+  /** Vertical-owned account settings (AccountFileSchema `config`), verbatim. */
+  config: Record<string, unknown>;
   defaultRoles: string[];
   assignments: readonly RoleAssignment[];
   defaults: EffectiveDefaults;
@@ -258,6 +280,7 @@ function compileAccount(
     channelEnabled: org.channels?.[channel]?.enabled ?? true,
     secretRef: account.secretRef,
     transport: compileTransport(file.path, channel, account.transport),
+    config: account.config ?? {},
     defaultRoles: layers.defaultRoles,
     assignments: layers.accountAssignments,
     defaults: foldDefaults(layers.layers),
@@ -410,6 +433,10 @@ function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): Effecti
     return undefined;
   };
   const floor = ORG_DEFAULTS;
+  const outbound = {
+    path: pick((layer) => layer?.outbound?.path) ?? floor.outbound.path,
+    template: pick((layer) => layer?.outbound?.template) ?? floor.outbound.template,
+  };
   return {
     requireMention:
       pick((layer) => layer?.interaction?.requireMention) ?? floor.interaction.requireMention,
@@ -421,12 +448,80 @@ function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): Effecti
     },
     bindingKey: pick((layer) => layer?.binding?.key) ?? floor.binding.key,
     replyAnchor: pick((layer) => layer?.reply?.anchor) ?? floor.reply.anchor,
-    sync: {
-      finalAnswers: pick((layer) => layer?.sync?.finalAnswers) ?? floor.sync.finalAnswers,
-      progress: pick((layer) => layer?.sync?.progress) ?? floor.sync.progress,
-      toolCalls: pick((layer) => layer?.sync?.toolCalls) ?? floor.sync.toolCalls,
-      threadLink: pick((layer) => layer?.sync?.threadLink) ?? floor.sync.threadLink,
+    outbound,
+    sync: toolPathSyncFold(outbound.path, foldSyncDefaults(pick, floor.sync)),
+  };
+}
+
+/**
+ * Normalize one authored `sync.progress` layer to leaves. A bare boolean is
+ * the pre-group spelling and speaks about `progressMessage` ONLY — it never
+ * mentioned the other two surfaces, so they stay unset and keep inheriting
+ * from the layer below (an already-authored `progress: true` revision gains a
+ * typing indicator from the floor, not from this leaf).
+ */
+function progressLeaf(layer: SyncProgress | undefined): SyncProgressGroup {
+  if (layer === undefined) return {};
+  if (typeof layer === "boolean") return { progressMessage: layer };
+  return layer;
+}
+
+/** Fold the `sync` leaves (root + `subagents`) through the layer chain. */
+function foldSyncDefaults(
+  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
+  floor: (typeof ORG_DEFAULTS)["sync"],
+) {
+  return {
+    finalAnswers: pick((layer) => layer?.sync?.finalAnswers) ?? floor.finalAnswers,
+    progress: {
+      progressMessage:
+        pick((layer) => progressLeaf(layer?.sync?.progress).progressMessage) ??
+        floor.progress.progressMessage,
+      typingIndicator:
+        pick((layer) => progressLeaf(layer?.sync?.progress).typingIndicator) ??
+        floor.progress.typingIndicator,
+      messageReaction:
+        pick((layer) => progressLeaf(layer?.sync?.progress).messageReaction) ??
+        floor.progress.messageReaction,
     },
+    toolCalls: pick((layer) => layer?.sync?.toolCalls) ?? floor.toolCalls,
+    threadLink: pick((layer) => layer?.sync?.threadLink) ?? floor.threadLink,
+    subagents: {
+      finalAnswers:
+        pick((layer) => layer?.sync?.subagents?.finalAnswers) ?? floor.subagents.finalAnswers,
+      progress: pick((layer) => layer?.sync?.subagents?.progress) ?? floor.subagents.progress,
+      toolCalls: pick((layer) => layer?.sync?.subagents?.toolCalls) ?? floor.subagents.toolCalls,
+    },
+  };
+}
+
+/**
+ * The tool-path sync fold (E4/E6): when the effective `outbound.path` is
+ * `tool`, the agent's user-visible answer leaves through the hub-attached
+ * `message` MCP tool, so the route's relay knobs fold to all-off — the relay
+ * must stay silent for tool-path turns (exactly-one outcome: the tool post is
+ * the only user-visible answer). That includes `sync.subagents`: subagent
+ * (Task tool) output relayed into the thread would be a second user-visible
+ * answer on a tool turn. `threadLink` keeps its folded value — it has no
+ * effect while the relay is silent and still applies if the path flips back
+ * to `relay` on the next revision.
+ */
+function toolPathSyncFold(
+  path: "relay" | "tool",
+  sync: EffectiveDefaults["sync"],
+): EffectiveDefaults["sync"] {
+  if (path !== "tool") return sync;
+  return {
+    ...sync,
+    finalAnswers: false,
+    // Only the relayed TEXT leaf goes quiet. The typing indicator and the
+    // reaction are not posts — they are the liveness signal, and a tool-path
+    // turn has less visible text than a relay turn, so folding them off would
+    // remove the only sign of work. The group shape is what makes this
+    // distinction expressible; the old single boolean could not.
+    progress: { ...sync.progress, progressMessage: false },
+    toolCalls: false,
+    subagents: { finalAnswers: false, progress: false, toolCalls: false },
   };
 }
 

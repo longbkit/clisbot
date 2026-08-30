@@ -94,12 +94,8 @@
           "name": "runs_trigger_id_triggers_id_fk",
           "tableFrom": "runs",
           "tableTo": "triggers",
-          "columnsFrom": [
-            "trigger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trigger_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -209,14 +205,7 @@
     "public.run_status": {
       "name": "run_status",
       "schema": "public",
-      "values": [
-        "spawning",
-        "running",
-        "succeeded",
-        "failed",
-        "timed_out",
-        "canceled"
-      ]
+      "values": ["spawning", "running", "succeeded", "failed", "timed_out", "canceled"]
     }
   },
   "schemas": {},

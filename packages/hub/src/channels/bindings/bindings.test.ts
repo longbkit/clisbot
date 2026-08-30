@@ -77,11 +77,13 @@ const DEFAULTS = {
   followUp: { mode: "auto" as const, ttlMinutes: 60 },
   bindingKey: "thread" as const,
   replyAnchor: "thread" as const,
+  outbound: { path: "relay" as const, template: null },
   sync: {
     finalAnswers: true,
-    progress: false,
+    progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
     toolCalls: false,
     threadLink: "final-only" as const,
+    subagents: { finalAnswers: false, progress: false, toolCalls: false },
   },
 };
 
@@ -118,6 +120,7 @@ function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     channelEnabled: true,
     secretRef: "secret-ref",
     transport: {},
+    config: {},
     defaultRoles: ["interactor"],
     assignments: [],
     defaults: DEFAULTS,
@@ -168,7 +171,16 @@ function message(overrides: Partial<InboundMessage> = {}): InboundMessage {
   };
 }
 
-function makeEngine(store: ChannelStore, daemon: DaemonConnection, clock = new ManualClock()) {
+function makeEngine(
+  store: ChannelStore,
+  daemon: DaemonConnection,
+  clock = new ManualClock(),
+  resolver?: (
+    target: CompiledRoute["target"],
+    defaults: CompiledRoute["defaults"],
+    bindingRef: import("../plane/types.js").ChannelReplyBindingRef,
+  ) => CreateAgentConfig,
+) {
   const account = makeAccount(makeRoute());
   return new BindingEngine({
     organizationId: ORGANIZATION_ID,
@@ -177,7 +189,12 @@ function makeEngine(store: ChannelStore, daemon: DaemonConnection, clock = new M
     clock,
     store,
     daemon,
-    resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
+    resolveAgentSpec:
+      resolver ??
+      (() => ({
+        provider: "codex",
+        cwd: "/tmp/repo",
+      })),
   });
 }
 
@@ -208,18 +225,127 @@ afterAll(async () => {
 describe("deriveBindingKey", () => {
   it("keys on the native thread for binding.key = thread", () => {
     const key = deriveBindingKey(
-      { kind: "thread", id: "172.0", rootConversationId: CONVERSATION, threadId: "172.0" },
-      "thread",
+      message({
+        conversation: {
+          kind: "thread",
+          id: "172.0",
+          rootConversationId: CONVERSATION,
+          threadId: "172.0",
+        },
+      }),
+      makeRoute(),
     );
     assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: "172.0" });
   });
 
   it("collapses threads for binding.key = channel", () => {
     const key = deriveBindingKey(
-      { kind: "thread", id: "172.0", rootConversationId: CONVERSATION, threadId: "172.0" },
-      "channel",
+      message({
+        conversation: {
+          kind: "thread",
+          id: "172.0",
+          rootConversationId: CONVERSATION,
+          threadId: "172.0",
+        },
+      }),
+      makeRoute(CONVERSATION, { defaults: { bindingKey: "channel" } }),
     );
     assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
+  });
+
+  it("binds a root-level Slack marker at its own minted thread under reply.anchor = thread", () => {
+    const key = deriveBindingKey(message({ externalMessageId: "1700000000.000009" }), makeRoute());
+    assert.deepEqual(key, {
+      externalConversationId: CONVERSATION,
+      externalThreadId: "1700000000.000009",
+    });
+  });
+
+  it("keeps the conversation-level key for a root marker under reply.anchor = default", () => {
+    const key = deriveBindingKey(
+      message({ externalMessageId: "1700000000.000009" }),
+      makeRoute(CONVERSATION, { defaults: { replyAnchor: "default" } }),
+    );
+    assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
+  });
+
+  it("stays conversation-level under binding.key = channel even with the thread anchor", () => {
+    const key = deriveBindingKey(
+      message({ externalMessageId: "1700000000.000009" }),
+      makeRoute(CONVERSATION, { defaults: { bindingKey: "channel" } }),
+    );
+    assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
+  });
+
+  it("stays conversation-level when the marker carries no native Slack ts", () => {
+    const key = deriveBindingKey(message(), makeRoute());
+    assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
+  });
+
+  it("never marker-keys a DM root marker (no thread level in DMs)", () => {
+    const key = deriveBindingKey(
+      message({
+        conversation: { kind: "dm", id: "D0PEER", rootConversationId: "D0PEER", threadId: null },
+        externalMessageId: "1700000000.000009",
+      }),
+      makeRoute(),
+    );
+    assert.deepEqual(key, { externalConversationId: "D0PEER", externalThreadId: null });
+  });
+
+  it("never marker-keys on a non-Slack channel", () => {
+    const key = deriveBindingKey(
+      message({ channel: "telegram", externalMessageId: "424242" }),
+      makeRoute(),
+    );
+    assert.deepEqual(key, { externalConversationId: CONVERSATION, externalThreadId: null });
+  });
+});
+
+// --- bind (marker-keyed thread anchor) --------------------------------------
+
+describe("bind (root marker, reply.anchor = thread)", () => {
+  const MARKER_TS = "1700000000.000001";
+
+  it("binds the marker at its minted-thread key; the thread's first reply steers the same session", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+
+    const outcome = await engine.bindOrSteer(
+      message({ externalMessageId: MARKER_TS }),
+      makeAccount(makeRoute()),
+      makeRoute(),
+    );
+    assert.equal(outcome.kind, "bound");
+
+    const binding = await store.findThreadBinding(
+      ORGANIZATION_ID,
+      ACCOUNT_ID,
+      CONVERSATION,
+      MARKER_TS,
+    );
+    assert.equal(binding?.status, "bound");
+    assert.equal(binding?.agentId, outcome.kind === "bound" ? outcome.agentId : "");
+    assert.equal(
+      await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, null),
+      undefined,
+      "the conversation level stays unbound: the marker is its own thread root",
+    );
+
+    const followUp = message({
+      conversation: {
+        kind: "thread",
+        id: MARKER_TS,
+        rootConversationId: CONVERSATION,
+        threadId: MARKER_TS,
+      },
+      externalMessageId: "1700000000.000002",
+      text: "continue",
+    });
+    const steered = await engine.bindOrSteer(followUp, makeAccount(makeRoute()), makeRoute());
+    assert.equal(steered.kind, "steered");
+    assert.equal(steered.kind === "steered" ? steered.agentId : "", binding?.agentId);
+    assert.equal(created.length, 1, "the thread follow-up reuses the marker's session");
   });
 });
 
@@ -242,6 +368,80 @@ describe("bind (first mention)", () => {
     const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, null);
     assert.equal(binding?.status, "bound");
     assert.equal(binding?.agentId, outcome.kind === "bound" ? outcome.agentId : "");
+  });
+
+  it("records the created agent's home (create-time cwd) through noteAgentCwd", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const cwds: { agentId: string; cwd: string }[] = [];
+    const account = makeAccount(makeRoute());
+    const engine = new BindingEngine({
+      organizationId: ORGANIZATION_ID,
+      controlPlane: makeControlPlane(account),
+      logger: SILENT,
+      clock: new ManualClock(),
+      store,
+      daemon,
+      resolveAgentSpec: () => ({ provider: "codex", cwd: "/workspace/media" }),
+      // COMPAT(clisbot-control-plane): the plane-owned agentId→cwd record
+      // (the relay's native-media home, G7–G11).
+      noteAgentCwd: (agentId, cwd) => {
+        cwds.push({ agentId, cwd });
+      },
+    });
+    const route = makeRoute("C0CWD");
+
+    const outcome = await engine.bindOrSteer(
+      message({
+        conversation: {
+          kind: "channel",
+          id: "C0CWD",
+          rootConversationId: "C0CWD",
+          threadId: null,
+        },
+      }),
+      account,
+      route,
+    );
+
+    assert.equal(outcome.kind, "bound");
+    assert.equal(created.length, 1);
+    assert.deepEqual(
+      cwds,
+      [{ agentId: outcome.kind === "bound" ? outcome.agentId : "", cwd: "/workspace/media" }],
+      "the recorded home is the create config's cwd, for the created agent",
+    );
+  });
+
+  it("passes the account channel into the binding ref the tool-path URL embeds", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const refs: import("../plane/types.js").ChannelReplyBindingRef[] = [];
+    const engine = makeEngine(store, daemon, new ManualClock(), (target, defaults, bindingRef) => {
+      refs.push(bindingRef);
+      return { provider: "codex", cwd: "/tmp/repo" };
+    });
+    const route = makeRoute("C0REFCAPTURE");
+
+    const outcome = await engine.bindOrSteer(
+      message({
+        conversation: {
+          kind: "channel",
+          id: "C0REFCAPTURE",
+          rootConversationId: "C0REFCAPTURE",
+          threadId: null,
+        },
+      }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(outcome.kind, "bound");
+    assert.equal(created.length, 1);
+    assert.equal(refs.length, 1, "the resolver is called exactly once, with the binding ref");
+    assert.deepEqual(refs[0], {
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      externalConversationId: "C0REFCAPTURE",
+      externalThreadId: null,
+    });
   });
 
   it("ignores an unmentioned first message when requireMention is on", async () => {

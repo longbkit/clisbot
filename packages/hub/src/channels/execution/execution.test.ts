@@ -6,7 +6,7 @@
 // S10 posture assertion, and the approval-command short-circuit. The facade is
 // the thin routing layer; these prove it composes the three engines correctly.
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
@@ -26,7 +26,8 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
-import type { InboundMessage, PlaneLogger } from "../plane/types.js";
+import type { InboundMessage, PlaneLogger, TypingParams } from "../plane/types.js";
+import { ManualClock } from "../plane/clock.js";
 import { executionMarker } from "../bindings/index.js";
 import { ApprovalPostureError } from "../policy.js";
 import { createChannelPlane } from "../execution.js";
@@ -43,7 +44,14 @@ const DEFAULTS: EffectiveDefaults = {
   followUp: { mode: "auto", ttlMinutes: 60 },
   bindingKey: "thread",
   replyAnchor: "thread",
-  sync: { finalAnswers: true, progress: false, toolCalls: false, threadLink: "final-only" },
+  outbound: { path: "relay", template: null },
+  sync: {
+    finalAnswers: true,
+    progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+    toolCalls: false,
+    threadLink: "final-only",
+    subagents: { finalAnswers: false, progress: false, toolCalls: false },
+  },
 };
 
 // Kind-level match: any channel conversation resolves this route.
@@ -71,6 +79,7 @@ function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     channelEnabled: true,
     secretRef: "secret-ref",
     transport: {},
+    config: {},
     defaultRoles: ["interactor"],
     assignments: [],
     defaults: DEFAULTS,
@@ -115,7 +124,20 @@ function snapshotOf(id: string, title: string | null): AgentSnapshot {
   };
 }
 
-function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
+function makeFakeDaemon(
+  listAgents: AgentSnapshot[] = [],
+  options: {
+    /** Recorded in call order so a test can assert what happened BEFORE the
+     * daemon was touched: the processing lease opening, then the dispatch. */
+    order?: string[];
+    /** The daemon's first stream event, emitted from inside the send — the
+     * race that made a turn_started-driven indicator invisible. */
+    emitTurnStartedOnSend?: boolean | undefined;
+    failCreate?: boolean | undefined;
+    failSend?: boolean | undefined;
+    onEvent?: ((agentId: string, event: Record<string, unknown>) => Promise<void>) | undefined;
+  } = {},
+) {
   const created: { config: CreateAgentConfig; title: string | null }[] = [];
   const messages: { agentId: string; text: string; steer: boolean | null }[] = [];
   const responses: { agentId: string; requestId: string; response: AgentPermissionResponse }[] = [];
@@ -123,19 +145,34 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
   const daemon: DaemonConnection = {
     discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
     waitForConnected: async () => undefined,
-    createAgent: async (config, options) => {
-      created.push({ config, title: options?.title ?? null });
+    createAgent: async (config, opts) => {
+      options.order?.push("create");
+      if (options.failCreate === true) throw new Error("create refused");
+      created.push({ config, title: opts?.title ?? null });
       const id = `agent-${seq++}`;
-      return { agentId: id, agent: snapshotOf(id, options?.title ?? null) };
+      return { agentId: id, agent: snapshotOf(id, opts?.title ?? null) };
     },
-    sendAgentMessage: async (agentId, text, options) => {
-      messages.push({ agentId, text, steer: options?.steer ?? null });
+    sendAgentMessage: async (agentId, text, opts) => {
+      options.order?.push("send");
+      // The daemon starts the turn synchronously inside the delivery: its
+      // turn_started reaches the plane BEFORE the send call has returned.
+      if (options.emitTurnStartedOnSend === true) {
+        await options.onEvent?.(agentId, {
+          type: "turn_started",
+          provider: "codex",
+          turnId: `turn-${agentId}`,
+        });
+      }
+      if (options.failSend === true) throw new Error("send refused");
+      messages.push({ agentId, text, steer: opts?.steer ?? null });
     },
     respondToAgentPermission: async (agentId, requestId, response) => {
       responses.push({ agentId, requestId, response });
     },
     listAgents: async () => listAgents,
-    setTimelineSubscription: async () => undefined,
+    setTimelineSubscription: async () => {
+      options.order?.push("subscribe");
+    },
     stop: () => undefined,
   };
   return { daemon, created, messages, responses };
@@ -157,7 +194,15 @@ interface FacadeHarness {
   plane: ReturnType<typeof createChannelPlane>;
   fake: ReturnType<typeof makeFakeDaemon>;
   posted: string[];
+  /** The `threadId` of every outbound post (undefined = conversation root). */
+  postedThreads: (string | undefined)[];
+  mediaPosted: string[];
   next: { message: InboundMessage | null };
+  /** Every liveness drive, in wire order. */
+  driven: TypingParams[];
+  /** The daemon calls and the drives, interleaved in the order they happened. */
+  order: string[];
+  clock: ManualClock;
 }
 
 function makeHarness(
@@ -165,26 +210,68 @@ function makeHarness(
     envFlag?: boolean;
     account?: CompiledChannelAccount;
     controlPlane?: ChannelControlPlane;
+    media?: { mediaPost?: boolean; homeRoot?: string; agentCwd?: string };
+    /** The route's liveness leaves (default: indicator on, reaction off). */
+    progress?: Partial<EffectiveDefaults["sync"]["progress"]>;
+    daemonOptions?: Parameters<typeof makeFakeDaemon>[1];
+    processingTtlMs?: number;
   } = {},
 ): FacadeHarness {
-  const account = opts.account ?? makeAccount(makeRoute());
+  const progress: EffectiveDefaults["sync"]["progress"] = {
+    progressMessage: false,
+    typingIndicator: true,
+    messageReaction: "off",
+    ...opts.progress,
+  };
+  const liveRoute: CompiledRoute = {
+    ...makeRoute(),
+    defaults: { ...DEFAULTS, sync: { ...DEFAULTS.sync, progress } },
+  };
+  const account = opts.account ?? makeAccount(liveRoute);
   const controlPlane = opts.controlPlane ?? makeControlPlane(account);
-  const fake = makeFakeDaemon();
+  const driven: TypingParams[] = [];
+  const order: string[] = [];
+  const clock = new ManualClock(1_000);
+  const fake = makeFakeDaemon([], {
+    order,
+    onEvent: (agentId, event) => plane.onStreamEvent(agentId, event as never),
+    ...opts.daemonOptions,
+  });
   const posted: string[] = [];
+  const postedThreads: (string | undefined)[] = [];
+  const mediaPosted: string[] = [];
   const next: { message: InboundMessage | null } = { message: null };
   const plane = createChannelPlane({
     organizationId: ORGANIZATION_ID,
     normalizeInbound: () => next.message,
     envFlag: opts.envFlag ?? true,
     controlPlane,
+    clock,
     logger: SILENT,
+    ...(opts.processingTtlMs !== undefined ? { processingTtlMs: opts.processingTtlMs } : {}),
+    typing: async (params) => {
+      order.push(`typing:${params.action}`);
+      driven.push(params);
+    },
     post: async (p) => {
       posted.push(p.text);
+      postedThreads.push(p.threadId);
       return { ok: true, externalMessageId: "1720000000.000001" };
     },
-    resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
+    // COMPAT(clisbot-control-plane): the native-media post (G7–G11). The
+    // facade's plane-owned agentId→cwd map (recorded by the bindings engine's
+    // `noteAgentCwd` at create) is what the relay's `agentCwd` resolver reads.
+    mediaPost:
+      opts.media?.mediaPost === true
+        ? async (p) => {
+            mediaPosted.push(p.filePath);
+            return { ok: true, externalMessageId: `media-${mediaPosted.length}` };
+          }
+        : undefined,
+    homeRoot: opts.media?.homeRoot,
+    resolveAgentSpec: () => ({ provider: "codex", cwd: opts.media?.agentCwd ?? "/tmp/repo" }),
   });
-  return { plane, fake, posted, next };
+  return { plane, fake, posted, postedThreads, mediaPosted, next, driven, order, clock };
 }
 
 // --- Harness ---------------------------------------------------------------
@@ -262,7 +349,10 @@ describe("first-mention bind (flag on)", () => {
 });
 
 describe("shared stream consumer", () => {
-  async function bindAgent(externalConversationId: string) {
+  async function bindAgent(
+    externalConversationId: string,
+    overrides: Partial<InboundMessage> = {},
+  ) {
     const harness = makeHarness();
     await harness.plane.start(harness.fake.daemon, store);
     harness.next.message = message({
@@ -272,6 +362,7 @@ describe("shared stream consumer", () => {
         rootConversationId: externalConversationId,
         threadId: null,
       },
+      ...overrides,
     });
     const result = await harness.plane.onInbound({
       channel: "slack",
@@ -282,6 +373,7 @@ describe("shared stream consumer", () => {
     return {
       plane: harness.plane,
       posted: harness.posted,
+      postedThreads: harness.postedThreads,
       agentId: result.outcome?.kind === "bound" ? result.outcome.agentId : "",
     };
   }
@@ -322,6 +414,238 @@ describe("shared stream consumer", () => {
     });
 
     assert.ok(posted.includes("done"), "the final answer is relayed");
+  });
+
+  it("mints the reply thread on a root marker under the thread anchor", async () => {
+    const { plane, postedThreads, agentId } = await bindAgent("C0MINT", {
+      externalMessageId: "1712000000.000003",
+    });
+
+    await plane.onStreamEvent(agentId, {
+      type: "timeline",
+      provider: "codex",
+      item: { type: "assistant_message", text: "minted" },
+      turnId: "turn-mint",
+    });
+    await plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-mint",
+    });
+
+    assert.equal(postedThreads[0], "1712000000.000003", "the reply threads on the marker message");
+  });
+
+  it("never mints under the default anchor", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      defaults: { ...DEFAULTS, replyAnchor: "default" },
+    };
+    const account = makeAccount(route);
+    const harness = makeHarness({ account, controlPlane: makeControlPlane(account) });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({ externalMessageId: "1712000000.000006" });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(result.outcome?.kind, "bound");
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+
+    await harness.plane.onStreamEvent(agentId, {
+      type: "timeline",
+      provider: "codex",
+      item: { type: "assistant_message", text: "at root" },
+      turnId: "turn-nomint",
+    });
+    await harness.plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-nomint",
+    });
+
+    assert.equal(
+      harness.postedThreads[0],
+      undefined,
+      "the root marker stays at the conversation root",
+    );
+  });
+
+  it("follows the marker thread through the trigger when the binding collapses threads", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      defaults: { ...DEFAULTS, bindingKey: "channel", replyAnchor: "default" },
+    };
+    const account = makeAccount(route);
+    const harness = makeHarness({ account, controlPlane: makeControlPlane(account) });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      externalMessageId: "1712000000.000005",
+      conversation: {
+        kind: "thread",
+        id: "1711000000.000002",
+        rootConversationId: "C0COLLAPSE",
+        threadId: "1711000000.000002",
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(result.outcome?.kind, "bound");
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+
+    await harness.plane.onStreamEvent(agentId, {
+      type: "timeline",
+      provider: "codex",
+      item: { type: "assistant_message", text: "collapsed" },
+      turnId: "turn-c1",
+    });
+    await harness.plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-c1",
+    });
+
+    assert.equal(
+      harness.postedThreads[0],
+      "1711000000.000002",
+      "the marker's own thread carries the reply (binding collapsed to root)",
+    );
+  });
+
+  it("routes a subagent frame to the relay under the subagent scope", async () => {
+    // A route that opts into relaying subagent final answers.
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      defaults: {
+        ...DEFAULTS,
+        sync: {
+          ...DEFAULTS.sync,
+          subagents: { finalAnswers: true, progress: false, toolCalls: false },
+        },
+      },
+    };
+    const account = makeAccount(route);
+    const harness = makeHarness({ account, controlPlane: makeControlPlane(account) });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      conversation: { kind: "channel", id: "C0SUB", rootConversationId: "C0SUB", threadId: null },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(result.outcome?.kind, "bound");
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+
+    const frame = {
+      type: "agent.provider_subagents.update",
+      payload: {
+        kind: "timeline",
+        parentAgentId: agentId,
+        subagentId: "sub-1",
+        provider: "codex",
+        item: { type: "assistant_message", text: "sub result" },
+        timestamp: "2026-08-27T00:00:00.000Z",
+        seq: 1,
+        epoch: "e1",
+      },
+    };
+    // The frame carries its own parentAgentId — the facade needs no agent id.
+    await harness.plane.onSubagentFrame({
+      type: "agent.provider_subagents.update",
+      payload: {
+        kind: "upsert",
+        subagent: {
+          id: "sub-1",
+          parentAgentId: agentId,
+          title: "Research",
+          description: null,
+          status: "running",
+        },
+      },
+    });
+    await harness.plane.onSubagentFrame(frame);
+    await harness.plane.onSubagentFrame({
+      type: "agent.provider_subagents.update",
+      payload: { kind: "remove", parentAgentId: agentId, subagentId: "sub-1" },
+    });
+
+    assert.ok(
+      harness.posted.includes("▶ Research (subagent): sub result"),
+      "the subagent's answer is relayed with the scope prefix",
+    );
+    // An unattached parent is a no-op, and so is a non-subagent frame.
+    await harness.plane.onSubagentFrame({
+      ...frame,
+      payload: { ...frame.payload, parentAgentId: "agent-unknown" },
+    });
+    await harness.plane.onSubagentFrame({ type: "agent_stream", payload: {} });
+  });
+
+  it.skip("relays the bound agent's local media through the recorded create-time cwd", async () => {
+    // COMPAT(clisbot-control-plane): the create-time wiring (G7–G11) — the
+    // bindings engine's `noteAgentCwd` records the created agent's `cwd` into
+    // the plane-owned map, and the relay's `agentCwd` resolver reads it for
+    // media-path extraction. The shared homeRoot is a DIFFERENT dir without
+    // the file: a successful media post proves the agent's own cwd won.
+    const agentHome = await mkdtemp(join(tmpdir(), "hub-exec-media-agent-"));
+    const sharedHome = await mkdtemp(join(tmpdir(), "hub-exec-media-shared-"));
+    const mediaFile = join(agentHome, "chart.png");
+    await writeFile(mediaFile, "png");
+    try {
+      const harness = makeHarness({
+        media: { mediaPost: true, homeRoot: sharedHome, agentCwd: agentHome },
+      });
+      await harness.plane.start(harness.fake.daemon, store);
+      harness.next.message = message({
+        conversation: {
+          kind: "channel",
+          id: "C0MEDIA",
+          rootConversationId: "C0MEDIA",
+          threadId: null,
+        },
+      });
+      const bound = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {},
+      });
+      assert.equal(bound.outcome?.kind, "bound");
+      const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+
+      await harness.plane.onStreamEvent(agentId, {
+        type: "timeline",
+        provider: "codex",
+        item: {
+          type: "assistant_message",
+          text: `rendered the chart:\n${mediaFile}\nand done`,
+        },
+        turnId: "turn-media",
+      });
+      await harness.plane.onStreamEvent(agentId, {
+        type: "turn_completed",
+        provider: "codex",
+        turnId: "turn-media",
+      });
+
+      assert.deepEqual(harness.mediaPosted, [mediaFile], "the media post uses the agent's cwd");
+      assert.ok(
+        harness.posted.includes("rendered the chart:\nand done"),
+        "the caption relays with the media path line stripped",
+      );
+      assert.ok(
+        !harness.posted.some((text) => text.includes(mediaFile)),
+        "no text post carries the raw media path",
+      );
+    } finally {
+      await rm(agentHome, { recursive: true, force: true });
+      await rm(sharedHome, { recursive: true, force: true });
+    }
   });
 });
 
@@ -416,5 +740,357 @@ describe("approval-command short-circuit", () => {
     assert.equal(response?.agentId, agentId);
     assert.equal(response?.requestId, "req-cmd");
     assert.equal(response?.response.behavior, "allow");
+  });
+});
+
+// --- The processing lease (sync.progress liveness) -------------------------
+// The bug these pin: the surface used to open on turn_started, which the plane
+// cannot reliably observe because it sends the prompt before the stream is
+// subscribed. Every case below drives a REAL inbound through the facade with a
+// daemon that emits turn_started synchronously inside the delivery.
+
+describe("processing lease (accepted inbound opens it)", () => {
+  /** Let the controller's fire-and-forget drive promises settle. */
+  const settle = async (): Promise<void> => {
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+  };
+
+  it("raises the surface for a new agent BEFORE the daemon is dispatched", async () => {
+    const harness = makeHarness({ daemonOptions: { emitTurnStartedOnSend: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      externalMessageId: "1712000000.000010",
+      conversation: {
+        kind: "channel",
+        id: "C0LEASE",
+        rootConversationId: "C0LEASE",
+        threadId: null,
+      },
+    });
+
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+
+    assert.equal(result.outcome?.kind, "bound");
+    // The lease opens first, then the session is subscribed, then the prompt
+    // is delivered — the order that makes the indicator visible.
+    assert.deepEqual(harness.order, ["typing:start", "create", "subscribe", "send"]);
+    assert.deepEqual(
+      harness.driven.map((d) => [d.action, d.to, d.indicator]),
+      [["start", "C0LEASE", true]],
+    );
+  });
+
+  it("closes the surface on the turn's terminal event", async () => {
+    const harness = makeHarness({ daemonOptions: { emitTurnStartedOnSend: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0CLOSE",
+      rootConversationId: "C0CLOSE",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    await settle();
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start"],
+    );
+
+    // turn_started alone must NOT close or re-open anything (it is only a
+    // liveness touch), and the terminal event closes the surface.
+    await harness.plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-1",
+    });
+    await settle();
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start", "stop"],
+    );
+  });
+
+  it("raises the surface for a follow-up steer before the daemon dispatch", async () => {
+    const harness = makeHarness({ daemonOptions: { emitTurnStartedOnSend: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0STEER",
+      rootConversationId: "C0STEER",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    // End the first turn so the follow-up opens a surface of its own (a live
+    // one is shared, which the refcount test below pins).
+    await harness.plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-first",
+    });
+    await settle();
+    harness.order.length = 0;
+
+    harness.next.message = message({ text: "and then the tests", conversation });
+    const steered = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+
+    assert.equal(steered.outcome?.kind, "steered");
+    assert.deepEqual(harness.order, ["typing:start", "subscribe", "send"]);
+  });
+
+  it("never raises the surface for a message the plane did not admit", async () => {
+    // A route with no default role: only the assigned initiator may trigger it.
+    const closedRoute: CompiledRoute = { ...makeRoute(), defaultRoles: [] };
+    const account = makeAccount({
+      ...closedRoute,
+      defaults: {
+        ...DEFAULTS,
+        sync: {
+          ...DEFAULTS.sync,
+          progress: { progressMessage: false, typingIndicator: true, messageReaction: "off" },
+        },
+      },
+    });
+    const harness = makeHarness({ account, controlPlane: makeControlPlane(account) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0DENY",
+      rootConversationId: "C0DENY",
+      threadId: null,
+    };
+
+    // Not mentioned (requireMention is on).
+    harness.next.message = message({ mentionedBot: false, conversation });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    // A text command.
+    harness.next.message = message({ text: "/status", conversation });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    // A sender the route does not admit.
+    harness.next.message = message({ senderIdentity: "slack:U0STRANGER", conversation });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    await settle();
+
+    assert.deepEqual(harness.driven, [], "no surface for a turn that never runs");
+    assert.equal(harness.fake.created.length, 0);
+  });
+
+  it("releases the surface when the agent create fails", async () => {
+    const harness = makeHarness({ daemonOptions: { failCreate: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      conversation: {
+        kind: "channel",
+        id: "C0FAIL",
+        rootConversationId: "C0FAIL",
+        threadId: null,
+      },
+    });
+
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+
+    assert.equal(result.outcome?.kind, "ignored");
+    // The start reached the wire (the lease opened before the create), so the
+    // failed turn must have taken it back down.
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start", "stop"],
+    );
+  });
+
+  it("releases the surface when the prompt delivery fails", async () => {
+    const harness = makeHarness({ daemonOptions: { failSend: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      conversation: {
+        kind: "channel",
+        id: "C0SENDFAIL",
+        rootConversationId: "C0SENDFAIL",
+        threadId: null,
+      },
+    });
+
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+
+    assert.equal(result.outcome?.kind, "ignored");
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start", "stop"],
+    );
+  });
+
+  it("releases the surface when a turn stops reporting (the TTL)", async () => {
+    const harness = makeHarness({
+      daemonOptions: { emitTurnStartedOnSend: true },
+      processingTtlMs: 5_000,
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      conversation: { kind: "channel", id: "C0TTL", rootConversationId: "C0TTL", threadId: null },
+    });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    await settle();
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start"],
+    );
+
+    // Past the TTL with no stream event: the sweep closes it. The controller
+    // sweeps on a real interval, so drive the tick through the clock seam.
+    harness.clock.advance(6_000);
+    await new Promise((resolve) => setTimeout(resolve, 2_200));
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start", "stop"],
+    );
+  });
+
+  it("one indicator per surface: two inbounds in one thread share it", async () => {
+    const harness = makeHarness({ daemonOptions: { emitTurnStartedOnSend: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0TWO",
+      rootConversationId: "C0TWO",
+      threadId: null,
+    };
+
+    harness.next.message = message({ conversation });
+    const first = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    harness.next.message = message({ text: "second", conversation });
+    const second = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+
+    assert.equal(first.outcome?.kind, "bound");
+    assert.equal(second.outcome?.kind, "steered");
+    // Two leases, ONE wire start (the second inbound joins the live surface).
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start"],
+    );
+
+    // The agent's terminal event ends both leases, so the indicator goes once
+    // and is never left running by the lease the event did not name.
+    const agentId = first.outcome?.kind === "bound" ? first.outcome.agentId : "";
+    await harness.plane.onStreamEvent(agentId, {
+      type: "turn_completed",
+      provider: "codex",
+      turnId: "turn-a",
+    });
+    await settle();
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start", "stop"],
+    );
+  });
+
+  it("drives nothing when both liveness leaves are off", async () => {
+    const harness = makeHarness({
+      progress: { typingIndicator: false, messageReaction: "off" },
+      daemonOptions: { emitTurnStartedOnSend: true },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      conversation: {
+        kind: "channel",
+        id: "C0OFF2",
+        rootConversationId: "C0OFF2",
+        threadId: null,
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    await settle();
+
+    assert.equal(result.outcome?.kind, "bound", "the turn still runs");
+    assert.deepEqual(harness.driven, []);
+  });
+
+  it("carries the reaction leaf to the wire alongside the indicator", async () => {
+    const harness = makeHarness({
+      progress: { messageReaction: "hourglass_flowing_sand" },
+      daemonOptions: { emitTurnStartedOnSend: true },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      externalMessageId: "1712000000.000077",
+      conversation: {
+        kind: "channel",
+        id: "C0REACT",
+        rootConversationId: "C0REACT",
+        threadId: null,
+      },
+    });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    await settle();
+
+    assert.deepEqual(
+      harness.driven.map((d) => [d.action, d.indicator, d.reactionEmoji, d.messageId]),
+      [["start", true, "hourglass_flowing_sand", "1712000000.000077"]],
+    );
+  });
+
+  it("plane stop releases every open surface", async () => {
+    const harness = makeHarness({ daemonOptions: { emitTurnStartedOnSend: true } });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      conversation: {
+        kind: "channel",
+        id: "C0STOP",
+        rootConversationId: "C0STOP",
+        threadId: null,
+      },
+    });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    await settle();
+    harness.plane.stop();
+    await settle();
+    assert.deepEqual(
+      harness.driven.map((d) => d.action),
+      ["start", "stop"],
+    );
   });
 });

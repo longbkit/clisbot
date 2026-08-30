@@ -35,6 +35,11 @@ export interface TrustedDaemonClientOptions {
   onStateChange?: (state: "connected" | "disconnected") => void;
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
   onAgentUpdate?: (agent: unknown) => void;
+  /** One `agent.provider_subagents.update` wire frame (the subagent
+   * descriptors/timeline the daemon emits for the `provider_subagents`
+   * capability); delivered untyped, narrowed by the consumer
+   * (`plane/stream.ts` `asSubagentEvent`). */
+  onSubagentUpdate?: (frame: unknown) => void;
 }
 
 interface Frame {
@@ -184,7 +189,7 @@ export class TrustedDaemonClient extends EventEmitter {
         clientId: this.options.clientId ?? randomUUID(),
         clientType: "cli",
         protocolVersion: WS_PROTOCOL_VERSION,
-        capabilities: { selective_agent_timeline: true },
+        capabilities: { selective_agent_timeline: true, provider_subagents: true },
       }),
     );
     this.helloTimer = setTimeout(() => {
@@ -237,6 +242,10 @@ export class TrustedDaemonClient extends EventEmitter {
     if (type === "agent_update") {
       const payload = message["payload"] as { agent?: unknown } | undefined;
       if (payload?.agent !== undefined) this.options.onAgentUpdate?.(payload.agent);
+      return;
+    }
+    if (type === "agent.provider_subagents.update") {
+      this.options.onSubagentUpdate?.(message);
       return;
     }
     // Response frames carry the correlation id in the payload (stock wire:

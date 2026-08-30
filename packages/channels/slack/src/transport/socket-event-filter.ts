@@ -9,6 +9,7 @@
 // are unit-testable without a live socket. No OpenClaw imports.
 
 import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
+import { decodeSlackEntities } from "../mrkdwn.js";
 
 /** The identity facts L4 probes from `auth.test` (client/web-api.ts): the
  * bot user id + app/team ids this account's tokens belong to. */
@@ -167,7 +168,10 @@ export function buildSlackInboundEvent(
     channelId,
   );
   const senderId = typeof event.user === "string" && event.user !== "" ? event.user : "";
-  const text = event.text ?? "";
+  // Slack's API delivers `text` with its own entity escaping (`=&gt;`,
+  // `&lt;@U…&gt;` outside link tokens). Decode at the boundary so the agent
+  // reads what the user typed; the outbound render re-escapes idempotently.
+  const text = decodeSlackEntities(event.text ?? "");
   const timestampMs =
     resolveSlackTimestampMs(typeof event.event_ts === "string" ? event.event_ts : undefined) ??
     resolveSlackTimestampMs(ts) ??
@@ -190,6 +194,72 @@ export function buildSlackInboundEvent(
     wasMentioned: resolveSlackWasMentioned(event, source, identity),
     timestampMs,
     ...(isSlackOwnMessage(event, identity, botId) ? { isOwnMessage: true } : {}),
+  };
+}
+
+/** The Socket Mode `slash_commands` envelope body (an app-registered native
+ * slash command; NOT an events_api message — the command arrives flat). */
+export interface SlackSlashCommandBody {
+  command?: string;
+  text?: string;
+  user_id?: string;
+  channel_id?: string;
+  trigger_id?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Rewrite a native `slash_commands` body into the plain-text inbound command
+ * the shared parser (hub `commands.ts`) already understands, so a team that
+ * registered a native command gets the SAME commands with zero extra wiring.
+ * The registered command is a single alias whose FIRST WORD picks the
+ * sub-command (`/paseo approve`, `/paseo status`); the body's `text` is the
+ * remainder. A bare `/paseo` (empty text) becomes `help`.
+ *
+ * Returns undefined when the body is not a command we can mint (no channel,
+ * no user, or a command name the vertical was not told to accept — the
+ * caller passes `acceptedCommand` from the account's `transport.slashCommand`
+ * config; absent config = native ingestion off, the text spellings still
+ * work). The synthetic event carries the invoker as a `<@USERID>` mention so
+ * the decided-state path and trigger policy see the real person; Slack does
+ * NOT deliver the slash text as a message, so no dedupe collision with the
+ * `message` path is possible.
+ */
+export function buildSlackSlashCommandEvent(
+  body: SlackSlashCommandBody,
+  acceptedCommand: string | undefined,
+): ChannelInboundEvent | undefined {
+  if (acceptedCommand === undefined) return undefined;
+  const command = (body.command ?? "").trim();
+  const alias = acceptedCommand.trim();
+  if (alias === "" || command === "" || command.toLowerCase() !== alias.toLowerCase()) {
+    return undefined;
+  }
+  const channelId = typeof body.channel_id === "string" ? body.channel_id.trim() : "";
+  const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
+  if (channelId === "" || userId === "") return undefined;
+  const args = (body.text ?? "").trim();
+  const text = args === "" ? "help" : args;
+  const nowMs = Date.now();
+  return {
+    channel: "slack",
+    // Slash commands carry no message ts; the trigger_id is unique per
+    // invocation, so it is the honest dedupe key.
+    externalEventId:
+      typeof body.trigger_id === "string" && body.trigger_id !== ""
+        ? body.trigger_id
+        : `slash:${nowMs}:${userId}`,
+    externalMessageId:
+      typeof body.trigger_id === "string" && body.trigger_id !== ""
+        ? body.trigger_id
+        : `slash:${nowMs}:${userId}`,
+    externalConversationId: channelId,
+    chatType: resolveSlackChatType(normalizeSlackChannelType(undefined, channelId)),
+    messageThreadId: null,
+    senderId: userId,
+    body: `<@${userId}> ${text}`,
+    wasMentioned: true,
+    timestampMs: nowMs,
   };
 }
 

@@ -45,10 +45,12 @@ import {
   type ChannelControlPlane,
 } from "../config/compile.js";
 import { isChannelsEnabled } from "../loader/channel-gate.js";
+import type { ChannelReplyServer } from "../channel-reply.js";
 import { assignmentCoversPrincipal } from "../policy.js";
 import type { ChannelSupervisor } from "../supervisor/types.js";
 
-/** The seven ops, one per CLI verb. Responses are JSON or RFC 7807 problems. */
+/** The eight ops: one per CLI verb plus the tool-path channel-reply MCP
+ * endpoint (E4). Responses are JSON, RFC 7807 problems, or MCP payloads. */
 export interface ChannelControlPlaneOps {
   addChannel(request: Request): Promise<Response>;
   listChannels(request: Request): Promise<Response>;
@@ -57,6 +59,7 @@ export interface ChannelControlPlaneOps {
   showUser(request: Request, username: string): Promise<Response>;
   addUser(request: Request): Promise<Response>;
   editUser(request: Request, username: string): Promise<Response>;
+  handleChannelReplyMcp(request: Request, token: string): Promise<Response>;
 }
 
 export interface ChannelControlPlaneOpsOptions {
@@ -68,6 +71,9 @@ export interface ChannelControlPlaneOpsOptions {
   supervisor: ChannelSupervisor | null;
   /** The app's standard store factory (carries the daemon agent validator). */
   storeForProject: (projectId: string) => ProjectConfigurationStore;
+  /** The tool-path channel-reply MCP endpoint (E4); null degrades the
+   * `/mcp/channel/<ref>` route to the shared 503. */
+  channelReplyServer: ChannelReplyServer | null;
 }
 
 /** The P0 channels the control plane drives, and each one's default mode. */
@@ -113,7 +119,40 @@ export function createChannelControlPlaneOps(
       gate(options, request, (database) => handleAddUser(database, request, options)),
     editUser: (request, username) =>
       gate(options, request, (database) => handleEditUser(database, request, username, options)),
+    handleChannelReplyMcp: (request, token) => gateChannelReplyMcp(options, request, token),
   };
+}
+
+/** The channel-reply MCP gate (E4): the same precedence as `gate`, except the
+ * endpoint itself — not a `Database` — carries the request. The ledger and
+ * the post path were resolved at composition (application-runtime.ts), so the
+ * only per-request unknown is whether the server exists (null → shared 503). */
+function gateChannelReplyMcp(
+  options: ChannelControlPlaneOpsOptions,
+  request: Request,
+  token: string,
+): Promise<Response> {
+  if (!isChannelsEnabled()) {
+    return Promise.resolve(controlPlaneAbsent(request));
+  }
+  if (options.channelReplyServer === null) {
+    return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
+  }
+  if (!authorized(request, options.completionTokenSecret)) {
+    return Promise.resolve(
+      problem(
+        request,
+        401,
+        "invalid_credentials",
+        "Invalid credentials",
+        "provide the instance auth secret as a Bearer token, or call from loopback",
+      ),
+    );
+  }
+  const server = options.channelReplyServer;
+  return server
+    .handle(request, token)
+    .catch((error: unknown) => Promise.resolve(errorResponse(request, error)));
 }
 
 /** The per-op precedence: flag off → absent 404; database null → shared 503;
