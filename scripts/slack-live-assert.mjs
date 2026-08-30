@@ -40,6 +40,7 @@ if (!CHANNEL) {
 }
 const TIMEOUT_S = Number(opt("timeout", "300"));
 const POLL_MS = 3000;
+const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 function slackCli(flag, ...argv) {
   // slack-cli prints CSV (header + rows, quoted fields). Return rows as objects.
@@ -95,14 +96,18 @@ function hubEventsSince(sinceMs) {
   } catch {
     return [];
   }
-  const clean = raw.replace(/\x1b\[[0-9;]*m/g, "").split("\n");
+  const clean = raw.replace(ANSI_ESCAPE, "").split("\n");
   const events = [];
   for (let i = 0; i < clean.length; i++) {
     const line = clean[i];
     if (!/INFO:|WARN:/.test(line)) continue;
     const t = parseLogTime(line);
     if (t === null || t < sinceMs) continue;
-    if (!/bound a thread|bound a channel|steered an existing session|inbound answered/i.test(line))
+    if (
+      !/bound a thread|bound a channel|bound a conversation|conversation bound to a new agent session|steered an existing session|inbound answered/i.test(
+        line,
+      )
+    )
       continue;
     // Capture the block: the INFO line plus its indented continuation lines
     // (agentId/channel/dispatched live there, not on the INFO line itself).
@@ -196,7 +201,9 @@ if (mode === "post") {
     const events = hubEventsSince(t0);
     if (!steer && events.length > 0) steer = events[events.length - 1];
     if (!reply) {
-      const rows = readBack(threadTs);
+      // A root marker becomes the thread root for the reply. Reading channel
+      // history alone cannot see that threaded response.
+      const rows = readBack(threadTs ?? markerTs);
       reply = findMatch(rows, expect, text);
     }
     if (steer && reply) break;

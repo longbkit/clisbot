@@ -21,50 +21,72 @@ Read this before syncing upstream or opening an upstream PR.
   long-lived branch. Don't grow a second product line in the fork clone;
   upstream-facing work happens in the fork, everything else lands here.
 
-## Sync: merge upstream at release tags, not at HEAD
+## Sync policy: release baselines plus main rehearsals
 
-Upstream moves fast (about 17 commits/day in Aug 2026, with protocol and
-license changes in the mix). Chasing HEAD multiplies risk: every merge touches
-app/server/protocol churn and re-triggers the channel-plane E2E gate
-(`docs/lessons/2026-08-26-integration-seams-before-live-e2e.md`: gate
-re-drives on code change). Syncing daily burns E2E cycles for near-zero
-product value. This is the same pinned-supply doctrine the repo already uses
-for the OpenClaw verticals (`docs/audits/pinned-vertical-contracts/`).
+Upstream moves fast. The fusion therefore separates two jobs:
 
-Sync when:
+- **Rehearsal:** regularly test a merge of current `upstream/main` in a clean,
+  disposable worktree. Record overlap, semantic seams, dependency validation,
+  typecheck, and focused tests. Never publish the rehearsal merge.
+- **Promotion:** merge a named upstream release tag into the product branch.
+  Run the complete gate, then publish a verified tag only after every required
+  check passes.
+
+This keeps the product reproducible without discovering months of drift at the
+next release. The OpenClaw verticals remain independently pinned supply; that
+external-supply policy is not evidence that the Paseo foundation should ignore
+`main` between releases.
+
+Promote when:
 
 - an upstream release tag is cut (current: `v0.7.0-beta.2`),
 - a Clisbot release is about to be cut,
 - a specific upstream fix is needed (wait for the next tag, or cherry-pick
   just that fix).
 
-Not when: "main moved again".
+Rehearse when `main` moves materially in app/server/protocol or at least once
+per active development week. A rehearsal failure becomes tracked work; it does
+not silently move the product baseline.
 
-### Sync procedure
+### Promotion procedure
 
 ```bash
-cd <fusion checkout>
-git tag clisbot/fork-tip-$(date +%Y-%m-%d)   # mark the fork tip before merging
+git worktree add <clean-sync-worktree> clisbot-paseoclaw-fusion
+cd <clean-sync-worktree>
+test -z "$(git status --porcelain)"           # required clean boundary
+git tag clisbot/fork-tip-$(date +%Y-%m-%d)   # mark the product tip
 git fetch upstream --tags
 git merge vX.Y.Z -m "Sync upstream vX.Y.Z"
 # resolve the shared files below
-rm package-lock.json && npm install         # regenerate the lockfile
+npm install --package-lock-only --ignore-scripts
+npm ci                                      # trusted checkout; native tools need lifecycle setup
+npm ls --workspaces --depth=0
+# Add exact `npm ls <package> --depth=0` checks for pins changed by the release.
 npm run typecheck
 # channel-plane E2E per docs/lessons/2026-08-26-integration-seams-before-live-e2e.md
-git tag clisbot/sync-$(date +%Y-%m-%d)-vX.Y.Z
+# only after every required gate passes:
+git tag clisbot/sync-verified-$(date +%Y-%m-%d)-vX.Y.Z
 ```
 
-### Shared-file conflict surface
+### Shared-file overlap surface
 
 Since the fork point, only these files changed on both sides:
 
 - `CLAUDE.md` — doc table; keep both sides' rows.
 - `package.json` — upstream adds scripts and version/license; Clisbot adds
   the `hub`/`channels` workspaces. Keep both.
-- `package-lock.json` — take neither; delete and `npm install`.
+- `package-lock.json` — use the upstream release lock as the base and resolve
+  all manifests first. Reconcile with
+  `npm install --package-lock-only --ignore-scripts`, review the lock diff, and
+  require clean `npm ci` plus the
+  scoped `npm ls` checks below. Do not use `--ignore-scripts` for the test
+  install: native tools such as `tsgo` need their package setup intact.
 - `packages/cli/package.json` — merge dependencies.
 
-Everything else merges clean because Clisbot's work is additive in
+These are files changed on both sides, not proof that all four will conflict.
+Record separately: overlap files, actual textual conflicts reported by Git,
+and semantic conflicts found by validation. Everything else normally
+auto-merges because Clisbot's work is additive in
 `packages/hub`, `packages/channels/*`, and new CLI command directories. Keep
 it that way.
 
@@ -107,7 +129,7 @@ below uses.
 4. If upstream/main moved: `git fetch upstream && git rebase upstream/main`.
    Safe here: small branch, unshared, only you use it.
 5. `npm run typecheck` plus targeted tests, then
-   `git push -f origin fix/<short-name>`.
+   `git push --force-with-lease origin fix/<short-name>`.
 6. Open the PR `longbkit/paseo:fix/<name>` → `getpaseo/paseo:main` with
    "Allow edits by maintainers" enabled and the QA evidence from
    `CONTRIBUTING.md` (commands + output, test results, screenshots/video for
@@ -119,8 +141,9 @@ the whole channel plane and the PR gets rejected.
 ## The release gate
 
 A Clisbot release is a tag on the fusion branch. Its notes state the upstream
-tag it is based on ("based on upstream v0.7.0-beta.2"). Before cutting,
-confirm the latest upstream release tag is merged in.
+tag it is based on. A merge commit is not a verified sync point: dependency
+reproducibility, typecheck, focused tests, and required live channel evidence
+must be green before creating the `sync-verified-*` tag or cutting a release.
 
 ## Keeping the merge path cheap
 

@@ -27,7 +27,10 @@ Everything below runs on the fixed isolated dev home — `CLISBOT_HOME=~/.clisbo
 - **Telegram external sender**: `TELEGRAM_MASTER_BOT_TOKEN` posts into
   `TELEGRAM_TEST_GROUP_ID` (basic) / `TELEGRAM_TEST_TOPIC_GROUP_ID` (forum)
   addressing `@longluong3bot` (`TELEGRAM_DEV_BOT_TOKEN`, the bot under test).
-  Read-back: master bot `getUpdates` drain in the same group.
+  Read-back combines the master bot `getUpdates` drain with the dev bot's
+  `telegram.sent-messages` ledger. Telegram does not reliably deliver one bot's
+  group messages to another bot, so master-bot observation alone cannot prove
+  or disprove outbound delivery.
 - **Paseo-side observer**: `node scripts/live-trusted-client.mjs list|watch`
   against the dev daemon — sees channel-originated sessions as ordinary agents.
 - **Ledgers**: `~/.clisbot-dev/channels/work/state/{slack,telegram}.sent-messages.json`.

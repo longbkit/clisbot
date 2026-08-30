@@ -35,6 +35,13 @@ source_password() {
   fi
 }
 
+sanitize_agent_environment() {
+  # The dev plane must use the provider's normal persisted home. Codex sets
+  # CODEX_HOME for its own host process; inheriting that value makes the daemon
+  # look for channel-bound rollouts in the wrong directory.
+  unset CODEX_HOME
+}
+
 hub_stop_force() {
   # `"${CLI[@]}"`, not `"$CLI"`: in bash, the latter expands only element 0.
   "${CLI[@]}" hub stop --home "$HOME_DEV" --force
@@ -49,6 +56,7 @@ case "${1:-}" in
     ;;
   restart)
     source_password
+    sanitize_agent_environment
     hub_stop_force
     export CLISBOT_HOME="$HOME_DEV"
     # Verbose OpenClaw file log (<openclaw-tmp-dir>/openclaw.log): the channel
@@ -60,6 +68,7 @@ case "${1:-}" in
   foreground)
     # Debugging: visible output, tee'd to the same log, Ctrl-C stops it.
     source_password
+    sanitize_agent_environment
     hub_stop_force
     export CLISBOT_HOME="$HOME_DEV"
     export OPENCLAW_LOG_LEVEL=debug

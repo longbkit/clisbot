@@ -2,15 +2,15 @@
 
 ## Status and Source Strategy
 
-Clisbot PaseoClaw Fusion is an exploratory new generation of Clisbot, based on the latest `main` branch of the Paseo repository (`getpaseo/paseo`). This branch was cut directly from Paseo `main` — it intentionally does **not** carry clisbot `main` code. The fusion branch will eventually be published as a branch in the Clisbot repository, but it will remain local during the initial exploration.
+Clisbot PaseoClaw Fusion is an exploratory new generation of Clisbot, based on the Paseo repository (`getpaseo/paseo`). The product baseline advances at reviewed upstream release tags; a separate rehearsal against current `upstream/main` runs regularly so merge and compatibility drift are found before the next baseline promotion. The branch was cut directly from Paseo `main` — it intentionally does **not** carry clisbot `main` code.
 
 Repository wiring:
 
 - `origin` → `git@github.com:longbkit/clisbot.git` (the Clisbot home repository).
 - `upstream` → `git@github.com:getpaseo/paseo.git` (the Paseo foundation this branch tracks).
-- `clisbot-paseoclaw-fusion` tracks `upstream/main`.
+- `clisbot-paseoclaw-fusion` publishes to and Git-tracks its branch on `origin`; `upstream/main` remains the comparison and rehearsal source, while release tags are the product baselines.
 
-In the near term, the project must be able to merge new changes from Paseo's `main` branch regularly. Early development must therefore preserve Paseo compatibility and keep Clisbot-specific changes as isolated as practical. New capabilities should be protected by feature toggles when appropriate, with clear integration boundaries that minimize upstream merge conflicts. This approach is intended to buy development time while the product and its architecture mature.
+In the near term, the project must continuously prove that new changes from Paseo's `main` branch remain mergeable, without shipping an unreviewed moving target. Release-tag promotion and `main` rehearsal are separate gates: rehearsal detects conflicts and contract drift without changing the product baseline; promotion merges a named release only after dependency, typecheck, focused test, and channel E2E evidence pass. Early development must therefore preserve Paseo compatibility and keep Clisbot-specific changes as isolated as practical. New capabilities should be protected by feature toggles when appropriate, with clear integration boundaries that minimize upstream merge conflicts.
 
 The initial product should remain compatible with the Paseo environment model. It should expose a daemon host that can be added to and used by compatible Paseo clients and workflows (desktop app, mobile app, web, CLI).
 
@@ -163,7 +163,7 @@ The dated gap analysis [audits/2026-08-23-paseoclaw-fusion-gaps.md](../audits/20
 
 Initial changes should prioritize:
 
-1. preserving a clean path for regularly merging the latest Paseo changes (the branch tracks `upstream/main`);
+1. preserving a clean path to current Paseo changes through regular `upstream/main` rehearsals and reviewed release-tag promotions;
 2. defining isolated extension boundaries and feature toggles, following the dual kill-switch pattern proven in T3Claw Fusion;
 3. improving the runtime foundation beyond unstable tmux-dependent behavior, leaning on Paseo's daemon-owned agent processes;
 4. establishing secure team authorization and approval foundations on top of Paseo's pairing and relay model;

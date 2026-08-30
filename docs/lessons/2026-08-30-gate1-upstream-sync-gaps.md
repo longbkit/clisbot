@@ -8,20 +8,22 @@ verification = typecheck + live channel E2E on the merged dev daemon
 
 ## Merge evidence (for the record)
 
-- The conflict surface is provably bounded: merge-base `b5f58322`; the intersection of
+- The overlap surface is bounded: merge-base `b5f58322`; the intersection of
   files changed on both sides since that base is exactly `CLAUDE.md`, `package.json`,
-  `package-lock.json`, `packages/cli/package.json` — those four are the entire conflict
-  set. Everything else auto-merged (upstream side: 87 commits / 671 files since the
-  base; fork side: 825 files).
-- Resolutions: `CLAUDE.md` integrated the upstream docs table keeping the five Clisbot
+  `package-lock.json`, `packages/cli/package.json`. Git reported three textual conflicts:
+  `CLAUDE.md`, `package-lock.json`, and `packages/cli/package.json`; root `package.json`
+  auto-merged but still required semantic review. Everything else auto-merged (upstream
+  side: 87 commits / 671 files since the base; fork side: 825 files). Auto-merge is not
+  proof of semantic compatibility; the gates below own that evidence.
+- Resolutions as originally attempted: `CLAUDE.md` integrated the upstream docs table keeping the five Clisbot
   rows; `packages/cli/package.json` bumped deps to 0.7.0-beta.2, kept `@getpaseo/hub` at
   0.7.0; `package-lock.json` regenerated (`npm install`); root `package.json` → version
   0.7.0-beta.2 + license AGPL → Apache-2.0 (upstream #3944, shipped in 0.7.0-beta.1),
   hub/channels workspaces kept.
 - Post-merge: typecheck 0 errors in every workspace except `@getpaseo/app` (tsgo OOM,
   exit 137 on the 8 GB box — environmental; `packages/app` has 0 file diff against the
-  tag, upstream CI covers it). Live E2E round-trip on both channels on the merged daemon
-  (below).
+  tag). Slack completed a live round-trip; Telegram inbound/resume/turn passed but
+  outbound was not observed. Therefore the complete Gate 1 did **not** pass in this run.
 - Branch now 115 ahead / 21 behind `upstream/main`; tags `clisbot/fork-tip-2026-08-30`
   (`09e4475b1`) and `clisbot/sync-2026-08-30-v0.7.0-beta.2` (`6b43b96e8`).
 
@@ -36,8 +38,8 @@ session` agentId `4bbdb441` (15:39:18Z) → bot posts `PONG-SLACK-S` into the ma
   (16:05:51Z, 4.5 s turn). Inbound, cross-version thread resume, and turn verified.
   **Outbound relay post: NOT observed** — master-bot getUpdates drain empty and the send
   ledger flat as of 16:11Z. Open.
-- Both `*-live-assert.mjs` verdicts printed `FAIL`. Both are script-side false negatives
-  (gap 1), not system failures.
+- Both `*-live-assert.mjs` verdicts printed `FAIL`. Slack was a script-side false negative.
+  Telegram was a real open outbound result until a later run supplies send-ledger evidence.
 
 ## Gaps found (priority order)
 
@@ -50,11 +52,26 @@ instead. Its read-back also scans the channel root only, while replies post into
 minted thread at the marker ts. Both misses produced `VERDICT FAIL steer=no reply=no`
 on a round-trip that demonstrably passed.
 
-Rule: treat the scripts' verdicts as advisory until the matchers are updated (regex to
-the current wording, plus a `conversations-replies --thread-ts <marker ts>` read-back
-alongside the root). Cross-check hub.log and the thread read-back manually.
+Correction: the Slack matcher now accepts the current conversation wording and reads a
+root marker through `conversations-replies --thread-ts <marker ts>`. Telegram now uses
+its channel-host send ledger as outbound evidence because Telegram does not reliably
+deliver one bot's group messages to another bot's `getUpdates` stream.
 
-### 2. Dev daemon inherited `CODEX_HOME` from the host shell
+### 2. The regenerated lockfile did not match the merged manifest
+
+The merged server manifest pinned `@anthropic-ai/claude-agent-sdk` `0.3.246`, while the
+committed lock and installed tree still resolved `0.3.220`; `npm ls` returned
+`ELSPROBLEMS`. Deleting a monorepo lock and resolving from scratch also risks unrelated
+semver and platform-optional churn.
+
+Rule: resolve manifests first, use the upstream release lock as the base, reconcile with
+`npm install --package-lock-only --ignore-scripts`, review the lock diff, then require
+clean `npm ci`, `npm ls --workspaces --depth=0`, and exact checks for
+release-changed pins before a sync can be verified. Full transitive `npm ls --all` is
+advisory in this repository because optional cross-platform and peer dependencies report
+known noise even after a clean install.
+
+### 3. Dev daemon inherited `CODEX_HOME` from the host shell
 
 The host profile exports `CODEX_HOME=/home/node/.paseo/codex-local-home` (the Codex
 CLI's own home). A dev daemon started from such a shell runs the codex app-server with
@@ -70,7 +87,7 @@ Rule: start the dev daemon with a clean codex home (`env -u CODEX_HOME`, or pin 
 explicitly). `scripts/e2e-dev.sh` pins `CLISBOT_HOME` only — the daemon environment is
 unguarded.
 
-### 3. Server pid-lock treats a zombie as running
+### 4. Server pid-lock treats a zombie as running
 
 After killing the old supervisor trio, the fresh start was rejected:
 `Another Paseo daemon is already running (PID 2676354, started 2026-08-30T15:31:40.750Z)`
@@ -85,8 +102,29 @@ Rule: make the server pid-lock zombie-aware (check `/proc/<pid>/stat` state, not
 
 ## Open items
 
-- Re-run the Telegram outbound-relay assertion with the ledger diff as the assertion —
-  the 16:05:51Z `PONG-TG-T` never appeared in the group by 16:11Z.
-- Fix `slack-live-assert.mjs` matcher + thread read-back (gap 1).
+- Corrective run at 18:20Z used the ledger-aware assertion: marker message `366` →
+  `channel inbound steered an existing session` agent `4f072ac8` with
+  `dispatched: true`, but after 303 seconds the send ledger remained `93 → 93` and the
+  script reported `VERDICT FAIL steer=yes outbound=no`. Telegram outbound remains a
+  real blocker, not assertion drift.
+- Treat `clisbot/sync-2026-08-30-v0.7.0-beta.2` as the historical merge point, not a
+  verified tag. Create a new `sync-verified-*` tag only after every gate passes.
 - Update `docs/tests/channels/p0-live-scenarios.md` Status with this run's evidence
   (Slack PASS with thread read-back; Telegram inbound PASS, relay open).
+
+## Corrective verification after this lesson
+
+- Dependency baseline: preserved the known-working fusion lock and replaced only the
+  stale nested Claude Agent SDK `0.3.220` entries with the upstream release's exact
+  `0.3.246` package and platform entries. `npm ci --dry-run`, workspace-level `npm ls`,
+  and the exact SDK check pass. A real clean `npm ci` was attempted with the dev Hub and
+  daemon stopped but was OS-killed with exit 137 on this 8 GB box; incremental
+  `npm install` completes. Clean-install verification therefore remains blocked by the
+  environment. Full transitive `npm ls --all` also reports known optional/peer noise and
+  is not a release gate.
+- Assertions: Slack historical check now returns PASS against marker thread
+  `1788104353.604089`. A new Slack marker bound agent `eff3719e` but the agent waited on
+  a permission, so that re-drive was stopped rather than auto-approved. Telegram's new
+  ledger-aware run produced the real outbound failure recorded above.
+- Result: corrected lock contract, but **no verified sync tag** until a clean install
+  completes on a sufficiently resourced runner and Telegram outbound passes.

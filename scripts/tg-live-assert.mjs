@@ -3,9 +3,10 @@
 // slack-live-assert.mjs; see docs/lessons/2026-08-28-live-e2e-speedups.md
 // "one assertion script per surface").
 //
-// Read-back is the MASTER bot's getUpdates stream (the master only plays the
-// external sender — never the channel host). Drained updates are appended to
-// a durable obs log so `check` can re-verify a window after the fact:
+// Read-back combines the MASTER bot's getUpdates stream with the channel
+// host's durable send ledger. Telegram does not reliably deliver bot-authored
+// group messages to another bot, so getUpdates alone cannot prove outbound.
+// Drained updates are appended to a durable obs log so `check` can re-verify:
 //   $CLISBOT_HOME/.tg-observed-updates.jsonl  (one JSON update per line)
 //
 // Matching is per-observer (F-02): ids are per-observer in this simulated
@@ -59,6 +60,7 @@ if (!CHAT) {
 const THREAD = opt("thread") ? Number(opt("thread")) : undefined;
 const TIMEOUT_S = Number(opt("timeout", "300"));
 const POLL_MS = 3000;
+const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
 const API = `https://api.telegram.org/bot${MASTER_TOKEN}`;
 async function api(method, body = {}) {
@@ -95,7 +97,7 @@ async function drainTo(chatId, offset, maxMs) {
         limit: 100,
         timeout: 2,
       });
-    } catch (e) {
+    } catch {
       // One transient failure should not kill the loop.
       await sleep(2000);
       if (Date.now() - start > maxMs) break;
@@ -159,14 +161,18 @@ function hubEventsSince(sinceMs) {
   } catch {
     return [];
   }
-  const clean = raw.replace(/\x1b\[[0-9;]*m/g, "").split("\n");
+  const clean = raw.replace(ANSI_ESCAPE, "").split("\n");
   const events = [];
   for (let i = 0; i < clean.length; i++) {
     const line = clean[i];
     if (!/INFO:|WARN:/.test(line)) continue;
     const t = parseLogTime(line);
     if (t === null || t < sinceMs) continue;
-    if (!/bound a thread|bound a channel|steered an existing session|inbound answered/i.test(line))
+    if (
+      !/bound a thread|bound a channel|bound a conversation|conversation bound to a new agent session|steered an existing session|inbound answered/i.test(
+        line,
+      )
+    )
       continue;
     // Block = INFO line + indented continuation lines (agentId/channel live
     // there). Keep only Telegram-channel events.
@@ -188,6 +194,18 @@ function ledgerEntries() {
   } catch {
     return [];
   }
+}
+
+function ledgerOutboundSince(sinceMs) {
+  const rows = ledgerEntries();
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const value = rows[i]?.value;
+    if (value === undefined || value === null || typeof value !== "object") continue;
+    if (Number(value.chatId) !== CHAT) continue;
+    if (Number(value.timestamp ?? 0) < sinceMs) continue;
+    return value;
+  }
+  return null;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -233,6 +251,7 @@ if (mode === "post") {
   const deadline = t0 + TIMEOUT_S * 1000;
   let steer = null;
   let reply = null;
+  let ledgerReply = null;
   while (Date.now() < deadline) {
     await sleep(POLL_MS);
     const events = hubEventsSince(t0);
@@ -241,11 +260,12 @@ if (mode === "post") {
       const rows = await drainTo(CHAT, undefined, Math.min(5000, deadline - Date.now()));
       reply = findReply(rows, master.id, master.username, expect);
     }
-    if (steer && reply) break;
+    if (!ledgerReply) ledgerReply = ledgerOutboundSince(t0);
+    if (steer && (reply || ledgerReply)) break;
   }
   const after = ledgerEntries().length;
   const agentId = steer?.line.match(/agentId: "([a-f0-9-]{36})"/)?.[1] ?? null;
-  const ok = Boolean(steer && reply && agentId);
+  const ok = Boolean(steer && (reply || ledgerReply) && agentId);
   console.log(
     `[t+${Math.round((Date.now() - t0) / 1000)}s] hub.log: ${steer ? `${steer.t} ${steer.line}` : "NO bind/steer"}`,
   );
@@ -257,10 +277,15 @@ if (mode === "post") {
     }`,
   );
   console.log(`[ledger] entries ${before} -> ${after} (+${after - before})`);
+  if (ledgerReply) {
+    console.log(
+      `[ledger] outbound chat=${ledgerReply.chatId} message=${ledgerReply.messageId} timestamp=${ledgerReply.timestamp}`,
+    );
+  }
   console.log(
     ok
-      ? `VERDICT PASS steer=${agentId} replyMsg=${reply.msg.message_id}`
-      : `VERDICT FAIL steer=${steer ? "yes" : "no"} reply=${reply ? "yes" : "no"}`,
+      ? `VERDICT PASS steer=${agentId} outbound=${reply ? `observer:${reply.msg.message_id}` : `ledger:${ledgerReply.messageId}`}`
+      : `VERDICT FAIL steer=${steer ? "yes" : "no"} outbound=${reply || ledgerReply ? "yes" : "no"}`,
   );
   process.exit(ok ? 0 : 1);
 } else {
@@ -284,7 +309,9 @@ if (mode === "post") {
     rows = obsFor(CHAT, windowSince(sinceHM));
   }
   const match = findReply(rows, master.id, master.username, expect);
-  const events = hubEventsSince(windowSince(sinceHM));
+  const sinceMs = windowSince(sinceHM);
+  const ledgerReply = ledgerOutboundSince(sinceMs);
+  const events = hubEventsSince(sinceMs);
   console.log(
     `[check since ${sinceHM}] hub events: ${events.map((e) => `${e.t} ${e.line.slice(0, 90)}`).join(" | ") || "none"}`,
   );
@@ -295,10 +322,17 @@ if (mode === "post") {
         : "NOT FOUND"
     }`,
   );
+  if (ledgerReply) {
+    console.log(
+      `[check] ledger outbound: chat=${ledgerReply.chatId} message=${ledgerReply.messageId} timestamp=${ledgerReply.timestamp}`,
+    );
+  }
   console.log(
-    match ? `VERDICT PASS replyMsg=${match.msg.message_id}` : "VERDICT FAIL no reply match",
+    match || ledgerReply
+      ? `VERDICT PASS outbound=${match ? `observer:${match.msg.message_id}` : `ledger:${ledgerReply.messageId}`}`
+      : "VERDICT FAIL no outbound evidence",
   );
-  process.exit(match ? 0 : 1);
+  process.exit(match || ledgerReply ? 0 : 1);
 }
 
 function windowSince(sinceHM) {
