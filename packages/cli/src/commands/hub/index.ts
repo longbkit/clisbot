@@ -15,6 +15,7 @@ import { createCliLoginFlow, type CliLoginFlow } from "./login-flow.js";
 import { addHubLoginCommand } from "./login.js";
 import { addHubLogoutCommand, productionLogoutPrompt } from "./logout.js";
 import { addHubProjectsCommand } from "./projects.js";
+import { addHubExportCommand } from "./export.js";
 import { processHubReporter, type HubReporter } from "./reporter.js";
 import { hubStatusResult } from "./status-output.js";
 import { addHubResolutionHelp } from "./help.js";
@@ -22,6 +23,7 @@ import { addHubInitCommand, continueHubGuidedSetup } from "./init.js";
 // COMPAT(clisbot-hub-local): embedded-Hub lifecycle + discovery (implementation doc §3.2).
 import { startCommand as startLocalHubCommand } from "./start.js";
 import { stopCommand as stopLocalHubCommand } from "./stop.js";
+import { addHubPermissionsCommand } from "./permissions.js";
 
 interface HubCommandEnvironment {
   env: Readonly<Record<string, string | undefined>>;
@@ -86,11 +88,22 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
     daemon: environment.daemon,
     reporter: environment.reporter,
   });
+  addHubPermissionsCommand(hub, {
+    daemon: environment.daemon,
+    reporter: environment.reporter,
+  });
   addHubProjectsCommand(hub, {
     env: environment.env,
     credentials: environment.credentials,
     hub: environment.hub,
     reporter: environment.reporter,
+  });
+  addHubExportCommand(hub, {
+    env: environment.env,
+    credentials: environment.credentials,
+    hub: environment.hub,
+    reporter: environment.reporter,
+    cwd: environment.cwd,
   });
   addHubDeployCommand(hub, {
     env: environment.env,
