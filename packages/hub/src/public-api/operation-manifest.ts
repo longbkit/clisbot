@@ -2,12 +2,15 @@ import type { ApiKeyScope } from "../auth/api-key-contract.js";
 import type {
   DispatchManualRunResult,
   InstallConfigurationResult,
+  InstallTriggerResult,
   IssueEnrollmentTokenResult,
   ListConfigurationResourcesResult,
   ListSetupResourcesResult,
   ListProjectsResult,
+  ListTriggersResult,
   PublicOperations,
   ValidateConfigurationResult,
+  ValidateTriggerResult,
 } from "../public-operations/index.js";
 import {
   DispatchManualRunRequestSchema,
@@ -15,13 +18,20 @@ import {
   EnrollmentTokenSchema,
   InstallConfigurationRequestSchema,
   InstalledConfigurationSchema,
+  InstalledTriggerSchema,
   ProjectListSchema,
+  TriggerListSchema,
   ConfigurationResourcesSchema,
   SetupResourcesSchema,
   ValidatedConfigurationSchema,
+  TriggerYamlRequestSchema,
+  ValidatedTriggerSchema,
 } from "./contracts.js";
 
 export type PublicOperationId =
+  | "listTriggers"
+  | "validateTrigger"
+  | "installTrigger"
   | "listProjects"
   | "listConfigurationResources"
   | "listSetupResources"
@@ -35,17 +45,26 @@ export interface PublicOperationDefinition {
   method: "get" | "post";
   path: string;
   scope: ApiKeyScope;
-  requestSchema?: typeof InstallConfigurationRequestSchema | typeof DispatchManualRunRequestSchema;
+  requestSchema?:
+    | typeof InstallConfigurationRequestSchema
+    | typeof DispatchManualRunRequestSchema
+    | typeof TriggerYamlRequestSchema;
   successSchema:
+    | typeof InstalledTriggerSchema
+    | typeof ValidatedTriggerSchema
     | typeof InstalledConfigurationSchema
     | typeof ValidatedConfigurationSchema
     | typeof ProjectListSchema
+    | typeof TriggerListSchema
     | typeof ConfigurationResourcesSchema
     | typeof SetupResourcesSchema
     | typeof DispatchedManualRunSchema
     | typeof EnrollmentTokenSchema;
   successStatus: 200 | 201;
   resultMapping:
+    | "trigger-validation"
+    | "triggers"
+    | "trigger-installation"
     | "projects"
     | "configuration-resources"
     | "setup-resources"
@@ -55,7 +74,7 @@ export interface PublicOperationDefinition {
     | "enrollment-token";
   summary: string;
   description: string;
-  tag: "Projects" | "Configurations" | "Runs" | "Daemons";
+  tag: "Triggers" | "Projects" | "Configurations" | "Runs" | "Daemons";
   responses: Readonly<Record<number, string>>;
   invoke(
     operations: PublicOperations,
@@ -63,6 +82,9 @@ export interface PublicOperationDefinition {
     input: unknown,
   ): Promise<
     | ListProjectsResult
+    | ListTriggersResult
+    | ValidateTriggerResult
+    | InstallTriggerResult
     | ListConfigurationResourcesResult
     | ListSetupResourcesResult
     | ValidateConfigurationResult
@@ -73,6 +95,72 @@ export interface PublicOperationDefinition {
 }
 
 export const publicOperationManifest: readonly PublicOperationDefinition[] = [
+  {
+    id: "listTriggers",
+    method: "get",
+    path: "/api/v1/triggers",
+    scope: "configuration:validate",
+    successSchema: TriggerListSchema,
+    successStatus: 200,
+    resultMapping: "triggers",
+    summary: "List triggers",
+    description: "Lists active organization triggers with their deployable YAML documents.",
+    tag: "Triggers",
+    responses: {
+      200: "The organization's active trigger documents.",
+      401: "The bearer credential is missing, malformed, or revoked.",
+      403: "The bearer credential lacks configuration:validate.",
+      500: "The operation failed unexpectedly.",
+      503: "Hub authentication or storage is unavailable.",
+    },
+    invoke: (operations, authorization) => operations.listTriggers(authorization),
+  },
+  {
+    id: "validateTrigger",
+    method: "post",
+    path: "/api/v1/triggers/validate",
+    scope: "configuration:validate",
+    requestSchema: TriggerYamlRequestSchema,
+    successSchema: ValidatedTriggerSchema,
+    successStatus: 200,
+    resultMapping: "trigger-validation",
+    summary: "Validate one trigger",
+    description: "Validates one self-contained trigger against organization resources.",
+    tag: "Triggers",
+    responses: {
+      200: "The trigger is valid.",
+      400: "The JSON request is malformed.",
+      401: "The bearer credential is missing, malformed, or revoked.",
+      403: "The bearer credential lacks configuration:validate.",
+      422: "The trigger YAML or referenced organization resource is invalid.",
+      503: "Hub authentication or storage is unavailable.",
+    },
+    invoke: (operations, authorization, input) =>
+      operations.validateTrigger(authorization, TriggerYamlRequestSchema.parse(input)),
+  },
+  {
+    id: "installTrigger",
+    method: "post",
+    path: "/api/v1/triggers/install",
+    scope: "configuration:install",
+    requestSchema: TriggerYamlRequestSchema,
+    successSchema: InstalledTriggerSchema,
+    successStatus: 201,
+    resultMapping: "trigger-installation",
+    summary: "Install one trigger",
+    description: "Creates or replaces an organization trigger by its YAML name.",
+    tag: "Triggers",
+    responses: {
+      201: "The trigger revision is active.",
+      400: "The JSON request is malformed.",
+      401: "The bearer credential is missing, malformed, or revoked.",
+      403: "The bearer credential lacks configuration:install.",
+      422: "The trigger YAML or referenced organization resource is invalid.",
+      503: "Hub authentication or storage is unavailable.",
+    },
+    invoke: (operations, authorization, input) =>
+      operations.installTrigger(authorization, TriggerYamlRequestSchema.parse(input)),
+  },
   {
     id: "listProjects",
     method: "get",

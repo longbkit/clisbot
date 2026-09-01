@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/hub",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Self-hosted automation for Paseo daemons",
   "homepage": "https://paseo.sh/docs/hub",
   "license": "Apache-2.0",
@@ -71,7 +71,7 @@
     "@tanstack/react-router": "1.170.18",
     "@tanstack/react-start": "1.168.28",
     "ajv": "^8.20.0",
-    "better-auth": "1.6.23",
+    "better-auth": "^1.6.23",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",
@@ -87,11 +87,12 @@
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
     "radix-ui": "^1.6.2",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "stripe": "^18.5.0",
     "tailwind-merge": "3.4.0",
     "ws": "^8.21.3",
+    "yaml": "^2.8.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {

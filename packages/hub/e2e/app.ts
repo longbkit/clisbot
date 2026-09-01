@@ -1,18 +1,15 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createServer } from "node:net";
+import { createServer, type Server as NetServer } from "node:net";
 import { request as httpRequest } from "node:http";
 import { createServer as createHttpsServer, get as httpsGet, type Server } from "node:https";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, rm, unlink } from "node:fs/promises";
 import { promisify } from "node:util";
 import { test as base } from "@playwright/test";
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { Client } from "pg";
 import { z } from "zod";
 import { PaseoHub, type BuiltApplication, type BuiltApplicationOptions } from "./helpers/hub.js";
-import { createDatabase } from "../src/db/test-utils/runtime.js";
 import { SourcePaseo } from "./helpers/source-paseo.js";
 import type { BrowserDiscordEvent } from "../src/e2e/harness/browser-providers.js";
 import type { BrowserProviderScenario } from "../src/e2e/harness/browser-providers.js";
@@ -27,19 +24,13 @@ export const test = base.extend<{
   projectExternal: ProjectExternalFacts;
   billing: boolean;
   providerScenario: BrowserProviderScenario;
-  primaryDatabase: "postgres" | "embedded";
 }>({
   // Set with `test.use({ billing: true })` to configure the primary app with the fixture Stripe
   // catalog — the money test in billing-subscription.spec.ts needs a billing-configured instance.
   billing: [false, { option: true }],
   providerScenario: ["connected" as BrowserProviderScenario, { option: true }],
-  // The fixture always has a primary application, but a spec that claims its own applications
-  // never touches it. Set with `test.use({ primaryDatabase: "embedded" })` so those specs stop
-  // paying for a PostgreSQL container nothing reads. Anything asserting persistence behaviour
-  // keeps the default.
-  primaryDatabase: ["postgres" as "postgres" | "embedded", { option: true }],
   hub: async (
-    { browser, browserName, page, context, billing, providerScenario, primaryDatabase },
+    { browser, browserName, page, context, billing, providerScenario },
     provide,
     testInfo,
   ) => {
@@ -59,7 +50,6 @@ export const test = base.extend<{
         databaseProfile: "fresh",
         billing,
         providerScenario,
-        ...(primaryDatabase === "embedded" ? { embedded: true } : {}),
       });
       await provide(
         new PaseoHub(
@@ -91,26 +81,18 @@ class BuiltApplications {
   private readonly sourcePaseos: SourcePaseo[] = [];
 
   async start(options: BuiltApplicationOptions = {}): Promise<BuiltApplication> {
-    const postgres =
-      options.embedded === true
-        ? undefined
-        : await new PostgreSqlContainer("postgres:17-alpine").withStartupTimeout(30_000).start();
-    const dataDirectory =
-      options.embedded === true ? await mkdtemp(join(tmpdir(), "paseo-e2e-pglite-")) : undefined;
-    const databaseUrl = postgres?.getConnectionUri();
-    if (databaseUrl !== undefined) {
-      await prepareDatabase(databaseUrl, options.databaseProfile ?? "legacy");
-    }
-    const port = await availablePort();
-    const reverseProxyPort = options.reverseProxy === true ? await availablePort() : undefined;
+    const dataDirectory = await mkdtemp(join(tmpdir(), "paseo-e2e-pglite-"));
+    const portLease = await reservePort();
+    const reverseProxyPortLease = options.reverseProxy === true ? await reservePort() : undefined;
+    const port = portLease.port;
+    const reverseProxyPort = reverseProxyPortLease?.port;
     const tls =
       options.https === true || options.reverseProxy === true ? await createTestTls() : undefined;
     const publicPort = reverseProxyPort ?? port;
     const origin = `${tls === undefined ? "http" : "https"}://127.0.0.1:${publicPort}`;
     const machineKeyFile = join(tmpdir(), `paseo-e2e-machine-key-${randomUUID()}`);
     const childEnvironment = applicationEnvironment({
-      ...(databaseUrl === undefined ? {} : { databaseUrl }),
-      ...(dataDirectory === undefined ? {} : { dataDirectory }),
+      dataDirectory,
       origin,
       ...(options.reverseProxy === true ? {} : { appUrl: origin }),
       port,
@@ -125,17 +107,20 @@ class BuiltApplications {
         stdio: ["pipe", "pipe", "pipe", "ipc"],
       });
     let server = spawnServer();
+    let serverPortHandoff = handoffPortWhenRequested(server, portLease);
     const output: string[] = [];
     const proxy =
-      reverseProxyPort === undefined || tls === undefined
+      reverseProxyPortLease === undefined || tls === undefined
         ? undefined
-        : await startReverseProxy(reverseProxyPort, port, tls);
+        : await startReverseProxy(reverseProxyPortLease, port, tls);
     const application: RunningApplication = {
       origin,
-      databaseUrl: databaseUrl ?? `embedded:${dataDirectory}`,
       machineKey: "",
-      ...(postgres === undefined ? {} : { postgres }),
-      ...(dataDirectory === undefined ? {} : { dataDirectory }),
+      dataDirectory,
+      portLeases: [
+        portLease,
+        ...(reverseProxyPortLease === undefined ? [] : [reverseProxyPortLease]),
+      ],
       server,
       ...(proxy === undefined ? {} : { proxy }),
       ...(tls === undefined ? {} : { tlsRoot: tls.root }),
@@ -161,10 +146,22 @@ class BuiltApplications {
         slackSocketEvidenceSchema.parse(
           await deliverCommandForData(server, { type: "slack-socket-inspect", eventId }),
         ),
+      query: async (sql, params = []) => {
+        const rows = await deliverCommandForData(server, { type: "database-query", sql, params });
+        if (!Array.isArray(rows)) throw new Error("database query returned invalid rows");
+        return rows as Record<string, unknown>[];
+      },
+      installUnroutedSlackFixture: (input) =>
+        deliverCommand(server, { type: "install-unrouted-slack-fixture", ...input }),
+      installProviderDispatchFixture: (input) =>
+        deliverCommand(server, { type: "install-provider-dispatch-fixture", ...input }),
       restart: async () => {
         await stopServer(server);
+        await portLease.reacquire();
         server = spawnServer();
+        serverPortHandoff = handoffPortWhenRequested(server, portLease);
         application.server = server;
+        await serverPortHandoff;
         await serverReady(server, origin, output);
       },
       reportedSeatQuantity: async (organizationId: string) => {
@@ -176,6 +173,7 @@ class BuiltApplications {
       },
     };
     this.running.push(application);
+    await serverPortHandoff;
     await serverReady(server, origin, output);
     application.machineKey = (await readFile(machineKeyFile, "utf8")).trim();
     return application;
@@ -193,10 +191,8 @@ class BuiltApplications {
       applications.map(async (application) => {
         await stopServer(application.server);
         await stopProxy(application.proxy);
-        await application.postgres?.stop();
-        if (application.dataDirectory !== undefined) {
-          await rm(application.dataDirectory, { recursive: true, force: true });
-        }
+        await Promise.all(application.portLeases.map((lease) => lease.release()));
+        await rm(application.dataDirectory, { recursive: true, force: true });
         if (application.tlsRoot !== undefined) {
           await rm(application.tlsRoot, { recursive: true, force: true });
         }
@@ -212,16 +208,15 @@ class BuiltApplications {
 }
 
 interface RunningApplication extends BuiltApplication {
-  postgres?: StartedPostgreSqlContainer;
-  dataDirectory?: string;
+  dataDirectory: string;
+  portLeases: readonly PortLease[];
   server: ChildProcess;
   tlsRoot?: string;
   proxy?: Server;
 }
 
 interface ApplicationEnvironmentInput {
-  databaseUrl?: string;
-  dataDirectory?: string;
+  dataDirectory: string;
   origin: string;
   appUrl?: string;
   port: number;
@@ -233,7 +228,7 @@ interface ApplicationEnvironmentInput {
   githubApprovalRequired?: boolean;
   providerScenario?: BrowserProviderScenario;
   providerApplications?: boolean;
-  environmentApps?: readonly ("github" | "slack" | "discord")[];
+  environmentApps?: readonly ("github" | "slack" | "discord" | "linear")[];
   machineKeyFile: string;
   databaseProfile?: BuiltApplicationOptions["databaseProfile"];
   bootstrap?: BuiltApplicationOptions["bootstrap"];
@@ -286,10 +281,8 @@ function applicationEnvironment(input: ApplicationEnvironmentInput): NodeJS.Proc
           PASEO_BOOTSTRAP_OWNER_PASSWORD: input.bootstrap.ownerPassword,
         }),
   };
-  if (input.databaseUrl === undefined) delete environment["DATABASE_URL"];
-  else environment["DATABASE_URL"] = input.databaseUrl;
-  if (input.dataDirectory === undefined) delete environment["PASEO_HUB_DATA_DIR"];
-  else environment["PASEO_HUB_DATA_DIR"] = input.dataDirectory;
+  delete environment["DATABASE_URL"];
+  environment["PASEO_HUB_DATA_DIR"] = input.dataDirectory;
   if (input.appUrl === undefined) delete environment["PASEO_HUB_APP_URL"];
   else environment["PASEO_HUB_APP_URL"] = input.appUrl;
   return environment;
@@ -333,7 +326,7 @@ async function createTestTls(): Promise<TestTls> {
  * connectable — read-only in the UI is a product rule, not a broken app.
  */
 function environmentAppVariables(
-  providers: readonly ("github" | "slack" | "discord")[],
+  providers: readonly ("github" | "slack" | "discord" | "linear")[],
 ): NodeJS.ProcessEnv {
   const variables: NodeJS.ProcessEnv = {};
   if (providers.includes("github")) {
@@ -354,6 +347,11 @@ function environmentAppVariables(
     variables["SLACK_CLIENT_ID"] = "browser-slack-client";
     variables["SLACK_CLIENT_SECRET"] = "browser-slack-client-secret";
     variables["SLACK_SIGNING_SECRET"] = "phase-zero-slack-webhook-secret";
+  }
+  if (providers.includes("linear")) {
+    variables["LINEAR_CLIENT_ID"] = "browser-linear-client";
+    variables["LINEAR_CLIENT_SECRET"] = "browser-linear-client-secret";
+    variables["LINEAR_WEBHOOK_SECRET"] = "browser-linear-webhook-secret";
   }
   return variables;
 }
@@ -388,48 +386,6 @@ async function deliverCommandForData(
   });
   server.send({ id, ...command });
   return result;
-}
-
-async function prepareDatabase(
-  databaseUrl: string,
-  profile: NonNullable<BuiltApplicationOptions["databaseProfile"]>,
-): Promise<void> {
-  const database = await createDatabase(databaseUrl);
-  await database.close();
-  if (profile === "fresh") return;
-  const client = new Client({ connectionString: databaseUrl });
-  await client.connect();
-  await client.query(
-    `insert into organization (id, name, slug)
-     values ('phase-zero', 'Phase Zero', 'phase-zero')`,
-  );
-  // A faithful legacy organization: it predates the meters field, so its granted document has
-  // the exact shape migration 0025 backfilled. Enforcement reads it on every provider event
-  // through the versioned normalization boundary, so the built server exercises that upgrade
-  // path end to end — without a row here, metering would throw and manual runs would 500.
-  await client.query(
-    `insert into organization_entitlements
-       (organization_id, granted, overrides, plan_id, plan_version, stamped_at, updated_at)
-     values ('phase-zero', '{"seats":{"max":null},"canInviteMembers":true}'::jsonb,
-             '{}'::jsonb, null, null, now(), now())`,
-  );
-  await client.query(
-    `insert into "user" (id, name, email, email_verified)
-     values ('phase-zero-user', 'Phase Zero', 'phase-zero@example.test', true)`,
-  );
-  await client.query(
-    `insert into member (id, organization_id, user_id, role)
-     values ('phase-zero-owner', 'phase-zero', 'phase-zero-user', 'owner')`,
-  );
-  await client.query(`
-    insert into projects (organization_id, name, slug)
-    select id, 'Default', 'default' from organization
-    on conflict (organization_id, slug) do nothing;
-    insert into project_configuration_sources (organization_id, project_id, kind)
-    select organization_id, id, 'manual' from projects
-    on conflict (project_id) do nothing;
-  `);
-  await client.end();
 }
 
 async function serverReady(server: ChildProcess, origin: string, output: string[]): Promise<void> {
@@ -470,7 +426,11 @@ async function stopServer(server: ChildProcess): Promise<void> {
   if (server.exitCode === null) server.kill("SIGKILL");
 }
 
-async function startReverseProxy(port: number, targetPort: number, tls: TestTls): Promise<Server> {
+async function startReverseProxy(
+  portLease: PortLease,
+  targetPort: number,
+  tls: TestTls,
+): Promise<Server> {
   const proxy = createHttpsServer(
     { key: await readFile(tls.key, "utf8"), cert: await readFile(tls.cert, "utf8") },
     (incoming, outgoing) => {
@@ -502,7 +462,10 @@ async function startReverseProxy(port: number, targetPort: number, tls: TestTls)
   );
   await new Promise<void>((resolve, reject) => {
     proxy.once("error", reject);
-    proxy.listen(port, "127.0.0.1", resolve);
+    void portLease
+      .handoff()
+      .then(() => proxy.listen(portLease.port, "127.0.0.1", resolve))
+      .catch(reject);
   });
   return proxy;
 }
@@ -516,22 +479,105 @@ async function stopProxy(proxy: Server | undefined): Promise<void> {
   });
 }
 
-async function availablePort(): Promise<number> {
-  const server = createServer();
+interface PortLease {
+  port: number;
+  handoff(): Promise<void>;
+  reacquire(): Promise<void>;
+  release(): Promise<void>;
+}
+
+const PORT_LEASE_DIRECTORY = join(process.cwd(), "test-results", "port-leases");
+
+async function reservePort(): Promise<PortLease> {
+  await mkdir(PORT_LEASE_DIRECTORY, { recursive: true });
+  while (true) {
+    const server = createPortReservationServer();
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      await closeServer(server);
+      throw new Error("failed to allocate port");
+    }
+    const leasePath = join(PORT_LEASE_DIRECTORY, String(address.port));
+    try {
+      const lease = await open(leasePath, "wx");
+      await lease.close();
+    } catch (error) {
+      await closeServer(server);
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw error;
+    }
+    let reservation: NetServer | undefined = server;
+    const handoff = async () => {
+      if (reservation === undefined) return;
+      const held = reservation;
+      reservation = undefined;
+      await closeServer(held);
+    };
+    return {
+      port: address.port,
+      handoff,
+      reacquire: async () => {
+        if (reservation !== undefined) throw new Error(`port ${address.port} is already reserved`);
+        const next = createPortReservationServer();
+        await new Promise<void>((resolve, reject) => {
+          next.once("error", reject);
+          next.listen(address.port, "127.0.0.1", resolve);
+        });
+        reservation = next;
+      },
+      release: async () => {
+        await handoff();
+        await unlink(leasePath).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== "ENOENT") throw error;
+        });
+      },
+    };
+  }
+}
+
+function createPortReservationServer(): NetServer {
+  return createServer((socket) => socket.destroy());
+}
+
+async function handoffPortWhenRequested(server: ChildProcess, lease: PortLease): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", resolve);
-  });
-  const address = server.address();
-  if (address === null || typeof address === "string") throw new Error("failed to allocate port");
-  await new Promise<void>((resolve, reject) => {
-    server.close((error) => {
-      if (error !== undefined) {
-        reject(error);
+    const onExit = () => finish(new Error("built application exited before requesting its port"));
+    const onMessage = (message: unknown) => {
+      if (
+        typeof message !== "object" ||
+        message === null ||
+        Reflect.get(message, "type") !== "port-handoff-request"
+      ) {
         return;
       }
-      resolve();
-    });
+      cleanup();
+      void lease.handoff().then(
+        () =>
+          server.send({ type: "port-handoff-ready" }, (error) => {
+            error === null ? resolve() : reject(error);
+          }),
+        reject,
+      );
+    };
+    const cleanup = () => {
+      server.off("exit", onExit);
+      server.off("message", onMessage);
+    };
+    const finish = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    server.once("exit", onExit);
+    server.on("message", onMessage);
   });
-  return address.port;
+}
+
+async function closeServer(server: NetServer): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => (error === undefined ? resolve() : reject(error)));
+  });
 }

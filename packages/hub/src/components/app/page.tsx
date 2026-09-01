@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "../../lib/utils.js";
+import { StatusPill, type StatusTone } from "./status-pill.js";
 
 /**
  * The single content column every dashboard surface sits in. Screens never set
@@ -19,19 +20,24 @@ export function PageHeader({
   description,
   children,
   id,
+  status,
 }: {
   title: string;
   description?: string;
   /** The page's actions. At most one is filled; the rest are outline or ghost. */
   children?: ReactNode;
   id?: string;
+  status?: { label: string; tone: StatusTone };
 }) {
   return (
     <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div className="grid min-w-0 gap-1">
-        <h1 id={id} className="text-xl font-semibold tracking-tight">
-          {title}
-        </h1>
+        <span className="flex items-center gap-2">
+          <h1 id={id} className="text-xl font-medium tracking-tight">
+            {title}
+          </h1>
+          {status === undefined ? null : <StatusPill tone={status.tone}>{status.label}</StatusPill>}
+        </span>
         {description === undefined ? null : (
           <p className="text-sm text-balance text-muted-foreground">{description}</p>
         )}

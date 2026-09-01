@@ -12,8 +12,30 @@ const member = {
   password: "bob-dashboard-password",
 };
 
-test("exposes an accessible account entry while signed out", async ({ hub }) => {
-  await hub.expectSignedOutAccountEntry();
+test.describe.configure({ timeout: 180_000 });
+
+test("an operator can navigate and manage invitations without a pointer", async ({ hub }) => {
+  await test.step("the signed-out account entry and signed-in sidebar are accessible", async () => {
+    await hub.expectSignedOutAccountEntry();
+    await hub.signUpAs("owner", owner);
+    await hub.createOrganization("owner", "Acme");
+    await hub.expectDesktopSidebarAndOrganizationMenu("owner");
+  });
+
+  await test.step("invitation links copy with announced feedback", async () => {
+    const invitation = await hub.inviteMember("owner", "teammate@example.com", "member");
+    await hub.copyInvitationAndExpectFeedback("owner", "teammate@example.com", invitation);
+  });
+
+  await test.step("an admin invitation can be created through the natural keyboard order", async () => {
+    await hub.createAdminInvitationWithKeyboard("owner", "keyboard@example.com");
+  });
+
+  await test.step("destructive team changes require confirmation", async () => {
+    await hub.addNewMember("owner", "member", member);
+    await hub.inviteMember("owner", "pending@example.com", "member");
+    await hub.expectTeamDestructiveConfirmations("owner", "Bob", "pending@example.com");
+  });
 });
 
 test("locks authentication mode while a request is pending", async ({ hub }) => {
@@ -28,12 +50,6 @@ test("keeps authentication locked until the signed-in account installs", async (
   await hub.createOrganization("owner", "Acme");
   await hub.signOut("owner");
   await hub.proveAuthenticationSettlementLocksMode("owner", owner, "Acme");
-});
-
-test("supports sidebar and organization menu keyboard behavior", async ({ hub }) => {
-  await hub.signUpAs("owner", owner);
-  await hub.createOrganization("owner", "Acme");
-  await hub.expectDesktopSidebarAndOrganizationMenu("owner");
 });
 
 test("removes the old organization panel while the new account context loads", async ({ hub }) => {
@@ -59,25 +75,4 @@ test("reports rejected account commands without changing organization or team st
   await hub.createAnotherOrganization("owner", "Orbit");
   await hub.chooseOrganization("owner", "Acme");
   await hub.rejectOrganizationSwitchAndInvitation("owner", "Orbit", "offline@example.com");
-});
-
-test("copies an invitation link and announces success", async ({ hub }) => {
-  await hub.signUpAs("owner", owner);
-  await hub.createOrganization("owner", "Acme");
-  const invitation = await hub.inviteMember("owner", "teammate@example.com", "member");
-  await hub.copyInvitationAndExpectFeedback("owner", "teammate@example.com", invitation);
-});
-
-test("creates an admin invitation through the natural keyboard order", async ({ hub }) => {
-  await hub.signUpAs("owner", owner);
-  await hub.createOrganization("owner", "Acme");
-  await hub.createAdminInvitationWithKeyboard("owner", "keyboard@example.com");
-});
-
-test("requires confirmation before destructive team changes", async ({ hub }) => {
-  await hub.signUpAs("owner", owner);
-  await hub.createOrganization("owner", "Acme");
-  await hub.addNewMember("owner", "member", member);
-  await hub.inviteMember("owner", "pending@example.com", "member");
-  await hub.expectTeamDestructiveConfirmations("owner", "Bob", "pending@example.com");
 });

@@ -6,7 +6,6 @@ import { createAuthServer, type AuthServer } from "../../auth/server.js";
 import { composeBilling, type BillingConfig, type BillingRuntime } from "../../billing/index.js";
 import { composeEntitlements } from "../../auth/entitlements.js";
 import { readInstanceAuthPolicy } from "../../auth/instance-policy.js";
-import { createPostgresTestRuntime } from "../../db/test-utils/runtime.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntime } from "../../db/runtime/index.js";
 import { createDatabase } from "../../db/pg.js";
 import type { Database } from "../../db/types.js";
@@ -16,6 +15,7 @@ import { createGitHubRegistration } from "../../providers/github/index.js";
 import type { ProviderRegistration } from "../../providers/registration.js";
 import { createDiscordRegistration } from "../../providers/discord/index.js";
 import { createSlackRegistration } from "../../providers/slack/index.js";
+import { createLinearRegistration } from "../../providers/linear/index.js";
 import {
   BrowserDiscordBot,
   BrowserDiscordConnections,
@@ -52,6 +52,8 @@ import {
 } from "../../provider-applications/index.js";
 import { TRUSTED_REQUEST_ORIGIN_HEADER } from "../../http/request-origin.js";
 import { compileHubConfig, compiledConfigurationHash } from "../../config/compiler.js";
+import { ProjectConfigurationStore } from "../../configuration/store.js";
+import type { HubBundleFile } from "../../config/bundle.js";
 
 interface DiscordCommand {
   id: string;
@@ -111,6 +113,31 @@ interface DaemonEnrollmentCommand {
   verifier: string;
 }
 
+interface DatabaseQueryCommand {
+  id: string;
+  type: "database-query";
+  sql: string;
+  params: readonly unknown[];
+}
+
+interface InstallUnroutedSlackFixtureCommand {
+  id: string;
+  type: "install-unrouted-slack-fixture";
+  projectId: string;
+  userId: string;
+  files: readonly HubBundleFile[];
+}
+
+interface InstallProviderDispatchFixtureCommand {
+  id: string;
+  type: "install-provider-dispatch-fixture";
+  organizationId: string;
+  repositoryId: number;
+  repository: string;
+  guildId: string;
+  files: readonly HubBundleFile[];
+}
+
 // Fixture-only: signature verification is local HMAC, so any well-formed secret works
 // identically to a real one. STRIPE_WEBHOOK_SECRET must match what e2e/helpers/hub.ts signs
 // webhook payloads with — see WEBHOOK_SECRET there and GITHUB_WEBHOOK_SECRET for precedent.
@@ -120,7 +147,9 @@ async function main(): Promise<void> {
   const publicBaseUrl =
     process.env["PASEO_HUB_APP_URL"] ?? `http://127.0.0.1:${requiredEnvironment("PORT")}`;
   const scenario = readScenario();
+  const databaseProfile = requiredEnvironment("PASEO_E2E_DATABASE_PROFILE");
   const { database, runtime: databaseRuntime, locks } = await createBrowserDatabase();
+  if (databaseProfile === "legacy") await seedLegacyMachineAuthTarget(databaseRuntime);
   const entitlements = composeEntitlements(database, databaseRuntime);
   // Compose (and sync) billing before auth: a billing-configured harness provisions new
   // organizations onto the Free plan, so the resolver must exist before createAuthServer, and the
@@ -147,7 +176,6 @@ async function main(): Promise<void> {
     : null;
   await auth?.initialize?.();
   const machineAuth = machineAuthEnabled();
-  const databaseProfile = requiredEnvironment("PASEO_E2E_DATABASE_PROFILE");
   await seedMachineAuthTargetIfRequired(auth, machineAuth, databaseProfile, databaseRuntime);
   const machineKey =
     auth === null || !machineAuth
@@ -231,6 +259,13 @@ async function main(): Promise<void> {
               : null,
             ...(slackConfigured ? { botClient: slackBot } : {}),
           }),
+          createLinearRegistration({
+            database,
+            auth,
+            applicationBaseUrl: publicBaseUrl,
+            publicBaseUrl,
+            configuration: null,
+          }),
         ];
   const providers = await providerRuntimeOptions(auth, registrations, {
     database,
@@ -279,7 +314,11 @@ async function main(): Promise<void> {
   server.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     void runtime.hub.handleUpgrade?.(request, socket, head);
   });
-  server.listen(Number(requiredEnvironment("PORT")), "127.0.0.1");
+  await requestPortHandoff();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(Number(requiredEnvironment("PORT")), "127.0.0.1", resolve);
+  });
 
   process.on("message", (message: unknown) => {
     void acceptCommand(message, {
@@ -301,11 +340,30 @@ async function main(): Promise<void> {
   process.once("SIGINT", stop);
 }
 
+async function requestPortHandoff(): Promise<void> {
+  if (process.send === undefined) throw new Error("browser child requires an IPC channel");
+  await new Promise<void>((resolve, reject) => {
+    const receive = (message: unknown) => {
+      if (
+        typeof message !== "object" ||
+        message === null ||
+        Reflect.get(message, "type") !== "port-handoff-ready"
+      ) {
+        return;
+      }
+      process.off("message", receive);
+      resolve();
+    };
+    process.on("message", receive);
+    process.send?.({ type: "port-handoff-request" }, (error) => {
+      if (error === null) return;
+      process.off("message", receive);
+      reject(error);
+    });
+  });
+}
+
 async function createBrowserDatabase() {
-  const databaseUrl = process.env["DATABASE_URL"];
-  if (databaseUrl !== undefined && databaseUrl.length > 0) {
-    return createPostgresTestRuntime(databaseUrl);
-  }
   const bundle = await embeddedDatabaseRuntime(requiredEnvironment("PASEO_HUB_DATA_DIR"));
   try {
     await bundle.runtime.migrate();
@@ -315,6 +373,38 @@ async function createBrowserDatabase() {
     await bundle.runtime.close().catch(() => undefined);
     throw error;
   }
+}
+
+async function seedLegacyMachineAuthTarget(database: DatabaseRuntime): Promise<void> {
+  await database.query(`
+    insert into organization (id, name, slug)
+    values ('phase-zero', 'Phase Zero', 'phase-zero')
+  `);
+  // The granted document intentionally predates meters so normalization proves the legacy shape.
+  await database.query(`
+    insert into organization_entitlements
+      (organization_id, granted, overrides, plan_id, plan_version, stamped_at, updated_at)
+    values ('phase-zero', '{"seats":{"max":null},"canInviteMembers":true}'::jsonb,
+            '{}'::jsonb, null, null, now(), now())
+  `);
+  await database.query(`
+    insert into "user" (id, name, email, email_verified)
+    values ('phase-zero-user', 'Phase Zero', 'phase-zero@example.test', true)
+  `);
+  await database.query(`
+    insert into member (id, organization_id, user_id, role)
+    values ('phase-zero-owner', 'phase-zero', 'phase-zero-user', 'owner')
+  `);
+  await database.query(`
+    insert into projects (organization_id, name, slug)
+    select id, 'Default', 'default' from organization
+    on conflict (organization_id, slug) do nothing
+  `);
+  await database.query(`
+    insert into project_configuration_sources (organization_id, project_id, kind)
+    select organization_id, id, 'manual' from projects
+    on conflict (project_id) do nothing
+  `);
 }
 
 async function testServerOptions(): Promise<{
@@ -335,17 +425,23 @@ async function testServerOptions(): Promise<{
 
 function browserProviderPage(request: Request, publicBaseUrl: string): Response | undefined {
   const url = new URL(request.url);
-  if (url.pathname !== "/e2e/providers/slack/authorize") return undefined;
+  let provider: { name: string; callback: string } | undefined;
+  if (url.pathname === "/e2e/providers/slack/authorize") {
+    provider = { name: "Slack", callback: "/api/integrations/slack/callback" };
+  } else if (url.pathname === "/e2e/providers/linear/authorize") {
+    provider = { name: "Linear", callback: "/api/integrations/linear/callback" };
+  }
+  if (provider === undefined) return undefined;
   const state = url.searchParams.get("state");
   if (state === null) return new Response("Missing state", { status: 400 });
   const callback = new URL(
-    "/api/integrations/slack/callback",
+    provider.callback,
     request.headers.get(TRUSTED_REQUEST_ORIGIN_HEADER) ?? publicBaseUrl,
   );
   callback.searchParams.set("state", state);
   callback.searchParams.set("code", "accepted");
   return new Response(
-    `<!doctype html><html><body><main><h1>Install Paseo in Acme</h1><p>Slack is asking you to accept this app.</p><a href="${callback.toString()}">Accept installation</a></main></body></html>`,
+    `<!doctype html><html><body><main><h1>Install Paseo in Acme</h1><p>${provider.name} is asking you to accept this app.</p><a href="${callback.toString()}">Accept installation</a></main></body></html>`,
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
 }
@@ -440,11 +536,131 @@ async function acceptCommand(message: unknown, fixtures: CommandFixtures): Promi
     await acceptSlackSocketCommand(message, fixtures);
     return;
   }
+  if (isDatabaseQueryCommand(message)) {
+    await acceptDatabaseQueryCommand(message, fixtures.databaseRuntime);
+    return;
+  }
+  if (isInstallUnroutedSlackFixtureCommand(message)) {
+    await acceptInstallUnroutedSlackFixture(message, fixtures.database);
+    return;
+  }
+  if (isInstallProviderDispatchFixtureCommand(message)) {
+    await acceptInstallProviderDispatchFixture(
+      message,
+      fixtures.database,
+      fixtures.databaseRuntime,
+    );
+    return;
+  }
   if (acceptBillingCommand(message, billingCatalog, billingClient)) return;
   if (!isDiscordCommand(message)) return;
   try {
     await bot.deliver(message.event);
     process.send?.({ id: message.id, ok: true });
+  } catch (error) {
+    process.send?.({
+      id: message.id,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function acceptInstallUnroutedSlackFixture(
+  message: InstallUnroutedSlackFixtureCommand,
+  database: Database,
+): Promise<void> {
+  try {
+    const store = new ProjectConfigurationStore(database, message.projectId);
+    const revision = await store.insertManualBundleRevision({
+      files: message.files,
+      userId: message.userId,
+      sourceEvidence: { kind: "browser-drop-reason" },
+    });
+    await store.activate(revision.id);
+    process.send?.({ id: message.id, ok: true });
+  } catch (error) {
+    sendCommandError(message.id, error);
+  }
+}
+
+async function acceptInstallProviderDispatchFixture(
+  message: InstallProviderDispatchFixtureCommand,
+  database: Database,
+  runtime: DatabaseRuntime,
+): Promise<void> {
+  try {
+    const project = await database.findProjectBySlugForOrganization(
+      message.organizationId,
+      "default",
+    );
+    if (project === undefined) throw new Error("default project unavailable");
+    const daemon = await database.findDaemonBySlugForOrganization(
+      message.organizationId,
+      "shared-dispatch",
+    );
+    if (daemon === undefined) throw new Error("dispatch daemon unavailable");
+    const [owner] = (
+      await runtime.query<{ user_id: string }>(
+        `select user_id from member
+       where organization_id = $1 and role = 'owner'
+       order by id limit 1`,
+        [message.organizationId],
+      )
+    ).rows;
+    if (owner === undefined) throw new Error("organization owner unavailable");
+    const github = await database.findGitHubConnection(message.repositoryId);
+    if (github === undefined || github.organizationId !== message.organizationId) {
+      throw new Error("GitHub connection unavailable");
+    }
+    await database.upsertGitHubRepositories(message.organizationId, github.id, [
+      {
+        repositoryId: message.repositoryId,
+        fullName: message.repository,
+        defaultBranch: "main",
+      },
+    ]);
+    await database.setProjectGitHubConfigurationSource({
+      projectId: project.id,
+      githubConnectionId: github.id,
+      githubRepositoryId: message.repositoryId,
+      githubRepositoryFullName: message.repository,
+      githubDefaultBranch: "main",
+      automaticDeploymentEnabled: true,
+      userId: owner.user_id,
+    });
+    const discord = await database.findDiscordConnection(message.guildId);
+    if (discord === undefined || discord.organizationId !== message.organizationId) {
+      throw new Error("Discord connection unavailable");
+    }
+    const store = new ProjectConfigurationStore(database, project.id);
+    const revision = await store.insertManualBundleRevision({
+      files: message.files,
+      userId: owner.user_id,
+      sourceEvidence: { kind: "browser-fixture", userId: owner.user_id },
+    });
+    await store.activate(revision.id);
+    process.send?.({ id: message.id, ok: true });
+  } catch (error) {
+    sendCommandError(message.id, error);
+  }
+}
+
+function sendCommandError(id: string, error: unknown): void {
+  process.send?.({
+    id,
+    ok: false,
+    error: error instanceof Error ? error.message : String(error),
+  });
+}
+
+async function acceptDatabaseQueryCommand(
+  message: DatabaseQueryCommand,
+  database: DatabaseRuntime,
+): Promise<void> {
+  try {
+    const result = await database.query(message.sql, message.params);
+    process.send?.({ id: message.id, ok: true, data: result.rows });
   } catch (error) {
     process.send?.({
       id: message.id,
@@ -663,6 +879,47 @@ function isDaemonEnrollmentCommand(value: unknown): value is DaemonEnrollmentCom
     Reflect.get(value, "type") === "daemon-enrollment-token" &&
     typeof Reflect.get(value, "id") === "string" &&
     typeof Reflect.get(value, "verifier") === "string"
+  );
+}
+
+function isDatabaseQueryCommand(value: unknown): value is DatabaseQueryCommand {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Reflect.get(value, "type") === "database-query" &&
+    typeof Reflect.get(value, "id") === "string" &&
+    typeof Reflect.get(value, "sql") === "string" &&
+    Array.isArray(Reflect.get(value, "params"))
+  );
+}
+
+function isInstallUnroutedSlackFixtureCommand(
+  value: unknown,
+): value is InstallUnroutedSlackFixtureCommand {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Reflect.get(value, "type") === "install-unrouted-slack-fixture" &&
+    typeof Reflect.get(value, "id") === "string" &&
+    typeof Reflect.get(value, "projectId") === "string" &&
+    typeof Reflect.get(value, "userId") === "string" &&
+    isBundleFileList(Reflect.get(value, "files"))
+  );
+}
+
+function isInstallProviderDispatchFixtureCommand(
+  value: unknown,
+): value is InstallProviderDispatchFixtureCommand {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Reflect.get(value, "type") === "install-provider-dispatch-fixture" &&
+    typeof Reflect.get(value, "id") === "string" &&
+    typeof Reflect.get(value, "organizationId") === "string" &&
+    typeof Reflect.get(value, "repositoryId") === "number" &&
+    typeof Reflect.get(value, "repository") === "string" &&
+    typeof Reflect.get(value, "guildId") === "string" &&
+    isBundleFileList(Reflect.get(value, "files"))
   );
 }
 

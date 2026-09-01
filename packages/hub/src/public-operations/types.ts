@@ -44,6 +44,7 @@ export interface ConfigurationResources {
   }[];
   discord: readonly { slug: string; guildName: string }[];
   slack: readonly { slug: string; teamName: string }[];
+  linear: readonly { slug: string; organizationName: string }[];
 }
 
 export type ListConfigurationResourcesResult =
@@ -130,7 +131,49 @@ export interface InfrastructureUnavailable {
   status: "infrastructure_unavailable";
 }
 
+export interface TriggerYamlInput {
+  yaml: string;
+}
+
+export type ValidateTriggerResult =
+  | { status: "valid"; name: string; valid: true }
+  | { status: "invalid_trigger"; issues: readonly DomainIssue[] }
+  | InfrastructureUnavailable;
+
+export type InstallTriggerResult =
+  | {
+      status: "installed";
+      triggerId: string;
+      name: string;
+      revisionId: string;
+      version: number;
+      active: true;
+    }
+  | { status: "invalid_trigger"; issues: readonly DomainIssue[] }
+  | InfrastructureUnavailable;
+
+export interface PublicTrigger {
+  id: string;
+  name: string;
+  enabled: boolean;
+  format: "single_run" | "legacy_multistep";
+  yaml: string;
+}
+
+export type ListTriggersResult =
+  | { status: "listed"; triggers: readonly PublicTrigger[] }
+  | InfrastructureUnavailable;
+
 export interface PublicOperations {
+  listTriggers(authorization: PublicAuthorization): Promise<ListTriggersResult>;
+  validateTrigger(
+    authorization: PublicAuthorization,
+    input: TriggerYamlInput,
+  ): Promise<ValidateTriggerResult>;
+  installTrigger(
+    authorization: PublicAuthorization,
+    input: TriggerYamlInput,
+  ): Promise<InstallTriggerResult>;
   listProjects(authorization: PublicAuthorization): Promise<ListProjectsResult>;
   listConfigurationResources(
     authorization: PublicAuthorization,
@@ -155,10 +198,11 @@ export interface PublicOperationRepository {
   listActiveProjects(organizationId: string): Promise<readonly PublicProject[]>;
   listConfigurationResources(organizationId: string): Promise<ConfigurationResources>;
   listSetupResources(organizationId: string): Promise<SetupResources>;
-  findActiveProject(
+  resolveManualRunProject(
     organizationId: string,
+    triggerName: string,
     projectSlug: string,
-  ): Promise<{ id: string; slug: string } | undefined>;
+  ): Promise<{ status: "resolved"; id: string } | { status: "disabled" } | undefined>;
   resolveDeploymentProject(input: {
     organizationId: string;
     explicitProjectSlug?: string | undefined;
@@ -176,6 +220,15 @@ export interface PublicOperationRepository {
 }
 
 export interface PublicOperationCapabilities {
+  triggerForOrganization?(organizationId: string): {
+    list(): Promise<readonly PublicTrigger[]>;
+    validate(yaml: string): Promise<{ name: string }>;
+    install(input: {
+      yaml: string;
+      credentialId: string;
+      credentialKind: "apiKey" | "cliCredential";
+    }): Promise<{ triggerId: string; name: string; revisionId: string; version: number }>;
+  };
   configurationForProject(projectId: string): {
     validateBundle(
       files: readonly HubBundleFile[],

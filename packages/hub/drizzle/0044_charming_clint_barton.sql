@@ -1,0 +1,2 @@
+ALTER TABLE "organization_triggers" ADD COLUMN "runtime_project_id" uuid;--> statement-breakpoint
+ALTER TABLE "organization_triggers" ADD CONSTRAINT "organization_triggers_runtime_project_id_projects_id_fk" FOREIGN KEY ("runtime_project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;

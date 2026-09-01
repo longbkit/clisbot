@@ -39,6 +39,7 @@ import {
 import { EntitlementDenied } from "../entitlements/catalog.js";
 import { entitlementDenialResponse } from "../entitlements/denial.js";
 import type { EntitlementsService } from "../entitlements/service.js";
+import type { InvitationMailer } from "../invitations/index.js";
 
 const INVITATION_LIFETIME_HOURS = 48;
 
@@ -104,6 +105,8 @@ interface OrganizationAccessOptions {
    * accept, remove). The composition root wires billing's seat-quantity reporter here; undefined
    * self-hosted. Never blocks or fails the member action. */
   onMembershipChanged?: (organizationId: string) => Promise<void>;
+  /** Optional post-commit invitation delivery. Never rolls back or fails a created invitation. */
+  invitationMailer?: InvitationMailer;
 }
 
 interface MembershipRow extends QueryRow {
@@ -543,7 +546,25 @@ export class OrganizationAccess {
       return pending;
     });
     await this.notifyMembershipChanged(access.organization.id);
-    return Response.json(managerInvitationSummary(invitation, this.options.baseURL), {
+    const summary = managerInvitationSummary(invitation, this.options.baseURL);
+    await this.options.invitationMailer
+      ?.send({
+        id: invitation.id,
+        email: invitation.email,
+        inviterName: session.name,
+        organizationName: access.organization.name,
+        role: summary.role,
+        link: summary.link,
+        expiresAt: invitation.expires_at,
+      })
+      .catch((error: unknown) => {
+        reportFailure(error, {
+          operation: "auth.invitation.deliver",
+          component: "invitations",
+          organizationId: access.organization.id,
+        });
+      });
+    return Response.json(summary, {
       status: 201,
     });
   }

@@ -46,7 +46,7 @@ export class DaemonHandoffSurface {
    */
   async leave(label: "Continue" | "Do this later"): Promise<void> {
     await this.page.getByRole("button", { name: label, exact: true }).click();
-    await expect(this.page).toHaveURL(/\/o\/[^/]+\/projects\/default\/overview$/u);
-    await expect(this.page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await expect(this.page).toHaveURL(/\/o\/[^/]+\/triggers$/u);
+    await expect(this.page.getByRole("heading", { name: "Triggers", level: 1 })).toBeVisible();
   }
 }

@@ -259,7 +259,7 @@ export function ApiKeys() {
       </DataTable>
       <section className="mt-10 grid gap-4" aria-labelledby="cli-logins-heading">
         <div>
-          <h2 id="cli-logins-heading" className="text-lg font-semibold">
+          <h2 id="cli-logins-heading" className="text-lg">
             CLI logins
           </h2>
           <p className="text-muted-foreground text-sm">
@@ -353,7 +353,7 @@ function ApiKeyRow({
   return (
     <DataRow>
       <DataCell>
-        <span className="font-medium">{record.name}</span>
+        <span>{record.name}</span>
       </DataCell>
       <DataCell>
         <span className="font-mono text-xs">{record.prefix}</span>
@@ -467,7 +467,7 @@ function ApiKeyDialog({
               </Field>
               <Field>
                 <fieldset className="grid gap-3">
-                  <legend className="text-sm leading-snug font-medium">Scopes</legend>
+                  <legend className="text-sm leading-snug">Scopes</legend>
                   <div className="grid gap-3">
                     {SCOPE_OPTIONS.map((option) => (
                       <ScopeOption key={option.value} option={option} onChange={updateScope} />
@@ -540,7 +540,7 @@ function ScopeOption({
     <label htmlFor={id} className="flex cursor-pointer items-start gap-3">
       <CheckboxInput id={id} name="scopes" value={option.value} onChange={handleChange} />
       <span className="grid gap-0.5 text-sm">
-        <span className="font-medium">{option.label}</span>
+        <span>{option.label}</span>
         <span className="text-muted-foreground">{option.description}</span>
       </span>
     </label>

@@ -11,7 +11,7 @@ import {
 } from "./index.js";
 import { providerApplicationSaveFailure, providerHost, providerName } from "./save-failure.js";
 
-const providerSchema = z.enum(["github", "slack", "discord"]);
+const providerSchema = z.enum(["github", "slack", "discord", "linear"]);
 const surfaceSchema = z.enum(["appSetup", "apps"]).optional();
 const expectedVersionSchema = z.number().int().positive().optional();
 const configurationSchema = z.discriminatedUnion("provider", [
@@ -42,6 +42,14 @@ const configurationSchema = z.discriminatedUnion("provider", [
     applicationId: z.string().trim().min(1),
     clientSecret: z.string().min(1),
     botToken: z.string().min(1),
+    expectedVersion: expectedVersionSchema,
+    surface: surfaceSchema,
+  }),
+  z.object({
+    provider: z.literal("linear"),
+    clientId: z.string().trim().min(1),
+    clientSecret: z.string().min(1),
+    webhookSecret: z.string().min(1),
     expectedVersion: expectedVersionSchema,
     surface: surfaceSchema,
   }),
@@ -191,6 +199,9 @@ function sensitiveConfigurationValues(
   if (configuration.provider === "slack") {
     return [configuration.clientSecret, configuration.signingSecret];
   }
+  if (configuration.provider === "linear") {
+    return [configuration.clientSecret, configuration.webhookSecret];
+  }
   return [configuration.clientSecret, configuration.botToken];
 }
 
@@ -219,6 +230,15 @@ function normalizedConfiguration(
       clientId: data.clientId,
       clientSecret: data.clientSecret,
       signingSecret: data.signingSecret,
+      ...version,
+    };
+  }
+  if (data.provider === "linear") {
+    return {
+      provider: data.provider,
+      clientId: data.clientId,
+      clientSecret: data.clientSecret,
+      webhookSecret: data.webhookSecret,
       ...version,
     };
   }

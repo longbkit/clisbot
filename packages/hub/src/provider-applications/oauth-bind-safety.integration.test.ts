@@ -36,7 +36,7 @@ describe("provider application OAuth bind authority", () => {
       const fixture = await databaseFixture(engine);
       try {
         await seedAuthority(fixture.bundle);
-        for (const provider of ["github", "slack", "discord"] as const) {
+        for (const provider of ["github", "slack", "discord", "linear"] as const) {
           await rejectsStoredReplacement(fixture.bundle, provider);
           await resetProvider(fixture.bundle, provider);
           await serializesReplacementRace(fixture.bundle, provider);
@@ -236,9 +236,9 @@ async function assertAttemptConsumed(
 
 function callbackPhase(provider: Provider) {
   if (provider === "github") return "github_user_authorization" as const;
-  return provider === "slack"
-    ? ("slack_authorization" as const)
-    : ("discord_authorization" as const);
+  if (provider === "slack") return "slack_authorization" as const;
+  if (provider === "linear") return "linear_authorization" as const;
+  return "discord_authorization" as const;
 }
 
 async function startAttempt(
@@ -301,6 +301,18 @@ function bind(
       botUserId: "bot",
       botAccessToken: "xoxb-token",
       scopes: [...SLACK_REQUIRED_BOT_SCOPES],
+    });
+  }
+  if (provider === "linear") {
+    return database.bindLinearConnection({
+      ...shared,
+      phase: "linear_authorization",
+      linearOrganizationId: "linear-organization",
+      linearOrganizationName: "Acme",
+      appUserId: "linear-app-user",
+      accessToken: "linear-token",
+      refreshToken: "linear-refresh-token",
+      scopes: ["read", "comments:create"],
     });
   }
   return database.bindDiscordConnection({
@@ -372,6 +384,13 @@ function application(provider: Provider, suffix: string) {
       clientSecret: `slack-secret-${suffix}`,
       signingSecret: `slack-signing-${suffix}`,
     };
+  } else if (provider === "linear") {
+    configuration = {
+      provider,
+      clientId: `linear-client-${suffix}`,
+      clientSecret: `linear-secret-${suffix}`,
+      webhookSecret: `linear-webhook-${suffix}`,
+    };
   } else {
     configuration = {
       provider,
@@ -394,6 +413,9 @@ function identity(configuration: ProviderApplicationConfiguration): ProviderAppl
   }
   if (configuration.provider === "slack") {
     return { provider: "slack", id: configuration.appId, name: configuration.appId };
+  }
+  if (configuration.provider === "linear") {
+    return { provider: "linear", id: configuration.clientId, name: configuration.clientId };
   }
   return {
     provider: "discord",

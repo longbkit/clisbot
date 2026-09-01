@@ -18,7 +18,7 @@ The expression shape is exactly
 materializing the selected step, after the project and organization connection
 have been verified. The authored expression, not its resolved value, is retained
 in configuration and durable launch data. Resolved values are not placed in logs
-or diagnostics. This works for manual, Discord, Slack, and GitHub trigger events.
+or diagnostics. This works for manual, Discord, Slack, GitHub, and Linear trigger events.
 
 ## GitHub authority
 

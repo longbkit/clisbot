@@ -25,7 +25,7 @@ export function Section({
       {title === undefined ? null : (
         <div className="flex min-w-0 items-start justify-between gap-4">
           <div className="grid min-w-0 gap-1">
-            <h2 className="text-sm font-medium">{title}</h2>
+            <h2 className="text-sm">{title}</h2>
             {description === undefined ? null : (
               <p className="text-sm text-muted-foreground">{description}</p>
             )}

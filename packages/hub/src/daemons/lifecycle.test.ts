@@ -7,12 +7,16 @@ import type {
   DaemonEvent,
   DaemonConnection,
 } from "./protocol.js";
-import { createDaemonDispatchLifecycle, type DaemonDispatchLifecycle } from "./lifecycle.js";
+import {
+  createDaemonDispatchLifecycle,
+  DaemonDispatchFailure,
+  type DaemonDispatchLifecycle,
+} from "./lifecycle.js";
 import { createDurableWorkflowHandler } from "../workflows/engine.js";
 import type { TriggerProvider } from "../triggers/index.js";
 import { createUnlimitedEntitlementsService } from "../entitlements/test-utils.js";
 import type { DaemonRecord } from "../db/types.js";
-import { createLogger } from "../logger.js";
+import { createLogger, serializeError } from "../logger.js";
 import { assertOneFailure, FailureLogStream } from "../test-utils/failure-logs.js";
 
 const DAEMON_ID = "daemon-ack-test";
@@ -21,6 +25,22 @@ const EXECUTION_ID = "00000000-0000-4000-8000-000000000001";
 const ACKNOWLEDGED_AT = new Date("2026-01-01T00:00:01.000Z");
 
 describe("durable Hub action acknowledgement state", () => {
+  it("keeps the classified dispatch code in redacted error logs", () => {
+    const diagnostic = serializeError(
+      new DaemonDispatchFailure("github_authority_unavailable", {
+        cause: Object.assign(new Error("credential detail must not be logged"), {
+          code: "github_authority_unavailable",
+        }),
+      }),
+    );
+
+    assert.equal(diagnostic["code"], "github_authority_unavailable");
+    const cause = diagnostic["cause"];
+    assert.ok(typeof cause === "object" && cause !== null);
+    assert.equal(Reflect.get(cause, "code"), "github_authority_unavailable");
+    assert.equal(JSON.stringify(diagnostic).includes("credential detail"), false);
+  });
+
   it("logs a daemon execution recovery failure exactly once", async () => {
     const canary = "daemon-lifecycle-secret-4c09";
     const database = createMemoryDatabase();
@@ -53,6 +73,21 @@ describe("durable Hub action acknowledgement state", () => {
       canary,
     });
     await lifecycle.stop();
+  });
+
+  it("owns a rejected daemon event without leaking it to the process", async () => {
+    const fixture = await acknowledgementFixture();
+    await fixture.lifecycle.recoverPendingHubActions(DAEMON_ID);
+    vi.spyOn(fixture.database, "recordAgentExecutionHubAcknowledgement").mockRejectedValueOnce(
+      new Error("database event write failed"),
+    );
+
+    try {
+      await fixture.connection.emitObserved(turnCompleted());
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    } finally {
+      await fixture.lifecycle.stop();
+    }
   });
 
   it("defers workflow-owned terminal provider failure notification to the outbox", async () => {
@@ -258,6 +293,12 @@ class AcknowledgementConnection implements DaemonConnection {
     for (const handler of this.handlers) await handler(event);
   }
 
+  async emitObserved(event: DaemonEvent): Promise<void> {
+    for (const handler of this.handlers) {
+      await Promise.resolve(handler(event)).catch(() => undefined);
+    }
+  }
+
   async createAgent(): Promise<never> {
     throw new Error("not used");
   }
@@ -294,7 +335,7 @@ function daemonRecord(): DaemonRecord {
     serverId: "server-lifecycle",
     daemonPublicKey: "public-key",
     credentialVerifier: "verifier",
-    scopes: ["hub.execution.*"],
+    permissions: ["hub.execute"],
     registeredByApiKeyId: null,
     registeredByCliCredentialId: null,
     status: "active",

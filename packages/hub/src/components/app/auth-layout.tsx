@@ -83,7 +83,7 @@ export function ProductMark({ className }: { className?: string }) {
       <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
         <PaseoGlyph />
       </span>
-      <span className="text-sm font-medium">Paseo Hub</span>
+      <span className="text-sm">Paseo Hub</span>
     </div>
   );
 }

@@ -25,6 +25,7 @@ describe("provider application persistence", () => {
     const first = await embeddedDatabaseRuntime(root);
     await exercisePersistence(first);
     await exerciseSlackAtomicTransition(first);
+    await exerciseLinearScopeHealth(first);
     await first.runtime.close();
 
     const reopened = await embeddedDatabaseRuntime(root);
@@ -46,6 +47,7 @@ describe("provider application persistence", () => {
       const bundle = await postgresDatabaseRuntime(postgres.getConnectionUri());
       await exercisePersistence(bundle);
       await exerciseSlackAtomicTransition(bundle);
+      await exerciseLinearScopeHealth(bundle);
       await bundle.runtime.close();
 
       const reopened = await postgresDatabaseRuntime(postgres.getConnectionUri());
@@ -271,4 +273,43 @@ async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
     "socket",
   );
   assert.equal((await database.findSlackConnection("T2"))?.providerApplicationId, "A1");
+}
+
+async function exerciseLinearScopeHealth(bundle: DatabaseRuntimeBundle) {
+  await bundle.runtime.query(
+    `insert into linear_connections
+       (organization_id, linear_organization_id, provider_application_id, slug,
+        linear_organization_name, app_user_id, access_token, scopes, connected_by_user_id)
+     values ('org', 'linear-org', 'linear-app', 'acme-linear', 'Acme', 'linear-app-user',
+             'linear-token', '["read"]'::jsonb, 'operator')`,
+  );
+
+  assert.equal(
+    (await createProviderApplicationInventory(bundle.runtime).connectedIdentities("linear"))[0]
+      ?.status,
+    "actionNeeded",
+  );
+
+  await bundle.runtime.query(
+    `update linear_connections
+     set scopes = '["read", "comments:create"]'::jsonb,
+         access_token_expires_at = '2000-01-01T00:00:00.000Z',
+         refresh_token = null
+     where linear_organization_id = 'linear-org'`,
+  );
+  assert.equal(
+    (await createProviderApplicationInventory(bundle.runtime).connectedIdentities("linear"))[0]
+      ?.status,
+    "actionNeeded",
+  );
+
+  await bundle.runtime.query(
+    `update linear_connections set refresh_token = 'linear-refresh-token'
+     where linear_organization_id = 'linear-org'`,
+  );
+  assert.equal(
+    (await createProviderApplicationInventory(bundle.runtime).connectedIdentities("linear"))[0]
+      ?.status,
+    "connected",
+  );
 }

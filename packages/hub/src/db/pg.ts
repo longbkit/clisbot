@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
-import type { JsonValue } from "../config/compiler.js";
+import { parseCompiledHubConfig, type JsonValue } from "../config/compiler.js";
 import { parseInvocationInputs, parseInvocationRejection } from "../triggers/invocation.js";
 import type { ProviderEventDropReasonCode } from "../triggers/drop-reason.js";
 import {
@@ -55,7 +55,9 @@ import type {
   AdvanceGitHubConnectionAttemptInput,
   BindDiscordConnectionInput,
   BindGitHubConnectionInput,
+  BindLinearConnectionInput,
   BindSlackConnectionInput,
+  CompleteLinearProviderApplicationInput,
   CompleteSlackProviderApplicationInput,
   ConnectionStartAuthority,
   ConnectionProvider,
@@ -63,7 +65,10 @@ import type {
   StartConnectionAttemptInput,
   AcceptDiscordEventInput,
   AcceptGitHubEventInput,
+  AcceptLinearEventInput,
   AcceptSlackEventInput,
+  UpdateLinearConnectionTokensInput,
+  LinearConnectionRefreshOperation,
   GitHubLifecycleReceiptClaim,
   GitHubLifecycleReceiptClaimInput,
   GitHubLifecycleResult,
@@ -75,6 +80,11 @@ import type {
   GitHubRepositoryRecord,
   GitHubConfigurationTarget,
   ProjectTriggerRoute,
+  MigrateProjectTriggersInput,
+  OrganizationTriggerRecord,
+  OrganizationTriggerRevisionRecord,
+  PendingProjectTriggerMigration,
+  SaveOrganizationTriggerInput,
   CreateAcceptedTriggerRunInput,
   CreateRejectedTriggerRunInput,
   AgentExecutionHubAcknowledgementInput,
@@ -101,8 +111,8 @@ import type {
   BillingPlanRecord,
   BillingPlanPriceRecord,
   SyncBillingPlanInput,
-  OrganizationSubscriptionRecord,
-  ReconcileOrganizationSubscriptionInput,
+  OrganizationBillingCustomerRecord,
+  ReconcileOrganizationBillingInput,
 } from "./types.js";
 
 const OUTPUT_ATTEMPT_LEASE_MS = 5 * 60_000;
@@ -143,6 +153,10 @@ class PgDatabase implements Database {
 
   acceptSlackEvent(input: AcceptSlackEventInput) {
     return this.triggerAcceptance.acceptSlack(input);
+  }
+
+  acceptLinearEvent(input: AcceptLinearEventInput) {
+    return this.triggerAcceptance.acceptLinear(input);
   }
 
   persistManualEvent(input: PersistManualEventInput) {
@@ -1605,7 +1619,7 @@ class PgDatabase implements Database {
             input.serverId,
             input.daemonPublicKey,
             input.credentialVerifier,
-            JSON.stringify(input.scopes),
+            JSON.stringify(input.permissions),
             consumedToken.issued_by_api_key_id,
             consumedToken.issued_by_cli_credential_id,
           ],
@@ -1629,7 +1643,7 @@ class PgDatabase implements Database {
               input.serverId,
               input.daemonPublicKey,
               input.credentialVerifier,
-              JSON.stringify(input.scopes),
+              JSON.stringify(input.permissions),
               consumedToken.issued_by_api_key_id,
               consumedToken.issued_by_cli_credential_id,
             ],
@@ -1723,6 +1737,15 @@ class PgDatabase implements Database {
       `update daemons set presence = $2, connected_at = case when $2 = 'connected' then now() else connected_at end, disconnected_at = case when $2 = 'offline' then now() else disconnected_at end where id = $1`,
       [id, presence],
     );
+  }
+
+  async setDaemonPermissions(id: string, permissions: string[]): Promise<DaemonRecord | undefined> {
+    const rows = await query<DaemonRow>(
+      this.pool,
+      `update daemons set scopes = $2 where id = $1 and status = 'active' returning *`,
+      [id, JSON.stringify(permissions)],
+    );
+    return rows.rows[0] === undefined ? undefined : toDaemon(rows.rows[0]);
   }
 
   async revokeDaemon(id: string): Promise<boolean> {
@@ -1990,7 +2013,7 @@ class PgDatabase implements Database {
   async beginAgentExecutionOutput(
     executionId: string,
     outputType: string,
-    maxOutputs: number,
+    maxOutputs: number | undefined,
     startedAt: Date,
   ): Promise<AgentExecutionOutputAttempt | undefined> {
     try {
@@ -2011,9 +2034,10 @@ class PgDatabase implements Database {
             attempt.leaseExpiresAt > startedAt,
         ).length;
         if (
-          maxOutputs < 1 ||
+          (maxOutputs !== undefined && maxOutputs < 1) ||
           (execution.status !== "spawning" && execution.status !== "running") ||
-          (execution.outputEmissions[outputType] ?? 0) + activeAttempts >= maxOutputs
+          (maxOutputs !== undefined &&
+            (execution.outputEmissions[outputType] ?? 0) + activeAttempts >= maxOutputs)
         ) {
           return undefined;
         }
@@ -2681,37 +2705,24 @@ class PgDatabase implements Database {
     return plans.rows.map((row) => toBillingPlanRecord(row, pricesByPlan.get(row.id) ?? []));
   }
 
-  async reconcileOrganizationSubscription(
-    input: ReconcileOrganizationSubscriptionInput,
-  ): Promise<OrganizationSubscriptionRecord> {
+  async reconcileOrganizationBilling(
+    input: ReconcileOrganizationBillingInput,
+  ): Promise<OrganizationBillingCustomerRecord> {
     try {
       return await this.pool.transaction(async (client) => {
-        const rows = await client.query<OrganizationSubscriptionRow>(
-          `insert into organization_subscriptions
-           (organization_id, stripe_customer_id, stripe_subscription_id, plan_id, status,
-            current_period_end, cancel_at_period_end, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, now())
+        const rows = await client.query<OrganizationBillingCustomerRow>(
+          `insert into organization_billing_customers
+           (organization_id, stripe_customer_id, updated_at)
+         values ($1, $2, now())
          on conflict (organization_id) do update
            set stripe_customer_id = excluded.stripe_customer_id,
-               stripe_subscription_id = excluded.stripe_subscription_id,
-               plan_id = excluded.plan_id,
-               status = excluded.status,
-               current_period_end = excluded.current_period_end,
-               cancel_at_period_end = excluded.cancel_at_period_end,
                updated_at = now()
          returning *`,
-          [
-            input.organizationId,
-            input.stripeCustomerId,
-            input.stripeSubscriptionId,
-            input.planId,
-            input.status,
-            input.currentPeriodEnd,
-            input.cancelAtPeriodEnd,
-          ],
+          [input.organizationId, input.stripeCustomerId],
         );
         const row = rows.rows[0];
-        if (row === undefined) throw new Error("organization subscription upsert returned no row");
+        if (row === undefined)
+          throw new Error("organization billing customer upsert returned no row");
         // Same transaction as the mirror upsert: the plan the org is billed on and the entitlements
         // it enforces can never diverge across a crash between the two writes.
         if (input.stamp !== undefined) {
@@ -2720,7 +2731,7 @@ class PgDatabase implements Database {
             ...input.stamp,
           });
         }
-        return toOrganizationSubscriptionRecord(row);
+        return toOrganizationBillingCustomerRecord(row);
       });
     } catch (error) {
       throw toDatabaseError(error);
@@ -2731,24 +2742,447 @@ class PgDatabase implements Database {
     return this.locks.withLock(key, fn);
   }
 
-  async getOrganizationSubscription(
+  async getOrganizationBillingCustomer(
     organizationId: string,
-  ): Promise<OrganizationSubscriptionRecord | undefined> {
-    const rows = await query<OrganizationSubscriptionRow>(
+  ): Promise<OrganizationBillingCustomerRecord | undefined> {
+    const rows = await query<OrganizationBillingCustomerRow>(
       this.pool,
-      `select * from organization_subscriptions where organization_id = $1`,
+      `select * from organization_billing_customers where organization_id = $1`,
       [organizationId],
     );
-    return rows.rows[0] === undefined ? undefined : toOrganizationSubscriptionRecord(rows.rows[0]);
+    return rows.rows[0] === undefined
+      ? undefined
+      : toOrganizationBillingCustomerRecord(rows.rows[0]);
   }
 
   async listProjectsForOrganization(organizationId: string): Promise<ProjectRecord[]> {
     const rows = await query<ProjectRow>(
       this.pool,
-      `select * from projects where organization_id = $1 order by name, id`,
+      `select * from projects p
+       where organization_id = $1
+         and status = 'active'
+         and not exists (select 1 from organization_triggers t where t.runtime_project_id = p.id)
+       order by name, id`,
       [organizationId],
     );
     return rows.rows.map(toProjectRecord);
+  }
+
+  async listPendingProjectTriggerMigrations(): Promise<PendingProjectTriggerMigration[]> {
+    const rows = await query<PendingProjectTriggerMigrationRow>(
+      this.pool,
+      `select
+         p.id as p_id, p.organization_id as p_organization_id, p.name as p_name,
+         p.slug as p_slug, p.status as p_status, p.created_by_user_id as p_created_by_user_id,
+         p.created_at as p_created_at, p.updated_at as p_updated_at,
+         p.archived_at as p_archived_at,
+         p.active_configuration_revision_id as p_active_configuration_revision_id,
+         r.id as r_id, r.project_id as r_project_id, r.organization_id as r_organization_id,
+         r.version as r_version, r.source_kind as r_source_kind,
+         r.source_evidence as r_source_evidence, r.raw_yaml as r_raw_yaml,
+         r.normalized_configuration as r_normalized_configuration,
+         r.validation_errors as r_validation_errors, r.content_hash as r_content_hash,
+         r.created_by_user_id as r_created_by_user_id, r.received_at as r_received_at,
+         r.created_at as r_created_at, r.validated_at as r_validated_at
+       from projects p
+       join project_configuration_revisions r on r.id = p.active_configuration_revision_id
+       left join project_trigger_migrations m on m.project_id = p.id
+       where p.status = 'active' and m.project_id is null
+         and not exists (
+           select 1 from organization_triggers t where t.runtime_project_id = p.id
+         )
+       order by p.organization_id, p.created_at, p.id`,
+    );
+    return rows.rows.map((row) => ({
+      project: toProjectRecord(projectRowFromMigration(row)),
+      revision: toProjectConfigurationRevisionRecord(revisionRowFromMigration(row)),
+    }));
+  }
+
+  async migrateProjectTriggers(
+    input: MigrateProjectTriggersInput,
+  ): Promise<OrganizationTriggerRecord[]> {
+    return this.pool.transaction(async (client) => {
+      const project = await client.query<{
+        active_configuration_revision_id: string | null;
+        organization_id: string;
+      }>(
+        `select organization_id, active_configuration_revision_id
+         from projects where id = $1 for update`,
+        [input.projectId],
+      );
+      const current = project.rows[0];
+      const alreadyMigrated = await client.query(
+        `select project_id from project_trigger_migrations where project_id = $1`,
+        [input.projectId],
+      );
+      if (alreadyMigrated.rowCount > 0) {
+        return [];
+      }
+      if (
+        current === undefined ||
+        current.organization_id !== input.organizationId ||
+        current.active_configuration_revision_id !== input.configurationRevisionId
+      ) {
+        throw new Error("project configuration changed during trigger migration");
+      }
+
+      const legacyRouteRows = await client.query<{
+        provider: ConnectionProvider;
+        connection_id: string;
+        resource_id: string | null;
+        trigger_name: string;
+      }>(
+        `select provider, connection_id::text, resource_id, trigger_name
+         from project_trigger_routes
+         where project_id = $1 and configuration_revision_id = $2
+         order by trigger_name, provider, connection_id, resource_id nulls first`,
+        [input.projectId, input.configurationRevisionId],
+      );
+      const configurations = input.triggers.map((candidate) =>
+        parseCompiledHubConfig(candidate.normalizedConfiguration),
+      );
+      const candidateRoutes = input.triggers.map((candidate, index) => {
+        const configuredEventName = configurations[index]!.triggers[0]?.on;
+        if (configuredEventName === undefined) {
+          throw new Error(`migrated trigger ${candidate.name} has no configured event`);
+        }
+        return legacyRouteRows.rows
+          .filter((route) => route.trigger_name === candidate.name)
+          .map((route) => ({
+            provider: route.provider,
+            connectionId: route.connection_id,
+            resourceId: route.resource_id,
+            configuredEventName,
+          }));
+      });
+      if (
+        candidateRoutes.reduce((total, routes) => total + routes.length, 0) !==
+        legacyRouteRows.rows.length
+      ) {
+        throw new Error("project trigger routes do not match migrated triggers");
+      }
+
+      const names = await client.query<{ name: string }>(
+        `select name from organization_triggers where organization_id = $1 for update`,
+        [input.organizationId],
+      );
+      const occupied = new Set(names.rows.map(({ name }) => name));
+      const created: OrganizationTriggerRecord[] = [];
+      for (const [index, candidate] of input.triggers.entries()) {
+        const routes = candidateRoutes[index]!;
+        const name = availableMigratedTriggerName(occupied, input.projectSlug, candidate.name);
+        occupied.add(name);
+        const runtimeProjectRows = await client.query<ProjectRow>(
+          `insert into projects
+             (organization_id, name, slug, created_by_user_id)
+           values ($1, $2, $3, null) returning *`,
+          [
+            input.organizationId,
+            `Trigger runtime: ${name}`,
+            `trigger-${randomUUID().replaceAll("-", "")}`,
+          ],
+        );
+        const runtimeProject = runtimeProjectRows.rows[0]!;
+        await client.query(
+          `insert into project_configuration_sources
+             (project_id, organization_id, kind, automatic_deployment_enabled, selected_by_user_id)
+           values ($1, $2, 'manual', false, null)`,
+          [runtimeProject.id, input.organizationId],
+        );
+        const triggerRows = await client.query<OrganizationTriggerRow>(
+          `insert into organization_triggers
+             (organization_id, name, enabled, format, runtime_project_id)
+           values ($1, $2, $3, $4, $5) returning *`,
+          [input.organizationId, name, candidate.enabled, candidate.format, runtimeProject.id],
+        );
+        const trigger = triggerRows.rows[0]!;
+        const revisionRows = await client.query<OrganizationTriggerRevisionRow>(
+          `insert into organization_trigger_revisions (
+             trigger_id, organization_id, version, yaml, normalized_configuration,
+             content_hash, source_kind, source_evidence, created_by_user_id
+           ) values ($1, $2, 1, $3, $4, $5, 'project_migration', $6, null)
+           returning *`,
+          [
+            trigger.id,
+            input.organizationId,
+            candidate.yaml,
+            candidate.normalizedConfiguration,
+            candidate.contentHash,
+            candidate.sourceEvidence,
+          ],
+        );
+        const revision = revisionRows.rows[0]!;
+        for (const route of routes) {
+          await client.query(
+            `insert into organization_trigger_routes (
+               organization_id, trigger_id, trigger_revision_id, provider,
+               connection_id, resource_id, configured_event_name
+             ) values ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              input.organizationId,
+              trigger.id,
+              revision.id,
+              route.provider,
+              route.connectionId,
+              route.resourceId,
+              route.configuredEventName,
+            ],
+          );
+        }
+        const runtimeRevisionRows = await client.query<ProjectConfigurationRevisionRow>(
+          `insert into project_configuration_revisions (
+             project_id, organization_id, version, source_kind, source_evidence, raw_yaml,
+             normalized_configuration, validation_errors, content_hash,
+             created_by_user_id, received_at, validated_at
+           ) values ($1, $2, 1, 'manual', $3, $4, $5, null, $6, null,
+             clock_timestamp(), clock_timestamp()) returning *`,
+          [
+            runtimeProject.id,
+            input.organizationId,
+            { kind: "organization_trigger_adapter", triggerId: trigger.id },
+            candidate.yaml,
+            candidate.normalizedConfiguration,
+            candidate.contentHash,
+          ],
+        );
+        const runtimeRevision = runtimeRevisionRows.rows[0]!;
+        const configuration = configurations[index]!;
+        for (const route of routes) {
+          const configuredTriggerName =
+            configuration.triggers.find(({ on }) => on === route.configuredEventName)?.name ??
+            configuration.triggers[0]?.name ??
+            name;
+          await client.query(
+            `insert into project_trigger_routes (
+               organization_id, project_id, configuration_revision_id, provider,
+               connection_id, resource_id, trigger_name
+             ) values ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              input.organizationId,
+              runtimeProject.id,
+              runtimeRevision.id,
+              route.provider,
+              route.connectionId,
+              route.resourceId,
+              configuredTriggerName,
+            ],
+          );
+        }
+        await client.query(
+          `update projects set active_configuration_revision_id = $2,
+             updated_at = clock_timestamp() where id = $1`,
+          [runtimeProject.id, runtimeRevision.id],
+        );
+        const activated = await client.query<OrganizationTriggerRow>(
+          `update organization_triggers
+           set active_revision_id = $2, updated_at = clock_timestamp()
+           where id = $1 returning *`,
+          [trigger.id, revision.id],
+        );
+        created.push(toOrganizationTriggerRecord(activated.rows[0]!));
+      }
+      await client.query(
+        `insert into project_trigger_migrations
+           (project_id, organization_id, configuration_revision_id)
+         values ($1, $2, $3)`,
+        [input.projectId, input.organizationId, input.configurationRevisionId],
+      );
+      await client.query(`delete from project_trigger_routes where project_id = $1`, [
+        input.projectId,
+      ]);
+      await client.query(
+        `update projects set status = 'archived', archived_at = clock_timestamp(),
+           active_configuration_revision_id = null, updated_at = clock_timestamp()
+         where id = $1`,
+        [input.projectId],
+      );
+      return created;
+    });
+  }
+
+  async listOrganizationTriggers(organizationId: string): Promise<OrganizationTriggerRecord[]> {
+    const rows = await query<OrganizationTriggerRow>(
+      this.pool,
+      `select * from organization_triggers
+       where organization_id = $1 and active_revision_id is not null
+       order by name, id`,
+      [organizationId],
+    );
+    return rows.rows.map(toOrganizationTriggerRecord);
+  }
+
+  async findOrganizationTriggerRevision(
+    triggerId: string,
+    revisionId: string,
+  ): Promise<OrganizationTriggerRevisionRecord | undefined> {
+    const rows = await query<OrganizationTriggerRevisionRow>(
+      this.pool,
+      `select * from organization_trigger_revisions where trigger_id = $1 and id = $2`,
+      [triggerId, revisionId],
+    );
+    return rows.rows[0] === undefined
+      ? undefined
+      : toOrganizationTriggerRevisionRecord(rows.rows[0]);
+  }
+
+  async findOrganizationTriggerMigrationRevision(
+    triggerId: string,
+  ): Promise<OrganizationTriggerRevisionRecord | undefined> {
+    const rows = await query<OrganizationTriggerRevisionRow>(
+      this.pool,
+      `select * from organization_trigger_revisions
+       where trigger_id = $1 and source_kind = 'project_migration'
+       order by version limit 1`,
+      [triggerId],
+    );
+    return rows.rows[0] === undefined
+      ? undefined
+      : toOrganizationTriggerRevisionRecord(rows.rows[0]);
+  }
+
+  async saveOrganizationTrigger(
+    input: SaveOrganizationTriggerInput,
+  ): Promise<OrganizationTriggerRecord> {
+    return this.pool.transaction(async (client) => {
+      let trigger: OrganizationTriggerRow;
+      if (input.triggerId === undefined) {
+        const runtimeProjectRows = await client.query<ProjectRow>(
+          `insert into projects
+             (organization_id, name, slug, created_by_user_id)
+           values ($1, $2, $3, $4) returning *`,
+          [
+            input.organizationId,
+            `Trigger runtime: ${input.name}`,
+            `trigger-${randomUUID().replaceAll("-", "")}`,
+            input.createdByUserId,
+          ],
+        );
+        const runtimeProject = runtimeProjectRows.rows[0]!;
+        await client.query(
+          `insert into project_configuration_sources
+             (project_id, organization_id, kind, automatic_deployment_enabled, selected_by_user_id)
+           values ($1, $2, 'manual', false, $3)`,
+          [runtimeProject.id, input.organizationId, input.createdByUserId],
+        );
+        const inserted = await client.query<OrganizationTriggerRow>(
+          `insert into organization_triggers
+             (organization_id, name, enabled, format, runtime_project_id)
+           values ($1, $2, $3, $4, $5) returning *`,
+          [input.organizationId, input.name, input.enabled, input.format, runtimeProject.id],
+        );
+        trigger = inserted.rows[0]!;
+      } else {
+        const updated = await client.query<OrganizationTriggerRow>(
+          `update organization_triggers
+           set name = $3, enabled = $4, format = $5, updated_at = clock_timestamp()
+           where id = $1 and organization_id = $2 returning *`,
+          [input.triggerId, input.organizationId, input.name, input.enabled, input.format],
+        );
+        if (updated.rows[0] === undefined) throw new Error("organization trigger not found");
+        trigger = updated.rows[0];
+      }
+      const revisionRows = await client.query<OrganizationTriggerRevisionRow>(
+        `insert into organization_trigger_revisions (
+           trigger_id, organization_id, version, yaml, normalized_configuration,
+           content_hash, source_kind, source_evidence, created_by_user_id
+         ) values (
+           $1, $2,
+           coalesce((select max(version) + 1 from organization_trigger_revisions where trigger_id = $1), 1),
+           $3, $4, $5, $6, $7, $8
+         ) returning *`,
+        [
+          trigger.id,
+          input.organizationId,
+          input.yaml,
+          input.normalizedConfiguration,
+          input.contentHash,
+          input.sourceKind,
+          input.sourceEvidence,
+          input.createdByUserId,
+        ],
+      );
+      const revision = revisionRows.rows[0]!;
+      await client.query(`delete from organization_trigger_routes where trigger_id = $1`, [
+        trigger.id,
+      ]);
+      for (const route of input.routes) {
+        await client.query(
+          `insert into organization_trigger_routes (
+             organization_id, trigger_id, trigger_revision_id, provider,
+             connection_id, resource_id, configured_event_name
+           ) values ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            input.organizationId,
+            trigger.id,
+            revision.id,
+            route.provider,
+            route.connectionId,
+            route.resourceId,
+            route.configuredEventName,
+          ],
+        );
+      }
+      const runtimeRevisionRows = await client.query<ProjectConfigurationRevisionRow>(
+        `insert into project_configuration_revisions (
+           project_id, organization_id, version, source_kind, source_evidence, raw_yaml,
+           normalized_configuration, validation_errors, content_hash,
+           created_by_user_id, received_at, validated_at
+         ) values (
+           $1, $2,
+           coalesce((select max(version) + 1 from project_configuration_revisions where project_id = $1), 1),
+           $3, $4, $5, $6, null, $7, $8, clock_timestamp(), clock_timestamp()
+         ) returning *`,
+        [
+          trigger.runtime_project_id,
+          input.organizationId,
+          input.sourceKind,
+          { kind: "organization_trigger_adapter", triggerId: trigger.id },
+          input.yaml,
+          input.normalizedConfiguration,
+          input.contentHash,
+          input.createdByUserId,
+        ],
+      );
+      const runtimeRevision = runtimeRevisionRows.rows[0]!;
+      await client.query(`delete from project_trigger_routes where project_id = $1`, [
+        trigger.runtime_project_id,
+      ]);
+      const configuration = parseCompiledHubConfig(input.normalizedConfiguration);
+      for (const route of input.routes) {
+        const configuredTriggerName =
+          configuration.triggers.find(({ on }) => on === route.configuredEventName)?.name ??
+          configuration.triggers[0]?.name ??
+          input.name;
+        await client.query(
+          `insert into project_trigger_routes (
+             organization_id, project_id, configuration_revision_id, provider,
+             connection_id, resource_id, trigger_name
+           ) values ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            input.organizationId,
+            trigger.runtime_project_id,
+            runtimeRevision.id,
+            route.provider,
+            route.connectionId,
+            route.resourceId,
+            configuredTriggerName,
+          ],
+        );
+      }
+      await client.query(
+        `update projects set active_configuration_revision_id = $2, updated_at = clock_timestamp()
+         where id = $1`,
+        [trigger.runtime_project_id, runtimeRevision.id],
+      );
+      const activated = await client.query<OrganizationTriggerRow>(
+        `update organization_triggers
+         set active_revision_id = $2, updated_at = clock_timestamp()
+         where id = $1 returning *`,
+        [trigger.id, revision.id],
+      );
+      return toOrganizationTriggerRecord(activated.rows[0]!);
+    });
   }
 
   async findProjectForOrganization(organizationId: string, projectId: string) {
@@ -3374,7 +3808,7 @@ class PgDatabase implements Database {
        order by connection.account_login, connection.id`,
       [organizationId],
     );
-    const [discord, slack] = await Promise.all([
+    const [discord, slack, linear] = await Promise.all([
       query<{
         id: string;
         organization_id: string;
@@ -3407,6 +3841,27 @@ class PgDatabase implements Database {
          order by team_name, id`,
         [organizationId],
       ),
+      query<{
+        id: string;
+        organization_id: string;
+        slug: string;
+        linear_organization_id: string;
+        linear_organization_name: string;
+        app_user_id: string;
+        access_token: string;
+        refresh_token: string | null;
+        access_token_expires_at: Date | null;
+        scopes: unknown;
+        provider_application_id: string | null;
+      }>(
+        this.pool,
+        `select id, organization_id, slug, linear_organization_id, linear_organization_name,
+                app_user_id, access_token, refresh_token, access_token_expires_at, scopes,
+                provider_application_id
+         from linear_connections where organization_id = $1
+         order by linear_organization_name, id`,
+        [organizationId],
+      ),
     ]);
     return {
       github: github.rows.map((row) => ({
@@ -3436,6 +3891,19 @@ class PgDatabase implements Database {
         teamName: row.team_name,
         botUserId: row.bot_user_id,
         botAccessToken: row.bot_access_token,
+        scopes: stringArray(row.scopes),
+        providerApplicationId: row.provider_application_id,
+      })),
+      linear: linear.rows.map((row) => ({
+        id: row.id,
+        organizationId: row.organization_id,
+        slug: row.slug,
+        linearOrganizationId: row.linear_organization_id,
+        linearOrganizationName: row.linear_organization_name,
+        appUserId: row.app_user_id,
+        accessToken: row.access_token,
+        refreshToken: row.refresh_token,
+        accessTokenExpiresAt: row.access_token_expires_at,
         scopes: stringArray(row.scopes),
         providerApplicationId: row.provider_application_id,
       })),
@@ -3646,6 +4114,25 @@ class PgDatabase implements Database {
     return this.connections.completeSlackProviderApplication(input);
   }
 
+  bindLinearConnection(input: BindLinearConnectionInput): Promise<void> {
+    return this.connections.bindLinear(input);
+  }
+
+  completeLinearProviderApplication(input: CompleteLinearProviderApplicationInput): Promise<void> {
+    return this.connections.completeLinearProviderApplication(input);
+  }
+
+  updateLinearConnectionTokens(input: UpdateLinearConnectionTokensInput): Promise<void> {
+    return this.connections.updateLinearTokens(input);
+  }
+
+  withLinearConnectionRefresh<T>(
+    linearOrganizationId: string,
+    operation: LinearConnectionRefreshOperation<T>,
+  ): Promise<T> {
+    return this.connections.withLinearRefresh(linearOrganizationId, operation);
+  }
+
   disconnectConnection(
     provider: ConnectionProvider,
     connectionId: string,
@@ -3666,8 +4153,16 @@ class PgDatabase implements Database {
     return this.connections.findSlack(teamId);
   }
 
+  findLinearConnection(linearOrganizationId: string) {
+    return this.connections.findLinear(linearOrganizationId);
+  }
+
   findSlackConnectionForOrganization(organizationId: string, teamId: string) {
     return this.connections.findSlackForOrganization(organizationId, teamId);
+  }
+
+  findLinearConnectionForOrganization(organizationId: string, linearOrganizationId: string) {
+    return this.connections.findLinearForOrganization(organizationId, linearOrganizationId);
   }
 
   findDiscordConnectionForOrganization(organizationId: string, guildId: string) {
@@ -4143,7 +4638,7 @@ function toDaemon(row: DaemonRow): DaemonRecord {
     serverId: row.server_id,
     daemonPublicKey: row.daemon_public_key,
     credentialVerifier: row.credential_verifier,
-    scopes: row.scopes,
+    permissions: semanticDaemonPermissions(row.scopes),
     registeredByApiKeyId: row.registered_by_api_key_id,
     registeredByCliCredentialId: row.registered_by_cli_credential_id,
     status: row.status,
@@ -4153,6 +4648,14 @@ function toDaemon(row: DaemonRow): DaemonRecord {
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
   };
+}
+
+function semanticDaemonPermissions(stored: readonly string[]): string[] {
+  return [
+    ...new Set(
+      stored.map((permission) => (permission === "hub.execution.*" ? "hub.execute" : permission)),
+    ),
+  ];
 }
 
 function toCliAuthorization(row: CliAuthorizationRow): CliAuthorizationRecord {
@@ -4186,7 +4689,7 @@ export interface OrganizationEntitlementsRow extends QueryRow {
  * that lands the same granted template and the same plan provenance is a no-op — no timestamp
  * bump, no duplicate audit row — which is what stops the webhook re-stamp ping-pong. jsonb
  * `is distinct from` compares granted structurally. Shared by `stampOrganizationEntitlements`
- * and `reconcileOrganizationSubscription` so the subscription mirror and the stamp commit
+ * and `reconcileOrganizationBilling` so the subscription mirror and the stamp commit
  * together.
  */
 async function stampEntitlementsWithinTransaction(
@@ -4361,28 +4864,18 @@ function toBillingPlanRecord(
   };
 }
 
-export interface OrganizationSubscriptionRow extends QueryRow {
+export interface OrganizationBillingCustomerRow extends QueryRow {
   organization_id: string;
   stripe_customer_id: string;
-  stripe_subscription_id: string;
-  plan_id: string | null;
-  status: string;
-  current_period_end: Date | null;
-  cancel_at_period_end: boolean;
   updated_at: Date;
 }
 
-function toOrganizationSubscriptionRecord(
-  row: OrganizationSubscriptionRow,
-): OrganizationSubscriptionRecord {
+function toOrganizationBillingCustomerRecord(
+  row: OrganizationBillingCustomerRow,
+): OrganizationBillingCustomerRecord {
   return {
     organizationId: row.organization_id,
     stripeCustomerId: row.stripe_customer_id,
-    stripeSubscriptionId: row.stripe_subscription_id,
-    planId: row.plan_id,
-    status: row.status,
-    currentPeriodEnd: row.current_period_end,
-    cancelAtPeriodEnd: row.cancel_at_period_end,
     updatedAt: row.updated_at,
   };
 }
@@ -4440,6 +4933,141 @@ export interface ProjectConfigurationRevisionRow extends QueryRow {
   received_at: Date | null;
   created_at: Date;
   validated_at: Date | null;
+}
+
+interface OrganizationTriggerRow extends QueryRow {
+  id: string;
+  organization_id: string;
+  name: string;
+  enabled: boolean;
+  format: "single_run" | "legacy_multistep";
+  runtime_project_id: string;
+  active_revision_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface OrganizationTriggerRevisionRow extends QueryRow {
+  id: string;
+  trigger_id: string;
+  organization_id: string;
+  version: number;
+  yaml: string;
+  normalized_configuration: unknown;
+  content_hash: string;
+  source_kind: "manual" | "github" | "project_migration";
+  source_evidence: unknown;
+  created_by_user_id: string | null;
+  created_at: Date;
+}
+
+interface PendingProjectTriggerMigrationRow extends QueryRow {
+  p_id: string;
+  p_organization_id: string;
+  p_name: string;
+  p_slug: string;
+  p_status: "active" | "archived";
+  p_created_by_user_id: string | null;
+  p_created_at: Date;
+  p_updated_at: Date;
+  p_archived_at: Date | null;
+  p_active_configuration_revision_id: string | null;
+  r_id: string;
+  r_project_id: string;
+  r_organization_id: string;
+  r_version: number;
+  r_source_kind: "github" | "manual";
+  r_source_evidence: unknown;
+  r_raw_yaml: string | null;
+  r_normalized_configuration: unknown;
+  r_validation_errors: unknown;
+  r_content_hash: string;
+  r_created_by_user_id: string | null;
+  r_received_at: Date | null;
+  r_created_at: Date;
+  r_validated_at: Date | null;
+}
+
+function projectRowFromMigration(row: PendingProjectTriggerMigrationRow): ProjectRow {
+  return {
+    id: row.p_id,
+    organization_id: row.p_organization_id,
+    name: row.p_name,
+    slug: row.p_slug,
+    status: row.p_status,
+    created_by_user_id: row.p_created_by_user_id,
+    created_at: row.p_created_at,
+    updated_at: row.p_updated_at,
+    archived_at: row.p_archived_at,
+    active_configuration_revision_id: row.p_active_configuration_revision_id,
+  };
+}
+
+function revisionRowFromMigration(
+  row: PendingProjectTriggerMigrationRow,
+): ProjectConfigurationRevisionRow {
+  return {
+    id: row.r_id,
+    project_id: row.r_project_id,
+    organization_id: row.r_organization_id,
+    version: row.r_version,
+    source_kind: row.r_source_kind,
+    source_evidence: row.r_source_evidence,
+    raw_yaml: row.r_raw_yaml,
+    normalized_configuration: row.r_normalized_configuration,
+    validation_errors: row.r_validation_errors,
+    content_hash: row.r_content_hash,
+    created_by_user_id: row.r_created_by_user_id,
+    received_at: row.r_received_at,
+    created_at: row.r_created_at,
+    validated_at: row.r_validated_at,
+  };
+}
+
+function toOrganizationTriggerRecord(row: OrganizationTriggerRow): OrganizationTriggerRecord {
+  if (row.active_revision_id === null) throw new Error("organization trigger is not active");
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    name: row.name,
+    enabled: row.enabled,
+    format: row.format,
+    runtimeProjectId: row.runtime_project_id,
+    activeRevisionId: row.active_revision_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toOrganizationTriggerRevisionRecord(
+  row: OrganizationTriggerRevisionRow,
+): OrganizationTriggerRevisionRecord {
+  return {
+    id: row.id,
+    triggerId: row.trigger_id,
+    organizationId: row.organization_id,
+    version: row.version,
+    yaml: row.yaml,
+    normalizedConfiguration: row.normalized_configuration,
+    contentHash: row.content_hash,
+    sourceKind: row.source_kind,
+    sourceEvidence: row.source_evidence,
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+  };
+}
+
+function availableMigratedTriggerName(
+  occupied: ReadonlySet<string>,
+  projectSlug: string,
+  requestedName: string,
+): string {
+  if (!occupied.has(requestedName)) return requestedName;
+  const base = `${projectSlug}-${requestedName}`;
+  if (!occupied.has(base)) return base;
+  let suffix = 2;
+  while (occupied.has(`${base}-${String(suffix)}`)) suffix += 1;
+  return `${base}-${String(suffix)}`;
 }
 
 interface GitHubRepositoryRow extends QueryRow {

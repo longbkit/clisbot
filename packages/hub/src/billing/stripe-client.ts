@@ -90,19 +90,45 @@ export function createStripeBillingClient(stripeSecretKey: string): StripeBillin
       );
       return customer.id;
     },
+    async listCustomerSubscriptions(
+      customerId: string,
+    ): Promise<readonly StripeSubscriptionState[]> {
+      const result: StripeSubscriptionState[] = [];
+      for await (const subscription of stripe.subscriptions.list({
+        customer: customerId,
+        status: "all",
+        limit: LIST_PAGE_SIZE,
+      })) {
+        const organizationId = subscription.metadata[ORGANIZATION_REFERENCE_METADATA_KEY];
+        const item = subscription.items.data[0];
+        if (organizationId !== undefined && item !== undefined)
+          result.push(toSubscriptionState(subscription, organizationId, item));
+      }
+      return result;
+    },
     async createCheckoutSession(input: CreateCheckoutSessionInput): Promise<{ url: string }> {
-      const session = await stripe.checkout.sessions.create({
-        mode: "subscription",
-        customer: input.customerId,
-        line_items: [{ price: input.priceId, quantity: input.quantity }],
-        success_url: input.successUrl,
-        cancel_url: input.cancelUrl,
-        client_reference_id: input.organizationId,
-        subscription_data: {
+      const session = await stripe.checkout.sessions.create(
+        {
+          mode: "subscription",
+          customer: input.customerId,
+          line_items: [{ price: input.priceId, quantity: input.quantity }],
+          success_url: input.successUrl,
+          cancel_url: input.cancelUrl,
+          client_reference_id: input.organizationId,
           metadata: { [ORGANIZATION_REFERENCE_METADATA_KEY]: input.organizationId },
+          subscription_data: input.trial
+            ? {
+                trial_period_days: 14,
+                trial_settings: { end_behavior: { missing_payment_method: "cancel" } },
+                metadata: { [ORGANIZATION_REFERENCE_METADATA_KEY]: input.organizationId },
+              }
+            : { metadata: { [ORGANIZATION_REFERENCE_METADATA_KEY]: input.organizationId } },
+          ...(input.trial ? { payment_method_collection: "if_required" } : {}),
         },
-        metadata: { [ORGANIZATION_REFERENCE_METADATA_KEY]: input.organizationId },
-      });
+        {
+          idempotencyKey: `checkout:${input.organizationId}:${input.priceId}:${input.trial ? "trial" : "paid"}`,
+        },
+      );
       if (session.url === null) throw new Error("Stripe checkout session has no redirect URL");
       return { url: session.url };
     },
@@ -147,19 +173,26 @@ export function createStripeBillingClient(stripeSecretKey: string): StripeBillin
       const organizationId = subscription.metadata[ORGANIZATION_REFERENCE_METADATA_KEY];
       const item = subscription.items.data[0];
       if (organizationId === undefined || item === undefined) return undefined;
-      return {
-        id: subscription.id,
-        customerId:
-          typeof subscription.customer === "string"
-            ? subscription.customer
-            : subscription.customer.id,
-        organizationId,
-        priceId: item.price.id,
-        quantity: item.quantity ?? 1,
-        status: subscription.status,
-        currentPeriodEnd: new Date(item.current_period_end * 1000),
-        cancelAtPeriodEnd: subscription.cancel_at_period_end,
-      };
+      return toSubscriptionState(subscription, organizationId, item);
     },
+  };
+}
+
+function toSubscriptionState(
+  subscription: StripeSDK.Subscription,
+  organizationId: string,
+  item: StripeSDK.SubscriptionItem,
+): StripeSubscriptionState {
+  return {
+    id: subscription.id,
+    customerId:
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+    organizationId,
+    priceId: item.price.id,
+    quantity: item.quantity ?? 1,
+    status: subscription.status,
+    currentPeriodEnd: new Date(item.current_period_end * 1000),
+    trialEnd: subscription.trial_end === null ? null : new Date(subscription.trial_end * 1000),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
   };
 }

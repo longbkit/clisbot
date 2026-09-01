@@ -14,7 +14,7 @@ function DashboardLanding() {
   const search = Route.useSearch();
   return (
     <Navigate
-      to={`/o/${account.organization.slug}/projects` as never}
+      to={`/o/${account.organization.slug}/triggers` as never}
       search={search as never}
       replace
     />

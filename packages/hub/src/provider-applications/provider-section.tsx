@@ -300,7 +300,7 @@ function SlackTransportChoice({
 }) {
   return (
     <fieldset className="grid gap-3">
-      <legend className="text-sm font-medium">How should Slack reach Hub?</legend>
+      <legend className="text-sm">How should Slack reach Hub?</legend>
       <div className="grid gap-3 sm:grid-cols-2">
         {(
           [
@@ -325,7 +325,7 @@ function SlackTransportChoice({
               onChange={() => onChange(transport)}
             />
             <span className="grid gap-1">
-              <span className="font-medium">{label}</span>
+              <span>{label}</span>
               <span className="text-sm text-muted-foreground">{description}</span>
             </span>
           </label>
@@ -588,7 +588,7 @@ function PasteForm({
       className="grid gap-4 rounded-lg border bg-muted/30 p-4 lg:sticky lg:top-6"
     >
       <div className="grid gap-1">
-        <h3 className="font-medium">{replacing ? "Replace credentials" : guide.formTitle}</h3>
+        <h3>{replacing ? "Replace credentials" : guide.formTitle}</h3>
         {replacing ? (
           <p className="text-sm text-muted-foreground">
             Rotating secrets for the same app keeps your connections. Setting up a different app
@@ -808,7 +808,7 @@ function InstructionGroup({
     <section className="grid min-w-0 gap-3">
       {group.title === undefined ? null : (
         <div className="grid gap-1 border-t pt-5">
-          <h3 className="font-medium">{group.title}</h3>
+          <h3>{group.title}</h3>
           {group.description === undefined ? null : (
             <p className="text-sm text-muted-foreground">{group.description}</p>
           )}
@@ -857,7 +857,7 @@ function StepBody({
         <dl className="mt-3 grid gap-x-4 gap-y-1.5 sm:grid-cols-[max-content_1fr]">
           {step.permissions.map((permission) => (
             <div key={permission.name} className="contents">
-              <dt className="font-medium text-foreground">{permission.name}</dt>
+              <dt className="text-foreground">{permission.name}</dt>
               <dd>{permission.access}</dd>
             </div>
           ))}
@@ -897,9 +897,9 @@ function StepBody({
 
 function Segment({ segment }: { segment: StepSegment }) {
   // Instruction prose is muted; the controls to find in the portal are not. That contrast is
-  // what makes a step scannable, and it is why not everything on the page is font-medium.
+  // what makes a step scannable without relying on font weight.
   if (segment.kind === "term") {
-    return <strong className="font-medium text-foreground">{segment.value}</strong>;
+    return <span className="text-foreground">{segment.value}</span>;
   }
   if (segment.kind === "link") {
     return (

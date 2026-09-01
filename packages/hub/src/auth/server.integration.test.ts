@@ -19,6 +19,7 @@ import {
 } from "./organization-contract.js";
 import { createAuthServer, type AuthServer } from "./server.js";
 import { composeEntitlements, type ComposedEntitlements } from "./entitlements.js";
+import type { InvitationEmail, InvitationMailer } from "../invitations/index.js";
 
 type ActiveState = ActiveAccountState;
 
@@ -134,6 +135,28 @@ describe("account and organization boundary", () => {
       replacement.id,
     ]);
     assert.equal(await hub.pendingInvitationCount(organizationId, bob.email), 1);
+  });
+
+  it("delivers a committed invitation through the configured mailer", async () => {
+    const mailer = new RecordingInvitationMailer();
+    const hub = await startAccounts(postgres, mailer);
+    const alice = await hub.signUp("Alice", "alice@example.com");
+    await alice.createOrganization("Acme");
+
+    const invitation = await alice.invite("bob@example.com", "admin");
+
+    const sent = mailer.sent[0];
+    assert.ok(sent !== undefined);
+    assert.deepEqual(sent, {
+      id: invitation.id,
+      email: "bob@example.com",
+      inviterName: "Alice",
+      organizationName: "Acme",
+      role: "admin",
+      link: invitation.link,
+      expiresAt: sent.expiresAt,
+    });
+    assert.ok(sent.expiresAt.getTime() > Date.now());
   });
 
   it("does not create pending invitations for current members", async () => {
@@ -344,8 +367,11 @@ const MISSING_RESOURCES = ["missing", "missing", "missing"] as const;
 
 const activeAccounts: PaseoAccounts[] = [];
 
-async function startAccounts(postgres: StartedPostgreSqlContainer): Promise<PaseoAccounts> {
-  const accounts = await PaseoAccounts.start(postgres);
+async function startAccounts(
+  postgres: StartedPostgreSqlContainer,
+  invitationMailer?: InvitationMailer,
+): Promise<PaseoAccounts> {
+  const accounts = await PaseoAccounts.start(postgres, invitationMailer);
   activeAccounts.push(accounts);
   return accounts;
 }
@@ -366,7 +392,10 @@ class PaseoAccounts {
     this.resources = new OrganizationResources(database);
   }
 
-  static async start(postgres: StartedPostgreSqlContainer): Promise<PaseoAccounts> {
+  static async start(
+    postgres: StartedPostgreSqlContainer,
+    invitationMailer?: InvitationMailer,
+  ): Promise<PaseoAccounts> {
     const url = isolatedDatabaseUrl(postgres);
     const database = await createDatabase(url);
     const entitlements = composeEntitlements(database, testDatabaseRuntime(database));
@@ -381,6 +410,7 @@ class PaseoAccounts {
         secret: "phase-one-auth-secret-at-least-32-characters",
         baseURL: "http://localhost:3000",
         policy: { registrationMode: "open", organizationCreation: "open", bootstrap: undefined },
+        ...(invitationMailer === undefined ? {} : { invitationMailer }),
       }),
     );
   }
@@ -643,6 +673,15 @@ class PaseoAccounts {
     } finally {
       await client.close();
     }
+  }
+}
+
+class RecordingInvitationMailer implements InvitationMailer {
+  readonly sent: InvitationEmail[] = [];
+
+  send(invitation: InvitationEmail): Promise<void> {
+    this.sent.push(invitation);
+    return Promise.resolve();
   }
 }
 

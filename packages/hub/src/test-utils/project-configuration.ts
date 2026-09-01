@@ -86,7 +86,7 @@ export async function enrollTestDaemon(
     serverId: "server-1",
     daemonPublicKey: "public-key",
     credentialVerifier: "credential-verifier",
-    scopes: ["hub.execution.*"],
+    permissions: ["hub.execute"],
     now: new Date("2026-08-06T11:00:00.000Z"),
   });
 }

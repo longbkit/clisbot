@@ -8,10 +8,12 @@ export async function readProviderApplicationEnvironment(
   const github = await githubEnvironment(environment);
   const slack = slackEnvironment(environment);
   const discord = discordEnvironment(environment);
+  const linear = linearEnvironment(environment);
   return {
     ...(github === undefined ? {} : { github }),
     ...(slack === undefined ? {} : { slack }),
     ...(discord === undefined ? {} : { discord }),
+    ...(linear === undefined ? {} : { linear }),
   };
 }
 
@@ -112,6 +114,23 @@ function discordEnvironment(
   return applicationId === undefined || clientSecret === undefined || botToken === undefined
     ? undefined
     : { provider: "discord", applicationId, clientSecret, botToken };
+}
+
+function linearEnvironment(
+  environment: Record<string, string | undefined>,
+): ProviderApplicationConfiguration | undefined {
+  const clientId = nonEmpty(environment["LINEAR_CLIENT_ID"]);
+  const clientSecret = nonEmpty(environment["LINEAR_CLIENT_SECRET"]);
+  const webhookSecret = nonEmpty(environment["LINEAR_WEBHOOK_SECRET"]);
+  if (clientId === undefined && clientSecret === undefined && webhookSecret === undefined) {
+    return undefined;
+  }
+  if (clientId === undefined || clientSecret === undefined || webhookSecret === undefined) {
+    throw new Error(
+      "Linear environment configuration requires LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET, and LINEAR_WEBHOOK_SECRET.",
+    );
+  }
+  return { provider: "linear", clientId, clientSecret, webhookSecret };
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

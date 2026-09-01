@@ -13,6 +13,30 @@ import { createSlackTriggerProvider } from "./provider.js";
 import { isAcceptedTriggerProviderMatch } from "../index.js";
 
 describe("Slack Phase 1 trigger provider", () => {
+  it("accepts the explicit wildcard without a pointless username lookup", async () => {
+    const database = createMemoryDatabase();
+    const wildcard = configuration();
+    wildcard.triggers[0]!.filters.from_users = ["*"];
+    const { project, revision, store } = await createActiveProjectConfiguration(
+      database,
+      wildcard,
+      { organizationId: "org-1" },
+    );
+    const client = new RecordingSlackClient();
+    const provider = createSlackTriggerProvider({
+      configurationStoreForProject: () => store,
+      botUserIdForWorkspace: () => Promise.resolve("UBOT"),
+      client,
+    });
+
+    const matched = await provider.match(
+      external(project.id, revision.id, { authorId: "U-ANYONE" }),
+    );
+
+    assert.notEqual(typeof matched, "string");
+    assert.deepEqual(client.userLookups, []);
+  });
+
   it("resolves the authored Slack username once before matching", async () => {
     const database = createMemoryDatabase();
     const { project, revision, store } = await createActiveProjectConfiguration(
@@ -541,7 +565,7 @@ describe("Slack Phase 1 trigger provider", () => {
     assert.equal(context.slack.thread.messages.length, 1);
   });
 
-  it("caps Slack history traversal and retains the newest 50 messages oldest first", async () => {
+  it("caps Slack history traversal while retaining the root and newest 49 messages", async () => {
     const maximumPageCount = 10;
     const messagesPerPage = 100;
     let requests = 0;
@@ -597,7 +621,7 @@ describe("Slack Phase 1 trigger provider", () => {
     assert.equal(context.slack.thread.status, "incomplete");
     assert.deepEqual(
       context.slack.thread.messages.map((message) => message.content),
-      Array.from({ length: 50 }, (_, index) => `reply-${951 + index}`),
+      ["reply-1", ...Array.from({ length: 49 }, (_, index) => `reply-${952 + index}`)],
     );
   });
 

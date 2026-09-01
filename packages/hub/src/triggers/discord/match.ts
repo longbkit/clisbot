@@ -68,6 +68,7 @@ function matchesFilter(
   }
 
   if (
+    !filter.from_users.includes("*") &&
     !filter.from_users.includes(event.author.username) &&
     !filter.from_users.includes(event.author.id)
   ) {

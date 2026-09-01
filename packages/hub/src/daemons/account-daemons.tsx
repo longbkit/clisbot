@@ -34,6 +34,7 @@ const DAEMON_COLUMNS: readonly DataColumn[] = [
   { header: "Slug" },
   { header: "ID" },
   { header: "Status" },
+  { header: "Access" },
   { header: "Last seen" },
   { header: "Registered" },
   { header: "", align: "end" },
@@ -192,6 +193,9 @@ function DaemonRow({
       </DataCell>
       <DataCell>
         <DaemonStatus daemon={daemon} />
+      </DataCell>
+      <DataCell muted>
+        {daemon.permissions.includes("hub.execute") ? "Hub automations" : "Connected only"}
       </DataCell>
       <DataCell muted>{formatDate(daemon.lastSeenAt)}</DataCell>
       <DataCell muted>{formatDate(daemon.registeredAt)}</DataCell>

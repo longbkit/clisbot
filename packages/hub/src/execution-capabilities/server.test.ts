@@ -168,6 +168,24 @@ describe("execution capability MCP boundary", () => {
     }
   });
 
+  it("allows an event-native reply to be sent repeatedly without a synthetic cap", async () => {
+    const fixture = await capabilityFixture(undefined, "succeeded", null);
+
+    for (const content of ["Starting.", "Still working.", "Done."]) {
+      const response = await fixture.call("tools/call", {
+        name: "reply",
+        arguments: { content },
+      });
+      assert.equal(ToolResultSchema.parse(response.result).isError, undefined);
+    }
+
+    assert.equal(fixture.outbound.length, 3);
+    assert.deepEqual(
+      (await fixture.database.findAgentExecutionById(fixture.executionId))?.outputEmissions,
+      { "slack.reply": 3 },
+    );
+  });
+
   it("renders the structured execution MCP contract exposed by the server", async () => {
     const fixture = await capabilityFixture(undefined, "succeeded", 1, {
       type: "object",
@@ -712,7 +730,7 @@ const slackOutputContext = {
 async function capabilityFixture(
   execute: (() => Promise<void>) | undefined = () => Promise.resolve(),
   completionStatus: "succeeded" | "failed" = "succeeded",
-  maxReplies = 1,
+  maxReplies: number | null = 1,
   outputSchema?: JsonValue,
   autoArchive = false,
   requiredOutputTypes: readonly string[] = [],
@@ -861,7 +879,7 @@ async function abortHttpRequestAfterFirstResponseData(options: {
 }
 
 function launchIntent(
-  maxReplies = 1,
+  maxReplies: number | null = 1,
   outputSchema?: JsonValue,
   autoArchive = false,
   requiredOutputTypes: readonly string[] = [],
@@ -884,7 +902,7 @@ function launchIntent(
     allowOutputs: [
       {
         type: "slack.reply",
-        max: maxReplies,
+        ...(maxReplies === null ? {} : { max: maxReplies }),
         ...(requiredOutputTypes.includes("slack.reply") ? { required: true } : {}),
       },
       ...requiredOutputTypes

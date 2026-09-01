@@ -40,7 +40,7 @@ export function DataTable({
               <TableHead
                 key={column.header === "" ? `actions-${String(index)}` : column.header}
                 className={cn(
-                  "h-9 px-4 text-xs font-medium text-muted-foreground",
+                  "h-9 px-4 text-xs text-muted-foreground",
                   // The identifying column absorbs the spare width; everything after it
                   // shrinks to its content, so columns stay next to each other instead of
                   // drifting apart on a wide screen.

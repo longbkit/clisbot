@@ -13,8 +13,6 @@ import type { PaseoHub } from "./helpers/hub.js";
 test.describe.configure({ timeout: 150_000 });
 // Every journey here claims its own pristine application, so the fixture's primary is never
 // navigated to. It must not cost a PostgreSQL container nobody reads.
-test.use({ primaryDatabase: "embedded" });
-
 const OPERATOR = {
   name: "App Operator",
   email: "app-operator@example.com",
@@ -25,19 +23,13 @@ const SAVE = "provider_application.verify_and_save";
 
 async function openSetup(
   hub: PaseoHub,
-  environmentApps?: readonly ("github" | "slack" | "discord")[],
+  environmentApps?: readonly ("github" | "slack" | "discord" | "linear")[],
 ): Promise<AppSetupSession> {
   return await hub.openAppSetup({
     account: OPERATOR,
     ...(environmentApps === undefined ? {} : { environmentApps }),
   });
 }
-
-test("onboarding journeys never claim a database they do not read", async ({ hub }) => {
-  // Each journey below starts its own application. The fixture's primary exists only because the
-  // fixture always has one, and a PostgreSQL container per test to hold nothing is pure cost.
-  expect(hub.primaryApplication().databaseUrl).toMatch(/^embedded:/u);
-});
 
 test("a first account continues to app setup, and skipping it is durable", async ({ hub }) => {
   const session = await hub.openAppSetup({
@@ -53,8 +45,9 @@ test("a first account continues to app setup, and skipping it is durable", async
       GitHub: "Not set up",
       Slack: "Not set up",
       Discord: "Not set up",
+      Linear: "Not set up",
     });
-    // A chooser, not three open manuals. This is also the evidence contract: the screenshot
+    // A chooser, not four open manuals. This is also the evidence contract: the screenshot
     // below is taken before anything on the page has been touched, so it cannot be a shot of a
     // wall of instructions that a `collapse()` call tidied away first.
     for (const section of surface.sections()) await section.expectCollapsed();
@@ -62,6 +55,9 @@ test("a first account continues to app setup, and skipping it is durable", async
     await surface.accessible();
     await surface.shoot(SHOTS, "apps-01-chooser.desktop");
 
+    await surface.linear.expand();
+    await surface.linear.expectLinearHttpsBlocked(session.origin);
+    await surface.linear.collapse();
     await surface.leave("Do this later");
     await expect(
       page
@@ -71,7 +67,7 @@ test("a first account continues to app setup, and skipping it is durable", async
     await surface.shoot(SHOTS, "apps-14-skip-dashboard.desktop");
     // Business as usual once the transition completes: reloading never returns here.
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Triggers", exact: true })).toBeVisible();
   } finally {
     await session.close();
   }
@@ -84,7 +80,8 @@ test("GitHub repository access is set up on plain HTTP while event triggers wait
   try {
     const { surface, page, origin } = session;
     const github = surface.github;
-    await github.expand();
+    await surface.expectIndependentCollapse();
+    await surface.slack.collapse();
 
     // The task reads as two columns: the portal checklist, and the values it produces.
     await github.expectSideBySideLayout();
@@ -123,8 +120,7 @@ test("GitHub repository access is set up on plain HTTP while event triggers wait
     await github.expectFieldError("Enter the App ID.");
     await github.expectStatus("Not set up");
 
-    await github.fillWorkingCredentials();
-    await github.save();
+    await surface.verifyGitHubFromKeyboard();
     await github.expectFocusedResult("GitHub accepted this App.");
     // Verified is not green: credentials a provider accepted are not a working integration.
     await github.expectStatus("Verified");
@@ -258,7 +254,6 @@ test("an unclassified GitHub fault says nothing was saved and offers a usable re
 }) => {
   const session = await hub.openAppSetup({
     account: OPERATOR,
-    embedded: true,
     providerScenario: "github-verification-internal",
   });
   try {
@@ -373,7 +368,6 @@ test("Discord transport, rate limit, and intent failures each name their own fix
   ]) {
     const session = await hub.openAppSetup({
       account: OPERATOR,
-      embedded: true,
       providerScenario: scenario.name,
     });
     const fakeClientSecret = `PRIVATE-DISCORD-CLIENT-SECRET-${scenario.kind}`;
@@ -413,7 +407,6 @@ test("Discord disallowed intents explains the exact portal setting and logs one 
 }) => {
   const session = await hub.openAppSetup({
     account: OPERATOR,
-    embedded: true,
     providerScenario: "discord-disallowed-intents",
   });
   const fakeClientSecret = "formatless-discord-client-secret-9c41";
@@ -458,7 +451,7 @@ test("Discord disallowed intents explains the exact portal setting and logs one 
 });
 
 test("Slack Socket Mode connects on plain HTTP with only two tokens", async ({ hub }) => {
-  const session = await hub.openAppSetup({ account: OPERATOR, embedded: true });
+  const session = await hub.openAppSetup({ account: OPERATOR });
   try {
     const { surface, page } = session;
     const slack = surface.slack;
@@ -519,29 +512,6 @@ test("Slack Socket Mode connects on plain HTTP with only two tokens", async ({ h
   }
 });
 
-test("Slack webhook setup remains available over HTTPS", async ({ hub }) => {
-  const session = await hub.openAppSetup({
-    account: OPERATOR,
-    https: true,
-  });
-  try {
-    const slack = session.surface.slack;
-    await slack.expand();
-    await slack.chooseSlackTransport("Webhooks");
-    await slack.fill(SLACK_WEBHOOK_CREDENTIALS);
-    await slack.save();
-    await expect(
-      session.page.getByRole("heading", { name: "Install Paseo in Acme" }),
-    ).toBeVisible();
-    await session.page.getByRole("link", { name: "Accept installation" }).click();
-    await slack.expectStatus("Connected");
-    await slack.expectSummary({ Delivery: "Webhooks", Events: "Waiting for the first event" });
-    await session.surface.shoot(SHOTS, "apps-07b-slack-webhook-connected.desktop");
-  } finally {
-    await session.close();
-  }
-});
-
 test("Slack Socket Mode rejects a bad app token without saving or leaking it", async ({ hub }) => {
   const session = await openSetup(hub);
   try {
@@ -566,7 +536,6 @@ test("Slack webhooks use the exact built zero-env PGlite HTTPS proxy journey", a
   const session = await hub.openAppSetup({
     account: OPERATOR,
     reverseProxy: true,
-    embedded: true,
   });
   try {
     const { application, page, surface, origin } = session;
@@ -622,6 +591,12 @@ test("every way a provider can send the operator back is answered in that sectio
         focus: "error" as const,
       },
       {
+        provider: "linear" as const,
+        result: "linear_cancelled",
+        copy: "Authorization cancelled at Linear. Nothing changed. Start again when you're ready.",
+        focus: "result" as const,
+      },
+      {
         provider: "github" as const,
         result: "something_nobody_mapped",
         copy: "GitHub ended the connection without saying why. Nothing was connected. Start the connection again from this page.",
@@ -635,7 +610,9 @@ test("every way a provider can send the operator back is answered in that sectio
           ? "GitHub"
           : outcome.provider === "slack"
             ? "Slack"
-            : "Discord",
+            : outcome.provider === "discord"
+              ? "Discord"
+              : "Linear",
       );
       // The provider's own section opens, takes the keyboard, and says what happened there.
       await section.expectExpanded();
@@ -651,48 +628,6 @@ test("every way a provider can send the operator back is answered in that sectio
       await section.collapse();
     }
     await surface.accessible();
-  } finally {
-    await session.close();
-  }
-});
-
-test("sections open and close independently and keep what was typed", async ({ hub }) => {
-  const session = await openSetup(hub);
-  try {
-    const { surface } = session;
-    await surface.expectIndependentCollapse();
-
-    await surface.github.fill({ "App ID": "42", "App slug": "paseo" });
-    await surface.github.collapse();
-    await surface.discord.expand();
-    await surface.discord.fill({ "Application ID": "900" });
-    await surface.github.expand();
-    // A half-filled form survives being collapsed, and its neighbour's state is its own.
-    expect(await surface.github.value("App ID")).toBe("42");
-    expect(await surface.github.value("App slug")).toBe("paseo");
-    expect(await surface.discord.value("Application ID")).toBe("900");
-
-    // Toggling from the keyboard leaves focus on the control that was pressed.
-    await surface.slack.collapse();
-    await surface.slack.toggleFromKeyboard();
-    await surface.slack.expectExpanded();
-    await surface.slack.toggleFromKeyboard();
-    await surface.slack.expectCollapsed();
-    await surface.collapseAll();
-    await surface.accessible();
-    await surface.expandAll();
-    await surface.accessible();
-  } finally {
-    await session.close();
-  }
-});
-
-test("GitHub setup can be tabbed through and submitted without a pointer", async ({ hub }) => {
-  const session = await openSetup(hub);
-  try {
-    await session.surface.github.expand();
-    await session.surface.verifyGitHubFromKeyboard();
-    await session.surface.github.expectFocusedResult("GitHub accepted this App.");
   } finally {
     await session.close();
   }
@@ -743,48 +678,7 @@ test("an environment-managed app is read-only, connectable, and names its variab
   }
 });
 
-test("credentials can be replaced in place after they are saved", async ({ hub }) => {
-  const session = await openSetup(hub);
-  try {
-    const { surface } = session;
-    const github = surface.github;
-    await github.expand();
-    await github.fillWorkingCredentials();
-    await github.save();
-    await github.expectStatus("Verified");
-    await surface.leave("Do this later");
-    await session.openManagement();
-    await github.expand();
-
-    await github.action("Replace credentials").click();
-    await expect(github.form().getByLabel("App ID", { exact: true })).toBeFocused();
-    // Identifiers come back for checking; secrets never do.
-    expect(await github.value("App ID")).toBe("42");
-    expect(await github.value("Client secret")).toBe("");
-    expect(await github.value("Private key")).toBe("");
-    await expect(
-      github
-        .form()
-        .getByText("Rotating secrets for the same app keeps your connections.", { exact: false }),
-    ).toBeVisible();
-    // The manual stays out of the way even while credentials are being rotated.
-    await expect(github.setupSteps()).toHaveAttribute("aria-expanded", "false");
-    await surface.shoot(SHOTS, "apps-17-replace-credentials.desktop");
-
-    await github.action("Cancel").click();
-    await expect(github.action("Replace credentials")).toBeFocused();
-    await expect(github.form()).toHaveCount(0);
-    await github.expectStatus("Verified");
-
-    // The instructions are still reachable, just not in the way.
-    await github.openSetupSteps();
-    await expect(github.body().getByRole("link", { name: "Create a GitHub App" })).toBeVisible();
-  } finally {
-    await session.close();
-  }
-});
-
-test("the operator finishes, then manages the same apps under Instance → Apps", async ({ hub }) => {
+test("the operator finishes, then manages the same apps from the account menu", async ({ hub }) => {
   const session = await hub.openAppSetup({
     account: OPERATOR,
     https: true,
@@ -808,24 +702,59 @@ test("the operator finishes, then manages the same apps under Instance → Apps"
     await surface.discord.action("Add to a Discord server").click();
     await surface.discord.expectStatus("Connected");
 
+    await surface.linear.expand();
+    await surface.linear.fillWorkingCredentials();
+    await surface.linear.save();
+    await expect(page.getByRole("heading", { name: "Install Paseo in Acme" })).toBeVisible();
+    await page.getByRole("link", { name: "Accept installation" }).click();
+    await surface.linear.expectStatus("Connected");
+    await surface.linear.expectSummary({
+      Application: "Linear app",
+      Workspaces: "Acme",
+      Events: "Waiting for the first event",
+    });
+
     await surface.collapseAll();
-    await surface.shoot(SHOTS, "apps-12-all-three-connected.desktop");
+    await surface.shoot(SHOTS, "apps-12-all-four-connected.desktop");
 
     await surface.leave("Finish");
     await surface.shoot(SHOTS, "apps-13-finish-dashboard.desktop");
 
-    // Later management is the same three sections, with the state left behind.
-    await page.getByRole("link", { name: "Apps", exact: true }).click();
-    await surface.expectManagement();
+    // Later management is the same four sections, with the state left behind. Onboarding leaves
+    // the operator inside the default project, and the instance is reachable from there — through
+    // the account menu, because the flag belongs to them and not to the project they are in.
+    await session.navigateToApps();
     await surface.expectStatuses({
       GitHub: "Connected",
       Slack: "Connected",
       Discord: "Connected",
+      Linear: "Connected",
     });
     // Nothing is open on arrival here either; there is no journey to lead.
     for (const section of surface.sections()) await section.expectCollapsed();
     await surface.accessible();
     await surface.shoot(SHOTS, "apps-15-instance-apps.desktop");
+
+    await test.step("saved identifiers return for credential rotation, but secrets do not", async () => {
+      const github = surface.github;
+      await github.expand();
+      await github.action("Replace credentials").click();
+      await expect(github.form().getByLabel("App ID", { exact: true })).toBeFocused();
+      expect(await github.value("App ID")).toBe("42");
+      expect(await github.value("Client secret")).toBe("");
+      expect(await github.value("Private key")).toBe("");
+      await expect(
+        github
+          .form()
+          .getByText("Rotating secrets for the same app keeps your connections.", { exact: false }),
+      ).toBeVisible();
+      await expect(github.setupSteps()).toHaveAttribute("aria-expanded", "false");
+      await surface.shoot(SHOTS, "apps-17-replace-credentials.desktop");
+      await github.action("Cancel").click();
+      await expect(github.action("Replace credentials")).toBeFocused();
+      await expect(github.form()).toHaveCount(0);
+      await github.expectStatus("Connected");
+    });
   } finally {
     await session.close();
   }

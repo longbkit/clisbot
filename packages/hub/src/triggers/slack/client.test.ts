@@ -129,16 +129,19 @@ describe("Slack Web API client", () => {
     assert.equal(requestSignal?.aborted, true);
   });
 
-  it("hydrates the latest 50 preceding replies across Slack pagination, oldest first", async () => {
+  it("keeps the root with the latest 49 preceding Slack replies, oldest first", async () => {
     const requests: Array<{ method: string; url: string; body: BodyInit | null | undefined }> = [];
-    const messages = Array.from({ length: 455 }, (_, index) => {
-      const sequence = index + 1;
-      return {
-        ts: `1700000000.${String(sequence).padStart(6, "0")}`,
-        text: `reply-${sequence}`,
-        ...(sequence === 455 ? { bot_id: "B455" } : { user: `U${sequence}` }),
-      };
-    });
+    const messages = [
+      { ts: "1700000000.000000", text: "root request", user: "UROOT" },
+      ...Array.from({ length: 455 }, (_, index) => {
+        const sequence = index + 1;
+        return {
+          ts: `1700000000.${String(sequence).padStart(6, "0")}`,
+          text: `reply-${sequence}`,
+          ...(sequence === 455 ? { bot_id: "B455" } : { user: `U${sequence}` }),
+        };
+      }),
+    ];
     const pageSize = 100;
     const client = createSlackBotClient({
       tokenForWorkspace: () => Promise.resolve("xoxb-secret"),
@@ -171,7 +174,8 @@ describe("Slack Web API client", () => {
     });
 
     assert.equal(hydrated?.messages.length, 50);
-    assert.equal(hydrated?.messages[0]?.content, "reply-406");
+    assert.equal(hydrated?.messages[0]?.content, "root request");
+    assert.equal(hydrated?.messages[1]?.content, "reply-407");
     assert.equal(hydrated?.messages.at(-1)?.content, "reply-455");
     assert.deepEqual(hydrated?.messages.at(-1)?.author, { id: "B455" });
     assert.equal(hydrated?.complete, true);
@@ -202,6 +206,7 @@ describe("Slack Web API client", () => {
           ? Response.json({
               ok: true,
               messages: [
+                { ts: "1700000000.000000", text: "root request", user: "UROOT" },
                 { ts: "1700000000.000001", text: "reply-1", user: "U1" },
                 { ts: "1700000000.000002", text: "reply-2", user: "U2" },
               ],
@@ -221,10 +226,34 @@ describe("Slack Web API client", () => {
 
     assert.deepEqual(
       hydrated?.messages.map((message) => message.content),
-      ["reply-1", "reply-2"],
+      ["root request", "reply-1", "reply-2"],
     );
     assert.equal(hydrated?.complete, false);
     assert.equal(requests, 2);
+  });
+
+  it("rejects Slack thread context when the API omits its root", async () => {
+    const client = createSlackBotClient({
+      tokenForWorkspace: () => Promise.resolve("xoxb-secret"),
+      fetch: () =>
+        Promise.resolve(
+          Response.json({
+            ok: true,
+            messages: [{ ts: "1700000000.000001", text: "reply-1", user: "U1" }],
+          }),
+        ),
+    });
+    await assert.rejects(
+      () =>
+        client.readThreadMessages!({
+          organizationId: "org-1",
+          teamId: "T1",
+          channelId: "C1",
+          threadTs: "1700000000.000000",
+          beforeTs: "1700000000.000002",
+        }),
+      /thread root unavailable/u,
+    );
   });
 
   it("keeps Slack file credentials and private URLs inside the client", async () => {

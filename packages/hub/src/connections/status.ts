@@ -7,6 +7,7 @@ const PROVIDER_NAMES = {
   github: "GitHub",
   discord: "Discord",
   slack: "Slack",
+  linear: "Linear",
 } as const;
 
 export function connectionsQueryKey(accountId: string, organizationId: string) {

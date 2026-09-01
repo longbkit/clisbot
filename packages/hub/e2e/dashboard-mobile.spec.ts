@@ -6,10 +6,13 @@ const owner = {
   password: "alice-mobile-password",
 };
 
-test("navigates the mobile sidebar by keyboard without overflowing Team", async ({ hub }) => {
+test("navigates the organization surfaces on mobile without overflowing", async ({ hub }) => {
   await hub.expectSignedOutAccountEntry();
   await hub.signUpAs("owner", owner);
   await hub.createOrganization("owner", "Acme");
   await hub.navigateToTeamFromMobileSidebar("owner");
   await hub.expectMobileTeamFitsViewport("owner");
+  await hub.denyCliLogin("owner");
+  await hub.navigateToDaemonsFromMobileSidebar("owner");
+  await hub.navigateToConnectionsFromMobileSidebar("owner");
 });

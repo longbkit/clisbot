@@ -35,8 +35,8 @@ function NotFound() {
     <Document>
       <main className="grid min-h-svh place-items-center px-6 py-16">
         <div className="grid max-w-md gap-4 text-center">
-          <p className="text-sm font-medium text-muted-foreground">404</p>
-          <h1 className="text-2xl font-semibold tracking-tight">Page not found</h1>
+          <p className="text-sm text-muted-foreground">404</p>
+          <h1 className="text-2xl font-medium tracking-tight">Page not found</h1>
           <p className="text-sm text-muted-foreground">
             This address does not match a page in Paseo Hub. Check the address or return home.
           </p>

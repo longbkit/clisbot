@@ -3,7 +3,8 @@ import { compileFinishExecutionArguments } from "../workflows/json-schema.js";
 
 export interface AllowedOutput {
   type: string;
-  max: number;
+  /** Absent for the event-native reply capability exposed by single-run triggers. */
+  max?: number | undefined;
   required?: boolean;
 }
 
@@ -161,7 +162,10 @@ export function executionToolDefinitions(
     },
     ...materializedOutputs.map(({ declaration, capability }) => ({
       name: capability.tool.name,
-      description: `${capability.tool.description} (up to ${declaration.max} times).`,
+      description:
+        declaration.max === undefined
+          ? capability.tool.description
+          : `${capability.tool.description} (up to ${String(declaration.max)} times).`,
       inputSchema: capability.tool.inputSchema,
     })),
   ];

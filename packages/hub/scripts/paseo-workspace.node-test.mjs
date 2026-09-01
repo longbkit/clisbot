@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { planWorkspaceAction } from "./paseo-workspace.mjs";
 
@@ -55,4 +59,37 @@ test("evidence is its own action and is never what dev runs", () => {
 
 test("an unknown action is refused rather than guessed at", () => {
   assert.throws(() => planWorkspaceAction("serve", workspace), /Expected one of/u);
+});
+
+test("worktree setup copies local agent instructions even when there is no .env", () => {
+  const root = mkdtempSync(join(tmpdir(), "paseo-hub-worktree-setup-"));
+  const source = join(root, "source");
+  const worktree = join(root, "worktree");
+  mkdirSync(source);
+  mkdirSync(worktree);
+  writeFileSync(join(source, "AGENTS.override.md"), "agent instructions\n");
+  writeFileSync(join(source, "CLAUDE.local.md"), "claude instructions\n");
+
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("./paseo-workspace.mjs", import.meta.url)), "setup"],
+      {
+        env: {
+          ...process.env,
+          PASEO_SOURCE_CHECKOUT_PATH: source,
+          PASEO_WORKTREE_PATH: worktree,
+        },
+        encoding: "utf8",
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      readFileSync(join(worktree, "AGENTS.override.md"), "utf8"),
+      "agent instructions\n",
+    );
+    assert.equal(readFileSync(join(worktree, "CLAUDE.local.md"), "utf8"), "claude instructions\n");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

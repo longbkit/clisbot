@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.0 - 2026-08-25
+
+### Added
+
+- Pull-request-created and pull-request-label-added workflows now receive GitHub webhook deliveries.
+- GitHub issue and pull-request triggers now react on the item with `eyes` when accepted, then `+1` on success or `-1` on failure.
+
+### Fixed
+
+- Workflows triggered by Discord, Slack, GitHub, or manual input can use capabilities owned by another provider without losing valid authority.
+- Workflow preparation failures retain their actual safe reason instead of being reported as `daemon_unreachable`.
+- Deleting a Discord trigger message no longer leaves Hub retrying an impossible terminal reaction.
+
 ## 0.7.0 - 2026-08-23
 
 ### Added

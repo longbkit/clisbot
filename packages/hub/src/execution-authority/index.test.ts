@@ -80,7 +80,6 @@ describe("Hub execution authority", () => {
 
     assert.deepEqual(mint.inputs, [
       {
-        executionId: "execution-manual",
         projectId: "project-1",
         connectionSlug: "getpaseo-github",
         repositories: ["getpaseo/paseo", "getpaseo/hub"],
@@ -148,7 +147,10 @@ describe("Hub execution authority", () => {
           durationMs: 60 * 60 * 1000,
         },
       }),
-      /github\.repositories is required.*cannot safely expand/iu,
+      (error: unknown) =>
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "github_authority_scope_invalid",
     );
     assert.deepEqual(mint.inputs, []);
   });
@@ -255,7 +257,8 @@ describe("Hub execution authority", () => {
           durationMs: 60 * 60 * 1000,
         },
       }),
-      /terminal execution/iu,
+      (error: unknown) =>
+        error instanceof Error && "code" in error && error.code === "execution_terminal",
     );
     assert.equal(mints, 0);
   });

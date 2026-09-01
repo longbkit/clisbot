@@ -932,6 +932,7 @@ async function resolution(
     github: github === undefined ? [] : [github],
     discord: discord === undefined ? [] : [discord],
     slack: [],
+    linear: [],
   });
   assert(status !== null && typeof status === "object" && "status" in status);
   if (status.status === "suspended") return { status: "suspended" as const };

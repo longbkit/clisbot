@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
@@ -45,6 +46,7 @@ export async function createEmbeddedRuntime(dataDirectory: string): Promise<Data
 
 class EmbeddedRuntime implements DatabaseRuntime {
   private readonly database;
+  private readonly transactionContext = new AsyncLocalStorage<TransactionHandle>();
 
   constructor(
     private readonly client: PGlite,
@@ -58,6 +60,8 @@ class EmbeddedRuntime implements DatabaseRuntime {
     sql: string,
     params: readonly unknown[] = [],
   ): Promise<QueryResult<Row>> {
+    const transaction = this.transactionContext.getStore();
+    if (transaction !== undefined) return transaction.query<Row>(sql, params);
     const result = await this.client.query<Row>(sql, [...params]);
     return {
       rows: [...result.rows],
@@ -66,32 +70,34 @@ class EmbeddedRuntime implements DatabaseRuntime {
   }
 
   async transaction<T>(operation: (transaction: TransactionHandle) => Promise<T>): Promise<T> {
+    const active = this.transactionContext.getStore();
+    if (active !== undefined) return operation(active);
     let handle: TransactionHandle | undefined;
     try {
-      return await this.client.transaction(async (transaction) =>
-        operation(
-          (handle = {
-            async query<Row extends QueryRow = QueryRow>(
-              sql: string,
-              params: readonly unknown[] = [],
-            ): Promise<QueryResult<Row>> {
-              const result = await transaction.query<Row>(sql, [...params]);
-              return {
-                rows: [...result.rows],
-                rowCount: result.rows.length > 0 ? result.rows.length : (result.affectedRows ?? 0),
-              };
-            },
-            drizzle: () =>
-              // PGlite's transaction implements its query client at runtime, but its public
-              // Drizzle overload accepts only the top-level client type.
-              // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
-              drizzle(transaction as unknown as PGlite, { schema }) as unknown as DrizzleHandle,
-            rollback(result: unknown): never {
-              throw new TransactionRollback(result);
-            },
-          }),
-        ),
-      );
+      return await this.client.transaction(async (transaction) => {
+        const transactionHandle: TransactionHandle = {
+          async query<Row extends QueryRow = QueryRow>(
+            sql: string,
+            params: readonly unknown[] = [],
+          ): Promise<QueryResult<Row>> {
+            const result = await transaction.query<Row>(sql, [...params]);
+            return {
+              rows: [...result.rows],
+              rowCount: result.rows.length > 0 ? result.rows.length : (result.affectedRows ?? 0),
+            };
+          },
+          drizzle: () =>
+            // PGlite's transaction implements its query client at runtime, but its public
+            // Drizzle overload accepts only the top-level client type.
+            // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
+            drizzle(transaction as unknown as PGlite, { schema }) as unknown as DrizzleHandle,
+          rollback(result: unknown): never {
+            throw new TransactionRollback(result);
+          },
+        };
+        handle = transactionHandle;
+        return this.transactionContext.run(transactionHandle, () => operation(transactionHandle));
+      });
     } catch (error) {
       // The rollback value originated in this same generic transaction callback.
       // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
@@ -103,6 +109,8 @@ class EmbeddedRuntime implements DatabaseRuntime {
   }
 
   drizzle() {
+    const transaction = this.transactionContext.getStore();
+    if (transaction !== undefined) return transaction.drizzle();
     // Both drivers expose the same PostgreSQL-dialect Drizzle operations; Drizzle's driver
     // generics are invariant, so the implementation-specific result type is hidden here.
     // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion

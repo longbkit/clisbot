@@ -285,7 +285,7 @@ function RevisionSummary({ revision }: { revision: Configuration["activeRevision
         </p>
       ) : (
         <div className="rounded-md border px-2.5 py-2">
-          <p className="text-sm font-medium">Revision {revision.version}</p>
+          <p className="text-sm">Revision {revision.version}</p>
           <p className="text-xs text-muted-foreground">
             {revision.sourceKind === "github" ? "GitHub-managed" : "Manual"} ·{" "}
             {formatDate(revision.createdAt)}
@@ -560,7 +560,7 @@ function SourceModeButton({
       title={title}
       onClick={onClick}
       className={cn(
-        "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex flex-1 items-center justify-center gap-1.5 rounded-sm px-2 py-1 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50",
         active
           ? "bg-background text-foreground shadow-xs"
           : "text-muted-foreground hover:text-foreground",
@@ -603,9 +603,7 @@ function ManualConfigurationResult({
 
 function RailLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-      {children}
-    </span>
+    <span className="text-[11px] tracking-wide text-muted-foreground uppercase">{children}</span>
   );
 }
 

@@ -97,6 +97,12 @@ const IssuedEnrollmentSchema = z.object({
 const EnrollmentSchema = z.object({
   daemonId: z.string(),
   slug: z.string(),
+  permissions: z.array(z.string()),
+  webSocketUrl: z.string(),
+});
+const LegacyEnrollmentSchema = z.object({
+  daemonId: z.string(),
+  slug: z.string(),
   scopes: z.array(z.string()),
   webSocketUrl: z.string(),
 });
@@ -217,14 +223,18 @@ export class HubHarness {
     } as const;
   }
 
-  async connectDaemon(token?: string): Promise<string> {
+  async connectDaemon(
+    token?: string,
+    permissions: readonly string[] = ["hub.execute"],
+  ): Promise<string> {
     const issued =
       token === undefined ? await this.issueEnrollment() : { status: 201 as const, token };
     if (issued.status !== 201 || !("token" in issued))
       throw new Error("Enrollment token was not issued");
     this.connectedDaemon = TestDaemon.create(this.origin);
-    const daemon = await this.connectedDaemon.enroll(issued.token);
+    const daemon = await this.connectedDaemon.enroll(issued.token, undefined, permissions);
     await this.connectedDaemon.connect(daemon);
+    await this.observeConnectedPresence(daemon.daemonId);
     return daemon.daemonId;
   }
 
@@ -234,6 +244,24 @@ export class HubHarness {
       throw new Error("Enrollment token was not issued");
     }
     return TestDaemon.create(this.origin).enroll(issued.token, hostname);
+  }
+
+  async enrollLegacyDaemon(): Promise<{ daemonId: string; scopes: string[] }> {
+    const issued = await this.issueEnrollment();
+    if (issued.status !== 201 || !("token" in issued)) {
+      throw new Error("Enrollment token was not issued");
+    }
+    const daemon = TestDaemon.create(this.origin);
+    const enrollment = await daemon.enrollLegacy(issued.token);
+    return { daemonId: enrollment.daemonId, scopes: enrollment.scopes };
+  }
+
+  async updateConnectedDaemonPermissions(
+    permissions: readonly string[],
+    credential?: string,
+  ): Promise<number> {
+    if (!this.connectedDaemon) throw new Error("No connected daemon");
+    return this.connectedDaemon.updatePermissions(permissions, credential);
   }
 
   async renameConnectedDaemon(slug: string): Promise<void> {
@@ -312,6 +340,7 @@ export class HubHarness {
     const first = await this.connectedDaemon.enroll(issued.token, "Replay Host.local");
     const replay = await this.connectedDaemon.enroll(issued.token, "Replay Host.local");
     await this.connectedDaemon.connect(replay);
+    await this.observeConnectedPresence(replay.daemonId);
     const contender = TestDaemon.create(this.origin);
     const consumedTokenStatus = await contender.enrollmentStatus(issued.token);
     const persisted = await Promise.all([
@@ -330,11 +359,13 @@ export class HubHarness {
 
   async replaceDaemon(options: { acceptSpawns?: boolean } = {}): Promise<void> {
     const daemon = this.requireDaemon();
+    const previousConnectedAt = (await this.daemon(daemon.daemonId)).connectedAt;
     const replacement = daemon.replacement();
     if (options.acceptSpawns === true) replacement.acceptSpawn();
     await replacement.connectExisting();
     await daemon.closed();
     this.connectedDaemon = replacement;
+    await this.observeConnectedPresence(replacement.daemonId, previousConnectedAt);
   }
 
   async revokeDaemon(): Promise<number> {
@@ -342,7 +373,9 @@ export class HubHarness {
     const closed = daemon.closedCode();
     const response = await daemon.revoke();
     assert.equal(response, 204);
-    return closed;
+    const code = await closed;
+    await this.observeOfflinePresence();
+    return code;
   }
   invalidCredentialReconnectStatus(): Promise<number> {
     return this.requireDaemon().reconnectStatus("invalid");
@@ -356,18 +389,24 @@ export class HubHarness {
   }
 
   async reconnectDaemon(): Promise<void> {
-    const replacement = this.requireDaemon().replacement(this.origin);
+    const daemon = this.requireDaemon();
+    const previousConnectedAt = (await this.daemon(daemon.daemonId)).connectedAt;
+    const replacement = daemon.replacement(this.origin);
     await replacement.connectExisting();
     this.connectedDaemon = replacement;
+    await this.observeConnectedPresence(replacement.daemonId, previousConnectedAt);
   }
 
   async reconnectDaemonAndCompleteHubAction(
     executionId: string,
   ): Promise<HubExecutionControlAction> {
-    const replacement = this.requireDaemon().replacement(this.origin);
+    const daemon = this.requireDaemon();
+    const previousConnectedAt = (await this.daemon(daemon.daemonId)).connectedAt;
+    const replacement = daemon.replacement(this.origin);
     const action = replacement.nextControlAction(executionId);
     await replacement.connectExisting();
     this.connectedDaemon = replacement;
+    await this.observeConnectedPresence(replacement.daemonId, previousConnectedAt);
     const acknowledged = await action;
     await this.completePendingCleanup(replacement.daemonId);
     return acknowledged;
@@ -376,6 +415,20 @@ export class HubHarness {
   async observeOfflinePresence(): Promise<void> {
     const daemonId = this.requireDaemon().daemonId;
     await waitFor(async () => (await this.daemon(daemonId)).presence === "offline");
+  }
+
+  private async observeConnectedPresence(
+    daemonId: string,
+    previousConnectedAt: Date | null = null,
+  ): Promise<void> {
+    await waitFor(async () => {
+      const daemon = await this.daemon(daemonId);
+      return (
+        daemon.presence === "connected" &&
+        (previousConnectedAt === null ||
+          daemon.connectedAt?.getTime() !== previousConnectedAt.getTime())
+      );
+    });
   }
 
   async daemon(id?: string): Promise<DaemonRecord> {
@@ -664,6 +717,17 @@ export class HubHarness {
   async waitForRecoveredExecution(id: string): Promise<AgentExecutionRecord> {
     await waitFor(async () => (await this.execution(id)).daemonAgentId !== null);
     return this.execution(id);
+  }
+  async waitForExecutionForTriggerRun(triggerRunId: string): Promise<AgentExecutionRecord> {
+    let execution: AgentExecutionRecord | undefined;
+    await waitFor(async () => {
+      const step = await this.requireDatabase().findWorkflowStepRunByTriggerRun(triggerRunId);
+      if (step === undefined) return false;
+      execution = await this.requireDatabase().findAgentExecutionByWorkflowStepRunId(step.id);
+      return execution !== undefined;
+    });
+    if (execution === undefined) throw new Error("Workflow execution does not exist");
+    return execution;
   }
   async waitForExecutionStatus(
     id: string,
@@ -1088,9 +1152,11 @@ export class HubHarness {
     await this.stopApp();
     await this.startApp();
     if (this.connectedDaemon) {
+      const previousConnectedAt = (await this.daemon(this.connectedDaemon.daemonId)).connectedAt;
       const replacement = this.connectedDaemon.replacement(this.origin);
       await replacement.connectExisting();
       this.connectedDaemon = replacement;
+      await this.observeConnectedPresence(replacement.daemonId, previousConnectedAt);
     }
   }
   async restartAppWithoutDaemonReconnect(): Promise<void> {
@@ -1523,7 +1589,7 @@ export class HubHarness {
       serverId: "seed-server",
       daemonPublicKey: "seed-public-key",
       credentialVerifier: "seed-credential-verifier",
-      scopes: ["hub.execution.*"],
+      permissions: ["hub.execute"],
       now: new Date(),
     });
     const config = await store.insertManualBundleRevision({
@@ -1979,10 +2045,11 @@ interface Enrollment {
   daemonId: string;
   slug: string;
   webSocketUrl: string;
-  scopes: string[];
+  permissions: string[];
 }
 class TestDaemon {
   private socket: WebSocket | undefined;
+  private permissions: string[] = [];
   private readonly agents = new Map<string, Record<string, unknown>>();
   private createRequests = 0;
   private readonly controls: HubExecutionControlAction[] = [];
@@ -2021,7 +2088,11 @@ class TestDaemon {
     const id = randomUUID();
     return new TestDaemon(origin, id, `daemon-${id.slice(0, 8)}`, randomUUID());
   }
-  async enroll(token: string, hostname?: string): Promise<Enrollment> {
+  async enroll(
+    token: string,
+    hostname?: string,
+    permissions: readonly string[] = ["hub.execute"],
+  ): Promise<Enrollment> {
     const response = await fetch(`${this.origin}/api/daemons/enroll`, {
       method: "POST",
       headers: {
@@ -2035,10 +2106,12 @@ class TestDaemon {
         daemonPublicKey: "public-key",
         credentialVerifier: createHash("sha256").update(this.credential).digest("base64url"),
         ...(hostname === undefined ? {} : { hostname }),
+        permissions,
       }),
     });
     if (response.status !== 200) throw new Error(`Enrollment failed: ${response.status}`);
     const enrollment = EnrollmentSchema.parse(await response.json());
+    this.permissions = [...enrollment.permissions];
     Object.assign(this, { webSocketUrl: enrollment.webSocketUrl });
     return enrollment;
   }
@@ -2056,6 +2129,41 @@ class TestDaemon {
         daemonPublicKey: "public-key",
         credentialVerifier: createHash("sha256").update(this.credential).digest("base64url"),
       }),
+    });
+    return response.status;
+  }
+
+  async enrollLegacy(token: string): Promise<z.infer<typeof LegacyEnrollmentSchema>> {
+    const response = await fetch(`${this.origin}/api/daemons/enroll`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        daemonId: this.daemonId,
+        idempotencyKey: this.idempotencyKey,
+        serverId: randomUUID(),
+        daemonPublicKey: "public-key",
+        credentialVerifier: createHash("sha256").update(this.credential).digest("base64url"),
+        scopes: ["hub.execution.*"],
+      }),
+    });
+    if (response.status !== 200) throw new Error(`Legacy enrollment failed: ${response.status}`);
+    return LegacyEnrollmentSchema.parse(await response.json());
+  }
+
+  async updatePermissions(
+    permissions: readonly string[],
+    credential = this.credential,
+  ): Promise<number> {
+    const response = await fetch(`${this.origin}/api/daemons/${this.daemonId}`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${credential}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ permissions }),
     });
     return response.status;
   }
@@ -2114,6 +2222,7 @@ class TestDaemon {
     replacement.omitSnapshotOnReconnect = this.omitSnapshotOnReconnect;
     replacement.holdControlAck = this.holdControlAck;
     replacement.materializeSpawn = this.materializeSpawn;
+    replacement.permissions = [...this.permissions];
     return replacement;
   }
   omitAgentSnapshotOnReconnect(): void {
@@ -2360,7 +2469,20 @@ class TestDaemon {
     return new Promise((resolve) => this.socket?.once("close", (code) => resolve(code)));
   }
   private receive(data: RawData): void {
-    const envelope = ExecutionSessionRequestSchema.safeParse(JSON.parse(readText(data)));
+    const value = JSON.parse(readText(data)) as unknown;
+    if (isHubHello(value)) {
+      this.send({
+        type: "status",
+        payload: {
+          status: "server_info",
+          serverId: this.daemonId,
+          permissions: this.permissions,
+          features: {},
+        },
+      });
+      return;
+    }
+    const envelope = ExecutionSessionRequestSchema.safeParse(value);
     if (!envelope.success) return;
     const request = envelope.data.message;
     if (request.type === "hub.execution.agent.validate.request") {
@@ -2459,6 +2581,10 @@ class TestDaemon {
   private send(value: unknown): void {
     this.socket?.send(JSON.stringify({ type: "session", message: value }));
   }
+}
+
+function isHubHello(value: unknown): boolean {
+  return typeof value === "object" && value !== null && "type" in value && value.type === "hello";
 }
 
 type HubCreateError =

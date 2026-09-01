@@ -26,23 +26,24 @@ const dana = {
   password: "dana-phase-two-password",
 };
 
-test("enrolls and manages a source-built Paseo daemon", async ({ hub }) => {
+test("approves CLI access, then enrolls and manages a Paseo daemon", async ({ hub }) => {
   await hub.signUpAs("alice", alice);
   await hub.createOrganization("alice", "Acme");
-  await hub.startDaemonRegistration("alice");
-  const daemonId = await hub.approveDaemon("alice", "Build Studio");
-  await hub.expectDaemon("alice", "build-studio", daemonId, "Connected");
-  await hub.proveDaemonAccessBoundaries("alice", "bob", bob, "build-studio");
-  await hub.renameDaemon("alice", "build-studio", "release-studio");
-  await hub.revokeDaemon("alice", "release-studio");
-});
 
-test("approves, denies, and expires CLI login requests", async ({ hub }) => {
-  await hub.signUpAs("alice", alice);
-  await hub.createOrganization("alice", "Acme");
-  await hub.approveCliLogin("alice");
-  await hub.denyCliLogin("alice");
-  await hub.expireCliLogin("alice");
+  await test.step("approve, deny, and expire CLI login requests", async () => {
+    await hub.approveCliLogin("alice");
+    await hub.denyCliLogin("alice");
+    await hub.expireCliLogin("alice");
+  });
+
+  await test.step("enroll, rename, and revoke a daemon", async () => {
+    await hub.startDaemonRegistration("alice");
+    const daemonId = await hub.approveDaemon("alice", "Build Studio");
+    await hub.expectDaemon("alice", "build-studio", daemonId, "Connected");
+    await hub.proveDaemonAccessBoundaries("alice", "bob", bob, "build-studio");
+    await hub.renameDaemon("alice", "build-studio", "release-studio");
+    await hub.revokeDaemon("alice", "release-studio");
+  });
 });
 
 test("keeps daemon browser state inside the current identity", async ({ hub }) => {

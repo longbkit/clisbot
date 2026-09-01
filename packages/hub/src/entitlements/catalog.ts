@@ -13,7 +13,7 @@ export const entitlementsSchema = z
     seats: z
       .object({
         /** null means unlimited. */
-        max: z.number().int().positive().nullable(),
+        max: z.number().int().nonnegative().nullable(),
       })
       .strict(),
     canInviteMembers: z.boolean(),
@@ -22,7 +22,7 @@ export const entitlementsSchema = z
         "executions.monthly": z
           .object({
             /** null means unlimited. */
-            limit: z.number().int().positive().nullable(),
+            limit: z.number().int().nonnegative().nullable(),
           })
           .strict(),
       })
@@ -46,12 +46,12 @@ export type Entitlements = z.infer<typeof entitlementsSchema>;
  * decides how an older shape maps onto it.
  */
 const storedEntitlementsSchema = z.object({
-  seats: z.object({ max: z.number().int().positive().nullable() }),
+  seats: z.object({ max: z.number().int().nonnegative().nullable() }),
   canInviteMembers: z.boolean(),
   meters: z
     .object({
       "executions.monthly": z
-        .object({ limit: z.number().int().positive().nullable() })
+        .object({ limit: z.number().int().nonnegative().nullable() })
         .default({ limit: null }),
     })
     .default({ "executions.monthly": { limit: null } }),
@@ -69,7 +69,7 @@ export const entitlementOverridesSchema = z
   .object({
     seats: z
       .object({
-        max: z.number().int().positive().nullable(),
+        max: z.number().int().nonnegative().nullable(),
       })
       .strict()
       .partial(),
@@ -78,7 +78,7 @@ export const entitlementOverridesSchema = z
       .object({
         "executions.monthly": z
           .object({
-            limit: z.number().int().positive().nullable(),
+            limit: z.number().int().nonnegative().nullable(),
           })
           .strict()
           .partial(),

@@ -286,6 +286,40 @@ describe("workflow compiler", () => {
     });
   });
 
+  it("allows a project-scoped Linear scout but keeps reactive Linear triggers actor-allowlisted", () => {
+    const raw = configuration();
+    const trigger = raw.triggers[0]!;
+    assert.doesNotThrow(() =>
+      compileHubConfig({
+        ...raw,
+        triggers: [
+          {
+            ...trigger,
+            on: "linear.issue_entered_scope",
+            filters: { project: "linear-project-id", states: ["ready"] },
+          },
+        ],
+      }),
+    );
+    assert.throws(
+      () =>
+        compileHubConfig({
+          ...raw,
+          triggers: [{ ...trigger, on: "linear.issue_entered_scope", filters: {} }],
+        }),
+      /requires filters\.project/iu,
+    );
+    assert.throws(
+      () =>
+        compileHubConfig({
+          ...raw,
+          triggers: [
+            { ...trigger, on: "linear.comment_created", filters: { project: "linear-project-id" } },
+          ],
+        }),
+      /filters\.from_users/iu,
+    );
+  });
   it("requires explicit repositories for non-GitHub authority", () => {
     const raw = configuration();
     const step = raw.triggers[0]!.steps[0]!;

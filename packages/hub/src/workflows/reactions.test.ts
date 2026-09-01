@@ -70,8 +70,8 @@ describe("workflow-owned provider reactions", () => {
     assert.deepEqual(fixture.triggerContext, original);
     assert.deepEqual(result.visible(), ["+1"]);
     assert.deepEqual(result.calls(), {
-      created: ["eyes", "rocket", "+1"],
-      deleted: [1, 2],
+      created: ["eyes", "+1"],
+      deleted: [1],
     });
   });
 
@@ -80,10 +80,10 @@ describe("workflow-owned provider reactions", () => {
 
     assert.deepEqual(result.visible(), ["+1"]);
     assert.deepEqual(result.calls(), {
-      created: ["eyes", "rocket", "+1"],
-      deleted: [1, 2],
+      created: ["eyes", "+1"],
+      deleted: [1],
     });
-    assert.deepEqual(result.run.reactionState, { reactionId: 3 });
+    assert.deepEqual(result.run.reactionState, { reactionId: 2 });
     assert.equal(result.run.status, "succeeded");
   });
 
@@ -123,10 +123,10 @@ describe("workflow-owned provider reactions", () => {
 
       assert.deepEqual(result.visible(), ["-1"]);
       assert.deepEqual(result.calls(), {
-        created: ["eyes", "rocket", "-1"],
-        deleted: [1, 2],
+        created: ["eyes", "-1"],
+        deleted: [1],
       });
-      assert.deepEqual(result.run.reactionState, { reactionId: 3 });
+      assert.deepEqual(result.run.reactionState, { reactionId: 2 });
     },
   );
 });
@@ -266,7 +266,7 @@ async function runTwoStepWorkflow<
     serverId: "server-1",
     daemonPublicKey: "public-key",
     credentialVerifier: "credential-verifier",
-    scopes: ["hub.execution.*"],
+    permissions: ["hub.execute"],
     now: new Date("2026-08-10T00:00:00.000Z"),
   });
   const { project, revision } = await createActiveProjectConfiguration(

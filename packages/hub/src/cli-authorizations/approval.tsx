@@ -89,7 +89,7 @@ export function CliLoginApproval({ accountId, organizationId }: ApprovalIdentity
       >
         <div className="grid gap-1 rounded-md border px-3 py-2.5 text-sm">
           <span className="text-muted-foreground">Organization receiving access</span>
-          <strong>{request.organization.name}</strong>
+          <span className="text-foreground">{request.organization.name}</span>
         </div>
         {request.canManage ? (
           <form className="grid gap-6" onSubmit={submitDecision} aria-label="Approve CLI login">

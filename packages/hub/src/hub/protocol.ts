@@ -50,6 +50,26 @@ export function isHubFinishExecutionToolName(name: string): boolean {
   return name === "hub.finish_execution" || name === "mcp__hub__finish_execution";
 }
 
+export const HubDaemonHelloSchema = z.object({
+  type: z.literal("hello"),
+  clientId: z.string(),
+  clientType: z.literal("hub"),
+  protocolVersion: z.literal(1),
+});
+
+export const HubDaemonServerInfoEnvelopeSchema = z.object({
+  type: z.literal("session"),
+  message: z.object({
+    type: z.literal("status"),
+    payload: z
+      .object({
+        status: z.literal("server_info"),
+        permissions: z.array(z.string()),
+      })
+      .passthrough(),
+  }),
+});
+
 export const HubExecutionAgentStreamEventSchema = z.discriminatedUnion("type", [
   z
     .object({

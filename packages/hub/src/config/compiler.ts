@@ -89,6 +89,14 @@ const AuthoredTriggerFilterSchema = z
     repo: z.string().min(1).optional(),
     guild: z.string().min(1).optional(),
     workspace: z.string().min(1).optional(),
+    /** A Linear project UUID. It is deliberately a string so imported Linear IDs work verbatim. */
+    project: z.string().min(1).optional(),
+    /** Linear workflow-state IDs which are eligible for this trigger. */
+    states: z.array(z.string().min(1)).min(1).optional(),
+    /** Linear label IDs which make an issue ineligible. */
+    exclude_labels: z.array(z.string().min(1)).min(1).optional(),
+    /** Linear user IDs which may be assigned to the issue. */
+    assignees: z.array(z.string().min(1)).min(1).optional(),
     channels: z.array(z.string().min(1)).optional(),
     from_users: z.array(z.string().min(1)).optional(),
     inputs: z.record(z.string(), InputValueSchema).optional(),
@@ -238,16 +246,23 @@ export interface CompiledStep {
   github?: CompiledGitHubAuthority | undefined;
   condition?: Expression | undefined;
   output?: { schema: JsonValue } | undefined;
-  allowOutputs: readonly { type: string; max: number; required: boolean }[];
+  allowOutputs: readonly { type: string; max?: number | undefined; required: boolean }[];
   autoArchive: boolean;
 }
 
 export type CompiledSteps = readonly CompiledStep[];
 
 export type CompiledTriggerFilter = Readonly<
-  Omit<AuthoredTriggerFilter, "channels" | "from_users"> & {
+  Omit<
+    AuthoredTriggerFilter,
+    "channels" | "from_users" | "states" | "labels" | "exclude_labels" | "assignees"
+  > & {
     channels?: readonly string[] | undefined;
     from_users?: readonly string[] | undefined;
+    states?: readonly string[] | undefined;
+    labels?: readonly string[] | undefined;
+    exclude_labels?: readonly string[] | undefined;
+    assignees?: readonly string[] | undefined;
     inputs?: Readonly<Record<string, JsonPrimitive>> | undefined;
     connectionId?: string | undefined;
     resourceId?: string | undefined;
@@ -382,7 +397,7 @@ const CompiledStepSchema: z.ZodType<CompiledStep> = z
       z
         .object({
           type: z.string().regex(EVENT_NAME),
-          max: z.number().int().positive(),
+          max: z.number().int().positive().optional(),
           required: z.boolean().default(false),
         })
         .strict(),
@@ -1315,6 +1330,16 @@ function validateAuthoredIds(config: AuthoredHubConfig): void {
 
 function validateTriggerLaunchSecurity(trigger: CompiledTrigger): void {
   if (trigger.on === "manual.run") return;
+  // A project scout is an intentionally autonomous, project-scoped policy. Every other
+  // externally-originated Linear action remains actor-allowlisted below.
+  if (trigger.on === "linear.issue_entered_scope") {
+    if (trigger.filters?.project === undefined) {
+      throw new Error(
+        `trigger ${trigger.name} requires filters.project for linear.issue_entered_scope`,
+      );
+    }
+    return;
+  }
   if ((trigger.filters?.from_users?.length ?? 0) === 0) {
     throw new Error(
       `trigger ${trigger.name} requires a non-empty filters.from_users allowlist for externally sourced events`,

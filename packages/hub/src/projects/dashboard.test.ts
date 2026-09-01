@@ -6,6 +6,84 @@ import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../test-utils/project-config
 import { ProjectDashboard, type ManualConfigurationInput } from "./dashboard.js";
 
 describe("project dashboard activity read models", () => {
+  it("uses canonical Linear health in project and organization snapshots", async () => {
+    const database = createMemoryDatabase({
+      memberships: [
+        {
+          userId: "user-1",
+          organizationId: "org-1",
+          organizationName: "Acme",
+          organizationSlug: "acme",
+          membershipId: "membership-1",
+          role: "owner",
+        },
+      ],
+    });
+    await database.createProject({
+      organizationId: "org-1",
+      name: "Hub",
+      slug: "hub",
+      createdByUserId: "user-1",
+    });
+    database.organizationConnectionUsage = () =>
+      Promise.resolve({
+        github: [],
+        discord: [],
+        slack: [],
+        linear: [
+          {
+            id: "expired",
+            organizationId: "org-1",
+            slug: "expired",
+            providerApplicationId: "linear-client",
+            linearOrganizationId: "linear-expired",
+            linearOrganizationName: "Expired",
+            appUserId: "linear-app-user",
+            accessToken: "expired-token",
+            refreshToken: null,
+            accessTokenExpiresAt: new Date("2000-01-01T00:00:00.000Z"),
+            scopes: ["read", "comments:create"],
+          },
+          {
+            id: "refreshable",
+            organizationId: "org-1",
+            slug: "refreshable",
+            providerApplicationId: "linear-client",
+            linearOrganizationId: "linear-refreshable",
+            linearOrganizationName: "Refreshable",
+            appUserId: "linear-app-user",
+            accessToken: "expired-token",
+            refreshToken: "refresh-token",
+            accessTokenExpiresAt: new Date("2000-01-01T00:00:00.000Z"),
+            scopes: ["read", "comments:create"],
+          },
+        ],
+      });
+
+    const dashboard = new ProjectDashboard(database, accountAuth(), undefined);
+    const request = new Request("https://hub.test/o/acme/projects/hub");
+    const [organization, project] = await Promise.all([
+      dashboard.organizationSnapshot(request, { organizationSlug: "acme" }),
+      dashboard.projectSnapshot(request, {
+        organizationSlug: "acme",
+        projectSlug: "hub",
+      }),
+    ]);
+
+    for (const snapshot of [organization, project]) {
+      assert.deepEqual(
+        snapshot.connections.linear.map((connection) => ({
+          id: connection.id,
+          requiresReauthorization: connection.requiresReauthorization,
+        })),
+        [
+          { id: "expired", requiresReauthorization: true },
+          { id: "refreshable", requiresReauthorization: false },
+        ],
+      );
+    }
+  });
+
   it("omits payload-bearing evidence from lists and retains it in detail", async () => {
     const database = createMemoryDatabase({
       memberships: [

@@ -34,6 +34,7 @@ import {
   decodeEntitlementDenialFailureReason,
   entitlementDenialSummary,
 } from "../entitlements/denial.js";
+import { linearConnectionRequiresReauthorization } from "../providers/linear/client.js";
 import { hasRequiredSlackScopes } from "../providers/slack/client.js";
 import { resolveRouteTenant } from "./access.js";
 import { ProjectCommandError } from "./command-error.js";
@@ -443,6 +444,13 @@ function connectionUsageView(
       teamId: connection.teamId,
       teamName: connection.teamName,
       requiresReauthorization: !hasRequiredSlackScopes(connection.scopes),
+    })),
+    linear: connections.linear.map((connection) => ({
+      id: connection.id,
+      slug: connection.slug,
+      linearOrganizationId: connection.linearOrganizationId,
+      linearOrganizationName: connection.linearOrganizationName,
+      requiresReauthorization: linearConnectionRequiresReauthorization(connection),
     })),
   };
 }

@@ -1,8 +1,8 @@
 import type { BillingPlanPriceInterval, BillingPlanPriceRecord } from "../db/types.js";
 
 /**
- * The lookup key a plan's price for an interval must carry: `{slug}_{interval}` — `solo_monthly`,
- * `team_annual`. This is catalog identity. Prices are selected by exact lookup key, never by "the
+ * The lookup key a plan's price for an interval must carry: `{slug}_{interval}` —
+ * `hosted_monthly`. This is catalog identity. Prices are selected by exact lookup key, never by "the
  * first active price for this interval", so a second active monthly price is a rejected ambiguity
  * rather than an arbitrary amount to charge or display.
  */

@@ -37,6 +37,15 @@ describe("Discord trigger matching", () => {
     );
   });
 
+  it("allows every author only when the wildcard is explicit", () => {
+    const config = configFor({ from_users: ["*"] });
+
+    assert.equal(
+      matchDiscordTriggers(config, createEvent({ authorId: "stranger" }), BOT_ID).length,
+      1,
+    );
+  });
+
   it("rejects raw bot-looking content without Discord mention evidence", () => {
     const config = configFor({ guild: "100", from_users: ["400"] });
     assert.deepEqual(

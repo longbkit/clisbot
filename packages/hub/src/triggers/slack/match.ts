@@ -35,7 +35,8 @@ function matchesFilters(
   if (filters === undefined || !event.content.includes(`<@${botUserId}>`)) return false;
   if (
     filters.from_users === undefined ||
-    (!filters.from_users.includes(event.author.id) &&
+    (!filters.from_users.includes("*") &&
+      !filters.from_users.includes(event.author.id) &&
       (event.author.username === undefined || !filters.from_users.includes(event.author.username)))
   )
     return false;

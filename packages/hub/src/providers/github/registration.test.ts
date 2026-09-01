@@ -177,7 +177,7 @@ describe("GitHub registration", () => {
     assert.equal(registration.triggerProviders.length, 1);
     assert.deepEqual(
       registration.outputs.map((output) => output.type),
-      [],
+      ["github.reply"],
     );
     assert.deepEqual(
       registration.requests.map((request) => request.name),
@@ -204,9 +204,12 @@ describe("GitHub registration", () => {
       configuration: null,
     });
 
-    assert.deepEqual(registration.connection.status({ github: [], discord: [], slack: [] }), {
-      status: "notConfigured",
-    });
+    assert.deepEqual(
+      registration.connection.status({ github: [], discord: [], slack: [], linear: [] }),
+      {
+        status: "notConfigured",
+      },
+    );
     assert.deepEqual(registration.sources, []);
     assert.deepEqual(registration.outputs, []);
   });
@@ -231,6 +234,7 @@ describe("GitHub registration", () => {
       ],
       discord: [],
       slack: [],
+      linear: [],
     });
     const installations: number[] = [];
     const registration = createGitHubRegistration({
@@ -290,6 +294,7 @@ describe("GitHub registration", () => {
       ],
       discord: [],
       slack: [],
+      linear: [],
     });
     const requests: unknown[] = [];
     const revoked: string[] = [];
@@ -425,7 +430,10 @@ describe("GitHub registration", () => {
 
     assert.equal(registration.sources.length, 1);
     assert.equal(registration.triggerProviders.length, 1);
-    assert.equal(registration.outputs.length, 0);
+    assert.deepEqual(
+      registration.outputs.map((output) => output.type),
+      ["github.reply"],
+    );
     assert.deepEqual(registration.connection.actions, {});
   });
 

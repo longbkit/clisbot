@@ -18,13 +18,13 @@ export const GITHUB_SEMANTIC_TRIGGER_EVENT_NAMES = [
 
 export type GitHubSemanticEvent = (typeof GITHUB_SEMANTIC_TRIGGER_EVENT_NAMES)[number];
 
-export const GITHUB_TRIGGER_EVENT_NAMES = [
+export const GITHUB_TRIGGER_SOURCE_NAMES = [
   "github.issue_comment",
   "github.issues",
+  "github.pull_request",
   "github.pull_request_review",
   "github.pull_request_review_comment",
   "github.push",
-  ...GITHUB_SEMANTIC_TRIGGER_EVENT_NAMES,
 ] as const;
 
 export interface GitHubClassifiedEvent {

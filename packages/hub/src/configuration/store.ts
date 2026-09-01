@@ -459,7 +459,7 @@ async function resolveCompiledConfiguration(
   configuration: CompiledHubConfig,
 ): Promise<CompileConfigurationResult> {
   const daemons = (await database.listDaemonsForOrganization(organizationId)).filter(
-    ({ status }) => status === "active",
+    ({ status, permissions }) => status === "active" && permissions.includes("hub.execute"),
   );
   const resolutions = await Promise.all(
     configuration.environments.map(async (environment) =>
@@ -475,7 +475,8 @@ async function resolveCompiledConfiguration(
     ),
   );
   const daemonIssues = resolutions.flatMap(({ environment, daemon }) =>
-    environment.kind === "daemon" && daemon === undefined
+    environment.kind === "daemon" &&
+    (daemon === undefined || !daemon.permissions.includes("hub.execute"))
       ? [
           {
             path: [HUB_RESOURCE_PATH, "environments", environment.name, "daemon"],
@@ -503,6 +504,59 @@ async function resolveCompiledConfiguration(
   return {
     success: true,
     configuration: toProjectConfiguration(parseCompiledHubConfig(resolvedConfiguration)),
+  };
+}
+
+/** Organization-level seam used by the self-contained trigger store. */
+export async function resolveTriggerConfigurationForOrganization(
+  database: Database,
+  organizationId: string,
+  configuration: CompiledHubConfig,
+): Promise<
+  | {
+      success: true;
+      configuration: CompiledProjectConfiguration;
+      routes: readonly {
+        provider: ConnectionProvider;
+        connectionId: string;
+        resourceId: string | null;
+        configuredEventName: string;
+      }[];
+    }
+  | {
+      success: false;
+      configuration: CompiledHubConfig;
+      issues: readonly { path: readonly (string | number)[]; message: string }[];
+    }
+> {
+  const resolved = await resolveCompiledConfiguration(database, organizationId, configuration);
+  if (!resolved.success) {
+    return {
+      success: false,
+      configuration: resolved.configuration,
+      issues: resolved.issues,
+    };
+  }
+  const compiled = await compileTriggers(database, organizationId, resolved.configuration.triggers);
+  if (compiled.issues.length > 0) {
+    return {
+      success: false,
+      configuration: resolved.configuration,
+      issues: compiled.issues,
+    };
+  }
+  const eventByInternalName = new Map(
+    compiled.triggers.map((trigger) => [trigger.name, trigger.on] as const),
+  );
+  return {
+    success: true,
+    configuration: { ...resolved.configuration, triggers: compiled.triggers },
+    routes: compiled.routes.map((route) => ({
+      provider: route.provider,
+      connectionId: route.connectionId,
+      resourceId: route.resourceId,
+      configuredEventName: eventByInternalName.get(route.triggerName) ?? route.triggerName,
+    })),
   };
 }
 
@@ -639,7 +693,10 @@ async function compileTriggers(
 
 function providerForEvent(eventName: string): ConnectionProvider | undefined {
   const provider = eventName.slice(0, eventName.indexOf("."));
-  return provider === "github" || provider === "slack" || provider === "discord"
+  return provider === "github" ||
+    provider === "slack" ||
+    provider === "discord" ||
+    provider === "linear"
     ? provider
     : undefined;
 }
@@ -652,7 +709,8 @@ function readAuthoredResource(
   let value: string | undefined;
   if (provider === "github") value = filters.repo;
   else if (provider === "slack") value = filters.workspace;
-  else value = filters.guild;
+  else if (provider === "discord") value = filters.guild;
+  else value = filters.project;
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
@@ -691,6 +749,13 @@ async function resolveResource(
       ? undefined
       : { connectionId: connection.id, resourceId: connection.teamId };
   }
+  if (provider === "linear") {
+    const connections = (await database.organizationConnectionUsage(organizationId)).linear.filter(
+      ({ id }) => allowedConnectionIds.has(id),
+    );
+    if (connections.length !== 1) return undefined;
+    return { connectionId: connections[0]!.id, resourceId: resource };
+  }
   const connection = (await database.organizationConnectionUsage(organizationId)).discord.find(
     ({ id, slug }) => slug === resource && allowedConnectionIds.has(id),
   );
@@ -703,18 +768,22 @@ function triggerFilterPath(trigger: CompiledTrigger, field: string): readonly (s
   return [trigger.sourceFile ?? ".paseo/workflows", "filters", field];
 }
 
-function resourceField(provider: ConnectionProvider): "repo" | "workspace" | "guild" {
+function resourceField(provider: ConnectionProvider): "repo" | "workspace" | "guild" | "project" {
   if (provider === "github") return "repo";
-  return provider === "slack" ? "workspace" : "guild";
+  if (provider === "slack") return "workspace";
+  return provider === "discord" ? "guild" : "project";
 }
 
 function providerLabel(provider: ConnectionProvider): string {
   if (provider === "github") return "GitHub";
-  return provider === "slack" ? "Slack" : "Discord";
+  if (provider === "slack") return "Slack";
+  return provider === "discord" ? "Discord" : "Linear";
 }
 
 function resourceLabel(provider: ConnectionProvider): string {
-  return provider === "github" ? "GitHub repository" : `${providerLabel(provider)} connection`;
+  if (provider === "github") return "GitHub repository";
+  if (provider === "linear") return "Linear project";
+  return `${providerLabel(provider)} connection`;
 }
 
 function formatCandidates(candidates: readonly string[]): string {
@@ -728,6 +797,7 @@ function formatConnectionCandidates(
     slug: string;
     guildName?: string;
     teamName?: string;
+    linearOrganizationName?: string;
   }[],
 ): string {
   return formatCandidates(
@@ -736,6 +806,8 @@ function formatConnectionCandidates(
         return `${connection.slug} "${connection.guildName}"`;
       if (provider === "slack" && connection.teamName !== undefined)
         return `${connection.slug} "${connection.teamName}"`;
+      if (provider === "linear" && connection.linearOrganizationName !== undefined)
+        return `${connection.slug} "${connection.linearOrganizationName}"`;
       return connection.slug;
     }),
   );
@@ -745,7 +817,13 @@ async function formatResourceCandidates(
   database: Database,
   organizationId: string,
   provider: ConnectionProvider,
-  connections: readonly { id: string; slug: string; guildName?: string; teamName?: string }[],
+  connections: readonly {
+    id: string;
+    slug: string;
+    guildName?: string;
+    teamName?: string;
+    linearOrganizationName?: string;
+  }[],
 ): Promise<string> {
   if (provider !== "github") return formatConnectionCandidates(provider, connections);
   const connectionIds = new Set(connections.map(({ id }) => id));

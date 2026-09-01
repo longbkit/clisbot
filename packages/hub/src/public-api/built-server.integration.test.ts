@@ -109,7 +109,7 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
         serverId: "built-test-server",
         daemonPublicKey: `built-public-key-${organizationId}`,
         credentialVerifier: `built-credential-${organizationId}`,
-        scopes: ["hub.execution.*"],
+        permissions: ["hub.execute"],
         now: new Date("2026-08-07T00:00:00.000Z"),
       });
     }

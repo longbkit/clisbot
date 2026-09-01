@@ -21,7 +21,7 @@ export type FailureKind =
 export interface FailureContext {
   operation: string;
   component: string;
-  provider?: "github" | "slack" | "discord" | "stripe";
+  provider?: "github" | "slack" | "discord" | "linear" | "stripe";
   requestId?: string;
   status?: number;
   organizationSlug?: string;

@@ -23,7 +23,7 @@ export function StatTile({
         {label}
       </div>
       <div className="grid min-h-11 content-start gap-1">
-        <p className="text-2xl leading-none font-semibold tracking-tight tabular-nums">{value}</p>
+        <p className="text-2xl leading-none tracking-tight tabular-nums">{value}</p>
         <p className="min-h-5 text-xs text-muted-foreground">{detail}</p>
       </div>
     </div>

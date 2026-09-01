@@ -17,16 +17,11 @@ describe("dynamic provider runtime", () => {
   it.each([
     "github.issues",
     "github.issue_comment",
+    "github.pull_request",
     "github.pull_request_review",
     "github.pull_request_review_comment",
     "github.push",
-    "github.issue_created",
-    "github.pull_request_created",
-    "github.issue_comment_created",
-    "github.pull_request_comment_created",
-    "github.issue_label_added",
-    "github.pull_request_label_added",
-  ] as const)("publishes %s through the activated GitHub runtime registry", async (eventName) => {
+  ] as const)("publishes raw source %s through the activated GitHub runtime", async (eventName) => {
     const runtime = new DynamicProviderRuntime({
       database: createMemoryDatabase(),
       auth: testAuth(),
@@ -60,7 +55,7 @@ describe("dynamic provider runtime", () => {
     assert.ok(trigger.eventNames.includes(eventName));
   });
 
-  it("publishes a started replacement, retires old resources, and retains in-flight snapshots", async () => {
+  it("publishes a started replacement and routes later callbacks through it", async () => {
     const started: string[] = [];
     const stopped: string[] = [];
     const completed: string[] = [];
@@ -108,7 +103,7 @@ describe("dynamic provider runtime", () => {
     second.publish();
     await new Promise((resolve) => setImmediate(resolve));
 
-    // Inbound delivery retires immediately; the old execution keeps its leased trigger/output.
+    // The replaced source retires immediately; later callbacks use the active registration.
     assert.deepEqual(stopped, ["A1"]);
 
     await trigger.onAgentExecutionCompleted?.(oldMatch!.triggerContext, oldMatch!.outputContext, {
@@ -121,11 +116,11 @@ describe("dynamic provider runtime", () => {
     );
     assert.deepEqual(started, ["A1", "A2"]);
     assert.deepEqual(stopped, ["A1"]);
-    assert.deepEqual(completed, ["A1"]);
+    assert.deepEqual(completed, ["A2"]);
     assert.deepEqual(await response.json(), { url: "https://provider.test/A2" });
   });
 
-  it("keeps replies and attachments on the registration that matched the trigger", async () => {
+  it("routes replies and attachments through the active registration", async () => {
     const used: string[] = [];
     const stopped: string[] = [];
     const database = createMemoryDatabase();
@@ -190,14 +185,106 @@ describe("dynamic provider runtime", () => {
       executionId: "execution-1",
     });
 
-    assert.deepEqual(used, ["launch:A1", "reply:A1", "attachment:A1"]);
+    assert.deepEqual(used, ["launch:A1", "reply:A2", "attachment:A2"]);
     assert.deepEqual(stopped, ["A1"]);
     await trigger.onAgentExecutionTerminal?.("execution-1", match.triggerContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(stopped, ["A1"]);
   });
 
-  it("leases integrations, GitHub authority, and configuration calls across rotation", async () => {
+  it("lets a Discord-triggered execution use the active GitHub integration and authority", async () => {
+    const used: string[] = [];
+    const runtime = new DynamicProviderRuntime({
+      database: createMemoryDatabase(),
+      auth: testAuth(),
+      applicationBaseUrl: "https://hub.test",
+      registrationFactory: ({ configuration }) =>
+        downstreamRegistration(providerConfigurationId(configuration), used, []),
+    });
+    const github = runtime
+      .registrations()
+      .find((registration) => registration.connection.name === "github")!;
+    const discord = runtime
+      .registrations()
+      .find((registration) => registration.connection.name === "discord")!;
+    const discordTrigger = discord.triggerProviders[0]!({
+      configurationStoreForProject: () => {
+        throw new Error("unused");
+      },
+      connectionsForProject: () => {
+        throw new Error("unused");
+      },
+    })!;
+    const githubCandidate = await runtime.prepare(
+      "github",
+      providerConfiguration("github", "A1"),
+      "https://hub.test",
+      providerIdentity("github", "A1"),
+      1,
+    );
+    await githubCandidate.start();
+    githubCandidate.publish();
+    const discordCandidate = await runtime.prepare(
+      "discord",
+      providerConfiguration("discord", "D1"),
+      "https://hub.test",
+      providerIdentity("discord", "D1"),
+      1,
+    );
+    await discordCandidate.start();
+    discordCandidate.publish();
+
+    const matches = await discordTrigger.match({
+      ...externalTrigger(),
+      source: "discord.mention",
+    });
+    if (typeof matches === "string") throw new Error("expected a match");
+    const match = matches[0]!;
+    await discordTrigger.materializeLaunch?.({
+      executionId: "execution-1",
+      organizationId: "org",
+      projectId: "project",
+      triggerContext: match.triggerContext,
+    });
+
+    await github.integration!.resolve("project", "github", "token", {
+      executionId: "execution-1",
+    });
+    const authority = await github.integration!.githubAuthority!.mint({
+      projectId: "project",
+      connectionSlug: "github",
+      repositories: ["acme/repository"],
+      permissions: { contents: "write" },
+    });
+
+    assert.deepEqual(used, ["launch:D1", "integration:A1", "authority-mint:A1"]);
+    await github.integration!.githubAuthority!.revoke(authority.token);
+  });
+
+  it("reports an unavailable capability with a stable diagnostic code", async () => {
+    const runtime = new DynamicProviderRuntime({
+      database: createMemoryDatabase(),
+      auth: testAuth(),
+      applicationBaseUrl: "https://hub.test",
+    });
+    const github = runtime
+      .registrations()
+      .find((registration) => registration.connection.name === "github")!;
+
+    await assert.rejects(
+      async () =>
+        github.integration!.githubAuthority!.mint({
+          projectId: "project",
+          connectionSlug: "github",
+          repositories: ["acme/repository"],
+          permissions: { contents: "read" },
+        }),
+      (error: unknown) =>
+        error instanceof Error && "code" in error && error.code === "github_authority_unavailable",
+    );
+  });
+
+  it("drains in-flight configuration calls while later GitHub capabilities use the replacement", async () => {
     const used: string[] = [];
     const stopped: string[] = [];
     let releaseConfiguration: (() => void) | undefined;
@@ -271,7 +358,6 @@ describe("dynamic provider runtime", () => {
       executionId: "execution-1",
     });
     const authority = await stable.integration!.githubAuthority!.mint({
-      executionId: "execution-1",
       projectId: "project",
       connectionSlug: "github",
       repositories: ["acme/repository"],
@@ -282,8 +368,8 @@ describe("dynamic provider runtime", () => {
     assert.deepEqual(used, [
       "launch:A1",
       "configuration:A1",
-      "integration:A1",
-      "authority-mint:A1",
+      "integration:A2",
+      "authority-mint:A2",
     ]);
     assert.deepEqual(stopped, ["A1"]);
     await trigger.onAgentExecutionTerminal?.("execution-1", match.triggerContext);
@@ -291,7 +377,7 @@ describe("dynamic provider runtime", () => {
     assert.deepEqual(stopped, ["A1"]);
     await stable.integration!.githubAuthority!.revoke(authority.token);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(used.at(-1), "authority-revoke:A1");
+    assert.equal(used.at(-1), "authority-revoke:A2");
     assert.deepEqual(stopped, ["A1"]);
   });
 
@@ -519,6 +605,9 @@ function providerConfiguration(provider: Provider, id: string): ProviderApplicat
     };
   }
   if (provider === "slack") return slackConfiguration(id);
+  if (provider === "linear") {
+    return { provider, clientId: id, clientSecret: "secret", webhookSecret: "webhook" };
+  }
   return { provider, applicationId: id, clientSecret: "secret", botToken: "token" };
 }
 
@@ -530,6 +619,7 @@ function providerIdentity(provider: Provider, id: string): ProviderApplicationId
 function providerConfigurationId(configuration: ProviderApplicationConfiguration): string {
   if (configuration.provider === "github") return configuration.appId;
   if (configuration.provider === "slack") return configuration.appId;
+  if (configuration.provider === "linear") return configuration.clientId;
   return configuration.applicationId;
 }
 

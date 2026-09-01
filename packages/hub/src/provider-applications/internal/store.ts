@@ -42,10 +42,17 @@ const discordConfigurationSchema = z.object({
   clientSecret: z.string().min(1),
   botToken: z.string().min(1),
 });
+const linearConfigurationSchema = z.object({
+  provider: z.literal("linear"),
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1),
+  webhookSecret: z.string().min(1),
+});
 const configurationSchema = z.discriminatedUnion("provider", [
   githubConfigurationSchema,
   slackConfigurationSchema,
   discordConfigurationSchema,
+  linearConfigurationSchema,
 ]);
 
 /** @package */
@@ -68,6 +75,7 @@ const identitySchema = z.discriminatedUnion("provider", [
   }),
   z.object({ provider: z.literal("slack"), id: z.string().min(1), name: z.string().min(1) }),
   z.object({ provider: z.literal("discord"), id: z.string().min(1), name: z.string().min(1) }),
+  z.object({ provider: z.literal("linear"), id: z.string().min(1), name: z.string().min(1) }),
 ]);
 
 interface ProviderConfigurationRow extends QueryRow {
@@ -92,7 +100,10 @@ export class ProviderConfigurationConflictError extends Error {
 export function createProviderApplicationStore(
   database: DatabaseRuntime,
   locks: Locks,
-  connections?: Pick<Database, "completeSlackProviderApplication">,
+  connections?: Pick<
+    Database,
+    "completeSlackProviderApplication" | "completeLinearProviderApplication"
+  >,
 ): ProviderApplicationStore {
   return {
     async read(provider) {
@@ -180,6 +191,18 @@ export function createProviderApplicationStore(
     completeSlackInstallation(input) {
       if (connections === undefined) throw new Error("Slack application persistence unavailable");
       return connections.completeSlackProviderApplication({
+        ...input.binding,
+        providerConfiguration: {
+          configuration: input.configuration,
+          identity: input.identity,
+          expectedVersion: input.expectedVersion,
+          updatedByUserId: input.updatedByUserId,
+        },
+      });
+    },
+    completeLinearInstallation(input) {
+      if (connections === undefined) throw new Error("Linear application persistence unavailable");
+      return connections.completeLinearProviderApplication({
         ...input.binding,
         providerConfiguration: {
           configuration: input.configuration,
@@ -313,6 +336,7 @@ async function writeProviderActivation(
 function connectionTable(provider: Provider): string {
   if (provider === "github") return "github_connections";
   if (provider === "slack") return "slack_connections";
+  if (provider === "linear") return "linear_connections";
   return "discord_connections";
 }
 
@@ -335,6 +359,8 @@ function parseRow(row: ProviderConfigurationRow): StoredProviderApplication {
 }
 
 function providerSchema(value: string): Provider {
-  if (value === "github" || value === "slack" || value === "discord") return value;
+  if (value === "github" || value === "slack" || value === "discord" || value === "linear") {
+    return value;
+  }
   throw new Error("stored provider configuration has invalid provider");
 }

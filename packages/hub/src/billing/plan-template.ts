@@ -18,6 +18,16 @@ const positiveIntegerOrUnlimited = z.string().transform((value, ctx) => {
   return parsed;
 });
 
+const nonnegativeIntegerOrUnlimited = z.string().transform((value, ctx) => {
+  if (value === "unlimited") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    ctx.addIssue({ code: "custom", message: `must be a nonnegative integer or "unlimited"` });
+    return z.NEVER;
+  }
+  return parsed;
+});
+
 const booleanFlag = z.enum(["true", "false"]).transform((value) => value === "true");
 
 /**
@@ -29,7 +39,7 @@ const planMetadataSchema = z.object({
   paseo_plan_slug: z.string().trim().min(1, "paseo_plan_slug must not be blank"),
   ent_seats_max: positiveIntegerOrUnlimited,
   ent_can_invite: booleanFlag,
-  ent_executions_monthly_limit: positiveIntegerOrUnlimited,
+  ent_executions_monthly_limit: nonnegativeIntegerOrUnlimited,
 });
 
 export interface ParsedPlanTemplate {

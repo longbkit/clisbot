@@ -112,8 +112,8 @@ const paseoHighlight = HighlightStyle.define([
   { tag: [tags.number, tags.bool, tags.null, tags.atom], color: "var(--chart-4)" },
   { tag: [tags.comment], color: "var(--muted-foreground)", fontStyle: "italic" },
   { tag: [tags.keyword, tags.operator, tags.punctuation], color: "var(--muted-foreground)" },
-  { tag: [tags.heading], color: "var(--link)", fontWeight: "600" },
-  { tag: [tags.strong], fontWeight: "600" },
+  { tag: [tags.heading], color: "var(--foreground)" },
+  { tag: [tags.strong], color: "var(--foreground)" },
   { tag: [tags.emphasis], fontStyle: "italic" },
   { tag: [tags.link, tags.url], color: "var(--chart-2)" },
 ]);

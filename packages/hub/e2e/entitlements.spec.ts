@@ -1,6 +1,7 @@
 import { expect } from "@playwright/test";
 import { test } from "./app.js";
 import { projectApp } from "./helpers/projects/index.js";
+import { OrganizationTriggers } from "./helpers/triggers.js";
 
 const owner = {
   name: "Amara",
@@ -86,6 +87,7 @@ test.describe("metered usage", () => {
   }) => {
     const reason = "Trial cap on monthly executions";
     const app = projectApp(page);
+    const triggers = new OrganizationTriggers(page);
 
     await test.step("sign up, create an organization, register a daemon, become an operator", async () => {
       await hub.signUpAs("owner", meterOwner);
@@ -103,41 +105,16 @@ test.describe("metered usage", () => {
     });
 
     await test.step("install a manual deploy trigger against the registered daemon", async () => {
-      await app.navigation.openOrganizationSection("Projects");
-      await app.navigation.openProject("Default");
-      await app.navigation.openProjectSection("Configuration");
-      await app.configuration.switchToManual();
-      await app.configuration.saveManualConfiguration(
-        [
-          "environments:",
-          "  slice-three-runner:",
-          "    kind: daemon",
-          "    daemon: slice-three-runner",
-          "    cwd: /workspace",
-          "agents: {}",
-        ].join("\n"),
-      );
-      await app.configuration.addWorkflow(
-        "deploy.yml",
-        [
-          "name: deploy",
-          "on: manual.run",
-          "max_runtime: 1h",
-          "filters:",
-          "  from_users: [alice]",
-          "steps:",
-          "  - id: deploy",
-          "    environment: slice-three-runner",
-          "    max_runtime: 10m",
-          "    idle_timeout: 1m",
-          "    agent:",
-          "      provider: opencode",
-          "    prompt:",
-          "      - text: '${{ paseo.prompt }}'",
-        ].join("\n"),
-      );
-      await app.configuration.save();
-      await app.configuration.expectActiveRevision(2);
+      await app.navigation.leaveInstance();
+      await triggers.startNew();
+      await triggers.configureManual({
+        name: "deploy",
+        daemon: "slice-three-runner",
+        cwd: "/workspace",
+        agent: "opencode",
+        prompt: "${{ paseo.prompt }}",
+      });
+      await triggers.save("deploy");
     });
 
     const runApiKey = await hub.createRunApiKey("owner");
@@ -151,7 +128,6 @@ test.describe("metered usage", () => {
       expect(first.workflowStatus).toBe("running");
     });
 
-    let deniedRunId = "";
     await test.step("a second execution in the same month is accepted, then denied by the meter", async () => {
       // Metering is per-execution now, so the trigger is accepted (200) and the denial lands
       // when the durable engine creates the execution — surfaced on the run, not the response.
@@ -162,28 +138,23 @@ test.describe("metered usage", () => {
       });
       expect(second.status).toBe(200);
       expect(second.triggerRunId).toBeDefined();
-      deniedRunId = second.triggerRunId ?? "";
     });
 
-    await test.step("the denied run fails with the entitlement reason, not a generic failure", async () => {
-      await app.navigation.openOrganizationSection("Projects");
-      await app.navigation.openProject("Default");
-      await app.navigation.openProjectSection("Activity");
-      const activity = page.getByRole("table", { name: "Project activity" });
-      const deniedRow = activity
+    await test.step("the denied run fails in organization activity", async () => {
+      await app.navigation.openOrganizationSection("Activity");
+      const deployRows = page
+        .getByRole("table", { name: "Trigger activity" })
         .getByRole("row")
-        .filter({ has: page.locator(`a[href$="/activity/${deniedRunId}"]`) });
-      // The denial lands when the durable worker creates the second execution — asynchronous to
-      // the manual-run response — and the activity snapshot does not live-refetch, so reload
-      // until that exact run is marked failed. Targeting the run by id keeps this unambiguous
-      // even if an unrelated run also fails.
+        .filter({ has: page.getByRole("cell", { name: "deploy", exact: true }) });
+      // Organization activity is intentionally compact and has no legacy run-detail route. The
+      // durable-engine suite retains the exact entitlement-reason assertion.
       await expect(async () => {
         await page.reload();
-        await expect(deniedRow).toContainText("failed");
+        await expect(deployRows).toHaveCount(2);
+        await expect(
+          deployRows.first().getByRole("cell", { name: "failed", exact: true }),
+        ).toBeVisible();
       }).toPass({ timeout: 90_000, intervals: [1_000, 2_000, 5_000] });
-      await deniedRow.getByRole("link", { name: "deploy", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Run detail" })).toBeVisible();
-      await expect(page.getByText("executions.monthly", { exact: false }).first()).toBeVisible();
       await page.screenshot({ path: `${SLICE_3_DIR}/02-execution-denied.png`, fullPage: true });
     });
 

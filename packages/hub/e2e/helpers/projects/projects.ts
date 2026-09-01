@@ -20,7 +20,7 @@ export class ProjectLifecycle {
   async archive(name: string) {
     await this.page.getByRole("link", { name }).click();
     await this.page
-      .getByRole("navigation", { name: "Project" })
+      .getByRole("navigation", { name: "Project", exact: true })
       .getByRole("link", {
         name: "Settings",
       })

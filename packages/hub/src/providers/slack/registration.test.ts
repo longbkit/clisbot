@@ -78,9 +78,12 @@ describe("Slack registration", () => {
       publicBaseUrl: "https://hub.test",
       configuration: null,
     });
-    assert.deepEqual(registration.connection.status({ github: [], discord: [], slack: [] }), {
-      status: "notConfigured",
-    });
+    assert.deepEqual(
+      registration.connection.status({ github: [], discord: [], slack: [], linear: [] }),
+      {
+        status: "notConfigured",
+      },
+    );
     assert.deepEqual(registration.sources, []);
     assert.deepEqual(registration.outputs, []);
     assert.deepEqual(registration.requests, []);
@@ -295,6 +298,7 @@ describe("Slack registration", () => {
             providerApplicationId: "A1",
           },
         ],
+        linear: [],
       }),
       { status: "requiresReauthorization" },
     );

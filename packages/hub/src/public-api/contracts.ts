@@ -18,6 +18,29 @@ export const FieldIssueSchema = z
     example: { path: ["projectSlug"], message: "Required" },
   });
 
+export const TriggerYamlRequestSchema = z
+  .object({ yaml: z.string().min(1).max(1_000_000) })
+  .strict()
+  .openapi("TriggerYamlRequest", {
+    description: "One self-contained Paseo trigger YAML document.",
+  });
+
+export const ValidatedTriggerSchema = z
+  .object({ name: z.string(), valid: z.literal(true) })
+  .strict()
+  .openapi("ValidatedTrigger");
+
+export const InstalledTriggerSchema = z
+  .object({
+    triggerId: z.string().uuid(),
+    name: z.string(),
+    revisionId: z.string().uuid(),
+    version: z.number().int().positive(),
+    active: z.literal(true),
+  })
+  .strict()
+  .openapi("InstalledTrigger");
+
 export const StartCliAuthorizationRequestSchema = z
   .object({})
   .strict()
@@ -195,6 +218,22 @@ export const ProjectListSchema = z
     },
   });
 
+export const TriggerExportSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string(),
+    enabled: z.boolean(),
+    format: z.enum(["single_run", "legacy_multistep"]),
+    yaml: z.string(),
+  })
+  .strict()
+  .openapi("TriggerExport");
+
+export const TriggerListSchema = z
+  .object({ triggers: z.array(TriggerExportSchema) })
+  .strict()
+  .openapi("TriggerList");
+
 export const ConfigurationResourcesSchema = z
   .object({
     daemons: z.array(z.object({ id: z.string().uuid(), slug: z.string() }).strict()),
@@ -210,6 +249,7 @@ export const ConfigurationResourcesSchema = z
     ),
     discord: z.array(z.object({ slug: z.string(), guildName: z.string() }).strict()),
     slack: z.array(z.object({ slug: z.string(), teamName: z.string() }).strict()),
+    linear: z.array(z.object({ slug: z.string(), organizationName: z.string() }).strict()),
   })
   .strict()
   .openapi("ConfigurationResources");

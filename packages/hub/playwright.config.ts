@@ -12,7 +12,7 @@ export default defineConfig({
     {
       name: "desktop-chromium",
       testIgnore:
-        /(dashboard-mobile|phase-two-mobile|phase-three-mobile|projects-mobile|apps-mobile)\.spec\.ts/u,
+        /(dashboard-mobile|dashboard-navigation-mobile|phase-two-mobile|phase-three-mobile|apps-mobile|billing-mobile)\.spec\.ts/u,
       use: {
         ...devices["Desktop Chrome"],
         trace: "retain-on-failure",
@@ -21,7 +21,7 @@ export default defineConfig({
     {
       name: "mobile-chromium",
       testMatch:
-        /(authentication|dashboard-mobile|phase-two-mobile|phase-three-mobile|projects-mobile|apps-mobile)\.spec\.ts/u,
+        /(dashboard-mobile|dashboard-navigation-mobile|apps-mobile|billing-mobile)\.spec\.ts/u,
       use: {
         ...devices["Pixel 7"],
         trace: "retain-on-failure",

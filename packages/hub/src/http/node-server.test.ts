@@ -36,6 +36,45 @@ describe("trusted request origin metadata", () => {
       "https://hub.example.test",
     );
   });
+
+  it("uses the configured public origin instead of caller-controlled proxy metadata", async () => {
+    assert.equal(
+      await observedOrigin(
+        {
+          trustedClientIpHeader: "fly-client-ip",
+          canonicalRequestOrigin: "https://hub.example.test/path",
+        },
+        {
+          host: "internal:3000",
+          "x-forwarded-host": "attacker.example.test",
+          "x-forwarded-proto": "https",
+        },
+      ),
+      "https://hub.example.test",
+    );
+    assert.equal(
+      await observedOrigin(
+        { canonicalRequestOrigin: "https://hub.example.test" },
+        { host: "internal:3000", "x-forwarded-proto": "https" },
+      ),
+      "https://hub.example.test",
+    );
+  });
+
+  it("rejects a non-HTTP or credential-bearing configured public URL at startup", () => {
+    const handler = () => new Response("ok");
+    assert.throws(
+      () => createFetchServer(handler, { canonicalRequestOrigin: "ftp://hub.example.test" }),
+      /invalid origin/u,
+    );
+    assert.throws(
+      () =>
+        createFetchServer(handler, {
+          canonicalRequestOrigin: "https://operator:secret@hub.example.test",
+        }),
+      /invalid origin/u,
+    );
+  });
 });
 
 describe("CLI authorization client address", () => {
@@ -189,6 +228,9 @@ describe("HTTP failure ownership", () => {
     const failure = new Error("storage exploded with formatless-secret-f09e");
     const failOperation = () => Promise.reject(failure);
     const operations: PublicOperations = {
+      listTriggers: failOperation,
+      validateTrigger: failOperation,
+      installTrigger: failOperation,
       listProjects: failOperation,
       listConfigurationResources: failOperation,
       listSetupResources: failOperation,
@@ -291,7 +333,7 @@ function closeServer(server: ReturnType<typeof createFetchServer>): Promise<void
 }
 
 async function observedOrigin(
-  options: { trustedClientIpHeader?: string },
+  options: { trustedClientIpHeader?: string; canonicalRequestOrigin?: string },
   headers: Record<string, string>,
 ): Promise<string> {
   const server = createFetchServer(

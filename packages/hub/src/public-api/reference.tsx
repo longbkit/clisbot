@@ -3,6 +3,12 @@ import { ApiReferenceReact, type AnyApiReferenceConfiguration } from "@scalar/ap
 import scalarStyles from "@scalar/api-reference-react/style.css?inline";
 
 const referenceStyle = { minHeight: "100vh" };
+const referenceTypography = `
+:where(.scalar-app) *,
+:where(.scalar-app) ::before,
+:where(.scalar-app) ::after { font-weight: 400 !important; }
+:where(.scalar-app) h1 { font-weight: 500 !important; }
+`;
 const referenceConfiguration = {
   url: "/api/openapi.json",
   metaData: { title: "Paseo Hub Public API" },
@@ -23,7 +29,7 @@ const referenceConfiguration = {
     proxyUrl: "/api/reference",
     apiBaseUrl: "/api/reference",
   },
-  customCss: `${scalarStyles}\n:root { --scalar-font: ui-sans-serif, system-ui, sans-serif; --scalar-font-code: ui-monospace, monospace; }`,
+  customCss: `${scalarStyles}\n:root { --scalar-font: ui-sans-serif, system-ui, sans-serif; --scalar-font-code: ui-monospace, monospace; }${referenceTypography}`,
 } satisfies AnyApiReferenceConfiguration;
 
 export function PublicApiReference() {

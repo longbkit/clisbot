@@ -58,9 +58,7 @@ export function Disclosure({
           </span>
         )}
         <span className="contents sm:grid sm:min-w-0 sm:flex-1 sm:gap-0.5">
-          <span className="col-start-2 row-start-1 truncate font-medium sm:col-auto sm:row-auto">
-            {title}
-          </span>
+          <span className="col-start-2 row-start-1 truncate sm:col-auto sm:row-auto">{title}</span>
           {description === undefined ? null : (
             <span className="col-span-3 row-start-2 text-sm text-muted-foreground sm:col-auto sm:row-auto">
               {description}

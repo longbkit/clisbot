@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { DaemonHandoffSurface } from "./daemon-handoff.js";
 
-export type AppProvider = "GitHub" | "Slack" | "Discord";
+export type AppProvider = "GitHub" | "Slack" | "Discord" | "Linear";
 
 export type AppStatus =
   | "Not set up"
@@ -16,12 +16,14 @@ const PORTAL_LINKS: Readonly<Record<AppProvider, string>> = {
   GitHub: "Create a GitHub App",
   Slack: "Create a Slack app",
   Discord: "Discord developer portal",
+  Linear: "Open Linear API applications",
 };
 
 const APP_SUMMARIES: Readonly<Record<AppProvider, string>> = {
   GitHub: "Reads issues and pull requests, and lets agents push.",
   Slack: "Reads mentions in your workspace and replies in the thread.",
   Discord: "Reads mentions in your server and replies in the thread.",
+  Linear: "Starts project-scoped workflows from issues and posts outcomes back to Linear.",
 };
 
 /**
@@ -47,6 +49,11 @@ export const WORKING_CREDENTIALS: Readonly<Record<AppProvider, Readonly<Record<s
     Slack: {
       "App-level token": "xapp-browser-fixture",
       "Bot token": "xoxb-browser-fixture",
+    },
+    Linear: {
+      "Client ID": "browser-linear-client",
+      "Client Secret": "browser-linear-client-secret",
+      "Webhook signing secret": "browser-linear-webhook-secret",
     },
   };
 
@@ -195,7 +202,9 @@ export class AppSection {
         name:
           this.provider === "Slack"
             ? /^(?:Connect Slack|Save and continue to Slack)$/u
-            : "Verify and save",
+            : this.provider === "Linear"
+              ? "Save and continue to Linear"
+              : "Verify and save",
       })
       .click();
   }
@@ -261,6 +270,20 @@ export class AppSection {
     await expect(this.body().getByRole("button", { name: "Copy manifest" })).toHaveCount(0);
     await expect(this.form()).toHaveCount(0);
     await expect(this.action("Save and continue to Slack")).toHaveCount(0);
+    await expect(this.setupSteps()).toHaveCount(0);
+  }
+
+  async expectLinearHttpsBlocked(origin: string): Promise<void> {
+    await this.expectExpanded();
+    await expect(this.body().getByRole("alert")).toContainText("HTTPS required");
+    await expect(this.body().getByRole("alert")).toContainText(
+      `Linear webhooks need HTTPS, and Hub is at ${origin}. Reopen Hub at its public HTTPS address to set up Linear.`,
+    );
+    await expect(
+      this.body().getByRole("link", { name: "Open Linear API applications" }),
+    ).toHaveCount(0);
+    await expect(this.form()).toHaveCount(0);
+    await expect(this.action("Save and continue to Linear")).toHaveCount(0);
     await expect(this.setupSteps()).toHaveCount(0);
   }
 
@@ -432,6 +455,7 @@ export class AppSetupSurface {
   readonly github: AppSection;
   readonly slack: AppSection;
   readonly discord: AppSection;
+  readonly linear: AppSection;
   /** Where the way out leads on first run, before the dashboard. */
   readonly daemonHandoff: DaemonHandoffSurface;
 
@@ -439,22 +463,26 @@ export class AppSetupSurface {
     this.github = new AppSection(page, "GitHub");
     this.slack = new AppSection(page, "Slack");
     this.discord = new AppSection(page, "Discord");
+    this.linear = new AppSection(page, "Linear");
     this.daemonHandoff = new DaemonHandoffSurface(page);
   }
 
   sections(): readonly AppSection[] {
-    return [this.github, this.slack, this.discord];
+    return [this.github, this.slack, this.discord, this.linear];
   }
 
   section(provider: AppProvider): AppSection {
-    return provider === "GitHub" ? this.github : provider === "Slack" ? this.slack : this.discord;
+    if (provider === "GitHub") return this.github;
+    if (provider === "Slack") return this.slack;
+    if (provider === "Discord") return this.discord;
+    return this.linear;
   }
 
   async expectOnboarding(): Promise<void> {
     await expect(this.page.getByRole("heading", { name: "Set up your apps" })).toBeVisible();
     await expect(
       this.page.getByText(
-        "Paseo Hub talks to GitHub, Slack, and Discord through apps you create and own.",
+        "Paseo Hub talks to GitHub, Slack, Discord, and Linear through apps you create and own.",
         { exact: false },
       ),
     ).toBeVisible();
@@ -464,7 +492,9 @@ export class AppSetupSurface {
   async expectManagement(): Promise<void> {
     await expect(this.page.getByRole("heading", { name: "Apps", exact: true })).toBeVisible();
     await expect(
-      this.page.getByText("The GitHub, Slack, and Discord apps Hub uses to reach your workspaces."),
+      this.page.getByText(
+        "The GitHub, Slack, Discord, and Linear apps Hub uses to reach your workspaces.",
+      ),
     ).toBeVisible();
   }
 
@@ -516,6 +546,7 @@ export class AppSetupSurface {
     await this.github.expectExpanded();
     await this.slack.expectExpanded();
     await this.discord.expectCollapsed();
+    await this.linear.expectCollapsed();
   }
 
   async collapseAll(): Promise<void> {
@@ -586,10 +617,33 @@ export class AppSetupSurface {
       "instance operator flag",
       "this hub",
       "app settings",
-      "project",
-      "projects",
     ]) {
       expect(copy, `visible copy contains prohibited phrase: ${phrase}`).not.toContain(phrase);
+    }
+    // "Project" is Linear's native resource name and belongs in that card. It remains internal
+    // vocabulary everywhere else on this app-ownership surface.
+    const copyWithoutLinear = await this.page.locator("body").evaluate((body) => {
+      const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+      const visible: string[] = [];
+      let node = walker.nextNode();
+      while (node !== null) {
+        const element = node.parentElement;
+        if (
+          element !== null &&
+          element.closest('[data-provider="linear"]') === null &&
+          element.getClientRects().length > 0
+        ) {
+          visible.push(node.textContent ?? "");
+        }
+        node = walker.nextNode();
+      }
+      return visible.join(" ").toLowerCase();
+    });
+    for (const phrase of ["project", "projects"]) {
+      expect(
+        copyWithoutLinear,
+        `visible non-Linear copy contains prohibited phrase: ${phrase}`,
+      ).not.toContain(phrase);
     }
     const restarts = await this.page.getByText("restart Hub", { exact: false }).all();
     for (const mention of restarts) {

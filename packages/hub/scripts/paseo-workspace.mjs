@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import process from "node:process";
 
 const workspacePath = resolve(process.env.PASEO_WORKTREE_PATH ?? process.cwd());
+const LOCAL_WORKSPACE_FILES = [".env", "AGENTS.override.md", "CLAUDE.local.md"];
 
 /**
  * Everything the evidence service starts with nothing in. A handoff instance has to prove that
@@ -77,7 +78,7 @@ if (resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) await mai
 async function main() {
   const action = process.argv[2];
   if (action === "setup") {
-    await copyWorkspaceEnvironment();
+    await copyWorkspaceLocalFiles();
     return;
   }
   if (action === "teardown") return;
@@ -95,18 +96,23 @@ async function main() {
   );
 }
 
-async function copyWorkspaceEnvironment() {
+async function copyWorkspaceLocalFiles() {
   const sourceRoot = process.env.PASEO_SOURCE_CHECKOUT_PATH;
   if (sourceRoot === undefined || resolve(sourceRoot) === workspacePath) return;
 
-  const source = join(sourceRoot, ".env");
+  for (const name of LOCAL_WORKSPACE_FILES) {
+    await copyIfPresent(join(sourceRoot, name), join(workspacePath, name));
+  }
+}
+
+async function copyIfPresent(source, destination) {
   try {
     await stat(source);
   } catch (error) {
     if (error?.code === "ENOENT") return;
     throw error;
   }
-  await copyFile(source, join(workspacePath, ".env"));
+  await copyFile(source, destination);
 }
 
 function requiredPort() {

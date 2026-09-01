@@ -37,6 +37,7 @@ import {
 } from "../organizations/provisioning.js";
 import { InstanceAppOnboarding } from "../instance-setup/app-onboarding.js";
 import { TRUSTED_REQUEST_ORIGIN_HEADER } from "../http/request-origin.js";
+import type { InvitationMailer } from "../invitations/index.js";
 
 export interface AuthServer {
   handle(request: Request): Promise<Response>;
@@ -84,6 +85,8 @@ interface AuthServerOptions {
   /** Post-commit hook fired when a membership change alters an organization's seat count. The
    * composition root wires billing's seat-quantity reporter here; undefined self-hosted. */
   onMembershipChanged?: (organizationId: string) => Promise<void>;
+  /** Optional post-commit delivery for organization invitations. */
+  invitationMailer?: InvitationMailer;
 }
 
 const sessionSchema = z.object({
@@ -203,6 +206,9 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     ...(options.onMembershipChanged === undefined
       ? {}
       : { onMembershipChanged: options.onMembershipChanged }),
+    ...(options.invitationMailer === undefined
+      ? {}
+      : { invitationMailer: options.invitationMailer }),
   });
   const browserOrigin = new URL(options.baseURL).origin;
 

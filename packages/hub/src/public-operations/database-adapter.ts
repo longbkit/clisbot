@@ -20,7 +20,9 @@ export function createDatabasePublicOperationRepository(
       ]);
       return {
         daemons: daemons
-          .filter(({ status }) => status === "active")
+          .filter(
+            ({ status, permissions }) => status === "active" && permissions.includes("hub.execute"),
+          )
           .map(({ id, slug }) => ({ id, slug })),
         github: connections.github.map(({ id, slug, accountLogin, accountType }) => ({
           slug,
@@ -32,6 +34,10 @@ export function createDatabasePublicOperationRepository(
         })),
         discord: connections.discord.map(({ slug, guildName }) => ({ slug, guildName })),
         slack: connections.slack.map(({ slug, teamName }) => ({ slug, teamName })),
+        linear: connections.linear.map(({ slug, linearOrganizationName }) => ({
+          slug,
+          organizationName: linearOrganizationName,
+        })),
       };
     },
     async listSetupResources(organizationId) {
@@ -49,11 +55,19 @@ export function createDatabasePublicOperationRepository(
         slack: connections.slack.map(({ teamId, teamName }) => ({ teamId, teamName })),
       };
     },
-    async findActiveProject(organizationId, projectSlug) {
+    async resolveManualRunProject(organizationId, triggerName, projectSlug) {
+      const organizationTrigger = (await database.listOrganizationTriggers(organizationId)).find(
+        ({ name }) => name === triggerName,
+      );
+      if (organizationTrigger !== undefined) {
+        return organizationTrigger.enabled
+          ? { status: "resolved", id: organizationTrigger.runtimeProjectId }
+          : { status: "disabled" };
+      }
       const project = await database.findProjectBySlugForOrganization(organizationId, projectSlug);
       return project === undefined || project.status !== "active"
         ? undefined
-        : { id: project.id, slug: project.slug };
+        : { status: "resolved", id: project.id };
     },
     resolveDeploymentProject: (input) => deploymentProjects.resolve(input),
     async findManualRun(providerEventReceiptId, trigger) {

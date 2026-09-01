@@ -23,6 +23,21 @@ export interface FixtureBillingPrice {
   interval: "month" | "year" | null;
 }
 
+/**
+ * A deterministic mirror of the catalog Hub actually publishes, not an invented price list. Two
+ * products, because that is what Stripe carries:
+ *
+ * - `free` is the internal entitlement record. It exists so provisioning and cancellation have a
+ *   template to stamp; it is not an offer, and `BillingRuntime.publicCatalog` withholds it. Its
+ *   zero execution limit is the enforcement floor a customer without a subscription lands on —
+ *   E2E asserts it is never rendered as a plan.
+ * - `hosted` is the one purchasable plan: Paseo Hub, €15 per user per month, monthly only. There
+ *   is no annual price, so the picker has no interval to switch between.
+ *
+ * Keep this in step with the live Stripe catalog. A test that needs several plans to exercise
+ * generic catalog behaviour builds its own synthetic products (see `src/billing/reconcile.test.ts`)
+ * rather than adding fictional tiers here, where they would reach the screenshots.
+ */
 export const FIXTURE_BILLING_PRODUCTS: readonly FixtureBillingProduct[] = [
   {
     id: "prod_fixture_free",
@@ -33,35 +48,27 @@ export const FIXTURE_BILLING_PRODUCTS: readonly FixtureBillingProduct[] = [
       paseo_plan_slug: "free",
       ent_seats_max: "1",
       ent_can_invite: "false",
-      ent_executions_monthly_limit: "100",
+      ent_executions_monthly_limit: "0",
     },
-    marketingFeatures: ["1 seat", "100 executions / month", "Community support"],
+    marketingFeatures: [],
   },
   {
-    id: "prod_fixture_solo",
-    name: "Solo",
+    id: "prod_fixture_hosted",
+    name: "Paseo Hub",
     active: true,
     metadata: {
       paseo_plan: "true",
-      paseo_plan_slug: "solo",
-      ent_seats_max: "unlimited",
-      ent_can_invite: "true",
-      ent_executions_monthly_limit: "2000",
-    },
-    marketingFeatures: ["Unlimited seats", "2,000 executions / month", "Email support"],
-  },
-  {
-    id: "prod_fixture_team",
-    name: "Team",
-    active: true,
-    metadata: {
-      paseo_plan: "true",
-      paseo_plan_slug: "team",
+      paseo_plan_slug: "hosted",
       ent_seats_max: "unlimited",
       ent_can_invite: "true",
       ent_executions_monthly_limit: "unlimited",
     },
-    marketingFeatures: ["Unlimited seats", "Unlimited executions", "Priority support"],
+    marketingFeatures: [
+      "Unlimited daemons",
+      "GitHub, Linear, Slack, and Discord triggers",
+      "Versioned workflows and activity",
+      "Bring your own agents and inference",
+    ],
   },
 ];
 
@@ -71,54 +78,18 @@ export const FIXTURE_BILLING_PRICES: readonly FixtureBillingPrice[] = [
     productId: "prod_fixture_free",
     lookupKey: "free_monthly",
     active: true,
-    currency: "usd",
+    currency: "eur",
     unitAmount: 0,
     interval: "month",
   },
   {
-    id: "price_fixture_free_annual",
-    productId: "prod_fixture_free",
-    lookupKey: "free_annual",
+    id: "price_fixture_hosted_monthly",
+    productId: "prod_fixture_hosted",
+    lookupKey: "hosted_monthly",
     active: true,
-    currency: "usd",
-    unitAmount: 0,
-    interval: "year",
-  },
-  {
-    id: "price_fixture_solo_monthly",
-    productId: "prod_fixture_solo",
-    lookupKey: "solo_monthly",
-    active: true,
-    currency: "usd",
-    unitAmount: 2900,
+    currency: "eur",
+    unitAmount: 1500,
     interval: "month",
-  },
-  {
-    id: "price_fixture_solo_annual",
-    productId: "prod_fixture_solo",
-    lookupKey: "solo_annual",
-    active: true,
-    currency: "usd",
-    unitAmount: 29000,
-    interval: "year",
-  },
-  {
-    id: "price_fixture_team_monthly",
-    productId: "prod_fixture_team",
-    lookupKey: "team_monthly",
-    active: true,
-    currency: "usd",
-    unitAmount: 9900,
-    interval: "month",
-  },
-  {
-    id: "price_fixture_team_annual",
-    productId: "prod_fixture_team",
-    lookupKey: "team_annual",
-    active: true,
-    currency: "usd",
-    unitAmount: 99000,
-    interval: "year",
   },
 ];
 
@@ -161,6 +132,7 @@ export interface FixtureSubscriptionState {
   quantity: number;
   status: string;
   currentPeriodEnd: Date | null;
+  trialEnd: Date | null;
   cancelAtPeriodEnd: boolean;
 }
 
@@ -194,12 +166,23 @@ export class FixtureStripeBillingClient {
     return `cus_fixture_${input.organizationId}`;
   }
 
+  async listCustomerSubscriptions(
+    customerId: string,
+  ): Promise<readonly FixtureSubscriptionState[]> {
+    const result: FixtureSubscriptionState[] = [];
+    for (const subscription of this.subscriptions.values()) {
+      if (subscription.customerId === customerId) result.push({ ...subscription });
+    }
+    return result;
+  }
+
   async createCheckoutSession(input: {
     organizationId: string;
     customerId: string;
     priceId: string;
     quantity: number;
     successUrl: string;
+    trial: boolean;
   }): Promise<{ url: string }> {
     const id = fixtureSubscriptionId(input.organizationId);
     // Idempotent initial subscription: if one already exists, checkout does not open a second or
@@ -211,8 +194,9 @@ export class FixtureStripeBillingClient {
         organizationId: input.organizationId,
         priceId: input.priceId,
         quantity: input.quantity,
-        status: "active",
+        status: input.trial ? "trialing" : "active",
         currentPeriodEnd: new Date(Date.now() + FIXTURE_SUBSCRIPTION_PERIOD_MS),
+        trialEnd: input.trial ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) : null,
         cancelAtPeriodEnd: false,
       });
     }

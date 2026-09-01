@@ -297,6 +297,7 @@ function needsSlackUsername(
     (candidate) =>
       candidate.on === "slack.mention" &&
       candidate.filters?.from_users !== undefined &&
+      !candidate.filters.from_users.includes("*") &&
       !candidate.filters.from_users.includes(authorId),
   );
 }

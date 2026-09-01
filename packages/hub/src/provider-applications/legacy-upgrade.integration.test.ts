@@ -109,7 +109,7 @@ describe("pre-provider-app connection upgrade", () => {
         });
 
         assert.deepEqual(failures, []);
-        assert.deepEqual(runtime.published, ["github", "slack", "discord"]);
+        assert.deepEqual(runtime.published, ["github", "slack", "discord", "linear"]);
         for (const provider of ["github", "slack", "discord"] as const) {
           assert.deepEqual(
             (await inventory.connectedIdentities(provider)).map(
@@ -118,6 +118,7 @@ describe("pre-provider-app connection upgrade", () => {
             [identity(ENVIRONMENT_APPLICATIONS[provider]).id],
           );
         }
+        assert.deepEqual(await inventory.connectedIdentities("linear"), []);
 
         const changed = new RecordingRuntime();
         const changedFailures = await activateProviderApplicationsAtStartup({
@@ -166,6 +167,12 @@ const ENVIRONMENT_APPLICATIONS = {
     applicationId: "discord-app",
     clientSecret: "discord-secret",
     botToken: "discord-token",
+  },
+  linear: {
+    provider: "linear",
+    clientId: "linear-client",
+    clientSecret: "linear-secret",
+    webhookSecret: "linear-webhook-secret",
   },
 } satisfies Record<Provider, ProviderApplicationConfiguration>;
 
@@ -317,6 +324,9 @@ function identity(configuration: ProviderApplicationConfiguration): ProviderAppl
   }
   if (configuration.provider === "slack") {
     return { provider: "slack", id: configuration.appId, name: "Slack app" };
+  }
+  if (configuration.provider === "linear") {
+    return { provider: "linear", id: configuration.clientId, name: "Linear app" };
   }
   return { provider: "discord", id: configuration.applicationId, name: "Discord app" };
 }

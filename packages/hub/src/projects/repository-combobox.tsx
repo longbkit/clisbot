@@ -53,7 +53,7 @@ export function RepositoryCombobox({
           aria-expanded={open}
           aria-controls={listId}
           disabled={disabled}
-          className="w-full min-w-0 justify-between font-normal"
+          className="w-full min-w-0 justify-between"
         >
           <span className="truncate">{selected?.fullName ?? placeholder}</span>
           {loading ? (

@@ -99,6 +99,13 @@ describe("provider application failure copy", () => {
     );
   });
 
+  it("names Linear when HTTPS is required", () => {
+    assert.equal(
+      messageFor("linear", new ProviderApplicationError("httpsRequired", "http://hub.test")),
+      "Linear only works over HTTPS, and Hub is at http://hub.test. Nothing was saved. Reopen Hub at its public HTTPS address to set up Linear.",
+    );
+  });
+
   it("says nothing was saved for every way a save can fail", () => {
     const failures: readonly [Provider, unknown][] = [
       ["github", new ProviderApplicationError("credentialsRejected", "privateKey")],

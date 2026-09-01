@@ -98,7 +98,7 @@ function matchesFilter(
     return false;
   }
 
-  if (!filter.from_users.includes(classified.actor)) {
+  if (!filter.from_users.includes("*") && !filter.from_users.includes(classified.actor)) {
     return false;
   }
 

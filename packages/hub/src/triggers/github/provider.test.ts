@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
+import { Octokit } from "octokit";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { DurableProviderEvent } from "../../db/types.js";
 import { createActiveProjectConfiguration } from "../../test-utils/project-configuration.js";
 import { createDurableWorkflowHandler } from "../../workflows/engine.js";
 import type { GitHubReactionClient } from "./provider.js";
-import { createGitHubTriggerProvider } from "./provider.js";
+import { createGitHubReactionClient, createGitHubTriggerProvider } from "./provider.js";
 import type { NormalizedGitHubEvent } from "../../auth/github-events.js";
+import type { GitHubAuth } from "../../auth/github.js";
 import { isAcceptedTriggerProviderMatch } from "../index.js";
 import { createUnlimitedEntitlementsService } from "../../entitlements/test-utils.js";
 
@@ -114,6 +116,129 @@ describe("GitHub Phase 1 trigger provider", () => {
     assert.equal(typeof matches === "string" ? 0 : matches.length, 1);
   });
 
+  it.each([
+    ["issues", "opened", "github.issue_created", 211],
+    ["issues", "labeled", "github.issue_label_added", 211],
+    ["pull_request", "opened", "github.pull_request_created", 312],
+    ["pull_request", "labeled", "github.pull_request_label_added", 312],
+  ] as const)("derives an item reaction target for %s %s", async (type, action, source, number) => {
+    const configuration = githubConfiguration();
+    configuration.triggers[0] = { ...configuration.triggers[0]!, on: source };
+    const { project, revision, store } = await activeConfiguration(configuration);
+    const provider = createProvider(store, new TestReactions());
+    const matches = await provider.match(
+      external(project.id, revision.id, createItemEvent(type, action, number)),
+    );
+    if (typeof matches === "string") throw new Error("expected item match");
+
+    assert.deepEqual(matches[0]?.triggerContext.reactionSubject, {
+      kind: "item",
+      issueNumber: number,
+    });
+  });
+
+  it.each([
+    ["completed", "+1"],
+    ["failed", "-1"],
+  ] as const)(
+    "replaces an item acceptance reaction with %s terminal reaction",
+    async (terminal, content) => {
+      const configuration = githubConfiguration();
+      configuration.triggers[0] = {
+        ...configuration.triggers[0]!,
+        on: "github.pull_request_created",
+      };
+      const { project, revision, store } = await activeConfiguration(configuration);
+      const reactions = new TestReactions();
+      const provider = createProvider(store, reactions);
+      const matches = await provider.match(
+        external(project.id, revision.id, createItemEvent("pull_request", "opened", 312)),
+      );
+      if (typeof matches === "string") throw new Error("expected pull request match");
+      const match = matches[0]!;
+      const reactionState =
+        (await provider.onDispatchAccepted?.(match.triggerContext, match.outputContext)) ?? null;
+
+      if (terminal === "completed") {
+        await provider.onAgentExecutionCompleted?.(
+          match.triggerContext,
+          match.outputContext,
+          { status: "succeeded" },
+          reactionState,
+        );
+      } else {
+        await provider.onAgentExecutionFailed?.(
+          match.triggerContext,
+          match.outputContext,
+          "boom",
+          reactionState,
+        );
+      }
+
+      assert.deepEqual(
+        reactions.created.map((call) => call.content),
+        ["eyes", content],
+      );
+      assert.deepEqual(reactions.deleted, [
+        {
+          installationId: 42,
+          repo: "boudra/faro",
+          subject: { kind: "item", issueNumber: 312 },
+          reactionId: 1,
+        },
+      ]);
+    },
+  );
+
+  it("uses the issue reactions endpoint for item create and delete", async () => {
+    const calls: Array<{ url: string; method: string; body: string | undefined }> = [];
+    const octokit = new Octokit({
+      request: {
+        fetch: async (url: RequestInfo | URL, init?: RequestInit) => {
+          calls.push({
+            url: requestUrl(url),
+            method: init?.method ?? "GET",
+            body: typeof init?.body === "string" ? init.body : undefined,
+          });
+          return new Response(JSON.stringify({ id: 99 }), {
+            headers: { "content-type": "application/json" },
+          });
+        },
+      },
+    });
+    const auth = {
+      createInstallationOctokit: async () => octokit,
+    } satisfies Pick<GitHubAuth, "createInstallationOctokit">;
+    const reactions = createGitHubReactionClient(auth);
+    const subject = { kind: "item" as const, issueNumber: 312 };
+
+    await reactions.createReaction({
+      installationId: 42,
+      repo: "owner/repository",
+      subject,
+      content: "eyes",
+    });
+    await reactions.deleteReaction({
+      installationId: 42,
+      repo: "owner/repository",
+      subject,
+      reactionId: 99,
+    });
+
+    assert.deepEqual(calls, [
+      {
+        url: "https://api.github.com/repos/owner/repository/issues/312/reactions",
+        method: "POST",
+        body: '{"content":"eyes"}',
+      },
+      {
+        url: "https://api.github.com/repos/owner/repository/issues/312/reactions/99",
+        method: "DELETE",
+        body: undefined,
+      },
+    ]);
+  });
+
   it("exposes safe issue and pull-request item context without the raw webhook", async () => {
     const { project, revision, store } = await activeConfiguration();
     const provider = createProvider(store, new TestReactions());
@@ -175,14 +300,8 @@ describe("GitHub Phase 1 trigger provider", () => {
     const provider = createProvider(store, reactions);
     const match = (await provider.match(external(project.id, revision.id, createEvent())))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
-    let reactionState =
+    const reactionState =
       (await provider.onDispatchAccepted?.(match.triggerContext, match.outputContext)) ?? null;
-    reactionState =
-      (await provider.onAgentExecutionStarted?.(
-        match.triggerContext,
-        match.outputContext,
-        reactionState,
-      )) ?? reactionState;
     await provider.onAgentExecutionCompleted?.(
       match.triggerContext,
       match.outputContext,
@@ -191,7 +310,7 @@ describe("GitHub Phase 1 trigger provider", () => {
     );
     assert.deepEqual(
       reactions.created.map((call) => call.content),
-      ["eyes", "rocket", "+1"],
+      ["eyes", "+1"],
     );
   });
 
@@ -424,6 +543,44 @@ function createEvent(
     },
     createdAt: "2026-05-19T00:00:00.000Z",
   };
+}
+
+function createItemEvent(
+  type: "issues" | "pull_request",
+  action: "opened" | "labeled",
+  number: number,
+): NormalizedGitHubEvent {
+  return {
+    id: `github-${type}-${action}`,
+    type,
+    repo: "boudra/faro",
+    repositoryId: 7,
+    installationId: 42,
+    payload:
+      type === "issues"
+        ? {
+            action,
+            issue: { number, title: "smoke", body: "issue body @paseo", user: { login: "boudra" } },
+            sender: { login: "boudra" },
+          }
+        : {
+            action,
+            pull_request: {
+              number,
+              title: "smoke",
+              body: "pull request body @paseo",
+              user: { login: "boudra" },
+            },
+            sender: { login: "boudra" },
+          },
+    createdAt: "2026-05-19T00:00:00.000Z",
+  };
+}
+
+function requestUrl(url: RequestInfo | URL): string {
+  if (typeof url === "string") return url;
+  if (url instanceof URL) return url.href;
+  return url.url;
 }
 
 class TestReactions implements GitHubReactionClient {

@@ -1,11 +1,133 @@
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import { createServer } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { WebSocket, type RawData } from "ws";
+import type { DaemonRecord } from "../db/types.js";
+import { HubDaemonHelloSchema } from "../hub/protocol.js";
 import { createLogger } from "../logger.js";
 import { assertOneFailure, FailureLogStream } from "../test-utils/failure-logs.js";
 import { DaemonCreateRejectedError, DaemonCreateResponseLostError } from "./protocol.js";
+import { ActiveDaemonRegistry, createDaemonUpgradeHandler } from "./registry.js";
 import { DaemonRegistryHarness } from "./test-utils/daemon-registry-harness.js";
 
+function rawDataToText(data: RawData): string {
+  if (Array.isArray(data)) return Buffer.concat(data).toString();
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString();
+  return data.toString();
+}
+
+describe("daemon socket protocol negotiation", () => {
+  it.each([
+    {
+      offered: true,
+      expectedProtocol: "1",
+      expectsHello: true,
+      expectsReady: false,
+    },
+    {
+      offered: false,
+      expectedProtocol: undefined,
+      expectsHello: false,
+      expectsReady: true,
+    },
+  ])(
+    "negotiates the standard session only when offered=$offered",
+    async ({ offered, expectedProtocol, expectsHello, expectsReady }) => {
+      const secret = "daemon-secret";
+      const now = new Date();
+      const daemon: DaemonRecord = {
+        id: randomUUID(),
+        slug: "negotiation-daemon",
+        machineId: randomUUID(),
+        serverId: randomUUID(),
+        daemonPublicKey: "public-key",
+        credentialVerifier: createHash("sha256").update(secret).digest("base64url"),
+        permissions: ["hub.execute"],
+        registeredByApiKeyId: null,
+        registeredByCliCredentialId: null,
+        status: "active",
+        presence: "offline",
+        connectedAt: null,
+        disconnectedAt: null,
+        lastSeenAt: now,
+        createdAt: now,
+      };
+      const registry = new ActiveDaemonRegistry({
+        touchDaemon: async () => undefined,
+        setDaemonPresence: async () => undefined,
+      });
+      const server = createServer();
+      const handleUpgrade = createDaemonUpgradeHandler(
+        { findDaemonById: async () => daemon },
+        registry,
+      );
+      server.on("upgrade", (request, socket, head) => {
+        void handleUpgrade(request, socket, head);
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      assert(address && typeof address !== "string");
+      const messages: string[] = [];
+      let negotiatedProtocol: string | string[] | undefined;
+      const client = new WebSocket(`ws://127.0.0.1:${address.port}/api/daemons/socket`, {
+        headers: {
+          authorization: `Bearer ${secret}`,
+          "x-paseo-daemon-id": daemon.id,
+          ...(offered ? { "x-paseo-session-protocol": "1" } : {}),
+        },
+      });
+      client.on("upgrade", (response) => {
+        negotiatedProtocol = response.headers["x-paseo-session-protocol"];
+      });
+      client.on("message", (data: RawData) => {
+        messages.push(rawDataToText(data));
+      });
+      await new Promise<void>((resolve, reject) => {
+        client.once("open", resolve);
+        client.once("error", reject);
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      assert.equal(negotiatedProtocol, expectedProtocol);
+      assert.equal(
+        messages.some((message) => HubDaemonHelloSchema.safeParse(JSON.parse(message)).success),
+        expectsHello,
+      );
+      assert.equal(registry.connection(daemon.id) !== undefined, expectsReady);
+
+      client.close();
+      await new Promise<void>((resolve) => client.once("close", () => resolve()));
+      await registry.stop();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    },
+  );
+});
+
 describe("daemon socket generations", () => {
+  it("does not expose a physical socket until standard session bootstrap completes", async () => {
+    await daemon.replaceConnection(false);
+
+    assert.equal(daemon.connected(), false);
+    await daemon.completeServerInfo();
+
+    assert.equal(daemon.connected(), true);
+  });
+
+  it("rejects a session whose effective permissions differ from enrollment", async () => {
+    await daemon.replaceConnection(false);
+    await daemon.completeServerInfo([]);
+
+    await daemon.waitUntilCurrentClosed();
+    assert.equal(daemon.connected(), false);
+  });
+
+  it("keeps a legacy daemon connected without sending the standard hello", async () => {
+    await daemon.replaceConnection(false, "legacy");
+
+    assert.equal(daemon.connected(), true);
+  });
+
   let daemon: DaemonRegistryHarness;
   let stream: FailureLogStream;
 
@@ -57,7 +179,10 @@ describe("daemon socket generations", () => {
       valid: false,
       issues: [
         { path: ["provider"], message: "provider is unavailable" },
-        { path: ["options", "nonsense"], message: "unrecognized provider option" },
+        {
+          path: ["options", "nonsense"],
+          message: "unrecognized provider option",
+        },
       ],
     });
   });

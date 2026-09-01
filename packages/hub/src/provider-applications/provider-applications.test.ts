@@ -8,6 +8,7 @@ import {
   providerApplicationReturnRoute,
   type ProviderApplicationConfiguration,
   type ProviderApplicationIdentity,
+  type Provider,
   type ProviderApplicationStore,
   type ProviderRuntimeCandidate,
   type ProviderRuntimeOwner,
@@ -29,6 +30,12 @@ const slackConfiguration: ProviderApplicationConfiguration = {
   clientId: "client",
   clientSecret: "client-secret",
   signingSecret: "signing-secret",
+};
+const linearConfiguration: ProviderApplicationConfiguration = {
+  provider: "linear",
+  clientId: "linear-client",
+  clientSecret: "linear-client-secret",
+  webhookSecret: "linear-webhook-secret",
 };
 
 describe("provider applications", () => {
@@ -339,6 +346,78 @@ describe("provider applications", () => {
     assert.notEqual(fixture.runtime.active("slack"), undefined);
   });
 
+  it("persists and activates Linear only after the verified OAuth installation", async () => {
+    const fixture = createFixture();
+
+    const result = await fixture.applications.verifyAndSave(
+      request("POST"),
+      "linear",
+      linearConfiguration,
+    );
+
+    assert.deepEqual(result, {
+      status: "continuing",
+      provider: "linear",
+      url: "https://slack.test/install",
+    });
+    assert.equal(fixture.store.values.has("linear"), false);
+    assert.equal(fixture.runtime.active("linear"), undefined);
+
+    await fixture.runtime.completeLinear({
+      configuration: linearConfiguration,
+      expectedConfigurationVersion: undefined,
+      callbackOrigin: "https://hub.test",
+      userId: "operator",
+      installation: {
+        linearOrganizationId: "linear-acme",
+        linearOrganizationName: "Acme",
+        appUserId: "linear-app-user",
+        accessToken: "linear-token",
+        refreshToken: "linear-refresh-token",
+        accessTokenExpiresAt: null,
+        scopes: ["read", "comments:create"],
+      },
+      binding: linearBinding(),
+    });
+
+    assert.equal(fixture.store.values.get("linear")?.version, 1);
+    assert.notEqual(fixture.runtime.active("linear"), undefined);
+  });
+
+  it("requires HTTPS before starting a Linear configuration", async () => {
+    const fixture = createFixture();
+
+    await assert.rejects(
+      fixture.applications.verifyAndSave(
+        request("POST", "http://hub.test"),
+        "linear",
+        linearConfiguration,
+      ),
+      (error: unknown) =>
+        error instanceof ProviderApplicationError &&
+        error.code === "httpsRequired" &&
+        error.safeContext === "http://hub.test",
+    );
+
+    assert.equal(fixture.store.reads, 0);
+    assert.equal(fixture.runtime.prepareCount("linear"), 0);
+  });
+
+  it("requires HTTPS before starting an environment-managed Linear connection", async () => {
+    const fixture = createFixture({ environment: { linear: linearConfiguration } });
+
+    await assert.rejects(
+      fixture.applications.beginConnection(request("POST", "http://hub.test"), "linear", "org"),
+      (error: unknown) =>
+        error instanceof ProviderApplicationError &&
+        error.code === "httpsRequired" &&
+        error.safeContext === "http://hub.test",
+    );
+
+    assert.equal(fixture.store.reads, 0);
+    assert.equal(fixture.runtime.prepareCount("linear"), 0);
+  });
+
   it("verifies and atomically publishes Socket Mode with its first workspace", async () => {
     const fixture = createFixture();
 
@@ -480,13 +559,13 @@ describe("provider applications", () => {
   });
 });
 
-function request(method = "GET") {
-  return new Request("https://hub.test/apps", {
+function request(method = "GET", origin = "https://hub.test") {
+  return new Request(`${origin}/apps`, {
     method,
     headers: {
       cookie: "session=operator",
-      origin: "https://hub.test",
-      "x-paseo-trusted-request-origin": "https://hub.test",
+      origin,
+      "x-paseo-trusted-request-origin": origin,
     },
   });
 }
@@ -496,7 +575,7 @@ function createFixture(
     operator?: boolean;
     connected?: boolean;
     connectionStatus?: "connected" | "actionNeeded";
-    environment?: Partial<Record<"github" | "slack" | "discord", ProviderApplicationConfiguration>>;
+    environment?: Partial<Record<Provider, ProviderApplicationConfiguration>>;
     rejectMutation?: boolean;
     eventEvidenceVersion?: number;
   } = {},
@@ -581,17 +660,18 @@ function createFixture(
 }
 
 function identityFor(
-  provider: "github" | "slack" | "discord",
+  provider: Provider,
   github: ProviderApplicationIdentity,
 ): ProviderApplicationIdentity {
   if (provider === "github") return github;
   if (provider === "discord") return { provider, id: "100", name: "Paseo" };
+  if (provider === "linear") return { provider, id: "linear-client", name: "Paseo" };
   return { provider, id: "A1", name: "Paseo" };
 }
 
 function connectedInventory(applicationId: string) {
   return {
-    connectedIdentities: (provider: "github" | "slack" | "discord") =>
+    connectedIdentities: (provider: Provider) =>
       Promise.resolve(
         provider === "github"
           ? [
@@ -619,7 +699,7 @@ class MemoryStore implements ProviderApplicationStore {
     this.failSlackCompletion = true;
   }
 
-  read(provider: "github" | "slack" | "discord") {
+  read(provider: Provider) {
     this.reads += 1;
     return Promise.resolve(this.values.get(provider));
   }
@@ -666,6 +746,18 @@ class MemoryStore implements ProviderApplicationStore {
     });
   }
 
+  async completeLinearInstallation(
+    input: Parameters<ProviderApplicationStore["completeLinearInstallation"]>[0],
+  ) {
+    await this.save({
+      provider: "linear",
+      configuration: input.configuration,
+      identity: input.identity,
+      expectedVersion: input.expectedVersion,
+      updatedByUserId: input.updatedByUserId,
+    });
+  }
+
   completeSlackSocketApplication(
     input: Parameters<ProviderApplicationStore["completeSlackSocketApplication"]>[0],
   ) {
@@ -689,6 +781,9 @@ class BlockingRuntime implements ProviderRuntimeOwner {
   private slackInstallationHandler:
     | Parameters<NonNullable<ProviderRuntimeOwner["onSlackInstallation"]>>[0]
     | undefined;
+  private linearInstallationHandler:
+    | Parameters<NonNullable<ProviderRuntimeOwner["onLinearInstallation"]>>[0]
+    | undefined;
 
   onSlackInstallation(
     handler: Parameters<NonNullable<ProviderRuntimeOwner["onSlackInstallation"]>>[0],
@@ -703,8 +798,21 @@ class BlockingRuntime implements ProviderRuntimeOwner {
     return this.slackInstallationHandler(input);
   }
 
+  onLinearInstallation(
+    handler: Parameters<NonNullable<ProviderRuntimeOwner["onLinearInstallation"]>>[0],
+  ) {
+    this.linearInstallationHandler = handler;
+  }
+
+  completeLinear(
+    input: Parameters<Parameters<NonNullable<ProviderRuntimeOwner["onLinearInstallation"]>>[0]>[0],
+  ) {
+    if (this.linearInstallationHandler === undefined) throw new Error("handler unavailable");
+    return this.linearInstallationHandler(input);
+  }
+
   prepare(
-    provider: "github" | "slack" | "discord",
+    provider: Provider,
     configuration: ProviderApplicationConfiguration,
     _callbackOrigin: string,
     _identity: ProviderApplicationIdentity,
@@ -713,7 +821,7 @@ class BlockingRuntime implements ProviderRuntimeOwner {
     const candidate = new Candidate(
       provider,
       this,
-      configuration.provider === "discord" ? configuration.applicationId : configuration.appId,
+      candidateConfigurationId(configuration),
       configurationVersion,
     );
     const candidates = this.candidates.get(provider) ?? [];
@@ -787,7 +895,7 @@ class Candidate implements ProviderRuntimeCandidate {
   closeCount = 0;
 
   constructor(
-    readonly provider: "github" | "slack" | "discord",
+    readonly provider: Provider,
     private readonly owner: BlockingRuntime,
     readonly configurationId: string,
     readonly configurationVersion: number,
@@ -824,6 +932,14 @@ class Candidate implements ProviderRuntimeCandidate {
   }
 }
 
+function candidateConfigurationId(configuration: ProviderApplicationConfiguration): string {
+  if (configuration.provider === "github" || configuration.provider === "slack") {
+    return configuration.appId;
+  }
+  if (configuration.provider === "linear") return configuration.clientId;
+  return configuration.applicationId;
+}
+
 function slackBinding() {
   return {
     providerApplicationId: "A1",
@@ -835,5 +951,21 @@ function slackBinding() {
     botUserId: "UBOT",
     botAccessToken: "token",
     scopes: ["chat:write"],
+  };
+}
+
+function linearBinding() {
+  return {
+    providerApplicationId: "linear-client",
+    stateVerifier: "state",
+    phase: "linear_authorization" as const,
+    access: { sessionId: "session", userId: "operator" },
+    linearOrganizationId: "linear-acme",
+    linearOrganizationName: "Acme",
+    appUserId: "linear-app-user",
+    accessToken: "linear-token",
+    refreshToken: "linear-refresh-token",
+    accessTokenExpiresAt: null,
+    scopes: ["read", "comments:create"],
   };
 }

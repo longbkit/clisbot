@@ -13,6 +13,7 @@ const unusedCatalogSource: StripeCatalogSource = {
 };
 const unusedBillingClient: StripeBillingClient = {
   ensureCustomer: () => Promise.reject(new Error("unused")),
+  listCustomerSubscriptions: () => Promise.reject(new Error("unused")),
   createCheckoutSession: () => Promise.reject(new Error("unused")),
   changeSubscriptionPrice: () => Promise.reject(new Error("unused")),
   reportSeatQuantity: () => Promise.reject(new Error("unused")),
@@ -39,7 +40,7 @@ function freePlan(overrides: Partial<SyncBillingPlanInput> = {}): SyncBillingPla
     template: {
       seats: { max: 1 },
       canInviteMembers: false,
-      meters: { "executions.monthly": { limit: 100 } },
+      meters: { "executions.monthly": { limit: 0 } },
     },
     templateHash: "hash-free",
     marketing: { features: ["1 seat"] },
@@ -60,7 +61,7 @@ describe("BillingRuntime.provisioningEntitlement", () => {
     assert.deepEqual(entitlement.granted, {
       seats: { max: 1 },
       canInviteMembers: false,
-      meters: { "executions.monthly": { limit: 100 } },
+      meters: { "executions.monthly": { limit: 0 } },
     });
   });
 

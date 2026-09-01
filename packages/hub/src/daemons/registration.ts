@@ -17,9 +17,16 @@ const enrollmentBody = z
     serverId: z.string(),
     daemonPublicKey: z.string(),
     credentialVerifier: z.string(),
-    scopes: z.array(z.string().min(1)).min(1).optional(),
+    permissions: z.array(z.string().min(1)).optional(),
+    scopes: z.array(z.literal("hub.execution.*")).max(1).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.permissions !== undefined && value.scopes !== undefined) {
+      context.addIssue({ code: "custom", message: "Use permissions or legacy scopes, not both" });
+    }
+  });
+const permissionsBody = z.object({ permissions: z.array(z.string().min(1)) }).strict();
 
 interface DaemonRegistrationOptions {
   database: Database;
@@ -123,11 +130,16 @@ export async function enrollDaemon(
   const input = enrollmentBody.safeParse(await parsedJson(request, "daemon.enroll.parse"));
   if (!input.success) return Response.json({ error: "invalid enrollment" }, { status: 400 });
   const fallbackSlug = `daemon-${input.data.daemonId.slice(0, 8)}`;
+  const permissions = enrollmentPermissions(input.data);
   const daemon = await database.enrollDaemon({
-    ...input.data,
+    daemonId: input.data.daemonId,
+    idempotencyKey: input.data.idempotencyKey,
+    serverId: input.data.serverId,
+    daemonPublicKey: input.data.daemonPublicKey,
+    credentialVerifier: input.data.credentialVerifier,
     suggestedSlug:
       input.data.hostname === undefined ? fallbackSlug : slugify(input.data.hostname, fallbackSlug),
-    scopes: ["hub.execution.*"],
+    permissions,
     tokenVerifier: verifier(token),
     now: clock.nowDate(),
   });
@@ -137,12 +149,36 @@ export async function enrollDaemon(
   if (daemon.status === "slug_conflict") return daemonSlugConflict(daemon.slug);
   const webSocketUrl = new URL("/api/daemons/socket", publicBaseUrl ?? request.url);
   webSocketUrl.protocol = webSocketUrl.protocol === "https:" ? "wss:" : "ws:";
-  return Response.json({
+  const response = {
     daemonId: daemon.id,
     slug: daemon.slug,
-    scopes: daemon.scopes,
     webSocketUrl: webSocketUrl.toString(),
-  });
+  };
+  return Response.json(
+    input.data.permissions === undefined
+      ? {
+          ...response,
+          scopes: daemon.permissions.includes("hub.execute") ? ["hub.execution.*"] : [],
+        }
+      : { ...response, permissions: daemon.permissions },
+  );
+}
+
+export async function updateDaemonPermissions(
+  request: Request,
+  id: string,
+  database: Database,
+  registry: ActiveDaemonRegistry,
+): Promise<Response> {
+  const daemon = await authenticatedDaemon(request, id, database);
+  if (daemon instanceof Response) return daemon;
+  const input = permissionsBody.safeParse(await parsedJson(request, "daemon.permissions.parse"));
+  if (!input.success) return Response.json({ error: "invalid permissions" }, { status: 400 });
+  const permissions = [...new Set(input.data.permissions)];
+  const updated = await database.setDaemonPermissions(id, permissions);
+  if (updated === undefined) return Response.json({ error: "daemon unavailable" }, { status: 404 });
+  registry.updatePermissions(updated);
+  return Response.json({ permissions: updated.permissions });
 }
 
 export async function revokeDaemon(
@@ -151,6 +187,22 @@ export async function revokeDaemon(
   database: Database,
   registry: ActiveDaemonRegistry,
 ): Promise<Response> {
+  const daemon = await authenticatedDaemon(request, id, database);
+  if (daemon instanceof Response) return daemon;
+  await database.revokeDaemon(id);
+  await registry.revoke(daemon);
+  return new Response(null, { status: 204 });
+}
+
+function verifier(value: string): string {
+  return createHash("sha256").update(value).digest("base64url");
+}
+
+async function authenticatedDaemon(
+  request: Request,
+  id: string,
+  database: Database,
+): Promise<DaemonRecord | Response> {
   const daemon = await database.findDaemonById(id);
   const credential = bearer(request.headers.get("authorization") ?? undefined);
   if (
@@ -160,13 +212,12 @@ export async function revokeDaemon(
   ) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  await database.revokeDaemon(id);
-  await registry.revoke(daemon);
-  return new Response(null, { status: 204 });
+  return daemon;
 }
 
-function verifier(value: string): string {
-  return createHash("sha256").update(value).digest("base64url");
+function enrollmentPermissions(input: z.infer<typeof enrollmentBody>): string[] {
+  if (input.permissions !== undefined) return [...new Set(input.permissions)];
+  return input.scopes?.includes("hub.execution.*") === false ? [] : ["hub.execute"];
 }
 
 function matchesVerifier(value: string, expectedVerifier: string): boolean {
@@ -207,6 +258,7 @@ function daemonSummary(daemon: DaemonRecord) {
     connectedAt: daemon.connectedAt?.toISOString() ?? null,
     lastSeenAt: daemon.lastSeenAt.toISOString(),
     registeredAt: daemon.createdAt.toISOString(),
+    permissions: daemon.permissions,
   };
 }
 

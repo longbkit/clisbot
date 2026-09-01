@@ -27,12 +27,11 @@ export function daemonLoginCommand(origin: string): string {
 }
 
 /**
- * Where both ways out of the handoff land: the project every organization is provisioned with
- * (`provisionOrganization` in src/organizations/provisioning.ts names it). Onboarding ends inside
- * the operator's project, not on a list asking them to pick the only entry it has.
+ * Where both ways out of the handoff land: the organization's trigger list, where connecting a
+ * daemon becomes useful. Projects are a legacy runtime detail and are not part of onboarding.
  */
-export function defaultProjectRoute(organizationSlug: string): string {
-  return `/o/${organizationSlug}/projects/default/overview`;
+export function organizationTriggersRoute(organizationSlug: string): string {
+  return `/o/${organizationSlug}/triggers`;
 }
 
 /**
@@ -97,13 +96,13 @@ export function DaemonHandoffEntry({
   const retry = useCallback(() => void refetch(), [refetch]);
   const navigate = useNavigate();
   /**
-   * Connecting and skipping end the same way: inside the default project. The route has to be
+   * Connecting and skipping end the same way: at organization triggers. The route has to be
    * committed before the phase is dropped — dropping it first would render the dashboard at
    * whatever URL onboarding happens to be standing on, and flash the project list on the way.
    */
   const leave = useCallback(() => {
     void (async () => {
-      await navigate({ to: defaultProjectRoute(organizationSlug) as never });
+      await navigate({ to: organizationTriggersRoute(organizationSlug) as never });
       onContinue();
     })();
   }, [navigate, onContinue, organizationSlug]);

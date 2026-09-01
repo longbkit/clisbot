@@ -10,6 +10,22 @@ import { composeEntitlements } from "../../auth/entitlements.js";
 import { createDatabase } from "../pg.js";
 import { embeddedDatabaseRuntime } from "./index.js";
 
+it("joins runtime queries to the active embedded transaction", async () => {
+  const root = await mkdtemp(join(tmpdir(), "hub-pglite-transaction-"));
+  const { runtime } = await embeddedDatabaseRuntime(join(root, "database"));
+  try {
+    await runtime.query("create table nested_query (value text not null)");
+    await runtime.transaction(async () => {
+      await runtime.query("insert into nested_query (value) values ($1)", ["joined"]);
+    });
+    const result = await runtime.query<{ value: string }>("select value from nested_query");
+    assert.deepEqual(result.rows, [{ value: "joined" }]);
+  } finally {
+    await runtime.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 it("runs the bootstrap, credential lock, and lease claim flows on embedded storage", async () => {
   const root = await mkdtemp(join(tmpdir(), "hub-pglite-smoke-"));
   const { runtime, locks } = await embeddedDatabaseRuntime(join(root, "database"));

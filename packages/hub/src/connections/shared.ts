@@ -79,7 +79,7 @@ export function connectionResult(
   publicBaseUrl: string,
   returnRoute: string,
   result: string,
-  provider?: "github" | "discord" | "slack",
+  provider?: "github" | "discord" | "slack" | "linear",
 ): Response {
   const url = new URL(returnRoute, publicBaseUrl);
   if (provider !== undefined) url.searchParams.set("app", provider);
@@ -91,8 +91,12 @@ export async function cancelledConnectionResult(input: {
   auth: AuthServer;
   database: Database;
   request: Request;
-  provider: "github" | "discord" | "slack";
-  phase: "github_user_authorization" | "discord_authorization" | "slack_authorization";
+  provider: "github" | "discord" | "slack" | "linear";
+  phase:
+    | "github_user_authorization"
+    | "discord_authorization"
+    | "slack_authorization"
+    | "linear_authorization";
   state: string;
   applicationBaseUrl: string;
 }): Promise<Response> {
@@ -131,7 +135,7 @@ export async function cancelledConnectionResult(input: {
 
 export function connectionCallbackFailure(input: {
   error: unknown;
-  provider: "github" | "discord" | "slack";
+  provider: "github" | "discord" | "slack" | "linear";
   phase: string;
   applicationBaseUrl: string;
   returnRoute: string;
@@ -158,7 +162,7 @@ export function connectionCallbackFailure(input: {
 
 export function connectionActionFailure(
   error: unknown,
-  provider: "github" | "discord" | "slack",
+  provider: "github" | "discord" | "slack" | "linear",
   action: "start" | "disconnect",
 ): Response {
   const accessDenied =

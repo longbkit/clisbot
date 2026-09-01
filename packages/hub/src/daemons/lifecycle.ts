@@ -110,12 +110,15 @@ export interface DaemonDispatchLifecycleOptions {
 }
 
 export class DaemonDispatchFailure extends Error {
+  readonly code: string;
+
   constructor(
     readonly reason: string,
     options?: { cause?: unknown },
   ) {
     super(`daemon dispatch failed: ${reason}`);
     this.name = "DaemonDispatchFailure";
+    this.code = reason;
     this.cause = options?.cause;
   }
 }
@@ -603,14 +606,6 @@ export class DaemonDispatchLifecycle {
     );
   }
 
-  private async createAgent(
-    connection: DaemonConnection,
-    intent: LaunchMachineIntent,
-    hubExecutionEnv: HubExecutionEnv,
-  ): Promise<Awaited<ReturnType<DaemonConnection["createAgent"]>>> {
-    return connection.createAgent(await this.buildCreateAgentOptions(intent, hubExecutionEnv));
-  }
-
   async handleAgentStreamEvent(
     executionId: string,
     event: DaemonAgentStreamEvent,
@@ -1018,12 +1013,17 @@ export class DaemonDispatchLifecycle {
     const intent = current.launchIntent;
     if (intent === null || this.options.publicBaseUrl === undefined)
       throw new Error("execution launch intent cannot be recovered");
-    this.subscribeRecoveredExecution(current.id, daemon.id, connection);
-    this.armExecutionDeadline(current);
-    const agent = await this.createAgent(connection, intent, {
+    const createOptions = await this.buildCreateAgentOptions(intent, {
       executionId: current.id,
       completionToken: this.completionToken(current.id),
       publicBaseUrl: this.options.publicBaseUrl,
+    }).catch((error: unknown) => {
+      throw toDispatchPreparationFailure(error);
+    });
+    this.subscribeRecoveredExecution(current.id, daemon.id, connection);
+    this.armExecutionDeadline(current);
+    const agent = await connection.createAgent(createOptions).catch((error: unknown) => {
+      throw toDaemonTransportFailure(error);
     });
     if (isInterruptedAgentState(agent.state)) {
       await this.failAgentExecution(current.id, "agent_interrupted");
@@ -1533,6 +1533,15 @@ export class DaemonDispatchLifecycle {
     if (connection === undefined) {
       throw new DaemonDispatchFailure("daemon_unreachable");
     }
+    const createOptions = await this.buildCreateAgentOptions(
+      input.intent,
+      input.hubExecutionEnv,
+    ).catch((error: unknown) => {
+      throw toDispatchPreparationFailure(error);
+    });
+    if (isCanceled()) {
+      throw new DaemonSpawnAckTimeoutError(this.dispatchTimeoutMs);
+    }
     const pendingHandlers = new Set<Promise<void>>();
     let disposed = false;
     let settleTerminal: ((failure?: DaemonDispatchFailure) => void) | undefined;
@@ -1589,7 +1598,9 @@ export class DaemonDispatchLifecycle {
         throw new DaemonSpawnAckTimeoutError(this.dispatchTimeoutMs);
       }
       const agent = await Promise.race([
-        this.createAgent(connection, input.intent, input.hubExecutionEnv),
+        connection
+          .createAgent(createOptions)
+          .catch((error: unknown) => Promise.reject(toDaemonTransportFailure(error))),
         terminal.then<never>(() => new Promise<never>(() => undefined)),
       ]);
       if (isCanceled()) {
@@ -1641,11 +1652,12 @@ export class DaemonDispatchLifecycle {
       .catch(() => undefined)
       .then(async () => this.handleDaemonEvent(executionId, daemonId, event));
     this.pendingStreamHandlersByExecution.set(executionId, current);
-    void current.finally(() => {
+    const clearCurrent = () => {
       if (this.pendingStreamHandlersByExecution.get(executionId) === current) {
         this.pendingStreamHandlersByExecution.delete(executionId);
       }
-    });
+    };
+    void current.then(clearCurrent, clearCurrent);
     return current;
   }
 
@@ -1935,8 +1947,36 @@ function toDaemonDispatchFailure(error: unknown): DaemonDispatchFailure {
     return new DaemonDispatchFailure(daemonCreateFailureReason(error), { cause: error });
   }
 
-  return new DaemonDispatchFailure("daemon_unreachable", { cause: error });
+  return new DaemonDispatchFailure("internal", { cause: error });
 }
+
+function toDispatchPreparationFailure(error: unknown): DaemonDispatchFailure {
+  const candidate =
+    typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+      ? error.code
+      : "internal";
+  const code = DISPATCH_PREPARATION_FAILURE_CODES.has(candidate) ? candidate : "internal";
+  return new DaemonDispatchFailure(code, { cause: error });
+}
+
+function toDaemonTransportFailure(error: unknown): Error {
+  if (error instanceof DaemonCreateResponseLostError) return error;
+  const classified = toDaemonDispatchFailure(error);
+  return classified.reason === "internal"
+    ? new DaemonDispatchFailure("daemon_unreachable", { cause: error })
+    : classified;
+}
+
+const DISPATCH_PREPARATION_FAILURE_CODES = new Set([
+  "discord_trigger_unavailable",
+  "execution_authority_stopped",
+  "execution_terminal",
+  "github_authority_scope_invalid",
+  "github_authority_unavailable",
+  "github_integration_unavailable",
+  "github_trigger_unavailable",
+  "slack_trigger_unavailable",
+]);
 
 function isDurablePrelaunchFailure(error: unknown): error is DaemonDispatchFailure {
   return error instanceof DaemonDispatchFailure && error.reason === "daemon_not_registered";

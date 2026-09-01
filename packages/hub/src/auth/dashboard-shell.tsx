@@ -1,28 +1,39 @@
 /* oxlint-disable typescript-eslint/no-unsafe-type-assertion -- dynamic tenant URLs are assembled from server-resolved route metadata */
 import {
+  ArrowLeft,
   Blocks,
   Cable,
   Check,
   ChevronsUpDown,
   Cpu,
-  CreditCard,
   FolderKanban,
   Gauge,
   History,
-  KeyRound,
   LogOut,
   Plus,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
-  Users,
+  Zap,
 } from "lucide-react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { billingConfigured } from "../server/capabilities.js";
-import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
+import { cn } from "../lib/utils.js";
 import { Page } from "../components/app/page.js";
+import {
+  SiteHeaderActionsProvider,
+  SiteHeaderActionsTarget,
+} from "../components/app/site-header-actions.js";
 import { PaseoGlyph } from "../components/app/auth-layout.js";
 import { Button } from "../components/ui/button.js";
 import {
@@ -55,6 +66,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
   useSidebar,
 } from "../components/ui/sidebar.js";
@@ -108,7 +120,7 @@ export function DashboardShell({ account }: { account: ActiveAccount }) {
     mutationFn: createOrganizationCommand,
     onSuccess: (result) => {
       if (result.status === "ok" && result.data.organizationSlug !== undefined) {
-        window.location.assign(`/o/${result.data.organizationSlug}/projects`);
+        window.location.assign(`/o/${result.data.organizationSlug}/triggers`);
       }
     },
   });
@@ -117,7 +129,7 @@ export function DashboardShell({ account }: { account: ActiveAccount }) {
     mutationFn: ({ input }: { input: Parameters<typeof selectOrganization>[0]; slug: string }) =>
       selectOrganizationCommand(input),
     onSuccess: (result, variables) => {
-      if (result.status === "ok") window.location.assign(`/o/${variables.slug}/projects`);
+      if (result.status === "ok") window.location.assign(`/o/${variables.slug}/triggers`);
     },
   });
   const leave = useMutation({
@@ -172,37 +184,41 @@ function DashboardContent({
   onSignOut: () => void;
 }) {
   const tenant = useOptionalRouteTenant() ?? undefined;
+  const instance = useInstanceScope(account.isInstanceOperator);
   return (
     <>
       <AppSidebar
         account={account}
         tenant={tenant}
+        instance={instance}
         organizationTrigger={organizationTrigger}
         busy={busy}
         onCreateOrganization={onCreateOrganization}
         onSelectOrganization={onSelectOrganization}
         onSignOut={onSignOut}
       />
-      <SidebarInset>
-        <SiteHeader
-          organization={tenant?.organization.name ?? account.organization.name}
-          {...(tenant?.project?.name === undefined ? {} : { project: tenant.project.name })}
-        />
-        <div className="flex flex-1 flex-col p-4 md:p-8">
-          <Page>
-            <ErrorSummary message={error} />
-            {transitioning ? (
-              <AccountTransition />
-            ) : (
-              <ActiveAccountProvider account={account}>
-                <div key={tenant?.project?.id ?? "organization"}>
-                  <Outlet />
-                </div>
-              </ActiveAccountProvider>
-            )}
-          </Page>
-        </div>
-      </SidebarInset>
+      <SiteHeaderActionsProvider>
+        <SidebarInset>
+          <SiteHeader
+            scope={instance ? "Instance" : (tenant?.organization.name ?? account.organization.name)}
+            {...(instance || tenant?.project == null ? {} : { project: tenant.project.name })}
+          />
+          <div className="flex flex-1 flex-col p-4 md:p-8">
+            <Page>
+              <ErrorSummary message={error} />
+              {transitioning ? (
+                <AccountTransition />
+              ) : (
+                <ActiveAccountProvider account={account}>
+                  <div key={tenant?.project?.id ?? "organization"}>
+                    <Outlet />
+                  </div>
+                </ActiveAccountProvider>
+              )}
+            </Page>
+          </div>
+        </SidebarInset>
+      </SiteHeaderActionsProvider>
     </>
   );
 }
@@ -235,6 +251,7 @@ function AccountTransition() {
 function AppSidebar({
   account,
   tenant,
+  instance,
   organizationTrigger,
   busy,
   onCreateOrganization,
@@ -243,38 +260,44 @@ function AppSidebar({
 }: {
   account: ActiveAccount;
   tenant: RouteTenant | undefined;
+  instance: boolean;
   organizationTrigger: RefObject<HTMLButtonElement | null>;
   busy: boolean;
   onCreateOrganization: (name: string) => void;
   onSelectOrganization: (organizationId: string, slug: string) => void;
   onSignOut: () => void;
 }) {
+  // The sidebar header stacks one switcher per level of where you are: organization, then
+  // project. The body lists destinations for the innermost level only. Anything outside the
+  // organization → project chain — instance, account — enters through the footer account menu.
+  // Location accumulates; destinations swap.
+  const project = tenant?.project ?? null;
+  const organization = tenant?.organization ?? account.organization;
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <OrganizationSwitcher
-          account={account}
-          currentOrganization={tenant?.organization ?? account.organization}
-          currentRole={tenant?.membership.role ?? account.membership.role}
-          activeOrganizationId={tenant?.organization.id ?? account.organization.id}
-          trigger={organizationTrigger}
-          busy={busy}
-          onCreateOrganization={onCreateOrganization}
-          onSelectOrganization={onSelectOrganization}
-        />
-        {tenant?.project === null || tenant?.project === undefined ? null : (
-          <nav aria-label="Project switcher">
-            <ProjectSwitcher tenant={tenant} />
-          </nav>
+        {instance ? (
+          <InstanceHeader />
+        ) : (
+          <>
+            <OrganizationSwitcher
+              account={account}
+              currentOrganization={organization}
+              currentRole={tenant?.membership.role ?? account.membership.role}
+              activeOrganizationId={organization.id}
+              trigger={organizationTrigger}
+              busy={busy}
+              onCreateOrganization={onCreateOrganization}
+              onSelectOrganization={onSelectOrganization}
+            />
+            {tenant === undefined || tenant.project === null ? null : (
+              <ProjectSwitcher tenant={tenant} />
+            )}
+          </>
         )}
       </SidebarHeader>
       <SidebarContent>
-        <NavigationGroups
-          organizationSlug={tenant?.organization.slug ?? account.organization.slug}
-          projectSlug={tenant?.project?.slug}
-          canManageResources={account.capabilities.manageResources}
-        />
-        {account.isInstanceOperator ? <InstanceNavigationGroup /> : null}
+        <Destinations instance={instance} organization={organization} project={project} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
@@ -282,6 +305,7 @@ function AppSidebar({
             <AccountMenu
               email={account.account.email}
               name={account.account.name}
+              operator={account.isInstanceOperator}
               busy={busy}
               onSignOut={onSignOut}
             />
@@ -293,20 +317,56 @@ function AppSidebar({
   );
 }
 
+/** The innermost level's destinations, and only those. Each group owns its own way back out. */
+function Destinations({
+  instance,
+  organization,
+  project,
+}: {
+  instance: boolean;
+  organization: { name: string; slug: string };
+  project: { slug: string } | null;
+}) {
+  if (instance) return <InstanceNavigationGroup organization={organization} />;
+  if (project === null) return <OrganizationNavigationGroup organizationSlug={organization.slug} />;
+  return <ProjectNavigationGroup organizationSlug={organization.slug} projectSlug={project.slug} />;
+}
+
+// Work, then administration. Team, API keys, Usage, and Billing are configured once and read
+// occasionally, so they sit behind Settings rather than competing with the three surfaces an
+// operator opens daily.
 const ORGANIZATION_DESTINATIONS = [
-  { section: "projects", label: "Projects", icon: FolderKanban },
+  { section: "triggers", label: "Triggers", icon: Zap, subtree: true },
+  { section: "activity", label: "Activity", icon: History },
   { section: "daemons", label: "Daemons", icon: Cpu },
   { section: "connections", label: "Connections", icon: Cable },
-  { section: "api-keys", label: "API keys", icon: KeyRound },
-  { section: "team", label: "Team", icon: Users },
-  { section: "usage", label: "Usage", icon: Gauge },
+  { section: "settings", label: "Settings", icon: Settings, subtree: true },
 ] as const;
 const PROJECT_DESTINATIONS = [
   { section: "overview", label: "Overview", icon: Gauge },
   { section: "configuration", label: "Configuration", icon: SlidersHorizontal },
   { section: "activity", label: "Activity", icon: History },
-  { section: "settings/general", label: "Settings", icon: Settings },
+  { section: "settings", label: "Settings", icon: Settings },
 ] as const;
+// The instance is the deployment, so its surfaces sit outside `/o/` and there is no tenant in
+// their paths. That also makes the path the only thing that can say you are on one.
+const INSTANCE_DESTINATIONS = [
+  { to: "/apps", label: "Apps", icon: Blocks },
+  { to: "/operator", label: "Operator", icon: ShieldCheck },
+] as const;
+const INSTANCE_ENTRY = INSTANCE_DESTINATIONS[0].to;
+
+/**
+ * Instance scope is a property of the user, not of a tenant, so a non-operator on an instance
+ * route keeps the organization sidebar and their way back out — the route itself refuses them.
+ */
+function useInstanceScope(operator: boolean): boolean {
+  const onInstanceRoute = useRouterState({
+    select: (state) =>
+      INSTANCE_DESTINATIONS.some((destination) => destination.to === state.location.pathname),
+  });
+  return operator && onInstanceRoute;
+}
 
 /**
  * Navigation stays inside the running app. A plain anchor reloads the document, which
@@ -316,15 +376,17 @@ function NavItem({
   to,
   label,
   icon: Icon,
+  subtree = false,
 }: {
   to: string;
   label: string;
   icon: typeof FolderKanban;
+  /** The destination owns pages beneath it, so it stays lit while any of them is open. */
+  subtree?: boolean;
 }) {
   const active = useRouterState({
     select: (state) =>
-      state.location.pathname === to ||
-      (label === "Settings" && state.location.pathname.startsWith(to.replace(/\/general$/u, ""))),
+      state.location.pathname === to || (subtree && state.location.pathname.startsWith(`${to}/`)),
   });
   const { isMobile, setOpenMobile } = useSidebar();
   // On compact the sidebar is an overlay covering the destination. A document load used
@@ -345,97 +407,59 @@ function NavItem({
   );
 }
 
-// Rendered from the active account's organization when the route has no tenant of its own — the
-// instance-scoped operator page is under the shell but outside /o/, and the sidebar must still let
-// the operator get back to their organization's sections.
-function NavigationGroups({
-  organizationSlug,
-  projectSlug,
-  canManageResources,
-}: {
-  organizationSlug: string;
-  projectSlug: string | undefined;
-  canManageResources: boolean;
-}) {
+// Some shell routes carry no tenant of their own — the instance surfaces sit outside /o/, and a
+// non-operator who reaches one is refused there rather than moved into instance scope. The slug
+// then comes from the active account, so the sidebar still offers a way somewhere.
+function OrganizationNavigationGroup({ organizationSlug }: { organizationSlug: string }) {
   const organizationBase = `/o/${organizationSlug}`;
-  const projectBase =
-    projectSlug === undefined ? undefined : `${organizationBase}/projects/${projectSlug}`;
-  // Billing is hosted-only: the entry appears solely when the instance is billing-configured, so
-  // self-hosted deployments show no billing navigation at all (the route also 404s there).
-  const loadBillingConfigured = useServerFn(billingConfigured);
-  const billingQuery = useQuery({
-    queryKey: ["billing-configured"],
-    queryFn: () => loadBillingConfigured(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-  const billingEnabled = billingQuery.data?.configured === true;
   return (
-    <>
-      <nav aria-label="Organization">
-        <SidebarGroup>
-          <div className="px-2 pb-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:sr-only">
-            Organization
-          </div>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {ORGANIZATION_DESTINATIONS.filter(
-                (destination) => destination.section !== "api-keys" || canManageResources,
-              ).map((destination) => (
-                <NavItem
-                  key={destination.section}
-                  to={`${organizationBase}/${destination.section}`}
-                  label={destination.label}
-                  icon={destination.icon}
-                />
-              ))}
-              {billingEnabled && (
-                <NavItem to={`${organizationBase}/billing`} label="Billing" icon={CreditCard} />
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </nav>
-      {projectBase === undefined ? null : (
-        <nav aria-label="Project">
-          <SidebarGroup>
-            <div className="px-2 pb-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:sr-only">
-              Project
-            </div>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {PROJECT_DESTINATIONS.map((destination) => (
-                  <NavItem
-                    key={destination.section}
-                    to={`${projectBase}/${destination.section}`}
-                    label={destination.label}
-                    icon={destination.icon}
-                  />
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </nav>
-      )}
-    </>
+    <nav aria-label="Organization">
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {ORGANIZATION_DESTINATIONS.map((destination) => (
+              <NavItem
+                key={destination.section}
+                to={`${organizationBase}/${destination.section}`}
+                label={destination.label}
+                icon={destination.icon}
+                subtree={"subtree" in destination}
+              />
+            ))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </nav>
   );
 }
 
-/**
- * Instance-scoped navigation — the operator back office. It lives outside the organization group
- * because an operator acts across organizations, so it renders whether or not a tenant is
- * resolved. Presence here is presentation only: the operator routes enforce the flag server-side.
- */
-function InstanceNavigationGroup() {
+function ProjectNavigationGroup({
+  organizationSlug,
+  projectSlug,
+}: {
+  organizationSlug: string;
+  projectSlug: string;
+}) {
+  const projectBase = `/o/${organizationSlug}/projects/${projectSlug}`;
   return (
-    <nav aria-label="Instance">
+    <nav aria-label="Project">
       <SidebarGroup>
-        <div className="px-2 pb-2 text-xs font-medium text-muted-foreground group-data-[collapsible=icon]:sr-only">
-          Instance
-        </div>
         <SidebarGroupContent>
           <SidebarMenu>
-            <NavItem to="/apps" label="Apps" icon={Blocks} />
-            <NavItem to="/operator" label="Operator" icon={ShieldCheck} />
+            <NavItem to={`/o/${organizationSlug}/projects`} label="All projects" icon={ArrowLeft} />
+          </SidebarMenu>
+        </SidebarGroupContent>
+        <SidebarSeparator className="my-2" />
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {PROJECT_DESTINATIONS.map((destination) => (
+              <NavItem
+                key={destination.section}
+                to={`${projectBase}/${destination.section}`}
+                label={destination.label}
+                icon={destination.icon}
+              />
+            ))}
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -444,17 +468,80 @@ function InstanceNavigationGroup() {
 }
 
 /**
- * Header context, not a second title. The page owns its `<h1>`; this says where that
- * page sits, which is why it leads with the organization rather than repeating the view.
+ * The operator back office. Instance routes carry no tenant, so the way back out is named after
+ * the organization the account is active in — the one the sidebar would show anywhere else.
+ * Presence here is presentation only: the operator routes enforce the flag server-side.
  */
-function SiteHeader({ organization, project }: { organization: string; project?: string }) {
-  const title = useRouterState({ select: (state) => viewTitle(state.location.pathname) });
+function InstanceNavigationGroup({
+  organization,
+}: {
+  organization: { name: string; slug: string };
+}) {
+  return (
+    <nav aria-label="Instance">
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <NavItem
+              to={`/o/${organization.slug}/triggers`}
+              label={`Back to ${organization.name}`}
+              icon={ArrowLeft}
+            />
+          </SidebarMenu>
+        </SidebarGroupContent>
+        <SidebarSeparator className="my-2" />
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {INSTANCE_DESTINATIONS.map((destination) => (
+              <NavItem
+                key={destination.to}
+                to={destination.to}
+                label={destination.label}
+                icon={destination.icon}
+              />
+            ))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </nav>
+  );
+}
+
+/** There is one instance and nothing to switch to, so the header slot holds a label, not a menu. */
+function InstanceHeader() {
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <div className="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-0!">
+          <span className="flex aspect-square size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <ShieldCheck aria-hidden="true" className="size-4" />
+          </span>
+          <span className="grid flex-1 leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="truncate">Instance</span>
+            <span className="truncate text-xs text-muted-foreground">Administration</span>
+          </span>
+        </div>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
+
+/**
+ * Header context, not a second title. The page owns its `<h1>`; this says where that page sits,
+ * which is why it leads with where you are — the same scope the sidebar header stacks — rather
+ * than repeating the view.
+ */
+function SiteHeader({ scope, project }: { scope: string; project?: string }) {
+  const trail = useRouterState({ select: (state) => viewTrail(state.location.pathname) });
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
       <RestoringSidebarTrigger />
       <Separator orientation="vertical" className="mr-1 h-4" />
-      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm">
-        <span className="truncate text-muted-foreground">{organization}</span>
+      <nav
+        aria-label="Breadcrumb"
+        className="flex min-w-0 items-center gap-1.5 overflow-hidden text-sm"
+      >
+        <span className="truncate text-muted-foreground">{scope}</span>
         {project === undefined ? null : (
           <>
             <span aria-hidden="true" className="hidden text-muted-foreground/60 sm:inline">
@@ -463,18 +550,32 @@ function SiteHeader({ organization, project }: { organization: string; project?:
             <span className="hidden truncate text-muted-foreground sm:inline">{project}</span>
           </>
         )}
-        <span aria-hidden="true" className="text-muted-foreground/60">
-          /
-        </span>
-        <span className="truncate">{title}</span>
+        {trail.map((entry, index) => (
+          <Fragment key={entry}>
+            <span aria-hidden="true" className="text-muted-foreground/60">
+              /
+            </span>
+            <span
+              className={cn(
+                "truncate",
+                index < trail.length - 1 && "hidden text-muted-foreground sm:inline",
+              )}
+            >
+              {entry}
+            </span>
+          </Fragment>
+        ))}
       </nav>
+      <SiteHeaderActionsTarget />
     </header>
   );
 }
 
-function viewTitle(pathname: string): string {
+function viewTrail(pathname: string): string[] {
+  if (/\/triggers\/[^/]+$/u.test(pathname)) return ["Triggers", "Trigger editor"];
   const section = routeSection(pathname);
-  return section === undefined ? "Register daemon" : section.label;
+  if (section === undefined) return ["Register daemon"];
+  return "group" in section ? [section.group, section.label] : [section.label];
 }
 
 function RestoringSidebarTrigger() {
@@ -535,7 +636,7 @@ function OrganizationSwitcher({
                 <PaseoGlyph />
               </span>
               <span className="grid flex-1 text-left leading-tight">
-                <span className="truncate text-sm font-medium">{currentOrganization.name}</span>
+                <span className="truncate text-sm">{currentOrganization.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {ROLE_LABELS[currentRole] ?? currentRole}
                 </span>
@@ -626,14 +727,16 @@ function ProjectSwitcher({ tenant }: { tenant: RouteTenant }) {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
+            {/* One line, and no organization on it: the organization switcher is the row directly
+                above, so repeating it here would say the same thing twice. */}
             <SidebarMenuButton
-              size="lg"
               aria-label="Project"
               tooltip={tenant.project?.name ?? "Project"}
+              className="data-[state=open]:bg-sidebar-accent"
             >
               <FolderKanban aria-hidden="true" />
               <span className="truncate">{tenant.project?.name}</span>
-              <ChevronsUpDown aria-hidden="true" className="ml-auto size-4" />
+              <ChevronsUpDown aria-hidden="true" className="ml-auto size-4 text-muted-foreground" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" side="bottom" className="min-w-56">
@@ -662,18 +765,21 @@ function ProjectSwitcher({ tenant }: { tenant: RouteTenant }) {
   );
 }
 
+// Longest suffix first: an organization settings path ends with `/settings/team`, a project
+// settings path ends with `/settings`, and only the first match may win.
 const ROUTE_SECTIONS = [
-  { suffix: "/settings/general", label: "Settings", projectSection: "settings/general" },
+  { suffix: "/settings/api-keys", label: "API keys", group: "Settings" },
+  { suffix: "/settings/team", label: "Team", group: "Settings" },
+  { suffix: "/settings/usage", label: "Usage", group: "Settings" },
+  { suffix: "/settings/billing", label: "Billing", group: "Settings" },
+  { suffix: "/settings", label: "Settings", projectSection: "settings" },
   { suffix: "/configuration", label: "Configuration", projectSection: "configuration" },
   { suffix: "/activity", label: "Activity", projectSection: "activity" },
   { suffix: "/overview", label: "Overview", projectSection: "overview" },
+  { suffix: "/triggers", label: "Triggers" },
   { suffix: "/projects", label: "Projects" },
   { suffix: "/daemons", label: "Daemons" },
   { suffix: "/connections", label: "Connections" },
-  { suffix: "/api-keys", label: "API keys" },
-  { suffix: "/team", label: "Team" },
-  { suffix: "/usage", label: "Usage" },
-  { suffix: "/billing", label: "Billing" },
   { suffix: "/apps", label: "Apps" },
   { suffix: "/operator", label: "Operator" },
 ] as const;
@@ -721,17 +827,30 @@ function CreateOrganizationDialog({
   );
 }
 
+/**
+ * The account menu carries what belongs to the person rather than to a tenant. Instance
+ * administration is one of those: `is_instance_operator` is a property of the user, so no
+ * position inside the organization → project sidebar would be true.
+ */
 function AccountMenu({
   email,
   name,
+  operator,
   busy,
   onSignOut,
 }: {
   email: string;
   name: string;
+  operator: boolean;
   busy: boolean;
   onSignOut: () => void;
 }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  // On compact the menu opens inside the drawer covering the destination, so leaving for the
+  // instance has to dismiss it the way a sidebar destination does.
+  const navigate = useCallback(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [isMobile, setOpenMobile]);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -741,7 +860,7 @@ function AccountMenu({
           tooltip={email}
           className="data-[state=open]:bg-sidebar-accent"
         >
-          <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-accent text-xs font-medium">
+          <span className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-accent text-xs">
             {initials(name, email)}
           </span>
           <span className="grid flex-1 text-left leading-tight">
@@ -757,6 +876,17 @@ function AccountMenu({
         sideOffset={4}
         className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
       >
+        {operator ? (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to={INSTANCE_ENTRY} onClick={navigate}>
+                <ShieldCheck aria-hidden="true" />
+                Instance administration
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem disabled={busy} onSelect={onSignOut}>
           <LogOut aria-hidden="true" />
           Sign out

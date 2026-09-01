@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { CONNECTION_MUTATION_KEY } from "../auth/tenant-mutation.js";
 import { useActiveAccount } from "../auth/active-account.js";
 import { ConfirmAction, ConfirmMenuItem } from "../components/app/confirm-action.js";
@@ -14,6 +14,7 @@ import { RowActions } from "../components/app/row-actions.js";
 import { Section } from "../components/app/section.js";
 import { StatusPill } from "../components/app/status-pill.js";
 import { ProviderGlyph } from "../connections/provider-glyph.js";
+import { connectionResultCopy, useConnectionResult } from "../connections/result.js";
 import { cn } from "../lib/utils.js";
 import { Alert, AlertDescription } from "../components/ui/alert.js";
 import { Button } from "../components/ui/button.js";
@@ -150,13 +151,13 @@ function ProjectCard({
     <>
       <span
         aria-hidden="true"
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm font-semibold text-link"
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-sm text-link"
       >
         {monogram(project.name)}
       </span>
       <span className="grid min-w-0 flex-1 gap-0.5">
         <span className="flex items-center gap-2">
-          <span className="truncate font-medium group-hover:text-link">{project.name}</span>
+          <span className="truncate group-hover:text-link">{project.name}</span>
           {project.status === "active" ? null : <StatusPill tone="neutral">Archived</StatusPill>}
         </span>
         <span className="truncate font-mono text-xs text-muted-foreground">{project.slug}</span>
@@ -223,7 +224,7 @@ export function OrganizationConnectionsPanel() {
   const status = queryState<ConnectionStatus>(statusQuery, "Connections unavailable");
   if (!status.ok) return status.element;
   const data = snapshot.data;
-  const connectProvider = (provider: "github" | "discord" | "slack") => {
+  const connectProvider = (provider: "github" | "discord" | "slack" | "linear") => {
     connect.mutate(
       { data: { ...scope, provider } },
       {
@@ -235,8 +236,11 @@ export function OrganizationConnectionsPanel() {
   };
   const rows = connectionRows(data);
   const busy = connect.isPending || disconnect.isPending;
-  const connectionActionLabel = (provider: "github" | "discord" | "slack") => {
-    if (provider === "slack" && status.data.slack.status === "requiresReauthorization") {
+  const connectionActionLabel = (provider: "github" | "discord" | "slack" | "linear") => {
+    if (
+      (provider === "slack" || provider === "linear") &&
+      status.data[provider].status === "requiresReauthorization"
+    ) {
       return "Reauthorize";
     }
     if (
@@ -273,7 +277,7 @@ export function OrganizationConnectionsPanel() {
           {rows.map((connection) => (
             <DataRow key={`${connection.provider}-${connection.id}`}>
               <DataCell>
-                <span className="font-medium">{connection.name}</span>
+                <span>{connection.name}</span>
                 <span className="block font-mono text-xs text-muted-foreground">
                   {connection.externalId}
                 </span>
@@ -324,13 +328,13 @@ export function OrganizationConnectionsPanel() {
           ))}
         </DataTable>
         {data.capabilities.manageResources ? (
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(["github", "discord", "slack"] as const).map((provider) => (
+          <div className="grid gap-2 sm:grid-cols-4">
+            {(["github", "discord", "slack", "linear"] as const).map((provider) => (
               <div
                 key={provider}
                 className="flex items-center justify-between gap-2 rounded-md border p-3"
               >
-                <span className="inline-flex items-center gap-2 text-sm font-medium">
+                <span className="inline-flex items-center gap-2 text-sm">
                   <ProviderGlyph provider={provider} />
                   {providerLabel(provider)}
                 </span>
@@ -398,10 +402,11 @@ export function ProjectOverviewPanel() {
           ready={
             data.connections.github.length +
               data.connections.discord.length +
-              data.connections.slack.length >
+              data.connections.slack.length +
+              data.connections.linear.length >
             0
           }
-          detail={`${String(data.connections.github.length + data.connections.discord.length + data.connections.slack.length)} organization connections`}
+          detail={`${String(data.connections.github.length + data.connections.discord.length + data.connections.slack.length + data.connections.linear.length)} organization connections`}
         />
       </div>
       <Section
@@ -507,7 +512,7 @@ export function ProjectActivityRunPanel({ runId }: { runId: string }) {
             {activity.steps.map((step) => (
               <DataRow key={step.id}>
                 <DataCell>
-                  <span className="font-medium">
+                  <span>
                     {step.ordinal + 1}. {step.stepId}
                   </span>
                 </DataCell>
@@ -566,14 +571,14 @@ export function ProjectGeneralSettingsPanel() {
         onSuccess: (result) => {
           if (result.status === "ok")
             void navigate({
-              to: `/o/${tenant.organization.slug}/projects/${slug}/settings/general` as never,
+              to: `/o/${tenant.organization.slug}/projects/${slug}/settings` as never,
             });
         },
       },
     );
   };
   return (
-    <SettingsPage title="General">
+    <SettingsPage>
       <CommandError mutations={[updateSlug, archive]} />
       {data.capabilities.manageResources ? (
         <>
@@ -613,18 +618,12 @@ export function ProjectGeneralSettingsPanel() {
   );
 }
 
-function SettingsPage({ title, children }: { title: string; children: ReactNode }) {
+function SettingsPage({ children }: { children: ReactNode }) {
   const tenant = useRouteTenant();
   if (tenant.project === null) throw new Error("settings route has no project");
-  const base = `/o/${tenant.organization.slug}/projects/${tenant.project.slug}/settings`;
   return (
     <>
-      <PageHeader title={title} description={`Project settings for ${tenant.project.name}.`} />
-      <nav aria-label="Project settings" className="mb-6 flex flex-wrap gap-2 border-b pb-3">
-        <Link className="text-sm hover:underline" to={`${base}/general` as never}>
-          General
-        </Link>
-      </nav>
+      <PageHeader title="Settings" description={`Project settings for ${tenant.project.name}.`} />
       {children}
     </>
   );
@@ -634,7 +633,7 @@ function SetupCard({ label, ready, detail }: { label: string; ready: boolean; de
   return (
     <section aria-label={label} className="rounded-lg border bg-card p-5">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="font-medium">{label}</h2>
+        <h2>{label}</h2>
         <StatusPill tone={ready ? "success" : "neutral"}>
           {ready ? "Ready" : "Setup needed"}
         </StatusPill>
@@ -647,7 +646,7 @@ function SetupCard({ label, ready, detail }: { label: string; ready: boolean; de
 function DetailField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid gap-1">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
   );
@@ -701,10 +700,7 @@ function ActivityTable({
             {detailBasePath &&
             "configuredTriggerName" in event &&
             event.configuredTriggerName !== null ? (
-              <Link
-                className="font-medium hover:underline"
-                to={`${detailBasePath}/${event.id}` as never}
-              >
+              <Link className="hover:underline" to={`${detailBasePath}/${event.id}` as never}>
                 {event.configuredTriggerName}
               </Link>
             ) : (
@@ -750,6 +746,15 @@ function connectionRows(data: OrganizationSnapshot) {
         ? ("requiresReauthorization" as const)
         : ("connected" as const),
     })),
+    ...data.connections.linear.map((connection) => ({
+      provider: "linear" as const,
+      id: connection.id,
+      name: connection.slug,
+      externalId: `workspace ${connection.linearOrganizationId}`,
+      status: connection.requiresReauthorization
+        ? ("requiresReauthorization" as const)
+        : ("connected" as const),
+    })),
   ];
 }
 /**
@@ -760,7 +765,7 @@ function UnconfiguredProvider({
   provider,
   operator,
 }: {
-  provider: "github" | "discord" | "slack";
+  provider: "github" | "discord" | "slack" | "linear";
   operator: boolean;
 }) {
   if (!operator) return <StatusPill tone="neutral">Not configured</StatusPill>;
@@ -771,49 +776,10 @@ function UnconfiguredProvider({
   );
 }
 
-function providerLabel(provider: "github" | "discord" | "slack") {
+function providerLabel(provider: "github" | "discord" | "slack" | "linear") {
   if (provider === "github") return "GitHub";
   if (provider === "discord") return "Discord";
-  return "Slack";
-}
-
-function useConnectionResult() {
-  const state = useState(readConnectionResult);
-  useEffect(stripConnectionResult, []);
-  return state;
-}
-
-function readConnectionResult(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  return new URL(window.location.href).searchParams.get("result") ?? undefined;
-}
-
-function stripConnectionResult(): void {
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has("app") && !url.searchParams.has("result")) return;
-  url.searchParams.delete("app");
-  url.searchParams.delete("result");
-  window.history.replaceState(window.history.state, "", url);
-}
-
-function connectionResultCopy(result: string): string {
-  if (result === "github_connected") return "GitHub connected.";
-  if (result === "discord_connected") return "Discord connected.";
-  if (result === "slack_connected") return "Slack connected.";
-  if (result === "github_disconnected") return "GitHub disconnected.";
-  if (result === "discord_disconnected") return "Discord disconnected.";
-  if (result === "slack_disconnected") return "Slack disconnected.";
-  if (result === "github_approval_required") {
-    return "GitHub owner approval is required. Retry after approval.";
-  }
-  if (result === "provider_not_configured") return "The provider is not configured.";
-  if (result === "connection_invalid") {
-    return "This connection link is invalid, expired, or already used. Restart the connection from this Hub.";
-  }
-  if (result === "connection_conflict") {
-    return "That provider account is already connected to another organization. Disconnect it there before trying again.";
-  }
-  return "The provider connection did not complete. Restart it from Connections; if it repeats, check the app credentials and provider status.";
+  return provider === "slack" ? "Slack" : "Linear";
 }
 
 function statusLabel(status: string): string {

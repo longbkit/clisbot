@@ -20,12 +20,12 @@ export function providerApplicationSaveFailure(
   const gateway = discordGatewayDiagnostic(error);
   const report = { operation, component: "provider_applications", provider } as const;
 
-  if (provider === "slack" && code === "httpsRequired") {
+  if ((provider === "slack" || provider === "linear") && code === "httpsRequired") {
     return respondWithFailure(
       error,
       report,
       {
-        fallback: `Slack only works over HTTPS, and Hub is at ${errorContext(error) ?? "an HTTP address"}. Nothing was saved. Reopen Hub at its public HTTPS address to set up Slack.`,
+        fallback: `${name} only works over HTTPS, and Hub is at ${errorContext(error) ?? "an HTTP address"}. Nothing was saved. Reopen Hub at its public HTTPS address to set up ${name}.`,
       },
       { kind: "validation", scrubValues },
     );
@@ -116,12 +116,14 @@ export function providerApplicationSaveFailure(
 export function providerHost(provider: Provider): string {
   if (provider === "github") return "api.github.com";
   if (provider === "slack") return "slack.com";
+  if (provider === "linear") return "linear.app";
   return "discord.com";
 }
 
 export function providerName(provider: Provider): string {
   if (provider === "github") return "GitHub";
   if (provider === "slack") return "Slack";
+  if (provider === "linear") return "Linear";
   return "Discord";
 }
 
@@ -158,6 +160,9 @@ function credentialMessage(provider: Provider, subject: string | undefined): str
     }
     return "Discord rejected these credentials. Nothing was saved. Check the Application ID, Client Secret, and bot token, then verify again.";
   }
+  if (provider === "linear") {
+    return "Linear rejected these app credentials. Nothing was saved. Check the Client ID and Client Secret in the Linear application, then continue again.";
+  }
   if (subject === "appToken") {
     return "Slack rejected the app-level token. Nothing was saved. Open Basic Information → App-Level Tokens, generate one with connections:write, then connect again.";
   }
@@ -180,6 +185,9 @@ function identityMismatchMessage(provider: Provider): string {
   }
   if (provider === "discord") {
     return "That bot token belongs to a different Discord application than the Application ID you entered. Nothing was saved. Copy both values from the same application, then verify again.";
+  }
+  if (provider === "linear") {
+    return "The Linear Client ID and Client Secret do not belong to the same application. Nothing was saved. Copy both from one Linear application, then continue again.";
   }
   return "The app-level token and bot token belong to different Slack apps. Nothing was saved. Copy both tokens from the same app, then connect again.";
 }

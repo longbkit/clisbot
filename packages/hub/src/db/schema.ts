@@ -31,7 +31,8 @@ export type AgentExecutionStatus = (typeof AGENT_EXECUTION_STATUSES)[number];
 
 export const PROJECT_STATUSES = ["active", "archived"] as const;
 export const CONFIGURATION_SOURCE_KINDS = ["github", "manual"] as const;
-export const CONNECTION_PROVIDERS = ["github", "slack", "discord"] as const;
+export const TRIGGER_FORMATS = ["single_run", "legacy_multistep"] as const;
+export const CONNECTION_PROVIDERS = ["github", "slack", "discord", "linear"] as const;
 
 export type MachineSource =
   | { kind: "manual"; userId?: string }
@@ -85,7 +86,7 @@ export const providerEventReceipts = pgTable(
     ),
     check(
       "provider_event_receipts_provider_check",
-      sql`${table.provider} in ('github', 'slack', 'discord', 'manual')`,
+      sql`${table.provider} in ('github', 'slack', 'discord', 'linear', 'manual')`,
     ),
   ],
 );
@@ -253,8 +254,157 @@ export const projectTriggerRoutes = pgTable(
     }).onDelete("cascade"),
     check(
       "project_trigger_routes_provider_check",
-      sql`${table.provider} in ('github', 'slack', 'discord')`,
+      sql`${table.provider} in ('github', 'slack', 'discord', 'linear')`,
     ),
+  ],
+);
+
+/** Organization-owned trigger identity. Authored files and UI edits create immutable revisions. */
+export const organizationTriggers = pgTable(
+  "organization_triggers",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    enabled: boolean().default(true).notNull(),
+    format: text().$type<(typeof TRIGGER_FORMATS)[number]>().notNull(),
+    runtimeProjectId: uuid("runtime_project_id").references(() => projects.id),
+    activeRevisionId: uuid("active_revision_id").references(
+      (): AnyPgColumn => organizationTriggerRevisions.id,
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_triggers_organization_name_unique").on(
+      table.organizationId,
+      table.name,
+    ),
+    uniqueIndex("organization_triggers_id_organization_unique").on(table.id, table.organizationId),
+    index("organization_triggers_organization_updated_idx").on(
+      table.organizationId,
+      table.updatedAt.desc(),
+    ),
+    check(
+      "organization_triggers_format_check",
+      sql`${table.format} in ('single_run', 'legacy_multistep')`,
+    ),
+  ],
+);
+
+export const organizationTriggerRevisions = pgTable(
+  "organization_trigger_revisions",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    triggerId: uuid("trigger_id").notNull(),
+    organizationId: text("organization_id").notNull(),
+    version: integer().notNull(),
+    yaml: text().notNull(),
+    normalizedConfiguration: jsonb("normalized_configuration").notNull(),
+    contentHash: text("content_hash").notNull(),
+    sourceKind: text("source_kind").$type<"manual" | "github" | "project_migration">().notNull(),
+    sourceEvidence: jsonb("source_evidence").notNull(),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_trigger_revisions_trigger_version_unique").on(
+      table.triggerId,
+      table.version,
+    ),
+    uniqueIndex("organization_trigger_revisions_id_trigger_organization_unique").on(
+      table.id,
+      table.triggerId,
+      table.organizationId,
+    ),
+    index("organization_trigger_revisions_trigger_created_idx").on(
+      table.triggerId,
+      table.createdAt.desc(),
+    ),
+    check(
+      "organization_trigger_revisions_source_kind_check",
+      sql`${table.sourceKind} in ('manual', 'github', 'project_migration')`,
+    ),
+    foreignKey({
+      columns: [table.triggerId, table.organizationId],
+      foreignColumns: [organizationTriggers.id, organizationTriggers.organizationId],
+      name: "organization_trigger_revisions_trigger_organization_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
+export const organizationTriggerRoutes = pgTable(
+  "organization_trigger_routes",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    triggerId: uuid("trigger_id").notNull(),
+    triggerRevisionId: uuid("trigger_revision_id").notNull(),
+    provider: text().$type<(typeof CONNECTION_PROVIDERS)[number]>().notNull(),
+    connectionId: uuid("connection_id").notNull(),
+    resourceId: text("resource_id"),
+    configuredEventName: text("configured_event_name").notNull(),
+  },
+  (table) => [
+    uniqueIndex("organization_trigger_routes_shape_unique").on(
+      table.triggerId,
+      table.triggerRevisionId,
+      table.provider,
+      table.connectionId,
+      table.resourceId,
+      table.configuredEventName,
+    ),
+    index("organization_trigger_routes_resource_idx").on(
+      table.organizationId,
+      table.provider,
+      table.connectionId,
+      table.resourceId,
+    ),
+    foreignKey({
+      columns: [table.triggerId, table.organizationId],
+      foreignColumns: [organizationTriggers.id, organizationTriggers.organizationId],
+      name: "organization_trigger_routes_trigger_organization_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.triggerRevisionId, table.triggerId, table.organizationId],
+      foreignColumns: [
+        organizationTriggerRevisions.id,
+        organizationTriggerRevisions.triggerId,
+        organizationTriggerRevisions.organizationId,
+      ],
+      name: "organization_trigger_routes_revision_trigger_organization_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
+/** One row means the project's active revision was atomically exploded into organization triggers. */
+export const projectTriggerMigrations = pgTable(
+  "project_trigger_migrations",
+  {
+    projectId: uuid("project_id")
+      .primaryKey()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    configurationRevisionId: uuid("configuration_revision_id").notNull(),
+    migratedAt: timestamp("migrated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("project_trigger_migrations_organization_idx").on(table.organizationId),
+    foreignKey({
+      columns: [table.configurationRevisionId, table.projectId, table.organizationId],
+      foreignColumns: [
+        projectConfigurationRevisions.id,
+        projectConfigurationRevisions.projectId,
+        projectConfigurationRevisions.organizationId,
+      ],
+      name: "project_trigger_migrations_revision_project_organization_fk",
+    }),
   ],
 );
 
@@ -454,7 +604,7 @@ export const daemons = pgTable(
     serverId: text("server_id").notNull(),
     daemonPublicKey: text("daemon_public_key").notNull(),
     credentialVerifier: text("credential_verifier").notNull(),
-    scopes: jsonb().$type<string[]>().notNull(),
+    permissions: jsonb("scopes").$type<string[]>().notNull(),
     registeredByApiKeyId: uuid("registered_by_api_key_id"),
     registeredByCliCredentialId: uuid("registered_by_cli_credential_id").references(
       (): AnyPgColumn => organizationCliCredentials.id,
@@ -688,13 +838,14 @@ export const organizationConnectionAttempts = pgTable(
   "organization_connection_attempts",
   {
     id: uuid().defaultRandom().primaryKey(),
-    provider: text().$type<"github" | "discord" | "slack">().notNull(),
+    provider: text().$type<"github" | "discord" | "slack" | "linear">().notNull(),
     phase: text()
       .$type<
         | "github_setup"
         | "github_user_authorization"
         | "discord_authorization"
         | "slack_authorization"
+        | "linear_authorization"
       >()
       .notNull(),
     stateVerifier: text("state_verifier").notNull().unique(),
@@ -724,18 +875,19 @@ export const organizationConnectionAttempts = pgTable(
     index("organization_connection_attempts_expiry_idx").on(table.expiresAt),
     check(
       "organization_connection_attempts_provider_check",
-      sql`${table.provider} in ('github', 'discord', 'slack')`,
+      sql`${table.provider} in ('github', 'discord', 'slack', 'linear')`,
     ),
     check(
       "organization_connection_attempts_phase_check",
-      sql`${table.phase} in ('github_setup', 'github_user_authorization', 'discord_authorization', 'slack_authorization')`,
+      sql`${table.phase} in ('github_setup', 'github_user_authorization', 'discord_authorization', 'slack_authorization', 'linear_authorization')`,
     ),
     check(
       "organization_connection_attempts_shape_check",
       sql`(${table.phase} = 'github_setup' and ${table.provider} = 'github' and ${table.candidateExternalId} is null and ${table.pkceVerifier} is null)
         or (${table.phase} = 'github_user_authorization' and ${table.provider} = 'github' and ${table.candidateExternalId} is not null and (${table.pkceVerifier} is not null or ${table.consumedAt} is not null))
         or (${table.phase} = 'discord_authorization' and ${table.provider} = 'discord' and ${table.candidateExternalId} is null and ${table.pkceVerifier} is null)
-        or (${table.phase} = 'slack_authorization' and ${table.provider} = 'slack' and ${table.candidateExternalId} is null and ${table.pkceVerifier} is null)`,
+        or (${table.phase} = 'slack_authorization' and ${table.provider} = 'slack' and ${table.candidateExternalId} is null and ${table.pkceVerifier} is null)
+        or (${table.phase} = 'linear_authorization' and ${table.provider} = 'linear' and ${table.candidateExternalId} is null and ${table.pkceVerifier} is null)`,
     ),
   ],
 );
@@ -848,6 +1000,45 @@ export const slackConnections = pgTable(
   (table) => [
     uniqueIndex("slack_connections_id_organization_unique").on(table.id, table.organizationId),
     uniqueIndex("slack_connections_organization_slug_unique").on(table.organizationId, table.slug),
+  ],
+);
+
+/**
+ * One OAuth installation per Linear workspace. Tokens belong to the Hub organization, never to
+ * an individual Paseo project; project-scoped trigger routes select the Linear project later.
+ */
+export const linearConnections = pgTable(
+  "linear_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    linearOrganizationId: text("linear_organization_id").notNull().unique(),
+    providerApplicationId: text("provider_application_id"),
+    slug: text().notNull(),
+    linearOrganizationName: text("linear_organization_name").notNull(),
+    appUserId: text("app_user_id").notNull(),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+    scopes: jsonb()
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    connectedByUserId: text("connected_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("linear_connections_id_organization_unique").on(table.id, table.organizationId),
+    uniqueIndex("linear_connections_organization_slug_unique").on(table.organizationId, table.slug),
+    uniqueIndex("linear_connections_organization_external_unique").on(
+      table.organizationId,
+      table.linearOrganizationId,
+    ),
   ],
 );
 
@@ -1044,7 +1235,7 @@ export const runtimeProviderConfiguration = pgTable(
   (table) => [
     check(
       "runtime_provider_configuration_provider_check",
-      sql`${table.provider} in ('github', 'slack', 'discord')`,
+      sql`${table.provider} in ('github', 'slack', 'discord', 'linear')`,
     ),
     check("runtime_provider_configuration_version_check", sql`${table.version} > 0`),
   ],
@@ -1061,7 +1252,7 @@ export const runtimeProviderActivations = pgTable(
   (table) => [
     check(
       "runtime_provider_activation_provider_check",
-      sql`${table.provider} in ('github', 'slack', 'discord')`,
+      sql`${table.provider} in ('github', 'slack', 'discord', 'linear')`,
     ),
     check("runtime_provider_activation_version_check", sql`${table.configurationVersion} >= 0`),
   ],
@@ -1430,15 +1621,10 @@ export const deliveryLedger = pgTable(
   ],
 );
 
-export const organizationSubscriptions = pgTable("organization_subscriptions", {
+export const organizationBillingCustomers = pgTable("organization_billing_customers", {
   organizationId: text("organization_id")
     .primaryKey()
     .references(() => organizations.id, { onDelete: "cascade" }),
   stripeCustomerId: text("stripe_customer_id").notNull(),
-  stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
-  planId: text("plan_id"),
-  status: text().notNull(),
-  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
-  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

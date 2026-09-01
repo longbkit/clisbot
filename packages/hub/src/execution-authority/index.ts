@@ -134,11 +134,13 @@ export function createExecutionAuthority(
       const env = await materializeEnvironment(input, context, tokenRevocations);
       if (input.github !== undefined) {
         if (options.githubAuthority === undefined) {
-          throw new Error("GitHub step authority is unavailable");
+          throw authorityError(
+            "github_authority_unavailable",
+            "GitHub step authority is unavailable",
+          );
         }
         const repositories = repositoriesForAuthority(input.github, input.triggerContext);
         const authority = await options.githubAuthority.mint({
-          executionId: input.executionId,
           projectId: input.projectId,
           connectionSlug: input.github.connection,
           repositories,
@@ -583,7 +585,8 @@ function repositoriesForAuthority(
   ) {
     return [triggerContext.target.repository];
   }
-  throw new Error(
+  throw authorityError(
+    "github_authority_scope_invalid",
     "github.repositories is required for this trigger source; Hub cannot safely expand authority to all installation repositories",
   );
 }
@@ -613,11 +616,18 @@ function githubEnvironment(
 }
 
 function terminalExecutionError(executionId: string): Error {
-  return new Error(`cannot materialize terminal execution ${executionId}`);
+  return authorityError(
+    "execution_terminal",
+    `cannot materialize terminal execution ${executionId}`,
+  );
 }
 
 function authorityStoppedError(): Error {
-  return new Error("execution authority is stopped");
+  return authorityError("execution_authority_stopped", "execution authority is stopped");
+}
+
+function authorityError(code: string, message: string): Error & { code: string } {
+  return Object.assign(new Error(message), { code });
 }
 
 function removeLease(

@@ -1,0 +1,1 @@
+ALTER TABLE "project_trigger_migrations" ADD CONSTRAINT "project_trigger_migrations_revision_project_organization_fk" FOREIGN KEY ("configuration_revision_id","project_id","organization_id") REFERENCES "public"."project_configuration_revisions"("id","project_id","organization_id") ON DELETE no action ON UPDATE no action;

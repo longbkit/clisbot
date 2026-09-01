@@ -12,6 +12,7 @@
 export interface StripeBillingClient {
   /** The Stripe customer for an organization, created if it does not exist yet. */
   ensureCustomer(input: EnsureCustomerInput): Promise<string>;
+  listCustomerSubscriptions(customerId: string): Promise<readonly StripeSubscriptionState[]>;
   /** A Checkout Session for the organization's *first* subscription to `priceId`, carrying
    * `organizationId` in metadata so the subscription webhook can resolve the reference on re-read.
    * Only ever called when the organization has no subscription yet — a plan change goes through
@@ -48,6 +49,7 @@ export interface CreateCheckoutSessionInput {
   quantity: number;
   successUrl: string;
   cancelUrl: string;
+  trial: boolean;
 }
 
 export interface ChangeSubscriptionPriceInput {
@@ -77,5 +79,6 @@ export interface StripeSubscriptionState {
   /** Stripe's own status vocabulary, verbatim (`active`, `trialing`, `canceled`, …). */
   status: string;
   currentPeriodEnd: Date | null;
+  trialEnd: Date | null;
   cancelAtPeriodEnd: boolean;
 }

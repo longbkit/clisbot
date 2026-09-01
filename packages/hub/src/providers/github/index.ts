@@ -36,6 +36,8 @@ import type { GitHubConfigurationProvider } from "../../configuration/github-syn
 import { createGitHubConfigurationProvider } from "./configuration.js";
 import type { ConnectionResolutionContext } from "../../config/connections.js";
 import type { ProjectConfigurationStore } from "../../configuration/store.js";
+import { replyOutputTool } from "../../execution-capabilities/outputs.js";
+import { createGitHubReplyExecutor, githubReplyAvailable } from "../../triggers/github/reply.js";
 
 export interface GitHubRegistrationConfiguration {
   appId: string;
@@ -228,7 +230,26 @@ export function createGitHubRegistration(
       },
     ],
     sources: [webhook],
-    outputs: [],
+    outputs: [
+      {
+        type: "github.reply",
+        tool: replyOutputTool,
+        available: githubReplyAvailable,
+        execute: createGitHubReplyExecutor({
+          client: {
+            async createIssueComment(input) {
+              const octokit = await appAuth.createInstallationOctokit(input.installationId);
+              await octokit.request("POST /repos/{owner}/{repo}/issues/{issue_number}/comments", {
+                owner: input.owner,
+                repo: input.repo,
+                issue_number: input.issueNumber,
+                body: input.body,
+              });
+            },
+          },
+        }),
+      },
+    ],
     requests: [{ name: "webhook", handle: (request) => webhook.handle(request) }],
     githubConfiguration,
   };

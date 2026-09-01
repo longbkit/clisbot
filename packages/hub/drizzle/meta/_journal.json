@@ -285,15 +285,50 @@
     {
       "idx": 40,
       "version": "7",
-      "when": 1787654851452,
-      "tag": "0040_channel_control_plane",
+      "when": 1787443895467,
+      "tag": "0040_cultured_punisher",
       "breakpoints": true
     },
     {
       "idx": 41,
       "version": "7",
-      "when": 1787760463828,
-      "tag": "0041_channel_ledger_bidirectional",
+      "when": 1787949616226,
+      "tag": "0041_parched_bucky",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788028212397,
+      "tag": "0042_smooth_whizzer",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788028826964,
+      "tag": "0043_chubby_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1788029691057,
+      "tag": "0044_charming_clint_barton",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1788178040836,
+      "tag": "0045_restore_implicit_trigger_routes",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1788251462728,
+      "tag": "0046_lumpy_riptide",
       "breakpoints": true
     }
   ]

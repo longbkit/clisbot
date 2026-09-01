@@ -16,11 +16,13 @@ import {
 import { matchesInputFilters, parseInvocation } from "../invocation.js";
 import {
   IssueCommentPayloadSchema,
+  IssuesPayloadSchema,
   NormalizedGitHubEventSchema,
+  PullRequestPayloadSchema,
   PullRequestReviewCommentPayloadSchema,
 } from "../../auth/github-events.js";
 import type { NormalizedGitHubEvent } from "../../auth/github-events.js";
-import { classifyGitHubEvent, GITHUB_TRIGGER_EVENT_NAMES } from "./classification.js";
+import { classifyGitHubEvent, GITHUB_TRIGGER_SOURCE_NAMES } from "./classification.js";
 
 export interface GitHubReactionClient {
   createReaction(input: {
@@ -48,7 +50,6 @@ export type GitHubReactionContent =
   | "confused"
   | "heart"
   | "hooray"
-  | "rocket"
   | "eyes";
 
 export interface GitHubMergeData {
@@ -70,43 +71,58 @@ interface GitHubContextItem {
   author: { login: string } | null;
 }
 
-export function createGitHubReactionClient(auth: GitHubAuth): GitHubReactionClient {
+export function createGitHubReactionClient(
+  auth: Pick<GitHubAuth, "createInstallationOctokit">,
+): GitHubReactionClient {
   return {
     async createReaction(input) {
       const [owner, repo] = splitRepo(input.repo);
       const octokit = await auth.createInstallationOctokit(input.installationId);
-      const endpoint =
-        input.subject.kind === "issue_comment"
-          ? "POST /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions"
-          : "POST /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions";
-
-      const response = await octokit.request(endpoint, {
-        owner,
-        repo,
-        comment_id: input.subject.commentId,
-        content: input.content,
-      });
+      if (input.subject.kind === "item") {
+        const response = await octokit.request(
+          "POST /repos/{owner}/{repo}/issues/{issue_number}/reactions",
+          { owner, repo, issue_number: input.subject.issueNumber, content: input.content },
+        );
+        return { id: response.data.id };
+      }
+      if (input.subject.kind === "issue_comment") {
+        const response = await octokit.request(
+          "POST /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions",
+          { owner, repo, comment_id: input.subject.commentId, content: input.content },
+        );
+        return { id: response.data.id };
+      }
+      const response = await octokit.request(
+        "POST /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions",
+        { owner, repo, comment_id: input.subject.commentId, content: input.content },
+      );
       return { id: response.data.id };
     },
     async deleteReaction(input) {
       const [owner, repo] = splitRepo(input.repo);
       const octokit = await auth.createInstallationOctokit(input.installationId);
-      const endpoint =
-        input.subject.kind === "issue_comment"
-          ? "DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions/{reaction_id}"
-          : "DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions/{reaction_id}";
-
-      await octokit.request(endpoint, {
-        owner,
-        repo,
-        comment_id: input.subject.commentId,
-        reaction_id: input.reactionId,
-      });
+      if (input.subject.kind === "item") {
+        await octokit.request(
+          "DELETE /repos/{owner}/{repo}/issues/{issue_number}/reactions/{reaction_id}",
+          { owner, repo, issue_number: input.subject.issueNumber, reaction_id: input.reactionId },
+        );
+      } else if (input.subject.kind === "issue_comment") {
+        await octokit.request(
+          "DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}/reactions/{reaction_id}",
+          { owner, repo, comment_id: input.subject.commentId, reaction_id: input.reactionId },
+        );
+      } else {
+        await octokit.request(
+          "DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}/reactions/{reaction_id}",
+          { owner, repo, comment_id: input.subject.commentId, reaction_id: input.reactionId },
+        );
+      }
     },
   };
 }
 
 export type GitHubReactionSubject =
+  | { kind: "item"; issueNumber: number }
   | { kind: "issue_comment"; commentId: number }
   | { kind: "pull_request_review_comment"; commentId: number };
 
@@ -128,7 +144,7 @@ export function createGitHubTriggerProvider(options: {
 }): TriggerProvider<"github", GitHubTriggerContext> {
   return {
     name: "github",
-    eventNames: GITHUB_TRIGGER_EVENT_NAMES,
+    eventNames: GITHUB_TRIGGER_SOURCE_NAMES,
     async match(externalTrigger) {
       const event = NormalizedGitHubEventSchema.parse(externalTrigger.payload);
       const stored = await options
@@ -204,9 +220,6 @@ export function createGitHubTriggerProvider(options: {
         content: "eyes",
       });
       return { reactionId: reaction.id } satisfies GitHubReactionState;
-    },
-    async onAgentExecutionStarted(triggerContext, _outputContext, reactionState) {
-      return reactToLifecycle(options.reactions, triggerContext, "rocket", reactionState);
     },
     async onAgentExecutionCompleted(triggerContext, _outputContext, _result, reactionState) {
       return reactToLifecycle(options.reactions, triggerContext, "+1", reactionState);
@@ -287,6 +300,20 @@ function githubReactionId(state: TriggerProviderReactionState | undefined): numb
 }
 
 function reactionSubjectForEvent(event: NormalizedGitHubEvent): GitHubReactionSubject | null {
+  if (event.type === "issues") {
+    const payload = IssuesPayloadSchema.parse(event.payload);
+    return payload.issue?.number === undefined
+      ? null
+      : { kind: "item", issueNumber: payload.issue.number };
+  }
+
+  if (event.type === "pull_request") {
+    const payload = PullRequestPayloadSchema.parse(event.payload);
+    return payload.pull_request?.number === undefined
+      ? null
+      : { kind: "item", issueNumber: payload.pull_request.number };
+  }
+
   if (event.type === "issue_comment") {
     const payload = IssueCommentPayloadSchema.parse(event.payload);
     return payload.comment?.id === undefined

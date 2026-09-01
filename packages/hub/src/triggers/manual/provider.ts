@@ -67,7 +67,10 @@ export function createManualRunProvider(
         (candidate) => candidate.name === payload.trigger && candidate.on === "manual.run",
       );
       if (!trigger) throw new ManualRunRejected("trigger_not_found");
-      if (!trigger.filters?.from_users?.includes(payload.actor))
+      if (
+        !trigger.filters?.from_users?.includes("*") &&
+        !trigger.filters?.from_users?.includes(payload.actor)
+      )
         throw new ManualRunRejected("actor_forbidden");
       const event: ManualMergeData = {
         manual: {

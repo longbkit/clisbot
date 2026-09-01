@@ -342,6 +342,32 @@ describe("EntitlementsService", () => {
     });
   });
 
+  it("denies every execution for a zero-execution Hosted Free stamp", async () => {
+    const service = serviceWith();
+    await service.stamp(
+      "org-free",
+      {
+        seats: { max: 1 },
+        canInviteMembers: false,
+        meters: { "executions.monthly": { limit: 0 } },
+      },
+      { source: "plan_stamp", planId: "prod-free" },
+    );
+
+    const denied = await service.consume("org-free", "executions.monthly", 1).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    assert.ok(denied instanceof EntitlementDenied);
+    assert.equal(denied.limit, 0);
+    assert.equal(denied.current, 0);
+    assert.deepEqual(await service.usage("org-free", "executions.monthly"), {
+      meter: "executions.monthly",
+      used: 0,
+      limit: 0,
+    });
+  });
+
   it("rejects a non-positive or non-integer consume amount before touching usage", async () => {
     const service = serviceWith();
     await service.stamp(

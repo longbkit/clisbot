@@ -14,7 +14,7 @@ describe("manual invocation provider", () => {
           name: "manual-request",
           on: "manual.run",
           max_runtime: "1h",
-          filters: { from_users: ["operator"], inputs: { repo: "hub" } },
+          filters: { from_users: ["*"], inputs: { repo: "hub" } },
           inputs: {
             repo: { type: "string", choices: ["paseo", "hub"] },
             agent: { type: "string", default: "codex", choices: ["codex", "opus"] },

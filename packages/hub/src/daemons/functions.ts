@@ -13,6 +13,7 @@ const daemonSchema = z.object({
   connectedAt: z.string().datetime().nullable(),
   lastSeenAt: z.string().datetime(),
   registeredAt: z.string().datetime(),
+  permissions: z.array(z.string()),
 });
 const daemonListSchema = z.object({
   daemons: z.array(daemonSchema),

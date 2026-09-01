@@ -108,6 +108,7 @@ test("only Discord has no inbound events to wait for", () => {
       ["github", true],
       ["slack", true],
       ["discord", false],
+      ["linear", true],
     ],
   );
 });
@@ -142,16 +143,21 @@ test("identity lines name the app the operator created", () => {
   );
 });
 
-test("only the Slack Webhook choice treats plain HTTP as a hard gate", () => {
+test("the Slack Webhook choice and Linear treat plain HTTP as a hard gate", () => {
   assert.equal(guideFor("slack").requiresHttps, false);
   assert.equal(SLACK_WEBHOOK_GUIDE.requiresHttps, true);
   assert.equal(guideFor("github").requiresHttps, false);
   assert.equal(guideFor("discord").requiresHttps, false);
+  assert.equal(guideFor("linear").requiresHttps, true);
   assert.equal(isSecureOrigin(LOCAL), false);
   assert.equal(isSecureOrigin(ORIGIN), true);
   assert.equal(
     SLACK_WEBHOOK_GUIDE.httpsRequirement(LOCAL),
     `Slack only works over HTTPS, and Hub is at ${LOCAL}. Reopen Hub at its public HTTPS address to set up Slack.`,
+  );
+  assert.equal(
+    guideFor("linear").httpsRequirement(LOCAL),
+    `Linear webhooks need HTTPS, and Hub is at ${LOCAL}. Reopen Hub at its public HTTPS address to set up Linear.`,
   );
 });
 
@@ -292,12 +298,16 @@ test("every field the boundary needs is asked for, in the portal's own words", (
     guideFields(SLACK_WEBHOOK_GUIDE, ORIGIN).map((field) => field.label),
     ["App ID", "Client ID", "Client Secret", "Signing Secret"],
   );
+  assert.deepEqual(
+    guideFields(guideFor("linear"), ORIGIN).map((field) => field.label),
+    ["Client ID", "Client Secret", "Webhook signing secret"],
+  );
 });
 
 test("each provider names the panel the operator pastes into after that provider", () => {
   assert.deepEqual(
     PROVIDER_GUIDES.map((guide) => guide.formTitle),
-    ["Paste from GitHub", "Connect Slack", "Paste from Discord"],
+    ["Paste from GitHub", "Connect Slack", "Paste from Discord", "Paste from Linear"],
   );
 });
 
@@ -314,6 +324,10 @@ test("a connected app is summarised with labelled rows rather than loose sentenc
   assert.deepEqual(guideFor("discord").summaryLabels, {
     identity: "Application",
     connections: "Servers",
+  });
+  assert.deepEqual(guideFor("linear").summaryLabels, {
+    identity: "Application",
+    connections: "Workspaces",
   });
 });
 
@@ -336,6 +350,11 @@ test("environment-managed copy can name the exact variables the operator has to 
     "GITHUB_APP_PRIVATE_KEY",
     "GITHUB_WEBHOOK_SECRET",
   ]);
+  assert.deepEqual(guideFor("linear").environmentVariables, [
+    "LINEAR_CLIENT_ID",
+    "LINEAR_CLIENT_SECRET",
+    "LINEAR_WEBHOOK_SECRET",
+  ]);
 });
 
 test("no guide leaks Paseo's internal vocabulary into operator-facing copy", () => {
@@ -349,7 +368,6 @@ test("no guide leaks Paseo's internal vocabulary into operator-facing copy", () 
     "configuration version",
     "latch",
     "factory",
-    "project",
     "app settings",
   ];
   const phrases: string[] = [];

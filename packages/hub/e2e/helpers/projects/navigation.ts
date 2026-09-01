@@ -1,5 +1,10 @@
 import { expect, type Page } from "@playwright/test";
 
+export type OrganizationSection = "Triggers" | "Activity" | "Daemons" | "Connections" | "Settings";
+export type OrganizationSettingsSection = "Team" | "API keys" | "Usage" | "Billing";
+export type ProjectSection = "Overview" | "Configuration" | "Activity" | "Settings";
+export type InstanceSection = "Apps" | "Operator";
+
 export class ProjectNavigation {
   constructor(private readonly page: Page) {}
 
@@ -12,32 +17,102 @@ export class ProjectNavigation {
     await expect(this.page.getByRole("heading", { name: "Overview" })).toBeVisible();
   }
 
-  async openOrganizationSection(
-    name: "Projects" | "Daemons" | "Connections" | "Team" | "API keys" | "Usage" | "Billing",
-  ) {
+  async openOrganizationSection(name: OrganizationSection) {
     await this.page
-      .getByRole("navigation", { name: "Organization" })
+      .getByRole("navigation", { name: "Organization", exact: true })
       .getByRole("link", { name })
       .click();
   }
 
-  async openProjectSection(name: "Overview" | "Configuration" | "Activity" | "Settings") {
+  /** Administration is two hops now: the Settings entry, then the section's tab. */
+  async openOrganizationSettings(name: OrganizationSettingsSection) {
+    await this.openOrganizationSection("Settings");
     await this.page
-      .getByRole("navigation", { name: "Project" })
+      .getByRole("navigation", { name: "Organization settings" })
       .getByRole("link", { name })
       .click();
   }
 
-  async openMobileProjectSection(name: "Overview" | "Configuration" | "Activity" | "Settings") {
+  async openProjectSection(name: ProjectSection) {
+    await this.page
+      .getByRole("navigation", { name: "Project", exact: true })
+      .getByRole("link", { name })
+      .click();
+  }
+
+  /** The project sidebar's way back out to organization scope. */
+  async leaveProject() {
+    await this.page
+      .getByRole("navigation", { name: "Project", exact: true })
+      .getByRole("link", { name: "All projects" })
+      .click();
+  }
+
+  /**
+   * Instance administration is outside the organization → project chain, so it is not in the
+   * sidebar body at all: it enters through the footer account menu, which the signed-in email
+   * names. Entering lands on the first instance destination; the section is then picked there.
+   */
+  async openInstanceSection(account: string, name: InstanceSection) {
+    await this.enterInstanceScope(account);
+    await this.instanceNav().getByRole("link", { name, exact: true }).click();
+  }
+
+  async openMobileInstanceSection(account: string, name: InstanceSection) {
+    await this.toggleMobileSidebar();
+    await this.enterInstanceScope(account);
+    // Leaving for the instance dismisses the drawer, the way a sidebar destination does, so the
+    // section has to be picked from a reopened one.
+    await expect(this.page.getByRole("dialog", { name: "Sidebar" })).toBeHidden();
+    await this.toggleMobileSidebar();
+    await this.instanceNav().getByRole("link", { name, exact: true }).click();
+  }
+
+  /**
+   * The instance sidebar's way back out. Instance routes carry no tenant, so the row is named
+   * after the organization the account is active in rather than one in the path.
+   */
+  async leaveInstance() {
+    await this.instanceNav()
+      .getByRole("link", { name: /^Back to / })
+      .click();
+  }
+
+  /** The footer account menu — everything that belongs to the person, not to a tenant. */
+  async openAccountMenu(account: string) {
+    await this.page.getByRole("button", { name: account }).click();
+    const menu = this.page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    return menu;
+  }
+
+  private async enterInstanceScope(account: string) {
+    const menu = await this.openAccountMenu(account);
+    await menu.getByRole("menuitem", { name: "Instance administration" }).click();
+    await expect(this.page).toHaveURL(/\/apps$/u);
+  }
+
+  private instanceNav() {
+    return this.page.getByRole("navigation", { name: "Instance", exact: true });
+  }
+
+  private async toggleMobileSidebar() {
     await this.page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  }
+
+  async openMobileProjectSection(name: ProjectSection) {
+    await this.toggleMobileSidebar();
     await this.openProjectSection(name);
   }
 
-  async openMobileOrganizationSection(
-    name: "Projects" | "Daemons" | "Connections" | "Team" | "API keys" | "Usage" | "Billing",
-  ) {
-    await this.page.getByRole("button", { name: "Toggle Sidebar" }).click();
+  async openMobileOrganizationSection(name: OrganizationSection) {
+    await this.toggleMobileSidebar();
     await this.openOrganizationSection(name);
+  }
+
+  async openMobileOrganizationSettings(name: OrganizationSettingsSection) {
+    await this.toggleMobileSidebar();
+    await this.openOrganizationSettings(name);
   }
 
   async switchProject(name: string) {

@@ -21,6 +21,10 @@ import type {
 // entitlements onto the subscription's live state, idempotently, and stamps Free when it ends.
 // Signature verification runs for real (HMAC over `${timestamp}.${payload}` with the webhook
 // secret), the same scheme Stripe uses, so nothing here mocks the SDK.
+//
+// The three products below are synthetic: reconciliation has to converge across plan changes, and
+// Hub sells one plan today. The catalog a customer actually sees is fixed at the public boundary
+// (`public-catalog.test.ts`) and mirrored for E2E in `src/e2e/harness/browser-billing.ts`.
 
 const WEBHOOK_SECRET = "whsec_reconcile_test";
 
@@ -41,7 +45,7 @@ const PRODUCTS: StripeCatalogProduct[] = [
       paseo_plan_slug: "free",
       ent_seats_max: "1",
       ent_can_invite: "false",
-      ent_executions_monthly_limit: "100",
+      ent_executions_monthly_limit: "0",
     },
     marketingFeatures: [],
   },
@@ -114,6 +118,7 @@ class FakeBillingClient implements StripeBillingClient {
       quantity: 1,
       status,
       currentPeriodEnd: new Date("2030-01-01T00:00:00Z"),
+      trialEnd: status === "trialing" ? new Date("2030-01-15T00:00:00Z") : null,
       cancelAtPeriodEnd: false,
     });
   }
@@ -123,8 +128,20 @@ class FakeBillingClient implements StripeBillingClient {
     if (state !== undefined) state.status = "canceled";
   }
 
+  setStatus(id: string, status: string): void {
+    const state = this.subscriptions.get(id);
+    if (state !== undefined) state.status = status;
+  }
+
   async ensureCustomer(): Promise<string> {
     throw new Error("unused");
+  }
+  async listCustomerSubscriptions(customerId: string): Promise<readonly StripeSubscriptionState[]> {
+    const result: StripeSubscriptionState[] = [];
+    for (const subscription of this.subscriptions.values()) {
+      if (subscription.customerId === customerId) result.push({ ...subscription });
+    }
+    return result;
   }
   async createCheckoutSession(): Promise<{ url: string }> {
     throw new Error("unused");
@@ -245,6 +262,25 @@ describe("subscription webhook reconciliation", () => {
     assert.equal((await database.getOrganizationEntitlements("org_1"))?.planId, FREE_PRODUCT);
   });
 
+  it("grants trialing and active access, revokes canceled and unpaid access, and preserves past_due", async () => {
+    const { database, billingClient, billing } = await setup();
+    billingClient.setSubscription("sub_1", "org_1", SOLO_PRICE, "trialing");
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.created", "sub_1"));
+    assert.equal((await database.getOrganizationEntitlements("org_1"))?.planId, SOLO_PRODUCT);
+
+    billingClient.setStatus("sub_1", "active");
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.updated", "sub_1"));
+    assert.equal((await database.getOrganizationEntitlements("org_1"))?.planId, SOLO_PRODUCT);
+
+    billingClient.setStatus("sub_1", "past_due");
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.updated", "sub_1"));
+    assert.equal((await database.getOrganizationEntitlements("org_1"))?.planId, SOLO_PRODUCT);
+
+    billingClient.setStatus("sub_1", "unpaid");
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.updated", "sub_1"));
+    assert.equal((await database.getOrganizationEntitlements("org_1"))?.planId, FREE_PRODUCT);
+  });
+
   it("converges a late duplicate onto current live state instead of reverting", async () => {
     const { database, billingClient, billing } = await setup();
     billingClient.setSubscription("sub_1", "org_1", SOLO_PRICE);
@@ -287,5 +323,56 @@ describe("subscription webhook reconciliation", () => {
     // reconciles without re-reporting — no ping-pong.
     await billing.handleWebhook(subscriptionWebhook("customer.subscription.updated", "sub_1"));
     assert.equal((await billingClient.getSubscription("sub_1"))?.quantity, 3);
+  });
+});
+
+/**
+ * What the billing page is handed after reconciliation. The free record is the enforcement floor,
+ * never an offer: an organization sitting on it has no plan to show, so the page reads as a
+ * paywall instead of advertising a tier that is not for sale.
+ */
+describe("customer-facing subscription view", () => {
+  it("names the plan an organization is trialing", async () => {
+    const { billingClient, billing } = await setup();
+    billingClient.setSubscription("sub_1", "org_1", SOLO_PRICE, "trialing");
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.created", "sub_1"));
+
+    const view = await billing.subscriptionSnapshot("org_1");
+
+    assert.equal(view.planSlug, "solo");
+    assert.equal(view.planName, "Solo");
+    assert.equal(view.status, "trialing");
+    assert.equal(view.manageable, true);
+    assert.equal(view.trialEligible, false);
+  });
+
+  it("reports no plan after cancellation instead of the free record it stamped", async () => {
+    const { database, billingClient, billing } = await setup();
+    billingClient.setSubscription("sub_1", "org_1", SOLO_PRICE);
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.created", "sub_1"));
+    billingClient.cancel("sub_1");
+    await billing.handleWebhook(subscriptionWebhook("customer.subscription.deleted", "sub_1"));
+    // The stamp really is Free — enforcement reverted — the customer view just does not show it.
+    assert.equal((await database.getOrganizationEntitlements("org_1"))?.planId, FREE_PRODUCT);
+
+    const view = await billing.subscriptionSnapshot("org_1");
+
+    assert.equal(view.planSlug, null);
+    assert.equal(view.planName, null);
+    assert.equal(view.status, null);
+    assert.equal(view.manageable, false);
+    // The cancelled subscription is still Stripe history, so no second free trial is offered.
+    assert.equal(view.trialEligible, false);
+  });
+
+  it("reports no plan for an organization that never subscribed, and offers it the trial", async () => {
+    const { billing } = await setup();
+
+    const view = await billing.subscriptionSnapshot("org_never");
+
+    assert.equal(view.planSlug, null);
+    assert.equal(view.planName, null);
+    assert.equal(view.trialEligible, true);
+    assert.equal(view.manageable, false);
   });
 });

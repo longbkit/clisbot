@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { AgentExecutionStatus, MachineStatus } from "./schema.js";
-import type { JsonValue } from "../config/compiler.js";
+import { parseCompiledHubConfig, type JsonValue } from "../config/compiler.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
+import { linearConnectionRequiresReauthorization } from "../providers/linear/client.js";
 import type {
   AgentExecutionRecord,
   AgentExecutionOutputAttempt,
@@ -25,7 +26,9 @@ import type {
   AdvanceGitHubConnectionAttemptInput,
   BindDiscordConnectionInput,
   BindGitHubConnectionInput,
+  BindLinearConnectionInput,
   BindSlackConnectionInput,
+  CompleteLinearProviderApplicationInput,
   CompleteSlackProviderApplicationInput,
   ConnectionStartAuthority,
   ConnectionProvider,
@@ -37,6 +40,7 @@ import type {
   ConfigurationSyncAttemptRecord,
   AcceptDiscordEventInput,
   AcceptGitHubEventInput,
+  AcceptLinearEventInput,
   AcceptSlackEventInput,
   DurableProviderEvent,
   GitHubLifecycleReceiptClaim,
@@ -56,9 +60,16 @@ import type {
   GitHubConfigurationTarget,
   DiscordConnectionRecord,
   SlackConnectionRecord,
+  LinearConnectionRecord,
   GitHubRepositoryRecord,
   OrganizationConnectionUsage,
   ProjectTriggerRoute,
+  MigrateProjectTriggersInput,
+  OrganizationTriggerRecord,
+  OrganizationTriggerRevisionRecord,
+  PendingProjectTriggerMigration,
+  SaveOrganizationTriggerInput,
+  OrganizationTriggerRoute,
   CreateAcceptedTriggerRunInput,
   CreateRejectedTriggerRunInput,
   AcceptedTriggerRunRecord,
@@ -81,8 +92,10 @@ import type {
   ConsumeOrganizationUsageInput,
   BillingPlanRecord,
   SyncBillingPlanInput,
-  OrganizationSubscriptionRecord,
-  ReconcileOrganizationSubscriptionInput,
+  OrganizationBillingCustomerRecord,
+  ReconcileOrganizationBillingInput,
+  UpdateLinearConnectionTokensInput,
+  LinearConnectionRefreshOperation,
 } from "./types.js";
 import {
   clearOverrideKey,
@@ -109,6 +122,7 @@ export interface MemoryDatabaseOptions {
     role: "owner" | "admin" | "member";
   }[];
   now?: () => Date;
+  slackConnections?: readonly SlackConnectionRecord[];
 }
 
 function usageKey(organizationId: string, meter: string, periodStart: Date): string {
@@ -160,7 +174,10 @@ class MemoryDatabase implements Database {
   private readonly entitlementChanges: EntitlementChangeRecord[] = [];
   private readonly organizationUsage = new Map<string, OrganizationUsageRecord>();
   private readonly billingPlans = new Map<string, BillingPlanRecord>();
-  private readonly organizationSubscriptions = new Map<string, OrganizationSubscriptionRecord>();
+  private readonly organizationBillingCustomers = new Map<
+    string,
+    OrganizationBillingCustomerRecord
+  >();
   private readonly advisoryLocks = new Map<string, Promise<void>>();
   private readonly projects = new Map<string, ProjectRecord>();
   private readonly configurationRevisions = new Map<string, ProjectConfigurationRevisionRecord>();
@@ -177,14 +194,25 @@ class MemoryDatabase implements Database {
   >();
   private readonly configurationSyncAttempts = new Map<string, ConfigurationSyncAttemptRecord[]>();
   private readonly projectTriggerRoutes = new Map<string, ProjectTriggerRoute[]>();
+  private readonly organizationTriggers = new Map<string, OrganizationTriggerRecord>();
+  private readonly organizationTriggerRevisions = new Map<
+    string,
+    OrganizationTriggerRevisionRecord
+  >();
+  private readonly migratedProjects = new Set<string>();
+  private readonly organizationTriggerRoutes = new Map<string, OrganizationTriggerRoute[]>();
   private readonly githubRepositories = new Map<string, GitHubRepositoryRecord>();
   private readonly githubConnections = new Map<number, GitHubConnectionRecord>();
   private readonly discordConnections = new Map<string, DiscordConnectionRecord>();
   private readonly slackConnections = new Map<string, SlackConnectionRecord>();
+  private readonly linearConnections = new Map<string, LinearConnectionRecord>();
   private readonly organizationIds: Set<string>;
 
   constructor(private readonly options: MemoryDatabaseOptions = {}) {
     this.organizationIds = new Set(options.organizationIds);
+    for (const connection of options.slackConnections ?? []) {
+      this.slackConnections.set(connection.teamId, connection);
+    }
   }
 
   private now(): Date {
@@ -1022,6 +1050,18 @@ class MemoryDatabase implements Database {
     );
   }
 
+  async acceptLinearEvent(input: AcceptLinearEventInput): Promise<ProviderEventAcceptance> {
+    const binding = await this.findLinearConnection(input.linearOrganizationId);
+    const reason = linearDropReason(input, binding);
+    return this.acceptMemoryEvent(
+      input,
+      binding?.organizationId,
+      binding?.id,
+      input.projectId ?? null,
+      reason,
+    );
+  }
+
   async persistManualEvent(input: PersistManualEventInput) {
     const existing = this.findReceiptId(
       input.organizationId,
@@ -1484,7 +1524,7 @@ class MemoryDatabase implements Database {
       serverId: input.serverId,
       daemonPublicKey: input.daemonPublicKey,
       credentialVerifier: input.credentialVerifier,
-      scopes: input.scopes,
+      permissions: input.permissions,
       registeredByApiKeyId: token.issuedByApiKeyId ?? null,
       registeredByCliCredentialId: token.issuedByCliCredentialId ?? null,
       status: "active",
@@ -1543,6 +1583,13 @@ class MemoryDatabase implements Database {
       connectedAt: presence === "connected" ? new Date() : value.connectedAt,
       disconnectedAt: presence === "offline" ? new Date() : value.disconnectedAt,
     });
+  }
+  async setDaemonPermissions(id: string, permissions: string[]) {
+    const value = this.daemons.get(id);
+    if (!value) return undefined;
+    const updated = { ...value, permissions: [...permissions] };
+    this.daemons.set(id, updated);
+    return updated;
   }
   async revokeDaemon(id: string) {
     const value = this.daemons.get(id);
@@ -1680,13 +1727,13 @@ class MemoryDatabase implements Database {
   async beginAgentExecutionOutput(
     executionId: string,
     outputType: string,
-    maxOutputs: number,
+    maxOutputs: number | undefined,
     startedAt: Date,
   ): Promise<AgentExecutionOutputAttempt | undefined> {
     const execution = this.agentExecutions.get(executionId);
     if (
       execution === undefined ||
-      maxOutputs < 1 ||
+      (maxOutputs !== undefined && maxOutputs < 1) ||
       (execution.status !== "spawning" && execution.status !== "running")
     ) {
       return undefined;
@@ -1697,7 +1744,10 @@ class MemoryDatabase implements Database {
         attempt.status === "pending" &&
         attempt.leaseExpiresAt > startedAt,
     ).length;
-    if ((execution.outputEmissions[outputType] ?? 0) + activeAttempts >= maxOutputs) {
+    if (
+      maxOutputs !== undefined &&
+      (execution.outputEmissions[outputType] ?? 0) + activeAttempts >= maxOutputs
+    ) {
       return undefined;
     }
     const attempt: AgentExecutionOutputAttempt = {
@@ -2141,20 +2191,15 @@ class MemoryDatabase implements Database {
     return Array.from(this.billingPlans.values());
   }
 
-  async reconcileOrganizationSubscription(
-    input: ReconcileOrganizationSubscriptionInput,
-  ): Promise<OrganizationSubscriptionRecord> {
-    const record: OrganizationSubscriptionRecord = {
+  async reconcileOrganizationBilling(
+    input: ReconcileOrganizationBillingInput,
+  ): Promise<OrganizationBillingCustomerRecord> {
+    const record: OrganizationBillingCustomerRecord = {
       organizationId: input.organizationId,
       stripeCustomerId: input.stripeCustomerId,
-      stripeSubscriptionId: input.stripeSubscriptionId,
-      planId: input.planId,
-      status: input.status,
-      currentPeriodEnd: input.currentPeriodEnd,
-      cancelAtPeriodEnd: input.cancelAtPeriodEnd,
       updatedAt: this.now(),
     };
-    this.organizationSubscriptions.set(input.organizationId, record);
+    this.organizationBillingCustomers.set(input.organizationId, record);
     // No await between the two writes, so on Node's single thread the mirror and the stamp land
     // together — the in-memory stand-in for the Postgres transaction that couples them.
     if (input.stamp !== undefined) {
@@ -2187,16 +2232,317 @@ class MemoryDatabase implements Database {
     }
   }
 
-  async getOrganizationSubscription(
+  async getOrganizationBillingCustomer(
     organizationId: string,
-  ): Promise<OrganizationSubscriptionRecord | undefined> {
-    return this.organizationSubscriptions.get(organizationId);
+  ): Promise<OrganizationBillingCustomerRecord | undefined> {
+    return this.organizationBillingCustomers.get(organizationId);
   }
 
   async listProjectsForOrganization(organizationId: string) {
-    return Array.from(this.projects.values()).filter(
-      (project) => project.organizationId === organizationId,
+    const runtimeProjects = new Set(
+      Array.from(this.organizationTriggers.values()).map(
+        ({ runtimeProjectId }) => runtimeProjectId,
+      ),
     );
+    return Array.from(this.projects.values()).filter(
+      (project) =>
+        project.organizationId === organizationId &&
+        project.status === "active" &&
+        !runtimeProjects.has(project.id),
+    );
+  }
+
+  async listPendingProjectTriggerMigrations(): Promise<PendingProjectTriggerMigration[]> {
+    const runtimeProjects = new Set(
+      Array.from(this.organizationTriggers.values()).map(
+        ({ runtimeProjectId }) => runtimeProjectId,
+      ),
+    );
+    return Array.from(this.projects.values()).flatMap((project) => {
+      if (
+        project.status !== "active" ||
+        project.activeConfigurationRevisionId === null ||
+        this.migratedProjects.has(project.id) ||
+        runtimeProjects.has(project.id)
+      ) {
+        return [];
+      }
+      const revision = this.configurationRevisions.get(project.activeConfigurationRevisionId);
+      return revision === undefined ? [] : [{ project, revision }];
+    });
+  }
+
+  async migrateProjectTriggers(
+    input: MigrateProjectTriggersInput,
+  ): Promise<OrganizationTriggerRecord[]> {
+    if (this.migratedProjects.has(input.projectId)) return [];
+    const project = this.projects.get(input.projectId);
+    if (
+      project === undefined ||
+      project.organizationId !== input.organizationId ||
+      project.activeConfigurationRevisionId !== input.configurationRevisionId
+    ) {
+      throw new Error("project configuration changed during trigger migration");
+    }
+    const compiledCandidates = input.triggers.map((candidate) => {
+      if (candidate.format !== "single_run" && candidate.format !== "legacy_multistep") {
+        throw new Error("invalid organization trigger format");
+      }
+      return parseCompiledHubConfig(candidate.normalizedConfiguration);
+    });
+    const legacyRoutes = this.projectTriggerRoutes.get(input.projectId) ?? [];
+    const candidateRoutes = input.triggers.map((candidate, index) => {
+      const configuredEventName = compiledCandidates[index]!.triggers[0]?.on;
+      if (configuredEventName === undefined) {
+        throw new Error(`migrated trigger ${candidate.name} has no configured event`);
+      }
+      return legacyRoutes
+        .filter((route) => route.triggerName === candidate.name)
+        .map(
+          (route): OrganizationTriggerRoute => ({
+            provider: route.provider,
+            connectionId: route.connectionId,
+            resourceId: route.resourceId,
+            configuredEventName,
+          }),
+        );
+    });
+    if (
+      candidateRoutes.reduce((total, routes) => total + routes.length, 0) !== legacyRoutes.length
+    ) {
+      throw new Error("project trigger routes do not match migrated triggers");
+    }
+    const created: OrganizationTriggerRecord[] = [];
+    for (const [index, candidate] of input.triggers.entries()) {
+      const name = this.availableMigratedTriggerName(
+        input.organizationId,
+        input.projectSlug,
+        candidate.name,
+      );
+      const now = this.now();
+      const triggerId = randomUUID();
+      const revisionId = randomUUID();
+      const runtimeProjectId = this.createTriggerRuntimeProject({
+        organizationId: input.organizationId,
+        name: candidate.name,
+        createdByUserId: null,
+      });
+      const trigger: OrganizationTriggerRecord = {
+        id: triggerId,
+        organizationId: input.organizationId,
+        name,
+        enabled: candidate.enabled,
+        format: candidate.format,
+        runtimeProjectId,
+        activeRevisionId: revisionId,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const revision: OrganizationTriggerRevisionRecord = {
+        id: revisionId,
+        triggerId,
+        organizationId: input.organizationId,
+        version: 1,
+        yaml: candidate.yaml,
+        normalizedConfiguration: candidate.normalizedConfiguration,
+        contentHash: candidate.contentHash,
+        sourceKind: "project_migration",
+        sourceEvidence: candidate.sourceEvidence,
+        createdByUserId: null,
+        createdAt: now,
+      };
+      this.organizationTriggers.set(trigger.id, trigger);
+      this.organizationTriggerRevisions.set(revision.id, revision);
+      const routes = candidateRoutes[index]!;
+      this.organizationTriggerRoutes.set(trigger.id, routes);
+      const runtimeRevision = await this.insertProjectConfigurationRevision({
+        projectId: runtimeProjectId,
+        sourceKind: "manual",
+        sourceEvidence: { kind: "organization_trigger_adapter", triggerId },
+        rawYaml: candidate.yaml,
+        normalizedConfiguration: candidate.normalizedConfiguration,
+        contentHash: candidate.contentHash,
+      });
+      const configuration = compiledCandidates[index]!;
+      await this.activateProjectConfigurationRevision(
+        runtimeProjectId,
+        runtimeRevision.id,
+        routes.map((route) => ({
+          provider: route.provider,
+          connectionId: route.connectionId,
+          resourceId: route.resourceId,
+          triggerName:
+            configuration.triggers.find(({ on }) => on === route.configuredEventName)?.name ??
+            configuration.triggers[0]?.name ??
+            candidate.name,
+        })),
+      );
+      created.push(trigger);
+    }
+    this.projectTriggerRoutes.delete(input.projectId);
+    this.projects.set(input.projectId, {
+      ...project,
+      status: "archived",
+      activeConfigurationRevisionId: null,
+      archivedAt: this.now(),
+      updatedAt: this.now(),
+    });
+    this.migratedProjects.add(input.projectId);
+    return created;
+  }
+
+  async listOrganizationTriggers(organizationId: string): Promise<OrganizationTriggerRecord[]> {
+    return Array.from(this.organizationTriggers.values()).filter(
+      (trigger) => trigger.organizationId === organizationId,
+    );
+  }
+
+  async findOrganizationTriggerRevision(
+    triggerId: string,
+    revisionId: string,
+  ): Promise<OrganizationTriggerRevisionRecord | undefined> {
+    const revision = this.organizationTriggerRevisions.get(revisionId);
+    return revision?.triggerId === triggerId ? revision : undefined;
+  }
+
+  async findOrganizationTriggerMigrationRevision(
+    triggerId: string,
+  ): Promise<OrganizationTriggerRevisionRecord | undefined> {
+    return Array.from(this.organizationTriggerRevisions.values())
+      .filter(
+        (revision) =>
+          revision.triggerId === triggerId && revision.sourceKind === "project_migration",
+      )
+      .sort((left, right) => left.version - right.version)[0];
+  }
+
+  async saveOrganizationTrigger(
+    input: SaveOrganizationTriggerInput,
+  ): Promise<OrganizationTriggerRecord> {
+    const existing =
+      input.triggerId === undefined ? undefined : this.organizationTriggers.get(input.triggerId);
+    if (existing !== undefined && existing.organizationId !== input.organizationId) {
+      throw new Error("organization trigger not found");
+    }
+    if (
+      Array.from(this.organizationTriggers.values()).some(
+        (trigger) =>
+          trigger.organizationId === input.organizationId &&
+          trigger.name === input.name &&
+          trigger.id !== input.triggerId,
+      )
+    ) {
+      throw new Error("trigger name already exists");
+    }
+    const now = this.now();
+    const triggerId = existing?.id ?? randomUUID();
+    const runtimeProjectId =
+      existing?.runtimeProjectId ??
+      this.createTriggerRuntimeProject({
+        organizationId: input.organizationId,
+        name: input.name,
+        createdByUserId: input.createdByUserId,
+      });
+    const revisionId = randomUUID();
+    const version =
+      Math.max(
+        0,
+        ...Array.from(this.organizationTriggerRevisions.values())
+          .filter((revision) => revision.triggerId === triggerId)
+          .map((revision) => revision.version),
+      ) + 1;
+    const revision: OrganizationTriggerRevisionRecord = {
+      id: revisionId,
+      triggerId,
+      organizationId: input.organizationId,
+      version,
+      yaml: input.yaml,
+      normalizedConfiguration: input.normalizedConfiguration,
+      contentHash: input.contentHash,
+      sourceKind: input.sourceKind,
+      sourceEvidence: input.sourceEvidence,
+      createdByUserId: input.createdByUserId,
+      createdAt: now,
+    };
+    const trigger: OrganizationTriggerRecord = {
+      id: triggerId,
+      organizationId: input.organizationId,
+      name: input.name,
+      enabled: input.enabled,
+      format: input.format,
+      runtimeProjectId,
+      activeRevisionId: revisionId,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    this.organizationTriggerRevisions.set(revision.id, revision);
+    this.organizationTriggers.set(trigger.id, trigger);
+    this.organizationTriggerRoutes.set(trigger.id, [...input.routes]);
+    const runtimeRevision = await this.insertProjectConfigurationRevision({
+      projectId: runtimeProjectId,
+      sourceKind: input.sourceKind,
+      sourceEvidence: { kind: "organization_trigger_adapter", triggerId },
+      rawYaml: input.yaml,
+      normalizedConfiguration: input.normalizedConfiguration,
+      contentHash: input.contentHash,
+      createdByUserId: input.createdByUserId,
+    });
+    const configuration = parseCompiledHubConfig(input.normalizedConfiguration);
+    await this.activateProjectConfigurationRevision(
+      runtimeProjectId,
+      runtimeRevision.id,
+      input.routes.map((route) => ({
+        provider: route.provider,
+        connectionId: route.connectionId,
+        resourceId: route.resourceId,
+        triggerName:
+          configuration.triggers.find(({ on }) => on === route.configuredEventName)?.name ??
+          configuration.triggers[0]?.name ??
+          input.name,
+      })),
+    );
+    return trigger;
+  }
+
+  private createTriggerRuntimeProject(input: {
+    organizationId: string;
+    name: string;
+    createdByUserId: string | null;
+  }): string {
+    const id = randomUUID();
+    const now = this.now();
+    this.projects.set(id, {
+      id,
+      organizationId: input.organizationId,
+      name: `Trigger runtime: ${input.name}`,
+      slug: `trigger-${id.slice(0, 8)}`,
+      status: "active",
+      createdByUserId: input.createdByUserId,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+      activeConfigurationRevisionId: null,
+    });
+    this.configurationAuthorities.set(id, "manual");
+    return id;
+  }
+
+  private availableMigratedTriggerName(
+    organizationId: string,
+    projectSlug: string,
+    requestedName: string,
+  ): string {
+    const occupied = new Set(
+      Array.from(this.organizationTriggers.values())
+        .filter((trigger) => trigger.organizationId === organizationId)
+        .map((trigger) => trigger.name),
+    );
+    if (!occupied.has(requestedName)) return requestedName;
+    const base = `${projectSlug}-${requestedName}`;
+    if (!occupied.has(base)) return base;
+    let suffix = 2;
+    while (occupied.has(`${base}-${String(suffix)}`)) suffix += 1;
+    return `${base}-${String(suffix)}`;
   }
 
   async findProjectForOrganization(organizationId: string, projectId: string) {
@@ -2475,6 +2821,9 @@ class MemoryDatabase implements Database {
       slack: Array.from(this.slackConnections.values()).filter(
         (connection) => connection.organizationId === organizationId,
       ),
+      linear: Array.from(this.linearConnections.values()).filter(
+        (connection) => connection.organizationId === organizationId,
+      ),
     };
   }
 
@@ -2638,6 +2987,35 @@ class MemoryDatabase implements Database {
     return connectionPersistenceUnavailable();
   }
 
+  bindLinearConnection(_input: BindLinearConnectionInput): Promise<void> {
+    return connectionPersistenceUnavailable();
+  }
+
+  completeLinearProviderApplication(_input: CompleteLinearProviderApplicationInput): Promise<void> {
+    return connectionPersistenceUnavailable();
+  }
+
+  updateLinearConnectionTokens(_input: UpdateLinearConnectionTokensInput): Promise<void> {
+    return connectionPersistenceUnavailable();
+  }
+
+  withLinearConnectionRefresh<T>(
+    linearOrganizationId: string,
+    operation: LinearConnectionRefreshOperation<T>,
+  ): Promise<T> {
+    return this.withAdvisoryLock(
+      JSON.stringify(["paseo-connection", "linear", "external", linearOrganizationId]),
+      async () => {
+        const connection = this.linearConnections.get(linearOrganizationId);
+        return operation(connection, async (input) => {
+          const current = this.linearConnections.get(linearOrganizationId);
+          if (current === undefined) throw new Error("Linear connection unavailable");
+          this.linearConnections.set(linearOrganizationId, { ...current, ...input });
+        });
+      },
+    );
+  }
+
   disconnectConnection(
     _provider: ConnectionProvider,
     _connectionId: string,
@@ -2658,11 +3036,23 @@ class MemoryDatabase implements Database {
     return Promise.resolve(this.slackConnections.get(_teamId));
   }
 
+  findLinearConnection(_linearOrganizationId: string): Promise<LinearConnectionRecord | undefined> {
+    return Promise.resolve(this.linearConnections.get(_linearOrganizationId));
+  }
+
   findSlackConnectionForOrganization(
     organizationId: string,
     teamId: string,
   ): Promise<SlackConnectionRecord | undefined> {
     const connection = this.slackConnections.get(teamId);
+    return Promise.resolve(connection?.organizationId === organizationId ? connection : undefined);
+  }
+
+  findLinearConnectionForOrganization(
+    organizationId: string,
+    linearOrganizationId: string,
+  ): Promise<LinearConnectionRecord | undefined> {
+    const connection = this.linearConnections.get(linearOrganizationId);
     return Promise.resolve(connection?.organizationId === organizationId ? connection : undefined);
   }
 
@@ -2687,7 +3077,11 @@ class MemoryDatabase implements Database {
   }
 
   private async acceptMemoryEvent(
-    input: AcceptGitHubEventInput | AcceptDiscordEventInput | AcceptSlackEventInput,
+    input:
+      | AcceptGitHubEventInput
+      | AcceptDiscordEventInput
+      | AcceptSlackEventInput
+      | AcceptLinearEventInput,
     organizationId: string | undefined,
     connectionId: string | undefined,
     resourceId: string | null,
@@ -2879,11 +3273,15 @@ function connectionPersistenceUnavailable(): never {
 }
 
 function providerForInput(
-  input: AcceptGitHubEventInput | AcceptDiscordEventInput | AcceptSlackEventInput,
-): "github" | "discord" | "slack" {
+  input:
+    | AcceptGitHubEventInput
+    | AcceptDiscordEventInput
+    | AcceptSlackEventInput
+    | AcceptLinearEventInput,
+): "github" | "discord" | "slack" | "linear" {
   if ("installationId" in input) return "github";
   if ("guildId" in input) return "discord";
-  return "slack";
+  return "teamId" in input ? "slack" : "linear";
 }
 
 function githubDropReason(
@@ -2911,6 +3309,18 @@ function slackDropReason(
 ): string | undefined {
   if (input.dropReason !== undefined) return input.dropReason;
   if (binding === undefined) return "slack_unbound";
+  return undefined;
+}
+
+function linearDropReason(
+  input: AcceptLinearEventInput,
+  binding: LinearConnectionRecord | undefined,
+): string | undefined {
+  if (input.dropReason !== undefined) return input.dropReason;
+  if (binding === undefined) return "linear_unbound";
+  if (linearConnectionRequiresReauthorization(binding, input.receivedAt)) {
+    return "configuration_unavailable";
+  }
   return undefined;
 }
 

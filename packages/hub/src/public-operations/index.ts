@@ -15,6 +15,7 @@ import type {
   PublicOperationRepository,
   PublicOperations,
 } from "./types.js";
+import { TriggerDocumentError } from "../triggers/configuration/index.js";
 
 export type * from "./types.js";
 
@@ -24,6 +25,48 @@ export function createPublicOperations(
   clock: DaemonClock = { nowDate: () => new Date() },
 ): PublicOperations {
   return {
+    async listTriggers(authorization) {
+      try {
+        return {
+          status: "listed",
+          triggers: await triggerCapability(capabilities, authorization.organizationId).list(),
+        };
+      } catch (error) {
+        return storageUnavailableOrThrow(error);
+      }
+    },
+    async validateTrigger(authorization, input) {
+      try {
+        const trigger = await triggerCapability(
+          capabilities,
+          authorization.organizationId,
+        ).validate(input.yaml);
+        return { status: "valid", name: trigger.name, valid: true };
+      } catch (error) {
+        if (error instanceof TriggerDocumentError) {
+          return { status: "invalid_trigger", issues: error.issues };
+        }
+        return storageUnavailableOrThrow(error);
+      }
+    },
+    async installTrigger(authorization, input) {
+      try {
+        const installed = await triggerCapability(
+          capabilities,
+          authorization.organizationId,
+        ).install({
+          yaml: input.yaml,
+          credentialId: authorization.credentialId,
+          credentialKind: authorization.kind,
+        });
+        return { status: "installed", ...installed, active: true };
+      } catch (error) {
+        if (error instanceof TriggerDocumentError) {
+          return { status: "invalid_trigger", issues: error.issues };
+        }
+        return storageUnavailableOrThrow(error);
+      }
+    },
     async listProjects(authorization) {
       try {
         return {
@@ -142,11 +185,13 @@ export function createPublicOperations(
     },
     async dispatchManualRun(authorization, input) {
       try {
-        const project = await repository.findActiveProject(
+        const project = await repository.resolveManualRunProject(
           authorization.organizationId,
+          input.trigger,
           input.projectSlug,
         );
         if (project === undefined) return { status: "project_not_found" };
+        if (project.status === "disabled") return { status: "trigger_not_found" };
         let result: DispatchManualRunResult;
         try {
           result = await dispatchManualRun(
@@ -182,6 +227,13 @@ export function createPublicOperations(
       }
     },
   };
+}
+
+function triggerCapability(capabilities: PublicOperationCapabilities, organizationId: string) {
+  if (capabilities.triggerForOrganization === undefined) {
+    throw new Error("organization triggers are unavailable");
+  }
+  return capabilities.triggerForOrganization(organizationId);
 }
 
 async function dispatchManualRun(

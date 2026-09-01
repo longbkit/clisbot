@@ -5,7 +5,7 @@ import { compiledConfigurationHash, parseCompiledHubConfig } from "../config/com
 import { ProjectConfigurationStore, revisionBundleFiles } from "./store.js";
 import { createMemoryDatabase } from "../db/memory.js";
 import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../test-utils/project-configuration.js";
-import type { DiscordConnectionRecord } from "../db/types.js";
+import type { DiscordConnectionRecord, LinearConnectionRecord } from "../db/types.js";
 import { configurationBundleFixture } from "../test-utils/configuration-bundle.js";
 
 const primary: DiscordConnectionRecord = {
@@ -23,6 +23,20 @@ const secondary: DiscordConnectionRecord = {
   guildId: "200",
   slug: "discord-secondary",
   guildName: "Secondary guild",
+};
+
+const linear: LinearConnectionRecord = {
+  id: "00000000-0000-4000-8000-000000000003",
+  organizationId: "org_1",
+  slug: "acme-linear",
+  providerApplicationId: "linear-app",
+  linearOrganizationId: "linear-org-1",
+  linearOrganizationName: "Acme",
+  appUserId: "app-user-1",
+  accessToken: "token",
+  refreshToken: "refresh-token",
+  accessTokenExpiresAt: null,
+  scopes: ["read", "comments:create"],
 };
 
 describe("ProjectConfigurationStore resource compilation", () => {
@@ -92,7 +106,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     await enrollTestDaemon(database);
     const connections = [primary, secondary];
     database.organizationConnectionUsage = () =>
-      Promise.resolve({ github: [], slack: [], discord: connections });
+      Promise.resolve({ github: [], slack: [], discord: connections, linear: [] });
     const project = await database.createProject({
       organizationId: "org_1",
       name: "Guild project",
@@ -129,6 +143,107 @@ describe("ProjectConfigurationStore resource compilation", () => {
       switched.revision.contentHash,
       compiledConfigurationHash(parseCompiledHubConfig(switched.revision.normalizedConfiguration)),
     );
+  });
+
+  it("routes a project-scoped autonomous Linear scout through one Linear connection", async () => {
+    const database = createMemoryDatabase();
+    await enrollTestDaemon(database);
+    database.organizationConnectionUsage = () =>
+      Promise.resolve({ github: [], slack: [], discord: [], linear: [linear] });
+    database.findLinearConnection = async (linearOrganizationId) =>
+      linearOrganizationId === linear.linearOrganizationId ? linear : undefined;
+    const project = await database.createProject({
+      organizationId: "org_1",
+      name: "Linear scout project",
+      slug: "linear-scout-project",
+      createdByUserId: "user-1",
+    });
+    const store = new ProjectConfigurationStore(database, project.id);
+    const revision = await store.insertManualBundleRevision({
+      files: configurationBundleFixture(
+        dump({
+          environments: [
+            { name: "runner", kind: "daemon", daemon: TEST_DAEMON_SLUG, cwd: "/repo" },
+          ],
+          triggers: [
+            {
+              name: "scout",
+              on: "linear.issue_entered_scope",
+              max_runtime: "1h",
+              filters: {
+                connection: "acme-linear",
+                project: "linear-project-1",
+                states: ["ready"],
+              },
+              steps: [
+                {
+                  id: "assess",
+                  environment: "runner",
+                  max_runtime: "30m",
+                  idle_timeout: "5m",
+                  agent: { provider: "codex" },
+                  prompt: [{ text: "Assess the issue" }],
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+      userId: "user-1",
+    });
+    const active = await store.activate(revision.id);
+    assert.equal(active.configuration.triggers[0]?.filters?.connectionId, linear.id);
+    assert.equal(active.configuration.triggers[0]?.filters?.resourceId, "linear-project-1");
+
+    const accepted = await database.acceptLinearEvent({
+      linearOrganizationId: linear.linearOrganizationId,
+      projectId: "linear-project-1",
+      deliveryId: "linear-scout-entry",
+      source: "linear.issue",
+      payload: {},
+      receivedAt: new Date(0),
+    });
+    assert.equal(accepted.status, "accepted");
+    if (accepted.status === "accepted") assert.equal(accepted.events[0]?.projectId, project.id);
+
+    database.findLinearConnection = async (linearOrganizationId) =>
+      linearOrganizationId === linear.linearOrganizationId
+        ? { ...linear, scopes: ["read"] }
+        : undefined;
+    const underScoped = await database.acceptLinearEvent({
+      linearOrganizationId: linear.linearOrganizationId,
+      projectId: "linear-project-1",
+      deliveryId: "linear-scout-under-scoped",
+      source: "linear.issue",
+      payload: {},
+      receivedAt: new Date(1),
+    });
+    assert.equal(underScoped.status, "dropped");
+    if (underScoped.status === "dropped") {
+      assert.equal(underScoped.reason, "configuration_unavailable");
+    }
+
+    database.findLinearConnection = async (linearOrganizationId) =>
+      linearOrganizationId === linear.linearOrganizationId
+        ? {
+            ...linear,
+            scopes: ["read", "comments:create"],
+            refreshToken: null,
+            accessTokenExpiresAt: new Date(0),
+          }
+        : undefined;
+    const expired = await database.acceptLinearEvent({
+      linearOrganizationId: linear.linearOrganizationId,
+      projectId: "linear-project-1",
+      deliveryId: "linear-scout-expired",
+      source: "linear.issue",
+      payload: {},
+      receivedAt: new Date(120_000),
+    });
+    assert.equal(expired.status, "dropped");
+    if (expired.status === "dropped") {
+      assert.equal(expired.reason, "configuration_unavailable");
+    }
   });
 
   it("keeps authored prompt partials when switching a GitHub-managed configuration to manual", async () => {
@@ -169,7 +284,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     const database = createMemoryDatabase();
     await enrollTestDaemon(database);
     database.organizationConnectionUsage = () =>
-      Promise.resolve({ github: [], slack: [], discord: [primary, secondary] });
+      Promise.resolve({ github: [], slack: [], discord: [primary, secondary], linear: [] });
     const project = await database.createProject({
       organizationId: "org_1",
       name: "Unique guild project",
@@ -191,7 +306,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     const database = createMemoryDatabase();
     await enrollTestDaemon(database);
     database.organizationConnectionUsage = () =>
-      Promise.resolve({ github: [], slack: [], discord: [primary] });
+      Promise.resolve({ github: [], slack: [], discord: [primary], linear: [] });
     const project = await database.createProject({
       organizationId: "org_1",
       name: "Unknown connection project",
@@ -222,7 +337,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     const database = createMemoryDatabase();
     await enrollTestDaemon(database);
     database.organizationConnectionUsage = () =>
-      Promise.resolve({ github: [], slack: [], discord: [primary] });
+      Promise.resolve({ github: [], slack: [], discord: [primary], linear: [] });
     const project = await database.createProject({
       organizationId: "org_1",
       name: "Unknown guild project",
@@ -302,7 +417,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     const database = createMemoryDatabase();
     await enrollTestDaemon(database);
     database.organizationConnectionUsage = () =>
-      Promise.resolve({ github: [], slack: [], discord: [primary] });
+      Promise.resolve({ github: [], slack: [], discord: [primary], linear: [] });
     database.findDiscordConnection = () => Promise.resolve(primary);
     database.findDiscordConnectionForOrganization = async (_organizationId, guildId) =>
       guildId === primary.guildId ? primary : undefined;
@@ -341,7 +456,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
     const database = createMemoryDatabase();
     await enrollTestDaemon(database);
     database.organizationConnectionUsage = () =>
-      Promise.resolve({ github: [], slack: [], discord: [primary] });
+      Promise.resolve({ github: [], slack: [], discord: [primary], linear: [] });
     database.findDiscordConnection = () => Promise.resolve(primary);
     database.findDiscordConnectionForOrganization = async (_organizationId, guildId) =>
       guildId === primary.guildId ? primary : undefined;

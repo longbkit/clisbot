@@ -39,6 +39,16 @@ describe("parsePlanMetadata", () => {
     );
   });
 
+  it("accepts zero for the Free plan's execution meter", () => {
+    const result = parsePlanMetadata({ ...VALID_METADATA, ent_executions_monthly_limit: "0" });
+
+    assert.equal(result.success, true);
+    assert.equal(
+      result.success ? result.data.template.meters["executions.monthly"].limit : undefined,
+      0,
+    );
+  });
+
   it("rejects a non-numeric, non-unlimited limit instead of storing a garbage template", () => {
     const result = parsePlanMetadata({ ...VALID_METADATA, ent_seats_max: "lots" });
     assert.equal(result.success, false);

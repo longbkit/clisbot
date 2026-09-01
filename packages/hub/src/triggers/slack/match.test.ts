@@ -13,6 +13,12 @@ describe("Slack trigger matching", () => {
     assert.equal(matchSlackTriggers(config, mention({ authorId: "U2" }), "UBOT").length, 1);
   });
 
+  it("allows every human author only when the wildcard is explicit", () => {
+    const config = configForUsers(["*"]);
+
+    assert.equal(matchSlackTriggers(config, mention({ authorId: "stranger" }), "UBOT").length, 1);
+  });
+
   it("requires the compiled trigger filters and bot mention", () => {
     const config = compileHubConfig({
       environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],

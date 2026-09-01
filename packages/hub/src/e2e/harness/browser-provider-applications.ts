@@ -2,10 +2,12 @@ import type { AuthServer } from "../../auth/server.js";
 import type { Database } from "../../db/types.js";
 import { createDiscordRegistration } from "../../providers/discord/index.js";
 import { createGitHubRegistration } from "../../providers/github/index.js";
+import { createLinearRegistration } from "../../providers/linear/index.js";
 import { createSlackRegistration } from "../../providers/slack/index.js";
 import { createSlackSocketInstallationVerifier } from "../../providers/slack/installation.js";
 import { startSlackSocketFixture } from "../../test-utils/slack-socket-fixture.js";
 import type { SlackConnectionClient, SlackInstallation } from "../../providers/slack/client.js";
+import type { LinearConnectionClient, LinearInstallation } from "../../providers/linear/client.js";
 import type { ProviderRegistration } from "../../providers/registration.js";
 import {
   ProviderVerificationError,
@@ -47,6 +49,11 @@ export const FIXTURE_APP_CREDENTIALS = {
     appId: "browser-slack-app",
     clientId: "browser-slack-client",
     clientSecret: "browser-slack-client-secret",
+  },
+  linear: {
+    clientId: "browser-linear-client",
+    clientSecret: "browser-linear-client-secret",
+    webhookSecret: "browser-linear-webhook-secret",
   },
 } as const;
 
@@ -126,6 +133,7 @@ export const FIXTURE_APP_IDENTITIES: Readonly<Record<Provider, ProviderApplicati
   github: { provider: "github", id: "42", name: "Paseo Hub", ownerLogin: "acme-inc" },
   discord: { provider: "discord", id: "900", name: "Paseo" },
   slack: { provider: "slack", id: "browser-slack-app", name: "Paseo" },
+  linear: { provider: "linear", id: "browser-linear-client", name: "Paseo" },
 };
 
 /** The identity an environment-configured provider activates with at boot. */
@@ -246,6 +254,9 @@ export function browserRegistrationFactory(fixtures: BrowserProviderApplicationF
     onVerifiedSlackInstallation: NonNullable<
       Parameters<typeof createSlackRegistration>[0]["onVerifiedInstallation"]
     >;
+    onVerifiedLinearInstallation: NonNullable<
+      Parameters<typeof createLinearRegistration>[0]["onVerifiedInstallation"]
+    >;
   }): ProviderRegistration => {
     const shared = {
       database: fixtures.database,
@@ -277,6 +288,18 @@ export function browserRegistrationFactory(fixtures: BrowserProviderApplicationF
         connectionClient: discordConnections,
       });
     }
+    if (configuration.provider === "linear") {
+      return createLinearRegistration({
+        ...shared,
+        configuration,
+        connectionClient: new BrowserLinearConnections(input.callbackOrigin),
+        ...(input.expectedConfigurationVersion === undefined
+          ? {}
+          : { expectedConfigurationVersion: input.expectedConfigurationVersion }),
+        activateConfiguration: input.activateConfiguration,
+        onVerifiedInstallation: input.onVerifiedLinearInstallation,
+      });
+    }
     return createSlackRegistration({
       ...shared,
       configuration,
@@ -290,6 +313,37 @@ export function browserRegistrationFactory(fixtures: BrowserProviderApplicationF
       socket: { apiUrl: `${fixtures.slackSocket.apiBaseUrl}/apps.connections.open` },
     });
   };
+}
+
+class BrowserLinearConnections implements LinearConnectionClient {
+  constructor(private readonly publicBaseUrl: string) {}
+
+  authorizationUrl(state: string): string {
+    const url = new URL("/e2e/providers/linear/authorize", this.publicBaseUrl);
+    url.searchParams.set("state", state);
+    return url.toString();
+  }
+
+  exchangeCode(code: string): Promise<LinearInstallation> {
+    if (code !== "accepted") return Promise.reject(new Error("installation rejected"));
+    return Promise.resolve({
+      linearOrganizationId: "linear-acme",
+      linearOrganizationName: "Acme",
+      appUserId: "linear-app-user",
+      accessToken: "linear-token",
+      refreshToken: "linear-refresh-token",
+      accessTokenExpiresAt: null,
+      scopes: ["read", "comments:create"],
+    });
+  }
+
+  refresh(): Promise<never> {
+    return Promise.reject(new Error("unused"));
+  }
+
+  revoke(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 
 class BrowserSlackConnections implements SlackConnectionClient {

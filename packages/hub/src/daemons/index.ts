@@ -26,7 +26,7 @@ export type {
 export { DaemonDispatchFailure, DaemonSpawnAckTimeoutError };
 export { AgentExecutionCompletionFailure };
 export { ActiveDaemonRegistry, createDaemonUpgradeHandler, type DaemonClock } from "./registry.js";
-export { enrollDaemon, revokeDaemon } from "./registration.js";
+export { enrollDaemon, revokeDaemon, updateDaemonPermissions } from "./registration.js";
 
 interface DaemonModuleTestOptions {
   logger?: Logger;

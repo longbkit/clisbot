@@ -4,7 +4,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testconta
 import { createPostgresQueryRuntime } from "./test-utils/runtime.js";
 import { createDatabase } from "./test-utils/runtime.js";
 
-describe("manual trigger tenant idempotency", () => {
+describe("trigger acceptance persistence", () => {
   let postgres: StartedPostgreSqlContainer;
   let databaseUrl: string;
 
@@ -111,6 +111,95 @@ describe("manual trigger tenant idempotency", () => {
     const [unrouted] = await database.listUnroutedProviderEventsForOrganization("drop-reason-org");
     assert.equal(unrouted?.droppedReason, "trigger_filters_rejected");
     assert.equal("payload" in (unrouted ?? {}), false);
+    await database.close();
+  }, 120_000);
+
+  it("durably drops Linear events until the connection has the required scopes", async () => {
+    const database = await createDatabase(databaseUrl);
+    const client = await createPostgresQueryRuntime(databaseUrl);
+    const organizationId = "linear-scope-org";
+    const projectId = "40000000-0000-4000-8000-000000000001";
+    const connectionId = "40000000-0000-4000-8000-000000000002";
+
+    await client.query(`
+      insert into organization (id, name, slug)
+      values ('${organizationId}', 'Linear Scope', 'linear-scope');
+      insert into projects (id, organization_id, name, slug)
+      values ('${projectId}', '${organizationId}', 'Default', 'default');
+      insert into linear_connections
+        (id, organization_id, linear_organization_id, provider_application_id, slug,
+         linear_organization_name, app_user_id, access_token, refresh_token, scopes)
+      values
+        ('${connectionId}', '${organizationId}', 'linear-scope-workspace', 'linear-app',
+         'linear-scope', 'Linear Scope', 'linear-app-user', 'linear-access-token',
+         'linear-refresh-token', '["read"]'::jsonb);
+    `);
+    const revision = await database.insertProjectConfigurationRevision({
+      projectId,
+      sourceKind: "manual",
+      sourceEvidence: { kind: "test" },
+      normalizedConfiguration: { environments: [], triggers: [] },
+      contentHash: "linear-scope-config",
+    });
+    await database.activateProjectConfigurationRevision(projectId, revision.id, [
+      {
+        provider: "linear",
+        connectionId,
+        resourceId: "linear-project",
+        triggerName: "linear-issue",
+      },
+    ]);
+
+    const dropped = await database.acceptLinearEvent({
+      linearOrganizationId: "linear-scope-workspace",
+      projectId: "linear-project",
+      deliveryId: "linear-under-scoped",
+      source: "linear.issue",
+      payload: {},
+      receivedAt: new Date(0),
+    });
+    assert.equal(dropped.status, "dropped");
+    if (dropped.status !== "dropped") throw new Error("expected an under-scoped drop");
+    assert.equal(dropped.reason, "configuration_unavailable");
+    assert.equal(
+      (await database.findProviderEventReceiptByDeliveryId("linear-under-scoped", organizationId))
+        ?.droppedReason,
+      "configuration_unavailable",
+    );
+
+    await client.query(
+      `update linear_connections set scopes = '["read", "comments:create"]'::jsonb
+       where id = '${connectionId}'`,
+    );
+    const accepted = await database.acceptLinearEvent({
+      linearOrganizationId: "linear-scope-workspace",
+      projectId: "linear-project",
+      deliveryId: "linear-reauthorized",
+      source: "linear.issue",
+      payload: {},
+      receivedAt: new Date(1),
+    });
+    assert.equal(accepted.status, "accepted");
+    if (accepted.status === "accepted") assert.equal(accepted.events[0]?.projectId, projectId);
+
+    await client.query(
+      `update linear_connections
+       set refresh_token = null, access_token_expires_at = '1970-01-01T00:00:00.000Z'
+       where id = '${connectionId}'`,
+    );
+    const expired = await database.acceptLinearEvent({
+      linearOrganizationId: "linear-scope-workspace",
+      projectId: "linear-project",
+      deliveryId: "linear-expired-without-refresh",
+      source: "linear.issue",
+      payload: {},
+      receivedAt: new Date(120_000),
+    });
+    assert.equal(expired.status, "dropped");
+    if (expired.status !== "dropped") throw new Error("expected an expired-token drop");
+    assert.equal(expired.reason, "configuration_unavailable");
+
+    await client.close();
     await database.close();
   }, 120_000);
 });

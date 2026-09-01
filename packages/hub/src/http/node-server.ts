@@ -22,6 +22,8 @@ interface StreamingRequestInit extends RequestInit {
 
 interface FetchServerOptions {
   trustedClientIpHeader?: string;
+  /** Explicit public URL whose origin is authoritative over proxy request metadata. */
+  canonicalRequestOrigin?: string;
   /** Test and embedded adapters may terminate TLS directly; production normally uses its proxy. */
   tls?: { key: string; cert: string };
   logger?: Pick<Logger, "warn" | "error">;
@@ -31,12 +33,18 @@ export function createFetchServer(
   fetchHandler: FetchHandler,
   options: FetchServerOptions = {},
 ): Server {
-  const handler = (request: IncomingMessage, response: ServerResponse) => {
-    void forwardRequest(fetchHandler, request, response, options);
+  const resolvedOptions = {
+    ...options,
+    ...(options.canonicalRequestOrigin === undefined
+      ? {}
+      : { canonicalRequestOrigin: parseHttpOrigin(options.canonicalRequestOrigin) }),
   };
-  return options.tls === undefined
+  const handler = (request: IncomingMessage, response: ServerResponse) => {
+    void forwardRequest(fetchHandler, request, response, resolvedOptions);
+  };
+  return resolvedOptions.tls === undefined
     ? createServer(handler)
-    : createHttpsServer(options.tls, handler);
+    : createHttpsServer(resolvedOptions.tls, handler);
 }
 
 async function forwardRequest(
@@ -241,6 +249,7 @@ function requestHeaders(incoming: IncomingMessage): Headers {
 }
 
 function requestOrigin(incoming: IncomingMessage, options: FetchServerOptions): string {
+  if (options.canonicalRequestOrigin !== undefined) return options.canonicalRequestOrigin;
   const directProtocol = Reflect.get(incoming.socket, "encrypted") === true ? "https" : "http";
   const directHost = incoming.headers.host;
   if (options.trustedClientIpHeader === undefined) {
@@ -251,6 +260,13 @@ function requestOrigin(incoming: IncomingMessage, options: FetchServerOptions): 
   return forwardedProtocol === undefined || forwardedHost === undefined
     ? validatedOrigin(directProtocol, directHost)
     : validatedOrigin(forwardedProtocol, forwardedHost);
+}
+
+function parseHttpOrigin(value: string): string {
+  const url = new URL(value);
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("invalid origin");
+  if (url.username !== "" || url.password !== "") throw new Error("invalid origin");
+  return url.origin;
 }
 
 function firstForwardedValue(value: string | string[] | undefined): string | undefined {
