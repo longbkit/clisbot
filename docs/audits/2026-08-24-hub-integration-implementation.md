@@ -2,6 +2,15 @@
 
 Implementation companion to [2026-08-23-openclaw-channel-reuse-plan.md](2026-08-23-openclaw-channel-reuse-plan.md). The plan owns _what_ and _why_ (control plane in the Hub, in-process verticals §14.5; **P0: the Hub reaches the daemon as an ordinary client — both forms: embedded pairs over loopback, team/remote over the relay, `scopes: ["*"]`, existing RPCs — zero daemon diff; P1: a flag-gated per-resource grant engine in the daemon** — plan §4-S3/§14.6/§14.7). This doc owns _how it is built, shipped, installed, and where every source change lands_. Verified against both codebases 2026-08-24/25.
 
+> Upstream merge update, 2026-09-01: use organization Trigger APIs and
+> `.paseo/triggers/<name>.yml` for new Automation authoring. Legacy Project bundle operations remain
+> only for older CLI compatibility; the unreleased `.paseo/channels/**` authoring path must move to
+> an organization-owned Channel store rather than preserving its old Project container. Hub
+> enrollment now uses `permissions: string[]`; `hub.execute` is the current service-principal
+> permission for the existing `hub.execution.*` RPC messages. References below to that path as
+> frozen or expected to sunset, and to Project bundles as the future Automation model, are
+> superseded. Managed interactive access remains a separate Session/resource authorization layer.
+
 **Post-pull status (2026-08-26): Slack and Telegram run from in-repo packages.** The channel verticals were pulled into the repo as `packages/channels/slack`, `packages/channels/telegram`, shared `packages/channels/shared` (blueprint + executed wiring: [2026-08-26-in-repo-channel-verticals.md](2026-08-26-in-repo-channel-verticals.md) §6.5, commit `97433b457`). `loadMode: "in-repo"` in `channel-pins.json` takes the no-tarball install branch (the loader admits the in-repo package dirs as load-trace allowlist roots; the supervisor wires the shared L3's `inboundLedger` sink), and the pinned dists stay as upstream sync references for the re-sync loop (§4.8). Where this doc below describes the pinned supply's loader/install/seam behavior, that is the **pinned route** (zalouser + later channels) — not how Slack/Telegram load today.
 
 ## 1. Building process and package publish

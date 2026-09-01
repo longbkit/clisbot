@@ -6,6 +6,16 @@ what exists, what is missing, and what a dedicated surface would take. Companion
 [hub-integration implementation doc](2026-08-24-hub-integration-implementation.md) (the CLI verbs
 and HTTP ops, §1.4/§3.2). All claims verified against this checkout's code on 2026-08-27.
 
+> Upstream merge update, 2026-09-01: Hub's upstream product navigation now centers on
+> organization-owned Triggers and organization Settings; the old Project Configuration page is no
+> longer the target UI. The Clisbot Channel control plane itself still has no structured end-user
+> UI and still reads `.paseo/channels/**` from the legacy `default` Project revision, which current
+> startup Trigger migration archives. This path is unreleased: replace it with an
+> organization-owned Channel store; do not add legacy-Project retention or data migration. The final
+> UI and implementation direction are defined in
+> [Unified client Hub configuration UI](2026-09-01-unified-client-hub-configuration-ui.md); this
+> document remains the 2026-08-27 gap baseline.
+
 ## 1. The short answer
 
 There are **two different channel configurations** in this Hub, and the answer differs for each:

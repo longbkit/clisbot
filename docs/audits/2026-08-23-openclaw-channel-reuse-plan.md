@@ -2,6 +2,17 @@
 
 Date: 2026-08-24, final decisions 2026-08-25. Subject: the full channel capability for the fusion — same-machine channels, native per-channel formatting, and how it relates to the existing Paseo Hub trigger layer — built on OpenClaw's published channel code. Registry and package claims were verified against the public npm registry and published tarballs on 2026-08-23/24; code claims in this repo carry paths; Hub claims come from [2026-08-23-paseo-hub.md](2026-08-23-paseo-hub.md).
 
+> Upstream merge update, 2026-09-01: Hub Automations now build on organization-owned Triggers, not
+> new Project bundles. Daemon enrollment stores semantic permissions and requires `hub.execute` for
+> the existing `hub.execution.*` RPC family; that path is current service-principal architecture,
+> not frozen code expected to disappear. The Clisbot Channel plane still reads
+> `.paseo/channels/**` from the legacy `default` Project revision, which upstream startup migration
+> now archives. Because the Channel plane is unreleased, do not preserve that obsolete container or
+> migrate test data: move Channel authoring to an organization-owned store before shipping. New
+> UI/config work follows the
+> [unified client proposal](2026-09-01-unified-client-hub-configuration-ui.md). Older architecture
+> statements below are retained as decision history where they conflict with this note.
+
 **Headline (decisions §14.6/§14.7, 2026-08-24/25).** The channel control plane lives in the **Hub** (§4-S2); the Hub reaches the daemon as an **ordinary client** in both deployment forms — embedded pairs over loopback, team/remote pairs over the relay like any Paseo client (a relay-attached socket is `scopes: ["*"]`, `kind: "trusted"` — `websocket-server.ts:1342/1391`; only `attachHubSocket` is scope-narrowed). Channel code (OpenClaw's published channels) runs **in-process in the Hub** (§14.5). The daemon's P0 channel diff is **zero**: steer + approval ride the existing trusted-client RPCs, and the per-session/per-resource grant engine — which narrows any bound-principal session — moves to **P1** and applies to all clients. The upstream scoped channel (`hub.execution.*`) is **frozen legacy-compat, expected to sunset**: no form rides it by design at P0.
 
 **Status (2026-08-26): the supply model changed for Slack and Telegram.** Both P0 verticals are now **first-party in-repo packages** (`packages/channels/slack`, `packages/channels/telegram`, shared `packages/channels/shared`) — OpenClaw's code ported in-repo, zero `openclaw/*` imports, driven through the same drive surface (`plugin.gateway.startAccount` + `plugin.outbound.sendText`). The pinned OpenClaw dists stay in `channel-pins.json` as **upstream sync references only** (`loadMode: "in-repo"`, no tarball fetch, no integrity gate). The pull, its scope, and the re-sync loop: [2026-08-26-in-repo-channel-verticals.md](2026-08-26-in-repo-channel-verticals.md) — read its §1 (the contract that survives) and §6.5 (the executed blueprint) before touching the channel plane. This plan's §4-S1 option B (published tarball + alias seam) remains the supply model for **pinned** channels (zalouser and later); it is no longer how Slack or Telegram reach the Hub.
