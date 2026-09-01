@@ -11,4 +11,5 @@ pre-commit:
       glob: "*.{js,jsx,ts,tsx}"
       run: npm run lint -- {staged_files}
     - name: typecheck
-      run: npm run typecheck
+      # Workspace consumers resolve package declarations from dist; match CI's build-before-check order.
+      run: npm run build:server-deps && npm run typecheck
