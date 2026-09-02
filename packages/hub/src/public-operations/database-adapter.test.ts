@@ -15,18 +15,12 @@ describe("public manual-run workflow resolution", () => {
     });
     const repository = createDatabasePublicOperationRepository(database);
 
-    assert.deepEqual(
-      await repository.resolveManualRunWorkflow("org", "deploy"),
-      {
-        status: "resolved",
-        id: workflow.id,
-        revisionId: workflow.activeRevisionId,
-      },
-    );
-    assert.equal(
-      await repository.resolveManualRunWorkflow("org", "missing"),
-      undefined,
-    );
+    assert.deepEqual(await repository.resolveManualRunWorkflow("org", "deploy"), {
+      status: "resolved",
+      id: workflow.id,
+      revisionId: workflow.activeRevisionId,
+    });
+    assert.equal(await repository.resolveManualRunWorkflow("org", "missing"), undefined);
   });
 
   it("does not resolve a disabled organization workflow", async () => {
@@ -38,9 +32,10 @@ describe("public manual-run workflow resolution", () => {
     });
 
     assert.deepEqual(
-      await createDatabasePublicOperationRepository(
-        database,
-      ).resolveManualRunWorkflow("org", "deploy"),
+      await createDatabasePublicOperationRepository(database).resolveManualRunWorkflow(
+        "org",
+        "deploy",
+      ),
       { status: "disabled" },
     );
   });

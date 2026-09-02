@@ -6,16 +6,8 @@
 
 import { statSync } from "node:fs";
 import { extname } from "node:path";
-import type {
-  HostRuntime,
-  SendMediaFn,
-  SendTextFn,
-} from "@getpaseo/channels-shared";
-import {
-  evaluateOutboundMedia,
-  mediaFileName,
-  mimeFromExtension,
-} from "@getpaseo/channels-shared";
+import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
+import { evaluateOutboundMedia, mediaFileName, mimeFromExtension } from "@getpaseo/channels-shared";
 import { getHostRuntime } from "./runtime-store.js";
 import { sendTelegramMedia } from "./outbound-media.js";
 import {
@@ -50,9 +42,7 @@ function openSeamStores(runtime: HostRuntime): TelegramSeamStores {
 
 /** The `reply_markup` value the send args carry (the Hub's card builder
  * mints it; the vertical posts it verbatim on chunk 0). */
-function replyMarkupOf(
-  args: Parameters<SendTextFn>[0],
-): Record<string, unknown> | undefined {
+function replyMarkupOf(args: Parameters<SendTextFn>[0]): Record<string, unknown> | undefined {
   const markup = args["replyMarkup"];
   if (typeof markup === "object" && markup !== null && !Array.isArray(markup)) {
     return markup as Record<string, unknown>;
@@ -74,10 +64,7 @@ export const sendText: SendTextFn = async (args) => {
   // The token comes from `cfg.channels.telegram.accounts.<id>.botToken`
   // (start-account.md: the outbound path reads tokens from cfg, not the
   // flat drive-time account).
-  const account = resolveTelegramAccount(
-    cfg as unknown as TelegramCfg,
-    accountId,
-  );
+  const account = resolveTelegramAccount(cfg as unknown as TelegramCfg, accountId);
   const target = parseOutboundTarget(String(to));
   const messageThreadId =
     target.messageThreadId ??
@@ -88,10 +75,7 @@ export const sendText: SendTextFn = async (args) => {
   ) {
     throw new Error(`invalid Telegram topic id "${String(threadId)}"`);
   }
-  const api = await createTelegramApi(
-    account.token,
-    buildTelegramClientOptions(account),
-  );
+  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
   const chatId = await resolveChatId(target.chatId, api);
   const stores = openSeamStores(runtime);
   const replyMarkup = replyMarkupOf(args);
@@ -134,21 +118,13 @@ export async function updateText(args: {
   [key: string]: unknown;
 }): Promise<{ ok: boolean }> {
   const runtime = runtimeOf(args);
-  const account = resolveTelegramAccount(
-    args.cfg as unknown as TelegramCfg,
-    args.accountId,
-  );
+  const account = resolveTelegramAccount(args.cfg as unknown as TelegramCfg, args.accountId);
   const target = parseOutboundTarget(String(args.to));
-  const api = await createTelegramApi(
-    account.token,
-    buildTelegramClientOptions(account),
-  );
+  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
   const chatId = await resolveChatId(target.chatId, api);
   const messageId = Number(args.externalMessageId);
   if (!Number.isSafeInteger(messageId) || messageId === 0) {
-    throw new Error(
-      `invalid Telegram message id "${String(args.externalMessageId)}"`,
-    );
+    throw new Error(`invalid Telegram message id "${String(args.externalMessageId)}"`);
   }
   await editTelegramMessageText({
     api,
@@ -176,22 +152,15 @@ export async function updateText(args: {
 export const sendMedia: SendMediaFn = async (args) => {
   const { cfg, accountId, to, threadId, filePath } = args;
   const runtime = runtimeOf(args);
-  const account = resolveTelegramAccount(
-    cfg as unknown as TelegramCfg,
-    accountId,
-  );
+  const account = resolveTelegramAccount(cfg as unknown as TelegramCfg, accountId);
   const target = parseOutboundTarget(String(to));
   const messageThreadId =
     target.messageThreadId ??
     (threadId !== undefined && threadId !== "" ? Number(threadId) : undefined);
-  const api = await createTelegramApi(
-    account.token,
-    buildTelegramClientOptions(account),
-  );
+  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
   const chatId = await resolveChatId(target.chatId, api);
   const stores = openSeamStores(runtime);
-  const log = (message: string) =>
-    runtime.logging.getChildLogger().debug?.(message);
+  const log = (message: string) => runtime.logging.getChildLogger().debug?.(message);
   const postText = (text: string): Promise<{ messageId: string }> =>
     sendText({
       cfg,
@@ -207,9 +176,7 @@ export const sendMedia: SendMediaFn = async (args) => {
   try {
     sizeBytes = statSync(filePath).size;
   } catch {
-    throw new Error(
-      `Telegram sendMedia: local media file not found: ${filePath}`,
-    );
+    throw new Error(`Telegram sendMedia: local media file not found: ${filePath}`);
   }
   const decision = evaluateOutboundMedia({
     sizeBytes,
@@ -230,10 +197,6 @@ export const sendMedia: SendMediaFn = async (args) => {
     ...(messageThreadId !== undefined ? { messageThreadId } : {}),
     log,
   });
-  await recordSentMessage(
-    stores.sentMessages,
-    Number(result.chatId),
-    result.messageId,
-  );
+  await recordSentMessage(stores.sentMessages, Number(result.chatId), result.messageId);
   return { messageId: result.messageId, mediaPosted: true };
 };

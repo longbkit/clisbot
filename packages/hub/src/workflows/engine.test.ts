@@ -911,13 +911,14 @@ describe("durable multi-step workflow engine", () => {
       ...baseProvider,
       async match(event) {
         const matches = await baseProvider.match(event);
-        return matches.map((match) => ({
-          ...match,
-          outputContext: {
-            provider: "channel",
-            channel: { binding_key: "shared-binding" },
-          },
-        }));
+        return matches.map((match) =>
+          Object.assign({}, match, {
+            outputContext: {
+              provider: "channel",
+              channel: { binding_key: "shared-binding" },
+            },
+          }),
+        );
       },
     } satisfies import("../triggers/index.js").TriggerProvider;
     let now = new Date(Date.now() + 10_000);

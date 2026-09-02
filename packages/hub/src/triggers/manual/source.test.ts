@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { DurableProviderEvent } from "../../db/types.js";
 import { createMemoryDatabase } from "../../db/memory.js";
-import {
-  createManualTriggerSource,
-  handleManualTriggerRequest,
-} from "./source.js";
+import { createManualTriggerSource, handleManualTriggerRequest } from "./source.js";
 
 describe("manual trigger source", () => {
   it("passes arbitrary provider-namespaced payloads to the handler", async () => {
@@ -43,9 +40,7 @@ describe("manual trigger source", () => {
         },
       },
     ]);
-    assert.deepEqual(manual.evidence(), [
-      { connectionId: null, resourceId: null },
-    ]);
+    assert.deepEqual(manual.evidence(), [{ connectionId: null, resourceId: null }]);
   });
 
   it("rejects non-namespaced manual payload sources", async () => {
@@ -63,8 +58,7 @@ describe("manual trigger source", () => {
       {
         status: 400,
         body: {
-          error:
-            "source must be provider-namespaced, for example github.issue_comment",
+          error: "source must be provider-namespaced, for example github.issue_comment",
         },
       },
     );
@@ -115,9 +109,7 @@ class ManualTriggers {
     return manual;
   }
 
-  async deliver(
-    delivery: ManualDelivery,
-  ): Promise<{ status: number; body: unknown }> {
+  async deliver(delivery: ManualDelivery): Promise<{ status: number; body: unknown }> {
     const response = await handleManualTriggerRequest(
       new Request("http://localhost/test/trigger", {
         method: "POST",
@@ -132,14 +124,7 @@ class ManualTriggers {
 
   received(): ManualDelivery[] {
     return this.handled.map(
-      ({
-        organizationId,
-        workflowId,
-        configurationRevisionId,
-        source,
-        deliveryId,
-        payload,
-      }) => ({
+      ({ organizationId, workflowId, configurationRevisionId, source, deliveryId, payload }) => ({
         organizationId,
         triggerId: workflowId,
         triggerRevisionId: configurationRevisionId,

@@ -22,11 +22,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { dump, load } from "js-yaml";
 import { z } from "zod";
 import { CHANNEL_POLICY_PATH } from "../../config/bundle-contract.js";
-import {
-  compileHubBundle,
-  HubBundleError,
-  type HubBundleFile,
-} from "../../config/bundle.js";
+import { compileHubBundle, HubBundleError, type HubBundleFile } from "../../config/bundle.js";
 import type { Database } from "../../db/types.js";
 import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../../http/client-address.js";
 import {
@@ -112,31 +108,21 @@ export function createChannelControlPlaneOps(
 ): ChannelControlPlaneOps {
   return {
     addChannel: (request) =>
-      gate(options, request, (database) =>
-        handleAddChannel(database, request, options),
-      ),
+      gate(options, request, (database) => handleAddChannel(database, request, options)),
     listChannels: (request) =>
-      gate(options, request, (database) =>
-        handleListChannels(database, options.supervisor),
-      ),
+      gate(options, request, (database) => handleListChannels(database, options.supervisor)),
     channelStatus: (request) =>
       gate(options, request, () => handleChannelStatus(options.supervisor)),
-    listUsers: (request) =>
-      gate(options, request, (database) => handleListUsers(database)),
+    listUsers: (request) => gate(options, request, (database) => handleListUsers(database)),
     showUser: (request, username) =>
-      gate(options, request, (database) =>
-        handleShowUser(database, request, username),
-      ),
+      gate(options, request, (database) => handleShowUser(database, request, username)),
     addUser: (request) =>
-      gate(options, request, (database) =>
-        handleAddUser(database, request, options.supervisor),
-      ),
+      gate(options, request, (database) => handleAddUser(database, request, options.supervisor)),
     editUser: (request, username) =>
       gate(options, request, (database) =>
         handleEditUser(database, request, username, options.supervisor),
       ),
-    handleChannelReplyMcp: (request, token) =>
-      gateChannelReplyMcp(options, request, token),
+    handleChannelReplyMcp: (request, token) => gateChannelReplyMcp(options, request, token),
   };
 }
 
@@ -153,9 +139,7 @@ function gateChannelReplyMcp(
     return Promise.resolve(controlPlaneAbsent(request));
   }
   if (options.channelReplyServer === null) {
-    return Promise.resolve(
-      Response.json({ error: "database_unavailable" }, { status: 503 }),
-    );
+    return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
   }
   if (!authorized(request, options.completionTokenSecret)) {
     return Promise.resolve(
@@ -185,9 +169,7 @@ function gate(
     return Promise.resolve(controlPlaneAbsent(request));
   }
   if (options.database === null) {
-    return Promise.resolve(
-      Response.json({ error: "database_unavailable" }, { status: 503 }),
-    );
+    return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
   }
   if (!authorized(request, options.completionTokenSecret)) {
     return Promise.resolve(
@@ -201,9 +183,7 @@ function gate(
     );
   }
   const database = options.database;
-  return handle(database).catch((error: unknown) =>
-    Promise.resolve(errorResponse(request, error)),
-  );
+  return handle(database).catch((error: unknown) => Promise.resolve(errorResponse(request, error)));
 }
 
 /** The exact 404 the public API gives unknown canonical routes — byte-equivalent. */
@@ -219,21 +199,14 @@ function controlPlaneAbsent(request: Request): Response {
 
 /** A Bearer token must equal the instance auth secret (no loopback fallback);
  * without one, the caller's address must be loopback. */
-function authorized(
-  request: Request,
-  completionTokenSecret: string | undefined,
-): boolean {
+function authorized(request: Request, completionTokenSecret: string | undefined): boolean {
   const header = request.headers.get("authorization");
   if (header !== null) {
     const token = /^Bearer\s+(.+)$/u.exec(header.trim())?.[1];
-    if (token === undefined || completionTokenSecret === undefined)
-      return false;
+    if (token === undefined || completionTokenSecret === undefined) return false;
     const expected = Buffer.from(completionTokenSecret, "utf8");
     const presented = Buffer.from(token, "utf8");
-    return (
-      expected.length === presented.length &&
-      timingSafeEqual(expected, presented)
-    );
+    return expected.length === presented.length && timingSafeEqual(expected, presented);
   }
   const address = request.headers.get(INTERNAL_CLIENT_ADDRESS_HEADER);
   return (
@@ -247,13 +220,7 @@ function authorized(
 /** Map a handler failure to its status + problem body. */
 function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof ControlPlaneHttpError) {
-    return problem(
-      request,
-      error.status,
-      error.code,
-      error.title,
-      error.detail,
-    );
+    return problem(request, error.status, error.code, error.title, error.detail);
   }
   return problem(
     request,
@@ -278,30 +245,15 @@ class ControlPlaneHttpError extends Error {
 }
 
 function invalidRequest(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(
-    400,
-    "invalid_request",
-    "Invalid request",
-    detail,
-  );
+  return new ControlPlaneHttpError(400, "invalid_request", "Invalid request", detail);
 }
 
 function conflict(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(
-    409,
-    "control_plane_conflict",
-    "Conflict",
-    detail,
-  );
+  return new ControlPlaneHttpError(409, "control_plane_conflict", "Conflict", detail);
 }
 
 function invalidConfiguration(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(
-    422,
-    "invalid_configuration",
-    "Invalid configuration",
-    detail,
-  );
+  return new ControlPlaneHttpError(422, "invalid_configuration", "Invalid configuration", detail);
 }
 
 async function handleAddChannel(
@@ -329,20 +281,10 @@ async function handleAddChannel(
     channel: body.channel,
     connectionId,
   });
-  if (connection === undefined)
-    throw invalidRequest("the channel connection does not exist");
-  const files = upsertAccountFile(
-    snapshot,
-    body.channel,
-    body.account,
-    connectionId,
-  );
+  if (connection === undefined) throw invalidRequest("the channel connection does not exist");
+  const files = upsertAccountFile(snapshot, body.channel, body.account, connectionId);
   await deployRevision(database, snapshot, files);
-  const start = await startAccount(
-    options.supervisor,
-    body.channel,
-    body.account,
-  );
+  const start = await startAccount(options.supervisor, body.channel, body.account);
   return Response.json(
     {
       channel: body.channel,
@@ -369,10 +311,7 @@ async function handleListChannels(
   );
   const accounts = snapshot.controlPlane.accounts.map((account) => {
     // The effective switch: org kill-switch AND channel switch AND account flag.
-    const enabled =
-      snapshot.controlPlane.enabled &&
-      account.channelEnabled &&
-      account.enabled;
+    const enabled = snapshot.controlPlane.enabled && account.channelEnabled && account.enabled;
     const transport =
       transports.get(`${account.channel}\0${account.accountId}`) ??
       (enabled ? "stopped" : "disabled");
@@ -386,9 +325,7 @@ async function handleListChannels(
   return Response.json({ accounts }, { status: 200 });
 }
 
-function handleChannelStatus(
-  supervisor: ChannelSupervisor | null,
-): Promise<Response> {
+function handleChannelStatus(supervisor: ChannelSupervisor | null): Promise<Response> {
   if (supervisor === null) {
     return Promise.resolve(Response.json({ accounts: [] }, { status: 200 }));
   }
@@ -410,8 +347,8 @@ function handleChannelStatus(
 
 async function handleListUsers(database: Database): Promise<Response> {
   const snapshot = await loadSnapshot(database);
-  const users = Object.entries(snapshot.controlPlane.users).map(
-    ([username, user]) => userView(username, user, snapshot.controlPlane),
+  const users = Object.entries(snapshot.controlPlane.users).map(([username, user]) =>
+    userView(username, user, snapshot.controlPlane),
   );
   return Response.json({ users }, { status: 200 });
 }
@@ -491,10 +428,7 @@ async function handleEditUser(
   const name = body.name !== undefined ? body.name : existing.name;
   const files = upsertPolicyUser(snapshot, username, {
     ...(name === null ? {} : { name }),
-    identities:
-      body.identities !== undefined
-        ? body.identities
-        : [...existing.identities],
+    identities: body.identities !== undefined ? body.identities : [...existing.identities],
   });
   await deployRevision(database, snapshot, files);
   const reconciliation = await supervisor?.reconcile();
@@ -508,9 +442,7 @@ async function handleEditUser(
   );
 }
 
-async function loadSnapshot(
-  database: Database,
-): Promise<ChannelControlPlaneSnapshot> {
+async function loadSnapshot(database: Database): Promise<ChannelControlPlaneSnapshot> {
   try {
     return await loadChannelControlPlane(database);
   } catch (error) {
@@ -542,9 +474,7 @@ async function parseJsonBody<Schema extends z.ZodType>(
       .slice(0, 5)
       .map((entry) => `${entry.path.join(".")}: ${entry.message}`)
       .join("; ");
-    throw invalidRequest(
-      `invalid request body${detail.length > 0 ? `: ${detail}` : ""}`,
-    );
+    throw invalidRequest(`invalid request body${detail.length > 0 ? `: ${detail}` : ""}`);
   }
   return result.data;
 }
@@ -579,9 +509,7 @@ function upsertPolicyUser(
   username: string,
   record: { identities: string[]; name?: string },
 ): HubBundleFile[] {
-  const existing = snapshot.files.find(
-    (file) => file.path === CHANNEL_POLICY_PATH,
-  );
+  const existing = snapshot.files.find((file) => file.path === CHANNEL_POLICY_PATH);
   const parsed: unknown = existing === undefined ? {} : load(existing.content);
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw invalidRequest("the active channel policy is not a mapping");
@@ -589,16 +517,12 @@ function upsertPolicyUser(
   const policy: Record<string, unknown> = { ...parsed };
   const existingUsers = policy["users"];
   const users: Record<string, unknown> =
-    typeof existingUsers === "object" &&
-    existingUsers !== null &&
-    !Array.isArray(existingUsers)
+    typeof existingUsers === "object" && existingUsers !== null && !Array.isArray(existingUsers)
       ? { ...(existingUsers as Record<string, unknown>) }
       : {};
   users[username] = record;
   policy["users"] = users;
-  const next = snapshot.files.filter(
-    (file) => file.path !== CHANNEL_POLICY_PATH,
-  );
+  const next = snapshot.files.filter((file) => file.path !== CHANNEL_POLICY_PATH);
   next.push({
     path: CHANNEL_POLICY_PATH,
     content: dump(policy, { lineWidth: -1 }),
@@ -628,9 +552,7 @@ export async function deployRevision(
     const candidateBundle = compileHubBundle(candidateResourceFiles, {
       requireWorkflow: false,
     });
-    const workflowNames = (
-      await database.listOrganizationTriggers(snapshot.organizationId)
-    )
+    const workflowNames = (await database.listOrganizationTriggers(snapshot.organizationId))
       .filter(({ enabled }) => enabled)
       .map(({ name }) => name);
     compileChannelControlPlane({
@@ -640,23 +562,16 @@ export async function deployRevision(
       workflowNames,
     });
   } catch (error) {
-    if (
-      error instanceof ChannelCompilationError ||
-      error instanceof HubBundleError
-    ) {
+    if (error instanceof ChannelCompilationError || error instanceof HubBundleError) {
       throw invalidConfiguration(error.message);
     }
     throw error;
   }
-  const canonical = [...files].sort((left, right) =>
-    left.path.localeCompare(right.path),
-  );
+  const canonical = [...files].sort((left, right) => left.path.localeCompare(right.path));
   await database.saveChannelConfiguration({
     organizationId: snapshot.organizationId,
     files: canonical,
-    contentHash: createHash("sha256")
-      .update(JSON.stringify(canonical))
-      .digest("hex"),
+    contentHash: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
     createdByUserId: null,
   });
 }
@@ -690,8 +605,7 @@ async function startAccount(
     return {
       installed: false,
       transport: "deferred",
-      detail:
-        error instanceof Error ? error.message : "the channel start failed",
+      detail: error instanceof Error ? error.message : "the channel start failed",
     };
   }
 }
@@ -718,10 +632,7 @@ function userView(
 /** The roles covering the user: every org/account assignment whose identities
  * cover the user (the canonical cover check in `../policy.js`), restricted to
  * known role names — `[]` when none. */
-function userRoles(
-  username: string,
-  controlPlane: ChannelControlPlane,
-): string[] {
+function userRoles(username: string, controlPlane: ChannelControlPlane): string[] {
   const owners = controlPlane.identityOwners;
   const names = new Set<string>();
   const assignments = [

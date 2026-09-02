@@ -147,9 +147,7 @@ export interface ChannelControlPlane {
   /** Org per-channel switches resolved to booleans (omitted channel = enabled). */
   channelEnabled: Readonly<Record<string, boolean>>;
   /** Roles with precomputed `extends` closures; unknown names never appear. */
-  roles: Readonly<
-    Record<string, CompiledRole & { closure: readonly string[] }>
-  >;
+  roles: Readonly<Record<string, CompiledRole & { closure: readonly string[] }>>;
   users: Readonly<Record<string, CompiledUser>>;
   /** Each identity → the user that owns it. */
   identityOwners: Readonly<Record<string, string>>;
@@ -171,20 +169,11 @@ export interface ChannelCompileInput {
 
 // --- Orchestration -------------------------------------------------------------
 
-export function compileChannelControlPlane(
-  input: ChannelCompileInput,
-): ChannelControlPlane {
-  const policyFile = input.files.find(
-    (file) => file.path === CHANNEL_POLICY_PATH,
-  );
+export function compileChannelControlPlane(input: ChannelCompileInput): ChannelControlPlane {
+  const policyFile = input.files.find((file) => file.path === CHANNEL_POLICY_PATH);
   const org =
-    policyFile === undefined
-      ? OrgPolicySchema.parse({})
-      : parseYaml(policyFile, OrgPolicySchema);
-  requireStarFallback(
-    [CHANNEL_POLICY_PATH, "defaults", "approval"],
-    org.defaults?.approval ?? [],
-  );
+    policyFile === undefined ? OrgPolicySchema.parse({}) : parseYaml(policyFile, OrgPolicySchema);
+  requireStarFallback([CHANNEL_POLICY_PATH, "defaults", "approval"], org.defaults?.approval ?? []);
   const roles = compileRoles(org.roles);
   const { users, identityOwners } = compileUsers(org.users);
   validateAssignments(org.assignments ?? [], users, CHANNEL_POLICY_PATH);
@@ -194,9 +183,7 @@ export function compileChannelControlPlane(
   }
   const accounts = input.files
     .filter(
-      (file) =>
-        file.path.startsWith(`${CHANNELS_DIRECTORY}/`) &&
-        file.path !== CHANNEL_POLICY_PATH,
+      (file) => file.path.startsWith(`${CHANNELS_DIRECTORY}/`) && file.path !== CHANNEL_POLICY_PATH,
     )
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((file) => compileAccount(file, org, users, input));
@@ -214,21 +201,14 @@ export function compileChannelControlPlane(
   };
 }
 
-function validateUniqueConnections(
-  accounts: readonly CompiledChannelAccount[],
-): void {
+function validateUniqueConnections(accounts: readonly CompiledChannelAccount[]): void {
   const owners = new Map<string, string>();
   for (const account of accounts) {
     const key = `${account.channel}:${account.connectionId}`;
     const owner = owners.get(key);
     if (owner !== undefined) {
       issue(
-        [
-          CHANNELS_DIRECTORY,
-          account.channel,
-          account.accountId,
-          "connectionId",
-        ],
+        [CHANNELS_DIRECTORY, account.channel, account.accountId, "connectionId"],
         `connection ${account.connectionId} is already used by account ${owner}`,
       );
     }
@@ -248,8 +228,7 @@ interface ParsedAccountIdentity {
  * bundle path (`.paseo/channels/<channel>/<accountId>.yml`). */
 function parseAccountIdentity(file: HubBundleFile): ParsedAccountIdentity {
   const account = parseYaml(file, AccountFileSchema);
-  const channel =
-    file.path.slice(`${CHANNELS_DIRECTORY}/`.length).split("/")[0] ?? "";
+  const channel = file.path.slice(`${CHANNELS_DIRECTORY}/`.length).split("/")[0] ?? "";
   const accountId = file.path
     .split("/")
     .pop()!
@@ -289,16 +268,9 @@ function accountPolicyLayers(
   validateAssignments(account.policy?.assignments ?? [], users, file.path);
   const orgAssignments = org.assignments ?? [];
   const accountAssignments = account.policy?.assignments ?? [];
-  const defaultRoles =
-    account.policy?.defaultRoles ?? org.defaults?.defaultRoles ?? [];
-  const layers: readonly (ChannelDefaults | undefined)[] = [
-    org.defaults,
-    account.defaults,
-  ];
-  const approval = mergeApproval(
-    org.defaults?.approval,
-    account.defaults?.approval,
-  );
+  const defaultRoles = account.policy?.defaultRoles ?? org.defaults?.defaultRoles ?? [];
+  const layers: readonly (ChannelDefaults | undefined)[] = [org.defaults, account.defaults];
+  const approval = mergeApproval(org.defaults?.approval, account.defaults?.approval);
   requireStarFallback([file.path, "defaults", "approval"], approval);
   return { orgAssignments, accountAssignments, defaultRoles, layers, approval };
 }
@@ -325,11 +297,7 @@ function compileAccount(
         ...(route.policy?.assignments ?? []),
       ],
       defaults: foldDefaults([...layers.layers, route]),
-      approval: mergeApproval(
-        org.defaults?.approval,
-        account.defaults?.approval,
-        route.approval,
-      ),
+      approval: mergeApproval(org.defaults?.approval, account.defaults?.approval, route.approval),
     }),
   );
   return {
@@ -375,10 +343,7 @@ function compileRoute(
   },
 ): CompiledRoute {
   validateAssignments(context.assignments, context.users, context.file.path);
-  requireStarFallback(
-    [context.file.path, "routes", context.index],
-    context.approval,
-  );
+  requireStarFallback([context.file.path, "routes", context.index], context.approval);
   validateRouteKind(context.channel, route.match.kind, [
     context.file.path,
     "routes",
@@ -401,12 +366,9 @@ function validateRouteKind(
   kind: Route["match"]["kind"],
   path: readonly (string | number)[],
 ): void {
-  const supported =
-    channel === "slack"
-      ? ["dm", "channel", "thread", "group"]
-      : channel === "telegram"
-        ? ["dm", "group", "topic"]
-        : [];
+  let supported: readonly string[] = [];
+  if (channel === "slack") supported = ["dm", "channel", "thread", "group"];
+  if (channel === "telegram") supported = ["dm", "group", "topic"];
   if (!supported.includes(kind)) {
     issue(path, `${channel} never emits a ${kind} conversation`);
   }
@@ -439,16 +401,10 @@ function compileRouteTarget(
       issue(path, "an agent route needs both agent and environment");
     }
     if (!context.input.agentNames.includes(route.agent)) {
-      issue(
-        [...path, "agent"],
-        `agent ${route.agent} is not defined in hub.yml`,
-      );
+      issue([...path, "agent"], `agent ${route.agent} is not defined in hub.yml`);
     }
     if (!context.input.environmentNames.includes(route.environment)) {
-      issue(
-        [...path, "environment"],
-        `environment ${route.environment} is not defined in hub.yml`,
-      );
+      issue([...path, "environment"], `environment ${route.environment} is not defined in hub.yml`);
     }
     return {
       kind: "agent",
@@ -464,10 +420,7 @@ function compileRouteTarget(
   if (workflow === undefined)
     issue(path, "route must target either agent + environment or workflow");
   if (!context.input.workflowNames.includes(workflow)) {
-    issue(
-      [...path, "workflow"],
-      `workflow ${workflow} has no matching organization Trigger`,
-    );
+    issue([...path, "workflow"], `workflow ${workflow} has no matching organization Trigger`);
   }
   return { kind: "workflow", workflow };
 }
@@ -520,12 +473,8 @@ function compileFallback(
  * sets the leaf (§4.3.7: "org defaults < account defaults < route
  * overrides").
  */
-function foldDefaults(
-  layers: readonly (ChannelDefaults | undefined)[],
-): EffectiveDefaults {
-  const pick = <T>(
-    leaf: (layer: ChannelDefaults | undefined) => T | undefined,
-  ): T | undefined => {
+function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): EffectiveDefaults {
+  const pick = <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined): T | undefined => {
     for (let index = layers.length - 1; index >= 0; index -= 1) {
       const value = leaf(layers[index]);
       if (value !== undefined) return value;
@@ -535,17 +484,13 @@ function foldDefaults(
   const floor = ORG_DEFAULTS;
   const outbound = {
     path: pick((layer) => layer?.outbound?.path) ?? floor.outbound.path,
-    template:
-      pick((layer) => layer?.outbound?.template) ?? floor.outbound.template,
+    template: pick((layer) => layer?.outbound?.template) ?? floor.outbound.template,
   };
   return {
     requireMention:
-      pick((layer) => layer?.interaction?.requireMention) ??
-      floor.interaction.requireMention,
+      pick((layer) => layer?.interaction?.requireMention) ?? floor.interaction.requireMention,
     followUp: {
-      mode:
-        pick((layer) => layer?.interaction?.followUp?.mode) ??
-        floor.interaction.followUp.mode,
+      mode: pick((layer) => layer?.interaction?.followUp?.mode) ?? floor.interaction.followUp.mode,
       ttlMinutes:
         pick((layer) => layer?.interaction?.followUp?.ttlMinutes) ??
         floor.interaction.followUp.ttlMinutes,
@@ -572,14 +517,11 @@ function progressLeaf(layer: SyncProgress | undefined): SyncProgressGroup {
 
 /** Fold the `sync` leaves (root + `subagents`) through the layer chain. */
 function foldSyncDefaults(
-  pick: <T>(
-    leaf: (layer: ChannelDefaults | undefined) => T | undefined,
-  ) => T | undefined,
+  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
   floor: (typeof ORG_DEFAULTS)["sync"],
 ) {
   return {
-    finalAnswers:
-      pick((layer) => layer?.sync?.finalAnswers) ?? floor.finalAnswers,
+    finalAnswers: pick((layer) => layer?.sync?.finalAnswers) ?? floor.finalAnswers,
     progress: {
       progressMessage:
         pick((layer) => progressLeaf(layer?.sync?.progress).progressMessage) ??
@@ -595,14 +537,9 @@ function foldSyncDefaults(
     threadLink: pick((layer) => layer?.sync?.threadLink) ?? floor.threadLink,
     subagents: {
       finalAnswers:
-        pick((layer) => layer?.sync?.subagents?.finalAnswers) ??
-        floor.subagents.finalAnswers,
-      progress:
-        pick((layer) => layer?.sync?.subagents?.progress) ??
-        floor.subagents.progress,
-      toolCalls:
-        pick((layer) => layer?.sync?.subagents?.toolCalls) ??
-        floor.subagents.toolCalls,
+        pick((layer) => layer?.sync?.subagents?.finalAnswers) ?? floor.subagents.finalAnswers,
+      progress: pick((layer) => layer?.sync?.subagents?.progress) ?? floor.subagents.progress,
+      toolCalls: pick((layer) => layer?.sync?.subagents?.toolCalls) ?? floor.subagents.toolCalls,
     },
   };
 }

@@ -6,10 +6,7 @@ import { afterEach, it } from "vitest";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { createProviderApplicationStore } from "../provider-applications/index.js";
 import { createDatabase } from "./pg.js";
-import {
-  embeddedDatabaseRuntime,
-  type DatabaseRuntimeBundle,
-} from "./runtime/index.js";
+import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "./runtime/index.js";
 
 let bundle: DatabaseRuntimeBundle | undefined;
 let root: string | undefined;
@@ -55,12 +52,7 @@ it("stores Channel credentials only in encrypted canonical Connection envelopes"
     { botToken: telegramToken },
   );
 
-  const store = createProviderApplicationStore(
-    bundle.runtime,
-    bundle.locks,
-    cipher,
-    database,
-  );
+  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, cipher, database);
   const slackAppToken = "xapp-slack-secret-canary";
   const slackBotToken = "xoxb-slack-secret-canary";
   await store.completeSlackSocketApplication({

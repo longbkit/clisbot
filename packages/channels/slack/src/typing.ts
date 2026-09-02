@@ -71,9 +71,7 @@ const SLACK_THREAD_TS_RE = /^\d+\.\d+$/;
 function statusAnchor(args: SlackTypingArgs): string | undefined {
   if (args.threadId !== undefined && args.threadId !== "") return args.threadId;
   const marker = args.messageId;
-  return marker !== undefined && SLACK_THREAD_TS_RE.test(marker)
-    ? marker
-    : undefined;
+  return marker !== undefined && SLACK_THREAD_TS_RE.test(marker) ? marker : undefined;
 }
 
 /** Surfaces this process currently holds open (the set-once / clear-once dedupe). */
@@ -84,10 +82,7 @@ export function clearSlackTypingSurfacesForTest(): void {
   openSurfaces.clear();
 }
 
-function surfaceKey(
-  args: SlackTypingArgs,
-  kind: "status" | "reaction",
-): string {
+function surfaceKey(args: SlackTypingArgs, kind: "status" | "reaction"): string {
   // Each surface keys on its OWN target: two turns answered in one thread share
   // a status anchor but react to different messages, and must not dedupe
   // against each other.
@@ -149,8 +144,7 @@ async function driveIndicator(args: SlackTypingArgs): Promise<void> {
         loading_messages: [...SLACK_TYPING_LOADING_MESSAGES],
       });
     } catch (error) {
-      if (slackErrorCode(error) === "missing_scope")
-        warnMissingScope(args, "assistant:write");
+      if (slackErrorCode(error) === "missing_scope") warnMissingScope(args, "assistant:write");
       throw error;
     }
     openSurfaces.add(key);
@@ -176,8 +170,7 @@ async function driveReaction(args: SlackTypingArgs): Promise<void> {
   if (name === undefined || timestamp === undefined) return;
   const key = surfaceKey(args, "reaction");
   const client = await getSlackWriteClient(tokenFor(args));
-  const already =
-    args.action === "start" ? openSurfaces.has(key) : !openSurfaces.delete(key);
+  const already = args.action === "start" ? openSurfaces.has(key) : !openSurfaces.delete(key);
   if (already) return;
   const call =
     args.action === "start"
@@ -187,11 +180,7 @@ async function driveReaction(args: SlackTypingArgs): Promise<void> {
     await call();
   } catch (error) {
     const code = slackErrorCode(error);
-    if (
-      code === "already_reacted" ||
-      code === "no_reaction" ||
-      code === "message_not_found"
-    ) {
+    if (code === "already_reacted" || code === "no_reaction" || code === "message_not_found") {
       if (args.action === "start") openSurfaces.add(key);
       return;
     }

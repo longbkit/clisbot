@@ -127,9 +127,7 @@ export interface OutboundPostResult {
 }
 
 /** The channel's send path (its published send adapter, in-process). */
-export type PostFn = (
-  params: OutboundPostParams,
-) => Promise<OutboundPostResult>;
+export type PostFn = (params: OutboundPostParams) => Promise<OutboundPostResult>;
 
 /** COMPAT(clisbot-control-plane): one OUTBOUND native-media post (group G,
  * G7–G11) — the account's vertical `outbound.sendMedia` (one file per call),
@@ -195,9 +193,7 @@ export interface OutboundUpdateResult {
 }
 
 /** The channel's in-place update path (its published update adapter). */
-export type UpdateFn = (
-  params: OutboundUpdateParams,
-) => Promise<OutboundUpdateResult>;
+export type UpdateFn = (params: OutboundUpdateParams) => Promise<OutboundUpdateResult>;
 
 /** COMPAT(clisbot-control-plane): the account's vertical liveness drive
  * (`outbound.typing`) — the `sync.progress` "the bot is working" surface.
@@ -296,17 +292,13 @@ export type ChannelReplyFilePostFn = (
 
 /** Encode the binding ref into the URL segment of the tool-path mcpServers URL
  * (`/mcp/channel/<ref>`). */
-export function encodeChannelReplyBindingRef(
-  ref: ChannelReplyBindingRef,
-): string {
+export function encodeChannelReplyBindingRef(ref: ChannelReplyBindingRef): string {
   return Buffer.from(JSON.stringify(ref), "utf8").toString("base64url");
 }
 
 /** Decode a binding ref; undefined when the token is not a well-formed ref
  * (the endpoint maps that to a clean tool error, never a crash). */
-export function decodeChannelReplyBindingRef(
-  token: string,
-): ChannelReplyBindingRef | undefined {
+export function decodeChannelReplyBindingRef(token: string): ChannelReplyBindingRef | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
@@ -365,9 +357,7 @@ export type SessionLinkRenderer = (agentId: string) => string;
  * sender identity, and mention flag are read. Null = the event is not a
  * plane-bound message (e.g. a media-only event) and is ignored.
  */
-export type InboundNormalizer = (
-  params: InboundReplyParams,
-) => InboundMessage | null;
+export type InboundNormalizer = (params: InboundReplyParams) => InboundMessage | null;
 
 /** Everything the execution plane is built with (the facade's deps). */
 export interface ChannelPlaneDeps {

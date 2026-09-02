@@ -30,9 +30,7 @@ export function setChannelHostRuntime(runtime: HostRuntime): void {
 /** The stored HostRuntime; throws when driven before `setChannelRuntime`. */
 export function getHostRuntime(): HostRuntime {
   if (hostRuntime === undefined) {
-    throw new Error(
-      "telegram channel runtime not set (call entry.setChannelRuntime first)",
-    );
+    throw new Error("telegram channel runtime not set (call entry.setChannelRuntime first)");
   }
   return hostRuntime;
 }
@@ -70,18 +68,12 @@ export function registerAccountInbound(
 export function getAccountRuntime(accountId: string): AccountInbound {
   const entry = accounts.get(accountId);
   if (entry === undefined) {
-    throw new Error(
-      `telegram account "${accountId}" has no inbound processor (not started?)`,
-    );
+    throw new Error(`telegram account "${accountId}" has no inbound processor (not started?)`);
   }
   return entry;
 }
 
 /** Remove only the registration owned by this account lifecycle. */
-export function unregisterAccountInbound(
-  accountId: string,
-  runtime: HostRuntime,
-): void {
-  if (accounts.get(accountId)?.hostRuntime === runtime)
-    accounts.delete(accountId);
+export function unregisterAccountInbound(accountId: string, runtime: HostRuntime): void {
+  if (accounts.get(accountId)?.hostRuntime === runtime) accounts.delete(accountId);
 }

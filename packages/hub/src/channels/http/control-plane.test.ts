@@ -37,22 +37,6 @@ agents:
     model: gpt-5.5
 `;
 
-const WORKFLOW_YAML = `
-name: handoff
-on: manual.run
-max_runtime: 1h
-steps:
-  - id: work
-    environment: work
-    max_runtime: 30m
-    idle_timeout: 5m
-    agent:
-      provider: codex
-      model: gpt-5.5
-    prompt:
-      - text: "hand off"
-`;
-
 // The policy exercises the roles mapping: `operator` is a known role, assigned
 // to alice by username, so her view carries it; unknown names would not.
 const POLICY_YAML = `
@@ -156,9 +140,7 @@ function buildApp(
   extras: {
     dataDir?: string;
     supervisor?: ChannelSupervisor | null;
-    channelReplyServer?:
-      | import("../channel-reply.js").ChannelReplyServer
-      | null;
+    channelReplyServer?: import("../channel-reply.js").ChannelReplyServer | null;
   } = {},
 ): HubApplication {
   return createHubApplication({
@@ -167,9 +149,7 @@ function buildApp(
     publicApi: { status: "unavailable" },
     completionTokenSecret: "hub-secret",
     ...(extras.dataDir === undefined ? {} : { hubDataDir: extras.dataDir }),
-    ...(extras.supervisor === undefined
-      ? {}
-      : { channelSupervisor: extras.supervisor }),
+    ...(extras.supervisor === undefined ? {} : { channelSupervisor: extras.supervisor }),
     ...(extras.channelReplyServer === undefined
       ? {}
       : { channelReplyServer: extras.channelReplyServer }),
@@ -200,8 +180,7 @@ function jsonRequest(
 const ORIGINAL_FLAG = process.env["PASEO_HUB_CHANNELS_ENABLED"];
 
 afterEach(() => {
-  if (ORIGINAL_FLAG === undefined)
-    delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
+  if (ORIGINAL_FLAG === undefined) delete process.env["PASEO_HUB_CHANNELS_ENABLED"];
   else process.env["PASEO_HUB_CHANNELS_ENABLED"] = ORIGINAL_FLAG;
 });
 
@@ -244,31 +223,19 @@ describe("channel control-plane ops", () => {
     for (const database of [memoryDatabase(), null]) {
       const application = buildApp(database);
       for (const call of [
-        () =>
-          application.operations.handleChannelList(
-            jsonRequest("/api/v1/channels"),
-          ),
-        () =>
-          application.operations.handleUserShow(
-            jsonRequest("/api/v1/users/alice"),
-            "alice",
-          ),
+        () => application.operations.handleChannelList(jsonRequest("/api/v1/channels")),
+        () => application.operations.handleUserShow(jsonRequest("/api/v1/users/alice"), "alice"),
       ]) {
         const response = await call();
         assert.equal(response.status, 404);
-        assert.equal(
-          response.headers.get("content-type"),
-          "application/problem+json",
-        );
+        assert.equal(response.headers.get("content-type"), "application/problem+json");
         const body = await response.json();
         assert.equal(body.type, "https://paseo.sh/problems/not-found");
         assert.equal(body.title, "Not found");
         assert.equal(body.status, 404);
         assert.equal(body.detail, "No canonical API route matches this path.");
         assert.equal(body.code, "not_found");
-        assert.ok(
-          typeof body.requestId === "string" && body.requestId.length > 0,
-        );
+        assert.ok(typeof body.requestId === "string" && body.requestId.length > 0);
       }
       // Byte-equivalence against the reference: a Hub without these routes
       // answers /api/v1/channels through the public API's unknown-route 404.
@@ -284,14 +251,8 @@ describe("channel control-plane ops", () => {
         }),
       );
       assert.equal(reference.status, flagOff.status);
-      assert.equal(
-        reference.headers.get("content-type"),
-        flagOff.headers.get("content-type"),
-      );
-      assert.equal(
-        reference.headers.get("x-request-id"),
-        flagOff.headers.get("x-request-id"),
-      );
+      assert.equal(reference.headers.get("content-type"), flagOff.headers.get("content-type"));
+      assert.equal(reference.headers.get("x-request-id"), flagOff.headers.get("x-request-id"));
       assert.equal(await reference.text(), await flagOff.text());
     }
   });
@@ -309,8 +270,7 @@ describe("channel control-plane ops", () => {
     const database = memoryDatabase();
     await withActiveConfiguration(database);
     const application = buildApp(database);
-    const list = () =>
-      application.operations.handleChannelList(jsonRequest("/api/v1/channels"));
+    const list = () => application.operations.handleChannelList(jsonRequest("/api/v1/channels"));
 
     // No Bearer + non-loopback address → 401 with the Bearer challenge.
     let response = await list();
@@ -321,14 +281,8 @@ describe("channel control-plane ops", () => {
       response = await application.operations.handleChannelList(noLoopback);
       assert.equal(response.status, 401);
       assert.equal(response.headers.get("www-authenticate"), "Bearer");
-      assert.equal(
-        response.headers.get("content-type"),
-        "application/problem+json",
-      );
-      assert.deepEqual(
-        await response.json().then((body) => body.code),
-        "invalid_credentials",
-      );
+      assert.equal(response.headers.get("content-type"), "application/problem+json");
+      assert.deepEqual(await response.json().then((body) => body.code), "invalid_credentials");
     }
     // Wrong Bearer (any address) → 401.
     response = await application.operations.handleChannelList(
@@ -455,10 +409,7 @@ describe("channel control-plane ops", () => {
         "ref",
       );
       assert.equal(response.status, 404);
-      assert.equal(
-        response.headers.get("content-type"),
-        "application/problem+json",
-      );
+      assert.equal(response.headers.get("content-type"), "application/problem+json");
       const body = await response.json();
       assert.equal(body.code, "not_found");
     }
@@ -473,10 +424,7 @@ describe("channel control-plane ops", () => {
         method: "POST",
         headers: { "x-paseo-client-address": "10.1.2.3" },
       });
-      const response = await application.operations.handleChannelReplyMcp(
-        noLoopback,
-        "ref",
-      );
+      const response = await application.operations.handleChannelReplyMcp(noLoopback, "ref");
       assert.equal(response.status, 503);
       assert.deepEqual(await response.json(), {
         error: "database_unavailable",
@@ -493,10 +441,7 @@ describe("channel control-plane ops", () => {
         method: "POST",
         headers: { "x-paseo-client-address": "10.1.2.3" },
       });
-      const response = await application.operations.handleChannelReplyMcp(
-        noLoopback,
-        "ref",
-      );
+      const response = await application.operations.handleChannelReplyMcp(noLoopback, "ref");
       assert.equal(response.status, 401);
       assert.equal(response.headers.get("www-authenticate"), "Bearer");
       const body = await response.json();
@@ -550,10 +495,7 @@ describe("channel control-plane ops", () => {
         "ref-2",
       );
       assert.equal(response.status, 500);
-      assert.equal(
-        response.headers.get("content-type"),
-        "application/problem+json",
-      );
+      assert.equal(response.headers.get("content-type"), "application/problem+json");
       const body = await response.json();
       assert.equal(body.code, "internal_error");
     }
@@ -563,9 +505,7 @@ describe("channel control-plane ops", () => {
     const database = memoryDatabase();
     await withActiveConfiguration(database);
     const application = buildApp(database);
-    const response = await application.operations.handleUsersList(
-      jsonRequest("/api/v1/users"),
-    );
+    const response = await application.operations.handleUsersList(jsonRequest("/api/v1/users"));
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
       users: [
@@ -599,10 +539,7 @@ describe("channel control-plane ops", () => {
       "ghost",
     );
     assert.equal(absent.status, 404);
-    assert.equal(
-      absent.headers.get("content-type"),
-      "application/problem+json",
-    );
+    assert.equal(absent.headers.get("content-type"), "application/problem+json");
     const body = await absent.json();
     assert.equal(body.code, "not_found");
     assert.match(String(body.detail), /user "ghost"/u);
@@ -647,10 +584,7 @@ describe("channel control-plane ops", () => {
       assert.equal(account?.enabled, true);
       assert.match(account?.connectionId ?? "", /^[0-9a-f-]{36}$/u);
       for (const file of snapshot.files) {
-        assert.ok(
-          !file.content.includes(SECRET_TOKEN),
-          `token leaked into ${file.path}`,
-        );
+        assert.ok(!file.content.includes(SECRET_TOKEN), `token leaked into ${file.path}`);
       }
 
       // The new account lists with the degraded transport (the stub knows no
@@ -677,10 +611,7 @@ describe("channel control-plane ops", () => {
       }),
     );
     assert.equal(badChannel.status, 400);
-    assert.deepEqual(
-      await badChannel.json().then((body) => body.code),
-      "invalid_request",
-    );
+    assert.deepEqual(await badChannel.json().then((body) => body.code), "invalid_request");
 
     const duplicateUser = await application.operations.handleUserAdd(
       jsonRequest("/api/v1/users", {
@@ -690,10 +621,7 @@ describe("channel control-plane ops", () => {
     );
     // The pre-compile guard catches the duplicate identity before any write.
     assert.equal(duplicateUser.status, 422);
-    assert.deepEqual(
-      await duplicateUser.json().then((body) => body.code),
-      "invalid_configuration",
-    );
+    assert.deepEqual(await duplicateUser.json().then((body) => body.code), "invalid_configuration");
 
     const existingUser = await application.operations.handleUserAdd(
       jsonRequest("/api/v1/users", {

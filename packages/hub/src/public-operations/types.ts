@@ -200,9 +200,7 @@ export interface PublicOperationRepository {
     organizationId: string,
     triggerName: string,
   ): Promise<
-    | { status: "resolved"; id: string; revisionId: string }
-    | { status: "disabled" }
-    | undefined
+    { status: "resolved"; id: string; revisionId: string } | { status: "disabled" } | undefined
   >;
   resolveDeploymentProject(input: {
     organizationId: string;

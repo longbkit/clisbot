@@ -6,12 +6,7 @@ import {
   type ChannelCompileInput,
 } from "./compile.js";
 
-const AGENTS = [
-  "worker-app",
-  "worker-infra",
-  "assistant-personal",
-  "telegram-butler",
-];
+const AGENTS = ["worker-app", "worker-infra", "assistant-personal", "telegram-butler"];
 const ENVIRONMENTS = ["repo-app", "repo-infra", "personal-lab"];
 const WORKFLOWS = ["infra-runbook"];
 
@@ -28,14 +23,10 @@ function input(
   };
 }
 
-function expectCompileError(
-  files: Record<string, string>,
-  message: RegExp,
-): void {
+function expectCompileError(files: Record<string, string>, message: RegExp): void {
   assert.throws(
     () => compileChannelControlPlane(input(files)),
-    (error: unknown) =>
-      error instanceof ChannelCompilationError && message.test(error.message),
+    (error: unknown) => error instanceof ChannelCompilationError && message.test(error.message),
   );
 }
 

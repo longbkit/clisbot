@@ -133,11 +133,11 @@ export class ProviderEventAcceptanceRepository {
       }
 
       const acceptedRoutes: ProviderEventRouteSnapshot[] = selectedWorkflowRoutes.map((route) => ({
-          workflowId: route.workflowId,
-          configurationRevisionId: route.revisionId,
-          connectionId: route.connectionId,
-          resourceId: route.resourceId,
-        }));
+        workflowId: route.workflowId,
+        configurationRevisionId: route.revisionId,
+        connectionId: route.connectionId,
+        resourceId: route.resourceId,
+      }));
       await transaction
         .update(schema.providerEventReceipts)
         .set({ acceptedRoutes })

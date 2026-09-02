@@ -1561,7 +1561,7 @@ export class HubRelationshipHarness {
             providerSnapshotManager: providerCatalog,
           },
           input,
-      ),
+        ),
       interruptAgent: (agentId) => manager.cancelAgentRun(agentId),
       logger: pino({ level: "silent" }),
     });

@@ -11,9 +11,7 @@ describe("manual invocation provider", () => {
       await createActiveWorkflowConfiguration(
         database,
         {
-          environments: [
-            { name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" },
-          ],
+          environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
           triggers: [
             {
               name: "manual-request",
@@ -75,9 +73,7 @@ describe("manual invocation provider", () => {
       await createActiveWorkflowConfiguration(
         database,
         {
-          environments: [
-            { name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" },
-          ],
+          environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
           triggers: [
             {
               name: "manual-request",

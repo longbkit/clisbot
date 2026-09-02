@@ -20,27 +20,17 @@ export const ChannelWorkflowRequestPayloadSchema = z.object({
     trigger_thread_id: z.string().nullable(),
     trigger_message_id: z.string().optional(),
     route:
-      z.custom<
-        Pick<
-          CompiledRoute,
-          "defaultRoles" | "assignments" | "defaults" | "approval"
-        >
-      >(),
+      z.custom<Pick<CompiledRoute, "defaultRoles" | "assignments" | "defaults" | "approval">>(),
   }),
 });
 
-export const ChannelWorkflowPayloadSchema =
-  ChannelWorkflowRequestPayloadSchema.extend({
-    workflow_id: z.string().uuid(),
-    workflow_revision_id: z.string().uuid(),
-  });
+export const ChannelWorkflowPayloadSchema = ChannelWorkflowRequestPayloadSchema.extend({
+  workflow_id: z.string().uuid(),
+  workflow_revision_id: z.string().uuid(),
+});
 
-export type ChannelWorkflowRequestPayload = z.infer<
-  typeof ChannelWorkflowRequestPayloadSchema
->;
-export type ChannelWorkflowPayload = z.infer<
-  typeof ChannelWorkflowPayloadSchema
->;
+export type ChannelWorkflowRequestPayload = z.infer<typeof ChannelWorkflowRequestPayloadSchema>;
+export type ChannelWorkflowPayload = z.infer<typeof ChannelWorkflowPayloadSchema>;
 
 export function createChannelWorkflowProvider(
   database: Pick<Database, "findOrganizationTriggerRevision">,
@@ -55,11 +45,8 @@ export function createChannelWorkflowProvider(
         payload.workflow_revision_id,
       );
       if (stored === undefined) return "configuration_unavailable";
-      if (stored.organizationId !== external.organizationId)
-        return "configuration_unavailable";
-      const configuration = parseCompiledHubConfig(
-        stored.normalizedConfiguration,
-      );
+      if (stored.organizationId !== external.organizationId) return "configuration_unavailable";
+      const configuration = parseCompiledHubConfig(stored.normalizedConfiguration);
       const workflow = configuration.triggers[0];
       if (workflow === undefined) return "no_trigger_for_source";
       const invocation = parseInvocation(payload.text, workflow.inputs);
@@ -75,9 +62,7 @@ export function createChannelWorkflowProvider(
         outputContext: { provider: "channel", channel: payload.channel },
       };
       const match: TriggerProviderMatch =
-        invocation.status === "accepted"
-          ? { ...base, invocation }
-          : { ...base, invocation };
+        invocation.status === "accepted" ? { ...base, invocation } : { ...base, invocation };
       return [match];
     },
   };

@@ -2,10 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { JsonValue } from "../config/compiler.js";
-import {
-  parseInvocationInputs,
-  parseInvocationRejection,
-} from "../triggers/invocation.js";
+import { parseInvocationInputs, parseInvocationRejection } from "../triggers/invocation.js";
 import type { ProviderEventDropReasonCode } from "../triggers/drop-reason.js";
 import {
   clearOverrideKey,
@@ -26,17 +23,9 @@ import {
   toProviderEventReceiptSummary,
   toProviderEventReceiptRecord,
 } from "./mappers.js";
-import type {
-  AgentExecutionStatus,
-  MachineSource,
-  MachineStatus,
-} from "./schema.js";
+import type { AgentExecutionStatus, MachineSource, MachineStatus } from "./schema.js";
 import * as schema from "./schema.js";
-import type {
-  DatabaseRuntime,
-  QueryHandle,
-  QueryRow,
-} from "./runtime/index.js";
+import type { DatabaseRuntime, QueryHandle, QueryRow } from "./runtime/index.js";
 import type { Locks } from "./runtime/locks/index.js";
 import type {
   AgentExecutionOutputAttempt,
@@ -135,9 +124,7 @@ function transitionWithTerminalRun(
   transition: TransitionAgentExecutionResult,
   run: TriggerRunRecord | undefined,
 ): TransitionAgentExecutionResult {
-  return !transition.transitioned ||
-    run === undefined ||
-    run.status === "running"
+  return !transition.transitioned || run === undefined || run.status === "running"
     ? transition
     : { ...transition, terminalRun: run };
 }
@@ -185,13 +172,9 @@ function requireLinearAccessCredential(value: unknown): {
   refreshToken: string | null;
 } {
   const accessToken: unknown =
-    value !== null && typeof value === "object"
-      ? Reflect.get(value, "accessToken")
-      : undefined;
+    value !== null && typeof value === "object" ? Reflect.get(value, "accessToken") : undefined;
   const refreshToken: unknown =
-    value !== null && typeof value === "object"
-      ? Reflect.get(value, "refreshToken")
-      : undefined;
+    value !== null && typeof value === "object" ? Reflect.get(value, "refreshToken") : undefined;
   if (
     typeof accessToken !== "string" ||
     (refreshToken !== null && typeof refreshToken !== "string")
@@ -211,15 +194,8 @@ class PgDatabase implements Database {
     private readonly credentialCipher: CredentialCipher,
   ) {
     const database = this.pool.drizzle();
-    this.connections = new ConnectionRepository(
-      this.pool,
-      locks,
-      credentialCipher,
-    );
-    this.triggerAcceptance = new ProviderEventAcceptanceRepository(
-      database,
-      this.connections,
-    );
+    this.connections = new ConnectionRepository(this.pool, locks, credentialCipher);
+    this.triggerAcceptance = new ProviderEventAcceptanceRepository(database, this.connections);
   }
 
   acceptGitHubEvent(input: AcceptGitHubEventInput) {
@@ -258,9 +234,7 @@ class PgDatabase implements Database {
   }
 
   releaseGitHubLifecycleReceipt(providerEventReceiptId: string) {
-    return this.triggerAcceptance.releaseGitHubLifecycleReceipt(
-      providerEventReceiptId,
-    );
+    return this.triggerAcceptance.releaseGitHubLifecycleReceipt(providerEventReceiptId);
   }
 
   async markProviderEventDropped(
@@ -275,9 +249,7 @@ class PgDatabase implements Database {
       [providerEventReceiptId, reason],
     );
     if (rows.rowCount === 0)
-      throw new Error(
-        `provider event receipt not found: ${providerEventReceiptId}`,
-      );
+      throw new Error(`provider event receipt not found: ${providerEventReceiptId}`);
   }
 
   async findProviderEventReceiptByDeliveryId(
@@ -289,13 +261,9 @@ class PgDatabase implements Database {
       organizationId === undefined
         ? "select * from provider_event_receipts where delivery_id = $1 limit 1"
         : "select * from provider_event_receipts where delivery_id = $1 and organization_id = $2 limit 1",
-      organizationId === undefined
-        ? [deliveryId]
-        : [deliveryId, organizationId],
+      organizationId === undefined ? [deliveryId] : [deliveryId, organizationId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toProviderEventReceiptRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toProviderEventReceiptRecord(rows.rows[0]);
   }
 
   async insertMachine(input: InsertMachineInput): Promise<MachineRecord> {
@@ -343,9 +311,7 @@ class PgDatabase implements Database {
         [id],
       );
 
-      return rows.rows[0] === undefined
-        ? undefined
-        : toMachineRecord(rows.rows[0]);
+      return rows.rows[0] === undefined ? undefined : toMachineRecord(rows.rows[0]);
     } catch (error) {
       throw toDatabaseError(error);
     }
@@ -362,9 +328,7 @@ class PgDatabase implements Database {
         [id, organizationId],
       );
 
-      return rows.rows[0] === undefined
-        ? undefined
-        : toMachineRecord(rows.rows[0]);
+      return rows.rows[0] === undefined ? undefined : toMachineRecord(rows.rows[0]);
     } catch (error) {
       throw toDatabaseError(error);
     }
@@ -407,9 +371,7 @@ class PgDatabase implements Database {
     }
   }
 
-  async insertAgentExecution(
-    input: InsertAgentExecutionInput,
-  ): Promise<AgentExecutionRecord> {
+  async insertAgentExecution(input: InsertAgentExecutionInput): Promise<AgentExecutionRecord> {
     try {
       const rows = await query<AgentExecutionRow>(
         this.pool,
@@ -564,9 +526,7 @@ class PgDatabase implements Database {
         ],
       );
       const execution = rows.rows[0];
-      return execution === undefined
-        ? undefined
-        : toAgentExecutionRecord(execution);
+      return execution === undefined ? undefined : toAgentExecutionRecord(execution);
     } catch (error) {
       throw toDatabaseError(error);
     }
@@ -609,18 +569,12 @@ class PgDatabase implements Database {
              and workflow_id = $2
              and configured_trigger_name = $3
            for update`,
-            [
-              input.providerEventReceiptId,
-              input.workflowId,
-              input.configuredTriggerName,
-            ],
+            [input.providerEventReceiptId, input.workflowId, input.configuredTriggerName],
           );
           run = existing.rows[0];
         }
-        if (run === undefined)
-          throw new Error("trigger run insert returned no row");
-        if (run.outcome !== "accepted")
-          throw new Error("trigger branch outcome conflict");
+        if (run === undefined) throw new Error("trigger run insert returned no row");
+        if (run.outcome !== "accepted") throw new Error("trigger branch outcome conflict");
         for (const [ordinal, stepId] of input.stepIds.entries()) {
           await client.query(
             `insert into workflow_step_runs
@@ -637,8 +591,7 @@ class PgDatabase implements Database {
           [run.id, input.createdAt ?? new Date()],
         );
         const record = toTriggerRunRecord(run);
-        if (record.outcome !== "accepted")
-          throw new Error("trigger branch outcome conflict");
+        if (record.outcome !== "accepted") throw new Error("trigger branch outcome conflict");
         return { run: record, created };
       });
     } catch (error) {
@@ -685,21 +638,14 @@ class PgDatabase implements Database {
              and workflow_id = $2
              and configured_trigger_name = $3
            for update`,
-            [
-              input.providerEventReceiptId,
-              input.workflowId,
-              input.configuredTriggerName,
-            ],
+            [input.providerEventReceiptId, input.workflowId, input.configuredTriggerName],
           );
           run = existing.rows[0];
         }
-        if (run === undefined)
-          throw new Error("trigger run insert returned no row");
-        if (run.outcome !== "rejected")
-          throw new Error("trigger branch outcome conflict");
+        if (run === undefined) throw new Error("trigger run insert returned no row");
+        if (run.outcome !== "rejected") throw new Error("trigger branch outcome conflict");
         const record = toTriggerRunRecord(run);
-        if (record.outcome !== "rejected")
-          throw new Error("trigger branch outcome conflict");
+        if (record.outcome !== "rejected") throw new Error("trigger branch outcome conflict");
         return { run: record, created };
       });
     } catch (error) {
@@ -708,19 +654,13 @@ class PgDatabase implements Database {
   }
 
   async findTriggerRunById(id: string) {
-    const rows = await query<TriggerRunRow>(
-      this.pool,
-      `select * from trigger_runs where id = $1`,
-      [id],
-    );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toTriggerRunRecord(rows.rows[0]);
+    const rows = await query<TriggerRunRow>(this.pool, `select * from trigger_runs where id = $1`, [
+      id,
+    ]);
+    return rows.rows[0] === undefined ? undefined : toTriggerRunRecord(rows.rows[0]);
   }
 
-  async findTriggerRunsByProviderEventReceiptId(
-    providerEventReceiptId: string,
-  ) {
+  async findTriggerRunsByProviderEventReceiptId(providerEventReceiptId: string) {
     const rows = await query<TriggerRunRow>(
       this.pool,
       `select * from trigger_runs
@@ -737,9 +677,7 @@ class PgDatabase implements Database {
       `select * from workflow_step_runs where id = $1`,
       [id],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toWorkflowStepRunRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toWorkflowStepRunRecord(rows.rows[0]);
   }
 
   async findWorkflowStepRunByTriggerRun(triggerRunId: string) {
@@ -748,9 +686,7 @@ class PgDatabase implements Database {
       `select * from workflow_step_runs where trigger_run_id = $1 order by ordinal limit 1`,
       [triggerRunId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toWorkflowStepRunRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toWorkflowStepRunRecord(rows.rows[0]);
   }
 
   async listWorkflowStepRunsForTriggerRun(triggerRunId: string) {
@@ -768,9 +704,7 @@ class PgDatabase implements Database {
       `select * from agent_executions where workflow_step_run_id = $1 limit 1`,
       [stepRunId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toAgentExecutionRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
   }
 
   async claimWorkflowWakeup(now: Date, leaseMs: number) {
@@ -792,10 +726,7 @@ class PgDatabase implements Database {
           `update workflow_wakeups set lease_expires_at = $2 where trigger_run_id = $1 returning *`,
           [wakeup.trigger_run_id, new Date(now.getTime() + leaseMs)],
         );
-        return toWorkflowWakeupRecord(
-          updated.rows[0]!,
-          wakeup.lease_expires_at !== null,
-        );
+        return toWorkflowWakeupRecord(updated.rows[0]!, wakeup.lease_expires_at !== null);
       });
     } catch (error) {
       throw toDatabaseError(error);
@@ -857,11 +788,9 @@ class PgDatabase implements Database {
   }
 
   async deleteWorkflowWakeup(triggerRunId: string) {
-    await query(
-      this.pool,
-      `delete from workflow_wakeups where trigger_run_id = $1`,
-      [triggerRunId],
-    );
+    await query(this.pool, `delete from workflow_wakeups where trigger_run_id = $1`, [
+      triggerRunId,
+    ]);
   }
 
   async createWorkflowStepExecution(input: WorkflowStepExecutionInput) {
@@ -873,34 +802,28 @@ class PgDatabase implements Database {
           [input.triggerRunId],
         );
         const run = runRows.rows[0];
-        if (run === undefined)
-          throw new Error("workflow trigger run not found");
+        if (run === undefined) throw new Error("workflow trigger run not found");
         if (run.outcome !== "accepted" || run.status !== "running") {
           const stepRows = await client.query<WorkflowStepRunRow>(
             `select * from workflow_step_runs where trigger_run_id = $1 and step_id = $2 and ordinal = $3`,
             [input.triggerRunId, input.stepId, input.ordinal],
           );
           const step = stepRows.rows[0];
-          if (step === undefined)
-            throw new Error("workflow step run not found");
+          if (step === undefined) throw new Error("workflow step run not found");
           return {
             stepRun: toWorkflowStepRunRecord(step),
             execution: undefined,
             created: false,
           };
         }
-        if (
-          run.deadline_at === null ||
-          run.deadline_at.getTime() <= startedAt.getTime()
-        ) {
+        if (run.deadline_at === null || run.deadline_at.getTime() <= startedAt.getTime()) {
           await timeoutWorkflowRunOnClient(client, run, startedAt);
           const stepRows = await client.query<WorkflowStepRunRow>(
             `select * from workflow_step_runs where trigger_run_id = $1 and step_id = $2 and ordinal = $3`,
             [input.triggerRunId, input.stepId, input.ordinal],
           );
           const step = stepRows.rows[0];
-          if (step === undefined)
-            throw new Error("workflow step run not found");
+          if (step === undefined) throw new Error("workflow step run not found");
           return {
             stepRun: toWorkflowStepRunRecord(step),
             execution: undefined,
@@ -908,10 +831,7 @@ class PgDatabase implements Database {
           };
         }
         const deadlineAt = new Date(
-          Math.min(
-            input.execution.deadlineAt.getTime(),
-            run.deadline_at.getTime(),
-          ),
+          Math.min(input.execution.deadlineAt.getTime(), run.deadline_at.getTime()),
         );
         const idleDeadlineAt = new Date(
           Math.min(
@@ -934,9 +854,7 @@ class PgDatabase implements Database {
           return {
             stepRun: toWorkflowStepRunRecord(step),
             execution:
-              existing.rows[0] === undefined
-                ? undefined
-                : toAgentExecutionRecord(existing.rows[0]),
+              existing.rows[0] === undefined ? undefined : toAgentExecutionRecord(existing.rows[0]),
             created: false,
           };
         }
@@ -960,9 +878,7 @@ class PgDatabase implements Database {
           });
           if (reserved === undefined) {
             if (input.reservation.limit === null) {
-              throw new Error(
-                "unreachable: an unlimited meter reservation cannot be denied",
-              );
+              throw new Error("unreachable: an unlimited meter reservation cannot be denied");
             }
             const usage = await client.query<OrganizationUsageRow>(
               `select used from organization_usage
@@ -1024,12 +940,8 @@ class PgDatabase implements Database {
           [stepRunId],
         );
         const step = selected.rows[0];
-        if (step === undefined)
-          throw new Error(`workflow step run not found: ${stepRunId}`);
-        if (
-          step.agent_execution_id !== null &&
-          step.agent_execution_id !== executionId
-        ) {
+        if (step === undefined) throw new Error(`workflow step run not found: ${stepRunId}`);
+        if (step.agent_execution_id !== null && step.agent_execution_id !== executionId) {
           throw new Error(`workflow step run already linked: ${stepRunId}`);
         }
         if (step.agent_execution_id === executionId) {
@@ -1049,12 +961,7 @@ class PgDatabase implements Database {
              dispatch_intent = coalesce($4, dispatch_intent)
          where id = $1 and agent_execution_id is null
          returning *`,
-          [
-            stepRunId,
-            executionId,
-            executionRow.started_at,
-            dispatchIntent ?? null,
-          ],
+          [stepRunId, executionId, executionRow.started_at, dispatchIntent ?? null],
         );
         return toWorkflowStepRunRecord(updated.rows[0] ?? step);
       });
@@ -1070,20 +977,16 @@ class PgDatabase implements Database {
     failureReason?: string,
   ) {
     const execution = await this.findAgentExecutionById(executionId);
-    if (execution === undefined || execution.workflowStepRunId === null)
-      return undefined;
+    if (execution === undefined || execution.workflowStepRunId === null) return undefined;
     await this.completeWorkflowAgentExecution({
       executionId,
-      executionStatus:
-        execution.status === "succeeded" ? "succeeded" : "failed",
+      executionStatus: execution.status === "succeeded" ? "succeeded" : "failed",
       stepStatus: status,
       result,
       stepOutput: result,
       ...(failureReason === undefined ? {} : { failureReason }),
     });
-    const step = await this.findWorkflowStepRunById(
-      execution.workflowStepRunId,
-    );
+    const step = await this.findWorkflowStepRunById(execution.workflowStepRunId);
     return step === undefined
       ? undefined
       : {
@@ -1103,22 +1006,16 @@ class PgDatabase implements Database {
         if (initial === undefined)
           throw new Error(`agent execution not found: ${input.executionId}`);
         if (initial.workflow_step_run_id === null) {
-          return this.transitionAgentExecution(
-            input.executionId,
-            input.executionStatus,
-            {
-              result: input.result,
-              ...(input.completedByAgent === undefined
-                ? {}
-                : { completedByAgent: input.completedByAgent }),
-              ...(input.deadlineCondition === undefined
-                ? {}
-                : { deadlineCondition: input.deadlineCondition }),
-              ...(input.hubAction === undefined
-                ? {}
-                : { hubAction: input.hubAction }),
-            },
-          );
+          return this.transitionAgentExecution(input.executionId, input.executionStatus, {
+            result: input.result,
+            ...(input.completedByAgent === undefined
+              ? {}
+              : { completedByAgent: input.completedByAgent }),
+            ...(input.deadlineCondition === undefined
+              ? {}
+              : { deadlineCondition: input.deadlineCondition }),
+            ...(input.hubAction === undefined ? {} : { hubAction: input.hubAction }),
+          });
         }
 
         const stepLookup = await client.query<WorkflowStepRunRow>(
@@ -1126,15 +1023,13 @@ class PgDatabase implements Database {
           [initial.workflow_step_run_id],
         );
         const stepCandidate = stepLookup.rows[0];
-        if (stepCandidate === undefined)
-          throw new Error("workflow step run not found");
+        if (stepCandidate === undefined) throw new Error("workflow step run not found");
         const runRows = await client.query<TriggerRunRow>(
           `select * from trigger_runs where id = $1 for update`,
           [stepCandidate.trigger_run_id],
         );
         const run = runRows.rows[0];
-        if (run === undefined)
-          throw new Error("workflow trigger run not found");
+        if (run === undefined) throw new Error("workflow trigger run not found");
         const stepRows = await client.query<WorkflowStepRunRow>(
           `select * from workflow_step_runs where id = $1 for update`,
           [initial.workflow_step_run_id],
@@ -1151,27 +1046,14 @@ class PgDatabase implements Database {
           throw new Error(`agent execution not found: ${input.executionId}`);
         const observedAt = input.observedAt ?? new Date();
         if (execution.status === "spawning" || execution.status === "running") {
-          const deadlineKind = workflowDeadlineKind(
-            execution,
-            step,
-            run,
-            observedAt,
-          );
+          const deadlineKind = workflowDeadlineKind(execution, step, run, observedAt);
           if (deadlineKind === "whole_run") {
-            const recovery = await timeoutWorkflowRunOnClient(
-              client,
-              run,
-              observedAt,
-            );
+            const recovery = await timeoutWorkflowRunOnClient(client, run, observedAt);
             const terminalRun = await findTriggerRunOnClient(client, run.id);
-            const updatedExecution = await findAgentExecutionOnClient(
-              client,
-              input.executionId,
-            );
+            const updatedExecution = await findAgentExecutionOnClient(client, input.executionId);
             return transitionWithTerminalRun(
               {
-                execution:
-                  updatedExecution ?? toAgentExecutionRecord(execution),
+                execution: updatedExecution ?? toAgentExecutionRecord(execution),
                 transitioned: recovery.executionIds.includes(input.executionId),
                 deadlineKind,
               },
@@ -1199,11 +1081,7 @@ class PgDatabase implements Database {
           }
         }
 
-        const liveTransition = await transitionWorkflowAgentExecution(
-          client,
-          execution,
-          input,
-        );
+        const liveTransition = await transitionWorkflowAgentExecution(client, execution, input);
         if (liveTransition === undefined) {
           return {
             execution: toAgentExecutionRecord(execution),
@@ -1218,9 +1096,7 @@ class PgDatabase implements Database {
           {
             execution: toAgentExecutionRecord(liveTransition.execution),
             transitioned: liveTransition.transitioned,
-            ...(input.deadlineKind === undefined
-              ? {}
-              : { deadlineKind: input.deadlineKind }),
+            ...(input.deadlineKind === undefined ? {} : { deadlineKind: input.deadlineKind }),
           },
           terminalRun,
         );
@@ -1230,11 +1106,7 @@ class PgDatabase implements Database {
     }
   }
 
-  async markWorkflowStepSkipped(
-    triggerRunId: string,
-    stepId: string,
-    reason: string,
-  ) {
+  async markWorkflowStepSkipped(triggerRunId: string, stepId: string, reason: string) {
     try {
       return await this.pool.transaction(async (client) => {
         const stepRows = await client.query<WorkflowStepRunRow>(
@@ -1345,10 +1217,9 @@ class PgDatabase implements Database {
          where id = $1 returning *`,
           [triggerRunId, status, failureReason, completedAt],
         );
-        await client.query(
-          `delete from workflow_wakeups where trigger_run_id = $1`,
-          [triggerRunId],
-        );
+        await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [
+          triggerRunId,
+        ]);
         return {
           stepRun: toWorkflowStepRunRecord(updatedStep.rows[0] ?? step),
           run: toTriggerRunRecord(updatedRun.rows[0]!),
@@ -1381,10 +1252,7 @@ class PgDatabase implements Database {
     );
   }
 
-  async claimPendingWorkflowRunTerminalNotification(
-    now: Date,
-    leaseMs: number,
-  ) {
+  async claimPendingWorkflowRunTerminalNotification(now: Date, leaseMs: number) {
     try {
       return await this.pool.transaction(async (client) => {
         const selected = await client.query<TriggerRunRow>(
@@ -1437,10 +1305,7 @@ class PgDatabase implements Database {
     );
   }
 
-  async setWorkflowRunReactionState(
-    triggerRunId: string,
-    reactionState: JsonValue | null,
-  ) {
+  async setWorkflowRunReactionState(triggerRunId: string, reactionState: JsonValue | null) {
     const rows = await query<TriggerRunRow>(
       this.pool,
       `update trigger_runs
@@ -1452,14 +1317,11 @@ class PgDatabase implements Database {
     const row = rows.rows[0];
     if (row === undefined) return undefined;
     const run = toTriggerRunRecord(row);
-    if (run.outcome !== "accepted")
-      throw new Error("trigger branch outcome conflict");
+    if (run.outcome !== "accepted") throw new Error("trigger branch outcome conflict");
     return run;
   }
 
-  async recoverWorkflowDeadlines(
-    now: Date,
-  ): Promise<readonly WorkflowDeadlineRecovery[]> {
+  async recoverWorkflowDeadlines(now: Date): Promise<readonly WorkflowDeadlineRecovery[]> {
     try {
       return await this.pool.transaction(async (client) => {
         const recoveries: WorkflowDeadlineRecovery[] = [];
@@ -1500,24 +1362,15 @@ class PgDatabase implements Database {
             const execution = executionRows.rows[0];
             if (
               execution !== undefined &&
-              (execution.status === "succeeded" ||
-                execution.status === "failed")
+              (execution.status === "succeeded" || execution.status === "failed")
             ) {
               continue;
             }
-            const deadlineKind = workflowDeadlineKind(
-              execution,
-              step,
-              run,
-              now,
-            );
-            if (deadlineKind === undefined || deadlineKind === "whole_run")
-              continue;
+            const deadlineKind = workflowDeadlineKind(execution, step, run, now);
+            if (deadlineKind === undefined || deadlineKind === "whole_run") continue;
             if (execution === undefined) {
               const reason =
-                deadlineKind === "step_idle"
-                  ? "step_idle_timeout"
-                  : "step_hard_timeout";
+                deadlineKind === "step_idle" ? "step_idle_timeout" : "step_hard_timeout";
               await client.query(
                 `update workflow_step_runs
                set status = 'timed_out', failure_reason = $2, deadline_kind = $3, completed_at = $4
@@ -1530,10 +1383,9 @@ class PgDatabase implements Database {
                where id = $1 and status = 'running'`,
                 [run.id, deadlineKind, reason, now],
               );
-              await client.query(
-                `delete from workflow_wakeups where trigger_run_id = $1`,
-                [run.id],
-              );
+              await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [
+                run.id,
+              ]);
               recoveries.push({ triggerRunId: run.id, executionIds: [] });
             } else {
               const updated = await timeoutWorkflowStepOnClient(
@@ -1559,10 +1411,7 @@ class PgDatabase implements Database {
   }
 
   async issueEnrollmentToken(input: EnrollmentTokenRecord): Promise<boolean> {
-    if (
-      input.issuedByCliCredentialId !== undefined &&
-      input.issuedByCliCredentialId !== null
-    ) {
+    if (input.issuedByCliCredentialId !== undefined && input.issuedByCliCredentialId !== null) {
       return this.pool.transaction(async (client) => {
         await this.locks.withTxLock(client, input.issuedByCliCredentialId!);
         const credential = await client.query(
@@ -1587,10 +1436,7 @@ class PgDatabase implements Database {
         return true;
       });
     }
-    if (
-      input.issuedByApiKeyId === undefined ||
-      input.issuedByApiKeyId === null
-    ) {
+    if (input.issuedByApiKeyId === undefined || input.issuedByApiKeyId === null) {
       await query(
         this.pool,
         `insert into daemon_enrollment_tokens
@@ -1616,13 +1462,7 @@ class PgDatabase implements Database {
           `insert into daemon_enrollment_tokens
              (id, verifier, organization_id, issued_by_api_key_id, expires_at)
            values ($1, $2, $3, $4, $5)`,
-          [
-            input.id,
-            input.verifier,
-            input.organizationId,
-            input.issuedByApiKeyId,
-            input.expiresAt,
-          ],
+          [input.id, input.verifier, input.organizationId, input.issuedByApiKeyId, input.expiresAt],
         );
         return true;
       });
@@ -1692,9 +1532,7 @@ class PgDatabase implements Database {
        where user_code_verifier = $1 and status = 'pending' and expires_at > now()`,
       [userCodeVerifier],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toCliAuthorization(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toCliAuthorization(rows.rows[0]);
   }
 
   async decideCliAuthorization(
@@ -1743,12 +1581,7 @@ class PgDatabase implements Database {
              approved_by_user_id = case when $2 = 'approved' then $4 end,
              decided_at = now()
          where id = $1`,
-          [
-            authorization.rows[0].id,
-            status,
-            input.access.organizationId,
-            input.access.userId,
-          ],
+          [authorization.rows[0].id, status, input.access.organizationId, input.access.userId],
         );
         return status;
       });
@@ -1769,14 +1602,10 @@ class PgDatabase implements Database {
           [input.deviceVerifier],
         );
         const authorization = selected.rows[0];
-        if (
-          authorization !== undefined &&
-          authorization.expires_at <= authorization.database_now
-        ) {
-          await client.query(
-            `update cli_authorizations set status = 'expired' where id = $1`,
-            [authorization.id],
-          );
+        if (authorization !== undefined && authorization.expires_at <= authorization.database_now) {
+          await client.query(`update cli_authorizations set status = 'expired' where id = $1`, [
+            authorization.id,
+          ]);
           return {
             status: "expired",
             intervalSeconds: authorization.poll_interval_seconds,
@@ -1877,20 +1706,13 @@ class PgDatabase implements Database {
           [input.tokenVerifier, input.now],
         );
         const consumedToken = token.rows[0];
-        if (
-          consumedToken?.organization_id === null ||
-          consumedToken === undefined
-        )
+        if (consumedToken?.organization_id === null || consumedToken === undefined)
           return client.rollback(undefined);
         const machine = await client.query<MachineRow>(
           `insert into machines (org_id, source, status) values ($1, $2, 'alive') returning *`,
-          [
-            consumedToken.organization_id,
-            { kind: "daemon", daemonId: input.daemonId },
-          ],
+          [consumedToken.organization_id, { kind: "daemon", daemonId: input.daemonId }],
         );
-        const suggestedSlug =
-          input.suggestedSlug ?? `daemon-${input.daemonId.slice(0, 8)}`;
+        const suggestedSlug = input.suggestedSlug ?? `daemon-${input.daemonId.slice(0, 8)}`;
         requestedSlug = suggestedSlug;
         let daemon = await client.query<DaemonRow>(
           `insert into daemons
@@ -1969,11 +1791,7 @@ class PgDatabase implements Database {
   }
 
   async findDaemonById(id: string): Promise<DaemonRecord | undefined> {
-    const rows = await query<DaemonRow>(
-      this.pool,
-      `select * from daemons where id = $1`,
-      [id],
-    );
+    const rows = await query<DaemonRow>(this.pool, `select * from daemons where id = $1`, [id]);
     return rows.rows[0] ? toDaemon(rows.rows[0]) : undefined;
   }
 
@@ -1993,9 +1811,7 @@ class PgDatabase implements Database {
     return rows.rows[0] ? toDaemon(rows.rows[0]) : undefined;
   }
 
-  async listDaemonsForOrganization(
-    organizationId: string,
-  ): Promise<DaemonRecord[]> {
+  async listDaemonsForOrganization(organizationId: string): Promise<DaemonRecord[]> {
     const rows = await query<DaemonRow>(
       this.pool,
       `select daemons.* from daemons
@@ -2007,11 +1823,7 @@ class PgDatabase implements Database {
     return rows.rows.map(toDaemon);
   }
 
-  async renameDaemonForOrganization(
-    organizationId: string,
-    id: string,
-    slug: string,
-  ) {
+  async renameDaemonForOrganization(organizationId: string, id: string, slug: string) {
     try {
       const rows = await query<DaemonRow>(
         this.pool,
@@ -2023,24 +1835,16 @@ class PgDatabase implements Database {
       );
       return rows.rows[0] === undefined ? undefined : toDaemon(rows.rows[0]);
     } catch (error) {
-      if (isDaemonSlugConflict(error))
-        return { status: "slug_conflict" as const, slug };
+      if (isDaemonSlugConflict(error)) return { status: "slug_conflict" as const, slug };
       throw toDatabaseError(error);
     }
   }
 
   async touchDaemon(id: string): Promise<void> {
-    await query(
-      this.pool,
-      `update daemons set last_seen_at = now() where id = $1`,
-      [id],
-    );
+    await query(this.pool, `update daemons set last_seen_at = now() where id = $1`, [id]);
   }
 
-  async setDaemonPresence(
-    id: string,
-    presence: "offline" | "connected",
-  ): Promise<void> {
+  async setDaemonPresence(id: string, presence: "offline" | "connected"): Promise<void> {
     await query(
       this.pool,
       `update daemons set presence = $2, connected_at = case when $2 = 'connected' then now() else connected_at end, disconnected_at = case when $2 = 'offline' then now() else disconnected_at end where id = $1`,
@@ -2048,10 +1852,7 @@ class PgDatabase implements Database {
     );
   }
 
-  async setDaemonPermissions(
-    id: string,
-    permissions: string[],
-  ): Promise<DaemonRecord | undefined> {
+  async setDaemonPermissions(id: string, permissions: string[]): Promise<DaemonRecord | undefined> {
     const rows = await query<DaemonRow>(
       this.pool,
       `update daemons set scopes = $2 where id = $1 and status = 'active' returning *`,
@@ -2079,8 +1880,7 @@ class PgDatabase implements Database {
       `update agent_executions set daemon_id = $2, daemon_agent_id = $3 where id = $1 returning *`,
       [executionId, daemonId, agentId],
     );
-    if (!rows.rows[0])
-      throw new Error(`agent execution not found: ${executionId}`);
+    if (!rows.rows[0]) throw new Error(`agent execution not found: ${executionId}`);
     return toAgentExecutionRecord(rows.rows[0]);
   }
 
@@ -2097,8 +1897,7 @@ class PgDatabase implements Database {
           [executionId],
         );
         const existing = existingRows.rows[0];
-        if (existing === undefined)
-          throw new Error(`agent execution not found: ${executionId}`);
+        if (existing === undefined) throw new Error(`agent execution not found: ${executionId}`);
 
         let workflowRefreshAllowed = true;
         if (existing.workflow_step_run_id !== null) {
@@ -2187,14 +1986,11 @@ class PgDatabase implements Database {
     );
     if (rows.rows[0] !== undefined) return toAgentExecutionRecord(rows.rows[0]);
     const execution = await this.findAgentExecutionById(executionId);
-    if (execution === undefined)
-      throw new Error(`agent execution not found: ${executionId}`);
+    if (execution === undefined) throw new Error(`agent execution not found: ${executionId}`);
     return execution;
   }
 
-  async findAgentExecutionById(
-    id: string,
-  ): Promise<AgentExecutionRecord | undefined> {
+  async findAgentExecutionById(id: string): Promise<AgentExecutionRecord | undefined> {
     try {
       const rows = await query<AgentExecutionRow>(
         this.pool,
@@ -2202,9 +1998,7 @@ class PgDatabase implements Database {
         [id],
       );
 
-      return rows.rows[0] === undefined
-        ? undefined
-        : toAgentExecutionRecord(rows.rows[0]);
+      return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
     } catch (error) {
       throw toDatabaseError(error);
     }
@@ -2224,16 +2018,9 @@ class PgDatabase implements Database {
        where binding.organization_id = $1 and binding.binding_key = $2
          and binding.workflow_name = $3 and binding.step_id = $4
        limit 1`,
-      [
-        input.organizationId,
-        input.bindingKey,
-        input.workflowName,
-        input.stepId,
-      ],
+      [input.organizationId, input.bindingKey, input.workflowName, input.stepId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toAgentExecutionRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
   }
 
   async findLatestChannelWorkflowExecution(input: {
@@ -2256,9 +2043,7 @@ class PgDatabase implements Database {
        limit 1`,
       [input.organizationId, input.bindingKey, input.workflowName],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toAgentExecutionRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
   }
 
   async upsertWorkflowAgentReuseBinding(input: {
@@ -2298,8 +2083,7 @@ class PgDatabase implements Database {
       [executionId, reactionState],
     );
     const row = rows.rows[0];
-    if (row === undefined)
-      throw new Error(`agent execution not found: ${executionId}`);
+    if (row === undefined) throw new Error(`agent execution not found: ${executionId}`);
     return toAgentExecutionRecord(row);
   }
 
@@ -2315,26 +2099,20 @@ class PgDatabase implements Database {
         [id, organizationId],
       );
 
-      return rows.rows[0] === undefined
-        ? undefined
-        : toAgentExecutionRecord(rows.rows[0]);
+      return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
     } catch (error) {
       throw toDatabaseError(error);
     }
   }
 
-  async updateTriggerRunValues(
-    triggerRunId: string,
-    values: unknown,
-  ): Promise<TriggerRunRecord> {
+  async updateTriggerRunValues(triggerRunId: string, values: unknown): Promise<TriggerRunRecord> {
     const rows = await query<TriggerRunRow>(
       this.pool,
       `update trigger_runs set values = $2 where id = $1 returning *`,
       [triggerRunId, values],
     );
     const row = rows.rows[0];
-    if (row === undefined)
-      throw new Error(`trigger run not found: ${triggerRunId}`);
+    if (row === undefined) throw new Error(`trigger run not found: ${triggerRunId}`);
     return toTriggerRunRecord(row);
   }
 
@@ -2400,9 +2178,7 @@ class PgDatabase implements Database {
           return undefined;
         }
         const execution = toAgentExecutionRecord(row);
-        const activeAttempts = Object.values(
-          execution.outputDeliveryAttempts,
-        ).filter(
+        const activeAttempts = Object.values(execution.outputDeliveryAttempts).filter(
           (attempt) =>
             attempt.outputType === outputType &&
             attempt.status === "pending" &&
@@ -2419,8 +2195,7 @@ class PgDatabase implements Database {
             execution.status !== "running" &&
             execution.status !== "succeeded") ||
           (maxOutputs !== undefined &&
-            (execution.outputEmissions[outputType] ?? 0) + activeAttempts >=
-              maxOutputs)
+            (execution.outputEmissions[outputType] ?? 0) + activeAttempts >= maxOutputs)
         ) {
           return undefined;
         }
@@ -2429,9 +2204,7 @@ class PgDatabase implements Database {
           outputType,
           status: "pending",
           startedAt,
-          leaseExpiresAt: new Date(
-            startedAt.getTime() + OUTPUT_ATTEMPT_LEASE_MS,
-          ),
+          leaseExpiresAt: new Date(startedAt.getTime() + OUTPUT_ATTEMPT_LEASE_MS),
           completedAt: null,
         };
         await client.query(
@@ -2500,8 +2273,7 @@ class PgDatabase implements Database {
         }
         const outputEmissions = {
           ...execution.outputEmissions,
-          [attempt.outputType]:
-            (execution.outputEmissions[attempt.outputType] ?? 0) + 1,
+          [attempt.outputType]: (execution.outputEmissions[attempt.outputType] ?? 0) + 1,
         };
         const updated = await client.query<AgentExecutionRow>(
           `update agent_executions
@@ -2522,9 +2294,7 @@ class PgDatabase implements Database {
             }),
           ],
         );
-        return updated.rows[0] === undefined
-          ? undefined
-          : toAgentExecutionRecord(updated.rows[0]);
+        return updated.rows[0] === undefined ? undefined : toAgentExecutionRecord(updated.rows[0]);
       });
     } catch (error) {
       throw toDatabaseError(error);
@@ -2648,9 +2418,7 @@ class PgDatabase implements Database {
     }
   }
 
-  async findRunningAgentExecutionsForMachine(
-    machineId: string,
-  ): Promise<AgentExecutionRecord[]> {
+  async findRunningAgentExecutionsForMachine(machineId: string): Promise<AgentExecutionRecord[]> {
     try {
       const rows = await query<AgentExecutionRow>(
         this.pool,
@@ -2682,9 +2450,7 @@ class PgDatabase implements Database {
     }
   }
 
-  async findPendingHubActions(
-    daemonId?: string,
-  ): Promise<AgentExecutionRecord[]> {
+  async findPendingHubActions(daemonId?: string): Promise<AgentExecutionRecord[]> {
     try {
       const rows = await query<AgentExecutionRow>(
         this.pool,
@@ -2722,9 +2488,7 @@ class PgDatabase implements Database {
          returning *`,
         [executionId, observedAt],
       );
-      return rows.rows[0] === undefined
-        ? undefined
-        : toAgentExecutionRecord(rows.rows[0]);
+      return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
     } catch (error) {
       throw toDatabaseError(error);
     }
@@ -2738,12 +2502,8 @@ class PgDatabase implements Database {
       const state = `coalesce(hub_action_acknowledgements, '{"terminal_at":null,"idle_at":null,"finish_execution_call":null}'::jsonb)`;
       let statement: string;
       let parameters: unknown[];
-      if (
-        acknowledgement.kind === "terminal" ||
-        acknowledgement.kind === "idle"
-      ) {
-        const field =
-          acknowledgement.kind === "terminal" ? "terminal_at" : "idle_at";
+      if (acknowledgement.kind === "terminal" || acknowledgement.kind === "idle") {
+        const field = acknowledgement.kind === "terminal" ? "terminal_at" : "idle_at";
         statement = `
           update agent_executions
           set hub_action_acknowledgements = jsonb_set(
@@ -2796,23 +2556,14 @@ class PgDatabase implements Database {
           acknowledgement.status,
         ];
       }
-      const rows = await query<AgentExecutionRow>(
-        this.pool,
-        statement,
-        parameters,
-      );
-      return rows.rows[0] === undefined
-        ? undefined
-        : toAgentExecutionRecord(rows.rows[0]);
+      const rows = await query<AgentExecutionRow>(this.pool, statement, parameters);
+      return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
     } catch (error) {
       throw toDatabaseError(error);
     }
   }
 
-  async completeHubAction(
-    executionId: string,
-    action: "interrupt" | "archive",
-  ): Promise<boolean> {
+  async completeHubAction(executionId: string, action: "interrupt" | "archive"): Promise<boolean> {
     try {
       const rows = await query(
         this.pool,
@@ -2851,10 +2602,7 @@ class PgDatabase implements Database {
     return toProjectRecord(project);
   }
 
-  async restoreProject(
-    organizationId: string,
-    projectId: string,
-  ): Promise<ProjectRecord> {
+  async restoreProject(organizationId: string, projectId: string): Promise<ProjectRecord> {
     const rows = await query<ProjectRow>(
       this.pool,
       `update projects
@@ -2876,9 +2624,7 @@ class PgDatabase implements Database {
       `select * from organization_entitlements where organization_id = $1 limit 1`,
       [organizationId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toOrganizationEntitlementsRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toOrganizationEntitlementsRecord(rows.rows[0]);
   }
 
   async stampOrganizationEntitlements(
@@ -2905,9 +2651,7 @@ class PgDatabase implements Database {
         );
         const before = existing.rows[0];
         if (before === undefined) {
-          throw new Error(
-            `organization has no entitlements record: ${input.organizationId}`,
-          );
+          throw new Error(`organization has no entitlements record: ${input.organizationId}`);
         }
         // Merge the patch against the row we hold locked, so a concurrent override serializes
         // behind this one instead of reading a stale base and clobbering its keys.
@@ -2923,8 +2667,7 @@ class PgDatabase implements Database {
           [input.organizationId, JSON.stringify(overrides)],
         );
         const after = updated.rows[0];
-        if (after === undefined)
-          throw new Error("entitlements override returned no row");
+        if (after === undefined) throw new Error("entitlements override returned no row");
         await client.query(
           `insert into entitlement_changes (organization_id, actor, source, before, after, reason)
          values ($1, $2, 'override', $3::jsonb, $4::jsonb, $5)`,
@@ -2954,9 +2697,7 @@ class PgDatabase implements Database {
         );
         const before = existing.rows[0];
         if (before === undefined) {
-          throw new Error(
-            `organization has no entitlements record: ${input.organizationId}`,
-          );
+          throw new Error(`organization has no entitlements record: ${input.organizationId}`);
         }
         // Remove the key from the row we hold locked, the same lock the merge takes, so a clear and
         // a concurrent override serialize instead of racing on a stale base.
@@ -2972,8 +2713,7 @@ class PgDatabase implements Database {
           [input.organizationId, JSON.stringify(overrides)],
         );
         const after = updated.rows[0];
-        if (after === undefined)
-          throw new Error("entitlements override clear returned no row");
+        if (after === undefined) throw new Error("entitlements override clear returned no row");
         await client.query(
           `insert into entitlement_changes (organization_id, actor, source, before, after, reason)
          values ($1, $2, 'override', $3::jsonb, $4::jsonb, $5)`,
@@ -3018,17 +2758,13 @@ class PgDatabase implements Database {
     return rows.rows.map(toOperatorOrganizationRecord);
   }
 
-  async findOrganizationForOperator(
-    slug: string,
-  ): Promise<OperatorOrganizationRecord | undefined> {
+  async findOrganizationForOperator(slug: string): Promise<OperatorOrganizationRecord | undefined> {
     const rows = await query<OperatorOrganizationRow>(
       this.pool,
       `select id, name, slug from organization where slug = $1 limit 1`,
       [slug],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toOperatorOrganizationRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toOperatorOrganizationRecord(rows.rows[0]);
   }
 
   async consumeOrganizationUsage(
@@ -3049,14 +2785,10 @@ class PgDatabase implements Database {
        limit 1`,
       [organizationId, meter, periodStart],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toOrganizationUsageRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toOrganizationUsageRecord(rows.rows[0]);
   }
 
-  async syncBillingPlan(
-    input: SyncBillingPlanInput,
-  ): Promise<BillingPlanRecord> {
+  async syncBillingPlan(input: SyncBillingPlanInput): Promise<BillingPlanRecord> {
     try {
       return await this.pool.transaction(async (client) => {
         const planRow = await client.query<BillingPlanRow>(
@@ -3082,14 +2814,10 @@ class PgDatabase implements Database {
           ],
         );
         const plan = planRow.rows[0];
-        if (plan === undefined)
-          throw new Error("billing plan sync returned no row");
+        if (plan === undefined) throw new Error("billing plan sync returned no row");
         // Prices are replaced wholesale rather than diffed: the catalog is small and this runs
         // only on boot or a product/price webhook, so a delete-and-reinsert is simple and correct.
-        await client.query(
-          `delete from billing_plan_prices where plan_id = $1`,
-          [input.id],
-        );
+        await client.query(`delete from billing_plan_prices where plan_id = $1`, [input.id]);
         const prices: BillingPlanPriceRow[] = [];
         for (const price of input.prices) {
           const priceRow = await client.query<BillingPlanPriceRow>(
@@ -3118,9 +2846,7 @@ class PgDatabase implements Database {
     }
   }
 
-  async deactivateBillingPlansExcept(
-    activeIds: readonly string[],
-  ): Promise<void> {
+  async deactivateBillingPlansExcept(activeIds: readonly string[]): Promise<void> {
     // An empty snapshot means no Paseo plans remain, so every mirrored plan is deactivated.
     await query(
       this.pool,
@@ -3146,9 +2872,7 @@ class PgDatabase implements Database {
       list.push(row);
       pricesByPlan.set(row.plan_id, list);
     }
-    return plans.rows.map((row) =>
-      toBillingPlanRecord(row, pricesByPlan.get(row.id) ?? []),
-    );
+    return plans.rows.map((row) => toBillingPlanRecord(row, pricesByPlan.get(row.id) ?? []));
   }
 
   async reconcileOrganizationBilling(
@@ -3168,9 +2892,7 @@ class PgDatabase implements Database {
         );
         const row = rows.rows[0];
         if (row === undefined)
-          throw new Error(
-            "organization billing customer upsert returned no row",
-          );
+          throw new Error("organization billing customer upsert returned no row");
         // Same transaction as the mirror upsert: the plan the org is billed on and the entitlements
         // it enforces can never diverge across a crash between the two writes.
         if (input.stamp !== undefined) {
@@ -3203,9 +2925,7 @@ class PgDatabase implements Database {
       : toOrganizationBillingCustomerRecord(rows.rows[0]);
   }
 
-  async listProjectsForOrganization(
-    organizationId: string,
-  ): Promise<ProjectRecord[]> {
+  async listProjectsForOrganization(organizationId: string): Promise<ProjectRecord[]> {
     const rows = await query<ProjectRow>(
       this.pool,
       `select * from projects p
@@ -3217,9 +2937,7 @@ class PgDatabase implements Database {
     return rows.rows.map(toProjectRecord);
   }
 
-  async listOrganizationTriggers(
-    organizationId: string,
-  ): Promise<OrganizationTriggerRecord[]> {
+  async listOrganizationTriggers(organizationId: string): Promise<OrganizationTriggerRecord[]> {
     const rows = await query<OrganizationTriggerRow>(
       this.pool,
       `select * from organization_triggers
@@ -3249,12 +2967,10 @@ class PgDatabase implements Database {
     input: SaveChannelConfigurationInput,
   ): Promise<ChannelConfigurationRevisionRecord> {
     return this.pool.transaction(async (client) => {
-      const owner = await client.query(
-        `select id from organization where id = $1 for update`,
-        [input.organizationId],
-      );
-      if (owner.rows[0] === undefined)
-        throw new Error("organization not found");
+      const owner = await client.query(`select id from organization where id = $1 for update`, [
+        input.organizationId,
+      ]);
+      if (owner.rows[0] === undefined) throw new Error("organization not found");
       const inserted = await client.query<ChannelConfigurationRevisionRow>(
         `insert into channel_configuration_revisions
            (organization_id, version, files, content_hash, created_by_user_id)
@@ -3264,12 +2980,7 @@ class PgDatabase implements Database {
                      where organization_id = $1), 1),
            $2, $3, $4
          ) returning *`,
-        [
-          input.organizationId,
-          input.files,
-          input.contentHash,
-          input.createdByUserId,
-        ],
+        [input.organizationId, input.files, input.contentHash, input.createdByUserId],
       );
       const revision = inserted.rows[0]!;
       await client.query(
@@ -3317,16 +3028,9 @@ class PgDatabase implements Database {
           `update organization_triggers
            set name = $3, enabled = $4, format = $5, updated_at = clock_timestamp()
            where id = $1 and organization_id = $2 returning *`,
-          [
-            input.triggerId,
-            input.organizationId,
-            input.name,
-            input.enabled,
-            input.format,
-          ],
+          [input.triggerId, input.organizationId, input.name, input.enabled, input.format],
         );
-        if (updated.rows[0] === undefined)
-          throw new Error("organization trigger not found");
+        if (updated.rows[0] === undefined) throw new Error("organization trigger not found");
         trigger = updated.rows[0];
       }
       const revisionRows = await client.query<OrganizationTriggerRevisionRow>(
@@ -3350,10 +3054,9 @@ class PgDatabase implements Database {
         ],
       );
       const revision = revisionRows.rows[0]!;
-      await client.query(
-        `delete from organization_trigger_routes where trigger_id = $1`,
-        [trigger.id],
-      );
+      await client.query(`delete from organization_trigger_routes where trigger_id = $1`, [
+        trigger.id,
+      ]);
       for (const route of input.routes) {
         await client.query(
           `insert into organization_trigger_routes (
@@ -3387,20 +3090,14 @@ class PgDatabase implements Database {
       `select * from projects where organization_id = $1 and id = $2 limit 1`,
       [organizationId, projectId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toProjectRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toProjectRecord(rows.rows[0]);
   }
 
   async findProjectById(projectId: string) {
-    const rows = await query<ProjectRow>(
-      this.pool,
-      `select * from projects where id = $1`,
-      [projectId],
-    );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toProjectRecord(rows.rows[0]);
+    const rows = await query<ProjectRow>(this.pool, `select * from projects where id = $1`, [
+      projectId,
+    ]);
+    return rows.rows[0] === undefined ? undefined : toProjectRecord(rows.rows[0]);
   }
 
   async findProjectBySlugForOrganization(organizationId: string, slug: string) {
@@ -3409,16 +3106,10 @@ class PgDatabase implements Database {
       `select * from projects where organization_id = $1 and slug = $2 limit 1`,
       [organizationId, slug],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toProjectRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toProjectRecord(rows.rows[0]);
   }
 
-  async resolveTenantRouteAccess(
-    userId: string,
-    organizationSlug: string,
-    projectSlug?: string,
-  ) {
+  async resolveTenantRouteAccess(userId: string, organizationSlug: string, projectSlug?: string) {
     const rows = await query<TenantRouteAccessRow>(
       this.pool,
       `select organization.id as organization_id,
@@ -3467,18 +3158,13 @@ class PgDatabase implements Database {
               created_at: row.project_created_at!,
               updated_at: row.project_updated_at!,
               archived_at: row.project_archived_at,
-              active_configuration_revision_id:
-                row.project_active_configuration_revision_id,
+              active_configuration_revision_id: row.project_active_configuration_revision_id,
             }),
           }),
     };
   }
 
-  async archiveProject(
-    organizationId: string,
-    projectId: string,
-    userId: string,
-  ) {
+  async archiveProject(organizationId: string, projectId: string, userId: string) {
     try {
       return await this.pool.transaction(async (client) => {
         const access = await client.query<ProjectRow>(
@@ -3490,8 +3176,7 @@ class PgDatabase implements Database {
          for update of projects`,
           [projectId, organizationId, userId],
         );
-        if (access.rows[0] === undefined)
-          throw new Error("project access denied");
+        if (access.rows[0] === undefined) throw new Error("project access denied");
         await client.query(
           `update project_configuration_sources
          set kind = 'manual', github_connection_id = null, github_repository_id = null,
@@ -3500,10 +3185,7 @@ class PgDatabase implements Database {
          where project_id = $1`,
           [projectId],
         );
-        await client.query(
-          `delete from project_trigger_routes where project_id = $1`,
-          [projectId],
-        );
+        await client.query(`delete from project_trigger_routes where project_id = $1`, [projectId]);
         const archived = await client.query<ProjectRow>(
           `update projects
          set status = 'archived', active_configuration_revision_id = null,
@@ -3526,12 +3208,7 @@ class PgDatabase implements Database {
     }
   }
 
-  async updateProjectSlug(
-    organizationId: string,
-    projectId: string,
-    slug: string,
-    userId: string,
-  ) {
+  async updateProjectSlug(organizationId: string, projectId: string, slug: string, userId: string) {
     const rows = await query<ProjectRow>(
       this.pool,
       `update projects
@@ -3589,11 +3266,7 @@ class PgDatabase implements Database {
   ) {
     try {
       return await this.pool.transaction(async (client) => {
-        const revision = await lockValidProjectRevision(
-          client,
-          projectId,
-          revisionId,
-        );
+        const revision = await lockValidProjectRevision(client, projectId, revisionId);
         const compiledRoutes =
           routes ??
           (
@@ -3613,10 +3286,7 @@ class PgDatabase implements Database {
             resourceId: row.resource_id,
             triggerName: row.trigger_name,
           }));
-        await client.query(
-          `delete from project_trigger_routes where project_id = $1`,
-          [projectId],
-        );
+        await client.query(`delete from project_trigger_routes where project_id = $1`, [projectId]);
         for (const route of compiledRoutes) {
           await client.query(
             `insert into project_trigger_routes
@@ -3700,12 +3370,8 @@ class PgDatabase implements Database {
           [projectId, targetRevisionId],
         );
         const target = candidates.rows[0];
-        if (target === undefined)
-          throw new Error("configuration rollback target changed");
-        await client.query(
-          `delete from project_trigger_routes where project_id = $1`,
-          [projectId],
-        );
+        if (target === undefined) throw new Error("configuration rollback target changed");
+        await client.query(`delete from project_trigger_routes where project_id = $1`, [projectId]);
         for (const route of routes) {
           await client.query(
             `insert into project_trigger_routes
@@ -3750,10 +3416,7 @@ class PgDatabase implements Database {
       : toProjectConfigurationRevisionRecord(rows.rows[0]);
   }
 
-  async findProjectConfigurationRevision(
-    projectId: string,
-    revisionId: string,
-  ) {
+  async findProjectConfigurationRevision(projectId: string, revisionId: string) {
     const rows = await query<ProjectConfigurationRevisionRow>(
       this.pool,
       `select * from project_configuration_revisions where project_id = $1 and id = $2`,
@@ -3815,10 +3478,9 @@ class PgDatabase implements Database {
          where project_id = $1`,
           [input.projectId, input.userId],
         );
-        await client.query(
-          `delete from project_trigger_routes where project_id = $1`,
-          [input.projectId],
-        );
+        await client.query(`delete from project_trigger_routes where project_id = $1`, [
+          input.projectId,
+        ]);
         for (const route of input.routes) {
           await client.query(
             `insert into project_trigger_routes
@@ -3937,9 +3599,7 @@ class PgDatabase implements Database {
     };
   }
 
-  async projectConfigurationReadModel(
-    projectId: string,
-  ): Promise<ProjectConfigurationReadModel> {
+  async projectConfigurationReadModel(projectId: string): Promise<ProjectConfigurationReadModel> {
     const source = await query<{
       kind: "manual" | "github";
       github_connection_id: string | null;
@@ -3955,10 +3615,8 @@ class PgDatabase implements Database {
       [projectId],
     );
     const sourceRow = source.rows[0];
-    if (sourceRow === undefined)
-      throw new Error("configuration authority not found");
-    const activeRevision =
-      (await this.findActiveProjectConfiguration(projectId)) ?? null;
+    if (sourceRow === undefined) throw new Error("configuration authority not found");
+    const activeRevision = (await this.findActiveProjectConfiguration(projectId)) ?? null;
     const attempts = await query<{
       id: string;
       project_id: string;
@@ -4027,9 +3685,7 @@ class PgDatabase implements Database {
     };
   }
 
-  async organizationConnectionUsage(
-    organizationId: string,
-  ): Promise<OrganizationConnectionUsage> {
+  async organizationConnectionUsage(organizationId: string): Promise<OrganizationConnectionUsage> {
     const github = await query<{
       id: string;
       organization_id: string;
@@ -4172,9 +3828,7 @@ class PgDatabase implements Database {
     };
   }
 
-  async listGitHubRepositories(
-    organizationId: string,
-  ): Promise<GitHubRepositoryRecord[]> {
+  async listGitHubRepositories(organizationId: string): Promise<GitHubRepositoryRecord[]> {
     const rows = await query<GitHubRepositoryRow>(
       this.pool,
       `select repository.id, repository.organization_id, repository.connection_id,
@@ -4189,10 +3843,7 @@ class PgDatabase implements Database {
     return rows.rows.map(toGitHubRepositoryRecord);
   }
 
-  async findGitHubRepositoryForOrganization(
-    organizationId: string,
-    fullName: string,
-  ) {
+  async findGitHubRepositoryForOrganization(organizationId: string, fullName: string) {
     const rows = await query<GitHubRepositoryRow>(
       this.pool,
       `select repository.id, repository.organization_id, repository.connection_id,
@@ -4204,21 +3855,15 @@ class PgDatabase implements Database {
        order by repository.id limit 2`,
       [organizationId, fullName],
     );
-    if (rows.rows.length > 1)
-      throw new Error("github repository resource is ambiguous");
-    return rows.rows[0] === undefined
-      ? undefined
-      : toGitHubRepositoryRecord(rows.rows[0]);
+    if (rows.rows.length > 1) throw new Error("github repository resource is ambiguous");
+    return rows.rows[0] === undefined ? undefined : toGitHubRepositoryRecord(rows.rows[0]);
   }
 
   async upsertGitHubRepositories(
     organizationId: string,
     connectionId: string,
     repositories: Array<
-      Pick<
-        GitHubRepositoryRecord,
-        "repositoryId" | "fullName" | "defaultBranch"
-      >
+      Pick<GitHubRepositoryRecord, "repositoryId" | "fullName" | "defaultBranch">
     >,
   ): Promise<void> {
     for (const repository of repositories) {
@@ -4342,10 +3987,7 @@ class PgDatabase implements Database {
     return rows.rows.map(toProviderEventReceiptSummary);
   }
 
-  async isOrganizationMember(
-    userId: string,
-    organizationId: string,
-  ): Promise<boolean> {
+  async isOrganizationMember(userId: string, organizationId: string): Promise<boolean> {
     const rows = await query(
       this.pool,
       `select 1 from member where user_id = $1 and organization_id = $2 limit 1`,
@@ -4370,9 +4012,7 @@ class PgDatabase implements Database {
     return this.connections.consumeAttempt(input);
   }
 
-  advanceGitHubConnectionAttempt(
-    input: AdvanceGitHubConnectionAttemptInput,
-  ): Promise<void> {
+  advanceGitHubConnectionAttempt(input: AdvanceGitHubConnectionAttemptInput): Promise<void> {
     return this.connections.advanceGitHubAttempt(input);
   }
 
@@ -4388,9 +4028,7 @@ class PgDatabase implements Database {
     return this.connections.bindSlack(input);
   }
 
-  completeSlackProviderApplication(
-    input: CompleteSlackProviderApplicationInput,
-  ): Promise<void> {
+  completeSlackProviderApplication(input: CompleteSlackProviderApplicationInput): Promise<void> {
     return this.connections.completeSlackProviderApplication(input);
   }
 
@@ -4398,15 +4036,11 @@ class PgDatabase implements Database {
     return this.connections.bindLinear(input);
   }
 
-  completeLinearProviderApplication(
-    input: CompleteLinearProviderApplicationInput,
-  ): Promise<void> {
+  completeLinearProviderApplication(input: CompleteLinearProviderApplicationInput): Promise<void> {
     return this.connections.completeLinearProviderApplication(input);
   }
 
-  updateLinearConnectionTokens(
-    input: UpdateLinearConnectionTokensInput,
-  ): Promise<void> {
+  updateLinearConnectionTokens(input: UpdateLinearConnectionTokensInput): Promise<void> {
     return this.connections.updateLinearTokens(input);
   }
 
@@ -4446,37 +4080,18 @@ class PgDatabase implements Database {
     providerApplicationId: string,
     teamId: string,
   ) {
-    return this.connections.findSlackForOrganization(
-      organizationId,
-      providerApplicationId,
-      teamId,
-    );
+    return this.connections.findSlackForOrganization(organizationId, providerApplicationId, teamId);
   }
 
-  findSlackConnectionByIdForOrganization(
-    organizationId: string,
-    connectionId: string,
-  ) {
-    return this.connections.findSlackByIdForOrganization(
-      organizationId,
-      connectionId,
-    );
+  findSlackConnectionByIdForOrganization(organizationId: string, connectionId: string) {
+    return this.connections.findSlackByIdForOrganization(organizationId, connectionId);
   }
 
-  findLinearConnectionForOrganization(
-    organizationId: string,
-    linearOrganizationId: string,
-  ) {
-    return this.connections.findLinearForOrganization(
-      organizationId,
-      linearOrganizationId,
-    );
+  findLinearConnectionForOrganization(organizationId: string, linearOrganizationId: string) {
+    return this.connections.findLinearForOrganization(organizationId, linearOrganizationId);
   }
 
-  findDiscordConnectionForOrganization(
-    organizationId: string,
-    guildId: string,
-  ) {
+  findDiscordConnectionForOrganization(organizationId: string, guildId: string) {
     return this.connections.findDiscordForOrganization(organizationId, guildId);
   }
 
@@ -4511,10 +4126,7 @@ class PgDatabase implements Database {
           credentialEnvelope,
         })
         .onConflictDoUpdate({
-          target: [
-            schema.telegramConnections.organizationId,
-            schema.telegramConnections.accountId,
-          ],
+          target: [schema.telegramConnections.organizationId, schema.telegramConnections.accountId],
           set: { credentialEnvelope, updatedAt: sql`clock_timestamp()` },
         });
       return { connectionId };
@@ -4525,10 +4137,7 @@ class PgDatabase implements Database {
     organizationId: string;
     channel: "slack" | "telegram";
     connectionId: string;
-  }): Promise<
-    | { botToken: string; appToken?: string; providerApplicationId?: string }
-    | undefined
-  > {
+  }): Promise<{ botToken: string; appToken?: string; providerApplicationId?: string } | undefined> {
     const database = this.pool.drizzle();
     if (input.channel === "telegram") {
       const [row] = await database
@@ -4543,10 +4152,7 @@ class PgDatabase implements Database {
         .limit(1);
       if (row === undefined) return undefined;
       return requireChannelBotCredential(
-        this.credentialCipher.decrypt(
-          `telegram-connection:${row.id}`,
-          row.credentialEnvelope,
-        ),
+        this.credentialCipher.decrypt(`telegram-connection:${row.id}`, row.credentialEnvelope),
       );
     }
     const [connection] = await database
@@ -4607,23 +4213,17 @@ class PgDatabase implements Database {
     await this.pool.close();
   }
 
-  async findProviderEventReceiptById(
-    id: string,
-  ): Promise<ProviderEventReceiptRecord | undefined> {
+  async findProviderEventReceiptById(id: string): Promise<ProviderEventReceiptRecord | undefined> {
     const rows = await query<ProviderEventReceiptRow>(
       this.pool,
       "select * from provider_event_receipts where id = $1 limit 1",
       [id],
     );
 
-    return rows.rows[0] === undefined
-      ? undefined
-      : toProviderEventReceiptRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toProviderEventReceiptRecord(rows.rows[0]);
   }
 
-  async insertAttachment(
-    input: InsertAttachmentInput,
-  ): Promise<AttachmentRecord> {
+  async insertAttachment(input: InsertAttachmentInput): Promise<AttachmentRecord> {
     try {
       const rows = await query<AttachmentRow>(
         this.pool,
@@ -4659,8 +4259,7 @@ class PgDatabase implements Database {
         input.provider,
         input.sourceId,
       );
-      if (existing === undefined)
-        throw new Error("attachment insert conflict without row");
+      if (existing === undefined) throw new Error("attachment insert conflict without row");
       return existing;
     } catch (error) {
       throw toDatabaseError(error);
@@ -4678,9 +4277,7 @@ class PgDatabase implements Database {
        where provider_event_receipt_id = $1 and provider = $2 and source_id = $3 limit 1`,
       [providerEventReceiptId, provider, sourceId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toAttachmentRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toAttachmentRecord(rows.rows[0]);
   }
 
   async findAttachmentForExecution(
@@ -4702,9 +4299,7 @@ class PgDatabase implements Database {
        where attachment.id = $2 limit 1`,
       [executionId, attachmentId],
     );
-    return rows.rows[0] === undefined
-      ? undefined
-      : toAttachmentRecord(rows.rows[0]);
+    return rows.rows[0] === undefined ? undefined : toAttachmentRecord(rows.rows[0]);
   }
 }
 
@@ -4722,10 +4317,8 @@ async function lockValidProjectRevision(
     [projectId, revisionId],
   );
   const revision = selected.rows[0];
-  if (revision === undefined)
-    throw new Error("configuration revision not found");
-  if (revision.validation_errors !== null)
-    throw new Error("invalid configuration revision");
+  if (revision === undefined) throw new Error("configuration revision not found");
+  if (revision.validation_errors !== null) throw new Error("invalid configuration revision");
   return revision;
 }
 
@@ -4738,9 +4331,7 @@ async function query<T extends QueryRow = QueryRow>(
 }
 
 function stringArray(value: unknown): string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string")
-    ? value
-    : [];
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : [];
 }
 
 function isDaemonSlugConflict(error: unknown): boolean {
@@ -4803,15 +4394,11 @@ async function insertAgentExecutionOnClient(
     ],
   );
   const execution = rows.rows[0];
-  if (execution === undefined)
-    throw new Error("agent execution insert returned no row");
+  if (execution === undefined) throw new Error("agent execution insert returned no row");
   return execution;
 }
 
-const TERMINAL_AGENT_EXECUTION_STATUSES = [
-  "succeeded",
-  "failed",
-] satisfies AgentExecutionStatus[];
+const TERMINAL_AGENT_EXECUTION_STATUSES = ["succeeded", "failed"] satisfies AgentExecutionStatus[];
 
 export interface ProviderEventReceiptRow extends QueryRow {
   id: string;
@@ -4924,11 +4511,7 @@ function toTriggerRunRecord(row: TriggerRunRow): TriggerRunRecord {
     createdAt: row.created_at,
   };
   if (row.outcome === "rejected") {
-    if (
-      row.status !== "rejected" ||
-      row.rejection === null ||
-      row.rejection === undefined
-    ) {
+    if (row.status !== "rejected" || row.rejection === null || row.rejection === undefined) {
       throw new Error(`invalid rejected trigger run ${row.id}`);
     }
     const rejected: RejectedTriggerRunRecord = {
@@ -4940,15 +4523,10 @@ function toTriggerRunRecord(row: TriggerRunRow): TriggerRunRecord {
     };
     return rejected;
   }
-  if (
-    row.outcome !== "accepted" ||
-    row.status === "rejected" ||
-    row.rejection !== null
-  ) {
+  if (row.outcome !== "accepted" || row.status === "rejected" || row.rejection !== null) {
     throw new Error(`invalid accepted trigger run ${row.id}`);
   }
-  if (row.deadline_at === null)
-    throw new Error(`invalid accepted trigger run ${row.id}`);
+  if (row.deadline_at === null) throw new Error(`invalid accepted trigger run ${row.id}`);
   const accepted: AcceptedTriggerRunRecord = {
     ...evidence,
     outcome: "accepted",
@@ -4959,16 +4537,13 @@ function toTriggerRunRecord(row: TriggerRunRow): TriggerRunRecord {
     reactionState: row.reaction_state,
     terminalNotificationPendingAt: row.terminal_notification_pending_at,
     terminalNotificationDeliveredAt: row.terminal_notification_delivered_at,
-    terminalNotificationLeaseExpiresAt:
-      row.terminal_notification_lease_expires_at,
+    terminalNotificationLeaseExpiresAt: row.terminal_notification_lease_expires_at,
     completedAt: row.completed_at,
   };
   return accepted;
 }
 
-function toWorkflowStepRunRecord(
-  row: WorkflowStepRunRow,
-): WorkflowStepRunRecord {
+function toWorkflowStepRunRecord(row: WorkflowStepRunRow): WorkflowStepRunRecord {
   return {
     id: row.id,
     triggerRunId: row.trigger_run_id,
@@ -5114,9 +4689,7 @@ function toDaemon(row: DaemonRow): DaemonRecord {
 function semanticDaemonPermissions(stored: readonly string[]): string[] {
   return [
     ...new Set(
-      stored.map((permission) =>
-        permission === "hub.execution.*" ? "hub.execute" : permission,
-      ),
+      stored.map((permission) => (permission === "hub.execution.*" ? "hub.execute" : permission)),
     ),
   ];
 }
@@ -5159,20 +4732,13 @@ async function stampEntitlementsWithinTransaction(
   client: QueryHandle,
   input: StampOrganizationEntitlementsInput,
 ): Promise<OrganizationEntitlementsRecord> {
-  const existing = await client.query<
-    OrganizationEntitlementsRow & { changed: boolean }
-  >(
+  const existing = await client.query<OrganizationEntitlementsRow & { changed: boolean }>(
     `select *,
         (granted is distinct from $2::jsonb
          or plan_id is distinct from $3
          or plan_version is distinct from $4) as changed
      from organization_entitlements where organization_id = $1 for update`,
-    [
-      input.organizationId,
-      JSON.stringify(input.granted),
-      input.planId,
-      input.planVersion,
-    ],
+    [input.organizationId, JSON.stringify(input.granted), input.planId, input.planVersion],
   );
   const before = existing.rows[0];
   if (before !== undefined && !before.changed) {
@@ -5189,16 +4755,10 @@ async function stampEntitlementsWithinTransaction(
            stamped_at = now(),
            updated_at = now()
      returning *`,
-    [
-      input.organizationId,
-      JSON.stringify(input.granted),
-      input.planId,
-      input.planVersion,
-    ],
+    [input.organizationId, JSON.stringify(input.granted), input.planId, input.planVersion],
   );
   const after = stamped.rows[0];
-  if (after === undefined)
-    throw new Error("entitlements stamp returned no row");
+  if (after === undefined) throw new Error("entitlements stamp returned no row");
   await client.query(
     `insert into entitlement_changes (organization_id, actor, source, before, after, reason)
      values ($1, $2, $3, $4::jsonb, $5::jsonb, $6)`,
@@ -5248,9 +4808,7 @@ interface OperatorOrganizationRow extends QueryRow {
   slug: string;
 }
 
-function toOperatorOrganizationRecord(
-  row: OperatorOrganizationRow,
-): OperatorOrganizationRecord {
+function toOperatorOrganizationRecord(row: OperatorOrganizationRow): OperatorOrganizationRecord {
   return { id: row.id, name: row.name, slug: row.slug };
 }
 
@@ -5266,9 +4824,7 @@ export interface EntitlementChangeRow extends QueryRow {
   created_at: Date;
 }
 
-function toEntitlementChangeRecord(
-  row: EntitlementChangeRow,
-): EntitlementChangeRecord {
+function toEntitlementChangeRecord(row: EntitlementChangeRow): EntitlementChangeRecord {
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -5289,9 +4845,7 @@ export interface OrganizationUsageRow extends QueryRow {
   used: number | string;
 }
 
-function toOrganizationUsageRecord(
-  row: OrganizationUsageRow,
-): OrganizationUsageRecord {
+function toOrganizationUsageRecord(row: OrganizationUsageRow): OrganizationUsageRecord {
   return {
     organizationId: row.organization_id,
     meter: row.meter,
@@ -5382,17 +4936,9 @@ async function reserveOrganizationUsageOnClient(
          set used = organization_usage.used + excluded.used
        where $5::bigint is null or organization_usage.used + excluded.used <= $5::bigint
        returning *`,
-    [
-      input.organizationId,
-      input.meter,
-      input.periodStart,
-      input.amount,
-      input.limit,
-    ],
+    [input.organizationId, input.meter, input.periodStart, input.amount, input.limit],
   );
-  return rows.rows[0] === undefined
-    ? undefined
-    : toOrganizationUsageRecord(rows.rows[0]);
+  return rows.rows[0] === undefined ? undefined : toOrganizationUsageRecord(rows.rows[0]);
 }
 
 export interface ProjectRow extends QueryRow {
@@ -5460,11 +5006,8 @@ interface ChannelConfigurationRevisionRow extends QueryRow {
   created_at: Date;
 }
 
-function toOrganizationTriggerRecord(
-  row: OrganizationTriggerRow,
-): OrganizationTriggerRecord {
-  if (row.active_revision_id === null)
-    throw new Error("organization trigger is not active");
+function toOrganizationTriggerRecord(row: OrganizationTriggerRow): OrganizationTriggerRecord {
+  if (row.active_revision_id === null) throw new Error("organization trigger is not active");
   return {
     id: row.id,
     organizationId: row.organization_id,
@@ -5524,10 +5067,7 @@ function deadlineConditionAllows(
   condition: WorkflowAgentCompletionInput["deadlineCondition"],
 ): boolean {
   if (condition === undefined) return true;
-  const current =
-    condition.kind === "hard"
-      ? execution.deadline_at
-      : execution.idle_deadline_at;
+  const current = condition.kind === "hard" ? execution.deadline_at : execution.idle_deadline_at;
   return (
     current !== null &&
     current.getTime() === condition.deadlineAt.getTime() &&
@@ -5541,21 +5081,13 @@ function workflowDeadlineKind(
   run: TriggerRunRow,
   observedAt: Date,
 ): WorkflowDeadlineKind | undefined {
-  if (
-    run.status === "running" &&
-    run.deadline_at !== null &&
-    run.deadline_at <= observedAt
-  ) {
+  if (run.status === "running" && run.deadline_at !== null && run.deadline_at <= observedAt) {
     return "whole_run";
   }
   const hardDeadline = execution?.deadline_at ?? step.deadline_at;
   const idleDeadline = execution?.idle_deadline_at ?? step.idle_deadline_at;
   if (hardDeadline !== null && hardDeadline <= observedAt) {
-    if (
-      idleDeadline !== null &&
-      idleDeadline <= observedAt &&
-      idleDeadline < hardDeadline
-    ) {
+    if (idleDeadline !== null && idleDeadline <= observedAt && idleDeadline < hardDeadline) {
       return "step_idle";
     }
     return "step_hard";
@@ -5572,8 +5104,7 @@ async function timeoutWorkflowStepOnClient(
   deadlineKind: Exclude<WorkflowDeadlineKind, "whole_run">,
   observedAt: Date,
 ): Promise<AgentExecutionRow> {
-  const reason =
-    deadlineKind === "step_idle" ? "step_idle_timeout" : "step_hard_timeout";
+  const reason = deadlineKind === "step_idle" ? "step_idle_timeout" : "step_hard_timeout";
   const updatedExecution = await client.query<AgentExecutionRow>(
     `update agent_executions
      set status = 'failed', completed_at = $2,
@@ -5606,9 +5137,7 @@ async function timeoutWorkflowStepOnClient(
       [run.id, deadlineKind, reason, observedAt],
     );
   }
-  await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [
-    run.id,
-  ]);
+  await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [run.id]);
   return updated;
 }
 
@@ -5651,9 +5180,7 @@ async function timeoutWorkflowRunOnClient(
      where id = $1 and status = 'running'`,
     [run.id, observedAt],
   );
-  await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [
-    run.id,
-  ]);
+  await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [run.id]);
   return {
     triggerRunId: run.id,
     executionIds: executionRows.rows.map((row) => row.id),
@@ -5664,14 +5191,11 @@ async function transitionWorkflowAgentExecution(
   client: QueryHandle,
   execution: AgentExecutionRow,
   input: WorkflowAgentCompletionInput,
-): Promise<
-  { execution: AgentExecutionRow; transitioned: boolean } | undefined
-> {
+): Promise<{ execution: AgentExecutionRow; transitioned: boolean } | undefined> {
   if (execution.status !== "spawning" && execution.status !== "running") {
     return { execution, transitioned: false };
   }
-  if (!deadlineConditionAllows(execution, input.deadlineCondition))
-    return undefined;
+  if (!deadlineConditionAllows(execution, input.deadlineCondition)) return undefined;
 
   const completedAt = input.observedAt ?? new Date();
   const updatedRows = await client.query<AgentExecutionRow>(
@@ -5725,17 +5249,14 @@ async function finishWorkflowStepAndRun(
     [
       step.id,
       input.stepStatus,
-      input.stepOutput !== undefined
-        ? input.stepOutput
-        : (input.result ?? null),
+      input.stepOutput !== undefined ? input.stepOutput : (input.result ?? null),
       input.failureReason ?? null,
       completedAt,
       input.deadlineKind ?? null,
     ],
   );
   if (input.stepStatus === "succeeded") {
-    if (run.status === "running")
-      await wakeWorkflowRun(client, step.trigger_run_id, completedAt);
+    if (run.status === "running") await wakeWorkflowRun(client, step.trigger_run_id, completedAt);
     return;
   }
   if (run.status === "running") {
@@ -5768,13 +5289,10 @@ async function findTriggerRunOnClient(
   client: QueryHandle,
   triggerRunId: string,
 ): Promise<TriggerRunRecord | undefined> {
-  const rows = await client.query<TriggerRunRow>(
-    `select * from trigger_runs where id = $1`,
-    [triggerRunId],
-  );
-  return rows.rows[0] === undefined
-    ? undefined
-    : toTriggerRunRecord(rows.rows[0]);
+  const rows = await client.query<TriggerRunRow>(`select * from trigger_runs where id = $1`, [
+    triggerRunId,
+  ]);
+  return rows.rows[0] === undefined ? undefined : toTriggerRunRecord(rows.rows[0]);
 }
 
 async function findAgentExecutionOnClient(
@@ -5785,9 +5303,7 @@ async function findAgentExecutionOnClient(
     `select * from agent_executions where id = $1`,
     [executionId],
   );
-  return rows.rows[0] === undefined
-    ? undefined
-    : toAgentExecutionRecord(rows.rows[0]);
+  return rows.rows[0] === undefined ? undefined : toAgentExecutionRecord(rows.rows[0]);
 }
 
 async function wakeWorkflowRun(
@@ -5805,12 +5321,8 @@ async function wakeWorkflowRun(
   );
 }
 
-function isTerminalWorkflowStepStatus(
-  status: WorkflowStepRunRow["status"],
-): boolean {
-  return (
-    status === "succeeded" || status === "failed" || status === "timed_out"
-  );
+function isTerminalWorkflowStepStatus(status: WorkflowStepRunRow["status"]): boolean {
+  return status === "succeeded" || status === "failed" || status === "timed_out";
 }
 
 interface GitHubConfigurationTargetRow extends GitHubRepositoryRow {
@@ -5818,9 +5330,7 @@ interface GitHubConfigurationTargetRow extends GitHubRepositoryRow {
   automatic_deployment_enabled: boolean;
 }
 
-function toGitHubRepositoryRecord(
-  row: GitHubRepositoryRow,
-): GitHubRepositoryRecord {
+function toGitHubRepositoryRecord(row: GitHubRepositoryRow): GitHubRepositoryRecord {
   return {
     id: row.id,
     organizationId: row.organization_id,

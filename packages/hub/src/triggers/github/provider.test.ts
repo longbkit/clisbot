@@ -14,7 +14,8 @@ import { createUnlimitedEntitlementsService } from "../../entitlements/test-util
 
 describe("GitHub Phase 1 trigger provider", () => {
   it("normalizes typed inputs identically at the provider boundary", async () => {
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputConfiguration());
+    const { workflow, revision, configurationForWorkflow } =
+      await activeConfiguration(inputConfiguration());
     const provider = createProvider(configurationForWorkflow, new TestReactions());
 
     const match = (
@@ -36,7 +37,8 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("parses typed inputs after a matched contains marker in leading prose", async () => {
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputConfiguration());
+    const { workflow, revision, configurationForWorkflow } =
+      await activeConfiguration(inputConfiguration());
     const provider = createProvider(configurationForWorkflow, new TestReactions());
 
     const match = (
@@ -95,7 +97,8 @@ describe("GitHub Phase 1 trigger provider", () => {
         on: "github.issue_created",
       },
     ];
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
+    const { workflow, revision, configurationForWorkflow } =
+      await activeConfiguration(configuration);
     const provider = createProvider(configurationForWorkflow, new TestReactions());
     const event: NormalizedGitHubEvent = {
       ...createEvent(),
@@ -124,7 +127,8 @@ describe("GitHub Phase 1 trigger provider", () => {
   ] as const)("derives an item reaction target for %s %s", async (type, action, source, number) => {
     const configuration = githubConfiguration();
     configuration.triggers[0] = { ...configuration.triggers[0]!, on: source };
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
+    const { workflow, revision, configurationForWorkflow } =
+      await activeConfiguration(configuration);
     const provider = createProvider(configurationForWorkflow, new TestReactions());
     const matches = await provider.match(
       external(workflow.id, revision.id, createItemEvent(type, action, number)),
@@ -148,7 +152,8 @@ describe("GitHub Phase 1 trigger provider", () => {
         ...configuration.triggers[0]!,
         on: "github.pull_request_created",
       };
-      const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
+      const { workflow, revision, configurationForWorkflow } =
+        await activeConfiguration(configuration);
       const reactions = new TestReactions();
       const provider = createProvider(configurationForWorkflow, reactions);
       const matches = await provider.match(
@@ -348,7 +353,8 @@ describe("GitHub Phase 1 trigger provider", () => {
 
   it("hands every matching configured GitHub trigger to the durable fan-out boundary", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await activeFanoutConfiguration(database);
+    const { workflow, revision, configurationForWorkflow } =
+      await activeFanoutConfiguration(database);
     const provider = createProvider(configurationForWorkflow, new TestReactions());
     const matches = await provider.match(external(workflow.id, revision.id, createEvent()));
     if (typeof matches === "string") throw new Error("expected matches");
@@ -414,7 +420,9 @@ describe("GitHub Phase 1 trigger provider", () => {
 });
 
 function createProvider(
-  configurationForWorkflow: Awaited<ReturnType<typeof activeConfiguration>>["configurationForWorkflow"],
+  configurationForWorkflow: Awaited<
+    ReturnType<typeof activeConfiguration>
+  >["configurationForWorkflow"],
   reactions: TestReactions,
 ) {
   return createGitHubTriggerProvider({

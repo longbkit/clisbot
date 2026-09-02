@@ -88,22 +88,22 @@ export async function runChannelsAddCommand(
 ): Promise<SingleResult<ChannelAddResult>> {
   const account = requiredStringOption(options, "account");
   const target = resolveControlPlaneTarget(extractControlPlaneOptions(options));
-  const result =
-    channel === "slack"
-      ? await addChannel(target, {
-          channel,
-          account,
-          connectionId: requiredStringOption(options, "connection-id"),
-        })
-      : channel === "telegram"
-        ? await addChannel(target, {
-            channel,
-            account,
-            botToken: telegramToken(readSecretFile(requiredStringOption(options, "secret-file"))),
-          })
-        : (() => {
-            throw { code: "INVALID_CHANNEL", message: `Unsupported channel: ${channel}` };
-          })();
+  let result: ChannelAddResult;
+  if (channel === "slack") {
+    result = await addChannel(target, {
+      channel,
+      account,
+      connectionId: requiredStringOption(options, "connection-id"),
+    });
+  } else if (channel === "telegram") {
+    result = await addChannel(target, {
+      channel,
+      account,
+      botToken: telegramToken(readSecretFile(requiredStringOption(options, "secret-file"))),
+    });
+  } else {
+    throw { code: "INVALID_CHANNEL", message: `Unsupported channel: ${channel}` };
+  }
   return { type: "single", data: result, schema: channelsAddSchema };
 }
 

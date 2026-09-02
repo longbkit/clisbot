@@ -45,7 +45,10 @@ export interface DaemonAgentConfigurationValidator {
   >;
 }
 
-export type CompiledExecutionConfiguration = Omit<CompiledHubConfig, "environments" | "triggers"> & {
+export type CompiledExecutionConfiguration = Omit<
+  CompiledHubConfig,
+  "environments" | "triggers"
+> & {
   environments: readonly (
     | Exclude<EnvironmentConfig, { kind: "daemon" }>
     | (Extract<EnvironmentConfig, { kind: "daemon" }> & { daemonId: string })

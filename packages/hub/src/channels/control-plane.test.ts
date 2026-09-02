@@ -65,22 +65,6 @@ agents:
     thinkingOptionId: high
 `;
 
-const WORKFLOW_YAML = `
-name: handoff
-on: manual.run
-max_runtime: 1h
-steps:
-  - id: work
-    environment: work
-    max_runtime: 30m
-    idle_timeout: 5m
-    agent:
-      provider: codex
-      model: gpt-5.5
-    prompt:
-      - text: "hand off"
-`;
-
 const POLICY_YAML = `
 enabled: true
 channels:

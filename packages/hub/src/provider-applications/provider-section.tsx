@@ -728,7 +728,7 @@ function OutcomeMessage({
   return (
     <Alert ref={ref} tabIndex={-1} variant="destructive">
       <TriangleAlert />
-      <AlertTitle>{guide.name} setup didn't finish</AlertTitle>
+      <AlertTitle>{guide.name} setup did not finish</AlertTitle>
       <AlertDescription>{outcome.message}</AlertDescription>
     </Alert>
   );
@@ -741,7 +741,7 @@ function EnvironmentNotice({ guide }: { guide: ProviderGuide }) {
       <AlertDescription>
         <p>
           These credentials come from <VariableList names={guide.environmentVariables} />. Change
-          them where you set Hub's environment and restart Hub; they cannot be edited here.
+          them where you set the Hub environment and restart Hub; they cannot be edited here.
           Connecting {guide.name} still works from this page.
         </p>
       </AlertDescription>

@@ -98,10 +98,7 @@ export interface ChannelSupervisor {
   /** Teardown: stop every account's transport, plane, and daemon connection. */
   stopAll(): Promise<void>;
   /** One account's install → load → start (the `channels add` transport step). */
-  startAccount(
-    channel: string,
-    accountId: string,
-  ): Promise<ChannelAccountStartResult>;
+  startAccount(channel: string, accountId: string): Promise<ChannelAccountStartResult>;
   /** After a revision activates: reconcile running accounts to the new config. */
   reconcile(): Promise<ChannelReconcileResult>;
   /** Per-account pin / integrity / load-trace / transport (the status endpoint). */
@@ -113,14 +110,8 @@ export interface ChannelSupervisor {
    * Fail-closed for an unstarted/unknown account (`{ok: false}`) — the
    * endpoint maps that to a clean tool error.
    */
-  channelReplyPost(
-    ref: ChannelReplyBindingRef,
-    text: string,
-  ): Promise<OutboundPostResult>;
-  channelReplyMediaPost(
-    ref: ChannelReplyBindingRef,
-    filePath: string,
-  ): Promise<MediaPostResult>;
+  channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult>;
+  channelReplyMediaPost(ref: ChannelReplyBindingRef, filePath: string): Promise<MediaPostResult>;
   workflowStreamEvent?(input: {
     execution: AgentExecutionRecord;
     agentId: string;

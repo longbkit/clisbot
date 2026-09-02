@@ -65,9 +65,7 @@ const DEFAULTS: EffectiveDefaults = {
 };
 
 // Kind-level match: any channel conversation resolves this route.
-function makeRoute(
-  overrides: { approval?: CompiledRoute["approval"] } = {},
-): CompiledRoute {
+function makeRoute(overrides: { approval?: CompiledRoute["approval"] } = {}): CompiledRoute {
   return {
     match: { kind: "channel", ids: [] },
     target: {
@@ -106,9 +104,7 @@ function makeAccount(route: CompiledRoute): CompiledChannelAccount {
   };
 }
 
-function makeControlPlane(
-  account: CompiledChannelAccount,
-): ChannelControlPlane {
+function makeControlPlane(account: CompiledChannelAccount): ChannelControlPlane {
   return {
     enabled: true,
     channelEnabled: {},
@@ -159,14 +155,11 @@ function makeFakeDaemon(
     emitTurnStartedOnSend?: boolean | undefined;
     failCreate?: boolean | undefined;
     failSend?: boolean | undefined;
-    onEvent?:
-      | ((agentId: string, event: Record<string, unknown>) => Promise<void>)
-      | undefined;
+    onEvent?: ((agentId: string, event: Record<string, unknown>) => Promise<void>) | undefined;
   } = {},
 ) {
   const created: { config: CreateAgentConfig; title: string | null }[] = [];
-  const messages: { agentId: string; text: string; steer: boolean | null }[] =
-    [];
+  const messages: { agentId: string; text: string; steer: boolean | null }[] = [];
   const responses: {
     agentId: string;
     requestId: string;
@@ -282,9 +275,7 @@ function makeHarness(
   const posted: string[] = [];
   const postedThreads: (string | undefined)[] = [];
   const mediaPosted: string[] = [];
-  const workflowDispatches: Parameters<
-    ChannelPlaneDeps["dispatchWorkflow"]
-  >[0][] = [];
+  const workflowDispatches: Parameters<ChannelPlaneDeps["dispatchWorkflow"]>[0][] = [];
   const next: { message: InboundMessage | null } = { message: null };
   const plane = createChannelPlane({
     organizationId: ORGANIZATION_ID,
@@ -303,9 +294,7 @@ function makeHarness(
     controlPlane,
     clock,
     logger: SILENT,
-    ...(opts.processingTtlMs !== undefined
-      ? { processingTtlMs: opts.processingTtlMs }
-      : {}),
+    ...(opts.processingTtlMs !== undefined ? { processingTtlMs: opts.processingTtlMs } : {}),
     typing: async (params) => {
       order.push(`typing:${params.action}`);
       driven.push(params);
@@ -400,13 +389,9 @@ describe("workflow route", () => {
     assert.equal(result.outcome?.kind, "workflow");
     assert.equal(harness.fake.created.length, 0);
     assert.equal(harness.workflowDispatches.length, 1);
+    assert.equal(harness.workflowDispatches[0]!.payload.workflow, "engineering-assistant");
     assert.equal(
-      harness.workflowDispatches[0]!.payload.workflow,
-      "engineering-assistant",
-    );
-    assert.equal(
-      harness.workflowDispatches[0]!.payload.channel.route.defaults.outbound
-        .path,
+      harness.workflowDispatches[0]!.payload.channel.route.defaults.outbound.path,
       "relay",
     );
     assert.equal(
@@ -548,10 +533,7 @@ describe("kill switch (flag off)", () => {
 
     assert.equal(result.dispatched, false);
     assert.equal(result.outcome?.kind, "ignored");
-    assert.match(
-      result.outcome?.kind === "ignored" ? result.outcome.reason : "",
-      /kill switch/u,
-    );
+    assert.match(result.outcome?.kind === "ignored" ? result.outcome.reason : "", /kill switch/u);
     assert.equal(fake.created.length, 0, "no agent created with the flag off");
     assert.equal(posted.length, 0, "nothing relayed with the flag off");
   });
@@ -578,23 +560,13 @@ describe("first-mention bind (flag on)", () => {
 
     assert.equal(result.dispatched, true);
     assert.equal(result.outcome?.kind, "bound");
-    const agentId =
-      result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
     assert.equal(fake.created.length, 1, "one agent created");
     assert.equal(fake.messages.length, 1, "the first prompt delivered");
     assert.equal(fake.messages[0]?.text, "start the build");
-    assert.equal(
-      fake.messages[0]?.steer,
-      false,
-      "the first prompt does not steer",
-    );
+    assert.equal(fake.messages[0]?.steer, false, "the first prompt does not steer");
 
-    const binding = await store.findThreadBinding(
-      ORGANIZATION_ID,
-      ACCOUNT_ID,
-      "C0BIND",
-      null,
-    );
+    const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0BIND", null);
     assert.equal(binding?.status, "bound");
     assert.equal(binding?.agentId, agentId);
   });
@@ -685,11 +657,7 @@ describe("shared stream consumer", () => {
       turnId: "turn-mint",
     });
 
-    assert.equal(
-      postedThreads[0],
-      "1712000000.000003",
-      "the reply threads on the marker message",
-    );
+    assert.equal(postedThreads[0], "1712000000.000003", "the reply threads on the marker message");
   });
 
   it("never mints under the default anchor", async () => {
@@ -710,8 +678,7 @@ describe("shared stream consumer", () => {
       ctxPayload: {},
     });
     assert.equal(result.outcome?.kind, "bound");
-    const agentId =
-      result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
 
     await harness.plane.onStreamEvent(agentId, {
       type: "timeline",
@@ -758,8 +725,7 @@ describe("shared stream consumer", () => {
       ctxPayload: {},
     });
     assert.equal(result.outcome?.kind, "bound");
-    const agentId =
-      result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
 
     await harness.plane.onStreamEvent(agentId, {
       type: "timeline",
@@ -812,8 +778,7 @@ describe("shared stream consumer", () => {
       ctxPayload: {},
     });
     assert.equal(result.outcome?.kind, "bound");
-    const agentId =
-      result.outcome?.kind === "bound" ? result.outcome.agentId : "";
+    const agentId = result.outcome?.kind === "bound" ? result.outcome.agentId : "";
 
     const frame = {
       type: "agent.provider_subagents.update",
@@ -889,8 +854,7 @@ describe("shared stream consumer", () => {
         ctxPayload: {},
       });
       assert.equal(bound.outcome?.kind, "bound");
-      const agentId =
-        bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+      const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
 
       await harness.plane.onStreamEvent(agentId, {
         type: "timeline",
@@ -907,11 +871,7 @@ describe("shared stream consumer", () => {
         turnId: "turn-media",
       });
 
-      assert.deepEqual(
-        harness.mediaPosted,
-        [mediaFile],
-        "the media post uses the agent's cwd",
-      );
+      assert.deepEqual(harness.mediaPosted, [mediaFile], "the media post uses the agent's cwd");
       assert.ok(
         harness.posted.includes("rendered the chart:\nand done"),
         "the caption relays with the media path line stripped",
@@ -940,10 +900,7 @@ describe("start-time recovery + posture", () => {
       initiator: "telegram:77",
       route: { kind: "group", id: "-100777" },
     });
-    const surviving = snapshotOf(
-      "telegram-agent",
-      executionMarker(pendingExecutionId),
-    );
+    const surviving = snapshotOf("telegram-agent", executionMarker(pendingExecutionId));
     const harness = makeHarness({ daemonAgents: [surviving] });
 
     await harness.plane.start(harness.fake.daemon, store);
@@ -972,10 +929,7 @@ describe("start-time recovery + posture", () => {
     const surviving = snapshotOf("agent-100", executionMarker(executionId));
     const { plane, posted } = makeHarness();
 
-    const recovered = await plane.start(
-      makeFakeDaemon([surviving]).daemon,
-      store,
-    );
+    const recovered = await plane.start(makeFakeDaemon([surviving]).daemon, store);
 
     assert.deepEqual(recovered, { rebound: 1, leftPending: 0 });
 
@@ -991,10 +945,7 @@ describe("start-time recovery + posture", () => {
       provider: "codex",
       turnId: "turn-rec",
     });
-    assert.ok(
-      posted.includes("still here"),
-      "the re-attached stream relays the final answer",
-    );
+    assert.ok(posted.includes("still here"), "the re-attached stream relays the final answer");
   });
 
   it("asserts the S10 posture and rejects a posture-lifting route at start", async () => {
@@ -1024,8 +975,7 @@ describe("approval-command short-circuit", () => {
       accountId: ACCOUNT_ID,
       ctxPayload: {},
     });
-    const agentId =
-      bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
 
     // Open a prompt for a command-class tool (require, initiator-only).
     await plane.onStreamEvent(agentId, {
@@ -1048,10 +998,7 @@ describe("approval-command short-circuit", () => {
       ctxPayload: {},
     });
     assert.equal(answered.outcome?.kind, "command");
-    assert.equal(
-      answered.outcome?.kind === "command" ? answered.outcome.handled : false,
-      true,
-    );
+    assert.equal(answered.outcome?.kind === "command" ? answered.outcome.handled : false, true);
 
     const response = fake.responses.at(-1);
     assert.equal(response?.agentId, agentId);
@@ -1076,8 +1023,7 @@ describe("channel session commands", () => {
       accountId: ACCOUNT_ID,
       ctxPayload: {},
     });
-    const agentId =
-      bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
     const promptCount = harness.fake.messages.length;
 
     harness.next.message = message({ text: "/stop", conversation });
@@ -1088,16 +1034,9 @@ describe("channel session commands", () => {
     });
 
     assert.deepEqual(harness.fake.cancelled, [agentId]);
-    assert.equal(
-      harness.fake.messages.length,
-      promptCount,
-      "stop must not create an empty turn",
-    );
+    assert.equal(harness.fake.messages.length, promptCount, "stop must not create an empty turn");
     assert.equal(stopped.outcome?.kind, "command");
-    assert.equal(
-      stopped.outcome?.kind === "command" ? stopped.outcome.handled : false,
-      true,
-    );
+    assert.equal(stopped.outcome?.kind === "command" ? stopped.outcome.handled : false, true);
   });
 
   it("does not let an unauthorized sender inspect or stop a bound Agent", async () => {
@@ -1134,10 +1073,7 @@ describe("channel session commands", () => {
 
     assert.deepEqual(harness.fake.cancelled, []);
     assert.equal(stopped.outcome?.kind, "command");
-    assert.equal(
-      stopped.outcome?.kind === "command" ? stopped.outcome.handled : true,
-      false,
-    );
+    assert.equal(stopped.outcome?.kind === "command" ? stopped.outcome.handled : true, false);
   });
 
   it("resolves /stop to the Workflow Agent for the current route", async () => {
@@ -1230,10 +1166,7 @@ describe("channel session commands", () => {
 
     assert.deepEqual(harness.fake.cancelled, ["workflow-agent"]);
     assert.equal(stopped.outcome?.kind, "command");
-    assert.equal(
-      stopped.outcome?.kind === "command" ? stopped.outcome.handled : false,
-      true,
-    );
+    assert.equal(stopped.outcome?.kind === "command" ? stopped.outcome.handled : false, true);
     const postsBeforeUndeclaredOutput = harness.posted.length;
     await harness.plane.onWorkflowStreamEvent({
       execution,
@@ -1303,12 +1236,7 @@ describe("processing lease (accepted inbound opens it)", () => {
     assert.equal(result.outcome?.kind, "bound");
     // The lease opens first, then the session is subscribed, then the prompt
     // is delivered — the order that makes the indicator visible.
-    assert.deepEqual(harness.order, [
-      "typing:start",
-      "create",
-      "subscribe",
-      "send",
-    ]);
+    assert.deepEqual(harness.order, ["typing:start", "create", "subscribe", "send"]);
     assert.deepEqual(
       harness.driven.map((d) => [d.action, d.to, d.indicator]),
       [["start", "C0LEASE", true]],
@@ -1332,8 +1260,7 @@ describe("processing lease (accepted inbound opens it)", () => {
       accountId: ACCOUNT_ID,
       ctxPayload: {},
     });
-    const agentId =
-      bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
     await settle();
     assert.deepEqual(
       harness.driven.map((d) => d.action),
@@ -1372,8 +1299,7 @@ describe("processing lease (accepted inbound opens it)", () => {
       ctxPayload: {},
     });
     await settle();
-    const agentId =
-      bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
     // End the first turn so the follow-up opens a surface of its own (a live
     // one is shared, which the refcount test below pins).
     await harness.plane.onStreamEvent(agentId, {
@@ -1454,11 +1380,7 @@ describe("processing lease (accepted inbound opens it)", () => {
     });
     await settle();
 
-    assert.deepEqual(
-      harness.driven,
-      [],
-      "no surface for a turn that never runs",
-    );
+    assert.deepEqual(harness.driven, [], "no surface for a turn that never runs");
     assert.equal(harness.fake.created.length, 0);
   });
 
@@ -1587,8 +1509,7 @@ describe("processing lease (accepted inbound opens it)", () => {
 
     // The agent's terminal event ends both leases, so the indicator goes once
     // and is never left running by the lease the event did not name.
-    const agentId =
-      first.outcome?.kind === "bound" ? first.outcome.agentId : "";
+    const agentId = first.outcome?.kind === "bound" ? first.outcome.agentId : "";
     await harness.plane.onStreamEvent(agentId, {
       type: "turn_completed",
       provider: "codex",
@@ -1649,12 +1570,7 @@ describe("processing lease (accepted inbound opens it)", () => {
     await settle();
 
     assert.deepEqual(
-      harness.driven.map((d) => [
-        d.action,
-        d.indicator,
-        d.reactionEmoji,
-        d.messageId,
-      ]),
+      harness.driven.map((d) => [d.action, d.indicator, d.reactionEmoji, d.messageId]),
       [["start", true, "hourglass_flowing_sand", "1712000000.000077"]],
     );
   });

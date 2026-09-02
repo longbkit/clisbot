@@ -32,7 +32,7 @@ import type {
   DaemonDispatchLifecycleOptions,
   ExecutionDeadlineClock,
 } from "./daemons/lifecycle.js";
-import type { TriggerProviderFactory, TriggerProviderResources } from "./providers/registration.js";
+import type { TriggerProviderFactory } from "./providers/registration.js";
 import type { TriggerProvider, TriggerSource } from "./triggers/index.js";
 import {
   createManualTriggerSource,
@@ -155,10 +155,7 @@ export function createHubRuntime(options: HubRuntimeOptions): HubRuntime {
 }
 
 export function createHubApplication(options: HubRuntimeOptions): HubApplication {
-  const daemons =
-    options.database === null
-      ? null
-      : new ActiveDaemonRegistry(options.database, options.daemonClock);
+  const daemons = createActiveDaemonRegistry(options);
   const storeForProject = (projectId: string) => {
     if (options.database === null) throw new DatabaseUnavailableError();
     return new ProjectConfigurationStore(options.database, projectId, daemons ?? undefined);
@@ -376,6 +373,11 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       channelControlPlane.handleChannelReplyMcp(request, token),
   };
   return { hub, operations, publicApi, configurationForProject: storeForProject };
+}
+
+function createActiveDaemonRegistry(options: HubRuntimeOptions): ActiveDaemonRegistry | null {
+  if (options.database === null) return null;
+  return new ActiveDaemonRegistry(options.database, options.daemonClock);
 }
 
 function createAppPublicOperations(

@@ -5,10 +5,7 @@ import type { OrganizationAccessValue } from "./auth/organization-access.js";
 import { createMemoryDatabase } from "./db/memory.js";
 import type { Database } from "./db/types.js";
 import { EntitlementsService } from "./entitlements/service.js";
-import type {
-  ProviderRegistration,
-  TriggerProviderResources,
-} from "./providers/registration.js";
+import type { ProviderRegistration, TriggerProviderResources } from "./providers/registration.js";
 import { createApplicationRuntime } from "./application-runtime.js";
 import { replyOutputTool } from "./execution-capabilities/outputs.js";
 
@@ -73,41 +70,28 @@ describe("application runtime provider composition", () => {
 
     assert.deepEqual(events, ["provider", "source:start"]);
     assert.equal(
-      await (
-        await runtime.webhook(new Request("https://hub.test/webhook"))
-      ).text(),
+      await (await runtime.webhook(new Request("https://hub.test/webhook"))).text(),
       "fake webhook",
     );
     assert.equal(
       await (
-        await runtime.providerRequest(
-          "webhook",
-          new Request("https://hub.test/webhook"),
-        )
+        await runtime.providerRequest("webhook", new Request("https://hub.test/webhook"))
       ).text(),
       "fake webhook",
     );
     assert.deepEqual(
       await (
-        await runtime.connectionAction(
-          new Request("https://hub.test/start"),
-          "fake",
-          "start",
-        )
+        await runtime.connectionAction(new Request("https://hub.test/start"), "fake", "start")
       ).json(),
       { provider: "fake" },
     );
     assert.deepEqual(
-      await (
-        await runtime.connectionStatus(new Request(scopedStatusUrl()))
-      ).json(),
+      await (await runtime.connectionStatus(new Request(scopedStatusUrl()))).json(),
       { canManage: true, fake: { status: "connected" } },
     );
     assert.deepEqual(
       await (
-        await runtime.connectionStatus(
-          new Request("https://hub.test/status?organizationSlug=org"),
-        )
+        await runtime.connectionStatus(new Request("https://hub.test/status?organizationSlug=org"))
       ).json(),
       { canManage: true, fake: { status: "connected" } },
     );
@@ -122,15 +106,11 @@ describe("application runtime provider composition", () => {
     const first = fakeRegistration();
     first.connection = { ...first.connection, name: "first" };
     first.sources = [trackedSource("first", events)];
-    first.requests = [
-      { name: "events", handle: () => Promise.resolve(new Response()) },
-    ];
+    first.requests = [{ name: "events", handle: () => Promise.resolve(new Response()) }];
     const second = fakeRegistration();
     second.connection = { ...second.connection, name: "second" };
     second.sources = [trackedSource("second", events)];
-    second.requests = [
-      { name: "events", handle: () => Promise.resolve(new Response()) },
-    ];
+    second.requests = [{ name: "events", handle: () => Promise.resolve(new Response()) }];
 
     const database = createMemoryDatabase();
     await assert.rejects(
@@ -168,9 +148,7 @@ describe("application runtime provider composition", () => {
     });
 
     assert.deepEqual(
-      await (
-        await runtime.connectionStatus(new Request(scopedStatusUrl()))
-      ).json(),
+      await (await runtime.connectionStatus(new Request(scopedStatusUrl()))).json(),
       { canManage: false, fake: { status: "connected" } },
     );
     await runtime.stop();

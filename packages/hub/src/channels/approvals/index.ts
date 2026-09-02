@@ -24,10 +24,7 @@ import type {
   CompiledFallback,
   CompiledRoute,
 } from "../config/compile.js";
-import type {
-  AgentPermissionRequest,
-  AgentPermissionResponse,
-} from "../daemon/types.js";
+import type { AgentPermissionRequest, AgentPermissionResponse } from "../daemon/types.js";
 import type { DaemonConnection } from "../daemon/client.js";
 import type { ChannelStore } from "../../db/channels.js";
 import {
@@ -141,21 +138,15 @@ export class ApprovalEngine {
    * Handle one `permission_requested` from the shared stream path: classify,
    * decide, and either auto-respond on the daemon or post the in-thread prompt.
    */
-  async handlePermissionRequest(
-    agentId: string,
-    request: AgentPermissionRequest,
-  ): Promise<void> {
+  async handlePermissionRequest(agentId: string, request: AgentPermissionRequest): Promise<void> {
     const context = this.streams.get(agentId);
     if (context === undefined) {
       // No context attached for this agent (a stream the plane never bound):
       // stay out of the decision rather than guess a route.
-      this.context.logger.warn(
-        "permission_requested for an unbound agent; not deciding",
-        {
-          agentId,
-          requestId: request.id,
-        },
-      );
+      this.context.logger.warn("permission_requested for an unbound agent; not deciding", {
+        agentId,
+        requestId: request.id,
+      });
       return;
     }
     const toolClass = classifyToolClass(request);
@@ -226,14 +217,11 @@ export class ApprovalEngine {
       // A later path lost the race (card click after the typed command, or a
       // client answer in flight): exactly-once — the second response is an
       // inert no-op.
-      this.context.logger.info?.(
-        "approval answer ignored (prompt already resolved)",
-        {
-          agentId,
-          requestId: command.requestId,
-          responder: responderIdentity,
-        },
-      );
+      this.context.logger.info?.("approval answer ignored (prompt already resolved)", {
+        agentId,
+        requestId: command.requestId,
+        responder: responderIdentity,
+      });
       return { allowed: false, answered: false, reason: "ok", stale: true };
     }
     const { context, request } = prompt;
@@ -246,28 +234,22 @@ export class ApprovalEngine {
       context.route,
     );
     if (!check.allowed) {
-      this.context.logger.info?.(
-        "approval answer refused; request stays open",
-        {
-          agentId,
-          requestId: command.requestId,
-          reason: check.reason,
-        },
-      );
+      this.context.logger.info?.("approval answer refused; request stays open", {
+        agentId,
+        requestId: command.requestId,
+        reason: check.reason,
+      });
       return { ...check, answered: false };
     }
     const response = this.buildResponse(prompt, command);
     if (response === null) {
       // A question prompt answered without an actionable answer (bare
       // `approve <id>`, bare "Other"): inert, the prompt stays open.
-      this.context.logger.info?.(
-        "approval answer ignored (no actionable answer)",
-        {
-          agentId,
-          requestId: command.requestId,
-          responder: responderIdentity,
-        },
-      );
+      this.context.logger.info?.("approval answer ignored (no actionable answer)", {
+        agentId,
+        requestId: command.requestId,
+        responder: responderIdentity,
+      });
       return { ...check, answered: false, stale: true };
     }
     // Latch BEFORE dispatch: a concurrent path that reads the entry between
@@ -281,13 +263,7 @@ export class ApprovalEngine {
       decision: command.decision,
       responder: responderIdentity,
     });
-    await this.updateDecidedCard(
-      prompt,
-      responderIdentity,
-      command,
-      response,
-      responderName,
-    );
+    await this.updateDecidedCard(prompt, responderIdentity, command, response, responderName);
     return { ...check, answered: true };
   }
 
@@ -327,16 +303,14 @@ export class ApprovalEngine {
   ): Promise<void> {
     const update = this.context.update;
     const location = prompt.cardLocation;
-    if (update === undefined || location === undefined || !prompt.cardPosted)
-      return;
+    if (update === undefined || location === undefined || !prompt.cardPosted) return;
     if (response.behavior !== "allow" && response.behavior !== "deny") return;
     // The Slack responder is tagged with the native `<@USERID>` mention —
     // Slack renders it as the person's name, so nobody reads a raw id. The
     // identity is `slack:<USERID>` (monitor.ts); anything else (a channel
     // without user ids) falls back to the display name / identity.
     const slackUserId =
-      prompt.context.channel === "slack" &&
-      /^slack:[A-Z][A-Z0-9]+$/u.test(responderIdentity)
+      prompt.context.channel === "slack" && /^slack:[A-Z][A-Z0-9]+$/u.test(responderIdentity)
         ? responderIdentity.slice("slack:".length)
         : undefined;
     const text = decidedPromptText({
@@ -347,23 +321,18 @@ export class ApprovalEngine {
       // Slack: the prepended `<@USERID>` mention IS the who — rendering the
       // display name again would be a duplicate. Other channels carry the
       // name (or the identity) in the text itself.
-      responder:
-        slackUserId !== undefined ? "" : (responderName ?? responderIdentity),
+      responder: slackUserId !== undefined ? "" : (responderName ?? responderIdentity),
       cardMode: true,
     });
     const result = await update({
       channel: prompt.context.channel,
       accountId: prompt.context.accountId,
       to: location.to,
-      ...(location.threadId !== undefined
-        ? { threadId: location.threadId }
-        : {}),
+      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
       externalMessageId: location.externalMessageId,
       text,
       clearCard: true,
-      ...(slackUserId !== undefined
-        ? { senderMention: `<@${slackUserId}>` }
-        : {}),
+      ...(slackUserId !== undefined ? { senderMention: `<@${slackUserId}>` } : {}),
     });
     if (!result.ok) {
       this.context.logger.warn("approval card in-place update failed", {
@@ -402,23 +371,14 @@ export class ApprovalEngine {
       });
       return;
     }
-    const posted = await this.postPromptMessage(
-      context,
-      request,
-      initiatorOnly,
-      eventTurnId,
-    );
+    const posted = await this.postPromptMessage(context, request, initiatorOnly, eventTurnId);
     if (posted === undefined) return; // post failed: leave no open prompt to answer
     this.openPrompts.set(this.promptKey(context.agentId, request.id), {
       context,
       request,
-      ...(posted.card.questions !== undefined
-        ? { questions: posted.card.questions }
-        : {}),
+      ...(posted.card.questions !== undefined ? { questions: posted.card.questions } : {}),
       cardPosted: posted.card.requested && (posted.result.cardPosted ?? true),
-      ...(posted.cardLocation !== undefined
-        ? { cardLocation: posted.cardLocation }
-        : {}),
+      ...(posted.cardLocation !== undefined ? { cardLocation: posted.cardLocation } : {}),
       resolved: false,
     });
   }
@@ -445,14 +405,10 @@ export class ApprovalEngine {
       channel: context.channel,
       accountId: context.accountId,
       to: location.to,
-      ...(location.threadId !== undefined
-        ? { threadId: location.threadId }
-        : {}),
+      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
       text: promptText(request, initiatorOnly, card.questions),
       ...(card.blocks !== undefined ? { blocks: card.blocks } : {}),
-      ...(card.replyMarkup !== undefined
-        ? { replyMarkup: card.replyMarkup }
-        : {}),
+      ...(card.replyMarkup !== undefined ? { replyMarkup: card.replyMarkup } : {}),
     });
     if (!result.ok) {
       await this.context.store.failDelivery({
@@ -464,14 +420,11 @@ export class ApprovalEngine {
         sequence: 0,
         failureReason: result.error ?? "channel post failed",
       });
-      this.context.logger.warn(
-        "approval prompt post failed; the request stays open",
-        {
-          agentId: context.agentId,
-          requestId: request.id,
-          error: result.error,
-        },
-      );
+      this.context.logger.warn("approval prompt post failed; the request stays open", {
+        agentId: context.agentId,
+        requestId: request.id,
+        error: result.error,
+      });
       return undefined;
     }
     await this.context.store.confirmDelivery({
@@ -531,27 +484,16 @@ export class ApprovalEngine {
     result: OutboundPostResult,
   ): PromptCardLocation | undefined {
     const externalMessageId = result.externalMessageId;
-    if (externalMessageId === undefined || externalMessageId === "")
-      return undefined;
+    if (externalMessageId === undefined || externalMessageId === "") return undefined;
     return {
       to: location.to,
-      ...(location.threadId !== undefined
-        ? { threadId: location.threadId }
-        : {}),
+      ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
       externalMessageId,
     };
   }
 
-  private async respond(
-    agentId: string,
-    requestId: string,
-    response: AgentPermissionResponse,
-  ) {
-    await this.context.daemon.respondToAgentPermission(
-      agentId,
-      requestId,
-      response,
-    );
+  private async respond(agentId: string, requestId: string, response: AgentPermissionResponse) {
+    await this.context.daemon.respondToAgentPermission(agentId, requestId, response);
   }
 
   private promptKey(agentId: string, requestId: string): string {
@@ -562,10 +504,7 @@ export class ApprovalEngine {
    * `requestId` when it is open. `requestId` undefined → the "latest" target.
    * Undefined when nothing open matches — the caller treats the command as
    * inert. Insertion order = prompt post order, so last = newest. */
-  resolveOpenPrompt(
-    agentId: string,
-    requestId?: string,
-  ): AgentPermissionRequest | undefined {
+  resolveOpenPrompt(agentId: string, requestId?: string): AgentPermissionRequest | undefined {
     if (requestId !== undefined) {
       const prompt = this.openPrompts.get(this.promptKey(agentId, requestId));
       if (prompt !== undefined && !prompt.resolved) return prompt.request;
@@ -573,18 +512,12 @@ export class ApprovalEngine {
       // of the full id among this agent's open prompts.
       let prefixMatch: AgentPermissionRequest | undefined;
       for (const candidate of this.openPrompts.values()) {
-        if (candidate.resolved || candidate.context.agentId !== agentId)
-          continue;
+        if (candidate.resolved || candidate.context.agentId !== agentId) continue;
         const matches =
-          shortIdOf(candidate.request.id).toLowerCase() ===
-            requestId.toLowerCase() ||
+          shortIdOf(candidate.request.id).toLowerCase() === requestId.toLowerCase() ||
           candidate.request.id.startsWith(requestId);
         if (!matches) continue;
-        if (
-          prefixMatch !== undefined &&
-          prefixMatch.id !== candidate.request.id
-        )
-          return undefined;
+        if (prefixMatch !== undefined && prefixMatch.id !== candidate.request.id) return undefined;
         prefixMatch = candidate.request;
       }
       return prefixMatch;
@@ -624,9 +557,7 @@ export { cardIdFor, parseCardValue };
  * catch-all fallback that targets an agent is a route too and is checked the
  * same way. Propagates policy's `ApprovalPostureError` naming the offender.
  */
-export function assertChannelPosture(
-  accounts: readonly CompiledChannelAccount[],
-): void {
+export function assertChannelPosture(accounts: readonly CompiledChannelAccount[]): void {
   for (const account of accounts) {
     for (const route of account.routes) {
       assertApprovalRequiredPosture(route);

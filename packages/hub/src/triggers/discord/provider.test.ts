@@ -10,7 +10,8 @@ import { isAcceptedTriggerProviderMatch } from "../index.js";
 
 describe("Discord Phase 1 trigger provider", () => {
   it("normalizes typed inputs identically at the provider boundary", async () => {
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputConfiguration());
+    const { workflow, revision, configurationForWorkflow } =
+      await activeConfiguration(inputConfiguration());
     const provider = createDiscordTriggerProvider({
       configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
@@ -35,7 +36,9 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("parses typed inputs after a matched command marker", async () => {
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputMarkerConfiguration());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
+      inputMarkerConfiguration(),
+    );
     const provider = createDiscordTriggerProvider({
       configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
@@ -63,7 +66,8 @@ describe("Discord Phase 1 trigger provider", () => {
         },
       ],
     };
-    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
+    const { workflow, revision, configurationForWorkflow } =
+      await activeConfiguration(configuration);
     const provider = createDiscordTriggerProvider({
       configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
@@ -128,10 +132,8 @@ describe("Discord Phase 1 trigger provider", () => {
     database.organizationConnectionUsage = () =>
       Promise.resolve({ github: [], slack: [], discord: [connection], linear: [] });
     database.findDiscordConnectionForOrganization = () => Promise.resolve(connection);
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      discordConnectionConfiguration(),
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, discordConnectionConfiguration());
     const provider = createDiscordTriggerProvider({
       configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
@@ -150,10 +152,8 @@ describe("Discord Phase 1 trigger provider", () => {
 
   it("preserves Discord attachments, references, and thread context as durable evidence", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      discordConfiguration(),
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, discordConfiguration());
     const attachments = createAttachmentCapabilityRegistry({
       database,
       publicBaseUrl: "https://hub.test",

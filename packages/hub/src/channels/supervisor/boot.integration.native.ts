@@ -41,17 +41,11 @@ import { createServer, type Server } from "node:http";
 import { after, before, describe, it } from "node:test";
 import { WebSocketServer } from "ws";
 import { OrganizationTriggerStore } from "../../triggers/store.js";
-import {
-  embeddedDatabaseRuntime,
-  type DatabaseRuntimeBundle,
-} from "../../db/runtime/index.js";
+import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "../../db/runtime/index.js";
 import { createDatabase } from "../../db/pg.js";
 import { createTestCredentialCipher } from "../../credentials/test-utils.js";
 import type { Database } from "../../db/types.js";
-import {
-  enrollTestDaemon,
-  TEST_DAEMON_SLUG,
-} from "../../test-utils/project-configuration.js";
+import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../../test-utils/project-configuration.js";
 import { createChannelSupervisor } from "./index.js";
 import type { ChannelSupervisor, ChannelSupervisorOptions } from "./types.js";
 
@@ -61,14 +55,7 @@ const DEV_HOME = process.env["CLISBOT_HOME"] ?? join(homedir(), ".clisbot-dev");
 // The test file's location: packages/hub/src/channels/supervisor/ — six
 // levels up (the file itself is the first) reaches the repo root.
 const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url));
-const HUB_DIST_LOADER = join(
-  REPO_ROOT,
-  "packages",
-  "hub",
-  "dist",
-  "channels",
-  "loader",
-);
+const HUB_DIST_LOADER = join(REPO_ROOT, "packages", "hub", "dist", "channels", "loader");
 const PINS_PATH = join(REPO_ROOT, "packages", "hub", "channel-pins.json");
 
 /** The in-repo workspace package dirs (blueprint §6.5): the workspace
@@ -106,9 +93,7 @@ const LIVE_HUB_LOCAL = join(DEV_HOME, "hub-local.json");
 function liveHubRunning(): boolean {
   let pid = 0;
   try {
-    pid =
-      (JSON.parse(readFileSync(LIVE_HUB_LOCAL, "utf8")) as { pid?: number })
-        .pid ?? 0;
+    pid = (JSON.parse(readFileSync(LIVE_HUB_LOCAL, "utf8")) as { pid?: number }).pid ?? 0;
   } catch {
     return false;
   }
@@ -201,9 +186,7 @@ class FakeDaemon {
   }
 
   async listen(): Promise<void> {
-    await new Promise<void>((resolve) =>
-      this.server.listen(0, "127.0.0.1", () => resolve()),
-    );
+    await new Promise<void>((resolve) => this.server.listen(0, "127.0.0.1", () => resolve()));
     this.port = (this.server.address() as AddressInfo).port;
   }
 
@@ -232,8 +215,7 @@ class FakeDaemon {
       client.send(JSON.stringify({ type: "pong" }));
       return;
     }
-    if (frame.type !== "session" || typeof frame["message"] !== "object")
-      return;
+    if (frame.type !== "session" || typeof frame["message"] !== "object") return;
     const message = frame["message"] as RecordedMessage;
     this.messages.push(message);
     this.respond(client, message);
@@ -242,10 +224,7 @@ class FakeDaemon {
   /** The stock wire shapes: create replies with a `status` frame; the other
    * RPCs reply with their dedicated `*_response` frame. All carry the
    * correlation id in the payload. */
-  private respond(
-    client: import("ws").WebSocket,
-    message: RecordedMessage,
-  ): void {
+  private respond(client: import("ws").WebSocket, message: RecordedMessage): void {
     switch (message["type"]) {
       case "create_agent_request": {
         client.send(
@@ -355,31 +334,8 @@ agents:
     model: gpt-5.6-luna
 `;
 
-// The bundle requires at least one direct workflow document (compileHubBundle
-// gate); the channel drive path never touches triggers, so this placeholder
-// exists only to satisfy that gate. `manual.run` = no external source (no
-// allowlist). The step uses an INLINE agent object rather than the named
-// `codex-e2e` agent under test, so `validateNamedAgents` collects zero targets
-// and `activate` never consults a daemon provider-validation capability — the
-// bootstrap trigger is fully decoupled from the agent the seam drives.
-const BOOTSTRAP_WORKFLOW = `
-name: boot-strap
-on: manual.run
-max_runtime: 1h
-steps:
-  - id: noop
-    environment: work
-    max_runtime: 30m
-    idle_timeout: 5m
-    agent:
-      provider: codex
-    prompt:
-      - text: placeholder
-`;
-
 function policyYaml(liveSender: string | undefined): string {
-  const liveIdentity =
-    liveSender !== undefined ? `\n      - slack:${liveSender}` : "";
+  const liveIdentity = liveSender !== undefined ? `\n      - slack:${liveSender}` : "";
   return `
 enabled: true
 channels:
@@ -445,543 +401,469 @@ fallback:
 `;
 }
 
-describe(
-  "channel supervisor boot (real supply + fake daemon)",
-  { skip: SKIP },
-  () => {
-    let workDir: string;
-    let dataDir: string;
-    let dbDir: string;
-    let bundle: DatabaseRuntimeBundle;
-    let database: Database;
-    let daemon: FakeDaemon;
-    let supervisor: ChannelSupervisor;
-    let liveSenderId: string | undefined;
-    let liveBotUserId: string | undefined;
-    const workflowDispatches: Array<
-      Parameters<NonNullable<ChannelSupervisorOptions["dispatchWorkflow"]>>[0]
-    > = [];
+describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, () => {
+  let workDir: string;
+  let dataDir: string;
+  let dbDir: string;
+  let bundle: DatabaseRuntimeBundle;
+  let database: Database;
+  let daemon: FakeDaemon;
+  let supervisor: ChannelSupervisor;
+  let liveSenderId: string | undefined;
+  let liveBotUserId: string | undefined;
+  const workflowDispatches: Array<
+    Parameters<NonNullable<ChannelSupervisorOptions["dispatchWorkflow"]>>[0]
+  > = [];
 
-    before(async () => {
-      workDir = mkdtempSync(join(tmpdir(), "hub-boot-"));
-      dataDir = join(workDir, "data");
-      dbDir = join(workDir, "db");
-      daemon = new FakeDaemon();
-      await daemon.listen();
+  before(async () => {
+    workDir = mkdtempSync(join(tmpdir(), "hub-boot-"));
+    dataDir = join(workDir, "data");
+    dbDir = join(workDir, "db");
+    daemon = new FakeDaemon();
+    await daemon.listen();
 
-      // 1. The in-repo install (blueprint §6.5): no supply copy — the Hub drives
-      // its OWN built workspace packages. Pre-seed the per-channel markers exactly
-      // as a fresh `ensureChannelInstalled` in-repo run would have recorded them
-      // (sync-reference pin + resolved package dir), so the boot's install step
-      // recognizes the install as pin-matching and skips to the load.
-      const pins = JSON.parse(readFileSync(PINS_PATH, "utf8")) as {
-        main: { package: string; version: string; dist: { integrity: string } };
-        channels: Record<
-          string,
-          {
-            loadMode: "published" | "bundled" | "in-repo";
-            entry: string;
-            channel: {
-              package: string;
-              version: string;
-              dist: { integrity: string; gitHead?: string };
-            };
-          }
-        >;
-      };
-      const mainRef = {
-        package: pins.main.package,
-        version: pins.main.version,
-        integrity: pins.main.dist.integrity,
-      };
-      const slackPin = pins.channels["slack"];
-      const telegramPin = pins.channels["telegram"];
-      if (slackPin === undefined || telegramPin === undefined) {
-        throw new Error("channel-pins.json must carry both P0 verticals");
-      }
-      if (
-        slackPin.loadMode !== "in-repo" ||
-        telegramPin.loadMode !== "in-repo"
-      ) {
-        throw new Error(
-          "channel-pins.json must pull both P0 verticals in-repo",
-        );
-      }
-      const workAccountRoot = join(dataDir, "channels", "work");
-      mkdirSync(workAccountRoot, { recursive: true });
-      // The live dev home's persisted per-account state (poll offsets, dedupe
-      // caches) — reused across runs (CLAUDE.md channel E2E guardrail) so a
-      // fresh boot does not replay the dev bot's whole update history from
-      // offset 0 into the fake daemon.
-      const liveState = join(DEV_HOME, "channels", "work", "state");
-      if (existsSync(liveState)) {
-        cpSync(liveState, join(workAccountRoot, "state"), { recursive: true });
-      }
-      const installedAt = "2026-08-26T00:00:00.000Z";
-      writeFileSync(
-        join(workAccountRoot, "install-slack.lock"),
-        `${JSON.stringify(
-          {
-            channel: "slack",
-            accountId: "work",
-            loadMode: slackPin.loadMode,
-            main: mainRef,
-            channelPackage: {
-              package: slackPin.channel.package,
-              version: slackPin.channel.version,
-              integrity: slackPin.channel.dist.integrity,
-              gitHead: slackPin.channel.dist.gitHead,
-            },
-            entry: slackPin.entry,
-            inRepoPackageDir: SLACK_IN_REPO,
-            installedAt,
-          },
-          null,
-          2,
-        )}\n`,
-        { mode: 0o600 },
-      );
-      writeFileSync(
-        join(workAccountRoot, "install-telegram.lock"),
-        `${JSON.stringify(
-          {
-            channel: "telegram",
-            accountId: "work",
-            loadMode: telegramPin.loadMode,
-            main: mainRef,
-            channelPackage: {
-              package: telegramPin.channel.package,
-              version: telegramPin.channel.version,
-              integrity: telegramPin.channel.dist.integrity,
-            },
-            entry: telegramPin.entry,
-            inRepoPackageDir: TELEGRAM_IN_REPO,
-            installedAt,
-          },
-          null,
-          2,
-        )}\n`,
-        { mode: 0o600 },
-      );
-
-      // 2. Test-only credential fixtures supplied through the resolver seam. `cpSync`
-      // copies the file's own mode, so chmod only if the source was wider.
-      const slackSecret = join(dataDir, "secrets", "slack-work.json");
-      const telegramSecret = join(dataDir, "secrets", "telegram-work.json");
-      cpSync(join(DEV_HOME, "secrets", "slack--work"), slackSecret);
-      cpSync(join(DEV_HOME, "secrets", "telegram--work"), telegramSecret);
-      chmodSync(slackSecret, 0o600);
-      chmodSync(telegramSecret, 0o600);
-
-      // 3. The live sender + bot ids for subtest 3 (real Slack socket pipeline).
-      // The user credential is the configured `[vex]-slack` user token (the same
-      // one the live E2E markers post with); the bot id comes from the app's
-      // bot token. Both are raw connectivity checks, allowed at any stage.
-      const userToken =
-        process.env["SLACK_MCP_XOXP_TOKEN"] ?? envVar("SLACK_MCP_XOXP_TOKEN");
-      const botToken = envVar("SLACK_BOT_TOKEN");
-      if (userToken !== undefined && botToken !== undefined) {
-        try {
-          liveSenderId = await slackAuthUserId(userToken);
-          liveBotUserId = await slackAuthUserId(botToken);
-        } catch (error) {
-          // Offline/no-creds: subtest 3 skips on the missing ids, not the suite.
-          process.stderr.write(
-            `[hub][warn] live Slack ids unavailable: ${String(error)}\n`,
-          );
-        }
-      }
-
-      // 4. The embedded database + the organization-owned Channel revision.
-      bundle = await embeddedDatabaseRuntime(dbDir);
-      await bundle.runtime.migrate();
-      await bundle.runtime.query(
-        "insert into organization (id, name, slug) values ($1, 'Boot Org', 'boot-org')",
-        [ORG_ID],
-      );
-      database = createDatabase(
-        bundle.runtime,
-        bundle.locks,
-        createTestCredentialCipher(),
-      );
-      await enrollTestDaemon(database, ORG_ID);
-      await new OrganizationTriggerStore(database, ORG_ID).save({
-        yaml: `name: boot-strap\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: ${TEST_DAEMON_SLUG}, cwd: ${ENV_CWD} }\n  agent: { provider: codex, mode: default }\n  prompt: placeholder\n  max_runtime: 1h\n  idle_timeout: 5m\n`,
-        userId: null,
-      });
-      const files = [
-        { path: ".paseo/hub.yml", content: HUB_YAML },
+    // 1. The in-repo install (blueprint §6.5): no supply copy — the Hub drives
+    // its OWN built workspace packages. Pre-seed the per-channel markers exactly
+    // as a fresh `ensureChannelInstalled` in-repo run would have recorded them
+    // (sync-reference pin + resolved package dir), so the boot's install step
+    // recognizes the install as pin-matching and skips to the load.
+    const pins = JSON.parse(readFileSync(PINS_PATH, "utf8")) as {
+      main: { package: string; version: string; dist: { integrity: string } };
+      channels: Record<
+        string,
         {
-          path: ".paseo/channels/policy.yml",
-          content: policyYaml(liveSenderId),
-        },
-        {
-          path: ".paseo/channels/slack/work.yml",
-          content: slackAccountYaml("00000000-0000-4000-8000-000000000001"),
-        },
-        {
-          path: ".paseo/channels/telegram/work.yml",
-          content: telegramAccountYaml("00000000-0000-4000-8000-000000000002"),
-        },
-      ];
-      await database.saveChannelConfiguration({
-        organizationId: ORG_ID,
-        files,
-        contentHash: "native-channel-configuration",
-        createdByUserId: null,
-      });
-
-      // 4. The supervisor: real install dir + real pins, loopback fake daemon,
-      // and an env WITHOUT PASEO_PASSWORD (the fake upgrade carries no subprotocol).
-      // The verticals run IN THIS process, so the native verbose log lever is
-      // process.env, not the supervisor's env copy (the supervisor only reads it
-      // for the channels flag + daemon password). shouldLogVerbose ->
-      // isFileLogLevelEnabled("debug") reads process.env directly; every native
-      // drop gate (mention policy, allowlist, debounce, ACP binding) logs at
-      // debug to the openclaw file log — a drop must be named, not guessed.
-      process.env["OPENCLAW_LOG_LEVEL"] = "debug";
-      const env = { ...process.env } as NodeJS.ProcessEnv;
-      delete env["PASEO_PASSWORD"];
-      env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
-      env["OPENCLAW_LOG_LEVEL"] = "debug";
-      supervisor = createChannelSupervisor({
-        database,
-        databaseRuntime: bundle.runtime,
-        dataDir,
-        pinsPath: PINS_PATH,
-        daemon: { host: `127.0.0.1:${daemon.port}` },
-        resolveConnection: ({ channel }) => {
-          const raw = readFileSync(
-            channel === "slack" ? slackSecret : telegramSecret,
-            "utf8",
-          );
-          const parsed = JSON.parse(raw) as {
-            botToken?: string;
-            appToken?: string;
-            token?: string;
+          loadMode: "published" | "bundled" | "in-repo";
+          entry: string;
+          channel: {
+            package: string;
+            version: string;
+            dist: { integrity: string; gitHead?: string };
           };
-          const resolvedBotToken = parsed.botToken ?? parsed.token;
-          if (resolvedBotToken === undefined) return Promise.resolve(undefined);
-          return Promise.resolve({
-            botToken: resolvedBotToken,
-            ...(parsed.appToken === undefined
-              ? {}
-              : { appToken: parsed.appToken }),
-          });
-        },
-        env,
-        dispatchWorkflow: async (input) => {
-          workflowDispatches.push(input);
-        },
-        logger: {
-          info: (message, meta) =>
-            logLine(`[hub][info] ${message} ${JSON.stringify(meta)}`),
-          warn: (message, meta) =>
-            logLine(`[hub][warn] ${message} ${JSON.stringify(meta)}`),
-          error: (message, meta) =>
-            logLine(`[hub][error] ${message} ${JSON.stringify(meta)}`),
-        },
-      });
-      await supervisor.startAll();
-    });
-
-    after(async () => {
-      await supervisor?.stopAll();
-      await daemon?.close();
-      await bundle?.runtime.close();
-      if (workDir !== undefined)
-        rmSync(workDir, { recursive: true, force: true });
-    });
-
-    it("boots both P0 accounts on the shared install root: transport started", () => {
-      const entries = supervisor.status();
-      const slack = entries.find(
-        (entry) => entry.channel === "slack" && entry.account === "work",
-      );
-      const telegram = entries.find(
-        (entry) => entry.channel === "telegram" && entry.account === "work",
-      );
-      assert.ok(
-        slack !== undefined,
-        `slack:work handle missing: ${JSON.stringify(entries)}`,
-      );
-      assert.ok(
-        telegram !== undefined,
-        `telegram:work handle missing: ${JSON.stringify(entries)}`,
-      );
-      assert.equal(
-        slack.detail,
-        undefined,
-        `slack:work deferred: ${slack.detail}`,
-      );
-      assert.equal(
-        telegram.detail,
-        undefined,
-        `telegram:work deferred: ${telegram.detail}`,
-      );
-      assert.deepEqual(
+        }
+      >;
+    };
+    const mainRef = {
+      package: pins.main.package,
+      version: pins.main.version,
+      integrity: pins.main.dist.integrity,
+    };
+    const slackPin = pins.channels["slack"];
+    const telegramPin = pins.channels["telegram"];
+    if (slackPin === undefined || telegramPin === undefined) {
+      throw new Error("channel-pins.json must carry both P0 verticals");
+    }
+    if (slackPin.loadMode !== "in-repo" || telegramPin.loadMode !== "in-repo") {
+      throw new Error("channel-pins.json must pull both P0 verticals in-repo");
+    }
+    const workAccountRoot = join(dataDir, "channels", "work");
+    mkdirSync(workAccountRoot, { recursive: true });
+    // The live dev home's persisted per-account state (poll offsets, dedupe
+    // caches) — reused across runs (CLAUDE.md channel E2E guardrail) so a
+    // fresh boot does not replay the dev bot's whole update history from
+    // offset 0 into the fake daemon.
+    const liveState = join(DEV_HOME, "channels", "work", "state");
+    if (existsSync(liveState)) {
+      cpSync(liveState, join(workAccountRoot, "state"), { recursive: true });
+    }
+    const installedAt = "2026-08-26T00:00:00.000Z";
+    writeFileSync(
+      join(workAccountRoot, "install-slack.lock"),
+      `${JSON.stringify(
         {
-          slack: [slack.integrity, slack.loadTrace, slack.transport],
-          telegram: [
-            telegram.integrity,
-            telegram.loadTrace,
-            telegram.transport,
-          ],
+          channel: "slack",
+          accountId: "work",
+          loadMode: slackPin.loadMode,
+          main: mainRef,
+          channelPackage: {
+            package: slackPin.channel.package,
+            version: slackPin.channel.version,
+            integrity: slackPin.channel.dist.integrity,
+            gitHead: slackPin.channel.dist.gitHead,
+          },
+          entry: slackPin.entry,
+          inRepoPackageDir: SLACK_IN_REPO,
+          installedAt,
         },
+        null,
+        2,
+      )}\n`,
+      { mode: 0o600 },
+    );
+    writeFileSync(
+      join(workAccountRoot, "install-telegram.lock"),
+      `${JSON.stringify(
         {
-          slack: ["ok", "ok", "started"],
-          telegram: ["ok", "ok", "started"],
+          channel: "telegram",
+          accountId: "work",
+          loadMode: telegramPin.loadMode,
+          main: mainRef,
+          channelPackage: {
+            package: telegramPin.channel.package,
+            version: telegramPin.channel.version,
+            integrity: telegramPin.channel.dist.integrity,
+          },
+          entry: telegramPin.entry,
+          inRepoPackageDir: TELEGRAM_IN_REPO,
+          installedAt,
         },
-      );
+        null,
+        2,
+      )}\n`,
+      { mode: 0o600 },
+    );
+
+    // 2. Test-only credential fixtures supplied through the resolver seam. `cpSync`
+    // copies the file's own mode, so chmod only if the source was wider.
+    const slackSecret = join(dataDir, "secrets", "slack-work.json");
+    const telegramSecret = join(dataDir, "secrets", "telegram-work.json");
+    cpSync(join(DEV_HOME, "secrets", "slack--work"), slackSecret);
+    cpSync(join(DEV_HOME, "secrets", "telegram--work"), telegramSecret);
+    chmodSync(slackSecret, 0o600);
+    chmodSync(telegramSecret, 0o600);
+
+    // 3. The live sender + bot ids for subtest 3 (real Slack socket pipeline).
+    // The user credential is the configured `[vex]-slack` user token (the same
+    // one the live E2E markers post with); the bot id comes from the app's
+    // bot token. Both are raw connectivity checks, allowed at any stage.
+    const userToken = process.env["SLACK_MCP_XOXP_TOKEN"] ?? envVar("SLACK_MCP_XOXP_TOKEN");
+    const botToken = envVar("SLACK_BOT_TOKEN");
+    if (userToken !== undefined && botToken !== undefined) {
+      try {
+        liveSenderId = await slackAuthUserId(userToken);
+        liveBotUserId = await slackAuthUserId(botToken);
+      } catch (error) {
+        // Offline/no-creds: subtest 3 skips on the missing ids, not the suite.
+        process.stderr.write(`[hub][warn] live Slack ids unavailable: ${String(error)}\n`);
+      }
+    }
+
+    // 4. The embedded database + the organization-owned Channel revision.
+    bundle = await embeddedDatabaseRuntime(dbDir);
+    await bundle.runtime.migrate();
+    await bundle.runtime.query(
+      "insert into organization (id, name, slug) values ($1, 'Boot Org', 'boot-org')",
+      [ORG_ID],
+    );
+    database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+    await enrollTestDaemon(database, ORG_ID);
+    await new OrganizationTriggerStore(database, ORG_ID).save({
+      yaml: `name: boot-strap\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: ${TEST_DAEMON_SLUG}, cwd: ${ENV_CWD} }\n  agent: { provider: codex, mode: default }\n  prompt: placeholder\n  max_runtime: 1h\n  idle_timeout: 5m\n`,
+      userId: null,
+    });
+    const files = [
+      { path: ".paseo/hub.yml", content: HUB_YAML },
+      {
+        path: ".paseo/channels/policy.yml",
+        content: policyYaml(liveSenderId),
+      },
+      {
+        path: ".paseo/channels/slack/work.yml",
+        content: slackAccountYaml("00000000-0000-4000-8000-000000000001"),
+      },
+      {
+        path: ".paseo/channels/telegram/work.yml",
+        content: telegramAccountYaml("00000000-0000-4000-8000-000000000002"),
+      },
+    ];
+    await database.saveChannelConfiguration({
+      organizationId: ORG_ID,
+      files,
+      contentHash: "native-channel-configuration",
+      createdByUserId: null,
     });
 
-    it("drives one real-shape Slack ctxPayload through the seam into the fake daemon", async () => {
-      // The compiled host module (dist/): the SAME file production's loader hooks
-      // serve as the bound `openclaw/plugin-sdk/channel-inbound` seam. Its
-      // getChannelRuntime reads the global runtime store the tsx-loaded supervisor
-      // filled at startAll — the cross-compilation split the global exists for.
-      const host = (await import(
-        pathToFileURL(
-          join(HUB_DIST_LOADER, "hosts", "channel-inbound.js"),
-        ).toString()
-      )) as {
-        dispatchChannelInboundReply(params: Record<string, unknown>): Promise<{
-          dispatched: boolean;
-          [key: string]: unknown;
-        }>;
-      };
-      const chatId = envVar("SLACK_TEST_CHANNEL") as string;
-      const ctxPayload = {
+    // 4. The supervisor: real install dir + real pins, loopback fake daemon,
+    // and an env WITHOUT PASEO_PASSWORD (the fake upgrade carries no subprotocol).
+    // The verticals run IN THIS process, so the native verbose log lever is
+    // process.env, not the supervisor's env copy (the supervisor only reads it
+    // for the channels flag + daemon password). shouldLogVerbose ->
+    // isFileLogLevelEnabled("debug") reads process.env directly; every native
+    // drop gate (mention policy, allowlist, debounce, ACP binding) logs at
+    // debug to the openclaw file log — a drop must be named, not guessed.
+    process.env["OPENCLAW_LOG_LEVEL"] = "debug";
+    const env = { ...process.env } as NodeJS.ProcessEnv;
+    delete env["PASEO_PASSWORD"];
+    env["PASEO_HUB_CHANNELS_ENABLED"] = "1";
+    env["OPENCLAW_LOG_LEVEL"] = "debug";
+    supervisor = createChannelSupervisor({
+      database,
+      databaseRuntime: bundle.runtime,
+      dataDir,
+      pinsPath: PINS_PATH,
+      daemon: { host: `127.0.0.1:${daemon.port}` },
+      resolveConnection: ({ channel }) => {
+        const raw = readFileSync(channel === "slack" ? slackSecret : telegramSecret, "utf8");
+        const parsed = JSON.parse(raw) as {
+          botToken?: string;
+          appToken?: string;
+          token?: string;
+        };
+        const resolvedBotToken = parsed.botToken ?? parsed.token;
+        if (resolvedBotToken === undefined) return Promise.resolve(undefined);
+        return Promise.resolve({
+          botToken: resolvedBotToken,
+          ...(parsed.appToken === undefined ? {} : { appToken: parsed.appToken }),
+        });
+      },
+      env,
+      dispatchWorkflow: async (input) => {
+        workflowDispatches.push(input);
+      },
+      logger: {
+        info: (message, meta) => logLine(`[hub][info] ${message} ${JSON.stringify(meta)}`),
+        warn: (message, meta) => logLine(`[hub][warn] ${message} ${JSON.stringify(meta)}`),
+        error: (message, meta) => logLine(`[hub][error] ${message} ${JSON.stringify(meta)}`),
+      },
+    });
+    await supervisor.startAll();
+  });
+
+  after(async () => {
+    await supervisor?.stopAll();
+    await daemon?.close();
+    await bundle?.runtime.close();
+    if (workDir !== undefined) rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it("boots both P0 accounts on the shared install root: transport started", () => {
+    const entries = supervisor.status();
+    const slack = entries.find((entry) => entry.channel === "slack" && entry.account === "work");
+    const telegram = entries.find(
+      (entry) => entry.channel === "telegram" && entry.account === "work",
+    );
+    assert.ok(slack !== undefined, `slack:work handle missing: ${JSON.stringify(entries)}`);
+    assert.ok(telegram !== undefined, `telegram:work handle missing: ${JSON.stringify(entries)}`);
+    assert.equal(slack.detail, undefined, `slack:work deferred: ${slack.detail}`);
+    assert.equal(telegram.detail, undefined, `telegram:work deferred: ${telegram.detail}`);
+    assert.deepEqual(
+      {
+        slack: [slack.integrity, slack.loadTrace, slack.transport],
+        telegram: [telegram.integrity, telegram.loadTrace, telegram.transport],
+      },
+      {
+        slack: ["ok", "ok", "started"],
+        telegram: ["ok", "ok", "started"],
+      },
+    );
+  });
+
+  it("drives one real-shape Slack ctxPayload through the seam into the fake daemon", async () => {
+    // The compiled host module (dist/): the SAME file production's loader hooks
+    // serve as the bound `openclaw/plugin-sdk/channel-inbound` seam. Its
+    // getChannelRuntime reads the global runtime store the tsx-loaded supervisor
+    // filled at startAll — the cross-compilation split the global exists for.
+    const host = (await import(
+      pathToFileURL(join(HUB_DIST_LOADER, "hosts", "channel-inbound.js")).toString()
+    )) as {
+      dispatchChannelInboundReply(params: Record<string, unknown>): Promise<{
+        dispatched: boolean;
+        [key: string]: unknown;
+      }>;
+    };
+    const chatId = envVar("SLACK_TEST_CHANNEL") as string;
+    const ctxPayload = {
+      AccountId: "work",
+      Body: "boot-integration-e2e first mention",
+      ChatType: "channel",
+      ChatId: chatId,
+      MessageThreadId: THREAD_TS,
+      SenderId: SLACK_SENDER,
+      From: SLACK_SENDER,
+      WasMentioned: true,
+    };
+    const result = await host.dispatchChannelInboundReply({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload,
+    });
+    assert.equal(result.dispatched, true, JSON.stringify(result));
+
+    const create = daemon.messages.find((message) => message["type"] === "create_agent_request");
+    assert.ok(
+      create !== undefined,
+      `no create_agent_request: ${JSON.stringify(daemon.messages.map((m) => m["type"]))}`,
+    );
+    const config = create["config"] as Record<string, unknown>;
+    assert.equal(config["provider"], "codex");
+    assert.equal(config["model"], "gpt-5.6-luna");
+    assert.equal(config["cwd"], ENV_CWD);
+    assert.match(String(config["title"]), /^clisbot-channel:[0-9a-f-]{36}$/u);
+
+    const send = daemon.messages.find(
+      (message) => message["type"] === "send_agent_message_request",
+    );
+    assert.ok(send !== undefined, "no send_agent_message_request");
+    assert.equal(send["agentId"], "agent-1");
+    assert.equal(send["text"], ctxPayload["Body"]);
+    // steer:false (the first prompt that starts the turn) = "interrupt".
+    assert.equal(send["activeTurnBehavior"], "interrupt");
+  });
+
+  it("drives a real-shape Slack inbound through a workflow route without creating a direct Agent", async () => {
+    const host = (await import(
+      pathToFileURL(join(HUB_DIST_LOADER, "hosts", "channel-inbound.js")).toString()
+    )) as {
+      dispatchChannelInboundReply(params: Record<string, unknown>): Promise<{
+        dispatched: boolean;
+        [key: string]: unknown;
+      }>;
+    };
+    const createsBefore = daemon.messages.filter(
+      (message) => message["type"] === "create_agent_request",
+    ).length;
+    const result = await host.dispatchChannelInboundReply({
+      channel: "slack",
+      accountId: "work",
+      ctxPayload: {
         AccountId: "work",
-        Body: "boot-integration-e2e first mention",
+        Body: "run the workflow",
         ChatType: "channel",
-        ChatId: chatId,
-        MessageThreadId: THREAD_TS,
+        ChatId: "C-WORKFLOW-E2E",
         SenderId: SLACK_SENDER,
         From: SLACK_SENDER,
         WasMentioned: true,
-      };
-      const result = await host.dispatchChannelInboundReply({
-        channel: "slack",
-        accountId: "work",
-        ctxPayload,
-      });
-      assert.equal(result.dispatched, true, JSON.stringify(result));
+        MessageSid: "1712000000.000321",
+      },
+    });
 
-      const create = daemon.messages.find(
-        (message) => message["type"] === "create_agent_request",
+    assert.equal(result.dispatched, true, JSON.stringify(result));
+    assert.equal(workflowDispatches.length, 1);
+    assert.equal(workflowDispatches[0]!.payload.workflow, "boot-strap");
+    assert.equal(workflowDispatches[0]!.payload.channel.route.defaults.outbound.path, "relay");
+    assert.equal(
+      daemon.messages.filter((message) => message["type"] === "create_agent_request").length,
+      createsBefore,
+    );
+  });
+
+  /**
+   * The live-drop repro (2026-08-26): drive a REAL marker through the pinned
+   * Slack vertical's REAL socket-mode pipeline — Slack delivers the
+   * app_mention to this process's SocketModeClient, the native dedupe/debounce/
+   * prepare/gates run, the seam hands the event to the plane, and the plane
+   * must hit the fake daemon. This is the exact native path the live E2E
+   * exercises, minus the live hub: the same app has ONE socket consumer, so
+   * the live hub must be stopped (the test skips rather than fights it).
+   * A drop here is reproduced + named in seconds, not in a 5–15 min restart
+   * cycle; all hub-side logging (seam miss, plane outcome, socket state) and
+   * the native verbose log (OPENCLAW_LOG_LEVEL=debug) are captured on stderr.
+   */
+  it(
+    "drives a real marker through the vertical's live Slack socket into the fake daemon",
+    { skip: liveSkipReason(), timeout: 180_000 },
+    async function liveSocketPipeline() {
+      const userToken = process.env["SLACK_MCP_XOXP_TOKEN"] ?? envVar("SLACK_MCP_XOXP_TOKEN");
+      assert.ok(userToken !== undefined, "SLACK_MCP_XOXP_TOKEN missing");
+      assert.ok(
+        liveSenderId !== undefined && liveBotUserId !== undefined,
+        "live Slack ids unavailable",
       );
+      const chatId = envVar("SLACK_TEST_CHANNEL") as string;
+
+      // The vertical's socket connection is async behind startAll: wait for
+      // its "slack socket mode connected" before posting (Slack delivers a
+      // socket event to the connected client only). 60s, not 30: the
+      // SocketModeClient's initial handshake has no connect timeout, and a
+      // transient Slack-side stall sits in `client.start()` with ZERO vertical
+      // log lines (the first line lands on success or reject) — observed
+      // 2026-08-26: a stall here is transient, the vertical connects on retry.
+      const startedAt = Date.now();
+      while (!hubLogLines.some((line) => line.includes("slack socket mode connected"))) {
+        assert.ok(
+          Date.now() - startedAt < 60_000,
+          `no socket connect; log:\n${hubLogLines.join("\n")}`,
+        );
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
+      const logBaseline = hubLogLines.length;
+      // Subtest 2 already drove a create + first prompt into the fake daemon;
+      // only frames recorded after this point belong to the live marker.
+      const frameBaseline = daemon.messages.length;
+      const marker = `clisbot-boot-native-${Date.now().toString(36)}`;
+      const post = (await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${userToken}`,
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          channel: chatId,
+          text: `<@${liveBotUserId}> ${marker} — please reply with exactly: E2E-OK ${marker}`,
+        }),
+      }).then((response) => response.json())) as {
+        ok: boolean;
+        ts?: string;
+        error?: string;
+      };
+      assert.equal(post.ok, true, `marker post failed: ${post.error ?? JSON.stringify(post)}`);
+      const markerTs = post.ts as string;
+
+      // The full native pipeline (socket -> dedupe -> debounce -> prepare ->
+      // gates -> seam -> plane -> binding -> createAgent + first prompt) is
+      // async end to end; poll the fake daemon's recorded frames.
+      const deadline = Date.now() + 30_000;
+      const markerFrames = () => daemon.messages.slice(frameBaseline);
+      let create: RecordedMessage | undefined;
+      while (Date.now() < deadline) {
+        create = markerFrames().find((message) => message["type"] === "create_agent_request");
+        if (create !== undefined) break;
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      const recentLog = hubLogLines.slice(logBaseline).join("\n");
       assert.ok(
         create !== undefined,
-        `no create_agent_request: ${JSON.stringify(daemon.messages.map((m) => m["type"]))}`,
+        `no create_agent_request after live marker ${markerTs} (ts ${markerTs}); log since marker:\n${recentLog}\n${nativeLogTail()}`,
       );
       const config = create["config"] as Record<string, unknown>;
       assert.equal(config["provider"], "codex");
       assert.equal(config["model"], "gpt-5.6-luna");
-      assert.equal(config["cwd"], ENV_CWD);
-      assert.match(String(config["title"]), /^clisbot-channel:[0-9a-f-]{36}$/u);
-
-      const send = daemon.messages.find(
-        (message) => message["type"] === "send_agent_message_request",
+      // The first prompt lands AFTER the create round-trip settles (the fake
+      // daemon's agent_created response, then the plane's ledger consume +
+      // post) — poll it like the create, never check it synchronously: create
+      // and the first prompt are not guaranteed adjacent in the fake daemon's
+      // frame log (observed 2026-08-26: create recorded, send still in flight
+      // at the synchronous check).
+      let send: RecordedMessage | undefined;
+      while (Date.now() < deadline) {
+        send = markerFrames().find((message) => message["type"] === "send_agent_message_request");
+        if (send !== undefined) break;
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      assert.ok(
+        send !== undefined,
+        `no first prompt after create; log:\n${recentLog}\n${nativeLogTail()}`,
       );
-      assert.ok(send !== undefined, "no send_agent_message_request");
-      assert.equal(send["agentId"], "agent-1");
-      assert.equal(send["text"], ctxPayload["Body"]);
-      // steer:false (the first prompt that starts the turn) = "interrupt".
-      assert.equal(send["activeTurnBehavior"], "interrupt");
-    });
+      assert.equal(
+        send["text"],
+        `<@${liveBotUserId}> ${marker} — please reply with exactly: E2E-OK ${marker}`,
+      );
 
-    it("drives a real-shape Slack inbound through a workflow route without creating a direct Agent", async () => {
-      const host = (await import(
-        pathToFileURL(
-          join(HUB_DIST_LOADER, "hosts", "channel-inbound.js"),
-        ).toString()
-      )) as {
-        dispatchChannelInboundReply(params: Record<string, unknown>): Promise<{
-          dispatched: boolean;
-          [key: string]: unknown;
+      // Self-verify the live send the way the E2E guardrail requires: read the
+      // channel back and match the marker's ts (a send without read-back is
+      // not a verified send).
+      const history = (await fetch(
+        `https://slack.com/api/conversations.history?channel=${chatId}&limit=5`,
+        { headers: { authorization: `Bearer ${userToken}` } },
+      ).then((response) => response.json())) as {
+        ok: boolean;
+        messages?: Array<{
+          ts: string;
+          user?: string;
+          text?: string;
+          bot_id?: string;
         }>;
       };
-      const createsBefore = daemon.messages.filter(
-        (message) => message["type"] === "create_agent_request",
-      ).length;
-      const result = await host.dispatchChannelInboundReply({
-        channel: "slack",
-        accountId: "work",
-        ctxPayload: {
-          AccountId: "work",
-          Body: "run the workflow",
-          ChatType: "channel",
-          ChatId: "C-WORKFLOW-E2E",
-          SenderId: SLACK_SENDER,
-          From: SLACK_SENDER,
-          WasMentioned: true,
-          MessageSid: "1712000000.000321",
-        },
-      });
-
-      assert.equal(result.dispatched, true, JSON.stringify(result));
-      assert.equal(workflowDispatches.length, 1);
-      assert.equal(workflowDispatches[0]!.payload.workflow, "boot-strap");
-      assert.equal(
-        workflowDispatches[0]!.payload.channel.route.defaults.outbound.path,
-        "relay",
+      assert.equal(history.ok, true, "history read-back failed");
+      const readBack = history.messages?.find((message) => message.ts === markerTs);
+      assert.ok(readBack !== undefined, `marker ${markerTs} not in read-back`);
+      assert.match(readBack.text ?? "", new RegExp(marker, "u"));
+      console.log(
+        `live marker ${markerTs} verified in read-back; fake daemon saw create + first prompt`,
       );
-      assert.equal(
-        daemon.messages.filter(
-          (message) => message["type"] === "create_agent_request",
-        ).length,
-        createsBefore,
-      );
-    });
-
-    /**
-     * The live-drop repro (2026-08-26): drive a REAL marker through the pinned
-     * Slack vertical's REAL socket-mode pipeline — Slack delivers the
-     * app_mention to this process's SocketModeClient, the native dedupe/debounce/
-     * prepare/gates run, the seam hands the event to the plane, and the plane
-     * must hit the fake daemon. This is the exact native path the live E2E
-     * exercises, minus the live hub: the same app has ONE socket consumer, so
-     * the live hub must be stopped (the test skips rather than fights it).
-     * A drop here is reproduced + named in seconds, not in a 5–15 min restart
-     * cycle; all hub-side logging (seam miss, plane outcome, socket state) and
-     * the native verbose log (OPENCLAW_LOG_LEVEL=debug) are captured on stderr.
-     */
-    it(
-      "drives a real marker through the vertical's live Slack socket into the fake daemon",
-      { skip: liveSkipReason(), timeout: 180_000 },
-      async function liveSocketPipeline() {
-        const userToken =
-          process.env["SLACK_MCP_XOXP_TOKEN"] ?? envVar("SLACK_MCP_XOXP_TOKEN");
-        assert.ok(userToken !== undefined, "SLACK_MCP_XOXP_TOKEN missing");
-        assert.ok(
-          liveSenderId !== undefined && liveBotUserId !== undefined,
-          "live Slack ids unavailable",
-        );
-        const chatId = envVar("SLACK_TEST_CHANNEL") as string;
-
-        // The vertical's socket connection is async behind startAll: wait for
-        // its "slack socket mode connected" before posting (Slack delivers a
-        // socket event to the connected client only). 60s, not 30: the
-        // SocketModeClient's initial handshake has no connect timeout, and a
-        // transient Slack-side stall sits in `client.start()` with ZERO vertical
-        // log lines (the first line lands on success or reject) — observed
-        // 2026-08-26: a stall here is transient, the vertical connects on retry.
-        const startedAt = Date.now();
-        while (
-          !hubLogLines.some((line) =>
-            line.includes("slack socket mode connected"),
-          )
-        ) {
-          assert.ok(
-            Date.now() - startedAt < 60_000,
-            `no socket connect; log:\n${hubLogLines.join("\n")}`,
-          );
-          await new Promise((resolve) => setImmediate(resolve));
-        }
-
-        const logBaseline = hubLogLines.length;
-        // Subtest 2 already drove a create + first prompt into the fake daemon;
-        // only frames recorded after this point belong to the live marker.
-        const frameBaseline = daemon.messages.length;
-        const marker = `clisbot-boot-native-${Date.now().toString(36)}`;
-        const post = (await fetch("https://slack.com/api/chat.postMessage", {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${userToken}`,
-            "content-type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            channel: chatId,
-            text: `<@${liveBotUserId}> ${marker} — please reply with exactly: E2E-OK ${marker}`,
-          }),
-        }).then((response) => response.json())) as {
-          ok: boolean;
-          ts?: string;
-          error?: string;
-        };
-        assert.equal(
-          post.ok,
-          true,
-          `marker post failed: ${post.error ?? JSON.stringify(post)}`,
-        );
-        const markerTs = post.ts as string;
-
-        // The full native pipeline (socket -> dedupe -> debounce -> prepare ->
-        // gates -> seam -> plane -> binding -> createAgent + first prompt) is
-        // async end to end; poll the fake daemon's recorded frames.
-        const deadline = Date.now() + 30_000;
-        const markerFrames = () => daemon.messages.slice(frameBaseline);
-        let create: RecordedMessage | undefined;
-        while (Date.now() < deadline) {
-          create = markerFrames().find(
-            (message) => message["type"] === "create_agent_request",
-          );
-          if (create !== undefined) break;
-          await new Promise((resolve) => setImmediate(resolve));
-        }
-        const recentLog = hubLogLines.slice(logBaseline).join("\n");
-        assert.ok(
-          create !== undefined,
-          `no create_agent_request after live marker ${markerTs} (ts ${markerTs}); log since marker:\n${recentLog}\n${nativeLogTail()}`,
-        );
-        const config = create["config"] as Record<string, unknown>;
-        assert.equal(config["provider"], "codex");
-        assert.equal(config["model"], "gpt-5.6-luna");
-        // The first prompt lands AFTER the create round-trip settles (the fake
-        // daemon's agent_created response, then the plane's ledger consume +
-        // post) — poll it like the create, never check it synchronously: create
-        // and the first prompt are not guaranteed adjacent in the fake daemon's
-        // frame log (observed 2026-08-26: create recorded, send still in flight
-        // at the synchronous check).
-        let send: RecordedMessage | undefined;
-        while (Date.now() < deadline) {
-          send = markerFrames().find(
-            (message) => message["type"] === "send_agent_message_request",
-          );
-          if (send !== undefined) break;
-          await new Promise((resolve) => setImmediate(resolve));
-        }
-        assert.ok(
-          send !== undefined,
-          `no first prompt after create; log:\n${recentLog}\n${nativeLogTail()}`,
-        );
-        assert.equal(
-          send["text"],
-          `<@${liveBotUserId}> ${marker} — please reply with exactly: E2E-OK ${marker}`,
-        );
-
-        // Self-verify the live send the way the E2E guardrail requires: read the
-        // channel back and match the marker's ts (a send without read-back is
-        // not a verified send).
-        const history = (await fetch(
-          `https://slack.com/api/conversations.history?channel=${chatId}&limit=5`,
-          { headers: { authorization: `Bearer ${userToken}` } },
-        ).then((response) => response.json())) as {
-          ok: boolean;
-          messages?: Array<{
-            ts: string;
-            user?: string;
-            text?: string;
-            bot_id?: string;
-          }>;
-        };
-        assert.equal(history.ok, true, "history read-back failed");
-        const readBack = history.messages?.find(
-          (message) => message.ts === markerTs,
-        );
-        assert.ok(
-          readBack !== undefined,
-          `marker ${markerTs} not in read-back`,
-        );
-        assert.match(readBack.text ?? "", new RegExp(marker, "u"));
-        console.log(
-          `live marker ${markerTs} verified in read-back; fake daemon saw create + first prompt`,
-        );
-      },
-    );
-  },
-);
+    },
+  );
+});
 
 /** The vertical's native file log tail (OPENCLAW_LOG_LEVEL=debug is on for
  * the whole test process). Every native drop gate names itself here — when a
@@ -994,10 +876,7 @@ function nativeLogTail(lines = 40): string {
   // preferred dir is /tmp/openclaw, fallback <tmpdir>/openclaw-<uid>). Resolve
   // today's stamp and fall back to the newest `openclaw-*.log` in each dir.
   const stamp = new Date().toISOString().slice(0, 10);
-  const dirs = [
-    "/tmp/openclaw",
-    join(tmpdir(), `openclaw-${process.getuid?.() ?? ""}`),
-  ];
+  const dirs = ["/tmp/openclaw", join(tmpdir(), `openclaw-${process.getuid?.() ?? ""}`)];
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
     let file = join(dir, `openclaw-${stamp}.log`);

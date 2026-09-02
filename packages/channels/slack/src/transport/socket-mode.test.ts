@@ -56,9 +56,7 @@ function envelope(
   };
 }
 
-function makeTransport(
-  onInbound: (event: ChannelInboundEvent) => Promise<void>,
-) {
+function makeTransport(onInbound: (event: ChannelInboundEvent) => Promise<void>) {
   const client = fakeSocketClient() as unknown as SocketModeClient;
   const transport = createSlackSocketTransport({
     client,
@@ -69,9 +67,7 @@ function makeTransport(
   return { client, transport };
 }
 
-function makeInteractiveTransport(
-  onInteractive: (body: Record<string, unknown>) => Promise<void>,
-) {
+function makeInteractiveTransport(onInteractive: (body: Record<string, unknown>) => Promise<void>) {
   const client = fakeSocketClient() as unknown as SocketModeClient;
   const transport = createSlackSocketTransport({
     client,
@@ -202,15 +198,9 @@ describe("slack socket transport: block_actions (the approval-card click)", () =
     // The RAW wire body goes to the seam: the vertical's parser narrows the
     // envelope, the hub's card-value parser owns the value format.
     assert.equal(seen[0]?.["type"], "block_actions");
-    const firstAction = (
-      seen[0]?.["actions"] as Record<string, unknown>[] | undefined
-    )?.[0];
+    const firstAction = (seen[0]?.["actions"] as Record<string, unknown>[] | undefined)?.[0];
     assert.deepEqual(firstAction?.["value"], "allow:req-1");
-    assert.equal(
-      acked,
-      true,
-      "the envelope is acked (ack-first redelivery semantic)",
-    );
+    assert.equal(acked, true, "the envelope is acked (ack-first redelivery semantic)");
   });
 
   it("acks and drops a non-block_actions interaction before the seam", async () => {
@@ -264,11 +254,7 @@ describe("slack socket transport: block_actions (the approval-card click)", () =
       },
     } as never);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(
-      acked,
-      true,
-      "no seam: the envelope is still acked (never redelivered)",
-    );
+    assert.equal(acked, true, "no seam: the envelope is still acked (never redelivered)");
   });
 });
 
@@ -307,10 +293,7 @@ describe("slack socket transport: inbound media fold (F-06, G5+G6)", () => {
     const { join } = await import("node:path");
     const dir = await mkdtemp(join(tmpdir(), "slack-transport-media-"));
     const seen: ChannelInboundEvent[] = [];
-    const mediaFetch = (async (
-      _url: string | URL | Request,
-      _init?: RequestInit,
-    ) =>
+    const mediaFetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
       new Response("img-bytes", {
         status: 200,
       })) as unknown as typeof globalThis.fetch;

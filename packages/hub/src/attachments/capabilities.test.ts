@@ -44,10 +44,7 @@ describe("attachment capability boundary", () => {
     assert.equal(await response.text(), "exact bytes");
     assert.equal(response.headers.get("content-type"), "image/png");
     assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.match(
-      response.headers.get("content-disposition") ?? "",
-      /pixel\.png/u,
-    );
+    assert.match(response.headers.get("content-disposition") ?? "", /pixel\.png/u);
     assert.deepEqual(resolverCalls, [
       {
         organizationId: "org-1",
@@ -88,22 +85,11 @@ describe("attachment capability boundary", () => {
       byteSize: 4,
     });
 
-    const validUrl = new URL(
-      registry.urlFor(attachment.id, fixture.executionId),
-    );
+    const validUrl = new URL(registry.urlFor(attachment.id, fixture.executionId));
     const forgedUrl = new URL(validUrl);
-    forgedUrl.searchParams.set(
-      "signature",
-      `${validUrl.searchParams.get("signature")}forged`,
-    );
+    forgedUrl.searchParams.set("signature", `${validUrl.searchParams.get("signature")}forged`);
     assert.equal(
-      (
-        await registry.handle(
-          new Request(forgedUrl),
-          fixture.executionId,
-          attachment.id,
-        )
-      ).status,
+      (await registry.handle(new Request(forgedUrl), fixture.executionId, attachment.id)).status,
       404,
     );
     assert.equal(
@@ -118,19 +104,10 @@ describe("attachment capability boundary", () => {
     );
     nowMs += 11_000;
     assert.equal(
-      (
-        await registry.handle(
-          new Request(validUrl),
-          fixture.executionId,
-          attachment.id,
-        )
-      ).status,
+      (await registry.handle(new Request(validUrl), fixture.executionId, attachment.id)).status,
       404,
     );
-    await fixture.database.transitionAgentExecution(
-      fixture.executionId,
-      "failed",
-    );
+    await fixture.database.transitionAgentExecution(fixture.executionId, "failed");
     assert.equal(
       (
         await registry.handle(
@@ -148,10 +125,7 @@ describe("attachment capability boundary", () => {
     const fixture = await workflowExecution();
     const resolver = createDiscordAttachmentResolver({
       fetch: async (input) => {
-        assert.equal(
-          requestUrl(input),
-          "https://cdn.discordapp.com/attachments/1/2/file.bin",
-        );
+        assert.equal(requestUrl(input), "https://cdn.discordapp.com/attachments/1/2/file.bin");
         return new Response("discord-bytes", {
           headers: { etag: '"discord-1"' },
         });
@@ -219,10 +193,7 @@ describe("attachment capability boundary", () => {
   });
 });
 
-async function workflowExecution(
-  database = createMemoryDatabase(),
-  deliveryId = "delivery-1",
-) {
+async function workflowExecution(database = createMemoryDatabase(), deliveryId = "delivery-1") {
   const workflow = await database.saveOrganizationTrigger({
     organizationId: "org-1",
     name: `attachment-workflow-${deliveryId}`,
@@ -247,8 +218,7 @@ async function workflowExecution(
     payload: {},
     receivedAt: new Date(),
   });
-  if (persisted.status !== "accepted")
-    throw new Error("receipt was not accepted");
+  if (persisted.status !== "accepted") throw new Error("receipt was not accepted");
   const run = await database.createAcceptedTriggerRun({
     organizationId: "org-1",
     workflowId: workflow.id,

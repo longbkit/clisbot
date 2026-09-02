@@ -93,7 +93,7 @@ union remains in this path.
 | -------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Restart-specific assertion | Add a fault-injection E2E proving persisted output context reattaches relay/approval before a replayed event. |
 | Remote tool path           | Define authenticated Hub reachability for a daemon that is not on the Hub host; relay already works.          |
-| Accepted no-op settings    | Implement or reject `transport.errorPolicy`; define the companion allowlist before enabling `inlineButtons`. |
+| Accepted no-op settings    | Implement or reject `transport.errorPolicy`; define the companion allowlist before enabling `inlineButtons`.  |
 
 MCP mutation after Agent creation is intentionally not required now: reuse reloads/restores the
 Agent with the current execution MCP and tool policy before sending the next prompt.

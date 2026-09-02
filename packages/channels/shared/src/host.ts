@@ -68,11 +68,7 @@ export interface KeyedStoreTtlOptions {
  * JSON-file store (implementation doc §4.2). */
 export interface HostKeyedStore<T = unknown> {
   register(key: string, value: T, opts?: KeyedStoreTtlOptions): Promise<void>;
-  registerIfAbsent(
-    key: string,
-    value: T,
-    opts?: KeyedStoreTtlOptions,
-  ): Promise<boolean>;
+  registerIfAbsent(key: string, value: T, opts?: KeyedStoreTtlOptions): Promise<boolean>;
   update(
     key: string,
     updateValue: (current: T | undefined) => T | undefined,

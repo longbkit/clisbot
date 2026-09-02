@@ -14,7 +14,9 @@ describe("Linear trigger provider", () => {
   ] as const)(
     "parses inputs after a matched Linear %s marker while preserving the original comment prompt",
     async (_filterName, marker, body) => {
-      const { workflow, revision, configurationForWorkflow } = await activeConfiguration(commandConfiguration(marker));
+      const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
+        commandConfiguration(marker),
+      );
       const provider = createLinearTriggerProvider({ configurationForWorkflow });
 
       const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];

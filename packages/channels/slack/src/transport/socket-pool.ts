@@ -1,9 +1,6 @@
 import { SocketModeClient } from "@slack/socket-mode";
 import type { HostChildLogger } from "@getpaseo/channels-shared";
-import {
-  runSlackSocketReconnectLoop,
-  stopSlackSocketClient,
-} from "./socket-reconnect.js";
+import { runSlackSocketReconnectLoop, stopSlackSocketClient } from "./socket-reconnect.js";
 
 interface SharedSocket {
   readonly client: SocketModeClient;
@@ -88,10 +85,7 @@ export function acquireSharedSlackSocket(input: {
   };
 }
 
-function waitForAbortOrSocketEnd(
-  signal: AbortSignal,
-  running: Promise<void>,
-): Promise<void> {
+function waitForAbortOrSocketEnd(signal: AbortSignal, running: Promise<void>): Promise<void> {
   if (signal.aborted) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const onAbort = (): void => {
@@ -103,17 +97,12 @@ function waitForAbortOrSocketEnd(
     void running.then(
       () => {
         cleanup();
-        if (signal.aborted) resolve();
-        else
-          reject(
-            new Error(
-              "Slack shared Socket Mode connection stopped unexpectedly",
-            ),
-          );
+        if (signal.aborted) return resolve();
+        return reject(new Error("Slack shared Socket Mode connection stopped unexpectedly"));
       },
       (error: unknown) => {
         cleanup();
-        reject(error);
+        return reject(error);
       },
     );
   });

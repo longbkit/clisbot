@@ -8,10 +8,7 @@ import {
 import { createMemoryDatabase } from "../db/memory.js";
 import type { ManualTriggerInput } from "../triggers/manual/schema.js";
 import type { TriggerProvider } from "../triggers/index.js";
-import {
-  createManualTriggerSource,
-  dispatchManualTrigger,
-} from "../triggers/manual/source.js";
+import { createManualTriggerSource, dispatchManualTrigger } from "../triggers/manual/source.js";
 import { createUnlimitedEntitlementsService } from "../entitlements/test-utils.js";
 import { createDispatcherWithEngine } from "./index.js";
 import { createChannelWorkflowProvider } from "../triggers/channel/provider.js";
@@ -38,8 +35,7 @@ describe("manual trigger durable workflow boundary", () => {
       trigger.activeRevisionId,
     );
     assert.ok(revision);
-    const dispatches: import("./launch-machine-intent.js").LaunchMachineIntent[] =
-      [];
+    const dispatches: import("./launch-machine-intent.js").LaunchMachineIntent[] = [];
     const { handler, engine } = createDispatcherWithEngine({
       database,
       entitlements: createUnlimitedEntitlementsService(),
@@ -93,24 +89,18 @@ describe("manual trigger durable workflow boundary", () => {
     assert.equal(dispatches.length, 1);
     assert.equal(dispatches[0]!.triggerName, "deploy");
     assert.equal(
-      dispatches[0]!.outputContext &&
-        Reflect.get(dispatches[0]!.outputContext, "provider"),
+      dispatches[0]!.outputContext && Reflect.get(dispatches[0]!.outputContext, "provider"),
       "channel",
     );
     assert.equal(
-      (
-        await database.findProviderEventReceiptById(
-          persisted.event.providerEventReceiptId,
-        )
-      )?.provider,
+      (await database.findProviderEventReceiptById(persisted.event.providerEventReceiptId))
+        ?.provider,
       "channel",
     );
     assert.equal(revision.id, persisted.event.configurationRevisionId);
     assert.equal(persisted.event.workflowId, trigger.id);
     const run = (
-      await database.findTriggerRunsByProviderEventReceiptId(
-        persisted.event.providerEventReceiptId,
-      )
+      await database.findTriggerRunsByProviderEventReceiptId(persisted.event.providerEventReceiptId)
     )[0];
     assert.equal(run?.workflowId, trigger.id);
     assert.equal(dispatches[0]?.workflowId, trigger.id);
@@ -128,15 +118,9 @@ describe("manual trigger durable workflow boundary", () => {
     });
     await source.start(handler);
 
-    await dispatchManualTrigger(
-      source,
-      manualTrigger("manual-no-match", workflow.id, revision.id),
-    );
+    await dispatchManualTrigger(source, manualTrigger("manual-no-match", workflow.id, revision.id));
 
-    const receipt = await database.findProviderEventReceiptByDeliveryId(
-      "manual-no-match",
-      "org_1",
-    );
+    const receipt = await database.findProviderEventReceiptByDeliveryId("manual-no-match", "org_1");
     assert.equal(receipt?.droppedReason, "no_trigger_for_source");
     assert.deepEqual(
       receipt === undefined
@@ -176,13 +160,11 @@ describe("manual trigger durable workflow boundary", () => {
       configurationRevisionId: revision.id,
       dispatchLaunchMachineIntent: async (intent) => {
         dispatches.push(intent.workflowStepRunId ?? "");
-        if (intent.workflowStepRunId === undefined)
-          throw new Error("workflow step is required");
+        if (intent.workflowStepRunId === undefined) throw new Error("workflow step is required");
         const execution = await database.findAgentExecutionByWorkflowStepRunId(
           intent.workflowStepRunId,
         );
-        if (execution === undefined)
-          throw new Error("workflow execution was not persisted");
+        if (execution === undefined) throw new Error("workflow execution was not persisted");
         return { execution };
       },
     });
@@ -197,24 +179,19 @@ describe("manual trigger durable workflow boundary", () => {
     assert.equal(outcome?.providerEventReceiptId !== undefined, true);
     const triggerId = outcome?.providerEventReceiptId;
     assert.ok(triggerId);
-    const run = (
-      await database.findTriggerRunsByProviderEventReceiptId(triggerId)
-    )[0];
+    const run = (await database.findTriggerRunsByProviderEventReceiptId(triggerId))[0];
     assert.ok(run);
     const step = await database.findWorkflowStepRunByTriggerRun(run.id);
     assert.ok(step);
     assert.deepEqual(dispatches, [step.id]);
     assert.equal(
-      (await database.findAgentExecutionByWorkflowStepRunId(step.id))
-        ?.workflowStepRunId,
+      (await database.findAgentExecutionByWorkflowStepRunId(step.id))?.workflowStepRunId,
       step.id,
     );
   });
 });
 
-async function createManualWorkflow(
-  database: ReturnType<typeof createMemoryDatabase>,
-) {
+async function createManualWorkflow(database: ReturnType<typeof createMemoryDatabase>) {
   const configuration = manualWorkflowConfiguration();
   const workflow = await database.saveOrganizationTrigger({
     organizationId: "org_1",
@@ -263,10 +240,7 @@ function noMatchingProvider(): TriggerProvider {
   };
 }
 
-function matchingProvider(
-  configuration: CompiledHubConfig,
-  revisionId: string,
-): TriggerProvider {
+function matchingProvider(configuration: CompiledHubConfig, revisionId: string): TriggerProvider {
   return {
     name: "manual",
     eventNames: ["manual.run"],
@@ -291,9 +265,7 @@ function matchingProvider(
 
 function manualWorkflowConfiguration(): CompiledHubConfig {
   const compiled = compileHubConfig({
-    environments: [
-      { name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" },
-    ],
+    environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
     triggers: [
       {
         name: "deploy",

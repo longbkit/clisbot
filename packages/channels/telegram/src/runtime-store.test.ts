@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { HostRuntime } from "@getpaseo/channels-shared";
-import {
-  registerAccountInbound,
-  unregisterAccountInbound,
-} from "./runtime-store.js";
+import { registerAccountInbound, unregisterAccountInbound } from "./runtime-store.js";
 
 function runtime(label: string): HostRuntime {
   return {

@@ -5,10 +5,7 @@ import {
   type CompiledProjectConfiguration,
 } from "../configuration/store.js";
 import type { Database, ProjectConfigurationRevisionRecord, ProjectRecord } from "../db/types.js";
-import type {
-  OrganizationTriggerRecord,
-  OrganizationTriggerRevisionRecord,
-} from "../db/types.js";
+import type { OrganizationTriggerRecord, OrganizationTriggerRevisionRecord } from "../db/types.js";
 import { createWorkflowConfigurationResolver } from "../triggers/configuration.js";
 
 export const TEST_DAEMON_ID = "10000000-0000-4000-8000-000000000001";

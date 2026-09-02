@@ -21,19 +21,9 @@ import {
   synchronizeGitHubDefaultBranch,
   type GitHubConfigurationProvider,
 } from "../configuration/github-sync.js";
-import type {
-  Database,
-  WorkflowActivityRunListRecord,
-  WorkflowActivityRunRecord,
-  ProviderEventReceiptSummary,
-} from "../db/types.js";
+import type { Database, ProviderEventReceiptSummary } from "../db/types.js";
 import { reportFailure } from "../failures/index.js";
-import { formatInvocationRejection } from "../triggers/invocation.js";
 import { providerEventDropReasonSummary } from "../triggers/drop-reason.js";
-import {
-  decodeEntitlementDenialFailureReason,
-  entitlementDenialSummary,
-} from "../entitlements/denial.js";
 import { linearConnectionRequiresReauthorization } from "../providers/linear/client.js";
 import { hasRequiredSlackScopes } from "../providers/slack/client.js";
 import { resolveRouteTenant } from "./access.js";
@@ -478,111 +468,6 @@ function configurationView(
   };
 }
 
-function activityRunView(activity: WorkflowActivityRunRecord) {
-  const { run, receipt, steps } = activity;
-  const base = {
-    id: run.id,
-    providerEventReceiptId: run.providerEventReceiptId,
-    provider: receipt.provider,
-    deliveryId: receipt.deliveryId,
-    source: receipt.source,
-    repo: receipt.repo,
-    receivedAt: receipt.receivedAt.toISOString(),
-    rawPayload: jsonValue(receipt.payload),
-    configuredTriggerName: run.configuredTriggerName,
-    prompt: run.prompt,
-    inputs: jsonValue(run.inputs),
-    values: jsonValue(run.values),
-    triggerContext: jsonValue(run.triggerContext),
-    outputContext: jsonValue(run.outputContext),
-    createdAt: run.createdAt.toISOString(),
-    completedAt: run.completedAt?.toISOString() ?? null,
-    steps: steps.map((step) => ({
-      id: step.id,
-      stepId: step.stepId,
-      ordinal: step.ordinal,
-      status: step.status,
-      deadlineAt: step.deadlineAt?.toISOString() ?? null,
-      idleDeadlineAt: step.idleDeadlineAt?.toISOString() ?? null,
-      deadlineKind: step.deadlineKind,
-      startedAt: step.startedAt?.toISOString() ?? null,
-      output: step.output === null ? null : jsonValue(step.output),
-      failureReason: displayFailureReason(step.failureReason),
-      completedAt: step.completedAt?.toISOString() ?? null,
-    })),
-  };
-  if (run.outcome === "rejected") {
-    return {
-      ...base,
-      outcome: run.outcome,
-      status: run.status,
-      deadlineAt: null,
-      deadlineKind: null,
-      failureReason: formatInvocationRejection(run.rejection),
-      rejectionReason: formatInvocationRejection(run.rejection),
-    };
-  }
-  return {
-    ...base,
-    outcome: run.outcome,
-    status: run.status,
-    deadlineAt: run.deadlineAt.toISOString(),
-    deadlineKind: run.deadlineKind,
-    failureReason: displayFailureReason(run.failureReason),
-    rejectionReason: null,
-  };
-}
-
-function activityRunListView(activity: WorkflowActivityRunListRecord) {
-  const { run, receipt } = activity;
-  const base = {
-    id: run.id,
-    providerEventReceiptId: run.providerEventReceiptId,
-    provider: receipt.provider,
-    deliveryId: receipt.deliveryId,
-    source: receipt.source,
-    repo: receipt.repo,
-    receivedAt: receipt.receivedAt.toISOString(),
-    configuredTriggerName: run.configuredTriggerName,
-    prompt: run.prompt,
-    inputs: jsonValue(run.inputs),
-    values: jsonValue(run.values),
-    outputContext: jsonValue(run.outputContext),
-    createdAt: run.createdAt.toISOString(),
-    completedAt: run.completedAt?.toISOString() ?? null,
-  };
-  if (run.outcome === "rejected") {
-    return {
-      ...base,
-      outcome: run.outcome,
-      status: run.status,
-      deadlineAt: null,
-      deadlineKind: null,
-      failureReason: formatInvocationRejection(run.rejection),
-      rejectionReason: formatInvocationRejection(run.rejection),
-    };
-  }
-  return {
-    ...base,
-    outcome: run.outcome,
-    status: run.status,
-    deadlineAt: run.deadlineAt.toISOString(),
-    deadlineKind: run.deadlineKind,
-    failureReason: displayFailureReason(run.failureReason),
-    rejectionReason: null,
-  };
-}
-
-/**
- * A run/step `failure_reason` for display. An entitlement denial is stored as a machine-parseable
- * payload (see engine.ts), so it is decoded into a typed denial and summarized here rather than
- * shown as raw JSON; every other reason (timeouts, crashes) passes through unchanged.
- */
-function displayFailureReason(reason: string | null): string | null {
-  const denial = decodeEntitlementDenialFailureReason(reason);
-  return denial === undefined ? reason : entitlementDenialSummary(denial);
-}
-
 function unroutedEventView(receipt: ProviderEventReceiptSummary) {
   return {
     id: receipt.id,
@@ -609,14 +494,4 @@ function unroutedEventView(receipt: ProviderEventReceiptSummary) {
     rejectionReason: null,
     steps: [],
   };
-}
-
-function jsonValue(value: unknown): JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (Array.isArray(value)) return value.map(jsonValue);
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, jsonValue(child)]));
-  }
-  return null;
 }

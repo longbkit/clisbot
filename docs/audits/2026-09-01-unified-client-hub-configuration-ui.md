@@ -1058,18 +1058,51 @@ For an open-audience Route, every step must have a fixed target, fixed Agent con
 runtime and outputs, and an exact automatic tool policy. One unconstrained step makes activation
 fail. Fast mode is off by default and additionally requires an explicit Route budget.
 
-### Management API decision gate
+### Management API
 
-The UI-to-Hub management API is intentionally not specified here. Do not implement new endpoints or
-DTOs from this document. Before Paseo screen implementation begins, review the existing Project
-configuration API, organization Trigger operations, Channel control-plane operations, Provider
-Application/Connection operations, and BetterAuth server functions together, including their auth,
-ownership, parameters, validation, persistence, activation, and error contracts.
+The inventory found reusable Hub application services but no single API suitable for every Paseo
+client:
 
-That review must decide which existing operations can be reused or generalized. If a new façade is
-required, it must be session-authenticated, organization-scoped, and generic enough to serve Paseo,
-CLI, and Advanced YAML over the same application services; do not add one-off Channel CRUD that
-creates another mutation path. This is the only open architecture gate in this document.
+- the public API authenticates API keys or CLI credentials and already owns Project bundle and
+  Automation operations;
+- the existing Hub pages call `ProjectDashboard`, `TriggerDashboard`, `ProviderApplications`,
+  Connection operations, and `OrganizationAccess` through TanStack server functions and a browser
+  cookie; and
+- the Channel CLI endpoints authenticate an instance secret or loopback caller and expose only the
+  early add/list/status and YAML-user commands.
+
+Keep those domain services and persistence paths. Add one Clisbot-owned HTTP adapter under
+`packages/hub/src/management-api/**`; it is a transport boundary, not a second configuration
+backend. The adapter authenticates a BetterAuth browser session or a first-party app credential,
+checks the organization named in the request, then calls the existing service that owns the
+operation. Hub page server functions may remain as compatibility callers, but Paseo and the CLI use
+the same operation layer beneath both HTTP surfaces.
+
+The resource families are `projects`, `automations`, `provider-applications`, `connections`,
+`channel-configuration`, `teams`, `channel-identities`, `access-assignments`, and `daemons`. They are
+organization-scoped under `/api/management/v1/organizations/:organizationId/**`; account and app
+authorization endpoints remain under `/api/auth/**`. Names describe durable domain resources, not
+Paseo screens or a specific provider.
+
+Channel behavior has one revisioned contract. A read returns the active revision and its structured
+configuration. Validation accepts a complete candidate without writing it. Replacement requires the
+caller's expected active revision, compiles the same candidate, stores one immutable revision,
+activates it atomically, and reconciles Channel runtimes. Structured forms and Advanced YAML both
+produce that candidate. A CLI command reads the active candidate, applies one pure edit, and submits
+the same replacement operation. There is no separate Channel-account mutation path and no second
+writable source.
+
+Automation validation and save continue through `OrganizationTriggerStore`; Project configuration
+continues through `ProjectConfigurationStore`; Provider Applications and Connections continue
+through their existing capability owners; Member invitation and organization-role changes continue
+through `OrganizationAccess`. Teams, verified Channel identities, access assignments, app
+credentials, managed Daemon catalogs, and access tickets are new resources because no current Hub
+service owns them.
+
+All mutations use optimistic concurrency where the resource is revisioned, return the existing
+problem/error vocabulary, redact credentials, and enforce authorization on the Hub. UI visibility
+is never the access boundary. The existing `/api/v1/**` public API stays compatible; management
+authentication is not added to it implicitly.
 
 The backend work independent of that API decision is fixed:
 

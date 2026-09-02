@@ -1,9 +1,5 @@
 import { randomBytes } from "node:crypto";
-import {
-  validateHeaderName,
-  type IncomingMessage,
-  type Server,
-} from "node:http";
+import { validateHeaderName, type IncomingMessage, type Server } from "node:http";
 import { fileURLToPath } from "node:url";
 import type { Duplex } from "node:stream";
 import type { Logger } from "pino";
@@ -23,11 +19,7 @@ import { installProcessFailureHandlers } from "./failures/process.js";
 import { createFetchServer } from "./http/node-server.js";
 import { loadBuiltStartServer } from "./server/build.js";
 import { createAuthServer } from "./auth/server.js";
-import {
-  startApplication,
-  stopApplication,
-  type ApplicationRuntime,
-} from "./server/runtime.js";
+import { startApplication, stopApplication, type ApplicationRuntime } from "./server/runtime.js";
 import { createApplicationRuntime } from "./application-runtime.js";
 import {
   composeBilling,
@@ -36,10 +28,7 @@ import {
   readBillingConfig,
   type BillingRuntime,
 } from "./billing/index.js";
-import {
-  composeEntitlements,
-  type ComposedEntitlements,
-} from "./auth/entitlements.js";
+import { composeEntitlements, type ComposedEntitlements } from "./auth/entitlements.js";
 import { readInstanceAuthPolicy } from "./auth/instance-policy.js";
 import { createRuntimeConfiguration } from "./runtime-configuration/index.js";
 import { CompositionResources } from "./composition-resources.js";
@@ -91,22 +80,15 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     // before the database handle resolves it for the embedded runtime, so the
     // same directory is threaded to the application composition.
     const hubDataDirectory = resolveHubDataDirectory();
-    const credentialCipher = await readCredentialCipherEnvironment(
-      process.env,
-      {
-        hubDataDirectory,
-      },
-    );
+    const credentialCipher = await readCredentialCipherEnvironment(process.env, {
+      hubDataDirectory,
+    });
     const { database, runtime, locks } = await createDatabaseHandle(
       hubDataDirectory,
       credentialCipher,
     );
     resources.own(() => database.close());
-    const identity = await resolveHubIdentity(
-      runtime,
-      readPort(),
-      credentialCipher,
-    );
+    const identity = await resolveHubIdentity(runtime, readPort(), credentialCipher);
     const entitlements = composeEntitlements(database, runtime);
     resources.own(() => entitlements.close());
     const billingConfig = readBillingConfig();
@@ -117,12 +99,8 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
         : composeBilling({
             config: billingConfig,
             database,
-            catalogSource: createStripeCatalogSource(
-              billingConfig.stripeSecretKey,
-            ),
-            billingClient: createStripeBillingClient(
-              billingConfig.stripeSecretKey,
-            ),
+            catalogSource: createStripeCatalogSource(billingConfig.stripeSecretKey),
+            billingClient: createStripeBillingClient(billingConfig.stripeSecretKey),
             seatUsage: entitlements.seatUsage,
           });
     // Sync on boot, per the plan. A Stripe outage here must not block the whole instance from
@@ -146,9 +124,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     );
     resources.own(() => auth.close());
     await auth.initialize?.();
-    const providerEnvironment = await readProviderApplicationEnvironment(
-      process.env,
-    );
+    const providerEnvironment = await readProviderApplicationEnvironment(process.env);
     const providerStore = createProviderApplicationStore(
       runtime,
       locks,
@@ -168,8 +144,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       providerApplicationId: string,
       operation: () => Promise<T>,
     ): Promise<T> => {
-      const previous =
-        slackInboundTransitions.get(providerApplicationId) ?? Promise.resolve();
+      const previous = slackInboundTransitions.get(providerApplicationId) ?? Promise.resolve();
       let release!: () => void;
       const gate = new Promise<void>((resolve) => {
         release = resolve;
@@ -191,13 +166,9 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       owner: string,
     ): Promise<() => Promise<void>> => {
       await serializeSlackInbound(providerApplicationId, async () => {
-        const owners =
-          slackInboundOwners.get(providerApplicationId) ?? new Set<string>();
+        const owners = slackInboundOwners.get(providerApplicationId) ?? new Set<string>();
         if (owners.size === 0) {
-          await providerRuntime.setSlackInboundSuppressed(
-            providerApplicationId,
-            true,
-          );
+          await providerRuntime.setSlackInboundSuppressed(providerApplicationId, true);
         }
         owners.add(owner);
         slackInboundOwners.set(providerApplicationId, owners);
@@ -211,10 +182,7 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
           current?.delete(owner);
           if (current !== undefined && current.size > 0) return;
           slackInboundOwners.delete(providerApplicationId);
-          await providerRuntime.setSlackInboundSuppressed(
-            providerApplicationId,
-            false,
-          );
+          await providerRuntime.setSlackInboundSuppressed(providerApplicationId, false);
         });
       };
     };
@@ -231,28 +199,17 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
             state: "stopped",
           },
         retry: (providerApplicationId) =>
-          providerRuntime.slackDelivery(providerApplicationId)?.retry() ??
-          Promise.resolve(),
+          providerRuntime.slackDelivery(providerApplicationId)?.retry() ?? Promise.resolve(),
       },
       inventory: providerInventory,
-      callbackOrigin: (request) =>
-        resolveCallbackOrigin(request, identity.explicitAppUrl),
-      beginCandidateConnection: async (
-        request,
-        organizationId,
-        returnRoute,
-        begin,
-      ) => {
-        const organizationSlug =
-          await providerInventory.organizationSlug(organizationId);
-        if (organizationSlug === undefined)
-          throw new Error("organization unavailable");
+      callbackOrigin: (request) => resolveCallbackOrigin(request, identity.explicitAppUrl),
+      beginCandidateConnection: async (request, organizationId, returnRoute, begin) => {
+        const organizationSlug = await providerInventory.organizationSlug(organizationId);
+        if (organizationSlug === undefined) throw new Error("organization unavailable");
         const url = new URL(request.url);
         url.searchParams.set("organizationSlug", organizationSlug);
         url.searchParams.set("returnRoute", returnRoute);
-        return begin(
-          new Request(url, { method: "POST", headers: request.headers }),
-        );
+        return begin(new Request(url, { method: "POST", headers: request.headers }));
       },
     });
     const application = await createApplicationRuntime({
@@ -318,8 +275,7 @@ function createProductionAuthServer(
       ? {}
       : {
           provisioningEntitlements: () => billing.provisioningEntitlement(),
-          onMembershipChanged: (organizationId: string) =>
-            billing.reportSeatUsage(organizationId),
+          onMembershipChanged: (organizationId: string) => billing.reportSeatUsage(organizationId),
         }),
   });
 }
@@ -378,10 +334,8 @@ async function initializeDatabaseRuntime(
 }
 
 function loadRuntimeConfig(): RuntimeConfig {
-  const trustedClientIpHeader =
-    process.env["PASEO_HUB_TRUSTED_CLIENT_IP_HEADER"];
-  if (trustedClientIpHeader !== undefined)
-    validateHeaderName(trustedClientIpHeader);
+  const trustedClientIpHeader = process.env["PASEO_HUB_TRUSTED_CLIENT_IP_HEADER"];
+  if (trustedClientIpHeader !== undefined) validateHeaderName(trustedClientIpHeader);
   return {
     bind: process.env["PASEO_HUB_BIND"] ?? "0.0.0.0",
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
@@ -400,17 +354,13 @@ async function resolveHubIdentity(
   effectivePort: number,
   credentialCipher: CredentialCipher,
 ): Promise<HubIdentity> {
-  const configuredAppUrl = nonEmptyEnvironment(
-    process.env["PASEO_HUB_APP_URL"],
-  );
+  const configuredAppUrl = nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]);
   const configuredAuthSecret = process.env["PASEO_HUB_AUTH_SECRET"];
   const configuration = createRuntimeConfiguration({
     database,
     environment: {
       ...(configuredAppUrl === undefined ? {} : { appUrl: configuredAppUrl }),
-      ...(configuredAuthSecret === undefined
-        ? {}
-        : { authSecret: configuredAuthSecret }),
+      ...(configuredAuthSecret === undefined ? {} : { authSecret: configuredAuthSecret }),
     },
     effectivePort,
     randomBytes,
@@ -419,9 +369,7 @@ async function resolveHubIdentity(
   return {
     appUrl: await configuration.publicUrl(),
     authSecret: await configuration.authSecret(),
-    ...(configuredAppUrl === undefined
-      ? {}
-      : { explicitAppUrl: configuredAppUrl }),
+    ...(configuredAppUrl === undefined ? {} : { explicitAppUrl: configuredAppUrl }),
   };
 }
 
@@ -439,9 +387,7 @@ async function main(): Promise<void> {
   await build.startProductionRuntime();
   const config = loadRuntimeConfig();
   const port = readPort();
-  const canonicalRequestOrigin = nonEmptyEnvironment(
-    process.env["PASEO_HUB_APP_URL"],
-  );
+  const canonicalRequestOrigin = nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]);
   const server = createFetchServer((request) => build.default.fetch(request), {
     ...(config.trustedClientIpHeader === undefined
       ? {}
@@ -456,14 +402,12 @@ async function main(): Promise<void> {
     });
   });
   const appUrl =
-    nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]) ??
-    `http://localhost:${port}`;
+    nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]) ?? `http://localhost:${port}`;
   server.listen(port, config.bind, () => {
     logger.info(`server started, available at: ${appUrl}`);
   });
 
-  const stop = () =>
-    stopProductionServer(server, () => build.stopProductionRuntime());
+  const stop = () => stopProductionServer(server, () => build.stopProductionRuntime());
   const stopAfterSignal = () => {
     void shutdownProductionServer(stop)
       .then((clean) => {
@@ -540,9 +484,7 @@ export async function handleDaemonUpgradeRequest(options: {
       {
         operation: "daemon.upgrade",
         component: "daemons",
-        ...(options.request.method === undefined
-          ? {}
-          : { method: options.request.method }),
+        ...(options.request.method === undefined ? {} : { method: options.request.method }),
         path: requestPath(options.request.url),
       },
       options.logger === undefined ? {} : { logger: options.logger },
@@ -563,8 +505,7 @@ function requestPath(value: string | undefined): string {
 function readPort(): number {
   const value = process.env["PORT"] ?? "3000";
   const port = Number(value);
-  if (!Number.isInteger(port) || port <= 0)
-    throw new Error(`invalid PORT value: ${value}`);
+  if (!Number.isInteger(port) || port <= 0) throw new Error(`invalid PORT value: ${value}`);
   return port;
 }
 

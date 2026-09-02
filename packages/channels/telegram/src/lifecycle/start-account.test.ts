@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  assertNoDuplicateTelegramTokens,
-  claimTelegramBotPoller,
-} from "./start-account.js";
+import { assertNoDuplicateTelegramTokens, claimTelegramBotPoller } from "./start-account.js";
 
-function cfgWithAccounts(
-  accounts: Record<string, { botToken?: string }>,
-): Record<string, unknown> {
+function cfgWithAccounts(accounts: Record<string, { botToken?: string }>): Record<string, unknown> {
   return { channels: { telegram: { accounts } } };
 }
 
@@ -19,10 +14,7 @@ describe("duplicate-token guard", () => {
       }),
       "a",
     );
-    assertNoDuplicateTelegramTokens(
-      cfgWithAccounts({ a: { botToken: "111:AAA" } }),
-      "a",
-    );
+    assertNoDuplicateTelegramTokens(cfgWithAccounts({ a: { botToken: "111:AAA" } }), "a");
     // Blank tokens are skipped, not collisions.
     assertNoDuplicateTelegramTokens(
       cfgWithAccounts({ a: { botToken: "111:AAA" }, b: { botToken: "  " } }),
@@ -35,12 +27,8 @@ describe("duplicate-token guard", () => {
       a: { botToken: "111:AAA" },
       b: { botToken: "111:AAA" },
     });
-    expect(() => assertNoDuplicateTelegramTokens(cfg, "a")).toThrow(
-      /duplicate Telegram bot token/,
-    );
-    expect(() => assertNoDuplicateTelegramTokens(cfg, "b")).toThrow(
-      /duplicate Telegram bot token/,
-    );
+    expect(() => assertNoDuplicateTelegramTokens(cfg, "a")).toThrow(/duplicate Telegram bot token/);
+    expect(() => assertNoDuplicateTelegramTokens(cfg, "b")).toThrow(/duplicate Telegram bot token/);
   });
 
   it("throws when any two configured accounts share a token", () => {
@@ -49,9 +37,7 @@ describe("duplicate-token guard", () => {
       b: { botToken: "111:AAA" },
       c: { botToken: "333:CCC" },
     });
-    expect(() => assertNoDuplicateTelegramTokens(cfg, "c")).toThrow(
-      /duplicate Telegram bot token/,
-    );
+    expect(() => assertNoDuplicateTelegramTokens(cfg, "c")).toThrow(/duplicate Telegram bot token/);
   });
 });
 

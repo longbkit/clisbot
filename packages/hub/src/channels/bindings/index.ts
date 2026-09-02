@@ -11,10 +11,7 @@
 // steer. Workflow targets are out of scope: they own their own session
 // lifecycle (implementation doc §4.3.4).
 import { randomUUID } from "node:crypto";
-import {
-  ChannelThreadBindingConflictError,
-  type ChannelStore,
-} from "../../db/channels.js";
+import { ChannelThreadBindingConflictError, type ChannelStore } from "../../db/channels.js";
 import type {
   ChannelControlPlane,
   CompiledChannelAccount,
@@ -56,13 +53,9 @@ export interface ThreadKey {
  * session, two root markers never share one, and the minted thread never
  * re-binds a second session on its first reply.
  */
-export function deriveBindingKey(
-  message: InboundMessage,
-  route: CompiledRoute,
-): ThreadKey {
+export function deriveBindingKey(message: InboundMessage, route: CompiledRoute): ThreadKey {
   const conversation = message.conversation;
-  let externalThreadId =
-    route.defaults.bindingKey === "thread" ? conversation.threadId : null;
+  let externalThreadId = route.defaults.bindingKey === "thread" ? conversation.threadId : null;
   if (
     externalThreadId === null &&
     route.defaults.bindingKey === "thread" &&
@@ -163,12 +156,7 @@ export class BindingEngine {
     } else if (route.defaults.requireMention && !message.mentionedBot) {
       return { allowed: false, reason: "not mentioned; requireMention is on" };
     }
-    return mayTrigger(
-      message.senderIdentity,
-      this.context.controlPlane,
-      account,
-      route,
-    )
+    return mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)
       ? { allowed: true }
       : { allowed: false, reason: "sender may not trigger this route" };
   }
@@ -197,16 +185,9 @@ export class BindingEngine {
       key.externalConversationId,
       key.externalThreadId,
     );
-    if (binding === undefined)
-      return this.firstMention(message, account, route, key, subscribe);
+    if (binding === undefined) return this.firstMention(message, account, route, key, subscribe);
     if (binding.status === "pending") {
-      return this.recoverPending(
-        message,
-        account,
-        route,
-        key,
-        binding.pendingExecutionId,
-      );
+      return this.recoverPending(message, account, route, key, binding.pendingExecutionId);
     }
     if (binding.status === "abandoned") {
       // Abandonment is an explicit operator act (the plane never abandons);
@@ -283,14 +264,7 @@ export class BindingEngine {
     if (defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
-    if (
-      !mayTrigger(
-        message.senderIdentity,
-        this.context.controlPlane,
-        account,
-        route,
-      )
-    ) {
+    if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const executionId = randomUUID();
@@ -323,13 +297,7 @@ export class BindingEngine {
         key.externalThreadId,
       );
       if (existing?.status === "pending") {
-        return this.recoverPending(
-          message,
-          account,
-          route,
-          key,
-          existing.pendingExecutionId,
-        );
+        return this.recoverPending(message, account, route, key, existing.pendingExecutionId);
       }
       throw error;
     }
@@ -347,14 +315,11 @@ export class BindingEngine {
       // failed, so a later inbound (or restart) can rebind the surviving
       // agent. Never re-create here — the marker is the idempotency.
       this.context.processing?.close(executionId);
-      this.context.logger.warn(
-        "agent create failed; the thread marker stays pending",
-        {
-          accountId: account.accountId,
-          executionId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
+      this.context.logger.warn("agent create failed; the thread marker stays pending", {
+        accountId: account.accountId,
+        executionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         kind: "ignored",
         reason: "agent create in progress; try again shortly",
@@ -374,13 +339,9 @@ export class BindingEngine {
     // here on is seen, including its terminal event.
     await subscribe?.(created.agentId);
     try {
-      await this.context.daemon.sendAgentMessage(
-        created.agentId,
-        message.text,
-        {
-          steer: false,
-        },
-      );
+      await this.context.daemon.sendAgentMessage(created.agentId, message.text, {
+        steer: false,
+      });
     } catch (error) {
       // The turn never started: release the surface, and say so.
       this.context.processing?.close(executionId);
@@ -432,21 +393,12 @@ export class BindingEngine {
     if (route.defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
-    if (
-      !mayTrigger(
-        message.senderIdentity,
-        this.context.controlPlane,
-        account,
-        route,
-      )
-    ) {
+    if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const executionId = pendingExecutionId ?? "";
     const agents = await this.context.daemon.listAgents();
-    const surviving = agents.find(
-      (agent) => agent.title === executionMarker(executionId),
-    );
+    const surviving = agents.find((agent) => agent.title === executionMarker(executionId));
     if (surviving === undefined) {
       return {
         kind: "ignored",
@@ -488,35 +440,18 @@ export class BindingEngine {
     agentId: string,
     subscribe?: (agentId: string) => Promise<void> | void,
   ): Promise<InboundOutcome> {
-    const admission = admitFollowUp(
-      message,
-      route.defaults,
-      this.isIdle(agentId, route.defaults),
-    );
+    const admission = admitFollowUp(message, route.defaults, this.isIdle(agentId, route.defaults));
     if (!admission.allowed) {
       return {
         kind: "ignored",
         reason: admission.reason ?? "follow-up not admitted",
       };
     }
-    if (
-      !mayTrigger(
-        message.senderIdentity,
-        this.context.controlPlane,
-        account,
-        route,
-      )
-    ) {
+    if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const leaseId = randomUUID();
-    this.openSurface(
-      leaseId,
-      message,
-      account,
-      route,
-      deriveBindingKey(message, route),
-    );
+    this.openSurface(leaseId, message, account, route, deriveBindingKey(message, route));
     this.context.processing?.bind(leaseId, agentId);
     await subscribe?.(agentId);
     try {
@@ -544,9 +479,7 @@ export class BindingEngine {
   isIdle(agentId: string, defaults: EffectiveDefaults): boolean {
     const last = this.lastActivity.get(agentId);
     if (last === undefined) return false;
-    return (
-      this.context.clock.now() - last > defaults.followUp.ttlMinutes * 60_000
-    );
+    return this.context.clock.now() - last > defaults.followUp.ttlMinutes * 60_000;
   }
 
   /** Record that the agent is active now (a steer or a fresh create). */
@@ -612,12 +545,8 @@ export class BindingEngine {
       accountId: account.accountId,
       sync: route.defaults.sync,
       to: key.externalConversationId,
-      ...(key.externalThreadId !== null
-        ? { threadId: key.externalThreadId }
-        : {}),
-      ...(message.externalMessageId !== undefined
-        ? { messageId: message.externalMessageId }
-        : {}),
+      ...(key.externalThreadId !== null ? { threadId: key.externalThreadId } : {}),
+      ...(message.externalMessageId !== undefined ? { messageId: message.externalMessageId } : {}),
     });
     if (surface === undefined) return;
     processing.open(leaseId, surface);
@@ -695,9 +624,7 @@ export function bindingSummary(
 
 /** The route-match descriptor the facade re-matches on re-attach; undefined when
  * the row carries no summary (or a malformed one). */
-export function parseStoredRouteSummary(
-  stored: unknown,
-): InboundConversation | undefined {
+export function parseStoredRouteSummary(stored: unknown): InboundConversation | undefined {
   if (typeof stored !== "object" || stored === null) return undefined;
   const match = (stored as { match?: unknown }).match;
   if (typeof match !== "object" || match === null) return undefined;
@@ -710,9 +637,7 @@ export function parseStoredRouteSummary(
 /** Raised when a route targets a workflow (out of scope for the bindings plane). */
 export class ChannelWorkflowTargetError extends Error {
   constructor(workflow: string) {
-    super(
-      `route targets workflow ${workflow}; the bindings plane drives agent routes only`,
-    );
+    super(`route targets workflow ${workflow}; the bindings plane drives agent routes only`);
     this.name = "ChannelWorkflowTargetError";
   }
 }

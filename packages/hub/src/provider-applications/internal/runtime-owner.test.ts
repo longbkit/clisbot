@@ -4,11 +4,7 @@ import type { AuthServer } from "../../auth/server.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { DurableProviderEvent } from "../../db/types.js";
 import type { ProviderRegistration } from "../../providers/registration.js";
-import type {
-  ExternalTrigger,
-  TriggerHandler,
-  TriggerProvider,
-} from "../../triggers/index.js";
+import type { ExternalTrigger, TriggerHandler, TriggerProvider } from "../../triggers/index.js";
 import type {
   Provider,
   ProviderApplicationConfiguration,
@@ -57,41 +53,34 @@ describe("dynamic provider runtime", () => {
     "github.pull_request_review",
     "github.pull_request_review_comment",
     "github.push",
-  ] as const)(
-    "publishes raw source %s through the activated GitHub runtime",
-    async (eventName) => {
-      const runtime = new DynamicProviderRuntime({
-        database: createMemoryDatabase(),
-        auth: testAuth(),
-        applicationBaseUrl: "https://hub.test",
-        registrationFactory: ({ configuration }) =>
-          downstreamRegistration(
-            providerConfigurationId(configuration),
-            [],
-            [],
-          ),
-      });
-      const stable = runtime
-        .registrations()
-        .find((registration) => registration.connection.name === "github")!;
-      await stable.sources[0]!.start(() => Promise.resolve());
-      const trigger = stable.triggerProviders[0]!({
-        configurationForWorkflow: async () => undefined,
-      })!;
+  ] as const)("publishes raw source %s through the activated GitHub runtime", async (eventName) => {
+    const runtime = new DynamicProviderRuntime({
+      database: createMemoryDatabase(),
+      auth: testAuth(),
+      applicationBaseUrl: "https://hub.test",
+      registrationFactory: ({ configuration }) =>
+        downstreamRegistration(providerConfigurationId(configuration), [], []),
+    });
+    const stable = runtime
+      .registrations()
+      .find((registration) => registration.connection.name === "github")!;
+    await stable.sources[0]!.start(() => Promise.resolve());
+    const trigger = stable.triggerProviders[0]!({
+      configurationForWorkflow: async () => undefined,
+    })!;
 
-      const candidate = await runtime.prepare(
-        "github",
-        providerConfiguration("github", "A1"),
-        "https://hub.test",
-        providerIdentity("github", "A1"),
-        1,
-      );
-      await candidate.start();
-      candidate.publish();
+    const candidate = await runtime.prepare(
+      "github",
+      providerConfiguration("github", "A1"),
+      "https://hub.test",
+      providerIdentity("github", "A1"),
+      1,
+    );
+    await candidate.start();
+    candidate.publish();
 
-      assert.ok(trigger.eventNames.includes(eventName));
-    },
-  );
+    assert.ok(trigger.eventNames.includes(eventName));
+  });
 
   it("keeps two Slack applications live and routes callbacks by application identity", async () => {
     const started: string[] = [];
@@ -102,12 +91,7 @@ describe("dynamic provider runtime", () => {
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
       registrationFactory: ({ configuration }) =>
-        fakeRegistration(
-          configurationId(configuration),
-          started,
-          stopped,
-          completed,
-        ),
+        fakeRegistration(configurationId(configuration), started, stopped, completed),
     });
     const stable = runtime
       .registrations()
@@ -144,17 +128,10 @@ describe("dynamic provider runtime", () => {
     // A different application id is additive; the first source remains live.
     assert.deepEqual(stopped, []);
 
-    await trigger.onAgentExecutionCompleted?.(
-      oldMatch!.triggerContext,
-      oldMatch!.outputContext,
-      {
-        status: "succeeded",
-      },
-    );
-    await trigger.onAgentExecutionTerminal?.(
-      "execution-1",
-      oldMatch!.triggerContext,
-    );
+    await trigger.onAgentExecutionCompleted?.(oldMatch!.triggerContext, oldMatch!.outputContext, {
+      status: "succeeded",
+    });
+    await trigger.onAgentExecutionTerminal?.("execution-1", oldMatch!.triggerContext);
     await new Promise((resolve) => setImmediate(resolve));
     const ambiguous = await stable.connection.actions["start"]!(
       new Request("https://hub.test/start", { method: "POST" }),
@@ -249,10 +226,7 @@ describe("dynamic provider runtime", () => {
 
     assert.deepEqual(used, ["launch:A1", "reply:A1", "attachment:A1"]);
     assert.deepEqual(stopped, []);
-    await trigger.onAgentExecutionTerminal?.(
-      "execution-1",
-      match.triggerContext,
-    );
+    await trigger.onAgentExecutionTerminal?.("execution-1", match.triggerContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(stopped, []);
   });
@@ -264,11 +238,7 @@ describe("dynamic provider runtime", () => {
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
       registrationFactory: ({ configuration }) =>
-        downstreamRegistration(
-          providerConfigurationId(configuration),
-          used,
-          [],
-        ),
+        downstreamRegistration(providerConfigurationId(configuration), used, []),
     });
     const github = runtime
       .registrations()
@@ -321,11 +291,7 @@ describe("dynamic provider runtime", () => {
       permissions: { contents: "write" },
     });
 
-    assert.deepEqual(used, [
-      "launch:D1",
-      "integration:A1",
-      "authority-mint:A1",
-    ]);
+    assert.deepEqual(used, ["launch:D1", "integration:A1", "authority-mint:A1"]);
     await github.integration!.githubAuthority!.revoke(authority.token);
   });
 
@@ -348,9 +314,7 @@ describe("dynamic provider runtime", () => {
           permissions: { contents: "read" },
         }),
       (error: unknown) =>
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "github_authority_unavailable",
+        error instanceof Error && "code" in error && error.code === "github_authority_unavailable",
     );
   });
 
@@ -440,10 +404,7 @@ describe("dynamic provider runtime", () => {
       "authority-mint:A2",
     ]);
     assert.deepEqual(stopped, ["A1"]);
-    await trigger.onAgentExecutionTerminal?.(
-      "execution-1",
-      match.triggerContext,
-    );
+    await trigger.onAgentExecutionTerminal?.("execution-1", match.triggerContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(stopped, ["A1"]);
     await stable.integration!.githubAuthority!.revoke(authority.token);
@@ -505,10 +466,7 @@ describe("dynamic provider runtime", () => {
         auth: testAuth(),
         applicationBaseUrl: "https://hub.test",
         registrationFactory: ({ provider: candidateProvider, configuration }) =>
-          connectionRegistration(
-            candidateProvider,
-            providerConfigurationId(configuration),
-          ),
+          connectionRegistration(candidateProvider, providerConfigurationId(configuration)),
       });
       const stable = runtime
         .registrations()
@@ -594,16 +552,8 @@ describe("dynamic provider runtime", () => {
       database,
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
-      registrationFactory: ({
-        provider,
-        configuration,
-        callbackOrigin,
-        configurationVersion,
-      }) => ({
-        ...connectionRegistration(
-          provider,
-          providerConfigurationId(configuration),
-        ),
+      registrationFactory: ({ provider, configuration, callbackOrigin, configurationVersion }) => ({
+        ...connectionRegistration(provider, providerConfigurationId(configuration)),
         configurationSnapshot: {
           version: configurationVersion,
           callbackOrigin,
@@ -637,17 +587,11 @@ describe("dynamic provider runtime", () => {
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
       registrationFactory: ({ provider, configuration }) => ({
-        ...connectionRegistration(
-          provider,
-          providerConfigurationId(configuration),
-        ),
+        ...connectionRegistration(provider, providerConfigurationId(configuration)),
         sources: [
           {
             start: (handler) => {
-              sourceHandlers.set(
-                providerConfigurationId(configuration),
-                handler,
-              );
+              sourceHandlers.set(providerConfigurationId(configuration), handler);
               return Promise.resolve();
             },
             stop: () => Promise.resolve(),
@@ -692,10 +636,7 @@ describe("dynamic provider runtime", () => {
   });
 });
 
-function providerConfiguration(
-  provider: Provider,
-  id: string,
-): ProviderApplicationConfiguration {
+function providerConfiguration(provider: Provider, id: string): ProviderApplicationConfiguration {
   if (provider === "github") {
     return {
       provider,
@@ -724,18 +665,12 @@ function providerConfiguration(
   };
 }
 
-function providerIdentity(
-  provider: Provider,
-  id: string,
-): ProviderApplicationIdentity {
-  if (provider === "github")
-    return { provider, id, name: id, ownerLogin: "owner" };
+function providerIdentity(provider: Provider, id: string): ProviderApplicationIdentity {
+  if (provider === "github") return { provider, id, name: id, ownerLogin: "owner" };
   return { provider, id, name: id };
 }
 
-function providerConfigurationId(
-  configuration: ProviderApplicationConfiguration,
-): string {
+function providerConfigurationId(configuration: ProviderApplicationConfiguration): string {
   if (configuration.provider === "github") return configuration.appId;
   if (configuration.provider === "slack") return configuration.appId;
   if (configuration.provider === "linear") return configuration.clientId;
@@ -753,19 +688,14 @@ function connectionRegistration(
       status: () => ({ status: "connected" }),
       actions: {
         start: () =>
-          Promise.resolve(
-            Response.json({ url: `https://provider.test/${provider}/${id}` }),
-          ),
+          Promise.resolve(Response.json({ url: `https://provider.test/${provider}/${id}` })),
         callback: () => Promise.resolve(Response.json({ callbackFor: id })),
       },
     },
     triggerProviders: [],
     sources: [
       {
-        start: () =>
-          failStart
-            ? Promise.reject(new Error("start failed"))
-            : Promise.resolve(),
+        start: () => (failStart ? Promise.reject(new Error("start failed")) : Promise.resolve()),
         stop: () => Promise.resolve(),
       },
     ],
@@ -774,9 +704,7 @@ function connectionRegistration(
   };
 }
 
-function slackConfiguration(
-  appId: string,
-): SlackProviderApplicationConfiguration {
+function slackConfiguration(appId: string): SlackProviderApplicationConfiguration {
   return {
     provider: "slack",
     transport: "webhook",
@@ -787,11 +715,8 @@ function slackConfiguration(
   };
 }
 
-function configurationId(
-  configuration: ProviderApplicationConfiguration,
-): string {
-  if (configuration.provider !== "slack")
-    throw new Error("expected Slack configuration");
+function configurationId(configuration: ProviderApplicationConfiguration): string {
+  if (configuration.provider !== "slack") throw new Error("expected Slack configuration");
   return configuration.appId;
 }
 
@@ -825,10 +750,7 @@ function fakeRegistration(
       name: "slack",
       status: () => ({ status: "connected" }),
       actions: {
-        start: () =>
-          Promise.resolve(
-            Response.json({ url: `https://provider.test/${id}` }),
-          ),
+        start: () => Promise.resolve(Response.json({ url: `https://provider.test/${id}` })),
       },
     },
     triggerProviders: [() => trigger],

@@ -2,14 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { AuthServer } from "../auth/server.js";
 import { createMemoryDatabase } from "../db/memory.js";
-import {
-  enrollTestDaemon,
-  TEST_DAEMON_SLUG,
-} from "../test-utils/project-configuration.js";
-import {
-  ProjectDashboard,
-  type ManualConfigurationInput,
-} from "./dashboard.js";
+import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../test-utils/project-configuration.js";
+import { ProjectDashboard, type ManualConfigurationInput } from "./dashboard.js";
 
 describe("project dashboard activity read models", () => {
   it("uses canonical Linear health in project and organization snapshots", async () => {
@@ -197,10 +191,7 @@ describe("manual configuration saves", () => {
     const rejected = await hub.save({ files: malformed });
 
     assert.equal(rejected.outcome, "invalid");
-    assert.match(
-      String(rejected.errors),
-      /\.paseo\/workflows\/triage\.yml\.steps\.only\.agent/iu,
-    );
+    assert.match(String(rejected.errors), /\.paseo\/workflows\/triage\.yml\.steps\.only\.agent/iu);
   });
 });
 

@@ -59,7 +59,7 @@ function ProviderApplications({
     return (
       <Alert variant="destructive">
         <TriangleAlert />
-        <AlertTitle>Your apps couldn't be loaded</AlertTitle>
+        <AlertTitle>Your apps could not be loaded</AlertTitle>
         <AlertDescription>
           {query.data?.status === "error"
             ? query.data.error.message
@@ -227,7 +227,7 @@ function ExitFailure({
   return (
     <Alert ref={ref} tabIndex={-1} variant="destructive">
       <TriangleAlert />
-      <AlertTitle>Hub couldn't leave app setup</AlertTitle>
+      <AlertTitle>Hub could not leave app setup</AlertTitle>
       <AlertDescription>
         <p>{message}</p>
         <Button type="button" size="sm" variant="outline" onClick={onRetry}>

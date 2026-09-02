@@ -60,9 +60,7 @@ export class ChannelStore {
    * carrying the same execution id returns the stored row; a different execution id
    * for the same thread key is a conflict.
    */
-  async recordPendingThreadBinding(
-    input: PendingThreadBindingInput,
-  ): Promise<ThreadBindingRecord> {
+  async recordPendingThreadBinding(input: PendingThreadBindingInput): Promise<ThreadBindingRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
       const [inserted] = await transaction
@@ -116,8 +114,7 @@ export class ChannelStore {
       );
       if (row === undefined) throw new ChannelThreadBindingNotFoundError();
       if (row.status === "bound") {
-        if (row.agentId !== input.agentId)
-          throw new ChannelThreadBindingConflictError();
+        if (row.agentId !== input.agentId) throw new ChannelThreadBindingConflictError();
         return toThreadBinding(row);
       }
       if (row.status !== "pending" || row.pendingExecutionId === null) {
@@ -149,8 +146,7 @@ export class ChannelStore {
         input.externalThreadId,
       );
       if (row === undefined) throw new ChannelThreadBindingNotFoundError();
-      if (row.status !== "pending")
-        throw new ChannelThreadBindingConflictError();
+      if (row.status !== "pending") throw new ChannelThreadBindingConflictError();
       return toThreadBinding(
         await markThread(transaction, row.id, {
           status: "abandoned",
@@ -218,10 +214,7 @@ export class ChannelStore {
               ]),
         ),
       )
-      .orderBy(
-        asc(schema.threadBindings.createdAt),
-        asc(schema.threadBindings.id),
-      );
+      .orderBy(asc(schema.threadBindings.createdAt), asc(schema.threadBindings.id));
     return rows.map(toThreadBinding);
   }
 
@@ -251,9 +244,7 @@ export class ChannelStore {
    * so a replay cannot double-post. A known failed handoff is atomically
    * re-armed and returned as `created: true`; exactly one retry owns the post.
    */
-  async recordDelivery(
-    input: RecordDeliveryInput,
-  ): Promise<RecordDeliveryResult> {
+  async recordDelivery(input: RecordDeliveryInput): Promise<RecordDeliveryResult> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
       const [recorded] = await transaction
@@ -284,8 +275,7 @@ export class ChannelStore {
         input.eventTurnId,
         input.sequence,
       );
-      if (existing === undefined)
-        throw new ChannelDeliveryRecordNotFoundError();
+      if (existing === undefined) throw new ChannelDeliveryRecordNotFoundError();
       if (existing.status !== "failed") {
         return { record: toDeliveryLedger(existing), created: false };
       }
@@ -304,9 +294,7 @@ export class ChannelStore {
   }
 
   /** Confirm a recorded delivery with the channel message id; idempotent on replay. */
-  async confirmDelivery(
-    input: ConfirmDeliveryInput,
-  ): Promise<DeliveryLedgerRecord> {
+  async confirmDelivery(input: ConfirmDeliveryInput): Promise<DeliveryLedgerRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
       const row = await lockDeliveryRow(
@@ -406,9 +394,7 @@ export class ChannelStore {
    * Mark a recorded inbound row consumed, referencing the plane turn it
    * dispatched to. Idempotent: an already-consumed row returns as-is.
    */
-  async consumeInbound(
-    input: ConsumeInboundInput,
-  ): Promise<DeliveryLedgerRecord> {
+  async consumeInbound(input: ConsumeInboundInput): Promise<DeliveryLedgerRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
       const row = await lockInboundRow(
@@ -472,18 +458,12 @@ export class ChannelStore {
           eq(schema.deliveryLedger.organizationId, organizationId),
           eq(schema.deliveryLedger.accountId, accountId),
           eq(schema.deliveryLedger.direction, "out"),
-          eq(
-            schema.deliveryLedger.externalConversationId,
-            externalConversationId,
-          ),
+          eq(schema.deliveryLedger.externalConversationId, externalConversationId),
           deliveryThreadMatches(externalThreadId),
           eq(schema.deliveryLedger.status, "posted"),
         ),
       )
-      .orderBy(
-        asc(schema.deliveryLedger.eventTurnId),
-        asc(schema.deliveryLedger.sequence),
-      );
+      .orderBy(asc(schema.deliveryLedger.eventTurnId), asc(schema.deliveryLedger.sequence));
     return rows.map(toDeliveryLedger);
   }
 }
@@ -502,10 +482,7 @@ async function findThreadBindingRow(
       and(
         eq(schema.threadBindings.organizationId, organizationId),
         eq(schema.threadBindings.accountId, accountId),
-        eq(
-          schema.threadBindings.externalConversationId,
-          externalConversationId,
-        ),
+        eq(schema.threadBindings.externalConversationId, externalConversationId),
         bindingThreadMatches(externalThreadId),
       ),
     )
@@ -527,10 +504,7 @@ async function lockThreadBindingRow(
       and(
         eq(schema.threadBindings.organizationId, organizationId),
         eq(schema.threadBindings.accountId, accountId),
-        eq(
-          schema.threadBindings.externalConversationId,
-          externalConversationId,
-        ),
+        eq(schema.threadBindings.externalConversationId, externalConversationId),
         bindingThreadMatches(externalThreadId),
       ),
     )
@@ -570,8 +544,7 @@ function assertReplayablePending(
   row: typeof schema.threadBindings.$inferSelect,
   executionId: string,
 ) {
-  if (row.status === "pending" && row.pendingExecutionId === executionId)
-    return;
+  if (row.status === "pending" && row.pendingExecutionId === executionId) return;
   throw new ChannelThreadBindingConflictError();
 }
 
@@ -605,10 +578,7 @@ async function findDeliveryRow(
         eq(schema.deliveryLedger.organizationId, organizationId),
         eq(schema.deliveryLedger.accountId, accountId),
         eq(schema.deliveryLedger.direction, direction),
-        eq(
-          schema.deliveryLedger.externalConversationId,
-          externalConversationId,
-        ),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
         deliveryThreadMatches(externalThreadId),
         eq(schema.deliveryLedger.eventTurnId, eventTurnId),
         eq(schema.deliveryLedger.sequence, sequence),
@@ -636,10 +606,7 @@ async function lockDeliveryRow(
         eq(schema.deliveryLedger.organizationId, organizationId),
         eq(schema.deliveryLedger.accountId, accountId),
         eq(schema.deliveryLedger.direction, direction),
-        eq(
-          schema.deliveryLedger.externalConversationId,
-          externalConversationId,
-        ),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
         deliveryThreadMatches(externalThreadId),
         eq(schema.deliveryLedger.eventTurnId, eventTurnId),
         eq(schema.deliveryLedger.sequence, sequence),
@@ -665,10 +632,7 @@ async function findInboundRow(
         eq(schema.deliveryLedger.organizationId, organizationId),
         eq(schema.deliveryLedger.accountId, accountId),
         eq(schema.deliveryLedger.direction, "in"),
-        eq(
-          schema.deliveryLedger.externalConversationId,
-          externalConversationId,
-        ),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
         eq(schema.deliveryLedger.externalMessageId, externalMessageId),
       ),
     )
@@ -691,10 +655,7 @@ async function lockInboundRow(
         eq(schema.deliveryLedger.organizationId, organizationId),
         eq(schema.deliveryLedger.accountId, accountId),
         eq(schema.deliveryLedger.direction, "in"),
-        eq(
-          schema.deliveryLedger.externalConversationId,
-          externalConversationId,
-        ),
+        eq(schema.deliveryLedger.externalConversationId, externalConversationId),
         eq(schema.deliveryLedger.externalMessageId, externalMessageId),
       ),
     )
@@ -703,9 +664,7 @@ async function lockInboundRow(
   return row;
 }
 
-function toThreadBinding(
-  row: typeof schema.threadBindings.$inferSelect,
-): ThreadBindingRecord {
+function toThreadBinding(row: typeof schema.threadBindings.$inferSelect): ThreadBindingRecord {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -724,9 +683,7 @@ function toThreadBinding(
   };
 }
 
-function toDeliveryLedger(
-  row: typeof schema.deliveryLedger.$inferSelect,
-): DeliveryLedgerRecord {
+function toDeliveryLedger(row: typeof schema.deliveryLedger.$inferSelect): DeliveryLedgerRecord {
   return {
     id: row.id,
     organizationId: row.organizationId,

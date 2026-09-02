@@ -98,12 +98,7 @@ describe("machine model database contract", () => {
       reason: "daemon_disconnected",
     });
     assert.equal(
-      await database.beginAgentExecutionOutput(
-        execution.id,
-        "telegram.reply",
-        1,
-        new Date(),
-      ),
+      await database.beginAgentExecutionOutput(execution.id, "telegram.reply", 1, new Date()),
       undefined,
     );
   });

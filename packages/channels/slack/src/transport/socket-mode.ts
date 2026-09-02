@@ -19,10 +19,7 @@
 // transport talks to the SocketModeClient directly (DEVIATIONS D-003).
 
 import type { SocketModeClient } from "@slack/socket-mode";
-import type {
-  ChannelInboundEvent,
-  HostChildLogger,
-} from "@getpaseo/channels-shared";
+import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
 import {
   buildSlackInboundEvent,
   buildSlackSlashCommandEvent,
@@ -34,10 +31,7 @@ import {
   type SlackTransportIdentity,
 } from "./socket-event-filter.js";
 import { foldInboundSlackMedia } from "./media.js";
-import {
-  runSlackSocketReconnectLoop,
-  stopSlackSocketClient,
-} from "./socket-reconnect.js";
+import { runSlackSocketReconnectLoop, stopSlackSocketClient } from "./socket-reconnect.js";
 
 export { SocketModeClient } from "@slack/socket-mode";
 export type { SocketModeOptions } from "@slack/socket-mode";
@@ -117,15 +111,7 @@ export interface SlackSocketTransport {
 export function createSlackSocketTransport(
   options: SlackSocketTransportOptions,
 ): SlackSocketTransport {
-  const {
-    client,
-    identity,
-    onInbound,
-    onInteractive,
-    slashCommand,
-    abortSignal,
-    logger,
-  } = options;
+  const { client, identity, onInbound, onInteractive, slashCommand, abortSignal, logger } = options;
 
   // In-flight envelope ids: the transport-level redelivery guard for the
   // socket reconnect window. The L3's event-id set + ledger row are the
@@ -149,17 +135,18 @@ export function createSlackSocketTransport(
     if (drop === null) {
       if (options.sharedClient !== true) return true;
       const rawTeam = envelope.body["team"];
-      const incomingTeamId =
-        typeof envelope.body["team_id"] === "string"
-          ? envelope.body["team_id"]
-          : rawTeam !== null && typeof rawTeam === "object" && "id" in rawTeam
-            ? (rawTeam as { id?: unknown }).id
-            : undefined;
+      let incomingTeamId: unknown = envelope.body["team_id"];
+      if (
+        typeof incomingTeamId !== "string" &&
+        rawTeam !== null &&
+        typeof rawTeam === "object" &&
+        "id" in rawTeam
+      ) {
+        incomingTeamId = (rawTeam as { id?: unknown }).id;
+      }
       // Shared sockets must route exactly once. A missing team id is not
       // attributable to an installation and therefore fails closed.
-      return (
-        typeof incomingTeamId === "string" && incomingTeamId === identity.teamId
-      );
+      return typeof incomingTeamId === "string" && incomingTeamId === identity.teamId;
     }
     logger?.debug?.(`slack: drop event with mismatched ${drop}`);
     return false;
@@ -171,12 +158,7 @@ export function createSlackSocketTransport(
   ): Promise<void> => {
     const event = envelope.event;
     if (event === undefined || typeof event !== "object") return;
-    const inbound = buildSlackInboundEvent(
-      event as never,
-      source,
-      identity,
-      options.botId,
-    );
+    const inbound = buildSlackInboundEvent(event as never, source, identity, options.botId);
     if (inbound === undefined) return;
     // F-06/G5+G6: fold the message's `files[]` into the body BEFORE the L3
     // handoff (the body must be final before dedupe/record). Per-file faults
@@ -190,9 +172,7 @@ export function createSlackSocketTransport(
           botToken: options.media.botToken,
           downloadDir: options.media.downloadDir,
           abortSignal,
-          ...(options.media.fetchImpl !== undefined
-            ? { fetchImpl: options.media.fetchImpl }
-            : {}),
+          ...(options.media.fetchImpl !== undefined ? { fetchImpl: options.media.fetchImpl } : {}),
           ...(logger !== undefined ? { logger } : {}),
         },
         event as never,
@@ -274,9 +254,7 @@ export function createSlackSocketTransport(
   // longer; an empty ack means Slack shows no ephemeral response and the
   // plane's own thread posts everything (the same surface the typed command
   // uses). Then rewrite to the plain-text form and hand to `onInbound`.
-  const onSlashCommand = async (
-    envelope: SocketEventEnvelope,
-  ): Promise<void> => {
+  const onSlashCommand = async (envelope: SocketEventEnvelope): Promise<void> => {
     if (!matchesEnvelope(envelope)) return;
     await ackSafe(envelope);
     if (slashCommand !== undefined && slashCommand !== "") {
@@ -288,21 +266,16 @@ export function createSlackSocketTransport(
         try {
           await onInbound(inbound);
         } catch (error) {
-          logger?.warn?.(
-            "slack slash-command handoff fault (kept socket alive)",
-            {
-              error: error instanceof Error ? error.message : String(error),
-            },
-          );
+          logger?.warn?.("slack slash-command handoff fault (kept socket alive)", {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }
     }
   };
   client.on("slash_commands", onSlashCommand);
 
-  const onInteractiveEnvelope = async (
-    envelope: SocketEventEnvelope,
-  ): Promise<void> => {
+  const onInteractiveEnvelope = async (envelope: SocketEventEnvelope): Promise<void> => {
     if (!matchesEnvelope(envelope)) return;
     await ackSafe(envelope);
     // Only message-component clicks matter here; a modal or Home-tab
@@ -315,12 +288,9 @@ export function createSlackSocketTransport(
     // arrival — without it a click that never arrives (Slack interactivity
     // off) and a click that dies hub-side are indistinguishable.
     if (onInteractive === undefined) {
-      logger?.warn?.(
-        "slack interactive click dropped (no approval seam wired)",
-        {
-          envelopeId: envelope.envelope_id,
-        },
-      );
+      logger?.warn?.("slack interactive click dropped (no approval seam wired)", {
+        envelopeId: envelope.envelope_id,
+      });
       return;
     }
     if (rememberEnvelope(envelope.envelope_id)) {
@@ -354,8 +324,7 @@ export function createSlackSocketTransport(
       // lifetime is over, so tear down the SocketModeClient: its internal
       // auto-reconnect keeps the socket alive across socket closes until
       // disconnected, and would otherwise hold the host process open.
-      const stopClient = (): Promise<void> =>
-        stopSlackSocketClient(client, logger);
+      const stopClient = (): Promise<void> => stopSlackSocketClient(client, logger);
       return runSlackSocketReconnectLoop({
         startSession: async (): Promise<void> => {
           await client.start();

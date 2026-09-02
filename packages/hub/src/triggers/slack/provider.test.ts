@@ -17,11 +17,8 @@ describe("Slack Phase 1 trigger provider", () => {
     const database = createMemoryDatabase();
     const wildcard = configuration();
     wildcard.triggers[0]!.filters.from_users = ["*"];
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      wildcard,
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, wildcard, { organizationId: "org-1" });
     const client = new RecordingSlackClient();
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
@@ -39,11 +36,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("resolves the authored Slack username once before matching", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      usernameConfiguration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, usernameConfiguration(), {
+        organizationId: "org-1",
+      });
     const client = new RecordingSlackClient({ username: "operator" });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
@@ -65,11 +61,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("normalizes typed inputs identically at the provider boundary", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      inputConfiguration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, inputConfiguration(), {
+        organizationId: "org-1",
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -92,11 +87,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("parses typed inputs after a matched command marker", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      inputMarkerConfiguration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, inputMarkerConfiguration(), {
+        organizationId: "org-1",
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -116,11 +110,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("preserves the complete message when the mention is last", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -128,7 +121,9 @@ describe("Slack Phase 1 trigger provider", () => {
     });
     const prompt = "Do the whole thing first <@UBOT>";
 
-    const match = (await provider.match(external(workflow.id, revision.id, { content: prompt })))[0];
+    const match = (
+      await provider.match(external(workflow.id, revision.id, { content: prompt }))
+    )[0];
 
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     assert.equal(match.invocation.prompt, prompt);
@@ -136,11 +131,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("uses exact input filters to select one configured trigger", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      inputFilterFanoutConfiguration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, inputFilterFanoutConfiguration(), {
+        organizationId: "org-1",
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -160,11 +154,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("matches the literal step and preserves the message reply target", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const client = new RecordingSlackClient();
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
@@ -181,13 +174,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("keeps provider reactions idempotent across the durable lifecycle hooks", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      {
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
         organizationId: "org-1",
-      },
-    );
+      });
     const client = new RecordingSlackClient();
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
@@ -210,13 +200,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("keeps a root Slack mention as the reply thread root", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      {
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
         organizationId: "org-1",
-      },
-    );
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -235,13 +222,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("targets Slack failure output at the originating message thread", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      {
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
         organizationId: "org-1",
-      },
-    );
+      });
     const client = new RecordingSlackClient();
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
@@ -265,11 +249,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("propagates terminal Slack reaction and notice failures", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const reactionFailure = new RecordingSlackClient({ failAddReaction: "white_check_mark" });
     const reactionProvider = createSlackTriggerProvider({
       configurationForWorkflow,
@@ -311,13 +294,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("defers routed thread hydration until context materialization", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      {
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
         organizationId: "org-1",
-      },
-    );
+      });
     const client = new RecordingSlackClient({
       threadMessages: Array.from({ length: 55 }, (_, index) => ({
         ts: `1700000000.${String(index + 1).padStart(6, "0")}`,
@@ -376,11 +356,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("exposes thread messages and execution-scoped attachments only through context", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const attachments = createAttachmentCapabilityRegistry({
       database,
       publicBaseUrl: "https://hub.test",
@@ -480,11 +459,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("distinguishes an unavailable Slack thread from an empty hydrated thread", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -530,11 +508,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("marks partially traversed Slack history incomplete", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const client = new RecordingSlackClient({
       threadMessages: [
         {
@@ -570,11 +547,10 @@ describe("Slack Phase 1 trigger provider", () => {
     const messagesPerPage = 100;
     let requests = 0;
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const client = createSlackBotClient({
       tokenForWorkspace: () => Promise.resolve("xoxb-secret"),
       fetch: () => {
@@ -627,11 +603,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("does not require attachment capability during Slack ingestion", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      { organizationId: "org-1" },
-    );
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
+        organizationId: "org-1",
+      });
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,
       botUserIdForWorkspace: () => Promise.resolve("UBOT"),
@@ -662,13 +637,10 @@ describe("Slack Phase 1 trigger provider", () => {
 
   it("does not hydrate an unrouted Slack thread", async () => {
     const database = createMemoryDatabase();
-    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
-      database,
-      configuration(),
-      {
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(database, configuration(), {
         organizationId: "org-1",
-      },
-    );
+      });
     const client = new RecordingSlackClient();
     const provider = createSlackTriggerProvider({
       configurationForWorkflow,

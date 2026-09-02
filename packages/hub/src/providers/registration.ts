@@ -1,12 +1,6 @@
-import type {
-  ConnectionResolutionContext,
-  ConnectionResolver,
-} from "../config/connections.js";
+import type { ConnectionResolutionContext } from "../config/connections.js";
 import type { OrganizationConnectionUsage } from "../db/types.js";
-import type {
-  OutputExecutor,
-  OutputToolDefinition,
-} from "../execution-capabilities/outputs.js";
+import type { OutputExecutor, OutputToolDefinition } from "../execution-capabilities/outputs.js";
 import type { TriggerProvider, TriggerSource } from "../triggers/index.js";
 import type { GitHubConfigurationProvider } from "../configuration/github-sync.js";
 import type {
