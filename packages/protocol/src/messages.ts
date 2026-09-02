@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TerminalActivitySchema } from "./terminal-activity.js";
 import { CLIENT_CAPS } from "./client-capabilities.js";
+import { MutableManagedAccessConfigSchema } from "./managed-access.js";
 import { AGENT_LIFECYCLE_STATUSES } from "./agent-lifecycle.js";
 import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "./agent-title-limits.js";
 import { AgentProviderSchema } from "./provider-manifest.js";
@@ -236,6 +237,7 @@ export const MutableDaemonConfigSchema = z
     app: z.object({ baseUrl: z.string() }).optional(),
     catalogRefreshTimeoutMs: z.number().int().positive().optional(),
     browserTools: MutableBrowserToolsConfigSchema.default({ enabled: false }),
+    managedAccess: MutableManagedAccessConfigSchema.default({ mode: "off" }),
     providers: z.record(z.string(), MutableDaemonProviderConfigSchema).default({}),
     metadataGeneration: MutableMetadataGenerationConfigSchema.default({ providers: [] }),
     autoArchiveAfterMerge: z.boolean().default(false),
@@ -254,6 +256,7 @@ export const MutableDaemonConfigPatchSchema = z
     relay: MutableRelayConfigSchema.partial().optional(),
     mcp: z.object({ injectIntoAgents: z.boolean().optional() }).passthrough().optional(),
     browserTools: MutableBrowserToolsConfigSchema.partial().optional(),
+    managedAccess: MutableManagedAccessConfigSchema.partial().optional(),
     providers: z
       .record(z.string(), MutableDaemonProviderConfigSchema.partial().passthrough())
       .optional(),
@@ -3400,6 +3403,9 @@ export const ServerInfoStatusPayloadSchema = z
         pluginLogs: z.boolean().optional(),
         // COMPAT(pluginGitManagement): added in v0.7.0, remove gate after 2027-08-26.
         pluginGitManagement: z.boolean().optional(),
+        // COMPAT(clisbotManagedAccess): diagnostic only. Managed Host metadata
+        // decides whether a ticket is needed before the first hello.
+        managedAccessTickets: z.boolean().optional(),
         // COMPAT(pluginThemes): added in v0.5.0, remove gate after 2027-08-20.
         // A daemon that predates this flag keeps `addTheme` in the server bundle it compiles,
         // so a theme plugin cannot start there at all.
@@ -6970,6 +6976,9 @@ export const WSHelloMessageSchema = z.object({
   clientType: z.enum(["mobile", "browser", "cli", "mcp", "hub"]),
   protocolVersion: z.number().int(),
   appVersion: z.string().optional(),
+  // COMPAT(clisbotManagedAccess): optional so ordinary Paseo peers retain the
+  // existing hello contract when managed access is disabled.
+  accessTicket: z.string().min(1).optional(),
   capabilities: z
     .object({
       voice: z.boolean().optional(),

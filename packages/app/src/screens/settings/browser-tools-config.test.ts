@@ -12,6 +12,7 @@ function makeConfig(browserToolsEnabled = false): MutableDaemonConfig {
     relay: { enabled: false },
     mcp: { injectIntoAgents: false },
     browserTools: { enabled: browserToolsEnabled },
+    managedAccess: { mode: "off" },
     providers: {},
     metadataGeneration: { providers: [] },
     autoArchiveAfterMerge: false,

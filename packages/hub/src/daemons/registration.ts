@@ -170,7 +170,7 @@ export async function updateDaemonPermissions(
   database: Database,
   registry: ActiveDaemonRegistry,
 ): Promise<Response> {
-  const daemon = await authenticatedDaemon(request, id, database);
+  const daemon = await authenticateDaemonRequest(request, id, database);
   if (daemon instanceof Response) return daemon;
   const input = permissionsBody.safeParse(await parsedJson(request, "daemon.permissions.parse"));
   if (!input.success) return Response.json({ error: "invalid permissions" }, { status: 400 });
@@ -187,7 +187,7 @@ export async function revokeDaemon(
   database: Database,
   registry: ActiveDaemonRegistry,
 ): Promise<Response> {
-  const daemon = await authenticatedDaemon(request, id, database);
+  const daemon = await authenticateDaemonRequest(request, id, database);
   if (daemon instanceof Response) return daemon;
   await database.revokeDaemon(id);
   await registry.revoke(daemon);
@@ -198,7 +198,8 @@ function verifier(value: string): string {
   return createHash("sha256").update(value).digest("base64url");
 }
 
-async function authenticatedDaemon(
+/** Authenticate a daemon-owned HTTP operation with its enrolled rotating credential. */
+export async function authenticateDaemonRequest(
   request: Request,
   id: string,
   database: Database,

@@ -228,11 +228,29 @@ function createServer(options?: {
   speechReadiness?: SpeechReadinessSnapshot | null;
   logger?: ReturnType<typeof createLogger>;
   startPaused?: boolean;
+  managedAccess?: {
+    mode: "off" | "external";
+    resolver?: {
+      resolve: (input: {
+        accessTicket: string;
+        clientId: string;
+        transport: "direct" | "relay";
+        peer: "loopback" | "external";
+      }) => Promise<{
+        principalId: string;
+        permissions: readonly (typeof DAEMON_PERMISSIONS)[number][];
+        resourceMode: "daemon" | "projects";
+        projects: ReadonlyMap<string, never>;
+        leaseExpiresAt: number;
+      }>;
+    };
+  };
 }) {
   const speechReadiness = options?.speechReadiness ?? null;
   const daemonConfigStore = {
     onApply: vi.fn(() => () => {}),
     onChange: vi.fn(() => () => {}),
+    onFieldChange: vi.fn(() => () => {}),
   };
   const logger = options?.logger ?? createLogger();
   return new VoiceAssistantWebSocketServer(
@@ -256,7 +274,11 @@ function createServer(options?: {
     "/tmp/paseo-test",
     createStub<DaemonConfigStore>(daemonConfigStore),
     null,
-    { allowedOrigins: new Set(), startPaused: options?.startPaused },
+    {
+      allowedOrigins: new Set(),
+      startPaused: options?.startPaused,
+      ...(options?.managedAccess === undefined ? {} : { managedAccess: options.managedAccess }),
+    },
     createWorkspaceAutoNameStub(),
     undefined,
     speechReadiness
@@ -380,7 +402,7 @@ function createDownloadInProgressSpeechReadinessSnapshot(): SpeechReadinessSnaps
 
 function createHelloMessage(
   clientId: string,
-  options?: { capabilities?: Record<string, boolean> },
+  options?: { capabilities?: Record<string, boolean>; accessTicket?: string },
 ) {
   return {
     type: "hello" as const,
@@ -388,6 +410,7 @@ function createHelloMessage(
     clientType: "cli" as const,
     protocolVersion: 1,
     ...(options?.capabilities ? { capabilities: options.capabilities } : {}),
+    ...(options?.accessTicket ? { accessTicket: options.accessTicket } : {}),
   };
 }
 
@@ -541,6 +564,72 @@ describe("relay external socket reconnect behavior", () => {
 
     expect(socket.readyState).toBe(3);
     expect(sessionMock.instances).toHaveLength(0);
+    await server.close();
+  });
+
+  test("external mode requires a ticket for relay and loopback TCP before session creation", async () => {
+    const resolver = vi.fn();
+    const server = createServer({
+      managedAccess: { mode: "external", resolver: { resolve: resolver } },
+    });
+    const relaySocket = new MockSocket();
+    const directSocket = new MockSocket();
+
+    await server.attachExternalSocket(relaySocket, { transport: "relay" });
+    relaySocket.emit("message", JSON.stringify(createHelloMessage("relay-client")));
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      directSocket,
+      createDirectRequest(),
+    );
+    directSocket.emit("message", JSON.stringify(createHelloMessage("direct-client")));
+
+    await vi.waitFor(() => {
+      expect(relaySocket.readyState).toBe(3);
+      expect(directSocket.readyState).toBe(3);
+    });
+    expect(resolver).not.toHaveBeenCalled();
+    expect(sessionMock.instances).toHaveLength(0);
+    await server.close();
+  });
+
+  test("external mode binds the Hub-resolved admission before returning server info", async () => {
+    const resolver = vi.fn(async () => ({
+      principalId: "member:user-1",
+      permissions: ["workspace.read" as const],
+      resourceMode: "projects" as const,
+      projects: new Map<string, never>(),
+      leaseExpiresAt: Date.now() + 60_000,
+    }));
+    const server = createServer({
+      managedAccess: { mode: "external", resolver: { resolve: resolver } },
+    });
+    const socket = new MockSocket();
+
+    await server.attachExternalSocket(
+      socket,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", { accessTicket: "paseo_dat_ticket" }),
+    );
+
+    expect(resolver).toHaveBeenCalledWith({
+      accessTicket: "paseo_dat_ticket",
+      clientId: "managed-client",
+      transport: "relay",
+      peer: "external",
+    });
+    expect(sessionMock.instances).toHaveLength(1);
+    expect(sessionMock.instances[0]?.args).toMatchObject({
+      permissions: ["workspace.read"],
+      resourceAuthorization: {
+        resourceMode: "projects",
+        leaseExpiresAt: expect.any(Number),
+      },
+    });
+    const serverInfo = parseServerInfoStatusPayload(
+      parseSentEnvelope(socket.sent[0]).message?.payload,
+    );
+    expect(serverInfo?.features?.managedAccessTickets).toBe(true);
     await server.close();
   });
 

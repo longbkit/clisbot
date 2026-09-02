@@ -76,6 +76,27 @@ describe("wire schema compatibility", () => {
     ]);
   });
 
+  test("hello keeps legacy clients valid and accepts an optional access ticket", () => {
+    expect(
+      WSHelloMessageSchema.parse({
+        type: "hello",
+        clientId: "managed-client",
+        clientType: "mobile",
+        protocolVersion: 1,
+        accessTicket: "paseo_dat_example",
+      }),
+    ).toMatchObject({ accessTicket: "paseo_dat_example" });
+
+    expect(
+      WSHelloMessageSchema.parse({
+        type: "hello",
+        clientId: "ordinary-client",
+        clientType: "mobile",
+        protocolVersion: 1,
+      }),
+    ).not.toHaveProperty("accessTicket");
+  });
+
   test("timeline replacement invalidation is opt-in and carries no timeline rows", () => {
     expect(
       WSHelloMessageSchema.parse({

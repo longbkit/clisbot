@@ -34,7 +34,9 @@ export function paseoOrganizationPlugin() {
   return organization({
     creatorRole: ORGANIZATION_ROLES[0],
     dynamicAccessControl: { enabled: false },
-    teams: { enabled: false },
+    // Team is the reusable member directory for access assignment subjects. BetterAuth owns
+    // Team CRUD/membership; resource privileges deliberately remain a separate Hub policy.
+    teams: { enabled: true },
   });
 }
 

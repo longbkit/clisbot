@@ -12,6 +12,7 @@ import {
   type DaemonPermission,
 } from "../authorization/index.js";
 import type { HubExecutionAgents } from "./daemon-executions.js";
+import type { ManagedAccessAdmission } from "../managed-access/types.js";
 import type {
   HubRelationshipRemote,
   HubSocketConnection,
@@ -140,6 +141,10 @@ export interface HubRelationshipManagement {
     revoke: readonly string[];
   }): Promise<HubRelationshipStatus>;
   status(): HubRelationshipStatus;
+  consumeAccessTicket(input: {
+    accessTicket: string;
+    clientId: string;
+  }): Promise<ManagedAccessAdmission>;
   disconnect(input: {
     force: boolean;
   }): Promise<{ status: HubRelationshipStatus; warning?: string }>;
@@ -352,6 +357,22 @@ export class HubRelationshipController implements HubRelationshipManagement {
     this.persist(this.record);
     this.options.updateAttachedPermissions(hubPrincipalId(this.record), permissions);
     return this.status();
+  }
+
+  async consumeAccessTicket(input: {
+    accessTicket: string;
+    clientId: string;
+  }): Promise<ManagedAccessAdmission> {
+    if (!this.record || this.record.state !== "active") {
+      throw new Error("This daemon is not connected to a Hub");
+    }
+    return this.options.remote.consumeAccessTicket({
+      daemonId: this.record.relationship.daemonId,
+      hubOrigin: this.record.relationship.hubOrigin,
+      credential: this.record.credential.secret,
+      accessTicket: input.accessTicket,
+      clientId: input.clientId,
+    });
   }
 
   async disconnect(input: {

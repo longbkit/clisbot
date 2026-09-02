@@ -245,6 +245,7 @@ import {
 import { archiveByScope, type ActiveWorkspaceRef } from "./workspace-archive-service.js";
 import { WorkspaceSetupRuntime } from "./workspace-setup-runtime.js";
 import { SessionAuthorization, type DaemonPermission } from "./authorization/index.js";
+import type { SessionResourceAuthorization } from "./managed-access/types.js";
 
 function resolveWorkspaceSetupRuntime(
   runtime: WorkspaceSetupRuntime | undefined,
@@ -436,6 +437,7 @@ type AgentMcpTransportFactory = () => Promise<unknown>;
 export interface SessionOptions {
   clientId: string;
   permissions: readonly DaemonPermission[];
+  resourceAuthorization?: SessionResourceAuthorization;
   appVersion?: string | null;
   clientCapabilities?: Record<string, unknown> | null;
   onMessage: (msg: SessionOutboundMessage) => void;
@@ -743,6 +745,7 @@ export class Session {
     const {
       clientId,
       permissions,
+      resourceAuthorization,
       appVersion,
       clientCapabilities,
       onMessage,
@@ -797,7 +800,7 @@ export class Session {
       getWebSocketRuntimeMetrics,
     } = options;
     this.clientId = clientId;
-    this.authorization = new SessionAuthorization(permissions);
+    this.authorization = new SessionAuthorization(permissions, resourceAuthorization);
     this.appVersion = appVersion ?? null;
     this.clientCapabilities = parseClientCapabilities(clientCapabilities);
     this.sessionId = uuidv4();

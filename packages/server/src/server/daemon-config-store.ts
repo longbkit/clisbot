@@ -20,6 +20,7 @@ interface SupportedMutableConfigPatch {
   relay?: { enabled?: boolean };
   mcp?: { injectIntoAgents?: boolean };
   browserTools?: { enabled?: boolean };
+  managedAccess?: { mode?: import("@getpaseo/protocol/managed-access").ManagedAccessMode };
   providers?: MutableDaemonConfig["providers"];
   removeProviders?: string[];
   metadataGeneration?: MutableDaemonConfig["metadataGeneration"];
@@ -173,6 +174,7 @@ const RELOADABLE_PATHS = [
   "daemon.mcp.enabled",
   "daemon.mcp.injectIntoAgents",
   "daemon.browserTools.enabled",
+  "daemon.managedAccess.mode",
   "daemon.hostnames",
   "daemon.cors.allowedOrigins",
   "daemon.trustedProxies",
@@ -196,6 +198,7 @@ const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["daemon.mcp.enabled", "mcp.enabled"],
   ["daemon.mcp.injectIntoAgents", "mcp.injectIntoAgents"],
   ["daemon.browserTools.enabled", "browserTools.enabled"],
+  ["daemon.managedAccess.mode", "managedAccess.mode"],
   ["daemon.hostnames", "hostnames"],
   ["daemon.cors.allowedOrigins", "cors.allowedOrigins"],
   ["daemon.trustedProxies", "trustedProxies"],
@@ -257,6 +260,9 @@ function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMut
       : {}),
     ...(patch.browserTools?.enabled !== undefined
       ? { browserTools: { enabled: patch.browserTools.enabled } }
+      : {}),
+    ...(patch.managedAccess?.mode !== undefined
+      ? { managedAccess: { mode: patch.managedAccess.mode } }
       : {}),
     ...(patch.providers !== undefined ? { providers: patch.providers } : {}),
     ...(patch.removeProviders !== undefined ? { removeProviders: patch.removeProviders } : {}),
@@ -641,6 +647,9 @@ function mergeMutableDaemonPatch(
   }
   if (patch.browserTools?.enabled !== undefined) {
     next.browserTools = { ...next.browserTools, enabled: patch.browserTools.enabled };
+  }
+  if (patch.managedAccess?.mode !== undefined) {
+    next.managedAccess = { mode: patch.managedAccess.mode };
   }
   if (patch.autoArchiveAfterMerge !== undefined) {
     next.autoArchiveAfterMerge = patch.autoArchiveAfterMerge;

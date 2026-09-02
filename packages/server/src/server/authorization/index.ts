@@ -4,6 +4,11 @@ import {
   requiredPermissionForInbound,
   requiredPermissionForOutbound,
 } from "./operation-permissions.js";
+import type {
+  ProjectAuthorization,
+  ProjectPrivilege,
+  SessionResourceAuthorization,
+} from "../managed-access/types.js";
 
 export { DAEMON_PERMISSIONS, type DaemonPermission };
 
@@ -23,9 +28,11 @@ export const OWNER_PERMISSIONS: readonly DaemonPermission[] = DAEMON_PERMISSIONS
 
 export class SessionAuthorization {
   private permissions: ReadonlySet<DaemonPermission>;
+  private readonly resources: SessionResourceAuthorization | null;
 
-  constructor(permissions: readonly DaemonPermission[]) {
+  constructor(permissions: readonly DaemonPermission[], resources?: SessionResourceAuthorization) {
     this.permissions = new Set(permissions);
+    this.resources = resources ?? null;
   }
 
   allowsInbound(message: SessionInboundMessage): boolean {
@@ -46,6 +53,28 @@ export class SessionAuthorization {
 
   allowsPermission(permission: DaemonPermission): boolean {
     return this.permissions.has(permission);
+  }
+
+  isResourceRestricted(): boolean {
+    return this.resources?.resourceMode === "projects";
+  }
+
+  project(projectId: string): ProjectAuthorization | undefined {
+    if (this.resources === null || this.resources.resourceMode === "daemon") {
+      return undefined;
+    }
+    return this.resources.projects.get(projectId);
+  }
+
+  allowsProject(projectId: string, privilege: ProjectPrivilege): boolean {
+    if (this.resources === null || this.resources.resourceMode === "daemon") return true;
+    if (Date.now() >= this.resources.leaseExpiresAt) return false;
+    const project = this.resources.projects.get(projectId);
+    return project?.privileges.has("project.use") === true && project.privileges.has(privilege);
+  }
+
+  leaseExpiresAt(): number | null {
+    return this.resources?.leaseExpiresAt ?? null;
   }
 
   private allows(permission: DaemonPermission | null): boolean {

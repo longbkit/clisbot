@@ -139,6 +139,8 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
     organization: schema.organizations,
     member: schema.members,
     invitation: schema.invitations,
+    team: schema.teams,
+    teamMember: schema.teamMembers,
   };
   const auth = betterAuth({
     baseURL: options.baseURL,

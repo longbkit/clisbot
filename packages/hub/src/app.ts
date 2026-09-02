@@ -61,6 +61,9 @@ import { createPublicOperations } from "./public-operations/index.js";
 import { createDatabasePublicOperationRepository } from "./public-operations/database-adapter.js";
 import type { EntitlementsService } from "./entitlements/service.js";
 import type { ExecutionAuthority } from "./execution-authority/index.js";
+import { AccessStore } from "./access/store.js";
+import { consumeDaemonAccessTicket } from "./managed-access/http.js";
+import { AccessTicketService } from "./managed-access/tickets.js";
 
 export interface HubRuntimeOptions {
   database: Database | null;
@@ -117,6 +120,7 @@ export interface HubOperations {
   handleDaemonEnrollment(request: Request): Promise<Response>;
   handleDaemonRevocation(request: Request, daemonId: string): Promise<Response>;
   handleDaemonPermissionUpdate(request: Request, daemonId: string): Promise<Response>;
+  handleDaemonAccessTicketConsumption(request: Request): Promise<Response>;
   handleCliAuthorizationStart(request: Request): Promise<Response>;
   handleCliAuthorizationPoll(request: Request): Promise<Response>;
   handleCliAuthorizationInspect(request: Request): Promise<Response>;
@@ -208,6 +212,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
           options.browserOrganizationAccess,
           options.publicBaseUrl,
         );
+  const accessTickets = createAccessTicketService(options);
 
   // COMPAT(clisbot-control-plane): one ops holder, built synchronously; the
   // kill-switch and database precedence are applied per request inside it.
@@ -336,6 +341,10 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       options.database === null || daemons === null
         ? databaseUnavailable()
         : updateDaemonPermissions(request, daemonId, options.database, daemons),
+    handleDaemonAccessTicketConsumption: (request) =>
+      options.database === null || accessTickets === null
+        ? databaseUnavailable()
+        : consumeDaemonAccessTicket(request, options.database, accessTickets),
     handleCliAuthorizationStart: (request) =>
       cliAuthorizations === null ? databaseUnavailable() : cliAuthorizations.start(request),
     handleCliAuthorizationPoll: (request) =>
@@ -378,6 +387,11 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
 function createActiveDaemonRegistry(options: HubRuntimeOptions): ActiveDaemonRegistry | null {
   if (options.database === null) return null;
   return new ActiveDaemonRegistry(options.database, options.daemonClock);
+}
+
+function createAccessTicketService(options: HubRuntimeOptions): AccessTicketService | null {
+  if (options.databaseRuntime === undefined) return null;
+  return new AccessTicketService(options.databaseRuntime, new AccessStore(options.databaseRuntime));
 }
 
 function createAppPublicOperations(

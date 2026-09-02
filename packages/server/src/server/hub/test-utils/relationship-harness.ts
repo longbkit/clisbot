@@ -396,6 +396,10 @@ class InMemoryHubRelationships implements HubRelationshipRemote {
     return { permissions: input.permissions.slice() };
   }
 
+  async consumeAccessTicket(): Promise<never> {
+    throw new Error("managed access is not configured in this relationship harness");
+  }
+
   openSocket(input: HubSocketCredentials, events: HubSocketEvents): HubSocketConnection {
     this.socketSnapshots.push(this.captureRelationship());
     const attempt = { input: { ...input }, events, socket: new MemoryHubSocket() };

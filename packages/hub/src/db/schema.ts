@@ -603,6 +603,164 @@ export const daemons = pgTable(
   ],
 );
 
+/** Stable Hub identity for one daemon-local Project advertised in its latest catalog snapshot. */
+export const daemonProjects = pgTable(
+  "daemon_projects",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    daemonId: uuid("daemon_id").notNull(),
+    externalProjectId: text("external_project_id").notNull(),
+    name: text().notNull(),
+    metadata: jsonb().notNull().default({}),
+    available: boolean().default(true).notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("daemon_projects_daemon_external_unique").on(
+      table.daemonId,
+      table.externalProjectId,
+    ),
+    uniqueIndex("daemon_projects_id_organization_unique").on(table.id, table.organizationId),
+    index("daemon_projects_organization_available_idx").on(table.organizationId, table.available),
+    foreignKey({
+      columns: [table.daemonId, table.organizationId],
+      foreignColumns: [daemons.id, daemons.organizationId],
+      name: "daemon_projects_daemon_organization_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
+/** A Hub member mapped to one verified sender identity on an installed Connection. */
+export const channelIdentities = pgTable(
+  "channel_identities",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull(),
+    externalSubjectId: text("external_subject_id").notNull(),
+    displayName: text("display_name"),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_identities_connection_subject_unique").on(
+      table.organizationId,
+      table.connectionId,
+      table.externalSubjectId,
+    ),
+    index("channel_identities_member_idx").on(table.organizationId, table.memberId),
+  ],
+);
+
+/** Additive grants for Member/Team subjects. Organization owners bypass this table. */
+export const accessAssignments = pgTable(
+  "access_assignments",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind").$type<"member" | "team">().notNull(),
+    subjectId: text("subject_id").notNull(),
+    resourceKind: text("resource_kind")
+      .$type<"organization" | "daemon" | "project" | "channel" | "automation">()
+      .notNull(),
+    resourceId: text("resource_id").notNull(),
+    privileges: jsonb().$type<string[]>().notNull(),
+    constraints: jsonb().notNull().default({}),
+    createdByUserId: text("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("access_assignments_subject_resource_unique").on(
+      table.organizationId,
+      table.subjectKind,
+      table.subjectId,
+      table.resourceKind,
+      table.resourceId,
+    ),
+    index("access_assignments_resource_idx").on(
+      table.organizationId,
+      table.resourceKind,
+      table.resourceId,
+    ),
+    check("access_assignments_subject_kind_check", sql`${table.subjectKind} in ('member', 'team')`),
+    check(
+      "access_assignments_resource_kind_check",
+      sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'channel', 'automation')`,
+    ),
+  ],
+);
+
+/** One-use, short-lived opaque credential minted after Hub user authorization. */
+export const daemonAccessTickets = pgTable(
+  "daemon_access_tickets",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    tokenVerifier: text("token_verifier").notNull().unique(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    daemonId: uuid("daemon_id")
+      .notNull()
+      .references(() => daemons.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    membershipId: text("membership_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("daemon_access_tickets_expiry_idx").on(table.expiresAt),
+    index("daemon_access_tickets_member_daemon_idx").on(table.membershipId, table.daemonId),
+  ],
+);
+
+/** Durable revocation handle for an admitted daemon session; expiry remains the hard fallback. */
+export const daemonAccessLeases = pgTable(
+  "daemon_access_leases",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    daemonId: uuid("daemon_id")
+      .notNull()
+      .references(() => daemons.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    membershipId: text("membership_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("daemon_access_leases_member_idx").on(table.organizationId, table.membershipId),
+    index("daemon_access_leases_daemon_expiry_idx").on(table.daemonId, table.expiresAt),
+  ],
+);
+
 export const cliAuthorizations = pgTable(
   "cli_authorizations",
   {
@@ -780,8 +938,12 @@ export const sessions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     activeOrganizationId: text("active_organization_id"),
+    activeTeamId: text("active_team_id"),
   },
-  (table) => [index("sessions_active_organization_id_idx").on(table.activeOrganizationId)],
+  (table) => [
+    index("sessions_active_organization_id_idx").on(table.activeOrganizationId),
+    index("sessions_active_team_id_idx").on(table.activeTeamId),
+  ],
 );
 
 export const accounts = pgTable("account", {
@@ -823,6 +985,21 @@ export const organizations = pgTable("organization", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   metadata: text(),
 });
+
+/** BetterAuth's organization-team directory. Resource grants remain in access_assignments. */
+export const teams = pgTable(
+  "team",
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
+  },
+  (table) => [index("teams_organization_id_idx").on(table.organizationId)],
+);
 
 export const organizationConnectionAttempts = pgTable(
   "organization_connection_attempts",
@@ -1156,6 +1333,25 @@ export const members = pgTable(
   ],
 );
 
+/** BetterAuth team membership; a user may belong to multiple teams. */
+export const teamMembers = pgTable(
+  "teamMember",
+  {
+    id: text().primaryKey(),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("team_members_team_user_unique").on(table.teamId, table.userId),
+    index("team_members_user_id_idx").on(table.userId),
+  ],
+);
+
 export const invitations = pgTable(
   "invitation",
   {
@@ -1170,6 +1366,7 @@ export const invitations = pgTable(
     inviterId: text("inviter_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    teamId: text("team_id").references(() => teams.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

@@ -99,12 +99,17 @@ function createMockTransport() {
   return {
     transport,
     sent,
-    triggerOpen: (options?: { preserveSent?: boolean; features?: Record<string, boolean> }) => {
+    triggerOpen: (options?: {
+      preserveSent?: boolean;
+      features?: Record<string, boolean>;
+      deferServerInfo?: boolean;
+    }) => {
       onOpen();
       if (!options?.preserveSent) {
         // Ignore HELLO handshake payloads in assertions.
         sent.length = 0;
       }
+      if (options?.deferServerInfo) return;
       onMessage(
         JSON.stringify({
           type: "session",
@@ -292,6 +297,41 @@ test("advertises consumer-provided browser automation capabilities", async () =>
     supportedCommands: [...BROWSER_AUTOMATION_COMMAND_NAMES],
     hostKind: "desktop app",
   });
+});
+
+test("resolves an access ticket only after transport open and includes it in hello", async () => {
+  const mock = createMockTransport();
+  const resolveAccessTicket = vi.fn(async () => "paseo_dat_ticket");
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "managed_access_unit_test",
+    transportFactory: () => mock.transport,
+    reconnect: { enabled: false },
+    resolveAccessTicket,
+  });
+  clients.push(client);
+
+  const connecting = client.connect();
+  expect(resolveAccessTicket).not.toHaveBeenCalled();
+  mock.triggerOpen({ preserveSent: true, deferServerInfo: true });
+  await vi.waitFor(() => expect(mock.sent).toHaveLength(1));
+
+  expect(resolveAccessTicket).toHaveBeenCalledOnce();
+  expect(JSON.parse(assertStr(mock.sent[0]))).toMatchObject({
+    type: "hello",
+    clientId: "managed_access_unit_test",
+    accessTicket: "paseo_dat_ticket",
+  });
+  mock.triggerMessage(
+    JSON.stringify({
+      type: "session",
+      message: {
+        type: "status",
+        payload: { status: "server_info", serverId: "server-1" },
+      },
+    }),
+  );
+  await connecting;
 });
 
 test("Hub management requires daemon support before dispatching requests", async () => {

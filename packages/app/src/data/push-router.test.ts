@@ -38,6 +38,7 @@ const daemonConfig: MutableDaemonConfig = {
   relay: { enabled: false },
   mcp: { injectIntoAgents: true },
   browserTools: { enabled: false },
+  managedAccess: { mode: "off" },
   providers: {},
   metadataGeneration: { providers: [] },
   autoArchiveAfterMerge: false,

@@ -332,6 +332,11 @@ export interface DaemonClientConfig {
   runtimeMetricsWindowMs?: number;
   trace?: DaemonClientTrace;
   capabilities?: Partial<Record<ClientCapability, unknown>>;
+  /**
+   * Resolve a one-use credential after the physical transport opens and before
+   * hello is sent. Omit for ordinary Paseo trust and upstream compatibility.
+   */
+  resolveAccessTicket?: () => Promise<string>;
 }
 
 export interface DaemonClientTrace {
@@ -1266,7 +1271,7 @@ export class DaemonClient {
             this.pendingGenericTransportErrorTimeout = null;
           }
           this.lastErrorValue = null;
-          this.sendHelloMessage();
+          void this.sendHelloMessage(transport);
         }),
         transport.onClose((event) => {
           this.resetConnectTimeout();
@@ -5601,8 +5606,8 @@ export class DaemonClient {
     return this.config.url;
   }
 
-  private sendHelloMessage(): void {
-    if (!this.transport) {
+  private async sendHelloMessage(openTransport: DaemonTransport): Promise<void> {
+    if (!this.transport || this.transport !== openTransport) {
       this.scheduleReconnect({
         reason: "Transport unavailable before hello",
         event: "HELLO_TRANSPORT_MISSING",
@@ -5612,6 +5617,15 @@ export class DaemonClient {
     }
 
     try {
+      const accessTicket = this.config.resolveAccessTicket
+        ? await this.config.resolveAccessTicket()
+        : undefined;
+      if (this.transport !== openTransport || this.connectionState.status !== "connecting") {
+        return;
+      }
+      if (accessTicket !== undefined && accessTicket.length === 0) {
+        throw new Error("Access ticket resolver returned an empty credential");
+      }
       this.sendJsonMessage("hello", "hello", {
         type: "hello",
         clientId: this.config.clientId,
@@ -5627,6 +5641,7 @@ export class DaemonClient {
           ...this.config.capabilities,
         },
         ...(this.config.appVersion ? { appVersion: this.config.appVersion } : {}),
+        ...(accessTicket === undefined ? {} : { accessTicket }),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to send hello message";

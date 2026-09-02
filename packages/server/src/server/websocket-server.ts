@@ -109,6 +109,12 @@ import {
   sendBoundedPhysicalFrame,
   sendBoundedPhysicalFrameAndWait,
 } from "./websocket/physical-socket.js";
+import type {
+  ManagedAccessAdmissionResolver,
+  ManagedAccessMode,
+  ProjectAuthorization,
+  SessionResourceAuthorization,
+} from "./managed-access/types.js";
 
 const WS_CLOSE_DAEMON_AUTH_FAILED = 4401;
 
@@ -122,6 +128,9 @@ export interface ExternalSocketMetadata {
 export interface SessionAdmission {
   principalId: string;
   permissions: readonly DaemonPermission[];
+  projects?: ReadonlyMap<string, ProjectAuthorization>;
+  resourceMode?: "daemon" | "projects";
+  leaseExpiresAt?: number;
   hubExecutionAgents?: HubExecutionAgents;
 }
 
@@ -130,6 +139,7 @@ interface PendingConnection {
   helloTimeout: ReturnType<typeof setTimeout> | null;
   identity: WebSocketConnectionIdentity;
   admission: SessionAdmission;
+  helloInFlight: boolean;
 }
 
 interface WebSocketConnectionIdentity {
@@ -156,6 +166,20 @@ interface WebSocketServerConfig {
   daemonStatusRpc?: boolean;
   relayConfig?: boolean;
   startPaused?: boolean;
+  managedAccess?: {
+    mode: ManagedAccessMode;
+    resolver?: ManagedAccessAdmissionResolver;
+  };
+}
+
+function resolveManagedAccessConfig(
+  configured: WebSocketServerConfig["managedAccess"],
+): NonNullable<WebSocketServerConfig["managedAccess"]> {
+  const managedAccess = configured ?? { mode: "off" as const };
+  if (managedAccess.mode === "external" && managedAccess.resolver === undefined) {
+    throw new Error("Managed access external mode requires an admission resolver");
+  }
+  return managedAccess;
 }
 
 type WebSocketRuntimeMetrics = SessionRuntimeMetrics & CheckoutDiffMetrics;
@@ -471,6 +495,7 @@ interface SocketSessionOptions {
   appVersion: string | null;
   clientCapabilities: Record<string, unknown> | null;
   permissions: readonly DaemonPermission[];
+  resourceAuthorization?: SessionResourceAuthorization;
   connectionLogger: pino.Logger;
   onMessage: (message: SessionOutboundMessage) => void;
   onMessageToSource?: (source: object, message: SessionOutboundMessage) => void;
@@ -600,6 +625,7 @@ export class VoiceAssistantWebSocketServer {
   private readonly directorySync = new DirectorySyncService();
   private readonly pluginRuntime: SessionOptions["pluginRuntime"];
   private readonly orchestrationSkills: SessionOptions["orchestrationSkills"];
+  private managedAccess: NonNullable<WebSocketServerConfig["managedAccess"]>;
 
   constructor(
     server: HTTPServer,
@@ -663,6 +689,7 @@ export class VoiceAssistantWebSocketServer {
     this.hubRelationships = hubRelationships ?? null;
     this.pluginRuntime = pluginRuntime;
     this.orchestrationSkills = orchestrationSkills;
+    this.managedAccess = resolveManagedAccessConfig(wsConfig.managedAccess);
     this.agentManager = agentManager;
     this.agentStorage = agentStorage;
     this.projectRegistry = projectRegistry ?? createNoopProjectRegistry();
@@ -711,11 +738,23 @@ export class VoiceAssistantWebSocketServer {
       providerSnapshotManager: this.providerSnapshotManager,
       updateProviderRegistry: (state) => this.agentManager.updateProviderRegistry(state),
     });
+    const unsubscribeManagedAccess = this.daemonConfigStore.onFieldChange(
+      "managedAccess.mode",
+      (value) => {
+        if (value === "off" || value === "external") {
+          if (value === "external" && this.managedAccess.resolver === undefined) {
+            throw new Error("Managed access external mode requires an admission resolver");
+          }
+          this.managedAccess = { ...this.managedAccess, mode: value };
+        }
+      },
+    );
     const unsubscribeChange = this.daemonConfigStore.onChange((config) => {
       this.broadcastDaemonConfigChanged(config);
     });
     this.unsubscribeDaemonConfigChange = () => {
       unsubscribeProviderConfig();
+      unsubscribeManagedAccess();
       unsubscribeChange();
     };
 
@@ -1262,6 +1301,7 @@ export class VoiceAssistantWebSocketServer {
       helloTimeout: null,
       identity,
       admission,
+      helloInFlight: false,
     };
     const timeout = setTimeout(() => {
       if (this.pendingConnections.get(ws) !== pending) {
@@ -1316,6 +1356,17 @@ export class VoiceAssistantWebSocketServer {
       appVersion,
       clientCapabilities,
       permissions: admission.permissions,
+      ...(admission.resourceMode !== undefined &&
+      admission.projects !== undefined &&
+      admission.leaseExpiresAt !== undefined
+        ? {
+            resourceAuthorization: {
+              resourceMode: admission.resourceMode,
+              projects: admission.projects,
+              leaseExpiresAt: admission.leaseExpiresAt,
+            },
+          }
+        : {}),
       connectionLogger,
       onMessage: (msg) => {
         if (!connection) {
@@ -1388,6 +1439,9 @@ export class VoiceAssistantWebSocketServer {
       appVersion: options.appVersion,
       clientCapabilities: options.clientCapabilities,
       permissions: options.permissions,
+      ...(options.resourceAuthorization === undefined
+        ? {}
+        : { resourceAuthorization: options.resourceAuthorization }),
       onMessage: options.onMessage,
       onMessageToSource: options.onMessageToSource,
       onBinaryMessage: options.onBinaryMessage,
@@ -1532,6 +1586,27 @@ export class VoiceAssistantWebSocketServer {
       return;
     }
 
+    if (this.requiresManagedAccess(pending.identity, pluginId)) {
+      if (pending.helloInFlight) return;
+      pending.helloInFlight = true;
+      void this.admitManagedAccess({ ws, message, pending, clientId }).then((admitted) => {
+        if (!admitted) return;
+        return this.completeHello({ ws, message, pending, clientId, pluginId });
+      });
+      return;
+    }
+    this.completeHello({ ws, message, pending, clientId, pluginId });
+  }
+
+  private completeHello(params: {
+    ws: WebSocketLike;
+    message: WSHelloMessage;
+    pending: PendingConnection;
+    clientId: string;
+    pluginId: string | undefined;
+  }): void {
+    const { ws, message, pending, clientId, pluginId } = params;
+
     this.clearPendingConnection(ws);
     pending.identity.clientId = clientId;
     if (message.appVersion) {
@@ -1570,6 +1645,65 @@ export class VoiceAssistantWebSocketServer {
       },
       "Client connected via hello",
     );
+  }
+
+  private requiresManagedAccess(
+    identity: WebSocketConnectionIdentity,
+    pluginId: string | undefined,
+  ): boolean {
+    return (
+      this.managedAccess.mode === "external" &&
+      pluginId === undefined &&
+      identity.transport !== "hub" &&
+      identity.peer !== "local_ipc"
+    );
+  }
+
+  private async admitManagedAccess(params: {
+    ws: WebSocketLike;
+    message: WSHelloMessage;
+    pending: PendingConnection;
+    clientId: string;
+  }): Promise<boolean> {
+    const { ws, message, pending, clientId } = params;
+    const accessTicket = message.accessTicket;
+    if (accessTicket === undefined) {
+      this.rejectManagedAccess(ws, pending, "Managed access ticket required");
+      return false;
+    }
+    const resolver = this.managedAccess.resolver;
+    if (resolver === undefined) {
+      this.rejectManagedAccess(ws, pending, "Managed access unavailable");
+      return false;
+    }
+    try {
+      const admission = await resolver.resolve({
+        accessTicket,
+        clientId,
+        transport: pending.identity.transport as "direct" | "relay",
+        peer: pending.identity.peer as "loopback" | "external",
+      });
+      if (this.pendingConnections.get(ws) !== pending) return false;
+      pending.admission = admission;
+      return true;
+    } catch (error) {
+      pending.connectionLogger.warn(
+        { err: error },
+        "Rejected hello because managed access admission failed",
+      );
+      this.rejectManagedAccess(ws, pending, "Managed access denied");
+      return false;
+    }
+  }
+
+  private rejectManagedAccess(ws: WebSocketLike, pending: PendingConnection, reason: string): void {
+    this.clearPendingConnection(ws);
+    pending.connectionLogger.warn("Rejected hello by managed access policy");
+    try {
+      ws.close(WS_CLOSE_DAEMON_AUTH_FAILED, reason);
+    } catch {
+      // ignore close errors
+    }
   }
 
   private resumeSession(params: {
@@ -1668,6 +1802,7 @@ export class VoiceAssistantWebSocketServer {
         pluginManagement: true,
         pluginGitManagement: true,
         pluginLogs: true,
+        ...(this.managedAccess.mode === "external" ? { managedAccessTickets: true } : {}),
         // COMPAT(pluginThemes): added in v0.5.0, remove gate after 2027-08-20.
         pluginThemes: true,
         // COMPAT(skillManagement): added in v0.4.0, remove gate after 2027-08-16.

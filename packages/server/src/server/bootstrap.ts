@@ -426,6 +426,7 @@ export interface PaseoDaemonConfig {
   };
   appBaseUrl?: string;
   auth?: DaemonAuthConfig;
+  managedAccessMode?: import("@getpaseo/protocol/managed-access").ManagedAccessMode;
   openai?: PaseoOpenAIConfig;
   speech?: PaseoSpeechConfig;
   voiceLlmProvider?: AgentProvider | null;
@@ -521,6 +522,12 @@ function resolveExpressTrustProxySetting(config: PaseoDaemonConfig): true | stri
   return config.trustedProxies ?? ["loopback"];
 }
 
+function initialManagedAccessConfig(
+  config: PaseoDaemonConfig,
+): MutableDaemonConfig["managedAccess"] {
+  return { mode: config.managedAccessMode ?? "off" };
+}
+
 function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
@@ -548,6 +555,7 @@ function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDae
     appendSystemPrompt: config.appendSystemPrompt ?? "",
     pluginsEnabled: config.pluginsEnabled ?? false,
     plugins: config.plugins ?? {},
+    managedAccess: initialManagedAccessConfig(config),
     skills: { selection: config.skillSelection },
   };
 
@@ -1603,6 +1611,13 @@ export async function createPaseoDaemon(
                 daemonStatusRpc: dependencies.serverFeatureOverrides?.daemonStatusRpc,
                 relayConfig: dependencies.serverFeatureOverrides?.relayConfig,
                 startPaused: true,
+                managedAccess: {
+                  mode: config.managedAccessMode ?? "off",
+                  resolver: {
+                    resolve: ({ accessTicket, clientId }) =>
+                      hubRelationships.consumeAccessTicket({ accessTicket, clientId }),
+                  },
+                },
               },
               workspaceAutoName,
               config.auth,

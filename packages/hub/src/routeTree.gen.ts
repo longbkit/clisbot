@@ -45,6 +45,7 @@ import { Route as ApiIntegrationsLinearCallbackRouteImport } from './routes/api/
 import { Route as ApiIntegrationsGithubSetupRouteImport } from './routes/api/integrations/github/setup'
 import { Route as ApiIntegrationsGithubCallbackRouteImport } from './routes/api/integrations/github/callback'
 import { Route as ApiIntegrationsDiscordCallbackRouteImport } from './routes/api/integrations/discord/callback'
+import { Route as ApiDaemonsAccessTicketsConsumeRouteImport } from './routes/api/daemons/access-tickets/consume'
 import { Route as AgentExecutionsExecutionIdAttachmentsAttachmentIdRouteImport } from './routes/agent-executions/$executionId/attachments/$attachmentId'
 import { Route as ShellOOrganizationSlugTriggersRouteImport } from './routes/_shell/o/$organizationSlug/triggers'
 import { Route as ShellOOrganizationSlugSettingsRouteImport } from './routes/_shell/o/$organizationSlug/settings'
@@ -247,6 +248,12 @@ const ApiIntegrationsDiscordCallbackRoute =
     path: '/api/integrations/discord/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDaemonsAccessTicketsConsumeRoute =
+  ApiDaemonsAccessTicketsConsumeRouteImport.update({
+    id: '/api/daemons/access-tickets/consume',
+    path: '/api/daemons/access-tickets/consume',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute =
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRouteImport.update({
     id: '/agent-executions/$executionId/attachments/$attachmentId',
@@ -358,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsRouteWithChildren
   '/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersRouteWithChildren
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
   '/api/integrations/github/setup': typeof ApiIntegrationsGithubSetupRoute
@@ -406,6 +414,7 @@ export interface FileRoutesByTo {
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
   '/o/$organizationSlug/daemons': typeof ShellOOrganizationSlugDaemonsRoute
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
   '/api/integrations/github/setup': typeof ApiIntegrationsGithubSetupRoute
@@ -458,6 +467,7 @@ export interface FileRoutesById {
   '/_shell/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsRouteWithChildren
   '/_shell/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersRouteWithChildren
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
   '/api/integrations/github/setup': typeof ApiIntegrationsGithubSetupRoute
@@ -510,6 +520,7 @@ export interface FileRouteTypes {
     | '/o/$organizationSlug/settings'
     | '/o/$organizationSlug/triggers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
+    | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
     | '/api/integrations/github/setup'
@@ -558,6 +569,7 @@ export interface FileRouteTypes {
     | '/o/$organizationSlug/connections'
     | '/o/$organizationSlug/daemons'
     | '/agent-executions/$executionId/attachments/$attachmentId'
+    | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
     | '/api/integrations/github/setup'
@@ -609,6 +621,7 @@ export interface FileRouteTypes {
     | '/_shell/o/$organizationSlug/settings'
     | '/_shell/o/$organizationSlug/triggers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
+    | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
     | '/api/integrations/github/setup'
@@ -651,6 +664,7 @@ export interface RootRouteChildren {
   ApiV1UsersRoute: typeof ApiV1UsersRouteWithChildren
   McpChannelTokenRoute: typeof McpChannelTokenRoute
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute: typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  ApiDaemonsAccessTicketsConsumeRoute: typeof ApiDaemonsAccessTicketsConsumeRoute
   ApiIntegrationsDiscordCallbackRoute: typeof ApiIntegrationsDiscordCallbackRoute
   ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
   ApiIntegrationsGithubSetupRoute: typeof ApiIntegrationsGithubSetupRoute
@@ -914,6 +928,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsDiscordCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/daemons/access-tickets/consume': {
+      id: '/api/daemons/access-tickets/consume'
+      path: '/api/daemons/access-tickets/consume'
+      fullPath: '/api/daemons/access-tickets/consume'
+      preLoaderRoute: typeof ApiDaemonsAccessTicketsConsumeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agent-executions/$executionId/attachments/$attachmentId': {
       id: '/agent-executions/$executionId/attachments/$attachmentId'
       path: '/agent-executions/$executionId/attachments/$attachmentId'
@@ -1146,6 +1167,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpChannelTokenRoute: McpChannelTokenRoute,
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute:
     AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute,
+  ApiDaemonsAccessTicketsConsumeRoute: ApiDaemonsAccessTicketsConsumeRoute,
   ApiIntegrationsDiscordCallbackRoute: ApiIntegrationsDiscordCallbackRoute,
   ApiIntegrationsGithubCallbackRoute: ApiIntegrationsGithubCallbackRoute,
   ApiIntegrationsGithubSetupRoute: ApiIntegrationsGithubSetupRoute,

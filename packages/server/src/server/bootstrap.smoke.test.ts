@@ -543,6 +543,9 @@ describe("paseo daemon bootstrap", () => {
       async updatePermissions(input) {
         return { permissions: input.permissions };
       },
+      async consumeAccessTicket() {
+        throw new Error("not used by this smoke test");
+      },
       async revoke(_input: HubRevocation): Promise<void> {},
       openSocket(_input: HubSocketCredentials, _events: HubSocketEvents): HubSocketConnection {
         return { close: () => undefined };

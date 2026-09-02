@@ -631,6 +631,7 @@ export function resolveConfigFromPersisted(
     webUi,
     appBaseUrl,
     auth: resolveAuthConfig(env, persisted),
+    managedAccessMode: persisted.daemon?.managedAccess?.mode ?? "off",
     openai,
     speech,
     voiceLlmProvider: voiceLlm.provider,

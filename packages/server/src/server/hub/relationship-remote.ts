@@ -1,6 +1,8 @@
 import { WebSocket } from "ws";
 import { z } from "zod";
 import type { WebSocketLike } from "../websocket-server.js";
+import { PROJECT_PRIVILEGES, type ManagedAccessAdmission } from "../managed-access/types.js";
+import { parseDaemonPermissions } from "../authorization/index.js";
 
 export interface HubEnrollment {
   daemonId: string;
@@ -39,6 +41,14 @@ export interface HubSocketCredentials {
   credential: string;
 }
 
+export interface HubAccessTicketConsumption {
+  daemonId: string;
+  hubOrigin: string;
+  credential: string;
+  accessTicket: string;
+  clientId: string;
+}
+
 export interface HubSocketEvents {
   connected(socket: WebSocketLike, sessionProtocol: "legacy" | "session-v1"): void;
   rejected(statusCode: 401 | 403): void;
@@ -54,6 +64,7 @@ export interface HubRelationshipRemote {
   enroll(input: HubEnrollment): Promise<HubEnrollmentResult>;
   updatePermissions(input: HubPermissionUpdate): Promise<{ permissions: string[] }>;
   revoke(input: HubRevocation): Promise<void>;
+  consumeAccessTicket(input: HubAccessTicketConsumption): Promise<ManagedAccessAdmission>;
   openSocket(input: HubSocketCredentials, events: HubSocketEvents): HubSocketConnection;
 }
 
@@ -76,6 +87,26 @@ const EnrollmentResultSchema = z.object({
     .refine((value) => new URL(value).hash === "", {
       message: "Hub WebSocket URL cannot include a fragment",
     }),
+});
+
+const AccessTicketAdmissionSchema = z.object({
+  principalId: z.string().min(1),
+  permissions: z.array(z.string()),
+  resourceMode: z.enum(["daemon", "projects"]),
+  projects: z.array(
+    z.object({
+      projectId: z.string().min(1),
+      privileges: z.array(z.enum(PROJECT_PRIVILEGES)),
+      agentConfigurations: z.array(
+        z.object({
+          providerId: z.string().min(1),
+          modelIds: z.union([z.literal("*"), z.array(z.string().min(1))]),
+          thinkingOptionIds: z.union([z.literal("*"), z.array(z.string().min(1))]),
+        }),
+      ),
+    }),
+  ),
+  leaseExpiresAt: z.string().datetime(),
 });
 
 function ensureWebSocketMatchesHubOrigin(hubOrigin: string, webSocketUrl: string): void {
@@ -157,6 +188,38 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       if (!response.ok && ![401, 403, 404].includes(response.status)) {
         throw new Error(`Hub revocation failed (${response.status})`);
       }
+    });
+  }
+
+  async consumeAccessTicket(input: HubAccessTicketConsumption): Promise<ManagedAccessAdmission> {
+    return this.withRequestTimeout(async (signal) => {
+      const response = await fetch(`${input.hubOrigin}/api/daemons/access-tickets/consume`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${input.credential}`,
+          "x-paseo-daemon-id": input.daemonId,
+        },
+        body: JSON.stringify({ accessTicket: input.accessTicket, clientId: input.clientId }),
+        signal,
+      });
+      if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
+      const admission = AccessTicketAdmissionSchema.parse(await response.json());
+      return {
+        principalId: admission.principalId,
+        permissions: parseDaemonPermissions(admission.permissions),
+        resourceMode: admission.resourceMode,
+        projects: new Map(
+          admission.projects.map((project) => [
+            project.projectId,
+            {
+              privileges: new Set(project.privileges),
+              agentConfigurations: project.agentConfigurations,
+            },
+          ]),
+        ),
+        leaseExpiresAt: Date.parse(admission.leaseExpiresAt),
+      };
     });
   }
 
