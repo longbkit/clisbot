@@ -7,7 +7,12 @@ import { afterEach, beforeEach, it } from "vitest";
 import { AccessStore } from "../access/store.js";
 import * as schema from "../db/schema.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "../db/runtime/index.js";
-import { AccessTicketError, AccessTicketService } from "./tickets.js";
+import {
+  AccessTicketError,
+  AccessTicketService,
+  DEFAULT_ACCESS_LEASE_DURATION_MS,
+  readAccessLeaseDuration,
+} from "./tickets.js";
 
 let bundle: DatabaseRuntimeBundle;
 let root: string;
@@ -22,6 +27,13 @@ afterEach(async () => {
   await bundle.runtime.close();
   await rm(root, { recursive: true, force: true });
 }, 30_000);
+
+it("uses a 15 minute lease by default and accepts a bounded minute override", () => {
+  assert.equal(readAccessLeaseDuration(undefined), DEFAULT_ACCESS_LEASE_DURATION_MS);
+  assert.equal(readAccessLeaseDuration("5"), 5 * 60_000);
+  assert.throws(() => readAccessLeaseDuration("0"), /between 1 and 60 minutes/);
+  assert.throws(() => readAccessLeaseDuration("61"), /between 1 and 60 minutes/);
+});
 
 it("keeps owner access implicit and resolves additive Team plus Member project grants", async () => {
   const fixture = await seedAuthority();

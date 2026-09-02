@@ -36,11 +36,11 @@ export class SessionAuthorization {
   }
 
   allowsInbound(message: SessionInboundMessage): boolean {
-    return this.allows(requiredPermissionForInbound(message.type));
+    return this.hasActiveLease() && this.allows(requiredPermissionForInbound(message.type));
   }
 
   allowsOutbound(message: SessionOutboundMessage): boolean {
-    return this.allows(requiredPermissionForOutbound(message.type));
+    return this.hasActiveLease() && this.allows(requiredPermissionForOutbound(message.type));
   }
 
   replacePermissions(permissions: readonly DaemonPermission[]): void {
@@ -67,8 +67,8 @@ export class SessionAuthorization {
   }
 
   allowsProject(projectId: string, privilege: ProjectPrivilege): boolean {
+    if (!this.hasActiveLease()) return false;
     if (this.resources === null || this.resources.resourceMode === "daemon") return true;
-    if (Date.now() >= this.resources.leaseExpiresAt) return false;
     const project = this.resources.projects.get(projectId);
     return project?.privileges.has("project.use") === true && project.privileges.has(privilege);
   }
@@ -77,8 +77,16 @@ export class SessionAuthorization {
     return this.resources?.leaseExpiresAt ?? null;
   }
 
+  leaseId(): string | null {
+    return this.resources?.leaseId ?? null;
+  }
+
   private allows(permission: DaemonPermission | null): boolean {
     return permission === null || this.permissions.has(permission);
+  }
+
+  private hasActiveLease(): boolean {
+    return this.resources === null || Date.now() < this.resources.leaseExpiresAt;
   }
 }
 

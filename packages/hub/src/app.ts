@@ -82,6 +82,8 @@ export interface HubRuntimeOptions {
    * control-plane scope can reach runtime-backed channel state; unused by P0 ops.
    */
   databaseRuntime?: DatabaseRuntime;
+  /** Shared authority instance used by daemon consumption and the app management API. */
+  accessTickets?: AccessTicketService;
   /** COMPAT(clisbot-control-plane): the Hub data directory operator secrets mirror into. */
   hubDataDir?: string;
   /** COMPAT(clisbot-control-plane): the channel supervisor, or null to degrade the transport step. */
@@ -390,6 +392,7 @@ function createActiveDaemonRegistry(options: HubRuntimeOptions): ActiveDaemonReg
 }
 
 function createAccessTicketService(options: HubRuntimeOptions): AccessTicketService | null {
+  if (options.accessTickets !== undefined) return options.accessTickets;
   if (options.databaseRuntime === undefined) return null;
   return new AccessTicketService(options.databaseRuntime, new AccessStore(options.databaseRuntime));
 }

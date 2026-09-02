@@ -232,7 +232,7 @@ function errorResponse(request: Request, error: unknown): Response {
 }
 
 /** A typed 4xx/5xx the handlers throw for their own failure classes. */
-class ControlPlaneHttpError extends Error {
+export class ControlPlaneHttpError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
@@ -540,6 +540,7 @@ export async function deployRevision(
   database: Database,
   snapshot: ChannelControlPlaneSnapshot,
   files: readonly HubBundleFile[],
+  options: { createdByUserId?: string | null; expectedRevisionId?: string | null } = {},
 ): Promise<void> {
   try {
     const candidateResourceFiles = [...files];
@@ -572,7 +573,10 @@ export async function deployRevision(
     organizationId: snapshot.organizationId,
     files: canonical,
     contentHash: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
-    createdByUserId: null,
+    createdByUserId: options.createdByUserId ?? null,
+    ...(options.expectedRevisionId === undefined
+      ? {}
+      : { expectedRevisionId: options.expectedRevisionId }),
   });
 }
 

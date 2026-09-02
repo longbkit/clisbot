@@ -37,6 +37,9 @@ import { runtimeFile } from "./runtime-files.js";
 import { ChannelStore } from "./db/channels.js";
 import type { ChannelReplyServer } from "./channels/channel-reply.js";
 import { resolveHome } from "./channels/daemon/discovery.js";
+import { AccessStore } from "./access/store.js";
+import { AccessTicketService } from "./managed-access/tickets.js";
+import { ManagementApi } from "./management-api/index.js";
 
 export interface ApplicationCompositionOptions {
   database: Database | null;
@@ -53,6 +56,7 @@ export interface ApplicationCompositionOptions {
   providerApplications?: ProviderApplications;
   publicBaseUrl?: string;
   completionTokenSecret?: string;
+  managedAccessLeaseDurationMs?: number;
   testTriggerRoutes?: boolean;
   daemonConnectionForId?: DaemonDispatchLifecycleOptions["connectionForDaemon"];
   /** COMPAT(clisbot-control-plane): exclusive Slack Socket Mode ownership. */
@@ -79,6 +83,18 @@ async function createOwnedApplicationRuntime(
   options: ApplicationCompositionOptions,
   ownership: CompositionResources,
 ): Promise<ApplicationRuntime> {
+  const accessStore =
+    options.databaseRuntime === undefined ? null : new AccessStore(options.databaseRuntime);
+  const accessTickets =
+    options.databaseRuntime === undefined || accessStore === null
+      ? null
+      : new AccessTicketService(
+          options.databaseRuntime,
+          accessStore,
+          options.managedAccessLeaseDurationMs === undefined
+            ? {}
+            : { leaseDurationMs: options.managedAccessLeaseDurationMs },
+        );
   const registrations = options.registrations ?? [];
   const connections = new Map(
     registrations.map((registration) => [registration.connection.name, registration.connection]),
@@ -127,6 +143,7 @@ async function createOwnedApplicationRuntime(
       outputRegistry,
       channelSupervisor,
       channelReplyServer,
+      accessTickets,
     ),
   );
   dispatchChannelWorkflow = (input) => application.hub.dispatchChannelWorkflow(input);
@@ -161,10 +178,12 @@ async function createOwnedApplicationRuntime(
   if (githubConfigurations.length > 1) {
     throw new Error("GitHub configuration registrations must be unique");
   }
+  const managementApi = createManagementApi(options, accessStore, accessTickets, channelSupervisor);
   return {
     hub: application.hub,
     operations: application.operations,
     publicApi: application.publicApi,
+    managementApi,
     resources,
     billing: options.billing,
     providerApplications: providerApplicationsFor(options),
@@ -358,6 +377,31 @@ async function createOwnedApplicationRuntime(
   };
 }
 
+function createManagementApi(
+  options: ApplicationCompositionOptions,
+  accessStore: AccessStore | null,
+  accessTickets: AccessTicketService | null,
+  channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
+): ManagementApi | null {
+  if (
+    options.database === null ||
+    options.databaseRuntime === undefined ||
+    options.auth === null ||
+    accessStore === null ||
+    accessTickets === null
+  ) {
+    return null;
+  }
+  return new ManagementApi({
+    database: options.database,
+    runtime: options.databaseRuntime,
+    auth: options.auth,
+    access: accessStore,
+    tickets: accessTickets,
+    channelSupervisor,
+  });
+}
+
 // COMPAT(clisbot-control-plane): build the channel supervisor at composition
 // time, only when the kill-switch is on and the runtime + data dir are
 // threaded. The factory loads through a literal dynamic import: Vite bundles
@@ -447,9 +491,12 @@ function hubApplicationOptions(
   outputRegistry: OutputExecutorRegistry,
   channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
   channelReplyServer: ChannelReplyServer | null,
+  accessTickets: AccessTicketService | null,
 ): HubRuntimeOptions {
   return {
     database: options.database,
+    ...(options.databaseRuntime === undefined ? {} : { databaseRuntime: options.databaseRuntime }),
+    ...(accessTickets === null ? {} : { accessTickets }),
     entitlements: options.entitlements,
     providerFactories: registrations.flatMap((registration) => registration.triggerProviders),
     ...(executionAuthority === undefined ? {} : { executionAuthority }),

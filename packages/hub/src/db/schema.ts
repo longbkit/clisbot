@@ -647,6 +647,12 @@ export const channelIdentities = pgTable(
     connectionId: text("connection_id").notNull(),
     externalSubjectId: text("external_subject_id").notNull(),
     displayName: text("display_name"),
+    verificationMethod: text("verification_method")
+      .$type<"administrator" | "channel_challenge">()
+      .notNull(),
+    verifiedByUserId: text("verified_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -658,6 +664,10 @@ export const channelIdentities = pgTable(
       table.externalSubjectId,
     ),
     index("channel_identities_member_idx").on(table.organizationId, table.memberId),
+    check(
+      "channel_identities_verification_method_check",
+      sql`${table.verificationMethod} in ('administrator', 'channel_challenge')`,
+    ),
   ],
 );
 

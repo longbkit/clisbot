@@ -31,6 +31,7 @@ export interface ProjectAuthorization {
 export interface SessionResourceAuthorization {
   resourceMode: "daemon" | "projects";
   projects: ReadonlyMap<string, ProjectAuthorization>;
+  leaseId: string;
   leaseExpiresAt: number;
 }
 

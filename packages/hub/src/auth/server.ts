@@ -116,6 +116,18 @@ const RAW_PRODUCT_PATHS = new Set([
   "/api/auth/change-password",
 ]);
 
+/** BetterAuth remains the single owner of Team CRUD and Team membership. */
+const TEAM_AUTH_PATHS = new Set([
+  "/api/auth/organization/create-team",
+  "/api/auth/organization/update-team",
+  "/api/auth/organization/remove-team",
+  "/api/auth/organization/list-teams",
+  "/api/auth/organization/list-user-teams",
+  "/api/auth/organization/list-team-members",
+  "/api/auth/organization/add-team-member",
+  "/api/auth/organization/remove-team-member",
+]);
+
 export function createAuthServer(options: AuthServerOptions): AuthServer {
   const database = options.database.drizzle();
   const policy = options.policy ?? defaultInstanceAuthPolicy();
@@ -242,6 +254,13 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
         );
         if (rejected !== undefined) return Promise.resolve(rejected);
         return changePassword(request);
+      }
+      if (TEAM_AUTH_PATHS.has(path)) {
+        const rejected = rejectCrossOriginCookieMutation(
+          request,
+          requestBrowserOrigin(request, browserOrigin),
+        );
+        return rejected === undefined ? auth.handler(request) : Promise.resolve(rejected);
       }
       if (!RAW_PRODUCT_PATHS.has(path)) {
         return Promise.resolve(Response.json({ error: "not_found" }, { status: 404 }));
@@ -385,7 +404,12 @@ function rejectCrossOriginCookieMutation(
   request: Request,
   browserOrigin: string,
 ): Response | undefined {
-  if (request.method !== "POST" || !request.headers.has("cookie")) return undefined;
+  if (
+    ["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase()) ||
+    !request.headers.has("cookie")
+  ) {
+    return undefined;
+  }
   if (request.headers.get("sec-fetch-site") === "cross-site") {
     return authBoundaryError(
       "Cross-site navigation login blocked. This request appears to be a CSRF attack.",

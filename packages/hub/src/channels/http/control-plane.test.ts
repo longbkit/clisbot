@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "vitest";
 import { createHubApplication, type HubApplication } from "../../app.js";
+import { ChannelConfigurationConflictError } from "../../db/errors.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { Database } from "../../db/types.js";
 import { createUnlimitedEntitlementsService } from "../../entitlements/test-utils.js";
@@ -213,6 +214,24 @@ describe("channel control-plane ops", () => {
       environment: "candidate-env",
       template: null,
     });
+  });
+
+  it("rejects a Channel configuration write based on a stale active revision", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const snapshot = await loadChannelControlPlane(database);
+    assert.ok(snapshot.revision);
+
+    await deployRevision(database, snapshot, snapshot.files, {
+      expectedRevisionId: snapshot.revision.id,
+    });
+
+    await assert.rejects(
+      deployRevision(database, snapshot, snapshot.files, {
+        expectedRevisionId: snapshot.revision.id,
+      }),
+      ChannelConfigurationConflictError,
+    );
   });
 
   it("answers the exact absent-404 when the kill-switch is off, before db or auth", async () => {

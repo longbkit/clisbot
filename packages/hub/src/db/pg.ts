@@ -9,7 +9,11 @@ import {
   entitlementOverridesSchema,
   mergeOverrides,
 } from "../entitlements/catalog.js";
-import { toDatabaseError } from "./errors.js";
+import {
+  ChannelConfigurationConflictError,
+  OrganizationTriggerConflictError,
+  toDatabaseError,
+} from "./errors.js";
 import { withApiKeySerialization } from "./api-key-serialization.js";
 import { ConnectionRepository } from "./connections.js";
 import { ProviderEventAcceptanceRepository } from "./trigger-acceptance.js";
@@ -2971,6 +2975,16 @@ class PgDatabase implements Database {
         input.organizationId,
       ]);
       if (owner.rows[0] === undefined) throw new Error("organization not found");
+      if (input.expectedRevisionId !== undefined) {
+        const active = await client.query<{ active_revision_id: string | null }>(
+          `select active_revision_id from organization_channel_configurations
+           where organization_id = $1`,
+          [input.organizationId],
+        );
+        if ((active.rows[0]?.active_revision_id ?? null) !== input.expectedRevisionId) {
+          throw new ChannelConfigurationConflictError();
+        }
+      }
       const inserted = await client.query<ChannelConfigurationRevisionRow>(
         `insert into channel_configuration_revisions
            (organization_id, version, files, content_hash, created_by_user_id)
@@ -3016,6 +3030,12 @@ class PgDatabase implements Database {
     return this.pool.transaction(async (client) => {
       let trigger: OrganizationTriggerRow;
       if (input.triggerId === undefined) {
+        if (
+          input.expectedActiveRevisionId !== undefined &&
+          input.expectedActiveRevisionId !== null
+        ) {
+          throw new OrganizationTriggerConflictError();
+        }
         const inserted = await client.query<OrganizationTriggerRow>(
           `insert into organization_triggers
              (organization_id, name, enabled, format)
@@ -3024,6 +3044,16 @@ class PgDatabase implements Database {
         );
         trigger = inserted.rows[0]!;
       } else {
+        if (input.expectedActiveRevisionId !== undefined) {
+          const current = await client.query<{ active_revision_id: string | null }>(
+            `select active_revision_id from organization_triggers
+             where id = $1 and organization_id = $2 for update`,
+            [input.triggerId, input.organizationId],
+          );
+          if ((current.rows[0]?.active_revision_id ?? null) !== input.expectedActiveRevisionId) {
+            throw new OrganizationTriggerConflictError();
+          }
+        }
         const updated = await client.query<OrganizationTriggerRow>(
           `update organization_triggers
            set name = $3, enabled = $4, format = $5, updated_at = clock_timestamp()

@@ -16,6 +16,7 @@ import type { TriggerDashboard } from "../triggers/dashboard.js";
 import type { PublicApi } from "../public-api/index.js";
 import type { UsageDashboard } from "../usage/dashboard.js";
 import type { ProviderApplications } from "../provider-applications/index.js";
+import type { ManagementApi } from "../management-api/index.js";
 
 /**
  * The public plan catalog shape is billing's own: `src/billing/public-catalog.ts` decides which
@@ -58,6 +59,7 @@ export interface ApplicationRuntime {
   hub: HubRuntime;
   operations: HubOperations;
   publicApi: PublicApi;
+  managementApi?: ManagementApi | null;
   resources: OrganizationResources | null;
   /** HOSTED only. Null self-hosted; present when the composition root has a billing config. */
   billing: BillingRuntime | null;
@@ -139,6 +141,13 @@ export function getApplication(): Promise<ApplicationRuntime> {
 
 export async function handleAuth(request: Request): Promise<Response> {
   return (await getApplication()).auth(request);
+}
+
+export async function handleManagementApi(request: Request): Promise<Response> {
+  const api = (await getApplication()).managementApi;
+  return api == null
+    ? Response.json({ error: "management_unavailable" }, { status: 503 })
+    : api.handle(request);
 }
 
 export async function handleWebhook(request: Request): Promise<Response> {

@@ -1,0 +1,4 @@
+ALTER TABLE "channel_identities" ADD COLUMN "verification_method" text NOT NULL;--> statement-breakpoint
+ALTER TABLE "channel_identities" ADD COLUMN "verified_by_user_id" text;--> statement-breakpoint
+ALTER TABLE "channel_identities" ADD CONSTRAINT "channel_identities_verified_by_user_id_user_id_fk" FOREIGN KEY ("verified_by_user_id") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "channel_identities" ADD CONSTRAINT "channel_identities_verification_method_check" CHECK ("channel_identities"."verification_method" in ('administrator', 'channel_challenge'));

@@ -241,6 +241,7 @@ function createServer(options?: {
         permissions: readonly (typeof DAEMON_PERMISSIONS)[number][];
         resourceMode: "daemon" | "projects";
         projects: ReadonlyMap<string, never>;
+        leaseId: string;
         leaseExpiresAt: number;
       }>;
     };
@@ -598,6 +599,7 @@ describe("relay external socket reconnect behavior", () => {
       permissions: ["workspace.read" as const],
       resourceMode: "projects" as const,
       projects: new Map<string, never>(),
+      leaseId: "00000000-0000-4000-8000-000000000001",
       leaseExpiresAt: Date.now() + 60_000,
     }));
     const server = createServer({
@@ -623,6 +625,7 @@ describe("relay external socket reconnect behavior", () => {
       permissions: ["workspace.read"],
       resourceAuthorization: {
         resourceMode: "projects",
+        leaseId: "00000000-0000-4000-8000-000000000001",
         leaseExpiresAt: expect.any(Number),
       },
     });

@@ -102,6 +102,18 @@ export interface ResolvedDaemonAccess {
   projects: ResolvedProjectAccess[];
 }
 
+export interface ChannelIdentityRecord {
+  id: string;
+  organizationId: string;
+  memberId: string;
+  connectionId: string;
+  externalSubjectId: string;
+  displayName: string | null;
+  verificationMethod: "administrator" | "channel_challenge";
+  verifiedByUserId: string | null;
+  verifiedAt: Date;
+}
+
 export class AccessPolicyError extends Error {
   constructor(
     readonly code: "invalid_assignment" | "subject_unavailable" | "resource_unavailable",
@@ -179,6 +191,76 @@ export class AccessStore {
         ),
       )
       .returning({ id: schema.accessAssignments.id });
+    return rows.length > 0;
+  }
+
+  listChannelIdentities(organizationId: string): Promise<ChannelIdentityRecord[]> {
+    return this.database
+      .select()
+      .from(schema.channelIdentities)
+      .where(eq(schema.channelIdentities.organizationId, organizationId))
+      .orderBy(
+        asc(schema.channelIdentities.memberId),
+        asc(schema.channelIdentities.connectionId),
+        asc(schema.channelIdentities.externalSubjectId),
+      )
+      .then((rows) => rows.map(toChannelIdentity));
+  }
+
+  async bindChannelIdentity(input: {
+    organizationId: string;
+    memberId: string;
+    connectionId: string;
+    externalSubjectId: string;
+    displayName?: string | null;
+    verificationMethod: "administrator" | "channel_challenge";
+    verifiedByUserId?: string | null;
+    verifiedAt?: Date;
+  }): Promise<ChannelIdentityRecord> {
+    await this.assertSubject(input.organizationId, "member", input.memberId);
+    const verifiedAt = input.verifiedAt ?? new Date();
+    const [row] = await this.database
+      .insert(schema.channelIdentities)
+      .values({
+        organizationId: input.organizationId,
+        memberId: input.memberId,
+        connectionId: input.connectionId,
+        externalSubjectId: input.externalSubjectId,
+        displayName: input.displayName ?? null,
+        verificationMethod: input.verificationMethod,
+        verifiedByUserId: input.verifiedByUserId ?? null,
+        verifiedAt,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.channelIdentities.organizationId,
+          schema.channelIdentities.connectionId,
+          schema.channelIdentities.externalSubjectId,
+        ],
+        set: {
+          memberId: input.memberId,
+          displayName: input.displayName ?? null,
+          verificationMethod: input.verificationMethod,
+          verifiedByUserId: input.verifiedByUserId ?? null,
+          verifiedAt,
+          updatedAt: verifiedAt,
+        },
+      })
+      .returning();
+    if (row === undefined) throw new Error("channel identity write returned no row");
+    return toChannelIdentity(row);
+  }
+
+  async deleteChannelIdentity(organizationId: string, identityId: string): Promise<boolean> {
+    const rows = await this.database
+      .delete(schema.channelIdentities)
+      .where(
+        and(
+          eq(schema.channelIdentities.organizationId, organizationId),
+          eq(schema.channelIdentities.id, identityId),
+        ),
+      )
+      .returning({ id: schema.channelIdentities.id });
     return rows.length > 0;
   }
 
@@ -465,6 +547,22 @@ function toDaemonProject(row: typeof schema.daemonProjects.$inferSelect): Daemon
     metadata: row.metadata,
     available: row.available,
     observedAt: row.observedAt,
+  };
+}
+
+function toChannelIdentity(
+  row: typeof schema.channelIdentities.$inferSelect,
+): ChannelIdentityRecord {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    memberId: row.memberId,
+    connectionId: row.connectionId,
+    externalSubjectId: row.externalSubjectId,
+    displayName: row.displayName,
+    verificationMethod: row.verificationMethod,
+    verifiedByUserId: row.verifiedByUserId,
+    verifiedAt: row.verifiedAt,
   };
 }
 

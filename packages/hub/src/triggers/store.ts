@@ -12,6 +12,7 @@ export interface SaveTriggerInput {
   userId: string | null;
   sourceKind?: "manual" | "github";
   sourceEvidence?: unknown;
+  expectedActiveRevisionId?: string | null;
 }
 
 export class OrganizationTriggerStore {
@@ -57,6 +58,9 @@ export class OrganizationTriggerStore {
       },
       createdByUserId: input.userId,
       routes: prepared.compiled.authored.enabled ? prepared.resolved.routes : [],
+      ...(input.expectedActiveRevisionId === undefined
+        ? {}
+        : { expectedActiveRevisionId: input.expectedActiveRevisionId }),
     });
   }
 

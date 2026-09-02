@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { ChannelConfigurationConflictError, OrganizationTriggerConflictError } from "./errors.js";
 import type { AgentExecutionStatus, MachineStatus } from "./schema.js";
 import type { JsonValue } from "../config/compiler.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
@@ -2457,6 +2458,15 @@ class MemoryDatabase implements Database {
   async saveChannelConfiguration(
     input: SaveChannelConfigurationInput,
   ): Promise<ChannelConfigurationRevisionRecord> {
+    const activeRevisionId = this.activeChannelConfigurationByOrganization.get(
+      input.organizationId,
+    );
+    if (
+      input.expectedRevisionId !== undefined &&
+      (activeRevisionId ?? null) !== input.expectedRevisionId
+    ) {
+      throw new ChannelConfigurationConflictError();
+    }
     const revisionVersion =
       Math.max(
         0,
@@ -2497,6 +2507,12 @@ class MemoryDatabase implements Database {
   ): Promise<OrganizationTriggerRecord> {
     const existing =
       input.triggerId === undefined ? undefined : this.organizationTriggers.get(input.triggerId);
+    if (
+      input.expectedActiveRevisionId !== undefined &&
+      (existing?.activeRevisionId ?? null) !== input.expectedActiveRevisionId
+    ) {
+      throw new OrganizationTriggerConflictError();
+    }
     if (existing !== undefined && existing.organizationId !== input.organizationId) {
       throw new Error("organization trigger not found");
     }

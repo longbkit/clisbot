@@ -50,6 +50,7 @@ import {
   readCredentialCipherEnvironment,
   type CredentialCipher,
 } from "./credentials/credential-cipher.js";
+import { readAccessLeaseDuration } from "./managed-access/tickets.js";
 
 export function startProductionRuntime(): Promise<ApplicationRuntime> {
   return startApplication(createProductionRuntime);
@@ -225,6 +226,9 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       providerApplications,
       publicBaseUrl: identity.appUrl,
       completionTokenSecret: identity.authSecret,
+      managedAccessLeaseDurationMs: readAccessLeaseDuration(
+        process.env["PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION"],
+      ),
       claimSlackInbound,
       close: () => resources.close(),
     });

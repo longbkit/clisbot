@@ -371,6 +371,8 @@ export interface SaveChannelConfigurationInput {
   files: readonly HubBundleFile[];
   contentHash: string;
   createdByUserId: string | null;
+  /** Omitted preserves legacy last-writer behavior; null means no active revision is expected. */
+  expectedRevisionId?: string | null;
 }
 
 export type ConnectionProvider = "github" | "discord" | "slack" | "linear";
@@ -1092,6 +1094,8 @@ export interface SaveOrganizationTriggerInput {
   sourceEvidence: unknown;
   createdByUserId: string | null;
   routes: readonly OrganizationTriggerRoute[];
+  /** Omitted preserves legacy behavior; null means a new Automation is expected. */
+  expectedActiveRevisionId?: string | null;
 }
 
 export interface SwitchProjectConfigurationToManualInput {

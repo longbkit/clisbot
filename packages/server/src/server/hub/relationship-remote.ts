@@ -90,6 +90,7 @@ const EnrollmentResultSchema = z.object({
 });
 
 const AccessTicketAdmissionSchema = z.object({
+  leaseId: z.string().uuid(),
   principalId: z.string().min(1),
   permissions: z.array(z.string()),
   resourceMode: z.enum(["daemon", "projects"]),
@@ -206,6 +207,7 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
       const admission = AccessTicketAdmissionSchema.parse(await response.json());
       return {
+        leaseId: admission.leaseId,
         principalId: admission.principalId,
         permissions: parseDaemonPermissions(admission.permissions),
         resourceMode: admission.resourceMode,

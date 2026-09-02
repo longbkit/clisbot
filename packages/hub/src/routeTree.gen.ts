@@ -38,6 +38,7 @@ import { Route as AgentExecutionsExecutionIdMcpRouteImport } from './routes/agen
 import { Route as ApiV1UsersUsernameRouteImport } from './routes/api/v1/users/$username'
 import { Route as ApiV1CliAuthorizationsPollRouteImport } from './routes/api/v1/cli-authorizations/poll'
 import { Route as ApiV1ChannelsStatusRouteImport } from './routes/api/v1/channels/status'
+import { Route as ApiManagementV1SplatRouteImport } from './routes/api/management/v1/$'
 import { Route as ApiIntegrationsSlackEventsRouteImport } from './routes/api/integrations/slack/events'
 import { Route as ApiIntegrationsSlackCallbackRouteImport } from './routes/api/integrations/slack/callback'
 import { Route as ApiIntegrationsLinearEventsRouteImport } from './routes/api/integrations/linear/events'
@@ -206,6 +207,11 @@ const ApiV1ChannelsStatusRoute = ApiV1ChannelsStatusRouteImport.update({
   path: '/status',
   getParentRoute: () => ApiV1ChannelsRoute,
 } as any)
+const ApiManagementV1SplatRoute = ApiManagementV1SplatRouteImport.update({
+  id: '/api/management/v1/$',
+  path: '/api/management/v1/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIntegrationsSlackEventsRoute =
   ApiIntegrationsSlackEventsRouteImport.update({
     id: '/api/integrations/slack/events',
@@ -373,6 +379,7 @@ export interface FileRoutesByFullPath {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/management/v1/$': typeof ApiManagementV1SplatRoute
   '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
@@ -422,6 +429,7 @@ export interface FileRoutesByTo {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/management/v1/$': typeof ApiManagementV1SplatRoute
   '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
@@ -475,6 +483,7 @@ export interface FileRoutesById {
   '/api/integrations/linear/events': typeof ApiIntegrationsLinearEventsRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/events': typeof ApiIntegrationsSlackEventsRoute
+  '/api/management/v1/$': typeof ApiManagementV1SplatRoute
   '/api/v1/channels/status': typeof ApiV1ChannelsStatusRoute
   '/api/v1/cli-authorizations/poll': typeof ApiV1CliAuthorizationsPollRoute
   '/api/v1/users/$username': typeof ApiV1UsersUsernameRoute
@@ -528,6 +537,7 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/management/v1/$'
     | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
     | '/api/v1/users/$username'
@@ -577,6 +587,7 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/management/v1/$'
     | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
     | '/api/v1/users/$username'
@@ -629,6 +640,7 @@ export interface FileRouteTypes {
     | '/api/integrations/linear/events'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/events'
+    | '/api/management/v1/$'
     | '/api/v1/channels/status'
     | '/api/v1/cli-authorizations/poll'
     | '/api/v1/users/$username'
@@ -672,6 +684,7 @@ export interface RootRouteChildren {
   ApiIntegrationsLinearEventsRoute: typeof ApiIntegrationsLinearEventsRoute
   ApiIntegrationsSlackCallbackRoute: typeof ApiIntegrationsSlackCallbackRoute
   ApiIntegrationsSlackEventsRoute: typeof ApiIntegrationsSlackEventsRoute
+  ApiManagementV1SplatRoute: typeof ApiManagementV1SplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -878,6 +891,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/v1/channels/status'
       preLoaderRoute: typeof ApiV1ChannelsStatusRouteImport
       parentRoute: typeof ApiV1ChannelsRoute
+    }
+    '/api/management/v1/$': {
+      id: '/api/management/v1/$'
+      path: '/api/management/v1/$'
+      fullPath: '/api/management/v1/$'
+      preLoaderRoute: typeof ApiManagementV1SplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/integrations/slack/events': {
       id: '/api/integrations/slack/events'
@@ -1175,6 +1195,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIntegrationsLinearEventsRoute: ApiIntegrationsLinearEventsRoute,
   ApiIntegrationsSlackCallbackRoute: ApiIntegrationsSlackCallbackRoute,
   ApiIntegrationsSlackEventsRoute: ApiIntegrationsSlackEventsRoute,
+  ApiManagementV1SplatRoute: ApiManagementV1SplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

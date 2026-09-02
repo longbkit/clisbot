@@ -101,10 +101,11 @@ export interface ChannelAgentSpecResolverOptions {
 /** Load the organization-owned Channel control plane. An absent revision is a valid empty plane. */
 export async function loadChannelControlPlane(
   database: Database,
+  organizationId?: string,
 ): Promise<ChannelControlPlaneSnapshot> {
-  const organization = await resolveDefaultOrganization(database);
-  const revision = await database.findActiveChannelConfiguration(organization.id);
-  return compileControlPlaneSnapshot(database, organization.id, revision ?? null);
+  const resolvedOrganizationId = organizationId ?? (await resolveDefaultOrganization(database)).id;
+  const revision = await database.findActiveChannelConfiguration(resolvedOrganizationId);
+  return compileControlPlaneSnapshot(database, resolvedOrganizationId, revision ?? null);
 }
 
 /** P0 is single-operator: exactly one provisioned organization. Zero or

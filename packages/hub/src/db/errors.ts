@@ -36,6 +36,20 @@ export class ConnectionAttemptUnavailableError extends Error {
   }
 }
 
+export class ChannelConfigurationConflictError extends Error {
+  constructor() {
+    super("channel configuration changed since it was read");
+    this.name = "ChannelConfigurationConflictError";
+  }
+}
+
+export class OrganizationTriggerConflictError extends Error {
+  constructor() {
+    super("automation changed since it was read");
+    this.name = "OrganizationTriggerConflictError";
+  }
+}
+
 export function isDatabaseUnavailableError(error: unknown): error is DatabaseUnavailableError {
   return error instanceof DatabaseUnavailableError;
 }

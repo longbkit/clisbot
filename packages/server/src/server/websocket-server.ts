@@ -130,6 +130,7 @@ export interface SessionAdmission {
   permissions: readonly DaemonPermission[];
   projects?: ReadonlyMap<string, ProjectAuthorization>;
   resourceMode?: "daemon" | "projects";
+  leaseId?: string;
   leaseExpiresAt?: number;
   hubExecutionAgents?: HubExecutionAgents;
 }
@@ -1358,11 +1359,13 @@ export class VoiceAssistantWebSocketServer {
       permissions: admission.permissions,
       ...(admission.resourceMode !== undefined &&
       admission.projects !== undefined &&
+      admission.leaseId !== undefined &&
       admission.leaseExpiresAt !== undefined
         ? {
             resourceAuthorization: {
               resourceMode: admission.resourceMode,
               projects: admission.projects,
+              leaseId: admission.leaseId,
               leaseExpiresAt: admission.leaseExpiresAt,
             },
           }
