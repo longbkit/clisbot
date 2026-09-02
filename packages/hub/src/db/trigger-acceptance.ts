@@ -52,7 +52,12 @@ export class ProviderEventAcceptanceRepository {
     input: ProviderEventEvidence,
   ): Promise<ProviderEventAcceptance> {
     return this.database.transaction(async (transaction) => {
-      const connection = await findConnection(transaction, provider, externalId);
+      const connection = await findConnection(
+        transaction,
+        provider,
+        externalId,
+        input.providerApplicationId,
+      );
       if (connection === undefined) {
         return { status: "dropped", receiptId: input.deliveryId, reason: `${provider}_unbound` };
       }
@@ -82,44 +87,44 @@ export class ProviderEventAcceptanceRepository {
         return { status: "dropped", receiptId: receipt.id, reason: dropReason };
       }
 
-      const routes = await transaction
+      const workflowRoutes = await transaction
         .select({
-          projectId: schema.projectTriggerRoutes.projectId,
-          revisionId: schema.projectTriggerRoutes.configurationRevisionId,
-          connectionId: schema.projectTriggerRoutes.connectionId,
-          resourceId: schema.projectTriggerRoutes.resourceId,
+          workflowId: schema.organizationTriggerRoutes.triggerId,
+          revisionId: schema.organizationTriggerRoutes.triggerRevisionId,
+          connectionId: schema.organizationTriggerRoutes.connectionId,
+          resourceId: schema.organizationTriggerRoutes.resourceId,
         })
-        .from(schema.projectTriggerRoutes)
+        .from(schema.organizationTriggerRoutes)
         .innerJoin(
-          schema.projects,
+          schema.organizationTriggers,
           and(
-            eq(schema.projects.id, schema.projectTriggerRoutes.projectId),
-            eq(schema.projects.organizationId, connection.organizationId),
-            eq(schema.projects.status, "active"),
+            eq(schema.organizationTriggers.id, schema.organizationTriggerRoutes.triggerId),
+            eq(schema.organizationTriggers.organizationId, connection.organizationId),
             eq(
-              schema.projects.activeConfigurationRevisionId,
-              schema.projectTriggerRoutes.configurationRevisionId,
+              schema.organizationTriggers.activeRevisionId,
+              schema.organizationTriggerRoutes.triggerRevisionId,
             ),
+            eq(schema.organizationTriggers.enabled, true),
           ),
         )
         .where(
           and(
-            eq(schema.projectTriggerRoutes.organizationId, connection.organizationId),
-            eq(schema.projectTriggerRoutes.provider, provider),
-            eq(schema.projectTriggerRoutes.connectionId, connection.id),
+            eq(schema.organizationTriggerRoutes.organizationId, connection.organizationId),
+            eq(schema.organizationTriggerRoutes.provider, provider),
+            eq(schema.organizationTriggerRoutes.connectionId, connection.id),
             or(
-              isNull(schema.projectTriggerRoutes.resourceId),
+              isNull(schema.organizationTriggerRoutes.resourceId),
               eq(
-                schema.projectTriggerRoutes.resourceId,
+                schema.organizationTriggerRoutes.resourceId,
                 resourceId === undefined ? "" : String(resourceId),
               ),
             ),
           ),
         );
 
-      const selectedRoutes = selectFirstRoutePerProject(routes);
-      if (selectedRoutes.length === 0) {
-        const reason = "no_project_route";
+      const selectedWorkflowRoutes = selectFirstRoutePerWorkflow(workflowRoutes);
+      if (selectedWorkflowRoutes.length === 0) {
+        const reason = "no_workflow_route";
         await transaction
           .update(schema.providerEventReceipts)
           .set({ droppedReason: reason })
@@ -127,12 +132,12 @@ export class ProviderEventAcceptanceRepository {
         return { status: "dropped", receiptId: receipt.id, reason };
       }
 
-      const acceptedRoutes: ProviderEventRouteSnapshot[] = selectedRoutes.map((route) => ({
-        projectId: route.projectId,
-        configurationRevisionId: route.revisionId,
-        connectionId: route.connectionId,
-        resourceId: route.resourceId,
-      }));
+      const acceptedRoutes: ProviderEventRouteSnapshot[] = selectedWorkflowRoutes.map((route) => ({
+          workflowId: route.workflowId,
+          configurationRevisionId: route.revisionId,
+          connectionId: route.connectionId,
+          resourceId: route.resourceId,
+        }));
       await transaction
         .update(schema.providerEventReceipts)
         .set({ acceptedRoutes })
@@ -143,7 +148,7 @@ export class ProviderEventAcceptanceRepository {
         events: acceptedRoutes.map((route) => ({
           providerEventReceiptId: receipt.id,
           organizationId: connection.organizationId,
-          projectId: route.projectId,
+          workflowId: route.workflowId,
           configurationRevisionId: route.configurationRevisionId,
           deliveryId: input.deliveryId,
           source: input.source,
@@ -158,6 +163,80 @@ export class ProviderEventAcceptanceRepository {
   }
 
   persistManual(input: PersistManualEventInput): Promise<ManualEventPersistence> {
+    return this.persistInternal(input, "manual");
+  }
+
+  persistChannel(
+    input: import("./types.js").PersistChannelEventInput,
+  ): Promise<ManualEventPersistence> {
+    return this.database.transaction(async (transaction) => {
+      const existing = await findReceipt(transaction, input, input.organizationId);
+      if (existing !== undefined) {
+        const route = parseAcceptedRoutes(existing.acceptedRoutes)?.[0];
+        return route === undefined
+          ? { status: "duplicate", providerEventReceiptId: existing.id }
+          : { status: "accepted", event: eventFromReceipt(existing, route) };
+      }
+      const [workflow] = await transaction
+        .select({ id: schema.organizationTriggers.id })
+        .from(schema.organizationTriggers)
+        .where(
+          and(
+            eq(schema.organizationTriggers.id, input.triggerId),
+            eq(schema.organizationTriggers.organizationId, input.organizationId),
+            eq(schema.organizationTriggers.activeRevisionId, input.triggerRevisionId),
+            eq(schema.organizationTriggers.enabled, true),
+          ),
+        );
+      if (workflow === undefined) {
+        throw new Error("organization workflow runtime is unavailable");
+      }
+      const route: ProviderEventRouteSnapshot = {
+        workflowId: workflow.id,
+        configurationRevisionId: input.triggerRevisionId,
+        connectionId: input.connectionId ?? null,
+        resourceId: input.resourceId ?? null,
+      };
+      const receipt = await claimProviderReceipt(transaction, {
+        organizationId: input.organizationId,
+        provider: "channel",
+        connectionId: null,
+        resourceId: null,
+        input,
+      });
+      if (!receipt.inserted) {
+        const duplicate = await findReceipt(transaction, input, input.organizationId);
+        const duplicateRoute = parseAcceptedRoutes(duplicate?.acceptedRoutes)?.[0];
+        return duplicate === undefined || duplicateRoute === undefined
+          ? { status: "duplicate", providerEventReceiptId: receipt.id }
+          : { status: "accepted", event: eventFromReceipt(duplicate, duplicateRoute) };
+      }
+      await transaction
+        .update(schema.providerEventReceipts)
+        .set({ acceptedRoutes: [route] })
+        .where(eq(schema.providerEventReceipts.id, receipt.id));
+      return {
+        status: "accepted",
+        event: {
+          providerEventReceiptId: receipt.id,
+          organizationId: input.organizationId,
+          workflowId: route.workflowId,
+          configurationRevisionId: route.configurationRevisionId,
+          deliveryId: input.deliveryId,
+          source: input.source,
+          payload: input.payload,
+          receivedAt: input.receivedAt,
+          connectionId: input.connectionId ?? null,
+          resourceId: input.resourceId ?? null,
+        },
+      };
+    });
+  }
+
+  private persistInternal(
+    input: PersistManualEventInput,
+    provider: "manual",
+  ): Promise<ManualEventPersistence> {
     return this.database.transaction(async (transaction) => {
       const existing = await findReceipt(transaction, input, input.organizationId);
       if (existing !== undefined) {
@@ -170,28 +249,29 @@ export class ProviderEventAcceptanceRepository {
           event: eventFromReceipt(existing, route),
         };
       }
-      const [project] = await transaction
-        .select({ configurationRevisionId: schema.projects.activeConfigurationRevisionId })
-        .from(schema.projects)
+      const [workflow] = await transaction
+        .select({ revisionId: schema.organizationTriggers.activeRevisionId })
+        .from(schema.organizationTriggers)
         .where(
           and(
-            eq(schema.projects.id, input.projectId),
-            eq(schema.projects.organizationId, input.organizationId),
-            eq(schema.projects.status, "active"),
+            eq(schema.organizationTriggers.id, input.triggerId),
+            eq(schema.organizationTriggers.organizationId, input.organizationId),
+            eq(schema.organizationTriggers.activeRevisionId, input.triggerRevisionId),
+            eq(schema.organizationTriggers.enabled, true),
           ),
         );
-      if (project?.configurationRevisionId === null || project === undefined) {
-        throw new Error("manual project configuration unavailable");
+      if (workflow === undefined) {
+        throw new Error(`${provider} workflow configuration unavailable`);
       }
       const route: ProviderEventRouteSnapshot = {
-        projectId: input.projectId,
-        configurationRevisionId: project.configurationRevisionId,
+        workflowId: input.triggerId,
+        configurationRevisionId: input.triggerRevisionId,
         connectionId: input.connectionId ?? null,
         resourceId: input.resourceId ?? null,
       };
       const receipt = await claimProviderReceipt(transaction, {
         organizationId: input.organizationId,
-        provider: "manual",
+        provider,
         connectionId: null,
         resourceId: null,
         input,
@@ -213,7 +293,7 @@ export class ProviderEventAcceptanceRepository {
         event: {
           providerEventReceiptId: receipt.id,
           organizationId: input.organizationId,
-          projectId: input.projectId,
+          workflowId: input.triggerId,
           configurationRevisionId: route.configurationRevisionId,
           deliveryId: input.deliveryId,
           source: input.source,
@@ -339,7 +419,7 @@ function eventFromReceipt(
   return {
     providerEventReceiptId: receipt.id,
     organizationId: receipt.organizationId,
-    projectId: route.projectId,
+    workflowId: route.workflowId,
     configurationRevisionId: route.configurationRevisionId,
     deliveryId: receipt.deliveryId,
     source: receipt.source,
@@ -387,7 +467,7 @@ function replayProviderReceipt(
     events: routes.map((route) => ({
       providerEventReceiptId: receipt.id,
       organizationId: receipt.organizationId,
-      projectId: route.projectId,
+      workflowId: route.workflowId,
       configurationRevisionId: route.configurationRevisionId,
       deliveryId: receipt.deliveryId,
       source: receipt.source,
@@ -404,19 +484,19 @@ function parseAcceptedRoutes(value: unknown): ProviderEventRouteSnapshot[] | nul
   if (!Array.isArray(value)) throw new Error("invalid accepted provider routes");
   return value.map((candidate) => {
     if (!isRecord(candidate)) throw new Error("invalid accepted provider route");
-    const projectId = candidate["projectId"];
+    const workflowId = candidate["workflowId"];
     const configurationRevisionId = candidate["configurationRevisionId"];
     const connectionId = candidate["connectionId"];
     const resourceId = candidate["resourceId"];
     if (
-      typeof projectId !== "string" ||
+      typeof workflowId !== "string" ||
       typeof configurationRevisionId !== "string" ||
       (connectionId !== null && typeof connectionId !== "string") ||
       (resourceId !== null && typeof resourceId !== "string")
     ) {
       throw new Error("invalid accepted provider route");
     }
-    return { projectId, configurationRevisionId, connectionId, resourceId };
+    return { workflowId, configurationRevisionId, connectionId, resourceId };
   });
 }
 
@@ -424,12 +504,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function selectFirstRoutePerProject<Route extends { projectId: string }>(
+function selectFirstRoutePerWorkflow<Route extends { workflowId: string }>(
   routes: readonly Route[],
 ): Route[] {
   const selected = new Map<string, Route>();
   for (const route of routes) {
-    if (!selected.has(route.projectId)) selected.set(route.projectId, route);
+    if (!selected.has(route.workflowId)) selected.set(route.workflowId, route);
   }
   return [...selected.values()];
 }
@@ -438,6 +518,7 @@ async function findConnection(
   transaction: HubTransaction,
   provider: "github" | "slack" | "discord" | "linear",
   externalId: number | string,
+  providerApplicationId: string | null | undefined,
 ) {
   if (provider === "github") {
     const [row] = await transaction
@@ -452,13 +533,19 @@ async function findConnection(
     return row;
   }
   if (provider === "slack") {
+    if (providerApplicationId === null || providerApplicationId === undefined) return undefined;
     const [row] = await transaction
       .select({
         id: schema.slackConnections.id,
         organizationId: schema.slackConnections.organizationId,
       })
       .from(schema.slackConnections)
-      .where(eq(schema.slackConnections.teamId, String(externalId)))
+      .where(
+        and(
+          eq(schema.slackConnections.providerApplicationId, providerApplicationId),
+          eq(schema.slackConnections.teamId, String(externalId)),
+        ),
+      )
       .limit(1);
     return row;
   }
@@ -468,13 +555,14 @@ async function findConnection(
         id: schema.linearConnections.id,
         organizationId: schema.linearConnections.organizationId,
         scopes: schema.linearConnections.scopes,
-        refreshToken: schema.linearConnections.refreshToken,
+        refreshTokenAvailable: schema.linearConnections.refreshTokenAvailable,
         accessTokenExpiresAt: schema.linearConnections.accessTokenExpiresAt,
       })
       .from(schema.linearConnections)
       .where(eq(schema.linearConnections.linearOrganizationId, String(externalId)))
       .limit(1);
-    return row;
+    if (row === undefined) return undefined;
+    return { ...row, refreshToken: row.refreshTokenAvailable ? "available" : null };
   }
   const [row] = await transaction
     .select({
@@ -491,7 +579,7 @@ async function claimProviderReceipt(
   transaction: HubTransaction,
   input: {
     organizationId: string;
-    provider: "github" | "slack" | "discord" | "linear" | "manual";
+    provider: "github" | "slack" | "discord" | "linear" | "manual" | "channel";
     connectionId: string | null;
     resourceId: string | null;
     input: ProviderEventEvidence;

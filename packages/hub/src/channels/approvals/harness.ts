@@ -90,7 +90,7 @@ export function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     accountId: ACCOUNT_ID,
     enabled: true,
     channelEnabled: true,
-    secretRef: "secret-ref",
+    connectionId: "connection-id",
     transport: {},
     config: {},
     defaultRoles: ["interactor"],
@@ -149,6 +149,7 @@ function makeFakeDaemon() {
       },
     }),
     sendAgentMessage: async () => undefined,
+    cancelAgent: async () => undefined,
     respondToAgentPermission: async (agentId, requestId, response) => {
       responses.push({ agentId, requestId, response });
     },

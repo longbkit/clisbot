@@ -7,8 +7,17 @@
 // owner pid and removes the state file. Mirrors the daemon's `local-daemon.ts`
 // pattern applied to the Hub's exported bin entry (implementation doc §2 step 3, §3.2).
 
+import { randomBytes } from "node:crypto";
 import { spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
-import fs, { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import fs, {
+  chmodSync,
+  closeSync,
+  existsSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -26,6 +35,8 @@ const FORK_DEFAULT_HOME_DIRECTORY_NAME = ".clisbot";
 const DETACHED_STARTUP_GRACE_MS = 1200;
 const PID_POLL_INTERVAL_MS = 100;
 const HUB_LOG_FILENAME = "hub.log";
+const HUB_MASTER_KEY_FILENAME_SUFFIX = "-hub-credential-master-key";
+const PRIVATE_FILE_MODE = 0o600;
 export const DEFAULT_STOP_TIMEOUT_MS = 15_000;
 export const DEFAULT_KILL_TIMEOUT_MS = 3_000;
 
@@ -328,6 +339,55 @@ function detachedStartupWatch(
   });
 }
 
+export function localHubMasterKeyPath(home: string, hubDataDirectory = home): string {
+  const resolvedDataDirectory = path.resolve(hubDataDirectory);
+  const parent = path.dirname(resolvedDataDirectory);
+  if (parent === resolvedDataDirectory) {
+    throw new Error("Hub data directory must not be the filesystem root");
+  }
+  return path.join(
+    parent,
+    `.${path.basename(path.resolve(home))}${HUB_MASTER_KEY_FILENAME_SUFFIX}`,
+  );
+}
+
+/**
+ * Provision the local-only Hub master key as a sibling of, never inside, the
+ * effective Hub data directory. Hosted deployments keep using their externally managed env/file
+ * secret; this helper only makes `paseo hub start` secure-by-default locally.
+ */
+export function readOrCreateLocalHubMasterKey(home: string, hubDataDirectory = home): string {
+  const keyPath = localHubMasterKeyPath(home, hubDataDirectory);
+  try {
+    const value = readFileSync(keyPath, "utf8").trim();
+    if (!/^[A-Za-z0-9+/]{43}=$/u.test(value)) {
+      throw new Error(`Local Hub credential master key is malformed: ${keyPath}`);
+    }
+    if (process.platform !== "win32") chmodSync(keyPath, PRIVATE_FILE_MODE);
+    return value;
+  } catch (error) {
+    if (readNodeErrnoCode(error) !== "ENOENT") throw error;
+  }
+
+  const generated = randomBytes(32).toString("base64");
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(keyPath, "wx", PRIVATE_FILE_MODE);
+    writeFileSync(descriptor, `${generated}\n`, "utf8");
+    closeSync(descriptor);
+    descriptor = undefined;
+    return generated;
+  } catch (error) {
+    if (descriptor !== undefined) closeSync(descriptor);
+    if (readNodeErrnoCode(error) === "EEXIST") {
+      return readOrCreateLocalHubMasterKey(home, hubDataDirectory);
+    }
+    throw new Error(`Could not provision local Hub credential master key: ${keyPath}`, {
+      cause: error,
+    });
+  }
+}
+
 function buildChildEnv(home: string, port: number): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -335,6 +395,18 @@ function buildChildEnv(home: string, port: number): NodeJS.ProcessEnv {
     PASEO_HUB_BIND: FORK_HUB_BIND,
     PASEO_HOME: home,
   };
+  if (
+    !isSet(env.PASEO_HUB_CREDENTIAL_MASTER_KEY) &&
+    !isSet(env.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE) &&
+    !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY) &&
+    !isSet(env.CLISBOT_HUB_CREDENTIAL_MASTER_KEY_FILE)
+  ) {
+    const hubDataDirectory =
+      (isSet(env.PASEO_HUB_DATA_DIR) ? env.PASEO_HUB_DATA_DIR : undefined) ??
+      (isSet(env.CLISBOT_HUB_DATA_DIR) ? env.CLISBOT_HUB_DATA_DIR : undefined) ??
+      home;
+    env.PASEO_HUB_CREDENTIAL_MASTER_KEY = readOrCreateLocalHubMasterKey(home, hubDataDirectory);
+  }
   const password = readDaemonPasswordFile(home);
   if (password !== undefined) env.PASEO_PASSWORD = password;
   return env;

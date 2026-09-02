@@ -401,7 +401,7 @@ function gatewayOptions(bot: MemoryDiscordBotClient) {
           {
             providerEventReceiptId: `trigger-${input.deliveryId}`,
             organizationId: "org_1",
-            projectId: "project-1",
+            workflowId: "project-1",
             configurationRevisionId: "11111111-1111-4111-8111-111111111131",
             deliveryId: input.deliveryId,
             source: input.source,

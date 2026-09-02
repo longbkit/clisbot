@@ -29,7 +29,7 @@ const systemClock: ExecutionAuthorityClock = {
 
 export interface ExecutionAuthorityMaterialization {
   executionId: string;
-  projectId: string;
+  organizationId: string;
   triggerContext: unknown;
   env?: Readonly<Record<string, string>> | undefined;
   github?: CompiledGitHubAuthority | undefined;
@@ -64,7 +64,7 @@ export interface ExecutionAuthorityStopResult {
 }
 
 export interface CreateExecutionAuthorityOptions {
-  connectionsForProject: (projectId: string) => ConnectionResolver;
+  connectionsForOrganization: (organizationId: string) => ConnectionResolver;
   githubAuthority?: GitHubAuthorityRegistration | undefined;
   clock?: ExecutionAuthorityClock | undefined;
   isExecutionActive: (executionId: string) => Promise<boolean>;
@@ -141,7 +141,7 @@ export function createExecutionAuthority(
         }
         const repositories = repositoriesForAuthority(input.github, input.triggerContext);
         const authority = await options.githubAuthority.mint({
-          projectId: input.projectId,
+          organizationId: input.organizationId,
           connectionSlug: input.github.connection,
           repositories,
           permissions: input.github.permissions,
@@ -189,7 +189,7 @@ export function createExecutionAuthority(
     tokenRevocations: Map<string, Promise<string> | undefined>,
   ): Promise<Record<string, string>> {
     if (input.env === undefined) return {};
-    const resolver = options.connectionsForProject(input.projectId);
+    const resolver = options.connectionsForOrganization(input.organizationId);
     return Object.fromEntries(
       await Promise.all(
         Object.entries(input.env).map(async ([key, value]) => {

@@ -7,7 +7,7 @@ import type { ProviderEventDropReasonCode } from "./drop-reason.js";
 export interface ExternalTrigger {
   providerEventReceiptId: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   configurationRevisionId: string;
   source: string;
   deliveryId: string;
@@ -103,7 +103,7 @@ export type TriggerProviderReactionResult = void | TriggerProviderReactionState;
 export interface TriggerLaunchMaterialization<TriggerContext = unknown> {
   executionId: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   environmentEnv?: Record<string, string>;
   environmentWorktree?: WorktreeTarget;
   triggerContext: TriggerContext;
@@ -117,7 +117,7 @@ export interface MaterializedTriggerLaunch {
 export interface TriggerContextMaterialization<TriggerContext = unknown> {
   executionId: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   providerEventReceiptId: string;
   triggerContext: TriggerContext;
 }

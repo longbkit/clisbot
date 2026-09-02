@@ -744,7 +744,7 @@ async function capabilityFixture(
   await database.insertAgentExecution({
     id: executionId,
     organizationId: "org-1",
-    projectId: "project-1",
+    workflowId: "project-1",
     machineId: null,
     triggerContext: { provider: "slack" },
     outputContext: slackOutputContext,
@@ -887,7 +887,7 @@ function launchIntent(
   return {
     kind: "launch_machine",
     organizationId: "org-1",
-    projectId: "project-1",
+    workflowId: "project-1",
     triggerRunId: randomUUID(),
     triggerName: "slack-mention",
     environmentName: "daemon",

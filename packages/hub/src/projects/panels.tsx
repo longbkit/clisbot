@@ -6,7 +6,10 @@ import { ChevronRight } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { CONNECTION_MUTATION_KEY } from "../auth/tenant-mutation.js";
 import { useActiveAccount } from "../auth/active-account.js";
-import { ConfirmAction, ConfirmMenuItem } from "../components/app/confirm-action.js";
+import {
+  ConfirmAction,
+  ConfirmMenuItem,
+} from "../components/app/confirm-action.js";
 import { DataCell, DataRow, DataTable } from "../components/app/data-table.js";
 import { EmptyState } from "../components/app/empty-state.js";
 import { PageHeader } from "../components/app/page.js";
@@ -14,7 +17,10 @@ import { RowActions } from "../components/app/row-actions.js";
 import { Section } from "../components/app/section.js";
 import { StatusPill } from "../components/app/status-pill.js";
 import { ProviderGlyph } from "../connections/provider-glyph.js";
-import { connectionResultCopy, useConnectionResult } from "../connections/result.js";
+import {
+  connectionResultCopy,
+  useConnectionResult,
+} from "../connections/result.js";
 import { cn } from "../lib/utils.js";
 import { Alert, AlertDescription } from "../components/ui/alert.js";
 import { Button } from "../components/ui/button.js";
@@ -53,7 +59,6 @@ import {
 } from "./panel-state.js";
 import {
   archiveProject,
-  activityRunSnapshot,
   createProject,
   updateProjectSlug,
 } from "./functions.js";
@@ -88,7 +93,9 @@ export function ProjectsPanel() {
       </PageHeader>
       {connectionResult === undefined ? null : (
         <Alert role="status" className="mb-6">
-          <AlertDescription>{connectionResultCopy(connectionResult)}</AlertDescription>
+          <AlertDescription>
+            {connectionResultCopy(connectionResult)}
+          </AlertDescription>
         </Alert>
       )}
       <CommandError mutations={[create]} />
@@ -116,7 +123,11 @@ export function ProjectsPanel() {
           <DialogHeader>
             <DialogTitle>New project</DialogTitle>
           </DialogHeader>
-          <form aria-label="Create project" className="grid gap-5" onSubmit={submitCreate}>
+          <form
+            aria-label="Create project"
+            className="grid gap-5"
+            onSubmit={submitCreate}
+          >
             <LabeledInput label="Project name" name="name" required />
             <LabeledInput
               label="Project slug"
@@ -158,9 +169,13 @@ function ProjectCard({
       <span className="grid min-w-0 flex-1 gap-0.5">
         <span className="flex items-center gap-2">
           <span className="truncate group-hover:text-link">{project.name}</span>
-          {project.status === "active" ? null : <StatusPill tone="neutral">Archived</StatusPill>}
+          {project.status === "active" ? null : (
+            <StatusPill tone="neutral">Archived</StatusPill>
+          )}
         </span>
-        <span className="truncate font-mono text-xs text-muted-foreground">{project.slug}</span>
+        <span className="truncate font-mono text-xs text-muted-foreground">
+          {project.slug}
+        </span>
       </span>
       <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
         Created {formatDate(project.createdAt)}
@@ -173,7 +188,10 @@ function ProjectCard({
   return (
     <Link
       to={to as never}
-      className={cn(card, "group transition-colors hover:border-primary/60 hover:bg-accent/40")}
+      className={cn(
+        card,
+        "group transition-colors hover:border-primary/60 hover:bg-accent/40",
+      )}
     >
       {body}
       <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
@@ -184,7 +202,9 @@ function ProjectCard({
 function monogram(name: string) {
   const words = name.split(/\s+/).filter((word) => word.length > 0);
   const letters =
-    words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : name.slice(0, 2);
+    words.length > 1
+      ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`
+      : name.slice(0, 2);
   return letters.toUpperCase();
 }
 
@@ -215,28 +235,40 @@ export function OrganizationConnectionsPanel() {
       await Promise.all([
         invalidateOrganization(queryClient, scope.organizationSlug),
         queryClient.invalidateQueries({
-          queryKey: ["connection-status", tenant.account.id, tenant.organization.id],
+          queryKey: [
+            "connection-status",
+            tenant.account.id,
+            tenant.organization.id,
+          ],
         }),
       ]);
     },
   });
   if (!snapshot.ok) return snapshot.element;
-  const status = queryState<ConnectionStatus>(statusQuery, "Connections unavailable");
+  const status = queryState<ConnectionStatus>(
+    statusQuery,
+    "Connections unavailable",
+  );
   if (!status.ok) return status.element;
   const data = snapshot.data;
-  const connectProvider = (provider: "github" | "discord" | "slack" | "linear") => {
+  const connectProvider = (
+    provider: "github" | "discord" | "slack" | "linear",
+  ) => {
     connect.mutate(
       { data: { ...scope, provider } },
       {
         onSuccess: (response) => {
-          if (response.status === "ok") window.location.assign(response.data.url);
+          if (response.status === "ok")
+            window.location.assign(response.data.url);
         },
       },
     );
   };
   const rows = connectionRows(data);
   const busy = connect.isPending || disconnect.isPending;
-  const connectionActionLabel = (provider: "github" | "discord" | "slack" | "linear") => {
+  const connectionActionLabel = (
+    provider: "github" | "discord" | "slack" | "linear",
+  ) => {
     if (
       (provider === "slack" || provider === "linear") &&
       status.data[provider].status === "requiresReauthorization"
@@ -246,7 +278,8 @@ export function OrganizationConnectionsPanel() {
     if (
       provider === "github" &&
       rows.some(
-        (connection) => connection.provider === "github" && connection.status === "suspended",
+        (connection) =>
+          connection.provider === "github" && connection.status === "suspended",
       )
     ) {
       return "Reconnect";
@@ -255,7 +288,10 @@ export function OrganizationConnectionsPanel() {
   };
   return (
     <>
-      <PageHeader title="Connections" description="Organization provider connections." />
+      <PageHeader
+        title="Connections"
+        description="Organization provider connections."
+      />
       {result === undefined ? null : (
         <Alert role="status" className="mb-6">
           <AlertDescription>{connectionResultCopy(result)}</AlertDescription>
@@ -329,28 +365,34 @@ export function OrganizationConnectionsPanel() {
         </DataTable>
         {data.capabilities.manageResources ? (
           <div className="grid gap-2 sm:grid-cols-4">
-            {(["github", "discord", "slack", "linear"] as const).map((provider) => (
-              <div
-                key={provider}
-                className="flex items-center justify-between gap-2 rounded-md border p-3"
-              >
-                <span className="inline-flex items-center gap-2 text-sm">
-                  <ProviderGlyph provider={provider} />
-                  {providerLabel(provider)}
-                </span>
-                {status.data[provider].status === "notConfigured" ? (
-                  <UnconfiguredProvider provider={provider} operator={isInstanceOperator} />
-                ) : (
-                  <Button
-                    disabled={busy}
-                    variant="outline"
-                    onClick={() => connectProvider(provider)}
-                  >
-                    {connectionActionLabel(provider)} {providerLabel(provider)}
-                  </Button>
-                )}
-              </div>
-            ))}
+            {(["github", "discord", "slack", "linear"] as const).map(
+              (provider) => (
+                <div
+                  key={provider}
+                  className="flex items-center justify-between gap-2 rounded-md border p-3"
+                >
+                  <span className="inline-flex items-center gap-2 text-sm">
+                    <ProviderGlyph provider={provider} />
+                    {providerLabel(provider)}
+                  </span>
+                  {status.data[provider].status === "notConfigured" ? (
+                    <UnconfiguredProvider
+                      provider={provider}
+                      operator={isInstanceOperator}
+                    />
+                  ) : (
+                    <Button
+                      disabled={busy}
+                      variant="outline"
+                      onClick={() => connectProvider(provider)}
+                    >
+                      {connectionActionLabel(provider)}{" "}
+                      {providerLabel(provider)}
+                    </Button>
+                  )}
+                </div>
+              ),
+            )}
           </div>
         ) : null}
       </Section>
@@ -358,7 +400,11 @@ export function OrganizationConnectionsPanel() {
         title="Known unrouted events"
         description="Events received for this organization that were not routed to a workflow."
       >
-        <ActivityTable activity={data.unroutedEvents} label="Unrouted events" showReason />
+        <ActivityTable
+          activity={data.unroutedEvents}
+          label="Unrouted events"
+          showReason
+        />
       </Section>
     </>
   );
@@ -412,7 +458,10 @@ export function ProjectOverviewPanel() {
       <Section
         title="Recent activity"
         action={
-          <Link className="text-sm hover:underline" to={`${base}/activity` as never}>
+          <Link
+            className="text-sm hover:underline"
+            to={`${base}/activity` as never}
+          >
             View all
           </Link>
         }
@@ -433,7 +482,10 @@ export function ProjectActivityPanel() {
   if (!snapshot.ok) return snapshot.element;
   return (
     <>
-      <PageHeader title="Activity" description="Provider events routed to this project." />
+      <PageHeader
+        title="Activity"
+        description="Provider events routed to this project."
+      />
       <ActivityTable
         activity={snapshot.data.activity}
         label="Project activity"
@@ -444,99 +496,14 @@ export function ProjectActivityPanel() {
 }
 
 export function ProjectActivityRunPanel({ runId }: { runId: string }) {
-  const tenant = useRouteTenant();
-  const load = useServerFn(activityRunSnapshot);
-  const scope = {
-    organizationSlug: tenant.organization.slug,
-    projectSlug: tenant.project?.slug ?? "",
-    runId,
-  };
-  const query = useQuery({
-    queryKey: ["project-activity-run", tenant.account.id, tenant.organization.id, runId],
-    queryFn: () => load({ data: scope }),
-  });
-  const snapshot = queryState<Awaited<ReturnType<ProjectDashboard["activityRunSnapshot"]>>>(
-    query,
-    "Run unavailable",
-  );
-  if (!snapshot.ok) return snapshot.element;
-  const activity = snapshot.data.activity;
+  void runId;
   return (
     <>
       <PageHeader
-        title="Run detail"
-        description={`${activity.provider} · ${activity.configuredTriggerName}`}
+        title="Run unavailable"
+        description="Workflow runs are organization-owned."
       />
-      <div className="grid gap-6">
-        <Section title="Invocation">
-          <dl className="grid gap-4 rounded-lg border bg-card p-5 sm:grid-cols-2">
-            <DetailField label="Prompt">
-              <pre className="whitespace-pre-wrap text-sm">{activity.prompt}</pre>
-            </DetailField>
-            <DetailField label="Typed inputs">
-              <JsonValue value={activity.inputs} />
-            </DetailField>
-            <DetailField label="Composed routing values">
-              <JsonValue value={activity.values} />
-            </DetailField>
-            <DetailField label="Run status">
-              <StatusPill tone={executionTone(activity.status)}>{activity.status}</StatusPill>
-            </DetailField>
-            <DetailField label="Run deadline">
-              <span className="font-mono text-xs">
-                {activity.deadlineAt === null ? "—" : formatDate(activity.deadlineAt)}
-                {activity.deadlineKind === null ? "" : ` · ${activity.deadlineKind}`}
-              </span>
-            </DetailField>
-            <DetailField label="Failure reason">
-              <span>{activity.failureReason ?? "—"}</span>
-            </DetailField>
-            <DetailField label="Delivery">
-              <span className="font-mono text-xs">{activity.deliveryId}</span>
-            </DetailField>
-          </dl>
-        </Section>
-        <Section title="Steps" description="Ordered durable step state and structured outputs.">
-          <DataTable
-            label="Run steps"
-            columns={[
-              { header: "Step" },
-              { header: "Status" },
-              { header: "Deadline" },
-              { header: "Structured output" },
-              { header: "Failure reason" },
-            ]}
-            isEmpty={activity.steps.length === 0}
-            empty={{ title: "No steps" }}
-          >
-            {activity.steps.map((step) => (
-              <DataRow key={step.id}>
-                <DataCell>
-                  <span>
-                    {step.ordinal + 1}. {step.stepId}
-                  </span>
-                </DataCell>
-                <DataCell>
-                  <StatusPill tone={executionTone(step.status)}>{step.status}</StatusPill>
-                </DataCell>
-                <DataCell muted>
-                  <span className="font-mono text-xs">
-                    {step.deadlineAt === null ? "—" : formatDate(step.deadlineAt)}
-                    {step.deadlineKind === null ? "" : ` · ${step.deadlineKind}`}
-                    {step.idleDeadlineAt === null
-                      ? ""
-                      : ` · idle ${formatDate(step.idleDeadlineAt)}`}
-                  </span>
-                </DataCell>
-                <DataCell>
-                  <JsonValue value={step.output} />
-                </DataCell>
-                <DataCell muted>{step.failureReason ?? "—"}</DataCell>
-              </DataRow>
-            ))}
-          </DataTable>
-        </Section>
-      </div>
+      <EmptyState title="Run unavailable" />
     </>
   );
 }
@@ -556,7 +523,9 @@ export function ProjectGeneralSettingsPanel() {
     mutationFn: archiveProjectFn,
     onSuccess: async (result) => {
       if (result.status !== "ok") return;
-      await navigate({ to: `/o/${tenant.organization.slug}/projects` as never });
+      await navigate({
+        to: `/o/${tenant.organization.slug}/projects` as never,
+      });
       await invalidateScope(queryClient, scope);
     },
   });
@@ -623,13 +592,24 @@ function SettingsPage({ children }: { children: ReactNode }) {
   if (tenant.project === null) throw new Error("settings route has no project");
   return (
     <>
-      <PageHeader title="Settings" description={`Project settings for ${tenant.project.name}.`} />
+      <PageHeader
+        title="Settings"
+        description={`Project settings for ${tenant.project.name}.`}
+      />
       {children}
     </>
   );
 }
 
-function SetupCard({ label, ready, detail }: { label: string; ready: boolean; detail: string }) {
+function SetupCard({
+  label,
+  ready,
+  detail,
+}: {
+  label: string;
+  ready: boolean;
+  detail: string;
+}) {
   return (
     <section aria-label={label} className="rounded-lg border bg-card p-5">
       <div className="mb-2 flex items-center justify-between">
@@ -643,7 +623,13 @@ function SetupCard({ label, ready, detail }: { label: string; ready: boolean; de
   );
 }
 
-function DetailField({ label, children }: { label: string; children: ReactNode }) {
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div className="grid gap-1">
       <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -674,7 +660,9 @@ function ActivityTable({
 }: {
   activity: ReadonlyArray<
     | ProjectSnapshot["activity"][number]
-    | Awaited<ReturnType<ProjectDashboard["organizationSnapshot"]>>["unroutedEvents"][number]
+    | Awaited<
+        ReturnType<ProjectDashboard["organizationSnapshot"]>
+      >["unroutedEvents"][number]
   >;
   label: string;
   detailBasePath?: string;
@@ -700,20 +688,27 @@ function ActivityTable({
             {detailBasePath &&
             "configuredTriggerName" in event &&
             event.configuredTriggerName !== null ? (
-              <Link className="hover:underline" to={`${detailBasePath}/${event.id}` as never}>
+              <Link
+                className="hover:underline"
+                to={`${detailBasePath}/${event.id}` as never}
+              >
                 {event.configuredTriggerName}
               </Link>
             ) : (
               <span className="font-mono text-xs">{event.id.slice(0, 12)}</span>
             )}
             {event.repo === null ? null : (
-              <span className="block text-xs text-muted-foreground">{event.repo}</span>
+              <span className="block text-xs text-muted-foreground">
+                {event.repo}
+              </span>
             )}
           </DataCell>
           <DataCell>{event.provider}</DataCell>
           <DataCell>{event.source}</DataCell>
           <DataCell>{"status" in event ? event.status : "dropped"}</DataCell>
-          {showReason ? <DataCell>{event.failureReason ?? "Unknown reason"}</DataCell> : null}
+          {showReason ? (
+            <DataCell>{event.failureReason ?? "Unknown reason"}</DataCell>
+          ) : null}
           <DataCell muted>{formatDate(event.receivedAt)}</DataCell>
         </DataRow>
       ))}
@@ -794,7 +789,10 @@ function LabeledInput({
   label,
   name,
   ...props
-}: { label: string; name: string } & Omit<React.ComponentProps<typeof Input>, "name">) {
+}: { label: string; name: string } & Omit<
+  React.ComponentProps<typeof Input>,
+  "name"
+>) {
   const id = `field-${name}`;
   return (
     <Field>

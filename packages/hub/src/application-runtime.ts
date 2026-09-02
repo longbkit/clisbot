@@ -56,6 +56,10 @@ export interface ApplicationCompositionOptions {
   completionTokenSecret?: string;
   testTriggerRoutes?: boolean;
   daemonConnectionForId?: DaemonDispatchLifecycleOptions["connectionForDaemon"];
+  /** COMPAT(clisbot-control-plane): exclusive Slack Socket Mode ownership. */
+  claimSlackInbound?: NonNullable<
+    import("./channels/supervisor/types.js").ChannelSupervisorOptions["claimSlackInbound"]
+  >;
   close(): Promise<void>;
 }
 
@@ -78,7 +82,10 @@ async function createOwnedApplicationRuntime(
 ): Promise<ApplicationRuntime> {
   const registrations = options.registrations ?? [];
   const connections = new Map(
-    registrations.map((registration) => [registration.connection.name, registration.connection]),
+    registrations.map((registration) => [
+      registration.connection.name,
+      registration.connection,
+    ]),
   );
   if (connections.size !== registrations.length) {
     throw new Error("provider connection registrations must have unique names");
@@ -89,17 +96,35 @@ async function createOwnedApplicationRuntime(
       integrations.set(registration.connection.name, registration.integration);
     }
   }
-  const connectionsForProject = createConnectionsForProject(options.database, integrations);
+  const connectionsForOrganization = createConnectionsForOrganization(
+    options.database,
+    integrations,
+  );
   const executionAuthority = createRuntimeExecutionAuthority(
     options.database,
-    connectionsForProject,
+    connectionsForOrganization,
     integrations,
   );
   const outputRegistry = new OutputExecutorRegistry();
-  for (const output of registrations.flatMap((registration) => registration.outputs)) {
+  for (const output of registrations.flatMap(
+    (registration) => registration.outputs,
+  )) {
     outputRegistry.register(output);
   }
-  const channelSupervisor = await createChannelSupervisorAtComposition(options);
+  let dispatchChannelWorkflow:
+    | import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"]
+    | undefined;
+  const channelSupervisor = await createChannelSupervisorAtComposition(
+    options,
+    (input) => {
+      if (dispatchChannelWorkflow === undefined) {
+        return Promise.reject(
+          new Error("channel workflow dispatcher is not started"),
+        );
+      }
+      return dispatchChannelWorkflow(input);
+    },
+  );
   const channelReplyServer = await createChannelReplyServerAtComposition(
     options,
     channelSupervisor,
@@ -110,12 +135,13 @@ async function createOwnedApplicationRuntime(
       options,
       registrations,
       executionAuthority,
-      connectionsForProject,
       outputRegistry,
       channelSupervisor,
       channelReplyServer,
     ),
   );
+  dispatchChannelWorkflow = (input) =>
+    application.hub.dispatchChannelWorkflow(input);
   // COMPAT(clisbot-control-plane): the channel supervisor's accounts run their
   // own transports (Slack Socket Mode, Telegram getUpdates poll) plus an
   // outbound trusted-client daemon connection each. `startAll` boots them at
@@ -127,22 +153,33 @@ async function createOwnedApplicationRuntime(
   ownership.own(async () => {
     await channelSupervisor?.stopAll();
   });
-  await application.hub.start(registrations.flatMap((registration) => registration.sources));
+  await application.hub.start(
+    registrations.flatMap((registration) => registration.sources),
+  );
   // COMPAT(clisbot-control-plane): boot recovery — install + start every enabled
   // channel account. Isolated per account (failures never abort the boot);
   // the supervisor is null whenever the kill-switch is off.
   await channelSupervisor?.startAll();
 
-  const resources = options.database === null ? null : new OrganizationResources(options.database);
+  const resources =
+    options.database === null
+      ? null
+      : new OrganizationResources(options.database);
   const requests = new Map<string, (incoming: Request) => Promise<Response>>();
-  for (const request of registrations.flatMap((registration) => registration.requests)) {
+  for (const request of registrations.flatMap(
+    (registration) => registration.requests,
+  )) {
     if (requests.has(request.name)) {
-      throw new Error(`provider request registrations must have unique names: ${request.name}`);
+      throw new Error(
+        `provider request registrations must have unique names: ${request.name}`,
+      );
     }
     requests.set(request.name, (incoming) => request.handle(incoming));
   }
   const githubConfigurations = registrations.flatMap((registration) =>
-    registration.githubConfiguration === undefined ? [] : [registration.githubConfiguration],
+    registration.githubConfiguration === undefined
+      ? []
+      : [registration.githubConfiguration],
   );
   if (githubConfigurations.length > 1) {
     throw new Error("GitHub configuration registrations must be unique");
@@ -168,38 +205,59 @@ async function createOwnedApplicationRuntime(
     testTriggerRoutes: options.testTriggerRoutes ?? false,
     auth: (request) => {
       if (options.database === null) {
-        return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
+        return Promise.resolve(
+          Response.json({ error: "database_unavailable" }, { status: 503 }),
+        );
       }
       return options.auth === null
-        ? Promise.resolve(Response.json({ error: "auth_unavailable" }, { status: 503 }))
+        ? Promise.resolve(
+            Response.json({ error: "auth_unavailable" }, { status: 503 }),
+          )
         : options.auth.handle(request);
     },
     browserAccount: (request) => {
-      if (options.database === null || options.auth?.browserAccount === undefined) {
-        return Promise.resolve(Response.json({ error: "auth_unavailable" }, { status: 503 }));
+      if (
+        options.database === null ||
+        options.auth?.browserAccount === undefined
+      ) {
+        return Promise.resolve(
+          Response.json({ error: "auth_unavailable" }, { status: 503 }),
+        );
       }
       return options.auth.browserAccount(request);
     },
     signInEmail(data, headers) {
-      if (options.database === null || options.auth?.signInEmail === undefined) {
+      if (
+        options.database === null ||
+        options.auth?.signInEmail === undefined
+      ) {
         return Promise.reject(new Error("auth unavailable"));
       }
       return options.auth.signInEmail(data, headers);
     },
     signUpEmail(data, headers, invitationId) {
-      if (options.database === null || options.auth?.signUpEmail === undefined) {
+      if (
+        options.database === null ||
+        options.auth?.signUpEmail === undefined
+      ) {
         return Promise.reject(new Error("auth unavailable"));
       }
       return options.auth.signUpEmail(data, headers, invitationId);
     },
     claimInstance(operator, headers) {
-      if (options.database === null || options.auth?.claimInstance === undefined) {
+      if (
+        options.database === null ||
+        options.auth?.claimInstance === undefined
+      ) {
         return Promise.reject(new Error("auth unavailable"));
       }
       return options.auth.claimInstance(operator, headers);
     },
     completeAppOnboarding(request) {
-      if (options.database === null || options.auth?.completeAppOnboarding === undefined) {
+      if (
+        options.database === null ||
+        options.auth?.completeAppOnboarding === undefined
+      ) {
         return Promise.reject(new Error("auth unavailable"));
       }
       return options.auth.completeAppOnboarding(request);
@@ -211,30 +269,48 @@ async function createOwnedApplicationRuntime(
       return options.auth.signOut(headers);
     },
     changePassword(data, headers) {
-      if (options.database === null || options.auth?.changePassword === undefined) {
+      if (
+        options.database === null ||
+        options.auth?.changePassword === undefined
+      ) {
         return Promise.reject(new Error("auth unavailable"));
       }
       return options.auth.changePassword(data, headers);
     },
     organizationResources(request) {
       if (resources === null || options.auth === null) {
-        return Promise.reject(new Error("organization resources are unavailable"));
+        return Promise.reject(
+          new Error("organization resources are unavailable"),
+        );
       }
       return options.auth.resources(request, resources);
     },
     connectionStatus: async (request) => {
       if (options.database === null || options.auth === null) {
-        return Response.json({ error: "database_unavailable" }, { status: 503 });
+        return Response.json(
+          { error: "database_unavailable" },
+          { status: 503 },
+        );
       }
       const url = new URL(request.url);
       const organizationSlug = url.searchParams.get("organizationSlug");
       if (organizationSlug === null) {
-        return Response.json({ error: "organization_required" }, { status: 400 });
+        return Response.json(
+          { error: "organization_required" },
+          { status: 400 },
+        );
       }
-      const { tenant } = await resolveRouteTenant(options.auth, options.database, request, {
-        organizationSlug,
-      });
-      const bindings = await options.database.organizationConnectionUsage(tenant.organization.id);
+      const { tenant } = await resolveRouteTenant(
+        options.auth,
+        options.database,
+        request,
+        {
+          organizationSlug,
+        },
+      );
+      const bindings = await options.database.organizationConnectionUsage(
+        tenant.organization.id,
+      );
       const statuses = Object.fromEntries(
         [...connections.values()].map((connection) => [
           connection.name,
@@ -248,11 +324,15 @@ async function createOwnedApplicationRuntime(
     },
     connectionAction: (request, provider, action) => {
       if (options.database === null || options.auth === null) {
-        return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
+        return Promise.resolve(
+          Response.json({ error: "database_unavailable" }, { status: 503 }),
+        );
       }
       return (
         connections.get(provider)?.actions[action]?.(request) ??
-        Promise.resolve(Response.json({ error: "provider_not_configured" }, { status: 409 }))
+        Promise.resolve(
+          Response.json({ error: "provider_not_configured" }, { status: 409 }),
+        )
       );
     },
     webhook: (request) =>
@@ -270,11 +350,19 @@ async function createOwnedApplicationRuntime(
       return options.billing.publicCatalog();
     },
     billingConfigured: () => options.billing !== null,
-    billingOverview: async (request, organizationSlug): Promise<BillingOverviewView> => {
+    billingOverview: async (
+      request,
+      organizationSlug,
+    ): Promise<BillingOverviewView> => {
       const { billing, database } = requireBilling(options);
-      const { tenant } = await resolveRouteTenant(requireAuth(options), database, request, {
-        organizationSlug,
-      });
+      const { tenant } = await resolveRouteTenant(
+        requireAuth(options),
+        database,
+        request,
+        {
+          organizationSlug,
+        },
+      );
       const [subscription, plans] = await Promise.all([
         billing.subscriptionSnapshot(tenant.organization.id),
         billing.publicCatalog(),
@@ -320,9 +408,14 @@ async function createOwnedApplicationRuntime(
     },
     billingPortal: async (request, organizationSlug) => {
       const { billing, database } = requireBilling(options);
-      const { tenant } = await resolveRouteTenant(requireAuth(options), database, request, {
-        organizationSlug,
-      });
+      const { tenant } = await resolveRouteTenant(
+        requireAuth(options),
+        database,
+        request,
+        {
+          organizationSlug,
+        },
+      );
       if (!capabilitiesFor(tenant.membership.role).manageResources) {
         throw new BillingForbiddenError();
       }
@@ -339,7 +432,8 @@ async function createOwnedApplicationRuntime(
       return { url: portal?.url ?? null };
     },
     providerRequest: (name, request) =>
-      requests.get(name)?.(request) ?? Promise.resolve(new Response("Not Found", { status: 404 })),
+      requests.get(name)?.(request) ??
+      Promise.resolve(new Response("Not Found", { status: 404 })),
     stop: () => ownership.close(),
   };
 }
@@ -354,6 +448,7 @@ async function createOwnedApplicationRuntime(
 // instead of failing the instance.
 async function createChannelSupervisorAtComposition(
   options: ApplicationCompositionOptions,
+  dispatchWorkflow: import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"],
 ): Promise<import("./channels/supervisor/types.js").ChannelSupervisor | null> {
   if (!isChannelsEnabled()) return null;
   if (
@@ -374,9 +469,16 @@ async function createChannelSupervisorAtComposition(
       // bundle `import.meta.url` points into `.output/`, so pin it explicitly.
       pinsPath: runtimeFile("channel-pins.json"),
       logger: channelLogger,
+      dispatchWorkflow,
+      ...(options.claimSlackInbound === undefined
+        ? {}
+        : { claimSlackInbound: options.claimSlackInbound }),
     });
   } catch (error) {
-    reportFailure(error, { operation: "channel_supervisor.compose", component: "channels" });
+    reportFailure(error, {
+      operation: "channel_supervisor.compose",
+      component: "channels",
+    });
     return null;
   }
 }
@@ -400,16 +502,21 @@ async function createChannelReplyServerAtComposition(
   try {
     const organizations = await options.database.listOrganizationsForOperator();
     if (organizations.length !== 1) return null;
-    const { createChannelReplyServer } = await import("./channels/channel-reply.js");
+    const { createChannelReplyServer } =
+      await import("./channels/channel-reply.js");
     return createChannelReplyServer({
       organizationId: organizations[0]!.id,
       store: new ChannelStore(options.databaseRuntime),
       post: (ref, text) => supervisor.channelReplyPost(ref, text),
-      mediaPost: (ref, filePath) => supervisor.channelReplyMediaPost(ref, filePath),
+      mediaPost: (ref, filePath) =>
+        supervisor.channelReplyMediaPost(ref, filePath),
       homeRoot: resolveHome(undefined, process.env),
     });
   } catch (error) {
-    reportFailure(error, { operation: "channel_reply.compose", component: "channels" });
+    reportFailure(error, {
+      operation: "channel_reply.compose",
+      component: "channels",
+    });
     return null;
   }
 }
@@ -419,30 +526,41 @@ function hubApplicationOptions(
   options: ApplicationCompositionOptions,
   registrations: readonly ProviderRegistration[],
   executionAuthority: ExecutionAuthority | undefined,
-  connectionsForProject: TriggerProviderResources["connectionsForProject"],
   outputRegistry: OutputExecutorRegistry,
-  channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
+  channelSupervisor:
+    | import("./channels/supervisor/types.js").ChannelSupervisor
+    | null,
   channelReplyServer: ChannelReplyServer | null,
 ): HubRuntimeOptions {
   return {
     database: options.database,
     entitlements: options.entitlements,
-    providerFactories: registrations.flatMap((registration) => registration.triggerProviders),
+    providerFactories: registrations.flatMap(
+      (registration) => registration.triggerProviders,
+    ),
     ...(executionAuthority === undefined ? {} : { executionAuthority }),
     attachmentResolvers: Object.fromEntries(
       registrations.flatMap((registration) =>
         registration.attachment === undefined
           ? []
-          : [[registration.attachment.provider, registration.attachment.resolve] as const],
+          : [
+              [
+                registration.attachment.provider,
+                registration.attachment.resolve,
+              ] as const,
+            ],
       ),
     ),
-    connectionsForProject,
-    ...(options.auth === null ? {} : { browserOrganizationAccess: options.auth }),
+    ...(options.auth === null
+      ? {}
+      : { browserOrganizationAccess: options.auth }),
     publicApi:
       options.auth?.publicCredentials === undefined
         ? { status: "unavailable" }
         : { status: "enabled", authenticator: options.auth.publicCredentials },
-    ...(options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl }),
+    ...(options.publicBaseUrl === undefined
+      ? {}
+      : { publicBaseUrl: options.publicBaseUrl }),
     ...(options.completionTokenSecret === undefined
       ? {}
       : { completionTokenSecret: options.completionTokenSecret }),
@@ -452,7 +570,9 @@ function hubApplicationOptions(
       : { daemonConnectionForId: options.daemonConnectionForId }),
     // COMPAT(clisbot-control-plane): the channel ops mirror operator secrets
     // into the same data directory the embedded database lives in.
-    ...(options.hubDataDir === undefined ? {} : { hubDataDir: options.hubDataDir }),
+    ...(options.hubDataDir === undefined
+      ? {}
+      : { hubDataDir: options.hubDataDir }),
     channelSupervisor,
     // COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint.
     channelReplyServer,
@@ -468,7 +588,9 @@ const channelLogger: import("./channels/plane/types.js").PlaneLogger = {
   error: (message, meta) => logger.error(meta, message),
 };
 
-function triggerDashboardFor(options: ApplicationCompositionOptions): TriggerDashboard | null {
+function triggerDashboardFor(
+  options: ApplicationCompositionOptions,
+): TriggerDashboard | null {
   return options.database === null || options.auth === null
     ? null
     : new TriggerDashboard(options.database, options.auth);
@@ -480,22 +602,30 @@ function providerApplicationsFor(
   return options.providerApplications ?? null;
 }
 
-function createConnectionsForProject(
+function createConnectionsForOrganization(
   database: Database | null,
   integrations: ReadonlyMap<string, ProviderIntegrationRegistration>,
-): (projectId: string) => ConnectionResolver {
-  return (projectId) => async (connectionSlug, value, context) => {
+): (organizationId: string) => ConnectionResolver {
+  return (organizationId) => async (connectionSlug, value, context) => {
     if (database === null) throw new Error("connection inventory unavailable");
-    const project = await database.findProjectById(projectId);
-    if (project === undefined) throw new Error("execution project unavailable");
-    const usage = await database.organizationConnectionUsage(project.organizationId);
+    const usage = await database.organizationConnectionUsage(organizationId);
     const candidates = [
-      ...usage.github.map((connection) => ({ provider: "github" as const, connection })),
-      ...usage.discord.map((connection) => ({ provider: "discord" as const, connection })),
-      ...usage.slack.map((connection) => ({ provider: "slack" as const, connection })),
+      ...usage.github.map((connection) => ({
+        provider: "github" as const,
+        connection,
+      })),
+      ...usage.discord.map((connection) => ({
+        provider: "discord" as const,
+        connection,
+      })),
+      ...usage.slack.map((connection) => ({
+        provider: "slack" as const,
+        connection,
+      })),
     ].filter(
       ({ connection }) =>
-        connection.organizationId === project.organizationId && connection.slug === connectionSlug,
+        connection.organizationId === organizationId &&
+        connection.slug === connectionSlug,
     );
     if (candidates.length === 0) {
       throw new Error(`connection slug is unavailable: ${connectionSlug}`);
@@ -505,15 +635,17 @@ function createConnectionsForProject(
     }
     const integration = integrations.get(candidates[0]!.provider);
     if (integration === undefined) {
-      throw new Error(`connection capability is unavailable: ${connectionSlug}`);
+      throw new Error(
+        `connection capability is unavailable: ${connectionSlug}`,
+      );
     }
-    return integration.resolve(projectId, connectionSlug, value, context);
+    return integration.resolve(organizationId, connectionSlug, value, context);
   };
 }
 
 function createRuntimeExecutionAuthority(
   database: Database | null,
-  connectionsForProject: (projectId: string) => ConnectionResolver,
+  connectionsForOrganization: (organizationId: string) => ConnectionResolver,
   integrations: ReadonlyMap<string, ProviderIntegrationRegistration>,
 ): ExecutionAuthority | undefined {
   if (database === null) return undefined;
@@ -521,11 +653,13 @@ function createRuntimeExecutionAuthority(
     (integration) => integration.githubAuthority !== undefined,
   )?.githubAuthority;
   return createExecutionAuthority({
-    connectionsForProject,
+    connectionsForOrganization,
     ...(githubAuthority === undefined ? {} : { githubAuthority }),
     isExecutionActive: async (executionId) => {
       const execution = await database.findAgentExecutionById(executionId);
-      return execution?.status === "spawning" || execution?.status === "running";
+      return (
+        execution?.status === "spawning" || execution?.status === "running"
+      );
     },
   });
 }
@@ -578,5 +712,8 @@ function billingReturnUrl(
   fallbackSlug: string,
 ): string {
   const base = options.publicBaseUrl ?? new URL(request.url).origin;
-  return new URL(`/o/${organizationSlug ?? fallbackSlug}/settings/billing`, base).toString();
+  return new URL(
+    `/o/${organizationSlug ?? fallbackSlug}/settings/billing`,
+    base,
+  ).toString();
 }

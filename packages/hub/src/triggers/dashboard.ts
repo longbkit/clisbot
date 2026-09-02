@@ -3,7 +3,6 @@ import { capabilitiesFor } from "../auth/organization-policy.js";
 import type { Database, OrganizationTriggerRecord } from "../db/types.js";
 import { resolveRouteTenant } from "../projects/access.js";
 import { ProjectCommandError } from "../projects/command-error.js";
-import { parseCompiledHubConfig } from "../config/compiler.js";
 import { projectTriggerForm } from "./configuration/editor.js";
 import { OrganizationTriggerStore } from "./store.js";
 
@@ -75,28 +74,8 @@ export class TriggerDashboard {
   }
 
   private async activityForTrigger(trigger: OrganizationTriggerRecord) {
-    const migrationRevision = await this.database.findOrganizationTriggerMigrationRevision(
-      trigger.id,
-    );
-    const evidence = record(migrationRevision?.sourceEvidence);
-    const legacyProjectId = string(evidence?.["legacyProjectId"]);
-    const legacyTriggerName =
-      migrationRevision === undefined
-        ? undefined
-        : parseCompiledHubConfig(migrationRevision.normalizedConfiguration).triggers[0]?.name;
-    const [current, historical] = await Promise.all([
-      this.database.listProjectActivityRuns(trigger.runtimeProjectId, 100),
-      legacyProjectId === undefined
-        ? Promise.resolve([])
-        : this.database.listProjectActivityRuns(legacyProjectId, 100),
-    ]);
-    return [...current, ...historical]
-      .filter(
-        ({ run }) =>
-          current.some((candidate) => candidate.run.id === run.id) ||
-          run.configuredTriggerName === legacyTriggerName,
-      )
-      .map(({ run, receipt }) => ({
+    return (await this.database.listWorkflowActivityRuns(trigger.id, 100)).map(
+      ({ run, receipt }) => ({
         id: run.id,
         triggerId: trigger.id,
         triggerName: trigger.name,
@@ -105,7 +84,8 @@ export class TriggerDashboard {
         repo: receipt.repo,
         status: run.status,
         receivedAt: receipt.receivedAt.toISOString(),
-      }));
+      }),
+    );
   }
 
   async save(
@@ -208,8 +188,4 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
-}
-
-function string(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }

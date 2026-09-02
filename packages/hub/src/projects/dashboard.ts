@@ -23,8 +23,8 @@ import {
 } from "../configuration/github-sync.js";
 import type {
   Database,
-  ProjectActivityRunListRecord,
-  ProjectActivityRunRecord,
+  WorkflowActivityRunListRecord,
+  WorkflowActivityRunRecord,
   ProviderEventReceiptSummary,
 } from "../db/types.js";
 import { reportFailure } from "../failures/index.js";
@@ -109,14 +109,13 @@ export class ProjectDashboard {
   async projectSnapshot(request: Request, scope: ProjectRouteScope) {
     const { account, tenant } = await this.resolveProject(request, scope);
     const project = tenant.project;
-    const [projects, configuration, organizationDaemons, connections, repositories, activity] =
+    const [projects, configuration, organizationDaemons, connections, repositories] =
       await Promise.all([
         this.database.listProjectsForOrganization(tenant.organization.id),
         this.database.projectConfigurationReadModel(project.id),
         this.database.listDaemonsForOrganization(tenant.organization.id),
         this.database.organizationConnectionUsage(tenant.organization.id),
         this.database.listGitHubRepositories(tenant.organization.id),
-        this.database.listProjectActivityRuns(project.id, 50),
       ]);
     return {
       account: account.account,
@@ -135,22 +134,15 @@ export class ProjectDashboard {
         fullName: repository.fullName,
         defaultBranch: repository.defaultBranch,
       })),
-      activity: activity.map(activityRunListView),
+      activity: [],
     };
   }
 
   async activityRunSnapshot(request: Request, scope: ProjectRouteScope & { runId: string }) {
     const { account, tenant } = await this.resolveProject(request, scope);
-    const activity = await this.database.findProjectActivityRun(tenant.project.id, scope.runId);
-    if (activity === undefined) throw new ProjectCommandError("run_unavailable");
-    return {
-      account: account.account,
-      organization: tenant.organization,
-      membership: tenant.membership,
-      capabilities: capabilitiesFor(tenant.membership.role),
-      project: projectView(tenant.project),
-      activity: activityRunView(activity),
-    };
+    void account;
+    void tenant;
+    throw new ProjectCommandError("run_unavailable");
   }
 
   async createProject(
@@ -486,7 +478,7 @@ function configurationView(
   };
 }
 
-function activityRunView(activity: ProjectActivityRunRecord) {
+function activityRunView(activity: WorkflowActivityRunRecord) {
   const { run, receipt, steps } = activity;
   const base = {
     id: run.id,
@@ -541,7 +533,7 @@ function activityRunView(activity: ProjectActivityRunRecord) {
   };
 }
 
-function activityRunListView(activity: ProjectActivityRunListRecord) {
+function activityRunListView(activity: WorkflowActivityRunListRecord) {
   const { run, receipt } = activity;
   const base = {
     id: run.id,

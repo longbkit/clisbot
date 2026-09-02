@@ -77,7 +77,10 @@ const JsonAgentSchema = z
   })
   .strict();
 
-export function compileHubBundle(input: readonly HubBundleFile[]): CompiledHubBundle {
+export function compileHubBundle(
+  input: readonly HubBundleFile[],
+  options: { requireWorkflow?: boolean } = {},
+): CompiledHubBundle {
   const files = normalizeBundleFiles(input);
   const resourceFile = files.get(HUB_RESOURCE_PATH);
   if (resourceFile === undefined) {
@@ -97,7 +100,7 @@ export function compileHubBundle(input: readonly HubBundleFile[]): CompiledHubBu
   const workflowFiles = [...files.values()]
     .filter((file) => isWorkflowPath(file.path))
     .sort(byPath);
-  if (workflowFiles.length === 0) {
+  if (workflowFiles.length === 0 && options.requireWorkflow !== false) {
     throw issue(
       [WORKFLOW_DIRECTORY],
       "at least one direct .paseo/workflows/<workflow>.yml document is required",

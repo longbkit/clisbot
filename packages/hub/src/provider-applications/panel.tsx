@@ -44,7 +44,7 @@ function ProviderApplications({
   organizationId: string;
 }) {
   const [returned] = useState(readAppReturn);
-  const [open, setOpen] = useState<Partial<Record<Provider, boolean>>>(() =>
+  const [open, setOpen] = useState<Record<string, boolean>>(() =>
     returned === undefined ? {} : { [returned.provider]: true },
   );
   const query = useProviderApplicationsOverview();
@@ -71,30 +71,48 @@ function ProviderApplications({
   const overview = query.data.data;
   return (
     <div className="grid min-w-0 gap-3">
-      {PROVIDER_GUIDES.map((guide) => (
-        <div
-          key={guide.provider}
-          className="min-w-0"
-          {...(returned?.provider === guide.provider ? { ref: section } : {})}
-        >
-          <ProviderSection
-            guide={guide}
-            view={overview.providers[guide.provider]}
-            callbackOrigin={overview.callbackOrigin}
-            surface={surface}
-            organizationId={organizationId}
-            // Closed until the operator picks one, or until a provider's own return has
-            // something to show them. Three open manuals is not a choice, it is a wall.
-            open={open[guide.provider] ?? false}
-            onOpenChange={(next) => setOpen((current) => ({ ...current, [guide.provider]: next }))}
-            {...(returned?.provider === guide.provider
-              ? { returned: returned.outcome }
-              : { returned: undefined })}
-          />
-        </div>
-      ))}
+      {PROVIDER_GUIDES.flatMap((guide) => {
+        const saved = overview.applications[guide.provider];
+        let views = saved.length > 0 ? [...saved] : [overview.providers[guide.provider]];
+        if (guide.provider === "slack" && saved.length > 0) {
+          views = [...views, emptyApplicationView(overview.providers.slack)];
+        }
+        return views.map((view, index) => {
+          const key = `${guide.provider}:${view.identity?.id ?? "new"}`;
+          const isReturned = returned?.provider === guide.provider && index === 0;
+          return (
+            <div key={key} className="min-w-0" {...(isReturned ? { ref: section } : {})}>
+              <ProviderSection
+                instanceId={key}
+                guide={guide}
+                view={view}
+                callbackOrigin={overview.callbackOrigin}
+                surface={surface}
+                organizationId={organizationId}
+                open={open[key] ?? open[guide.provider] ?? false}
+                onOpenChange={(next) => setOpen((current) => ({ ...current, [key]: next }))}
+                {...(isReturned ? { returned: returned.outcome } : { returned: undefined })}
+              />
+            </div>
+          );
+        });
+      })}
     </div>
   );
+}
+
+function emptyApplicationView(base: ProviderApplicationOverview["providers"]["slack"]) {
+  return {
+    ...base,
+    status: "notConfigured" as const,
+    identifiers: {},
+    identity: null,
+    connections: [],
+    eventsConfigured: false,
+    lastEventAt: null,
+    replaceable: true,
+    configurationVersion: null,
+  };
 }
 
 function OverviewLoading() {

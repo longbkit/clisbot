@@ -1,13 +1,12 @@
 // The channel control-plane source (plan S8 / implementation doc §4.3): the one
-// builder that turns the active project configuration into the channel control
+// builder that turns the active organization Channel revision into the control
 // plane everything above it consumes — the control-plane ops, the supervisor,
 // the execution plane. Loaded only under CLISBOT_HUB_CHANNELS_ENABLED, so
 // flag-off this module never enters the process (byte-equivalence).
 //
 // Two concerns, one module:
 //   1. resolve the org-scoped source: the single provisioned organization →
-//      its `default` project → the active revision → the authored bundle files
-//      (the ops handlers edit these files and insert a new revision).
+//      its active Channel revision → the authored files.
 //   2. compile the snapshot: `compileHubBundle` + `compileChannelControlPlane`
 //      + the agent-spec resolver the plane's binding engine drives.
 //
@@ -18,11 +17,10 @@
 // thinkingOptionId, providerOptions) plus the environment's `cwd`.
 
 import { compileHubBundle, type CompiledHubBundle, type HubBundleFile } from "../config/bundle.js";
-import { revisionBundleFiles } from "../configuration/store.js";
 import type {
+  ChannelConfigurationRevisionRecord,
   Database,
   OperatorOrganizationRecord,
-  ProjectConfigurationRevisionRecord,
 } from "../db/types.js";
 import type { CreateAgentConfig } from "./daemon/types.js";
 import {
@@ -40,14 +38,11 @@ import {
 } from "./plane/types.js";
 import { composeMessageToolPrompt } from "./outbound-template.js";
 
-/** The provisioned default project of every organization (auth/provisioning). */
-const DEFAULT_PROJECT_SLUG = "default";
+const EMPTY_CHANNEL_RESOURCE = `environments:\n  channel-unconfigured:\n    kind: daemon\n    daemon: channel-unconfigured\n    cwd: /\nagents: {}\n`;
 
 export type ChannelControlPlaneErrorCode =
   | "organization_not_found"
   | "organization_ambiguous"
-  | "project_not_found"
-  | "no_active_configuration"
   | "bundle_unavailable";
 
 /** A source failure — no usable control plane exists for this Hub instance. */
@@ -75,8 +70,7 @@ export class ChannelAgentSpecError extends Error {
 /** One load of the channel control plane from the active configuration. */
 export interface ChannelControlPlaneSnapshot {
   organizationId: string;
-  projectId: string;
-  revision: ProjectConfigurationRevisionRecord;
+  revision: ChannelConfigurationRevisionRecord | null;
   /** The active revision's authored files — the ops handlers edit these and
    * insert a new revision from the result. */
   files: readonly HubBundleFile[];
@@ -104,33 +98,13 @@ export interface ChannelAgentSpecResolverOptions {
   hubPort: number;
 }
 
-/**
- * Load the channel control plane for this Hub instance: the single provisioned
- * organization, its `default` project's active configuration. No caching —
- * every caller loads fresh, so an activated revision is visible immediately.
- */
+/** Load the organization-owned Channel control plane. An absent revision is a valid empty plane. */
 export async function loadChannelControlPlane(
   database: Database,
 ): Promise<ChannelControlPlaneSnapshot> {
   const organization = await resolveDefaultOrganization(database);
-  const project = await database.findProjectBySlugForOrganization(
-    organization.id,
-    DEFAULT_PROJECT_SLUG,
-  );
-  if (project === undefined) {
-    throw new ChannelControlPlaneError(
-      "project_not_found",
-      `organization has no "${DEFAULT_PROJECT_SLUG}" project`,
-    );
-  }
-  const revision = await database.findActiveProjectConfiguration(project.id);
-  if (revision === undefined) {
-    throw new ChannelControlPlaneError(
-      "no_active_configuration",
-      "the default project has no active configuration",
-    );
-  }
-  return compileControlPlaneSnapshot(organization.id, project, revision);
+  const revision = await database.findActiveChannelConfiguration(organization.id);
+  return compileControlPlaneSnapshot(database, organization.id, revision ?? null);
 }
 
 /** P0 is single-operator: exactly one provisioned organization. Zero or
@@ -149,26 +123,32 @@ async function resolveDefaultOrganization(database: Database): Promise<OperatorO
   return organizations[0]!;
 }
 
-function compileControlPlaneSnapshot(
+async function compileControlPlaneSnapshot(
+  database: Database,
   organizationId: string,
-  project: { id: string },
-  revision: ProjectConfigurationRevisionRecord,
-): ChannelControlPlaneSnapshot {
-  const files = revisionBundleFiles(revision);
-  if (files.length === 0) {
+  revision: ChannelConfigurationRevisionRecord | null,
+): Promise<ChannelControlPlaneSnapshot> {
+  const files = revision?.files ?? [];
+  if (files.some((file) => file.path.startsWith(".paseo/workflows/"))) {
     throw new ChannelControlPlaneError(
       "bundle_unavailable",
-      "the active configuration revision carries no authored bundle",
+      "Channel revisions cannot contain Workflow documents; use organization Triggers",
     );
   }
-  const bundle = compileHubBundle(files);
+  const resourceFiles = [...files];
+  if (!resourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {
+    resourceFiles.push({ path: ".paseo/hub.yml", content: EMPTY_CHANNEL_RESOURCE });
+  }
+  const bundle = compileHubBundle(resourceFiles, { requireWorkflow: false });
+  const workflowNames = (await database.listOrganizationTriggers(organizationId))
+    .filter(({ enabled }) => enabled)
+    .map(({ name }) => name);
   // The tool-path mcpServers URL needs the Hub's loopback listen port —
   // `process.env.PORT` is set by the Hub's process entry (index.ts
   // `readPort`), so the resolver and the listening server agree on it.
   const hubPort = hubListenPort(process.env);
   return {
     organizationId,
-    projectId: project.id,
     revision,
     files,
     bundle,
@@ -176,7 +156,7 @@ function compileControlPlaneSnapshot(
       files,
       agentNames: channelAgentNames(bundle),
       environmentNames: channelEnvironmentNames(bundle),
-      workflowNames: channelWorkflowNames(bundle),
+      workflowNames,
     }),
     hubPort,
     resolveAgentSpec: createChannelAgentSpecResolver(bundle, { hubPort }),
@@ -199,16 +179,14 @@ export function hubListenPort(environment: Record<string, string | undefined>): 
  * reference names the snapshot was compiled with. */
 export function channelEnvironmentNames(bundle: CompiledHubBundle): readonly string[] {
   return bundle.configuration.environments
-    .filter((environment) => environment.kind === "daemon")
+    .filter(
+      (environment) => environment.kind === "daemon" && environment.name !== "channel-unconfigured",
+    )
     .map(({ name }) => name);
 }
 
 export function channelAgentNames(bundle: CompiledHubBundle): readonly string[] {
   return Object.keys(bundle.agents);
-}
-
-export function channelWorkflowNames(bundle: CompiledHubBundle): readonly string[] {
-  return bundle.configuration.triggers.map(({ name }) => name);
 }
 
 /**

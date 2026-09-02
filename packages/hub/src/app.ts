@@ -40,6 +40,11 @@ import {
   handleManualTriggerRequest,
 } from "./triggers/manual/source.js";
 import { createManualRunProvider } from "./triggers/manual/provider.js";
+import { createWorkflowConfigurationResolver } from "./triggers/configuration.js";
+import {
+  createChannelWorkflowProvider,
+  type ChannelWorkflowRequestPayload,
+} from "./triggers/channel/provider.js";
 import { OrganizationTriggerStore } from "./triggers/store.js";
 import { DaemonRegistration } from "./daemons/registration.js";
 import { CliAuthorizations } from "./cli-authorizations/index.js";
@@ -65,7 +70,6 @@ export interface HubRuntimeOptions {
   providerFactories?: readonly TriggerProviderFactory[];
   executionAuthority?: ExecutionAuthority;
   attachmentResolvers?: Partial<Record<AttachmentProvider, AttachmentResolver>>;
-  connectionsForProject?: TriggerProviderResources["connectionsForProject"];
   configurationRevisionId?: string;
   outputRegistry?: OutputExecutorRegistry;
   publicApi: PublicApiComposition;
@@ -98,6 +102,12 @@ export interface HubRuntime {
     recoveredExecutionSubscriptions: number;
   };
   processWorkflowOutbox(): Promise<void>;
+  dispatchChannelWorkflow(input: {
+    organizationId: string;
+    deliveryId: string;
+    payload: ChannelWorkflowRequestPayload;
+    receivedAt: Date;
+  }): Promise<void>;
   handleUpgrade: ReturnType<typeof createDaemonUpgradeHandler> | null;
   start(sources?: readonly TriggerSource[]): Promise<void>;
   stop(): Promise<void>;
@@ -153,26 +163,29 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
     if (options.database === null) throw new DatabaseUnavailableError();
     return new ProjectConfigurationStore(options.database, projectId, daemons ?? undefined);
   };
+  const configurationForWorkflow =
+    options.database === null ? undefined : createWorkflowConfigurationResolver(options.database);
   const manualProvider =
-    options.database === null ? undefined : createManualRunProvider(storeForProject);
+    configurationForWorkflow === undefined
+      ? undefined
+      : createManualRunProvider(configurationForWorkflow);
+  const channelProvider = channelWorkflowProviderFor(options);
   const attachments = createAttachmentRegistry(options);
   const configuredProviders =
     options.database === null
       ? []
       : (options.providerFactories ?? []).map((factory) =>
           factory({
-            configurationStoreForProject: storeForProject,
-            connectionsForProject:
-              options.connectionsForProject ??
-              (() => () => {
-                throw new Error("no connection resolver registered");
-              }),
+            configurationForWorkflow: configurationForWorkflow!,
             ...(attachments === undefined ? {} : { attachments }),
           }),
         );
-  const providers = [manualProvider, ...configuredProviders, ...(options.providers ?? [])].filter(
-    (provider): provider is TriggerProvider => provider !== undefined,
-  );
+  const providers = [
+    manualProvider,
+    channelProvider,
+    ...configuredProviders,
+    ...(options.providers ?? []),
+  ].filter((provider): provider is TriggerProvider => provider !== undefined);
   const outputRegistry = options.outputRegistry ?? new OutputExecutorRegistry();
   const daemonModule = createAppDaemonModule(options, daemons, providers, outputRegistry);
   const capabilityServer = createAppExecutionCapabilityServer(
@@ -201,7 +214,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
 
   // COMPAT(clisbot-control-plane): one ops holder, built synchronously; the
   // kill-switch and database precedence are applied per request inside it.
-  const channelControlPlane = createChannelControlPlaneOpsFor(options, storeForProject);
+  const channelControlPlane = createChannelControlPlaneOpsFor(options);
   const manualSource =
     options.database === null ? undefined : createManualTriggerSource(options.database);
   const durableDispatchHandler =
@@ -260,6 +273,31 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
         daemonModule?.lifecycle.activeRecoveryObservationCount() ?? 0,
     }),
     processWorkflowOutbox: () => workflowEngine.processAvailable(),
+    async dispatchChannelWorkflow(input) {
+      if (options.database === null) throw new DatabaseUnavailableError();
+      const trigger = (await options.database.listOrganizationTriggers(input.organizationId)).find(
+        (candidate) => candidate.enabled && candidate.name === input.payload.workflow,
+      );
+      if (trigger === undefined) {
+        throw new Error(`organization workflow ${input.payload.workflow} is unavailable`);
+      }
+      const persisted = await options.database.persistChannelEvent({
+        organizationId: input.organizationId,
+        triggerId: trigger.id,
+        triggerRevisionId: trigger.activeRevisionId,
+        deliveryId: input.deliveryId,
+        source: "channel.message",
+        payload: {
+          ...input.payload,
+          workflow_id: trigger.id,
+          workflow_revision_id: trigger.activeRevisionId,
+        },
+        receivedAt: input.receivedAt,
+        connectionId: null,
+        resourceId: input.payload.channel.binding_key,
+      });
+      if (persisted.status === "accepted") await workflowDispatcher(persisted.event);
+    },
     handleUpgrade:
       options.database === null ? null : createDaemonUpgradeHandler(options.database, daemons!),
     async start(sources = []) {
@@ -446,21 +484,22 @@ function databaseUnavailable(): Promise<Response> {
   return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
 }
 
+function channelWorkflowProviderFor(options: HubRuntimeOptions): TriggerProvider | undefined {
+  return options.database === null ? undefined : createChannelWorkflowProvider(options.database);
+}
+
 // COMPAT(clisbot-control-plane): the ops holder's options, factored out of
 // `createHubApplication` so the composition function stays under its complexity
 // budget. The kill-switch and database precedence are applied per request
 // inside the ops.
 function createChannelControlPlaneOpsFor(
   options: HubRuntimeOptions,
-  storeForProject: (projectId: string) => ProjectConfigurationStore,
 ): ReturnType<typeof createChannelControlPlaneOps> {
   return createChannelControlPlaneOps({
     database: options.database,
     completionTokenSecret: options.completionTokenSecret,
-    dataDir: options.hubDataDir,
     supervisor: options.channelSupervisor ?? null,
     channelReplyServer: options.channelReplyServer ?? null,
-    storeForProject,
   });
 }
 
@@ -497,6 +536,13 @@ function createAppDaemonModule(
       ? {}
       : { completionTokenSecret: options.completionTokenSecret }),
     providers,
+    ...(options.channelSupervisor === null || options.channelSupervisor === undefined
+      ? {}
+      : {
+          onWorkflowChannelStream: (
+            input: Parameters<NonNullable<ChannelSupervisor["workflowStreamEvent"]>>[0],
+          ) => options.channelSupervisor!.workflowStreamEvent?.(input) ?? Promise.resolve(),
+        }),
     ...(options.executionAuthority === undefined
       ? {}
       : { executionAuthority: options.executionAuthority }),

@@ -1,8 +1,11 @@
-import { strict as assert } from "node:assert";
+import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { DurableProviderEvent } from "../../db/types.js";
 import { createMemoryDatabase } from "../../db/memory.js";
-import { createManualTriggerSource, handleManualTriggerRequest } from "./source.js";
+import {
+  createManualTriggerSource,
+  handleManualTriggerRequest,
+} from "./source.js";
 
 describe("manual trigger source", () => {
   it("passes arbitrary provider-namespaced payloads to the handler", async () => {
@@ -11,7 +14,8 @@ describe("manual trigger source", () => {
     assert.deepEqual(
       await manual.deliver({
         organizationId: "org_1",
-        projectId: manual.projectId,
+        triggerId: manual.workflowId,
+        triggerRevisionId: manual.revisionId,
         source: "discord.mention",
         deliveryId: "manual-discord-1",
         payload: {
@@ -20,12 +24,16 @@ describe("manual trigger source", () => {
           message: "@paseo ping",
         },
       }),
-      { status: 200, body: { status: "accepted", deliveryId: "manual-discord-1" } },
+      {
+        status: 200,
+        body: { status: "accepted", deliveryId: "manual-discord-1" },
+      },
     );
     assert.deepEqual(manual.received(), [
       {
         organizationId: "org_1",
-        projectId: manual.projectId,
+        triggerId: manual.workflowId,
+        triggerRevisionId: manual.revisionId,
         source: "discord.mention",
         deliveryId: "manual-discord-1",
         payload: {
@@ -35,7 +43,9 @@ describe("manual trigger source", () => {
         },
       },
     ]);
-    assert.deepEqual(manual.evidence(), [{ connectionId: null, resourceId: null }]);
+    assert.deepEqual(manual.evidence(), [
+      { connectionId: null, resourceId: null },
+    ]);
   });
 
   it("rejects non-namespaced manual payload sources", async () => {
@@ -44,14 +54,18 @@ describe("manual trigger source", () => {
     assert.deepEqual(
       await manual.deliver({
         organizationId: "org_1",
-        projectId: manual.projectId,
+        triggerId: manual.workflowId,
+        triggerRevisionId: manual.revisionId,
         source: "manual",
         deliveryId: "manual-legacy-1",
         payload: {},
       }),
       {
         status: 400,
-        body: { error: "source must be provider-namespaced, for example github.issue_comment" },
+        body: {
+          error:
+            "source must be provider-namespaced, for example github.issue_comment",
+        },
       },
     );
   });
@@ -59,7 +73,8 @@ describe("manual trigger source", () => {
 
 interface ManualDelivery {
   organizationId: string;
-  projectId: string;
+  triggerId: string;
+  triggerRevisionId: string;
   source: string;
   deliveryId: string;
   payload: unknown;
@@ -70,33 +85,39 @@ class ManualTriggers {
 
   private constructor(
     private readonly source: ReturnType<typeof createManualTriggerSource>,
-    readonly projectId: string,
+    readonly workflowId: string,
+    readonly revisionId: string,
   ) {}
 
   static async recording(): Promise<ManualTriggers> {
     const database = createMemoryDatabase();
-    const project = await database.createProject({
+    const workflow = await database.saveOrganizationTrigger({
       organizationId: "org_1",
-      name: "Manual project",
-      slug: "manual-project",
-      createdByUserId: "test-user",
-    });
-    const revision = await database.insertProjectConfigurationRevision({
-      projectId: project.id,
+      name: "manual-workflow",
+      enabled: true,
+      format: "legacy_multistep",
+      yaml: "name: manual-workflow",
       sourceKind: "manual",
       sourceEvidence: { kind: "test" },
       normalizedConfiguration: { environments: [], triggers: [] },
       contentHash: "manual-source-test-configuration",
+      createdByUserId: null,
+      routes: [],
     });
-    await database.activateProjectConfigurationRevision(project.id, revision.id);
-    const manual = new ManualTriggers(createManualTriggerSource(database), project.id);
+    const manual = new ManualTriggers(
+      createManualTriggerSource(database),
+      workflow.id,
+      workflow.activeRevisionId,
+    );
     await manual.source.start(async (trigger) => {
       manual.handled.push(trigger);
     });
     return manual;
   }
 
-  async deliver(delivery: ManualDelivery): Promise<{ status: number; body: unknown }> {
+  async deliver(
+    delivery: ManualDelivery,
+  ): Promise<{ status: number; body: unknown }> {
     const response = await handleManualTriggerRequest(
       new Request("http://localhost/test/trigger", {
         method: "POST",
@@ -110,16 +131,29 @@ class ManualTriggers {
   }
 
   received(): ManualDelivery[] {
-    return this.handled.map(({ organizationId, projectId, source, deliveryId, payload }) => ({
-      organizationId,
-      projectId,
-      source,
-      deliveryId,
-      payload,
-    }));
+    return this.handled.map(
+      ({
+        organizationId,
+        workflowId,
+        configurationRevisionId,
+        source,
+        deliveryId,
+        payload,
+      }) => ({
+        organizationId,
+        triggerId: workflowId,
+        triggerRevisionId: configurationRevisionId,
+        source,
+        deliveryId,
+        payload,
+      }),
+    );
   }
 
   evidence() {
-    return this.handled.map(({ connectionId, resourceId }) => ({ connectionId, resourceId }));
+    return this.handled.map(({ connectionId, resourceId }) => ({
+      connectionId,
+      resourceId,
+    }));
   }
 }

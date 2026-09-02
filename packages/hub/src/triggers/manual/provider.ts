@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { ProjectConfigurationStore } from "../../configuration/store.js";
 import { type TriggerProvider, type TriggerProviderMatch } from "../index.js";
 import { matchesInputFilters, parseInvocation } from "../invocation.js";
+import type { WorkflowConfigurationResolver } from "../configuration.js";
 
 export const ManualRunPayloadSchema = z.object({
   expectedVersionId: z.string().uuid().optional(),
@@ -45,15 +45,14 @@ export class ManualRunRejected extends Error {
 }
 
 export function createManualRunProvider(
-  configurationStoreForProject: (projectId: string) => ProjectConfigurationStore,
+  configurationForWorkflow: WorkflowConfigurationResolver,
 ): TriggerProvider<"manual", ManualRunContext, ManualRunOutputContext> {
   return {
     name: "manual",
     eventNames: ["manual.run"],
     async match(external) {
-      const store = configurationStoreForProject(external.projectId);
       const payload = ManualRunPayloadSchema.parse(external.payload);
-      const stored = await store.getRevision(external.configurationRevisionId);
+      const stored = await configurationForWorkflow(external);
       if (!stored) {
         throw new ManualRunRejected("configuration_not_found");
       }

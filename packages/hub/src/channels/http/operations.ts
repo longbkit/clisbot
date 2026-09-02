@@ -15,26 +15,23 @@
 // files, pre-compile the channel control plane (fail the request before any
 // write when the result would not compile), then insert + activate a new
 // revision through the app's standard store — one mutation path, no fork of
-// the activation semantics. Operator secrets are mirrored to the Hub data
-// directory (mode 0600); no token ever appears in any yml.
+// the activation semantics. Account files contain only connection ids; no token
+// appears in a revision or on disk.
 
-import { randomUUID, timingSafeEqual } from "node:crypto";
-import { chmod, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { dump, load } from "js-yaml";
 import { z } from "zod";
 import { CHANNEL_POLICY_PATH } from "../../config/bundle-contract.js";
-import { HubBundleError, type HubBundleFile } from "../../config/bundle.js";
 import {
-  ConfigurationActivationValidationError,
-  type ProjectConfigurationStore,
-} from "../../configuration/store.js";
+  compileHubBundle,
+  HubBundleError,
+  type HubBundleFile,
+} from "../../config/bundle.js";
 import type { Database } from "../../db/types.js";
 import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../../http/client-address.js";
 import {
   channelAgentNames,
   channelEnvironmentNames,
-  channelWorkflowNames,
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
   ChannelControlPlaneError,
@@ -65,27 +62,35 @@ export interface ChannelControlPlaneOps {
 export interface ChannelControlPlaneOpsOptions {
   database: Database | null;
   completionTokenSecret: string | undefined;
-  /** The Hub data directory operator secrets mirror into (`secrets/` under it). */
-  dataDir: string | undefined;
   /** The per-account lifecycle driver; null degrades the transport step. */
   supervisor: ChannelSupervisor | null;
-  /** The app's standard store factory (carries the daemon agent validator). */
-  storeForProject: (projectId: string) => ProjectConfigurationStore;
   /** The tool-path channel-reply MCP endpoint (E4); null degrades the
    * `/mcp/channel/<ref>` route to the shared 503. */
   channelReplyServer: ChannelReplyServer | null;
 }
 
 /** The P0 channels the control plane drives, and each one's default mode. */
-const P0_TRANSPORT_MODE: Record<string, string> = { slack: "socket", telegram: "polling" };
+const P0_TRANSPORT_MODE: Record<string, string> = {
+  slack: "socket",
+  telegram: "polling",
+};
 
-const channelAddBodySchema = z
-  .object({
-    channel: z.enum(["slack", "telegram"]),
-    account: z.string().min(1).max(128),
-    secret: z.string(),
-  })
-  .strict();
+const channelAddBodySchema = z.discriminatedUnion("channel", [
+  z
+    .object({
+      channel: z.literal("slack"),
+      account: z.string().min(1).max(128),
+      connectionId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal("telegram"),
+      account: z.string().min(1).max(128),
+      botToken: z.string().min(1),
+    })
+    .strict(),
+]);
 
 const userAddBodySchema = z
   .object({
@@ -107,19 +112,31 @@ export function createChannelControlPlaneOps(
 ): ChannelControlPlaneOps {
   return {
     addChannel: (request) =>
-      gate(options, request, (database) => handleAddChannel(database, request, options)),
+      gate(options, request, (database) =>
+        handleAddChannel(database, request, options),
+      ),
     listChannels: (request) =>
-      gate(options, request, (database) => handleListChannels(database, options.supervisor)),
+      gate(options, request, (database) =>
+        handleListChannels(database, options.supervisor),
+      ),
     channelStatus: (request) =>
       gate(options, request, () => handleChannelStatus(options.supervisor)),
-    listUsers: (request) => gate(options, request, (database) => handleListUsers(database)),
+    listUsers: (request) =>
+      gate(options, request, (database) => handleListUsers(database)),
     showUser: (request, username) =>
-      gate(options, request, (database) => handleShowUser(database, request, username)),
+      gate(options, request, (database) =>
+        handleShowUser(database, request, username),
+      ),
     addUser: (request) =>
-      gate(options, request, (database) => handleAddUser(database, request, options)),
+      gate(options, request, (database) =>
+        handleAddUser(database, request, options.supervisor),
+      ),
     editUser: (request, username) =>
-      gate(options, request, (database) => handleEditUser(database, request, username, options)),
-    handleChannelReplyMcp: (request, token) => gateChannelReplyMcp(options, request, token),
+      gate(options, request, (database) =>
+        handleEditUser(database, request, username, options.supervisor),
+      ),
+    handleChannelReplyMcp: (request, token) =>
+      gateChannelReplyMcp(options, request, token),
   };
 }
 
@@ -136,7 +153,9 @@ function gateChannelReplyMcp(
     return Promise.resolve(controlPlaneAbsent(request));
   }
   if (options.channelReplyServer === null) {
-    return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
+    return Promise.resolve(
+      Response.json({ error: "database_unavailable" }, { status: 503 }),
+    );
   }
   if (!authorized(request, options.completionTokenSecret)) {
     return Promise.resolve(
@@ -166,7 +185,9 @@ function gate(
     return Promise.resolve(controlPlaneAbsent(request));
   }
   if (options.database === null) {
-    return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
+    return Promise.resolve(
+      Response.json({ error: "database_unavailable" }, { status: 503 }),
+    );
   }
   if (!authorized(request, options.completionTokenSecret)) {
     return Promise.resolve(
@@ -180,7 +201,9 @@ function gate(
     );
   }
   const database = options.database;
-  return handle(database).catch((error: unknown) => Promise.resolve(errorResponse(request, error)));
+  return handle(database).catch((error: unknown) =>
+    Promise.resolve(errorResponse(request, error)),
+  );
 }
 
 /** The exact 404 the public API gives unknown canonical routes — byte-equivalent. */
@@ -196,14 +219,21 @@ function controlPlaneAbsent(request: Request): Response {
 
 /** A Bearer token must equal the instance auth secret (no loopback fallback);
  * without one, the caller's address must be loopback. */
-function authorized(request: Request, completionTokenSecret: string | undefined): boolean {
+function authorized(
+  request: Request,
+  completionTokenSecret: string | undefined,
+): boolean {
   const header = request.headers.get("authorization");
   if (header !== null) {
     const token = /^Bearer\s+(.+)$/u.exec(header.trim())?.[1];
-    if (token === undefined || completionTokenSecret === undefined) return false;
+    if (token === undefined || completionTokenSecret === undefined)
+      return false;
     const expected = Buffer.from(completionTokenSecret, "utf8");
     const presented = Buffer.from(token, "utf8");
-    return expected.length === presented.length && timingSafeEqual(expected, presented);
+    return (
+      expected.length === presented.length &&
+      timingSafeEqual(expected, presented)
+    );
   }
   const address = request.headers.get(INTERNAL_CLIENT_ADDRESS_HEADER);
   return (
@@ -217,7 +247,13 @@ function authorized(request: Request, completionTokenSecret: string | undefined)
 /** Map a handler failure to its status + problem body. */
 function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof ControlPlaneHttpError) {
-    return problem(request, error.status, error.code, error.title, error.detail);
+    return problem(
+      request,
+      error.status,
+      error.code,
+      error.title,
+      error.detail,
+    );
   }
   return problem(
     request,
@@ -242,15 +278,30 @@ class ControlPlaneHttpError extends Error {
 }
 
 function invalidRequest(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(400, "invalid_request", "Invalid request", detail);
+  return new ControlPlaneHttpError(
+    400,
+    "invalid_request",
+    "Invalid request",
+    detail,
+  );
 }
 
 function conflict(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(409, "control_plane_conflict", "Conflict", detail);
+  return new ControlPlaneHttpError(
+    409,
+    "control_plane_conflict",
+    "Conflict",
+    detail,
+  );
 }
 
 function invalidConfiguration(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(422, "invalid_configuration", "Invalid configuration", detail);
+  return new ControlPlaneHttpError(
+    422,
+    "invalid_configuration",
+    "Invalid configuration",
+    detail,
+  );
 }
 
 async function handleAddChannel(
@@ -262,24 +313,36 @@ async function handleAddChannel(
   if (body.account.includes("/") || body.account.includes("\0")) {
     throw invalidRequest("the account id must not contain '/'");
   }
-  if (options.dataDir === undefined) {
-    throw new ControlPlaneHttpError(
-      500,
-      "internal_error",
-      "Internal error",
-      "the hub data directory is not configured",
-    );
-  }
   const snapshot = await loadSnapshot(database);
-  const secretRef = await mirrorOperatorSecret(
-    options.dataDir,
+  const connectionId =
+    body.channel === "telegram"
+      ? (
+          await database.configureTelegramConnection({
+            organizationId: snapshot.organizationId,
+            accountId: body.account,
+            botToken: body.botToken,
+          })
+        ).connectionId
+      : body.connectionId;
+  const connection = await database.resolveChannelConnection({
+    organizationId: snapshot.organizationId,
+    channel: body.channel,
+    connectionId,
+  });
+  if (connection === undefined)
+    throw invalidRequest("the channel connection does not exist");
+  const files = upsertAccountFile(
+    snapshot,
     body.channel,
     body.account,
-    body.secret,
+    connectionId,
   );
-  const files = upsertAccountFile(snapshot, body.channel, body.account, secretRef);
-  await deployRevision(options, snapshot, files);
-  const start = await startAccount(options.supervisor, body.channel, body.account);
+  await deployRevision(database, snapshot, files);
+  const start = await startAccount(
+    options.supervisor,
+    body.channel,
+    body.account,
+  );
   return Response.json(
     {
       channel: body.channel,
@@ -306,16 +369,26 @@ async function handleListChannels(
   );
   const accounts = snapshot.controlPlane.accounts.map((account) => {
     // The effective switch: org kill-switch AND channel switch AND account flag.
-    const enabled = snapshot.controlPlane.enabled && account.channelEnabled && account.enabled;
+    const enabled =
+      snapshot.controlPlane.enabled &&
+      account.channelEnabled &&
+      account.enabled;
     const transport =
       transports.get(`${account.channel}\0${account.accountId}`) ??
       (enabled ? "stopped" : "disabled");
-    return { channel: account.channel, account: account.accountId, enabled, transport };
+    return {
+      channel: account.channel,
+      account: account.accountId,
+      enabled,
+      transport,
+    };
   });
   return Response.json({ accounts }, { status: 200 });
 }
 
-function handleChannelStatus(supervisor: ChannelSupervisor | null): Promise<Response> {
+function handleChannelStatus(
+  supervisor: ChannelSupervisor | null,
+): Promise<Response> {
   if (supervisor === null) {
     return Promise.resolve(Response.json({ accounts: [] }, { status: 200 }));
   }
@@ -337,8 +410,8 @@ function handleChannelStatus(supervisor: ChannelSupervisor | null): Promise<Resp
 
 async function handleListUsers(database: Database): Promise<Response> {
   const snapshot = await loadSnapshot(database);
-  const users = Object.entries(snapshot.controlPlane.users).map(([username, user]) =>
-    userView(username, user, snapshot.controlPlane),
+  const users = Object.entries(snapshot.controlPlane.users).map(
+    ([username, user]) => userView(username, user, snapshot.controlPlane),
   );
   return Response.json({ users }, { status: 200 });
 }
@@ -359,13 +432,15 @@ async function handleShowUser(
       `user "${username}" is not defined in the channel control plane`,
     );
   }
-  return Response.json(userView(username, user, snapshot.controlPlane), { status: 200 });
+  return Response.json(userView(username, user, snapshot.controlPlane), {
+    status: 200,
+  });
 }
 
 async function handleAddUser(
   database: Database,
   request: Request,
-  options: ChannelControlPlaneOpsOptions,
+  supervisor: ChannelSupervisor | null,
 ): Promise<Response> {
   const body = await parseJsonBody(request, userAddBodySchema);
   if (body.username.includes("/")) {
@@ -379,15 +454,23 @@ async function handleAddUser(
     identities: body.identities,
     ...(body.name === undefined ? {} : { name: body.name }),
   });
-  await deployRevision(options, snapshot, files);
-  return Response.json({ username: body.username, deployed: true }, { status: 200 });
+  await deployRevision(database, snapshot, files);
+  const reconciliation = await supervisor?.reconcile();
+  return Response.json(
+    {
+      username: body.username,
+      deployed: true,
+      ...(reconciliation === undefined ? {} : { reconciliation }),
+    },
+    { status: 200 },
+  );
 }
 
 async function handleEditUser(
   database: Database,
   request: Request,
   username: string,
-  options: ChannelControlPlaneOpsOptions,
+  supervisor: ChannelSupervisor | null,
 ): Promise<Response> {
   const body = await parseJsonBody(request, userEditBodySchema);
   if (body.name === undefined && body.identities === undefined) {
@@ -408,13 +491,26 @@ async function handleEditUser(
   const name = body.name !== undefined ? body.name : existing.name;
   const files = upsertPolicyUser(snapshot, username, {
     ...(name === null ? {} : { name }),
-    identities: body.identities !== undefined ? body.identities : [...existing.identities],
+    identities:
+      body.identities !== undefined
+        ? body.identities
+        : [...existing.identities],
   });
-  await deployRevision(options, snapshot, files);
-  return Response.json({ username, deployed: true }, { status: 200 });
+  await deployRevision(database, snapshot, files);
+  const reconciliation = await supervisor?.reconcile();
+  return Response.json(
+    {
+      username,
+      deployed: true,
+      ...(reconciliation === undefined ? {} : { reconciliation }),
+    },
+    { status: 200 },
+  );
 }
 
-async function loadSnapshot(database: Database): Promise<ChannelControlPlaneSnapshot> {
+async function loadSnapshot(
+  database: Database,
+): Promise<ChannelControlPlaneSnapshot> {
   try {
     return await loadChannelControlPlane(database);
   } catch (error) {
@@ -446,23 +542,11 @@ async function parseJsonBody<Schema extends z.ZodType>(
       .slice(0, 5)
       .map((entry) => `${entry.path.join(".")}: ${entry.message}`)
       .join("; ");
-    throw invalidRequest(`invalid request body${detail.length > 0 ? `: ${detail}` : ""}`);
+    throw invalidRequest(
+      `invalid request body${detail.length > 0 ? `: ${detail}` : ""}`,
+    );
   }
   return result.data;
-}
-
-/** Mirror the operator secret verbatim into the Hub data dir (never any yml). */
-async function mirrorOperatorSecret(
-  dataDir: string,
-  channel: string,
-  account: string,
-  secret: string,
-): Promise<string> {
-  const path = join(dataDir, "secrets", `${channel}--${account}`);
-  await mkdir(join(dataDir, "secrets"), { recursive: true });
-  await writeFile(path, secret, { mode: 0o600 });
-  await chmod(path, 0o600);
-  return path;
 }
 
 /** Write/replace the account file into a copy of the active revision's files. */
@@ -470,7 +554,7 @@ function upsertAccountFile(
   snapshot: ChannelControlPlaneSnapshot,
   channel: string,
   account: string,
-  secretRef: string,
+  connectionId: string,
 ): HubBundleFile[] {
   const path = `.paseo/channels/${channel}/${account}.yml`;
   const content = dump(
@@ -478,7 +562,7 @@ function upsertAccountFile(
       channel,
       accountId: account,
       enabled: true,
-      secretRef,
+      connectionId,
       transport: { mode: P0_TRANSPORT_MODE[channel] },
       fallback: { deny: true },
     },
@@ -495,7 +579,9 @@ function upsertPolicyUser(
   username: string,
   record: { identities: string[]; name?: string },
 ): HubBundleFile[] {
-  const existing = snapshot.files.find((file) => file.path === CHANNEL_POLICY_PATH);
+  const existing = snapshot.files.find(
+    (file) => file.path === CHANNEL_POLICY_PATH,
+  );
   const parsed: unknown = existing === undefined ? {} : load(existing.content);
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw invalidRequest("the active channel policy is not a mapping");
@@ -503,13 +589,20 @@ function upsertPolicyUser(
   const policy: Record<string, unknown> = { ...parsed };
   const existingUsers = policy["users"];
   const users: Record<string, unknown> =
-    typeof existingUsers === "object" && existingUsers !== null && !Array.isArray(existingUsers)
+    typeof existingUsers === "object" &&
+    existingUsers !== null &&
+    !Array.isArray(existingUsers)
       ? { ...(existingUsers as Record<string, unknown>) }
       : {};
   users[username] = record;
   policy["users"] = users;
-  const next = snapshot.files.filter((file) => file.path !== CHANNEL_POLICY_PATH);
-  next.push({ path: CHANNEL_POLICY_PATH, content: dump(policy, { lineWidth: -1 }) });
+  const next = snapshot.files.filter(
+    (file) => file.path !== CHANNEL_POLICY_PATH,
+  );
+  next.push({
+    path: CHANNEL_POLICY_PATH,
+    content: dump(policy, { lineWidth: -1 }),
+  });
   return next;
 }
 
@@ -519,39 +612,53 @@ function upsertPolicyUser(
  * validates the hub bundle + daemon agents, but the channel compile only runs
  * at load time — a broken channel revision would poison every later load.
  */
-async function deployRevision(
-  options: ChannelControlPlaneOpsOptions,
+export async function deployRevision(
+  database: Database,
   snapshot: ChannelControlPlaneSnapshot,
   files: readonly HubBundleFile[],
 ): Promise<void> {
   try {
+    const candidateResourceFiles = [...files];
+    if (!candidateResourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {
+      candidateResourceFiles.push({
+        path: ".paseo/hub.yml",
+        content: "environments: {}\nagents: {}\n",
+      });
+    }
+    const candidateBundle = compileHubBundle(candidateResourceFiles, {
+      requireWorkflow: false,
+    });
+    const workflowNames = (
+      await database.listOrganizationTriggers(snapshot.organizationId)
+    )
+      .filter(({ enabled }) => enabled)
+      .map(({ name }) => name);
     compileChannelControlPlane({
       files,
-      agentNames: channelAgentNames(snapshot.bundle),
-      environmentNames: channelEnvironmentNames(snapshot.bundle),
-      workflowNames: channelWorkflowNames(snapshot.bundle),
+      agentNames: channelAgentNames(candidateBundle),
+      environmentNames: channelEnvironmentNames(candidateBundle),
+      workflowNames,
     });
   } catch (error) {
-    if (error instanceof ChannelCompilationError || error instanceof HubBundleError) {
+    if (
+      error instanceof ChannelCompilationError ||
+      error instanceof HubBundleError
+    ) {
       throw invalidConfiguration(error.message);
     }
     throw error;
   }
-  const store = options.storeForProject(snapshot.projectId);
-  try {
-    const revision = await store.insertManualBundleRevision({ files, userId: null });
-    await store.activate(revision.id);
-  } catch (error) {
-    if (
-      error instanceof ConfigurationActivationValidationError ||
-      error instanceof HubBundleError
-    ) {
-      throw invalidConfiguration(
-        error instanceof Error ? error.message : "the configuration revision does not activate",
-      );
-    }
-    throw error;
-  }
+  const canonical = [...files].sort((left, right) =>
+    left.path.localeCompare(right.path),
+  );
+  await database.saveChannelConfiguration({
+    organizationId: snapshot.organizationId,
+    files: canonical,
+    contentHash: createHash("sha256")
+      .update(JSON.stringify(canonical))
+      .digest("hex"),
+    createdByUserId: null,
+  });
 }
 
 /** The supervisor's start step, degraded when the supervisor is unavailable. */
@@ -559,9 +666,17 @@ async function startAccount(
   supervisor: ChannelSupervisor | null,
   channel: string,
   account: string,
-): Promise<{ installed: boolean; transport: "started" | "deferred"; detail?: string }> {
+): Promise<{
+  installed: boolean;
+  transport: "started" | "deferred";
+  detail?: string;
+}> {
   if (supervisor === null) {
-    return { installed: false, transport: "deferred", detail: "channel supervisor unavailable" };
+    return {
+      installed: false,
+      transport: "deferred",
+      detail: "channel supervisor unavailable",
+    };
   }
   try {
     const result = await supervisor.startAccount(channel, account);
@@ -575,7 +690,8 @@ async function startAccount(
     return {
       installed: false,
       transport: "deferred",
-      detail: error instanceof Error ? error.message : "the channel start failed",
+      detail:
+        error instanceof Error ? error.message : "the channel start failed",
     };
   }
 }
@@ -585,7 +701,12 @@ function userView(
   username: string,
   user: { name: string | null; identities: readonly string[] },
   controlPlane: ChannelControlPlane,
-): { username: string; name: string | null; identities: string[]; roles: string[] } {
+): {
+  username: string;
+  name: string | null;
+  identities: string[];
+  roles: string[];
+} {
   return {
     username,
     name: user.name,
@@ -597,7 +718,10 @@ function userView(
 /** The roles covering the user: every org/account assignment whose identities
  * cover the user (the canonical cover check in `../policy.js`), restricted to
  * known role names — `[]` when none. */
-function userRoles(username: string, controlPlane: ChannelControlPlane): string[] {
+function userRoles(
+  username: string,
+  controlPlane: ChannelControlPlane,
+): string[] {
   const owners = controlPlane.identityOwners;
   const names = new Set<string>();
   const assignments = [

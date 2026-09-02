@@ -16,7 +16,7 @@ export interface DaemonEnvironmentTarget {
 export interface LaunchMachineIntent {
   kind: "launch_machine";
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   triggerRunId: string;
   workflowStepRunId?: string;
   triggerName: string;
@@ -27,6 +27,8 @@ export interface LaunchMachineIntent {
   prompt: string;
   agent: TriggerAgentConfig;
   allowOutputs: readonly AllowedOutput[];
+  reuse?: `binding` | `steps.${string}`;
+  reuseAgentId?: string;
   timeoutMs?: number;
   idleTimeoutMs?: number;
   autoArchive: boolean;
@@ -40,7 +42,7 @@ export interface LaunchMachineIntent {
 
 export function buildLaunchMachineIntent(input: {
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   triggerRunId: string;
   configurationRevisionId: string;
   triggerName: string;
@@ -51,6 +53,7 @@ export function buildLaunchMachineIntent(input: {
   prompt: string;
   agent: TriggerAgentConfig;
   allowOutputs: readonly AllowedOutput[];
+  reuse?: `binding` | `steps.${string}`;
   timeoutMs?: number;
   idleTimeoutMs?: number;
   autoArchive: boolean;
@@ -61,7 +64,7 @@ export function buildLaunchMachineIntent(input: {
   return {
     kind: "launch_machine",
     organizationId: input.organizationId,
-    projectId: input.projectId,
+    workflowId: input.workflowId,
     triggerRunId: input.triggerRunId,
     triggerName: input.triggerName,
     environmentName: input.environmentName,
@@ -71,6 +74,7 @@ export function buildLaunchMachineIntent(input: {
     prompt: input.prompt,
     agent: input.agent,
     allowOutputs: input.allowOutputs,
+    ...(input.reuse === undefined ? {} : { reuse: input.reuse }),
     ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
     ...(input.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: input.idleTimeoutMs }),
     autoArchive: input.autoArchive,

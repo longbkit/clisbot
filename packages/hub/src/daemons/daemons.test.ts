@@ -1064,6 +1064,14 @@ describe("daemon enrollment and execution", () => {
     assert.equal(response["error"], undefined);
     assert.equal((await hub.execution(result.execution.id)).status, "succeeded");
     assert.equal(hub.terminalHookCount(), 1);
+
+    // The MCP HTTP callback may complete before the daemon sends the final
+    // stream frames. Keep the dispatch subscription alive until those frames
+    // drain; channel relay depends on the same ordering guarantee.
+    await hub.completeCurrentTurnWithoutFinishTimeline(result.agentId);
+    const drained = await hub.waitForExecutionDrain(result.execution.id);
+    assert.notEqual(drained.hubActionAcknowledgements.terminalAt, null);
+    assert.notEqual(drained.hubActionAcknowledgements.idleAt, null);
   });
 
   it("keeps a required output completion recoverable through the application MCP route", async () => {

@@ -87,10 +87,40 @@ export async function runChannelsAddCommand(
   _command: Command,
 ): Promise<SingleResult<ChannelAddResult>> {
   const account = requiredStringOption(options, "account");
-  const secretFile = requiredStringOption(options, "secret-file");
   const target = resolveControlPlaneTarget(extractControlPlaneOptions(options));
-  const result = await addChannel(target, { channel, account, secret: readSecretFile(secretFile) });
+  const result =
+    channel === "slack"
+      ? await addChannel(target, {
+          channel,
+          account,
+          connectionId: requiredStringOption(options, "connection-id"),
+        })
+      : channel === "telegram"
+        ? await addChannel(target, {
+            channel,
+            account,
+            botToken: telegramToken(readSecretFile(requiredStringOption(options, "secret-file"))),
+          })
+        : (() => {
+            throw { code: "INVALID_CHANNEL", message: `Unsupported channel: ${channel}` };
+          })();
   return { type: "single", data: result, schema: channelsAddSchema };
+}
+
+function telegramToken(value: string): string {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      typeof Reflect.get(parsed, "botToken") === "string"
+    ) {
+      return String(Reflect.get(parsed, "botToken"));
+    }
+  } catch {
+    // A plain token file is the preferred shape.
+  }
+  return value.trim();
 }
 
 export type ChannelsListResult = ListResult<ChannelAccount>;
@@ -125,10 +155,8 @@ export function createChannelsCommand(): Command {
         .description("Install a channel account on the running Hub")
         .argument("<channel>", "Channel id (for example: slack, telegram)")
         .requiredOption("--account <id>", "Account id to install")
-        .requiredOption(
-          "--secret-file <path>",
-          "Operator secret file to install (read from local disk)",
-        ),
+        .option("--connection-id <uuid>", "Existing Hub Slack connection id")
+        .option("--secret-file <path>", "Telegram bot-token file"),
     ),
   ).action(withOutput(runChannelsAddCommand));
 

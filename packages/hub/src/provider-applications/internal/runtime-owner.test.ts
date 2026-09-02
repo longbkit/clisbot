@@ -4,7 +4,11 @@ import type { AuthServer } from "../../auth/server.js";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { DurableProviderEvent } from "../../db/types.js";
 import type { ProviderRegistration } from "../../providers/registration.js";
-import type { ExternalTrigger, TriggerHandler, TriggerProvider } from "../../triggers/index.js";
+import type {
+  ExternalTrigger,
+  TriggerHandler,
+  TriggerProvider,
+} from "../../triggers/index.js";
 import type {
   Provider,
   ProviderApplicationConfiguration,
@@ -14,6 +18,38 @@ import type {
 import { DynamicProviderRuntime } from "./runtime-owner.js";
 
 describe("dynamic provider runtime", () => {
+  it("hands one Slack app's inbound source to the Channel owner and restores it on release", async () => {
+    const started: string[] = [];
+    const stopped: string[] = [];
+    const runtime = new DynamicProviderRuntime({
+      database: createMemoryDatabase(),
+      auth: testAuth(),
+      applicationBaseUrl: "https://hub.test",
+      registrationFactory: ({ configuration }) =>
+        fakeRegistration(configurationId(configuration), started, stopped, []),
+    });
+    const stable = runtime
+      .registrations()
+      .find((registration) => registration.connection.name === "slack")!;
+    await stable.sources[0]!.start(() => Promise.resolve());
+    await runtime.setSlackInboundSuppressed("A1", true);
+    const candidate = await runtime.prepare(
+      "slack",
+      slackConfiguration("A1"),
+      "https://hub.test",
+      { provider: "slack", id: "A1", name: "A1" },
+      1,
+    );
+    await candidate.start();
+    candidate.publish();
+    assert.deepEqual(started, []);
+
+    await runtime.setSlackInboundSuppressed("A1", false);
+    assert.deepEqual(started, ["A1"]);
+    await runtime.setSlackInboundSuppressed("A1", true);
+    assert.deepEqual(stopped, ["A1"]);
+  });
+
   it.each([
     "github.issues",
     "github.issue_comment",
@@ -21,41 +57,43 @@ describe("dynamic provider runtime", () => {
     "github.pull_request_review",
     "github.pull_request_review_comment",
     "github.push",
-  ] as const)("publishes raw source %s through the activated GitHub runtime", async (eventName) => {
-    const runtime = new DynamicProviderRuntime({
-      database: createMemoryDatabase(),
-      auth: testAuth(),
-      applicationBaseUrl: "https://hub.test",
-      registrationFactory: ({ configuration }) =>
-        downstreamRegistration(providerConfigurationId(configuration), [], []),
-    });
-    const stable = runtime
-      .registrations()
-      .find((registration) => registration.connection.name === "github")!;
-    await stable.sources[0]!.start(() => Promise.resolve());
-    const trigger = stable.triggerProviders[0]!({
-      configurationStoreForProject: () => {
-        throw new Error("unused");
-      },
-      connectionsForProject: () => {
-        throw new Error("unused");
-      },
-    })!;
+  ] as const)(
+    "publishes raw source %s through the activated GitHub runtime",
+    async (eventName) => {
+      const runtime = new DynamicProviderRuntime({
+        database: createMemoryDatabase(),
+        auth: testAuth(),
+        applicationBaseUrl: "https://hub.test",
+        registrationFactory: ({ configuration }) =>
+          downstreamRegistration(
+            providerConfigurationId(configuration),
+            [],
+            [],
+          ),
+      });
+      const stable = runtime
+        .registrations()
+        .find((registration) => registration.connection.name === "github")!;
+      await stable.sources[0]!.start(() => Promise.resolve());
+      const trigger = stable.triggerProviders[0]!({
+        configurationForWorkflow: async () => undefined,
+      })!;
 
-    const candidate = await runtime.prepare(
-      "github",
-      providerConfiguration("github", "A1"),
-      "https://hub.test",
-      providerIdentity("github", "A1"),
-      1,
-    );
-    await candidate.start();
-    candidate.publish();
+      const candidate = await runtime.prepare(
+        "github",
+        providerConfiguration("github", "A1"),
+        "https://hub.test",
+        providerIdentity("github", "A1"),
+        1,
+      );
+      await candidate.start();
+      candidate.publish();
 
-    assert.ok(trigger.eventNames.includes(eventName));
-  });
+      assert.ok(trigger.eventNames.includes(eventName));
+    },
+  );
 
-  it("publishes a started replacement and routes later callbacks through it", async () => {
+  it("keeps two Slack applications live and routes callbacks by application identity", async () => {
     const started: string[] = [];
     const stopped: string[] = [];
     const completed: string[] = [];
@@ -64,7 +102,12 @@ describe("dynamic provider runtime", () => {
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
       registrationFactory: ({ configuration }) =>
-        fakeRegistration(configurationId(configuration), started, stopped, completed),
+        fakeRegistration(
+          configurationId(configuration),
+          started,
+          stopped,
+          completed,
+        ),
     });
     const stable = runtime
       .registrations()
@@ -81,12 +124,7 @@ describe("dynamic provider runtime", () => {
     await first.start();
     first.publish();
     const trigger = stable.triggerProviders[0]!({
-      configurationStoreForProject: () => {
-        throw new Error("unused");
-      },
-      connectionsForProject: () => {
-        throw new Error("unused");
-      },
+      configurationForWorkflow: async () => undefined,
     })!;
     const matches = await trigger.match(externalTrigger());
     if (typeof matches === "string") throw new Error("expected a match");
@@ -103,27 +141,56 @@ describe("dynamic provider runtime", () => {
     second.publish();
     await new Promise((resolve) => setImmediate(resolve));
 
-    // The replaced source retires immediately; later callbacks use the active registration.
-    assert.deepEqual(stopped, ["A1"]);
+    // A different application id is additive; the first source remains live.
+    assert.deepEqual(stopped, []);
 
-    await trigger.onAgentExecutionCompleted?.(oldMatch!.triggerContext, oldMatch!.outputContext, {
-      status: "succeeded",
-    });
-    await trigger.onAgentExecutionTerminal?.("execution-1", oldMatch!.triggerContext);
+    await trigger.onAgentExecutionCompleted?.(
+      oldMatch!.triggerContext,
+      oldMatch!.outputContext,
+      {
+        status: "succeeded",
+      },
+    );
+    await trigger.onAgentExecutionTerminal?.(
+      "execution-1",
+      oldMatch!.triggerContext,
+    );
     await new Promise((resolve) => setImmediate(resolve));
-    const response = await stable.connection.actions["start"]!(
+    const ambiguous = await stable.connection.actions["start"]!(
       new Request("https://hub.test/start", { method: "POST" }),
     );
+    assert.equal(ambiguous.status, 409);
+    const response = await stable.connection.actions["start"]!(
+      new Request("https://hub.test/start?providerApplicationId=A1", {
+        method: "POST",
+      }),
+    );
     assert.deepEqual(started, ["A1", "A2"]);
-    assert.deepEqual(stopped, ["A1"]);
-    assert.deepEqual(completed, ["A2"]);
-    assert.deepEqual(await response.json(), { url: "https://provider.test/A2" });
+    assert.deepEqual(stopped, []);
+    assert.deepEqual(completed, ["A1"]);
+    assert.deepEqual(await response.json(), {
+      url: "https://provider.test/A1",
+    });
   });
 
   it("routes replies and attachments through the active registration", async () => {
     const used: string[] = [];
     const stopped: string[] = [];
-    const database = createMemoryDatabase();
+    const database = createMemoryDatabase({
+      slackConnections: [
+        {
+          id: "connection",
+          organizationId: "org",
+          slug: "slack-a1",
+          teamId: "T1",
+          teamName: "Team",
+          botUserId: "U1",
+          botAccessToken: "token",
+          scopes: ["app_mentions:read", "chat:write"],
+          providerApplicationId: "A1",
+        },
+      ],
+    });
     const runtime = new DynamicProviderRuntime({
       database,
       auth: testAuth(),
@@ -136,12 +203,7 @@ describe("dynamic provider runtime", () => {
       .find((registration) => registration.connection.name === "slack")!;
     await stable.sources[0]!.start(() => Promise.resolve());
     const trigger = stable.triggerProviders[0]!({
-      configurationStoreForProject: () => {
-        throw new Error("unused");
-      },
-      connectionsForProject: () => {
-        throw new Error("unused");
-      },
+      configurationForWorkflow: async () => undefined,
     })!;
     const first = await runtime.prepare(
       "slack",
@@ -158,7 +220,7 @@ describe("dynamic provider runtime", () => {
     await trigger.materializeLaunch?.({
       executionId: "execution-1",
       organizationId: "org",
-      projectId: "project",
+      workflowId: "workflow",
       triggerContext: match.triggerContext,
     });
 
@@ -185,11 +247,14 @@ describe("dynamic provider runtime", () => {
       executionId: "execution-1",
     });
 
-    assert.deepEqual(used, ["launch:A1", "reply:A2", "attachment:A2"]);
-    assert.deepEqual(stopped, ["A1"]);
-    await trigger.onAgentExecutionTerminal?.("execution-1", match.triggerContext);
+    assert.deepEqual(used, ["launch:A1", "reply:A1", "attachment:A1"]);
+    assert.deepEqual(stopped, []);
+    await trigger.onAgentExecutionTerminal?.(
+      "execution-1",
+      match.triggerContext,
+    );
     await new Promise((resolve) => setImmediate(resolve));
-    assert.deepEqual(stopped, ["A1"]);
+    assert.deepEqual(stopped, []);
   });
 
   it("lets a Discord-triggered execution use the active GitHub integration and authority", async () => {
@@ -199,7 +264,11 @@ describe("dynamic provider runtime", () => {
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
       registrationFactory: ({ configuration }) =>
-        downstreamRegistration(providerConfigurationId(configuration), used, []),
+        downstreamRegistration(
+          providerConfigurationId(configuration),
+          used,
+          [],
+        ),
     });
     const github = runtime
       .registrations()
@@ -208,12 +277,7 @@ describe("dynamic provider runtime", () => {
       .registrations()
       .find((registration) => registration.connection.name === "discord")!;
     const discordTrigger = discord.triggerProviders[0]!({
-      configurationStoreForProject: () => {
-        throw new Error("unused");
-      },
-      connectionsForProject: () => {
-        throw new Error("unused");
-      },
+      configurationForWorkflow: async () => undefined,
     })!;
     const githubCandidate = await runtime.prepare(
       "github",
@@ -243,7 +307,7 @@ describe("dynamic provider runtime", () => {
     await discordTrigger.materializeLaunch?.({
       executionId: "execution-1",
       organizationId: "org",
-      projectId: "project",
+      workflowId: "workflow",
       triggerContext: match.triggerContext,
     });
 
@@ -251,13 +315,17 @@ describe("dynamic provider runtime", () => {
       executionId: "execution-1",
     });
     const authority = await github.integration!.githubAuthority!.mint({
-      projectId: "project",
+      organizationId: "org",
       connectionSlug: "github",
       repositories: ["acme/repository"],
       permissions: { contents: "write" },
     });
 
-    assert.deepEqual(used, ["launch:D1", "integration:A1", "authority-mint:A1"]);
+    assert.deepEqual(used, [
+      "launch:D1",
+      "integration:A1",
+      "authority-mint:A1",
+    ]);
     await github.integration!.githubAuthority!.revoke(authority.token);
   });
 
@@ -274,13 +342,15 @@ describe("dynamic provider runtime", () => {
     await assert.rejects(
       async () =>
         github.integration!.githubAuthority!.mint({
-          projectId: "project",
+          organizationId: "org",
           connectionSlug: "github",
           repositories: ["acme/repository"],
           permissions: { contents: "read" },
         }),
       (error: unknown) =>
-        error instanceof Error && "code" in error && error.code === "github_authority_unavailable",
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "github_authority_unavailable",
     );
   });
 
@@ -317,20 +387,18 @@ describe("dynamic provider runtime", () => {
     await first.start();
     first.publish();
     const trigger = stable.triggerProviders[0]!({
-      configurationStoreForProject: () => {
-        throw new Error("unused");
-      },
-      connectionsForProject: () => {
-        throw new Error("unused");
-      },
+      configurationForWorkflow: async () => undefined,
     })!;
-    const matches = await trigger.match({ ...externalTrigger(), source: "github.push" });
+    const matches = await trigger.match({
+      ...externalTrigger(),
+      source: "github.push",
+    });
     if (typeof matches === "string") throw new Error("expected a match");
     const match = matches[0]!;
     await trigger.materializeLaunch?.({
       executionId: "execution-1",
       organizationId: "org",
-      projectId: "project",
+      workflowId: "workflow",
       triggerContext: match.triggerContext,
     });
 
@@ -358,7 +426,7 @@ describe("dynamic provider runtime", () => {
       executionId: "execution-1",
     });
     const authority = await stable.integration!.githubAuthority!.mint({
-      projectId: "project",
+      organizationId: "org",
       connectionSlug: "github",
       repositories: ["acme/repository"],
       permissions: { contents: "write" },
@@ -372,7 +440,10 @@ describe("dynamic provider runtime", () => {
       "authority-mint:A2",
     ]);
     assert.deepEqual(stopped, ["A1"]);
-    await trigger.onAgentExecutionTerminal?.("execution-1", match.triggerContext);
+    await trigger.onAgentExecutionTerminal?.(
+      "execution-1",
+      match.triggerContext,
+    );
     await new Promise((resolve) => setImmediate(resolve));
     assert.deepEqual(stopped, ["A1"]);
     await stable.integration!.githubAuthority!.revoke(authority.token);
@@ -421,8 +492,10 @@ describe("dynamic provider runtime", () => {
     const response = await stable.connection.actions["start"]!(
       new Request("https://hub.test/start", { method: "POST" }),
     );
-    assert.deepEqual(await response.json(), { url: "https://provider.test/A1" });
-    assert.equal(runtime.identity("slack")?.id, "A1");
+    assert.deepEqual(await response.json(), {
+      url: "https://provider.test/A1",
+    });
+    assert.equal(runtime.identity("slack", "A1")?.id, "A1");
   });
 
   for (const provider of ["github", "slack", "discord"] as const) {
@@ -432,7 +505,10 @@ describe("dynamic provider runtime", () => {
         auth: testAuth(),
         applicationBaseUrl: "https://hub.test",
         registrationFactory: ({ provider: candidateProvider, configuration }) =>
-          connectionRegistration(candidateProvider, providerConfigurationId(configuration)),
+          connectionRegistration(
+            candidateProvider,
+            providerConfigurationId(configuration),
+          ),
       });
       const stable = runtime
         .registrations()
@@ -452,7 +528,9 @@ describe("dynamic provider runtime", () => {
       const response = await stable.connection.actions["start"]!(
         new Request("https://hub.test/start", { method: "POST" }),
       );
-      assert.deepEqual(await response.json(), { url: `https://provider.test/${provider}/one` });
+      assert.deepEqual(await response.json(), {
+        url: `https://provider.test/${provider}/one`,
+      });
     });
 
     it(`keeps the working ${provider} registration when replacement startup fails`, async () => {
@@ -494,8 +572,10 @@ describe("dynamic provider runtime", () => {
       const response = await stable.connection.actions["start"]!(
         new Request("https://hub.test/start", { method: "POST" }),
       );
-      assert.deepEqual(await response.json(), { url: `https://provider.test/${provider}/one` });
-      assert.equal(runtime.identity(provider)?.id, "one");
+      assert.deepEqual(await response.json(), {
+        url: `https://provider.test/${provider}/one`,
+      });
+      assert.equal(runtime.identity(provider, "one")?.id, "one");
     });
   }
 
@@ -503,6 +583,7 @@ describe("dynamic provider runtime", () => {
     const database = createMemoryDatabase();
     database.findConnectionAttemptConfiguration = () =>
       Promise.resolve({
+        providerApplicationId: "old",
         configurationVersion: 1,
         callbackOrigin: "https://old-origin.test",
         configurationSnapshot: slackConfiguration("old"),
@@ -513,9 +594,20 @@ describe("dynamic provider runtime", () => {
       database,
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
-      registrationFactory: ({ provider, configuration, callbackOrigin, configurationVersion }) => ({
-        ...connectionRegistration(provider, providerConfigurationId(configuration)),
-        configurationSnapshot: { version: configurationVersion, callbackOrigin },
+      registrationFactory: ({
+        provider,
+        configuration,
+        callbackOrigin,
+        configurationVersion,
+      }) => ({
+        ...connectionRegistration(
+          provider,
+          providerConfigurationId(configuration),
+        ),
+        configurationSnapshot: {
+          version: configurationVersion,
+          callbackOrigin,
+        },
       }),
     });
     const active = await runtime.prepare(
@@ -545,11 +637,17 @@ describe("dynamic provider runtime", () => {
       auth: testAuth(),
       applicationBaseUrl: "https://hub.test",
       registrationFactory: ({ provider, configuration }) => ({
-        ...connectionRegistration(provider, providerConfigurationId(configuration)),
+        ...connectionRegistration(
+          provider,
+          providerConfigurationId(configuration),
+        ),
         sources: [
           {
             start: (handler) => {
-              sourceHandlers.set(providerConfigurationId(configuration), handler);
+              sourceHandlers.set(
+                providerConfigurationId(configuration),
+                handler,
+              );
               return Promise.resolve();
             },
             stop: () => Promise.resolve(),
@@ -572,27 +670,32 @@ describe("dynamic provider runtime", () => {
       1,
     );
     await first.start();
-    await assert.rejects(sourceHandlers.get("one")!(durableEvent("before-first-publish")));
+    const firstHandler = sourceHandlers.get("one")!;
+    await assert.rejects(firstHandler(durableEvent("before-first-publish")));
     first.publish();
     await sourceHandlers.get("one")!(durableEvent("first-active"));
     const second = await runtime.prepare(
       "slack",
-      slackConfiguration("two"),
+      slackConfiguration("one"),
       "https://hub.test",
-      { provider: "slack", id: "two", name: "Two" },
+      { provider: "slack", id: "one", name: "One" },
       2,
     );
     await second.start();
-    await assert.rejects(sourceHandlers.get("two")!(durableEvent("before-second-publish")));
+    const secondHandler = sourceHandlers.get("one")!;
+    await assert.rejects(secondHandler(durableEvent("before-second-publish")));
     second.publish();
-    await assert.rejects(sourceHandlers.get("one")!(durableEvent("retired")));
-    await sourceHandlers.get("two")!(durableEvent("second-active"));
+    await assert.rejects(firstHandler(durableEvent("retired")));
+    await secondHandler(durableEvent("second-active"));
 
     assert.deepEqual(accepted, ["first-active", "second-active"]);
   });
 });
 
-function providerConfiguration(provider: Provider, id: string): ProviderApplicationConfiguration {
+function providerConfiguration(
+  provider: Provider,
+  id: string,
+): ProviderApplicationConfiguration {
   if (provider === "github") {
     return {
       provider,
@@ -606,17 +709,33 @@ function providerConfiguration(provider: Provider, id: string): ProviderApplicat
   }
   if (provider === "slack") return slackConfiguration(id);
   if (provider === "linear") {
-    return { provider, clientId: id, clientSecret: "secret", webhookSecret: "webhook" };
+    return {
+      provider,
+      clientId: id,
+      clientSecret: "secret",
+      webhookSecret: "webhook",
+    };
   }
-  return { provider, applicationId: id, clientSecret: "secret", botToken: "token" };
+  return {
+    provider,
+    applicationId: id,
+    clientSecret: "secret",
+    botToken: "token",
+  };
 }
 
-function providerIdentity(provider: Provider, id: string): ProviderApplicationIdentity {
-  if (provider === "github") return { provider, id, name: id, ownerLogin: "owner" };
+function providerIdentity(
+  provider: Provider,
+  id: string,
+): ProviderApplicationIdentity {
+  if (provider === "github")
+    return { provider, id, name: id, ownerLogin: "owner" };
   return { provider, id, name: id };
 }
 
-function providerConfigurationId(configuration: ProviderApplicationConfiguration): string {
+function providerConfigurationId(
+  configuration: ProviderApplicationConfiguration,
+): string {
   if (configuration.provider === "github") return configuration.appId;
   if (configuration.provider === "slack") return configuration.appId;
   if (configuration.provider === "linear") return configuration.clientId;
@@ -634,14 +753,19 @@ function connectionRegistration(
       status: () => ({ status: "connected" }),
       actions: {
         start: () =>
-          Promise.resolve(Response.json({ url: `https://provider.test/${provider}/${id}` })),
+          Promise.resolve(
+            Response.json({ url: `https://provider.test/${provider}/${id}` }),
+          ),
         callback: () => Promise.resolve(Response.json({ callbackFor: id })),
       },
     },
     triggerProviders: [],
     sources: [
       {
-        start: () => (failStart ? Promise.reject(new Error("start failed")) : Promise.resolve()),
+        start: () =>
+          failStart
+            ? Promise.reject(new Error("start failed"))
+            : Promise.resolve(),
         stop: () => Promise.resolve(),
       },
     ],
@@ -650,7 +774,9 @@ function connectionRegistration(
   };
 }
 
-function slackConfiguration(appId: string): SlackProviderApplicationConfiguration {
+function slackConfiguration(
+  appId: string,
+): SlackProviderApplicationConfiguration {
   return {
     provider: "slack",
     transport: "webhook",
@@ -661,8 +787,11 @@ function slackConfiguration(appId: string): SlackProviderApplicationConfiguratio
   };
 }
 
-function configurationId(configuration: ProviderApplicationConfiguration): string {
-  if (configuration.provider !== "slack") throw new Error("expected Slack configuration");
+function configurationId(
+  configuration: ProviderApplicationConfiguration,
+): string {
+  if (configuration.provider !== "slack")
+    throw new Error("expected Slack configuration");
   return configuration.appId;
 }
 
@@ -680,8 +809,8 @@ function fakeRegistration(
       Promise.resolve([
         {
           triggerName: "mention",
-          triggerContext: { id },
-          outputContext: { id },
+          triggerContext: { id, providerApplicationId: id },
+          outputContext: { id, providerApplicationId: id },
           hubConfig: {},
           invocation: { status: "accepted", prompt: "", inputs: {} },
         },
@@ -696,7 +825,10 @@ function fakeRegistration(
       name: "slack",
       status: () => ({ status: "connected" }),
       actions: {
-        start: () => Promise.resolve(Response.json({ url: `https://provider.test/${id}` })),
+        start: () =>
+          Promise.resolve(
+            Response.json({ url: `https://provider.test/${id}` }),
+          ),
       },
     },
     triggerProviders: [() => trigger],
@@ -731,8 +863,8 @@ function downstreamRegistration(
       Promise.resolve([
         {
           triggerName: "event",
-          triggerContext: { id },
-          outputContext: { provider: "slack", id },
+          triggerContext: { id, providerApplicationId: id },
+          outputContext: { provider: "slack", id, providerApplicationId: id },
           hubConfig: {},
           invocation: { status: "accepted", prompt: "", inputs: {} },
         },
@@ -782,7 +914,11 @@ function downstreamRegistration(
     outputs: [
       {
         type: "slack.reply",
-        tool: { name: "reply", description: "reply", inputSchema: { type: "object" } },
+        tool: {
+          name: "reply",
+          description: "reply",
+          inputSchema: { type: "object" },
+        },
         execute: () => {
           used.push(`reply:${id}`);
           return Promise.resolve();
@@ -814,7 +950,7 @@ function externalTrigger(): ExternalTrigger {
   return {
     providerEventReceiptId: "receipt",
     organizationId: "org",
-    projectId: "project",
+    workflowId: "workflow",
     configurationRevisionId: "revision",
     source: "slack.mention",
     deliveryId: "delivery",
@@ -827,7 +963,7 @@ function durableEvent(payload: string): DurableProviderEvent {
   return {
     providerEventReceiptId: "receipt",
     organizationId: "org",
-    projectId: "project",
+    workflowId: "workflow",
     configurationRevisionId: "revision",
     source: "slack.mention",
     deliveryId: payload,

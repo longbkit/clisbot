@@ -1,4 +1,3 @@
-import type { ProjectConfigurationStore } from "../../configuration/store.js";
 import type { CompiledTriggerConfig } from "../../config/index.js";
 import type {
   AttachmentCapabilityRegistry,
@@ -18,6 +17,7 @@ import {
   readSlackPromptBody,
 } from "./match.js";
 import { matchesInputFilters, parseInvocation } from "../invocation.js";
+import type { WorkflowConfigurationResolver } from "../configuration.js";
 
 export interface SlackAttachmentLocator {
   id: string;
@@ -88,6 +88,7 @@ export interface SlackTriggerContext {
 
 export interface SlackOutputContext {
   provider: "slack";
+  providerApplicationId: string;
   organizationId: string;
   teamId: string;
   channelId: string;
@@ -98,7 +99,7 @@ export interface SlackOutputContext {
 type SlackReactionPhase = "accepted" | "started";
 
 export function createSlackTriggerProvider(options: {
-  configurationStoreForProject: (projectId: string) => ProjectConfigurationStore;
+  configurationForWorkflow: WorkflowConfigurationResolver;
   botUserIdForWorkspace(organizationId: string, teamId: string): Promise<string | undefined>;
   client: SlackBotClient;
   attachments?: AttachmentCapabilityRegistry;
@@ -113,9 +114,7 @@ export function createSlackTriggerProvider(options: {
         rawEvent.teamId,
       );
       if (botUserId === undefined) return "configuration_unavailable";
-      const stored = await options
-        .configurationStoreForProject(trigger.projectId)
-        .getRevision(trigger.configurationRevisionId);
+      const stored = await options.configurationForWorkflow(trigger);
       if (stored === undefined) return "configuration_unavailable";
       if (!stored.configuration.triggers.some((candidate) => candidate.on === trigger.source))
         return "no_trigger_for_source";
@@ -139,6 +138,7 @@ export function createSlackTriggerProvider(options: {
           throw new Error(`compiled trigger not found: ${match.trigger.name}`);
         const outputContext: SlackOutputContext = {
           provider: "slack",
+          providerApplicationId: rawEvent.appId,
           organizationId: trigger.organizationId,
           teamId: rawEvent.teamId,
           channelId: rawEvent.channelId,

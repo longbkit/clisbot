@@ -204,7 +204,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
       receivedAt: new Date(0),
     });
     assert.equal(accepted.status, "accepted");
-    if (accepted.status === "accepted") assert.equal(accepted.events[0]?.projectId, project.id);
+    if (accepted.status === "accepted") assert.equal(accepted.events[0]?.workflowId, project.id);
 
     database.findLinearConnection = async (linearOrganizationId) =>
       linearOrganizationId === linear.linearOrganizationId
@@ -492,7 +492,7 @@ describe("ProjectConfigurationStore resource compilation", () => {
 
     assert.equal(accepted.status, "accepted");
     if (accepted.status !== "accepted") return;
-    assert.equal(accepted.events[0]?.projectId, project.id);
+    assert.equal(accepted.events[0]?.workflowId, project.id);
     assert.equal(accepted.events[0]?.source, "discord.mention");
   });
 });

@@ -21,10 +21,12 @@
 // a safe no-op returning the deferred/empty shape — no pins read, no install
 // dir touched, no vertical loaded, no daemon socket opened.
 
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadChannelControlPlane, type ChannelControlPlaneSnapshot } from "../control-plane.js";
+import {
+  loadChannelControlPlane,
+  type ChannelControlPlaneSnapshot,
+} from "../control-plane.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import { ChannelStore } from "../../db/channels.js";
 import {
@@ -49,7 +51,10 @@ import {
   type InboundReplyResult,
   type StartAccountContext,
 } from "../loader/host.js";
-import { loadChannelVertical, type LoadedChannelVertical } from "../loader/load-channel.js";
+import {
+  loadChannelVertical,
+  type LoadedChannelVertical,
+} from "../loader/load-channel.js";
 import { setChannelSeamLogger } from "../loader/seam-logger.js";
 import { isEnabled } from "../policy.js";
 import type {
@@ -77,7 +82,9 @@ import type {
 } from "./types.js";
 
 /** The inbound seam until the account's plane is wired (fail closed: no dispatch). */
-type InboundReplyHandler = (params: InboundReplyParams) => Promise<InboundReplyResult>;
+type InboundReplyHandler = (
+  params: InboundReplyParams,
+) => Promise<InboundReplyResult>;
 
 /**
  * The plane's inbound normalizer — the ONLY one (the pinned verticals expose no
@@ -91,20 +98,33 @@ type InboundReplyHandler = (params: InboundReplyParams) => Promise<InboundReplyR
  * the plane's `<channel>:<provider-id>` identity (§4.3.2) — the ctxPayload
  * carries the raw native id.
  */
-export function flatInboundNormalizer(params: InboundReplyParams): InboundMessage | null {
+export function flatInboundNormalizer(
+  params: InboundReplyParams,
+): InboundMessage | null {
   const ctx = params.ctxPayload;
-  const accountId = confirmedString(params.accountId) ?? confirmedString(ctx["AccountId"]);
-  if (params.channel === "" || accountId === null) return null;
+  const accountId =
+    confirmedString(params.accountId) ?? confirmedString(ctx["AccountId"]);
+  if (
+    (params.channel !== "slack" && params.channel !== "telegram") ||
+    accountId === null
+  )
+    return null;
   const text = confirmedString(ctx["Body"]);
   if (text === null) return null;
   const chatType = confirmedString(ctx["ChatType"]);
   const chatId = confirmedString(ctx["ChatId"]);
-  const conversation = planeConversation(params.channel, chatType, chatId, ctx["MessageThreadId"]);
+  const conversation = planeConversation(
+    params.channel,
+    chatType,
+    chatId,
+    ctx["MessageThreadId"],
+  );
   if (conversation === null) return null;
   // The plane's identity model is `<channel>:<provider-id>` (implementation doc
   // §4.3.2); the ctxPayload carries the raw native id, so the prefix is applied
   // here — the native → plane boundary — and nowhere else.
-  const rawSenderId = confirmedString(ctx["SenderId"]) ?? confirmedString(ctx["From"]);
+  const rawSenderId =
+    confirmedString(ctx["SenderId"]) ?? confirmedString(ctx["From"]);
   if (rawSenderId === null) return null;
   const conversationLabel = confirmedString(ctx["ConversationLabel"]);
   const senderName = confirmedString(ctx["SenderName"]);
@@ -145,7 +165,12 @@ function planeConversation(
       threadId,
     };
   }
-  return { kind: planeKind, id: chatId, rootConversationId: chatId, threadId: null };
+  return {
+    kind: planeKind,
+    id: chatId,
+    rootConversationId: chatId,
+    threadId: null,
+  };
 }
 
 /** The pinned payload's `MessageThreadId` is a string or a number; anything
@@ -182,7 +207,12 @@ function planeKindFor(
  * accountId, threadId})`; both THROW on failure. Fail closed: a missing
  * `sendText` or a throw lands as `{ok: false, error}` — never a fake success.
  */
-function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: PlaneLogger): PostFn {
+function postFor(
+  handle: AccountHandle,
+  cfg: Record<string, unknown>,
+  hostRuntime: HostRuntime,
+  logger: PlaneLogger,
+): PostFn {
   const send = handle.vertical?.plugin?.outbound?.["sendText"];
   if (typeof send !== "function") {
     return async () => ({
@@ -199,6 +229,7 @@ function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: Pl
         }>
       )({
         cfg,
+        hostRuntime,
         to: params.to,
         text: params.text,
         accountId: handle.accountId,
@@ -207,15 +238,25 @@ function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: Pl
         // card's `blocks` / `reply_markup`) — posted with the text (the text
         // stays the fallback rendering on both verticals).
         ...(params.blocks !== undefined ? { blocks: params.blocks } : {}),
-        ...(params.replyMarkup !== undefined ? { replyMarkup: params.replyMarkup } : {}),
+        ...(params.replyMarkup !== undefined
+          ? { replyMarkup: params.replyMarkup }
+          : {}),
         // Telegram only: disable the native config write-back (admin-scope
         // check fails) — P0 posts numeric chat ids, no legacy rewrite (outbound.md).
         ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
       });
+      if (
+        typeof result.messageId !== "string" &&
+        typeof result.messageId !== "number"
+      ) {
+        throw new Error("channel outbound.sendText returned no messageId");
+      }
       return {
         ok: true,
         externalMessageId: String(result.messageId),
-        ...(result.cardPosted !== undefined ? { cardPosted: result.cardPosted === true } : {}),
+        ...(result.cardPosted !== undefined
+          ? { cardPosted: result.cardPosted === true }
+          : {}),
       };
     } catch (error) {
       logger.warn("channel post failed", {
@@ -245,6 +286,7 @@ function postFor(handle: AccountHandle, cfg: Record<string, unknown>, logger: Pl
 function mediaPostFor(
   handle: AccountHandle,
   cfg: Record<string, unknown>,
+  hostRuntime: HostRuntime,
   logger: PlaneLogger,
 ): MediaPostFn | undefined {
   const send = handle.vertical?.plugin?.outbound?.["sendMedia"];
@@ -258,17 +300,26 @@ function mediaPostFor(
         }>
       )({
         cfg,
+        hostRuntime,
         to: params.to,
         filePath: params.filePath,
         accountId: handle.accountId,
         ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
       });
+      if (
+        typeof result.messageId !== "string" &&
+        typeof result.messageId !== "number"
+      ) {
+        throw new Error("channel outbound.sendMedia returned no messageId");
+      }
       return {
         ok: true,
         externalMessageId: String(result.messageId),
         // The G11 flag rides through only when the vertical reports it (the
         // shared SendMediaFn always does; an unknown flag is not asserted).
-        ...(typeof result.mediaPosted === "boolean" ? { mediaPosted: result.mediaPosted } : {}),
+        ...(typeof result.mediaPosted === "boolean"
+          ? { mediaPosted: result.mediaPosted }
+          : {}),
       };
     } catch (error) {
       logger.warn("channel media post failed", {
@@ -293,6 +344,7 @@ function mediaPostFor(
 function updateFor(
   handle: AccountHandle,
   cfg: Record<string, unknown>,
+  hostRuntime: HostRuntime,
   logger: PlaneLogger,
 ): UpdateFn {
   const update = handle.vertical?.plugin?.outbound?.["updateText"];
@@ -304,17 +356,31 @@ function updateFor(
   }
   return async (params) => {
     try {
-      await (update as (args: Record<string, unknown>) => Promise<unknown>)({
+      const result = await (
+        update as (args: Record<string, unknown>) => Promise<unknown>
+      )({
         cfg,
+        hostRuntime,
         accountId: handle.accountId,
-        ...(params.senderMention !== undefined ? { senderMention: params.senderMention } : {}),
+        ...(params.senderMention !== undefined
+          ? { senderMention: params.senderMention }
+          : {}),
         to: params.to,
         externalMessageId: params.externalMessageId,
         text: params.text,
         ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
-        ...(params.clearCard !== undefined ? { clearCard: params.clearCard } : {}),
+        ...(params.clearCard !== undefined
+          ? { clearCard: params.clearCard }
+          : {}),
         ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
       });
+      if (
+        typeof result === "object" &&
+        result !== null &&
+        Reflect.get(result, "ok") === false
+      ) {
+        throw new Error("channel outbound.updateText reported failure");
+      }
       return { ok: true };
     } catch (error) {
       logger.warn("channel in-place update failed", {
@@ -337,19 +403,28 @@ function updateFor(
  * which counts it and trips its breaker: typing can never disturb the reply
  * path.
  */
-function typingFor(handle: AccountHandle, cfg: Record<string, unknown>): TypingFn | undefined {
+function typingFor(
+  handle: AccountHandle,
+  cfg: Record<string, unknown>,
+  hostRuntime: HostRuntime,
+): TypingFn | undefined {
   const drive = handle.vertical?.plugin?.outbound?.["typing"];
   if (typeof drive !== "function") return undefined;
   return async (params) => {
     await (drive as (args: Record<string, unknown>) => Promise<unknown>)({
       cfg,
+      hostRuntime,
       accountId: handle.accountId,
       to: params.to,
       action: params.action,
       indicator: params.indicator,
       ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
-      ...(params.messageId !== undefined ? { messageId: params.messageId } : {}),
-      ...(params.reactionEmoji !== undefined ? { reactionEmoji: params.reactionEmoji } : {}),
+      ...(params.messageId !== undefined
+        ? { messageId: params.messageId }
+        : {}),
+      ...(params.reactionEmoji !== undefined
+        ? { reactionEmoji: params.reactionEmoji }
+        : {}),
       ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
     });
   };
@@ -358,29 +433,33 @@ function typingFor(handle: AccountHandle, cfg: Record<string, unknown>): TypingF
 /**
  * The drive-time account context (start-account.md): the flat token carrier
  * (`ctx.account`) + the `cfg` the vertical's outbound + account resolution
- * read tokens from. Tokens come exclusively from the 0600 mirror-secret file
- * at `compiled.secretRef` — never process env (the env fallbacks apply only to
- * the account id `default`; P0 ids are non-default). `cfg.channels.<ch>
+ * read tokens from. Tokens come from the encrypted provider connection selected
+ * by `compiled.connectionId` — never process env. `cfg.channels.<ch>
  * .accounts` holds EXACTLY ONE entry (Telegram's `findTelegramTokenOwnerAccountId`
  * throws on a duplicate token).
  */
-function accountAndCfg(
+async function accountAndCfg(
+  resolveConnection: import("../../db/types.js").Database["resolveChannelConnection"],
+  organizationId: string,
   compiled: CompiledChannelAccount,
   accountId: string,
-): { account: Record<string, unknown>; cfg: Record<string, unknown> } {
-  const secret = readFileSync(compiled.secretRef, "utf8");
-  let botToken = "";
-  let appToken: string | undefined;
-  try {
-    const parsed = JSON.parse(secret) as { botToken?: unknown; appToken?: unknown };
-    botToken = typeof parsed.botToken === "string" ? parsed.botToken : "";
-    appToken = typeof parsed.appToken === "string" ? parsed.appToken : undefined;
-  } catch {
-    // Not JSON: the file carries the literal token.
-    botToken = secret.trim();
-  }
-  if (botToken === "") {
-    throw new Error(`the channel account secret at ${compiled.secretRef} carries no bot token`);
+): Promise<{
+  account: Record<string, unknown>;
+  cfg: Record<string, unknown>;
+  providerApplicationId?: string;
+}> {
+  const credentials = await resolveConnection({
+    organizationId,
+    channel: compiled.channel === "slack" ? "slack" : "telegram",
+    connectionId: compiled.connectionId,
+  });
+  if (credentials === undefined)
+    throw new Error("the channel connection is unavailable");
+  const { botToken, appToken, providerApplicationId } = credentials;
+  if (compiled.channel === "slack" && appToken === undefined) {
+    throw new Error(
+      "the Slack connection requires a Socket Mode Provider Application",
+    );
   }
   const account: Record<string, unknown> =
     compiled.channel === "slack"
@@ -393,7 +472,7 @@ function accountAndCfg(
           // vertical's start-account can read channel-behavior knobs it owns
           // (e.g. `slashCommand` — the native slash-command alias the L2
           // rewrites; commands.ts). Tokens still come only from the carrier +
-          // secret file; this carries no secret.
+          // connection metadata; this carries no secret.
           transport: compiled.transport,
         }
       : { accountId, token: botToken, config: {} };
@@ -410,12 +489,18 @@ function accountAndCfg(
       : { botToken, gatewayClientScopes: [], config: compiled.config };
   return {
     account,
-    cfg: { channels: { [compiled.channel]: { accounts: { [accountId]: cfgAccount } } } },
+    cfg: {
+      channels: {
+        [compiled.channel]: { accounts: { [accountId]: cfgAccount } },
+      },
+    },
+    ...(providerApplicationId === undefined ? {} : { providerApplicationId }),
   };
 }
 interface AccountHandle {
   channel: string;
   accountId: string;
+  revisionId: string | null;
   abortController: AbortController;
   plane?: ChannelPlane;
   daemon?: DaemonConnection;
@@ -432,6 +517,10 @@ interface AccountHandle {
    * plane and kept for the tool-path MCP endpoint (`channelReplyPost`). */
   post?: PostFn;
   media?: MediaPostFn | undefined;
+  releaseSlackInbound?: (() => Promise<void>) | undefined;
+  /** Observed gateway lifetime; teardown waits for it so a replacement never
+   * overlaps the old account's socket/poll handlers. */
+  monitor?: Promise<void> | undefined;
 }
 
 /** The load step's bundle: the vertical, its host runtime, and the inbound wire. */
@@ -471,7 +560,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     this.logger = options.logger ?? NO_OP_LOGGER;
     this.store = new ChannelStore(options.databaseRuntime);
     this.pinsPath =
-      options.pinsPath ?? fileURLToPath(new URL("../../../channel-pins.json", import.meta.url));
+      options.pinsPath ??
+      fileURLToPath(new URL("../../../channel-pins.json", import.meta.url));
     // The bound seam module (a separate compilation, drive-time) reports its
     // no-runtime miss through this sink; without it the miss is a silent
     // no-dispatch the operator cannot see (seam-logger.ts).
@@ -486,9 +576,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     } catch (error) {
       // Mount-time recovery degrades: a missing org/configuration is operator
       // state, not a channel fault (P13: log, never throw).
-      this.logger.warn("channel startAll skipped: the active configuration is unavailable", {
-        error: errorMessage(error),
-      });
+      this.logger.warn(
+        "channel startAll skipped: the active configuration is unavailable",
+        {
+          error: errorMessage(error),
+        },
+      );
       return;
     }
     for (const account of snapshot.controlPlane.accounts) {
@@ -498,7 +591,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     }
   }
 
-  async startAccount(channel: string, accountId: string): Promise<ChannelAccountStartResult> {
+  async startAccount(
+    channel: string,
+    accountId: string,
+  ): Promise<ChannelAccountStartResult> {
     if (!this.enabled()) {
       return {
         channel,
@@ -515,7 +611,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       // Resolve on demand: re-read the active revision, no caching.
       const snapshot = await loadChannelControlPlane(this.options.database);
       const compiled = snapshot.controlPlane.accounts.find(
-        (candidate) => candidate.channel === channel && candidate.accountId === accountId,
+        (candidate) =>
+          candidate.channel === channel && candidate.accountId === accountId,
       );
       if (compiled === undefined) {
         return this.defer(
@@ -524,14 +621,22 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         );
       }
       if (!isEnabled(this.enabled(), snapshot.controlPlane, compiled)) {
-        return this.defer(handle, "channels are disabled in the active configuration");
+        return this.defer(
+          handle,
+          "channels are disabled in the active configuration",
+        );
       }
       const pins = loadChannelPins(this.pinsPath);
       const pinEntry = pins.channels[channel];
       if (pinEntry === undefined) {
         throw new InstallError(`unknown channel: ${channel}`, { channel });
       }
-      const install = await ensureChannelInstalled(pins, channel, accountId, this.options.dataDir);
+      const install = await ensureChannelInstalled(
+        pins,
+        channel,
+        accountId,
+        this.options.dataDir,
+      );
       handle.install = install;
       handle.integrity = "ok";
       handle.pin = `${pins.main.package}@${pins.main.version}`;
@@ -545,15 +650,25 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       handle.vertical = loaded.vertical;
       handle.loadTrace = "ok";
       await this.startTransport(handle, snapshot, compiled, loaded);
+      handle.revisionId = snapshot.revision?.id ?? null;
       handle.transport = "started";
       delete handle.detail;
-      return { channel, account: accountId, installed: install.installed, transport: "started" };
+      return {
+        channel,
+        account: accountId,
+        installed: install.installed,
+        transport: "started",
+      };
     } catch (error) {
       // P13: the failure is logged + surfaced in the result, never thrown.
       const detail = errorMessage(error);
       handle.detail = detail;
-      this.logger.warn("channel account start failed", { channel, account: accountId, detail });
-      this.stopHandle(handle);
+      this.logger.warn("channel account start failed", {
+        channel,
+        account: accountId,
+        detail,
+      });
+      await this.stopHandle(handle);
       handle.transport = "failed";
       if (error instanceof InstallError || error instanceof ProvisionError)
         handle.integrity = "failed";
@@ -576,14 +691,19 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     try {
       snapshot = await loadChannelControlPlane(this.options.database);
     } catch (error) {
-      this.logger.warn("channel reconcile skipped: the active configuration is unavailable", {
-        error: errorMessage(error),
-      });
+      this.logger.warn(
+        "channel reconcile skipped: the active configuration is unavailable",
+        {
+          error: errorMessage(error),
+        },
+      );
       return empty;
     }
     const desired = new Set(
       snapshot.controlPlane.accounts
-        .filter((account) => isEnabled(this.enabled(), snapshot.controlPlane, account))
+        .filter((account) =>
+          isEnabled(this.enabled(), snapshot.controlPlane, account),
+        )
         .map((account) => handleKey(account.channel, account.accountId)),
     );
     const stopped: { channel: string; account: string }[] = [];
@@ -598,8 +718,18 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     for (const account of snapshot.controlPlane.accounts) {
       const key = handleKey(account.channel, account.accountId);
       const handle = this.handles.get(key);
-      if (!desired.has(key) || (handle !== undefined && handle.transport === "started")) continue;
-      accounts.push(await this.startAccount(account.channel, account.accountId));
+      const activeRevisionId = snapshot.revision?.id ?? null;
+      if (
+        !desired.has(key) ||
+        (handle !== undefined &&
+          handle.transport === "started" &&
+          handle.revisionId === activeRevisionId)
+      ) {
+        continue;
+      }
+      accounts.push(
+        await this.startAccount(account.channel, account.accountId),
+      );
     }
     return { accounts, stopped };
   }
@@ -627,7 +757,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     if (!this.enabled()) return;
     const handles = [...this.handles.values()];
     this.handles.clear();
-    for (const handle of handles) this.stopHandle(handle);
+    for (const handle of handles) await this.stopHandle(handle);
   }
 
   /**
@@ -638,10 +768,17 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * records a failed delivery. This is the SAME `sendText` seam the relay's
    * post path uses, so a tool-path post and a relay post land identically.
    */
-  async channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult> {
+  async channelReplyPost(
+    ref: ChannelReplyBindingRef,
+    text: string,
+  ): Promise<OutboundPostResult> {
     const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
     const post = handle?.post;
-    if (handle === undefined || post === undefined || handle.transport !== "started") {
+    if (
+      handle === undefined ||
+      post === undefined ||
+      handle.transport !== "started"
+    ) {
       return {
         ok: false,
         error: `the ${ref.channel} account ${ref.accountId} is not started`,
@@ -651,7 +788,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       channel: ref.channel,
       accountId: ref.accountId,
       to: ref.externalConversationId,
-      ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
+      ...(ref.externalThreadId !== null
+        ? { threadId: ref.externalThreadId }
+        : {}),
       text,
     });
   }
@@ -662,16 +801,41 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   ): Promise<MediaPostResult> {
     const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
     const media = handle?.media;
-    if (handle === undefined || media === undefined || handle.transport !== "started") {
-      return { ok: false, error: `the ${ref.channel} account ${ref.accountId} is not started` };
+    if (
+      handle === undefined ||
+      media === undefined ||
+      handle.transport !== "started"
+    ) {
+      return {
+        ok: false,
+        error: `the ${ref.channel} account ${ref.accountId} is not started`,
+      };
     }
     return media({
       channel: ref.channel,
       accountId: ref.accountId,
       to: ref.externalConversationId,
-      ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
+      ...(ref.externalThreadId !== null
+        ? { threadId: ref.externalThreadId }
+        : {}),
       filePath,
     });
+  }
+
+  async workflowStreamEvent(input: {
+    execution: import("../../db/types.js").AgentExecutionRecord;
+    agentId: string;
+    event: import("../../daemons/protocol.js").DaemonAgentStreamEvent;
+  }): Promise<void> {
+    const context = input.execution.outputContext;
+    if (typeof context !== "object" || context === null) return;
+    const channel = Reflect.get(context, "channel");
+    if (typeof channel !== "object" || channel === null) return;
+    const name = Reflect.get(channel, "name");
+    const accountId = Reflect.get(channel, "account_id");
+    if (typeof name !== "string" || typeof accountId !== "string") return;
+    const handle = this.handles.get(handleKey(name, accountId));
+    await handle?.plane?.onWorkflowStreamEvent(input);
   }
 
   // --- Per-account lifecycle steps -------------------------------------------
@@ -684,6 +848,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const handle: AccountHandle = {
       channel,
       accountId,
+      revisionId: null,
       abortController: new AbortController(),
       transport: "starting",
       integrity: "not-checked",
@@ -693,7 +858,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     return handle;
   }
 
-  private defer(handle: AccountHandle, detail: string): ChannelAccountStartResult {
+  private defer(
+    handle: AccountHandle,
+    detail: string,
+  ): ChannelAccountStartResult {
     handle.transport = "deferred";
     handle.detail = detail;
     return {
@@ -790,22 +958,53 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   ): Promise<void> {
     // The drive-time token context, resolved ONCE and shared by the post path
     // (the plugin's sendText reads `cfg`) and the account monitor (start-account.md).
-    // A missing/unreadable mirror-secret file fails the account here (P13).
-    const { account, cfg } = accountAndCfg(compiled, handle.accountId);
+    // A missing/inaccessible connection fails the account here (P13).
+    const { account, cfg, providerApplicationId } = await accountAndCfg(
+      this.options.resolveConnection ??
+        this.options.database.resolveChannelConnection.bind(
+          this.options.database,
+        ),
+      snapshot.organizationId,
+      compiled,
+      handle.accountId,
+    );
+    if (
+      compiled.channel === "slack" &&
+      this.options.claimSlackInbound !== undefined
+    ) {
+      if (providerApplicationId === undefined) {
+        throw new Error(
+          "the Slack connection has no Provider Application identity",
+        );
+      }
+      handle.releaseSlackInbound = await this.options.claimSlackInbound(
+        providerApplicationId,
+        handleKey(handle.channel, handle.accountId),
+      );
+    }
     // Kept on the handle: the tool-path MCP endpoint's `channelReplyPost`
     // posts through this SAME outbound seam (the vertical's `sendText`).
-    const planePost = postFor(handle, cfg, this.logger);
+    const planePost = postFor(handle, cfg, loaded.hostRuntime, this.logger);
     // COMPAT(clisbot-control-plane): the account's native-media post (the
     // plugin's outbound.sendMedia, G7–G11); undefined when the plugin has no
     // sendMedia, which keeps the relay's media path a no-op (byte-identical).
     // The media home-root fallback is the shared daemon/Hub home — the same
     // home daemon discovery resolves (one home, one rule).
-    const planeMediaPost = mediaPostFor(handle, cfg, this.logger);
+    const planeMediaPost = mediaPostFor(
+      handle,
+      cfg,
+      loaded.hostRuntime,
+      this.logger,
+    );
     // The turn-lifecycle surface (the plugin's optional outbound.typing);
     // undefined leaves the seam unmounted — an absent capability, not a fault.
-    const planeTyping = typingFor(handle, cfg);
+    const planeTyping = typingFor(handle, cfg, loaded.hostRuntime);
     const plane = createChannelPlane({
       organizationId: snapshot.organizationId,
+      accountScope: {
+        channel: compiled.channel === "slack" ? "slack" : "telegram",
+        accountId: compiled.accountId,
+      },
       normalizeInbound: flatInboundNormalizer,
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
@@ -815,9 +1014,16 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       homeRoot: resolveHome(this.options.daemon?.home, this.env),
       // The approval card's in-place update (the plugin's optional
       // outbound.updateText; absent plugins fail closed per update).
-      update: updateFor(handle, cfg, this.logger),
+      update: updateFor(handle, cfg, loaded.hostRuntime, this.logger),
       ...(planeTyping !== undefined ? { typing: planeTyping } : {}),
       resolveAgentSpec: snapshot.resolveAgentSpec,
+      dispatchWorkflow:
+        this.options.dispatchWorkflow ??
+        (() =>
+          Promise.reject(
+            new Error("channel workflow dispatcher is unavailable"),
+          )),
+      workflowOutputStore: this.options.database,
     });
     handle.plane = plane;
     handle.post = planePost;
@@ -836,13 +1042,15 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       onStream: (payload) => {
         // P13: a channel fault must never reject the socket callback —
         // fire-and-forget into the plane, log the miss.
-        void plane.onStreamEvent(payload.agentId, payload.event).catch((error: unknown) => {
-          this.logger.warn("channel stream event failed", {
-            channel: handle.channel,
-            account: handle.accountId,
-            error: errorMessage(error),
+        void plane
+          .onStreamEvent(payload.agentId, payload.event)
+          .catch((error: unknown) => {
+            this.logger.warn("channel stream event failed", {
+              channel: handle.channel,
+              account: handle.accountId,
+              error: errorMessage(error),
+            });
           });
-        });
       },
       // The subagent frames ride the same socket, one fire-and-forget consumer
       // like `onStream` (P13).
@@ -881,7 +1089,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     // rejects the trusted session at the WS upgrade.
     if (daemonOptions.password === undefined) {
       const password = this.env["PASEO_PASSWORD"]?.trim();
-      if (password !== undefined && password !== "") daemonOptions.password = password;
+      if (password !== undefined && password !== "")
+        daemonOptions.password = password;
     }
     const daemon = connectChannelDaemon(daemonOptions);
     handle.daemon = daemon;
@@ -895,7 +1104,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * exact reason (why an admitted-looking message did not reach the agent);
    * `command` is an approval-command answer.
    */
-  private logPlaneOutcome(handle: AccountHandle, result: PlaneInboundResult): void {
+  private logPlaneOutcome(
+    handle: AccountHandle,
+    result: PlaneInboundResult,
+  ): void {
     const outcome = result.outcome;
     if (outcome === undefined) return;
     const base = {
@@ -933,7 +1145,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       case "ignored":
         // The message never reached the agent: the reason is the operator's
         // only lead (route miss, kill switch, mention policy, permissions).
-        this.logger.warn("channel inbound ignored", { ...base, reason: outcome.reason });
+        this.logger.warn("channel inbound ignored", {
+          ...base,
+          reason: outcome.reason,
+        });
         break;
     }
   }
@@ -945,7 +1160,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * check, or stale prompt is indistinguishable from a click that never
    * arrived.
    */
-  private logApprovalCallbackOutcome(handle: AccountHandle, result: PlaneInboundResult): void {
+  private logApprovalCallbackOutcome(
+    handle: AccountHandle,
+    result: PlaneInboundResult,
+  ): void {
     const outcome = result.outcome;
     if (outcome === undefined) return;
     const base = {
@@ -962,7 +1180,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         });
         break;
       case "ignored":
-        this.logger.warn("channel card click ignored", { ...base, reason: outcome.reason });
+        this.logger.warn("channel card click ignored", {
+          ...base,
+          reason: outcome.reason,
+        });
         break;
     }
   }
@@ -976,7 +1197,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    */
   private drive(
     handle: AccountHandle,
-    driveContext: { account: Record<string, unknown>; cfg: Record<string, unknown> },
+    driveContext: {
+      account: Record<string, unknown>;
+      cfg: Record<string, unknown>;
+    },
     hostRuntime: HostRuntime,
   ): void {
     const gateway = handle.vertical?.plugin?.gateway;
@@ -994,7 +1218,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const monitor = Promise.resolve(
       start(this.startAccountContext(handle, driveContext, hostRuntime)),
     );
-    void this.observeMonitor(handle, monitor);
+    const observed = this.observeMonitor(handle, monitor);
+    handle.monitor = observed;
+    void observed.finally(() => {
+      if (handle.monitor === observed) handle.monitor = undefined;
+    });
   }
 
   /**
@@ -1002,7 +1230,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * the account `stopped` (the monitor owns the account's lifetime); a reject
    * marks it `failed` (P13: logged, never thrown).
    */
-  private async observeMonitor(handle: AccountHandle, monitor: Promise<unknown>): Promise<void> {
+  private async observeMonitor(
+    handle: AccountHandle,
+    monitor: Promise<unknown>,
+  ): Promise<void> {
     try {
       await monitor;
       if (handle.transport === "started") {
@@ -1025,7 +1256,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
 
   private startAccountContext(
     handle: AccountHandle,
-    driveContext: { account: Record<string, unknown>; cfg: Record<string, unknown> },
+    driveContext: {
+      account: Record<string, unknown>;
+      cfg: Record<string, unknown>;
+    },
     hostRuntime: HostRuntime,
   ): StartAccountContext {
     let statusState: unknown;
@@ -1052,7 +1286,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
             account: handle.accountId,
             code,
           });
-          this.stopHandle(handle);
+          void this.stopHandle(handle);
         },
       },
       abortSignal: handle.abortController.signal,
@@ -1067,7 +1301,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       // Group G: the account's inbound-media download dir (the L2 transport
       // streams Bot API files here; the `[Attached files]` manifest points
       // the agent at absolute paths under it).
-      mediaDownloadDir: join(this.options.dataDir, "channels", handle.accountId, "downloads"),
+      mediaDownloadDir: join(
+        this.options.dataDir,
+        "channels",
+        handle.accountId,
+        "downloads",
+      ),
       // COMPAT(clisbot-control-plane): the native approval card's
       // button-click seam. The vertical's L2 transport (Slack Socket Mode
       // `interactive` events; Telegram `callback_query` — the poll loop's
@@ -1075,7 +1314,9 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       // onApprovalCallback: the SAME exactly-once resolver + two authority
       // checks as a typed command. The click is data — no authority.
       channelRuntime: {
-        approvalAction: (params: Record<string, unknown>): Promise<PlaneInboundResult> => {
+        approvalAction: (
+          params: Record<string, unknown>,
+        ): Promise<PlaneInboundResult> => {
           const plane = handle.plane;
           if (plane === undefined) {
             return Promise.resolve({
@@ -1087,14 +1328,21 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
             channel: handle.channel,
             accountId: handle.accountId,
             senderIdentity:
-              typeof params["senderIdentity"] === "string" ? params["senderIdentity"] : "",
-            cardValue: typeof params["cardValue"] === "string" ? params["cardValue"] : "",
+              typeof params["senderIdentity"] === "string"
+                ? params["senderIdentity"]
+                : "",
+            cardValue:
+              typeof params["cardValue"] === "string"
+                ? params["cardValue"]
+                : "",
             externalConversationId:
               typeof params["externalConversationId"] === "string"
                 ? params["externalConversationId"]
                 : "",
             externalThreadId:
-              typeof params["externalThreadId"] === "string" ? params["externalThreadId"] : null,
+              typeof params["externalThreadId"] === "string"
+                ? params["externalThreadId"]
+                : null,
             rootKind:
               params["rootKind"] === "dm" ||
               params["rootKind"] === "channel" ||
@@ -1103,10 +1351,13 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
                 : "channel",
           };
           const result = plane.onApprovalCallback(callback);
-          void result.then((outcome) => this.logApprovalCallbackOutcome(handle, outcome));
+          void result.then((outcome) =>
+            this.logApprovalCallbackOutcome(handle, outcome),
+          );
           return result;
         },
       },
+      hostRuntime,
     };
   }
 
@@ -1115,11 +1366,15 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * stops the daemon connection + clears the timeline subscription), and
    * dispose the vertical. Synchronous — the socket close is immediate.
    */
-  private stopHandle(handle: AccountHandle): void {
+  private async stopHandle(handle: AccountHandle): Promise<void> {
     handle.abortController.abort();
     if (handle.plane !== undefined) handle.plane.stop();
     else if (handle.daemon !== undefined) handle.daemon.stop();
+    await handle.monitor;
     handle.vertical?.dispose();
+    const release = handle.releaseSlackInbound;
+    handle.releaseSlackInbound = undefined;
+    if (release !== undefined) await release();
     handle.transport = "stopped";
   }
 
@@ -1127,7 +1382,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   private async teardown(handle: AccountHandle | undefined): Promise<void> {
     if (handle === undefined) return;
     this.handles.delete(handleKey(handle.channel, handle.accountId));
-    this.stopHandle(handle);
+    await this.stopHandle(handle);
   }
 
   private stateDir(accountId: string): string {
@@ -1179,6 +1434,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
  * it at startup (application-runtime.ts) and drives it through the
  * `ChannelSupervisor` contract.
  */
-export function createChannelSupervisor(options: ChannelSupervisorOptions): ChannelSupervisor {
+export function createChannelSupervisor(
+  options: ChannelSupervisorOptions,
+): ChannelSupervisor {
   return new ChannelSupervisorImpl(options);
 }

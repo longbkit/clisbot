@@ -5,52 +5,42 @@ import { enrollTestDaemon } from "../test-utils/project-configuration.js";
 import { OrganizationTriggerStore } from "../triggers/store.js";
 import { createDatabasePublicOperationRepository } from "./database-adapter.js";
 
-describe("public manual-run project resolution", () => {
-  it("prefers an organization trigger runtime and retains the legacy project fallback", async () => {
+describe("public manual-run workflow resolution", () => {
+  it("resolves an enabled organization workflow", async () => {
     const database = createMemoryDatabase({ organizationIds: ["org"] });
     await enrollTestDaemon(database, "org");
-    const legacy = await database.createProject({
-      organizationId: "org",
-      name: "Default",
-      slug: "default",
-      createdByUserId: null,
-    });
-    const trigger = await new OrganizationTriggerStore(database, "org").save({
+    const workflow = await new OrganizationTriggerStore(database, "org").save({
       yaml: triggerYaml(true),
       userId: null,
     });
     const repository = createDatabasePublicOperationRepository(database);
 
-    assert.deepEqual(await repository.resolveManualRunProject("org", "deploy", "default"), {
-      status: "resolved",
-      id: trigger.runtimeProjectId,
-    });
-    assert.deepEqual(await repository.resolveManualRunProject("org", "legacy", "default"), {
-      status: "resolved",
-      id: legacy.id,
-    });
+    assert.deepEqual(
+      await repository.resolveManualRunWorkflow("org", "deploy"),
+      {
+        status: "resolved",
+        id: workflow.id,
+        revisionId: workflow.activeRevisionId,
+      },
+    );
+    assert.equal(
+      await repository.resolveManualRunWorkflow("org", "missing"),
+      undefined,
+    );
   });
 
-  it("does not fall through to a legacy project when the organization trigger is disabled", async () => {
+  it("does not resolve a disabled organization workflow", async () => {
     const database = createMemoryDatabase({ organizationIds: ["org"] });
     await enrollTestDaemon(database, "org");
-    await database.createProject({
-      organizationId: "org",
-      name: "Default",
-      slug: "default",
-      createdByUserId: null,
-    });
     await new OrganizationTriggerStore(database, "org").save({
       yaml: triggerYaml(false),
       userId: null,
     });
 
     assert.deepEqual(
-      await createDatabasePublicOperationRepository(database).resolveManualRunProject(
-        "org",
-        "deploy",
-        "default",
-      ),
+      await createDatabasePublicOperationRepository(
+        database,
+      ).resolveManualRunWorkflow("org", "deploy"),
       { status: "disabled" },
     );
   });

@@ -58,7 +58,7 @@ describe("Slack webhook", () => {
           {
             providerEventReceiptId: "trigger-1",
             organizationId: "org-1",
-            projectId: "project-1",
+            workflowId: "project-1",
             configurationRevisionId: "11111111-1111-4111-8111-111111111132",
             deliveryId: input.deliveryId,
             source: input.source,
@@ -132,7 +132,7 @@ describe("Slack webhook", () => {
     const trigger: DurableProviderEvent = {
       providerEventReceiptId: "trigger-1",
       organizationId: "org-1",
-      projectId: "project-1",
+      workflowId: "project-1",
       configurationRevisionId: "11111111-1111-4111-8111-111111111132",
       deliveryId: "slack-Ev123",
       source: "slack.mention",

@@ -777,6 +777,55 @@ describe("Hub relationship", () => {
     expect(await relationship.durableOwnedAgentIds()).toHaveLength(2);
   });
 
+  test("a new Hub execution can reuse the same Agent with a fresh prompt", async () => {
+    relationship = await HubRelationshipHarness.start();
+    await relationship.beginConnect().result;
+    relationship.connectLatestSocket();
+    relationship.beginOwnedCreate("reuse-first", "reuse-execution-1", { prompt: "first turn" });
+    const first = await relationship.ownedCreateResult("reuse-first");
+    const agentId = first.payload.agentId!;
+
+    relationship.beginOwnedCreate("reuse-second", "reuse-execution-2", {
+      prompt: "follow-up turn",
+      reuseAgentId: agentId,
+    });
+    const second = await relationship.ownedCreateResult("reuse-second");
+
+    expect(second).toMatchObject({
+      payload: { success: true, executionId: "reuse-execution-2", agentId },
+    });
+    expect(await relationship.durableOwnedAgentIds()).toEqual([agentId]);
+    expect(relationship.providerResumes()).toBe(1);
+    expect(relationship.providerPromptTexts()).toEqual(["first turn", "follow-up turn"]);
+  });
+
+  test("a new Hub execution unarchives an archived Agent before reuse", async () => {
+    relationship = await HubRelationshipHarness.start();
+    await relationship.beginConnect().result;
+    relationship.connectLatestSocket();
+    relationship.beginOwnedCreate("archived-first", "archived-execution-1", {
+      prompt: "first turn",
+    });
+    const first = await relationship.ownedCreateResult("archived-first");
+    const agentId = first.payload.agentId!;
+    await relationship.ownedTurnCompletion(agentId);
+    const archived = await relationship.archiveExecution("archived-execution-1");
+    expect(archived.success).toBe(true);
+    expect(await relationship.ownedAgentArchivedAt(agentId)).not.toBeNull();
+
+    relationship.beginOwnedCreate("archived-second", "archived-execution-2", {
+      prompt: "follow-up turn",
+      reuseAgentId: agentId,
+    });
+    const second = await relationship.ownedCreateResult("archived-second");
+
+    expect(second).toMatchObject({
+      payload: { success: true, executionId: "archived-execution-2", agentId },
+    });
+    expect(await relationship.ownedAgentArchivedAt(agentId)).toBeNull();
+    expect(relationship.providerPromptTexts()).toEqual(["first turn", "follow-up turn"]);
+  });
+
   test("daemon shutdown fences a pending create before closing owned agents", async () => {
     relationship = await HubRelationshipHarness.start();
     await relationship.beginConnect().result;

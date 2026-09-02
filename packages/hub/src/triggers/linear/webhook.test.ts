@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash, createHmac } from "node:crypto";
 import { describe, it } from "vitest";
-import type { DurableProviderEvent, ProviderEventAcceptance } from "../../db/types.js";
+import type {
+  DurableProviderEvent,
+  ProviderEventAcceptance,
+} from "../../db/types.js";
 import {
   createLinearWebhookSource,
   verifyLinearSignature,
@@ -16,12 +19,24 @@ describe("Linear webhook", () => {
     const body = new TextEncoder().encode('{"title":"héllo"}');
     const signature = sign(body);
     assert.equal(verifyLinearSignature(SECRET, body, signature), true);
-    assert.equal(verifyLinearSignature(SECRET, body, `sha256=${signature.toUpperCase()}`), true);
+    assert.equal(
+      verifyLinearSignature(SECRET, body, `sha256=${signature.toUpperCase()}`),
+      true,
+    );
     assert.equal(verifyLinearSignature(SECRET, body, sign("different")), false);
     assert.equal(verifyLinearSignature(SECRET, body, "short"), false);
-    assert.equal(verifyLinearWebhookTimestamp({ webhookTimestamp: NOW }, NOW), true);
-    assert.equal(verifyLinearWebhookTimestamp({ webhookTimestamp: NOW - 60_001 }, NOW), false);
-    assert.equal(verifyLinearWebhookTimestamp({ webhookTimestamp: "not-a-time" }, NOW), false);
+    assert.equal(
+      verifyLinearWebhookTimestamp({ webhookTimestamp: NOW }, NOW),
+      true,
+    );
+    assert.equal(
+      verifyLinearWebhookTimestamp({ webhookTimestamp: NOW - 60_001 }, NOW),
+      false,
+    );
+    assert.equal(
+      verifyLinearWebhookTimestamp({ webhookTimestamp: "not-a-time" }, NOW),
+      false,
+    );
   });
 
   it("normalizes an issue, durably accepts it, and dispatches its selected route", async () => {
@@ -40,7 +55,10 @@ describe("Linear webhook", () => {
     assert.equal(response.status, 200);
     assert.equal(accepted.length, 1);
     assert.deepEqual(
-      dispatched.map(({ source: eventSource, resourceId }) => ({ eventSource, resourceId })),
+      dispatched.map(({ source: eventSource, resourceId }) => ({
+        eventSource,
+        resourceId,
+      })),
       [{ eventSource: "linear.issue", resourceId: "project-1" }],
     );
     assert.deepEqual(accepted[0], {
@@ -85,13 +103,16 @@ describe("Linear webhook", () => {
     const signature = sign(body);
 
     assert.equal(
-      (await endpoint.handle(request(issueEnvelope(), "Issue", { signature }))).status,
+      (await endpoint.handle(request(issueEnvelope(), "Issue", { signature })))
+        .status,
       200,
     );
     assert.equal(
       (
         await endpoint.handle(
-          request(issueEnvelope(), "Issue", { signature: `sha256=${signature.toUpperCase()}` }),
+          request(issueEnvelope(), "Issue", {
+            signature: `sha256=${signature.toUpperCase()}`,
+          }),
         )
       ).status,
       200,
@@ -127,7 +148,10 @@ describe("Linear webhook", () => {
       },
     });
 
-    assert.equal((await endpoint.handle(request(commentEnvelope(), "Comment"))).status, 200);
+    assert.equal(
+      (await endpoint.handle(request(commentEnvelope(), "Comment"))).status,
+      200,
+    );
     assert.equal(accepted[0]?.projectId, "project-1");
     assert.equal(accepted[0]?.source, "linear.comment");
   });
@@ -147,11 +171,18 @@ describe("Linear webhook", () => {
       },
       accept: async (input) => {
         accepted.push(input);
-        return { status: "dropped", receiptId: input.deliveryId, reason: "linear_unbound" };
+        return {
+          status: "dropped",
+          receiptId: input.deliveryId,
+          reason: "linear_unbound",
+        };
       },
     });
 
-    assert.equal((await endpoint.handle(request(commentEnvelope(), "Comment"))).status, 200);
+    assert.equal(
+      (await endpoint.handle(request(commentEnvelope(), "Comment"))).status,
+      200,
+    );
     assert.equal(issueReads, 0);
     assert.equal(accepted.length, 1);
     assert.equal(accepted[0]?.projectId, undefined);
@@ -164,19 +195,25 @@ describe("Linear webhook", () => {
       signingSecret: SECRET,
       now: () => NOW,
       canHydrateIssue: async () => true,
-      resolveIssue: async () => Promise.reject(new Error("Linear API unavailable")),
+      resolveIssue: async () =>
+        Promise.reject(new Error("Linear API unavailable")),
       accept: async () => {
         accepted = true;
         return { status: "duplicate", receiptId: "delivery-1" };
       },
     });
 
-    assert.equal((await endpoint.handle(request(commentEnvelope(), "Comment"))).status, 503);
+    assert.equal(
+      (await endpoint.handle(request(commentEnvelope(), "Comment"))).status,
+      503,
+    );
     assert.equal(accepted, false);
   });
 
   it("rejects unsigned and unavailable handoffs", async () => {
-    const endpoint = webhookSource(() => Promise.reject(new Error("database offline")));
+    const endpoint = webhookSource(() =>
+      Promise.reject(new Error("database offline")),
+    );
     assert.equal(
       (
         await endpoint.handle(
@@ -189,8 +226,11 @@ describe("Linear webhook", () => {
       401,
     );
     assert.equal(
-      (await endpoint.handle(request({ ...issueEnvelope(), webhookTimestamp: NOW - 60_001 })))
-        .status,
+      (
+        await endpoint.handle(
+          request({ ...issueEnvelope(), webhookTimestamp: NOW - 60_001 }),
+        )
+      ).status,
       401,
     );
     assert.equal((await endpoint.handle(request(issueEnvelope()))).status, 503);
@@ -199,10 +239,16 @@ describe("Linear webhook", () => {
 
 function webhookSource(
   accept: (
-    input: Parameters<Parameters<typeof createLinearWebhookSource>[0]["accept"]>[0],
+    input: Parameters<
+      Parameters<typeof createLinearWebhookSource>[0]["accept"]
+    >[0],
   ) => Promise<ProviderEventAcceptance>,
 ) {
-  return createLinearWebhookSource({ signingSecret: SECRET, now: () => NOW, accept });
+  return createLinearWebhookSource({
+    signingSecret: SECRET,
+    now: () => NOW,
+    accept,
+  });
 }
 
 function request(
@@ -234,7 +280,9 @@ function acceptedSignatureHash(): string {
 }
 
 function acceptedEvent(
-  input: Parameters<Parameters<typeof createLinearWebhookSource>[0]["accept"]>[0],
+  input: Parameters<
+    Parameters<typeof createLinearWebhookSource>[0]["accept"]
+  >[0],
 ): ProviderEventAcceptance {
   return {
     status: "accepted",
@@ -243,7 +291,7 @@ function acceptedEvent(
       {
         providerEventReceiptId: "receipt-1",
         organizationId: "org-1",
-        projectId: "hub-project-1",
+        workflowId: "hub-project-1",
         configurationRevisionId: "11111111-1111-4111-8111-111111111132",
         deliveryId: input.deliveryId,
         source: input.source,

@@ -43,7 +43,7 @@ import {
   type BotStartOptions,
   type BotStartPlan,
 } from "./plan.js";
-import { resolveTokenSecret, persistBotCredential, type BotChannelSecret } from "./token-input.js";
+import { resolveTokenSecret } from "./token-input.js";
 
 export interface BotStartInput {
   /** Commander's camelCase option bag for `bot start`. */
@@ -64,7 +64,7 @@ export interface BotStartReport {
   account: string;
   workspacePath: string;
   workspaceId: string;
-  credential: "persisted" | "runtime-only";
+  credential: "persisted";
   hub: "started" | "already-running";
   /** The Hub's loopback URL (the one-screen state: hub port). */
   hubUrl: string;
@@ -112,7 +112,6 @@ export interface BotStartDeps {
   addChannel(input: ChannelAddInput): Promise<ChannelAddResult>;
   /** The running Hub's per-account channel status (the plane-boot verification). */
   channelStatus(): Promise<ChannelStatusAccount[]>;
-  persistCredential(home: string, plan: BotStartPlan): string;
   readManifest(home: string, name: string): Promise<BotManifest | null>;
   writeManifest(home: string, manifest: BotManifest): Promise<void>;
 }
@@ -141,9 +140,6 @@ export async function runBotStart(
   const reused = existing !== null && planUnchanged(existing, plan);
 
   const infrastructure = await ensureInfrastructure(input, deps);
-  const persistPath = plan.persist ? deps.persistCredential(input.home, plan) : undefined;
-  const secret = assembleChannelSecret(plan);
-
   let ids: { agentId: string; agentTitle: string; workspacePath: string; workspaceId: string };
   if (reused && existing !== null) {
     // Same flags as the recorded bot: keep the existing workspace + agent, but
@@ -154,14 +150,14 @@ export async function runBotStart(
       workspacePath: existing.workspacePath,
       workspaceId: existing.workspaceId,
     };
-    await installChannelAccount(deps, plan, secret);
+    await installChannelAccount(deps, plan);
   } else {
-    ids = await createBotBundle(input, deps, plan, secret);
+    ids = await createBotBundle(input, deps, plan);
   }
 
-  await writeRecordedManifest(input.home, deps, plan, existing, ids, persistPath);
+  await writeRecordedManifest(input.home, deps, plan, existing, ids);
   const channel = await verifyChannelInstalled(deps, plan);
-  return buildReport(plan, ids, reused, infrastructure, persistPath, channel);
+  return buildReport(plan, ids, reused, infrastructure, channel);
 }
 
 /**
@@ -206,7 +202,6 @@ async function createBotBundle(
   input: BotStartInput,
   deps: BotStartDeps,
   plan: BotStartPlan,
-  secret: string,
 ): Promise<{ agentId: string; agentTitle: string; workspacePath: string; workspaceId: string }> {
   const host = deps.daemonHost(input.home, input.env);
   const client = await deps.openDaemon(host, deps.daemonPassword(input.home));
@@ -226,7 +221,7 @@ async function createBotBundle(
       workspaceId: workspace.id,
       title: plan.agentTitle,
     });
-    await installChannelAccount(deps, plan, secret);
+    await installChannelAccount(deps, plan);
     return {
       agentId: agent.id,
       agentTitle: plan.agentTitle,
@@ -239,13 +234,18 @@ async function createBotBundle(
 }
 
 /** Add the channel account, translating the cold-instance 409 into a `hub init` pointer. */
-async function installChannelAccount(
-  deps: BotStartDeps,
-  plan: BotStartPlan,
-  secret: string,
-): Promise<void> {
+async function installChannelAccount(deps: BotStartDeps, plan: BotStartPlan): Promise<void> {
   try {
-    await deps.addChannel({ channel: plan.channel, account: plan.account, secret });
+    const credential = plan.credential;
+    await deps.addChannel(
+      credential.channel === "slack"
+        ? { channel: "slack", account: plan.account, connectionId: credential.connectionId }
+        : {
+            channel: "telegram",
+            account: plan.account,
+            botToken: resolveTokenSecret(credential.input),
+          },
+    );
   } catch (error) {
     if (isNoActiveConfiguration(error)) {
       const commandError: CommandError = {
@@ -266,7 +266,6 @@ async function writeRecordedManifest(
   plan: BotStartPlan,
   existing: BotManifest | null,
   ids: { agentId: string; agentTitle: string; workspacePath: string; workspaceId: string },
-  persistPath: string | undefined,
 ): Promise<void> {
   const now = new Date();
   const credentialKey = `${plan.channel}:${plan.account}`;
@@ -275,10 +274,7 @@ async function writeRecordedManifest(
       ? buildBotManifest(plan, { workspaceId: ids.workspaceId, agentId: ids.agentId }, now)
       : { ...existing, updatedAt: now.toISOString() };
   manifest.routeNote = plan.routeNote;
-  manifest.credentials[credentialKey] = {
-    persisted: plan.persist,
-    ...(persistPath === undefined ? {} : { secretPath: persistPath }),
-  };
+  manifest.credentials[credentialKey] = { persisted: true };
   await deps.writeManifest(home, manifest);
 }
 
@@ -293,7 +289,6 @@ function buildReport(
     url: string;
     daemonHost: string;
   },
-  persistPath: string | undefined,
   channel: { transport?: string } | undefined,
 ): BotStartReport {
   return {
@@ -307,7 +302,7 @@ function buildReport(
     account: plan.account,
     workspacePath: ids.workspacePath,
     workspaceId: ids.workspaceId,
-    credential: persistPath === undefined ? "runtime-only" : "persisted",
+    credential: "persisted",
     hub: infrastructure.hub,
     hubUrl: infrastructure.url,
     hubPid: infrastructure.hubPid,
@@ -317,33 +312,6 @@ function buildReport(
     nextStep: buildNextStep(plan.channel),
     routeNote: plan.routeNote,
   };
-}
-
-/** The Slack/Telegram `secret` the Hub mirrors: a JSON document the supervisor reads. */
-export function assembleChannelSecret(plan: BotStartPlan): string {
-  const botToken = resolveTokenSecret(plan.credential.input);
-  if (plan.channel === "slack") {
-    const appToken = plan.credential.secondary
-      ? resolveTokenSecret(plan.credential.secondary)
-      : undefined;
-    return JSON.stringify({ botToken, ...(appToken === undefined ? {} : { appToken }) });
-  }
-  return JSON.stringify({ botToken });
-}
-
-/** Persist a `--persist`-ed credential to a 0600 file; returns its path. */
-export function persistBotCredentialFile(home: string, plan: BotStartPlan): string {
-  const botToken = resolveTokenSecret(plan.credential.input);
-  const secret: BotChannelSecret =
-    plan.channel === "slack"
-      ? {
-          botToken,
-          ...(plan.credential.secondary
-            ? { appToken: resolveTokenSecret(plan.credential.secondary) }
-            : {}),
-        }
-      : { token: botToken };
-  return persistBotCredential(home, plan.channel, plan.account, secret);
 }
 
 function buildBotWorkspaceSource(plan: BotStartPlan): BotWorkspaceSource {
@@ -454,7 +422,6 @@ export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotSta
     },
     addChannel: (input) => addChannel(localControlPlaneTarget(home, env), input),
     channelStatus: () => channelStatus(localControlPlaneTarget(home, env)),
-    persistCredential: (h, plan) => persistBotCredentialFile(h, plan),
     readManifest: (h, name) => readBotManifest(h, name),
     writeManifest: (h, manifest) => writeBotManifest(h, manifest),
   };

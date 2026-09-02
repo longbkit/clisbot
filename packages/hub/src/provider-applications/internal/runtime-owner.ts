@@ -2,7 +2,10 @@ import type { AuthServer } from "../../auth/server.js";
 import { createHash } from "node:crypto";
 import type { GitHubConfigurationProvider } from "../../configuration/github-sync.js";
 import type { Database } from "../../db/types.js";
-import { outputContextProvider, replyOutputTool } from "../../execution-capabilities/outputs.js";
+import {
+  outputContextProvider,
+  replyOutputTool,
+} from "../../execution-capabilities/outputs.js";
 import { logger } from "../../logger.js";
 import { reportFailure } from "../../failures/index.js";
 import { createDiscordRegistration } from "../../providers/discord/index.js";
@@ -13,7 +16,11 @@ import type {
   TriggerProviderResources,
 } from "../../providers/registration.js";
 import { createSlackRegistration } from "../../providers/slack/index.js";
-import type { TriggerHandler, TriggerProvider, TriggerSource } from "../../triggers/index.js";
+import type {
+  TriggerHandler,
+  TriggerProvider,
+  TriggerSource,
+} from "../../triggers/index.js";
 import type {
   Provider,
   ProviderApplicationConfiguration,
@@ -26,14 +33,15 @@ import type { SlackDeliveryStatus } from "../../triggers/slack/source/index.js";
 import { GITHUB_TRIGGER_SOURCE_NAMES } from "../../triggers/github/classification.js";
 
 interface Slot {
-  active: ActiveRegistration | undefined;
-  identity: ProviderApplicationIdentity | undefined;
+  active: Map<string, ActiveRegistration>;
+  identities: Map<string, ProviderApplicationIdentity>;
   triggerResources: TriggerProviderResources | undefined;
   handler: TriggerHandler | undefined;
 }
 
 interface ActiveRegistration {
   provider: Provider;
+  providerApplicationId: string;
   registration: ProviderRegistration;
   triggers: readonly TriggerProvider[];
   sourcesStarted: boolean;
@@ -89,6 +97,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
   private readonly stable = new Map<Provider, ProviderRegistration>();
   private slackInstallationHandler: SlackInstallationHandler | undefined;
   private linearInstallationHandler: LinearInstallationHandler | undefined;
+  private readonly suppressedSlackInbound = new Set<string>();
 
   constructor(private readonly options: DynamicProviderRuntimeOptions) {
     for (const provider of ["github", "slack", "discord", "linear"] as const) {
@@ -105,12 +114,20 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     ];
   }
 
-  identity(provider: Provider): ProviderApplicationIdentity | undefined {
-    return this.slot(provider).identity;
+  identity(
+    provider: Provider,
+    providerApplicationId: string,
+  ): ProviderApplicationIdentity | undefined {
+    return [...this.slot(provider).identities.values()].find(
+      (identity) => identity.id === providerApplicationId,
+    );
   }
 
-  slackDelivery(): { status(): SlackDeliveryStatus; retry(): Promise<void> } | undefined {
-    return this.slot("slack").active?.registration.slackDelivery;
+  slackDelivery(
+    providerApplicationId?: string,
+  ): { status(): SlackDeliveryStatus; retry(): Promise<void> } | undefined {
+    return selectActive(this.slot("slack"), providerApplicationId)?.registration
+      .slackDelivery;
   }
 
   onSlackInstallation(
@@ -144,16 +161,20 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       activation,
     );
     const slot = this.slot(provider);
+    const providerApplicationId = runtimeApplicationKey(provider, identity.id);
     const triggerResources = slot.triggerResources;
     const active: ActiveRegistration = {
       provider,
+      providerApplicationId: identity.id,
       registration,
       triggers:
         triggerResources === undefined
           ? []
           : registration.triggerProviders
               .map((factory) => factory(triggerResources))
-              .filter((trigger): trigger is TriggerProvider => trigger !== undefined),
+              .filter(
+                (trigger): trigger is TriggerProvider => trigger !== undefined,
+              ),
       sourcesStarted: false,
       acceptingEvents: false,
       leases: 0,
@@ -163,11 +184,13 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     let published = false;
     return {
       start: async () => {
-        if (slot.handler === undefined) return;
+        if (slot.handler === undefined || this.inboundSuppressed(active))
+          return;
         await startSources(active, slot.handler);
       },
       beginConnection: async (request) => {
-        const response = await registration.connection.actions["start"]?.(request);
+        const response =
+          await registration.connection.actions["start"]?.(request);
         if (response === undefined || !response.ok)
           throw unavailable("provider_application_unavailable");
         const body: unknown = await response.json();
@@ -175,14 +198,15 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
           body !== null && typeof body === "object" && "url" in body
             ? Reflect.get(body, "url")
             : undefined;
-        if (typeof url !== "string") throw unavailable("provider_application_unavailable");
+        if (typeof url !== "string")
+          throw unavailable("provider_application_unavailable");
         return { url };
       },
       publish: () => {
-        const previous = slot.active;
+        const previous = slot.active.get(providerApplicationId);
         if (previous !== undefined) previous.acceptingEvents = false;
-        slot.active = active;
-        slot.identity = identity;
+        slot.active.set(providerApplicationId, active);
+        slot.identities.set(providerApplicationId, identity);
         active.acceptingEvents = true;
         published = true;
         if (previous !== undefined) {
@@ -199,6 +223,26 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       },
       close: () => (published ? Promise.resolve() : stopSources(active)),
     };
+  }
+
+  /** Transfer Socket Mode ownership to/from the OpenClaw channel vertical.
+   * One Slack app must have exactly one inbound consumer: Slack load-balances
+   * envelopes across concurrent sockets instead of broadcasting them. */
+  async setSlackInboundSuppressed(
+    providerApplicationId: string,
+    suppressed: boolean,
+  ): Promise<void> {
+    if (suppressed) this.suppressedSlackInbound.add(providerApplicationId);
+    else this.suppressedSlackInbound.delete(providerApplicationId);
+    const active = selectActive(this.slot("slack"), providerApplicationId);
+    if (active === undefined) return;
+    if (suppressed) {
+      await stopSources(active);
+      return;
+    }
+    const handler = this.slot("slack").handler;
+    if (handler !== undefined && active.acceptingEvents)
+      await startSources(active, handler);
   }
 
   private build(
@@ -228,7 +272,9 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       applicationBaseUrl: this.options.applicationBaseUrl,
       publicBaseUrl: callbackOrigin,
       configurationVersion,
-      ...(this.options.fetch === undefined ? {} : { fetch: this.options.fetch }),
+      ...(this.options.fetch === undefined
+        ? {}
+        : { fetch: this.options.fetch }),
     };
     if (provider === "github" && configuration.provider === "github") {
       return createGitHubRegistration({ ...shared, configuration });
@@ -239,7 +285,10 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
         configuration,
         ...(activation?.expectedConfigurationVersion === undefined
           ? {}
-          : { expectedConfigurationVersion: activation.expectedConfigurationVersion }),
+          : {
+              expectedConfigurationVersion:
+                activation.expectedConfigurationVersion,
+            }),
         activateConfiguration: activation?.activateConfiguration ?? false,
         onVerifiedInstallation: (input) => this.handleSlackInstallation(input),
       });
@@ -260,7 +309,10 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
         configuration,
         ...(activation?.expectedConfigurationVersion === undefined
           ? {}
-          : { expectedConfigurationVersion: activation.expectedConfigurationVersion }),
+          : {
+              expectedConfigurationVersion:
+                activation.expectedConfigurationVersion,
+            }),
         activateConfiguration: activation?.activateConfiguration ?? false,
         onVerifiedInstallation: (input) => this.handleLinearInstallation(input),
       });
@@ -279,7 +331,9 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
           activateConfiguration: boolean;
         }
       | undefined,
-  ): Parameters<NonNullable<DynamicProviderRuntimeOptions["registrationFactory"]>>[0] {
+  ): Parameters<
+    NonNullable<DynamicProviderRuntimeOptions["registrationFactory"]>
+  >[0] {
     return {
       provider,
       configuration,
@@ -287,19 +341,25 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       configurationVersion,
       expectedConfigurationVersion: activation?.expectedConfigurationVersion,
       activateConfiguration: activation?.activateConfiguration ?? false,
-      onVerifiedSlackInstallation: (input) => this.handleSlackInstallation(input),
-      onVerifiedLinearInstallation: (input) => this.handleLinearInstallation(input),
+      onVerifiedSlackInstallation: (input) =>
+        this.handleSlackInstallation(input),
+      onVerifiedLinearInstallation: (input) =>
+        this.handleLinearInstallation(input),
     };
   }
 
-  private handleSlackInstallation(input: Parameters<SlackInstallationHandler>[0]): Promise<void> {
+  private handleSlackInstallation(
+    input: Parameters<SlackInstallationHandler>[0],
+  ): Promise<void> {
     if (this.slackInstallationHandler === undefined) {
       throw unavailable("slack_installation_handler_unavailable");
     }
     return this.slackInstallationHandler(input);
   }
 
-  private handleLinearInstallation(input: Parameters<LinearInstallationHandler>[0]): Promise<void> {
+  private handleLinearInstallation(
+    input: Parameters<LinearInstallationHandler>[0],
+  ): Promise<void> {
     if (this.linearInstallationHandler === undefined) {
       throw unavailable("linear_installation_handler_unavailable");
     }
@@ -311,29 +371,45 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     const source: TriggerSource = {
       start: async (handler) => {
         slot.handler = handler;
-        if (slot.active !== undefined) await startSources(slot.active, handler);
+        await Promise.all(
+          [...slot.active.values()]
+            .filter((active) => !this.inboundSuppressed(active))
+            .map((active) => startSources(active, handler)),
+        );
       },
       stop: async () => {
         slot.handler = undefined;
-        if (slot.active !== undefined) {
-          slot.active.acceptingEvents = false;
-          await stopSources(slot.active);
-        }
+        for (const active of slot.active.values())
+          active.acceptingEvents = false;
+        await Promise.all([...slot.active.values()].map(stopSources));
       },
     };
     const connectionActions = Object.fromEntries(
       actionNames(provider).map((action) => [
         action,
         async (request: Request) => {
-          const active = await this.registrationForAction(provider, slot, action, request);
+          const active = await this.registrationForAction(
+            provider,
+            slot,
+            action,
+            request,
+          );
           if (active === undefined) {
-            return Response.json({ error: "provider_not_configured" }, { status: 409 });
+            return Response.json(
+              { error: "provider_not_configured" },
+              { status: 409 },
+            );
           }
           return this.withLease(
             active,
             () =>
               active.registration.connection.actions[action]?.(request) ??
-              Promise.resolve(Response.json({ error: "provider_not_configured" }, { status: 409 })),
+              Promise.resolve(
+                Response.json(
+                  { error: "provider_not_configured" },
+                  { status: 409 },
+                ),
+              ),
           );
         },
       ]),
@@ -342,7 +418,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       connection: {
         name: provider,
         status: (connections) =>
-          slot.active?.registration.connection.status(connections) ?? {
+          firstActive(slot)?.registration.connection.status(connections) ?? {
             status: "notConfigured" as const,
           },
         actions: connectionActions,
@@ -351,33 +427,41 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
         ? {
             integration: {
               resolve: (
-                ...args: Parameters<NonNullable<ProviderRegistration["integration"]>["resolve"]>
+                ...args: Parameters<
+                  NonNullable<ProviderRegistration["integration"]>["resolve"]
+                >
               ) => {
-                const active = slot.active;
+                const active = firstActive(slot);
                 const integration = active?.registration.integration;
                 if (active === undefined || integration === undefined) {
                   throw unavailable("github_integration_unavailable");
                 }
-                return this.withLease(active, () => integration.resolve(...args));
+                return this.withLease(active, () =>
+                  integration.resolve(...args),
+                );
               },
               githubAuthority: {
                 mint: (
                   input: Parameters<
                     NonNullable<
-                      NonNullable<ProviderRegistration["integration"]>["githubAuthority"]
+                      NonNullable<
+                        ProviderRegistration["integration"]
+                      >["githubAuthority"]
                     >["mint"]
                   >[0],
                 ) => {
-                  const active = slot.active;
-                  const authority = active?.registration.integration?.githubAuthority;
+                  const active = firstActive(slot);
+                  const authority =
+                    active?.registration.integration?.githubAuthority;
                   if (active === undefined || authority === undefined) {
                     throw unavailable("github_authority_unavailable");
                   }
                   return this.withLease(active, () => authority.mint(input));
                 },
                 revoke: (token: string) => {
-                  const active = slot.active;
-                  const authority = active?.registration.integration?.githubAuthority;
+                  const active = firstActive(slot);
+                  const authority =
+                    active?.registration.integration?.githubAuthority;
                   if (active === undefined || authority === undefined) {
                     throw unavailable("github_authority_unavailable");
                   }
@@ -390,10 +474,12 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
       triggerProviders: [
         (resources) => {
           slot.triggerResources = resources;
-          if (slot.active !== undefined) {
-            slot.active.triggers = slot.active.registration.triggerProviders
+          for (const active of slot.active.values()) {
+            active.triggers = active.registration.triggerProviders
               .map((factory) => factory(resources))
-              .filter((trigger): trigger is TriggerProvider => trigger !== undefined);
+              .filter(
+                (trigger): trigger is TriggerProvider => trigger !== undefined,
+              );
           }
           return this.dynamicTrigger(provider, slot);
         },
@@ -408,7 +494,7 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
                 tool: replyOutputTool,
                 available: outputContextProvider(provider),
                 execute: (input) => {
-                  const active = slot.active;
+                  const active = selectActive(slot, applicationIdFrom(input));
                   const output = active?.registration.outputs.find(
                     (candidate) => candidate.type === `${provider}.reply`,
                   );
@@ -425,11 +511,15 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
           : [
               {
                 name: provider === "github" ? "webhook" : `${provider}.events`,
-                handle: (request) => {
-                  const active = slot.active;
+                handle: async (request) => {
+                  const active = await this.activeForRequest(
+                    provider,
+                    slot,
+                    request,
+                  );
                   const handler = active?.registration.requests[0];
                   return active === undefined || handler === undefined
-                    ? Promise.resolve(new Response("Not Found", { status: 404 }))
+                    ? new Response("Not Found", { status: 404 })
                     : this.withLease(active, () => handler.handle(request));
                 },
               },
@@ -441,8 +531,18 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
         ? {
             attachment: {
               provider,
-              resolve: (input) => {
-                const active = slot.active;
+              resolve: async (input) => {
+                const providerApplicationId =
+                  applicationIdFrom(input) ??
+                  (provider === "slack"
+                    ? (
+                        await this.options.database.findSlackConnectionByIdForOrganization(
+                          input.organizationId,
+                          input.connectionId,
+                        )
+                      )?.providerApplicationId
+                    : undefined);
+                const active = selectActive(slot, providerApplicationId);
                 const attachment = active?.registration.attachment;
                 if (active === undefined || attachment === undefined) {
                   throw unavailable(`${provider}_attachment_unavailable`);
@@ -461,44 +561,83 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     return slot;
   }
 
+  private inboundSuppressed(active: ActiveRegistration): boolean {
+    return (
+      active.provider === "slack" &&
+      this.suppressedSlackInbound.has(active.providerApplicationId)
+    );
+  }
+
   private dynamicTrigger(provider: Provider, slot: Slot): TriggerProvider {
-    const current = () => {
-      const active = slot.active;
+    const current = (input?: unknown) => {
+      const active = selectActive(slot, applicationIdFrom(input));
       const trigger = active?.triggers[0];
       if (active === undefined || trigger === undefined) {
         throw unavailable(`${provider}_trigger_unavailable`);
       }
       return { active, trigger };
     };
-    const invoke = <T>(operation: (trigger: TriggerProvider) => Promise<T>) => {
-      const selected = current();
+    const invoke = <T>(
+      input: unknown,
+      operation: (trigger: TriggerProvider) => Promise<T>,
+    ) => {
+      const selected = current(input);
       return this.withLease(selected.active, () => operation(selected.trigger));
     };
     return {
       name: provider,
       eventNames: eventNames(provider),
       match: async (external) => {
-        const selected = current();
-        return this.withLease(selected.active, () => selected.trigger.match(external));
+        const selected = current(external);
+        return this.withLease(selected.active, () =>
+          selected.trigger.match(external),
+        );
       },
-      materializeLaunch: (input) =>
-        invoke((trigger) => trigger.materializeLaunch?.(input) ?? Promise.resolve({})),
-      materializeContext: (input) =>
-        invoke((trigger) => trigger.materializeContext?.(input) ?? Promise.resolve(undefined)),
+      materializeLaunch: (input) => {
+        const selected = current(input);
+        return this.withLease(
+          selected.active,
+          () =>
+            selected.trigger.materializeLaunch?.(input) ?? Promise.resolve({}),
+        );
+      },
+      materializeContext: (input) => {
+        const selected = current(input);
+        return this.withLease(
+          selected.active,
+          () =>
+            selected.trigger.materializeContext?.(input) ??
+            Promise.resolve(undefined),
+        );
+      },
       onDispatchAccepted: (triggerContext, outputContext, reactionState) =>
         invoke(
+          triggerContext,
           (trigger) =>
-            trigger.onDispatchAccepted?.(triggerContext, outputContext, reactionState) ??
-            Promise.resolve(),
+            trigger.onDispatchAccepted?.(
+              triggerContext,
+              outputContext,
+              reactionState,
+            ) ?? Promise.resolve(),
         ),
       onAgentExecutionStarted: (triggerContext, outputContext, reactionState) =>
         invoke(
+          triggerContext,
           (trigger) =>
-            trigger.onAgentExecutionStarted?.(triggerContext, outputContext, reactionState) ??
-            Promise.resolve(),
+            trigger.onAgentExecutionStarted?.(
+              triggerContext,
+              outputContext,
+              reactionState,
+            ) ?? Promise.resolve(),
         ),
-      onAgentExecutionCompleted: (triggerContext, outputContext, result, reactionState) =>
+      onAgentExecutionCompleted: (
+        triggerContext,
+        outputContext,
+        result,
+        reactionState,
+      ) =>
         invoke(
+          triggerContext,
           (trigger) =>
             trigger.onAgentExecutionCompleted?.(
               triggerContext,
@@ -507,8 +646,14 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
               reactionState,
             ) ?? Promise.resolve(),
         ),
-      onAgentExecutionFailed: (triggerContext, outputContext, reason, reactionState) =>
+      onAgentExecutionFailed: (
+        triggerContext,
+        outputContext,
+        reason,
+        reactionState,
+      ) =>
         invoke(
+          triggerContext,
           (trigger) =>
             trigger.onAgentExecutionFailed?.(
               triggerContext,
@@ -519,21 +664,29 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
         ),
       onAgentExecutionTerminal: (executionId, triggerContext) =>
         invoke(
+          triggerContext,
           (trigger) =>
-            trigger.onAgentExecutionTerminal?.(executionId, triggerContext) ?? Promise.resolve(),
+            trigger.onAgentExecutionTerminal?.(executionId, triggerContext) ??
+            Promise.resolve(),
         ),
       onMachineTerminated: (triggerContext, reason, reactionState) =>
         invoke(
+          triggerContext,
           (trigger) =>
-            trigger.onMachineTerminated?.(triggerContext, reason, reactionState) ??
-            Promise.resolve(),
+            trigger.onMachineTerminated?.(
+              triggerContext,
+              reason,
+              reactionState,
+            ) ?? Promise.resolve(),
         ),
     };
   }
 
   private dynamicGitHubConfiguration(slot: Slot): GitHubConfigurationProvider {
-    const invoke = <T>(operation: (configuration: GitHubConfigurationProvider) => Promise<T>) => {
-      const active = slot.active;
+    const invoke = <T>(
+      operation: (configuration: GitHubConfigurationProvider) => Promise<T>,
+    ) => {
+      const active = firstActive(slot);
       const configuration = active?.registration.githubConfiguration;
       if (active === undefined || configuration === undefined) {
         throw unavailable("github_configuration_unavailable");
@@ -542,16 +695,22 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     };
     return {
       listInstallationRepositories: (input) =>
-        invoke((configuration) => configuration.listInstallationRepositories(input)),
+        invoke((configuration) =>
+          configuration.listInstallationRepositories(input),
+        ),
       readDefaultBranchHead: (input) =>
         invoke((configuration) => configuration.readDefaultBranchHead(input)),
       listFilesAtCommit: (input) =>
         invoke((configuration) => configuration.listFilesAtCommit(input)),
-      readFileAtCommit: (input) => invoke((configuration) => configuration.readFileAtCommit(input)),
+      readFileAtCommit: (input) =>
+        invoke((configuration) => configuration.readFileAtCommit(input)),
     };
   }
 
-  private async withLease<T>(active: ActiveRegistration, operation: () => Promise<T>): Promise<T> {
+  private async withLease<T>(
+    active: ActiveRegistration,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     active.leases += 1;
     try {
       return await operation();
@@ -563,7 +722,10 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     }
   }
 
-  private retireWhenDrained(provider: Provider, active: ActiveRegistration): Promise<void> {
+  private retireWhenDrained(
+    provider: Provider,
+    active: ActiveRegistration,
+  ): Promise<void> {
     if (active.leases > 0) return Promise.resolve();
     active.retirement ??= retire(provider, active);
     return active.retirement;
@@ -575,34 +737,52 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
     action: string,
     request: Request,
   ): Promise<ActiveRegistration | undefined> {
-    if (action !== "callback" && action !== "setup") return slot.active;
+    if (action !== "callback" && action !== "setup") {
+      if (provider !== "slack") return firstActive(slot);
+      return selectActive(slot, await applicationIdFromRequest(request));
+    }
     const state = new URL(request.url).searchParams.get("state");
-    if (state === null) return slot.active;
-    const snapshot = await this.options.database.findConnectionAttemptConfiguration(
-      createHash("sha256").update(state).digest("hex"),
+    if (state === null) {
+      return provider === "slack"
+        ? selectActive(slot, await applicationIdFromRequest(request))
+        : firstActive(slot);
+    }
+    const snapshot =
+      await this.options.database.findConnectionAttemptConfiguration(
+        createHash("sha256").update(state).digest("hex"),
+      );
+    if (snapshot === undefined) return firstActive(slot);
+    const snapshotKey = runtimeApplicationKey(
+      provider,
+      snapshot.providerApplicationId,
     );
-    if (snapshot === undefined) return slot.active;
     const existing =
-      slot.active?.registration.configurationSnapshot?.version === snapshot.configurationVersion &&
-      slot.active.registration.configurationSnapshot.callbackOrigin === snapshot.callbackOrigin
-        ? slot.active
+      slot.active.get(snapshotKey)?.registration.configurationSnapshot
+        ?.version === snapshot.configurationVersion &&
+      slot.active.get(snapshotKey)?.registration.configurationSnapshot
+        ?.callbackOrigin === snapshot.callbackOrigin
+        ? slot.active.get(snapshotKey)
         : undefined;
     if (existing !== undefined) return existing;
     try {
-      const configuration = parseProviderApplicationConfiguration(snapshot.configurationSnapshot);
-      if (configuration.provider !== provider) return slot.active;
+      const configuration = parseProviderApplicationConfiguration(
+        snapshot.configurationSnapshot,
+      );
+      if (configuration.provider !== provider) return firstActive(slot);
       const registration = this.build(
         provider,
         configuration,
         snapshot.callbackOrigin,
         snapshot.configurationVersion,
         {
-          expectedConfigurationVersion: snapshot.expectedConfigurationVersion ?? undefined,
+          expectedConfigurationVersion:
+            snapshot.expectedConfigurationVersion ?? undefined,
           activateConfiguration: snapshot.activateConfiguration,
         },
       );
       const restored: ActiveRegistration = {
         provider,
+        providerApplicationId: snapshot.providerApplicationId,
         registration,
         triggers: [],
         sourcesStarted: false,
@@ -618,22 +798,93 @@ export class DynamicProviderRuntime implements ProviderRuntimeOwner {
         component: "provider_runtime",
         provider,
       });
-      return slot.active;
+      return firstActive(slot);
     }
+  }
+
+  private async activeForRequest(
+    provider: Provider,
+    slot: Slot,
+    request: Request,
+  ): Promise<ActiveRegistration | undefined> {
+    if (provider !== "slack" || request.method !== "POST")
+      return firstActive(slot);
+    try {
+      const payload: unknown = await request.clone().json();
+      return selectActive(slot, applicationIdFrom(payload));
+    } catch {
+      return firstActive(slot);
+    }
+  }
+}
+
+async function applicationIdFromRequest(
+  request: Request,
+): Promise<string | undefined> {
+  const query = new URL(request.url).searchParams.get("providerApplicationId");
+  if (query !== null && query !== "") return query;
+  if (request.method === "GET" || request.method === "HEAD") return undefined;
+  try {
+    const payload: unknown = await request.clone().json();
+    return applicationIdFrom(payload);
+  } catch {
+    return undefined;
   }
 }
 
 function emptySlot(): Slot {
   return {
-    active: undefined,
-    identity: undefined,
+    active: new Map(),
+    identities: new Map(),
     triggerResources: undefined,
     handler: undefined,
   };
 }
 
+function firstActive(slot: Slot): ActiveRegistration | undefined {
+  return slot.active.values().next().value;
+}
+
+function selectActive(
+  slot: Slot,
+  providerApplicationId: string | undefined,
+): ActiveRegistration | undefined {
+  if (providerApplicationId !== undefined) {
+    const selected = slot.active.get(providerApplicationId);
+    if (selected !== undefined) return selected;
+  }
+  return slot.active.size === 1 ? firstActive(slot) : undefined;
+}
+
+function applicationIdFrom(value: unknown): string | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  for (const key of [
+    "providerApplicationId",
+    "provider_application_id",
+    "api_app_id",
+    "appId",
+  ]) {
+    const candidate: unknown = Reflect.get(value, key);
+    if (typeof candidate === "string" && candidate !== "") return candidate;
+  }
+  for (const key of ["event", "receipt", "triggerContext", "outputContext"]) {
+    const nestedValue: unknown = Reflect.get(value, key);
+    const nested = applicationIdFrom(nestedValue);
+    if (nested !== undefined) return nested;
+  }
+  return undefined;
+}
+
+function runtimeApplicationKey(
+  provider: Provider,
+  providerApplicationId: string,
+): string {
+  return provider === "slack" ? providerApplicationId : provider;
+}
+
 function actionNames(provider: Provider): readonly string[] {
-  if (provider === "github") return ["start", "disconnect", "setup", "callback"];
+  if (provider === "github")
+    return ["start", "disconnect", "setup", "callback"];
   return ["start", "disconnect", "callback"];
 }
 
@@ -644,7 +895,10 @@ function eventNames(provider: Provider): TriggerProvider["eventNames"] {
   return GITHUB_TRIGGER_SOURCE_NAMES;
 }
 
-async function startSources(active: ActiveRegistration, handler: TriggerHandler): Promise<void> {
+async function startSources(
+  active: ActiveRegistration,
+  handler: TriggerHandler,
+): Promise<void> {
   if (active.sourcesStarted) return;
   const started: TriggerSource[] = [];
   try {
@@ -658,7 +912,9 @@ async function startSources(active: ActiveRegistration, handler: TriggerHandler)
     }
     active.sourcesStarted = true;
   } catch (error) {
-    const cleanup = await Promise.allSettled(started.toReversed().map((source) => source.stop()));
+    const cleanup = await Promise.allSettled(
+      started.toReversed().map((source) => source.stop()),
+    );
     for (const failure of cleanup) {
       if (failure.status === "rejected") {
         reportFailure(failure.reason, {
@@ -682,13 +938,20 @@ async function stopSources(active: ActiveRegistration): Promise<void> {
   if (rejected?.status === "rejected") throw rejected.reason;
 }
 
-async function retire(provider: Provider, active: ActiveRegistration): Promise<void> {
+async function retire(
+  provider: Provider,
+  active: ActiveRegistration,
+): Promise<void> {
   try {
     await stopSources(active);
   } catch (error) {
     reportFailure(
       error,
-      { operation: "provider_runtime.retire", component: "provider_runtime", provider },
+      {
+        operation: "provider_runtime.retire",
+        component: "provider_runtime",
+        provider,
+      },
       { logger, kind: "internal" },
     );
   }

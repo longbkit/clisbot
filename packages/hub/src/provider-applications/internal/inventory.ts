@@ -9,7 +9,7 @@ interface ConnectionIdentityRow extends QueryRow {
   application_id: string | null;
   action_needed: boolean;
   scopes: unknown;
-  refresh_token?: unknown;
+  refresh_token_available?: unknown;
   access_token_expires_at?: unknown;
 }
 
@@ -18,20 +18,25 @@ export function createProviderApplicationInventory(
   database: DatabaseRuntime,
 ): ProviderApplicationInventory & { organizationSlug(id: string): Promise<string | undefined> } {
   return {
-    async connectedIdentities(provider) {
+    async connectedIdentities(provider, providerApplicationId) {
       const result = await database.query<ConnectionIdentityRow>(connectionIdentityQuery(provider));
-      return result.rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        applicationId: row.application_id,
-        status:
-          row.action_needed ||
-          (provider === "slack" &&
-            (!Array.isArray(row.scopes) || !hasRequiredSlackScopes(row.scopes))) ||
-          (provider === "linear" && linearConnectionActionNeeded(row))
-            ? "actionNeeded"
-            : "connected",
-      }));
+      return result.rows
+        .filter(
+          (row) =>
+            providerApplicationId === undefined || row.application_id === providerApplicationId,
+        )
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          applicationId: row.application_id,
+          status:
+            row.action_needed ||
+            (provider === "slack" &&
+              (!Array.isArray(row.scopes) || !hasRequiredSlackScopes(row.scopes))) ||
+            (provider === "linear" && linearConnectionActionNeeded(row))
+              ? "actionNeeded"
+              : "connected",
+        }));
     },
     async lastEventAt(provider, identity, configurationVersion) {
       if (provider === "discord") return null;
@@ -98,7 +103,7 @@ function connectionIdentityQuery(provider: Provider): string {
   if (provider === "linear") {
     return `select id::text as id, linear_organization_name as name,
                    provider_application_id as application_id,
-                   false as action_needed, scopes, refresh_token, access_token_expires_at
+                   false as action_needed, scopes, refresh_token_available, access_token_expires_at
             from linear_connections order by connected_at`;
   }
   return `select id::text as id, guild_name as name,
@@ -109,13 +114,13 @@ function connectionIdentityQuery(provider: Provider): string {
 
 function linearConnectionActionNeeded(row: ConnectionIdentityRow): boolean {
   if (!isStringArray(row.scopes)) return true;
-  const refreshToken = row.refresh_token;
-  if (refreshToken !== null && typeof refreshToken !== "string") return true;
+  const refreshTokenAvailable = row.refresh_token_available;
+  if (typeof refreshTokenAvailable !== "boolean") return true;
   const accessTokenExpiresAt = optionalDate(row.access_token_expires_at);
   if (accessTokenExpiresAt === undefined) return true;
   return linearConnectionRequiresReauthorization({
     scopes: row.scopes,
-    refreshToken,
+    refreshToken: refreshTokenAvailable ? "available" : null,
     accessTokenExpiresAt,
   });
 }

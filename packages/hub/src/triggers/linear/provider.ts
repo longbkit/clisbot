@@ -1,4 +1,4 @@
-import type { ProjectConfigurationStore } from "../../configuration/store.js";
+import type { WorkflowConfigurationResolver } from "../configuration.js";
 import {
   LINEAR_ISSUE_COMMENT_CONTEXT_LIMIT,
   type LinearApiClient,
@@ -67,7 +67,7 @@ export interface LinearMaterializedContext {
 }
 
 export function createLinearTriggerProvider(options: {
-  configurationStoreForProject: (projectId: string) => ProjectConfigurationStore;
+  configurationForWorkflow: WorkflowConfigurationResolver;
   client?: Pick<LinearApiClient, "readIssueComments">;
 }): TriggerProvider<
   "linear",
@@ -80,9 +80,7 @@ export function createLinearTriggerProvider(options: {
     eventNames: ["linear.issue", "linear.comment"],
     async match(externalTrigger) {
       const event = NormalizedLinearEventSchema.parse(externalTrigger.payload);
-      const stored = await options
-        .configurationStoreForProject(externalTrigger.projectId)
-        .getRevision(externalTrigger.configurationRevisionId);
+      const stored = await options.configurationForWorkflow(externalTrigger);
       if (stored === undefined) return "configuration_unavailable";
       if (!hasSourceTrigger(stored.configuration.triggers, externalTrigger.source)) {
         return "no_trigger_for_source";

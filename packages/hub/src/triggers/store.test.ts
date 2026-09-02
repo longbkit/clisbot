@@ -33,7 +33,6 @@ describe("organization trigger store", () => {
     });
 
     assert.equal(second.id, first.id);
-    assert.equal(second.runtimeProjectId, first.runtimeProjectId);
     assert.equal(second.enabled, false);
     assert.equal((await database.listProjectsForOrganization("org")).length, 0);
     assert.equal((await store.activeRevision(second)).version, 2);

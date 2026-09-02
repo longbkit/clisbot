@@ -3,15 +3,25 @@ import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import {
+  PostgreSqlContainer,
+  type StartedPostgreSqlContainer,
+} from "@testcontainers/postgresql";
 import { postgresDatabaseRuntime } from "./runtime/index.js";
-import type { DatabaseRuntime, QueryHandle, QueryRow } from "./runtime/index.js";
+import type {
+  DatabaseRuntime,
+  QueryHandle,
+  QueryRow,
+} from "./runtime/index.js";
 import { createPostgresQueryRuntime } from "./test-utils/runtime.js";
 import { z } from "zod";
 import { dump } from "js-yaml";
 import { createDatabase } from "./test-utils/runtime.js";
 import { createHubApplication } from "../app.js";
-import { ProjectConfigurationStore, revisionBundleFiles } from "../configuration/store.js";
+import {
+  ProjectConfigurationStore,
+  revisionBundleFiles,
+} from "../configuration/store.js";
 import { configurationBundleFixture } from "../test-utils/configuration-bundle.js";
 import { InstanceSetup } from "../instance-setup/index.js";
 import { UNLIMITED_PROVISIONING } from "../organizations/provisioning.js";
@@ -19,8 +29,7 @@ import type { InstanceAuthPolicy } from "../auth/instance-policy.js";
 import type { ApiKeyScope } from "../auth/api-key-contract.js";
 import type { OperationAuthenticator } from "../auth/operation-auth.js";
 import { EntitlementsService } from "../entitlements/service.js";
-import { migrateLegacyProjectTriggers } from "../triggers/migration.js";
-import type { MigrateProjectTriggersInput } from "./types.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 
 const LEGACY_MIGRATIONS = join(process.cwd(), "src/db/migrations");
 const DRIZZLE_MIGRATIONS = join(process.cwd(), "drizzle");
@@ -340,7 +349,9 @@ describe("database migration application", () => {
       const missingTrigger = await upgrade.runManualTrigger();
       assert.equal(missingTrigger.status, 404);
       assert.equal(
-        z.object({ code: z.literal("trigger_not_found") }).parse(missingTrigger.body).code,
+        z
+          .object({ code: z.literal("trigger_not_found") })
+          .parse(missingTrigger.body).code,
         "trigger_not_found",
       );
     } finally {
@@ -349,11 +360,18 @@ describe("database migration application", () => {
   });
 
   it("attaches a migrated customer organization before removing its principal binding", async () => {
-    const fixture = await createLegacyDatabase(postgres, "legacy_bootstrap_attach");
+    const fixture = await createLegacyDatabase(
+      postgres,
+      "legacy_bootstrap_attach",
+    );
     const upgraded = await createDatabase(fixture.url);
     await upgraded.close();
     const before = await durableSnapshot(fixture.url);
-    const organization = await poolQuery<{ id: string; name: string; members: number }>(
+    const organization = await poolQuery<{
+      id: string;
+      name: string;
+      members: number;
+    }>(
       fixture.url,
       `select organization.id, organization.name,
               (select count(*)::integer from member where member.organization_id = organization.id) as members
@@ -473,7 +491,9 @@ describe("database migration application", () => {
       {
         active_configuration_revision_id: activeId,
         historical_configuration: {
-          environments: [{ daemon: "retired-daemon", kind: "daemon", name: "retired" }],
+          environments: [
+            { daemon: "retired-daemon", kind: "daemon", name: "retired" },
+          ],
           triggers: [],
         },
         historical_source_evidence: {
@@ -509,12 +529,18 @@ describe("database migration application", () => {
     const database = await createDatabase(url);
     await database.close();
 
-    const customer = await poolQuery<{ organization_id: string; stripe_customer_id: string }>(
+    const customer = await poolQuery<{
+      organization_id: string;
+      stripe_customer_id: string;
+    }>(
       url,
       `select organization_id, stripe_customer_id from organization_billing_customers`,
     );
     assert.deepEqual(customer.rows, [
-      { organization_id: "organization-billing", stripe_customer_id: "cus_durable" },
+      {
+        organization_id: "organization-billing",
+        stripe_customer_id: "cus_durable",
+      },
     ]);
     assert.deepEqual(
       (
@@ -546,7 +572,9 @@ describe("database migration application", () => {
       const enrolled = await database.enrollDaemon({
         daemonId: randomUUID(),
         idempotencyKey: randomUUID(),
-        tokenVerifier: createHash("sha256").update(fixture.token).digest("base64url"),
+        tokenVerifier: createHash("sha256")
+          .update(fixture.token)
+          .digest("base64url"),
         serverId: "phase-one-server",
         daemonPublicKey: "phase-one-public-key",
         credentialVerifier: "phase-one-credential",
@@ -554,7 +582,9 @@ describe("database migration application", () => {
         now: new Date(),
       });
       assert.ok(enrolled !== undefined);
-      assert.deepEqual((await historicalShape(fixture.url)).organizationIds, ["org_1"]);
+      assert.deepEqual((await historicalShape(fixture.url)).organizationIds, [
+        "org_1",
+      ]);
     } finally {
       await database.close();
     }
@@ -563,24 +593,46 @@ describe("database migration application", () => {
   it("stops before adding Phase 1 constraints when identity data is unsafe", async () => {
     const failures = await rejectedPhaseOneFixtures(postgres);
 
-    assert.match(failures.duplicateMembership, /duplicate organization memberships exist/);
-    assert.match(failures.duplicateInvitation, /duplicate normalized pending invitations exist/);
+    assert.match(
+      failures.duplicateMembership,
+      /duplicate organization memberships exist/,
+    );
+    assert.match(
+      failures.duplicateInvitation,
+      /duplicate normalized pending invitations exist/,
+    );
     assert.match(
       failures.memberInvitationCollision,
       /pending invitation exists for current organization member/,
     );
-    assert.match(failures.invalidMemberRole, /unknown or multi-valued member role exists/);
-    assert.match(failures.invalidInvitation, /unknown or missing invitation role exists/);
-    assert.match(failures.invalidInvitationStatus, /unknown invitation status exists/);
+    assert.match(
+      failures.invalidMemberRole,
+      /unknown or multi-valued member role exists/,
+    );
+    assert.match(
+      failures.invalidInvitation,
+      /unknown or missing invitation role exists/,
+    );
+    assert.match(
+      failures.invalidInvitationStatus,
+      /unknown invitation status exists/,
+    );
   });
 
   it("activates and rolls back immutable deployments atomically in PostgreSQL", async () => {
     const url = databaseUrl(postgres, "deployment_lifecycle");
     const database = await createDatabase(url);
     try {
-      const [project, foreignProject] = await createProjectFixtures(database, url);
-      const first = await database.insertProjectConfigurationRevision(revision(project.id));
-      const second = await database.insertProjectConfigurationRevision(revision(project.id));
+      const [project, foreignProject] = await createProjectFixtures(
+        database,
+        url,
+      );
+      const first = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
+      const second = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
       const invalid = await database.insertProjectConfigurationRevision(
         revision(project.id, { formErrors: ["invalid"] }),
       );
@@ -602,9 +654,16 @@ describe("database migration application", () => {
         triggerName: "first-trigger",
       };
       const secondRoute = { ...firstRoute, triggerName: "second-trigger" };
-      const secondRoutes = [secondRoute, { ...secondRoute, triggerName: "second-trigger-2" }];
+      const secondRoutes = [
+        secondRoute,
+        { ...secondRoute, triggerName: "second-trigger-2" },
+      ];
 
-      await database.activateProjectConfigurationRevision(project.id, first.id, [firstRoute]);
+      await database.activateProjectConfigurationRevision(
+        project.id,
+        first.id,
+        [firstRoute],
+      );
       const activated = await database.activateProjectConfigurationRevision(
         project.id,
         second.id,
@@ -621,9 +680,11 @@ describe("database migration application", () => {
       assert.equal(accepted.status, "accepted");
       if (accepted.status !== "accepted") return;
       assert.equal(accepted.events.length, 1);
-      const rolledBack = await database.rollbackProjectConfiguration(project.id, first.id, [
-        firstRoute,
-      ]);
+      const rolledBack = await database.rollbackProjectConfiguration(
+        project.id,
+        first.id,
+        [firstRoute],
+      );
       const replayed = await database.acceptGitHubEvent({
         installationId: 9101,
         repositoryId: 9001,
@@ -640,13 +701,23 @@ describe("database migration application", () => {
       assert.equal(replayed.events[0]?.configurationRevisionId, second.id);
       assert.deepEqual(
         (
-          await poolQuery<{ configuration_revision_id: string; trigger_name: string }>(
+          await poolQuery<{
+            configuration_revision_id: string;
+            trigger_name: string;
+          }>(
             url,
             `select configuration_revision_id, trigger_name
              from project_trigger_routes where project_id = '${project.id}'`,
           )
-        ).rows.sort((left, right) => left.trigger_name.localeCompare(right.trigger_name)),
-        [{ configuration_revision_id: first.id, trigger_name: "first-trigger" }],
+        ).rows.sort((left, right) =>
+          left.trigger_name.localeCompare(right.trigger_name),
+        ),
+        [
+          {
+            configuration_revision_id: first.id,
+            trigger_name: "first-trigger",
+          },
+        ],
       );
       await assert.rejects(
         database.activateProjectConfigurationRevision(project.id, invalid.id),
@@ -677,9 +748,18 @@ describe("database migration application", () => {
       const revisionRecord = await database.insertProjectConfigurationRevision(
         revision(project.id),
       );
-      await database.activateProjectConfigurationRevision(project.id, revisionRecord.id, [
-        { provider: "github", connectionId, resourceId: null, triggerName: "receipt-trigger" },
-      ]);
+      await database.activateProjectConfigurationRevision(
+        project.id,
+        revisionRecord.id,
+        [
+          {
+            provider: "github",
+            connectionId,
+            resourceId: null,
+            triggerName: "receipt-trigger",
+          },
+        ],
+      );
       const input = {
         installationId: 9201,
         repositoryId: 9202,
@@ -695,10 +775,15 @@ describe("database migration application", () => {
         database.acceptGitHubEvent(input),
       ]);
 
-      assert.deepEqual(results.map((result) => result.status).sort(), ["accepted", "accepted"]);
+      assert.deepEqual(results.map((result) => result.status).sort(), [
+        "accepted",
+        "accepted",
+      ]);
       assert.deepEqual(
         results.map((result) =>
-          result.status === "accepted" ? result.events[0]?.configurationRevisionId : undefined,
+          result.status === "accepted"
+            ? result.events[0]?.configurationRevisionId
+            : undefined,
         ),
         [revisionRecord.id, revisionRecord.id],
       );
@@ -723,7 +808,14 @@ describe("database migration application", () => {
       );
       const store = new ProjectConfigurationStore(database, project.id);
       const configuration = {
-        environments: [{ name: "runner", kind: "daemon", daemon: "daemon-10000000", cwd: "/repo" }],
+        environments: [
+          {
+            name: "runner",
+            kind: "daemon",
+            daemon: "daemon-10000000",
+            cwd: "/repo",
+          },
+        ],
         triggers: [
           {
             name: "github-trigger",
@@ -760,9 +852,11 @@ describe("database migration application", () => {
       });
 
       assert.equal(switched.revision.sourceKind, "manual");
-      assert.equal(accepted.status, "accepted");
-      if (accepted.status !== "accepted") return;
-      assert.equal(accepted.events[0]?.projectId, project.id);
+      assert.deepEqual(accepted, {
+        status: "dropped",
+        receiptId: accepted.receiptId,
+        reason: "no_workflow_route",
+      });
     } finally {
       await database.close();
     }
@@ -776,7 +870,14 @@ describe("database migration application", () => {
       await seedTestDaemon(url, "organization-a");
       const store = new ProjectConfigurationStore(database, project.id);
       const rawConfiguration = {
-        environments: [{ name: "runner", kind: "daemon", daemon: "daemon-10000000", cwd: "/repo" }],
+        environments: [
+          {
+            name: "runner",
+            kind: "daemon",
+            daemon: "daemon-10000000",
+            cwd: "/repo",
+          },
+        ],
         triggers: [
           {
             name: "triage",
@@ -798,7 +899,10 @@ describe("database migration application", () => {
       const partialContent = "Triage the request before labeling it.";
       const files = [
         ...configurationBundleFixture(dump(rawConfiguration)),
-        { path: ".paseo/workflows/partials/triage.md", content: partialContent },
+        {
+          path: ".paseo/workflows/partials/triage.md",
+          content: partialContent,
+        },
       ];
       const githubRevision = await store.insertGitHubBundleRevision({
         files,
@@ -812,9 +916,13 @@ describe("database migration application", () => {
       await store.activate(githubRevision.id);
 
       const switched = await store.switchToManual("project-user");
-      const persisted = await database.findActiveProjectConfiguration(project.id);
+      const persisted = await database.findActiveProjectConfiguration(
+        project.id,
+      );
 
-      const expectedFiles = files.toSorted((a, b) => a.path.localeCompare(b.path));
+      const expectedFiles = files.toSorted((a, b) =>
+        a.path.localeCompare(b.path),
+      );
       assert.deepEqual(revisionBundleFiles(switched.revision), expectedFiles);
       assert.deepEqual(
         persisted === undefined ? undefined : revisionBundleFiles(persisted),
@@ -829,14 +937,24 @@ describe("database migration application", () => {
     const url = databaseUrl(postgres, "concurrent_manual_receipts");
     const database = await createDatabase(url);
     try {
-      const [project] = await createProjectFixtures(database, url);
-      const revisionRecord = await database.insertProjectConfigurationRevision(
-        revision(project.id),
-      );
-      await database.activateProjectConfigurationRevision(project.id, revisionRecord.id);
+      await createProjectFixtures(database, url);
+      const workflow = await database.saveOrganizationTrigger({
+        organizationId: "organization-a",
+        name: "concurrent-manual-workflow",
+        enabled: true,
+        format: "legacy_multistep",
+        yaml: "name: concurrent-manual-workflow",
+        normalizedConfiguration: { environments: [], triggers: [] },
+        contentHash: "concurrent-manual-workflow",
+        sourceKind: "manual",
+        sourceEvidence: { kind: "test" },
+        createdByUserId: null,
+        routes: [],
+      });
       const manualInput = {
         organizationId: "organization-a",
-        projectId: project.id,
+        triggerId: workflow.id,
+        triggerRevisionId: workflow.activeRevisionId,
         deliveryId: "concurrent-manual-receipt",
         signatureHash: "concurrent-manual-signature",
         source: "manual.run",
@@ -917,14 +1035,18 @@ describe("database migration application", () => {
         normalizedConfiguration: { environments: [], triggers: [] },
         contentHash: randomUUID(),
       });
-      await database.activateProjectConfigurationRevision(project.id, routeRevision.id, [
-        {
-          provider: "github",
-          connectionId,
-          resourceId: "9272",
-          triggerName: "lifecycle-removal-route",
-        },
-      ]);
+      await database.activateProjectConfigurationRevision(
+        project.id,
+        routeRevision.id,
+        [
+          {
+            provider: "github",
+            connectionId,
+            resourceId: "9272",
+            triggerName: "lifecycle-removal-route",
+          },
+        ],
+      );
 
       const claim = await database.claimGitHubLifecycleReceipt({
         installationId: 9271,
@@ -937,7 +1059,10 @@ describe("database migration application", () => {
       assert.equal(claim.status, "claimed");
       if (claim.status !== "claimed") return;
 
-      await database.applyGitHubLifecycle(claim, { status: "absent", removeBinding: true });
+      await database.applyGitHubLifecycle(claim, {
+        status: "absent",
+        removeBinding: true,
+      });
 
       const state = await poolQuery<{
         connections: number;
@@ -994,9 +1119,11 @@ describe("database migration application", () => {
 
       assert.equal(result.status, "dropped");
       assert.equal(
-        (await database.listUnroutedProviderEventsForOrganization("organization-a")).some(
-          (event) => event.deliveryId === "unrouted-activity-receipt",
-        ),
+        (
+          await database.listUnroutedProviderEventsForOrganization(
+            "organization-a",
+          )
+        ).some((event) => event.deliveryId === "unrouted-activity-receipt"),
         true,
       );
     } finally {
@@ -1009,9 +1136,15 @@ describe("database migration application", () => {
     const database = await createDatabase(url);
     try {
       const [project] = await createProjectFixtures(database, url);
-      const first = await database.insertProjectConfigurationRevision(revision(project.id));
-      const second = await database.insertProjectConfigurationRevision(revision(project.id));
-      const third = await database.insertProjectConfigurationRevision(revision(project.id));
+      const first = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
+      const second = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
+      const third = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
       await database.activateProjectConfigurationRevision(project.id, first.id);
 
       await Promise.all([
@@ -1021,9 +1154,15 @@ describe("database migration application", () => {
 
       const current = await database.findActiveProjectConfiguration(project.id);
       assert.ok(current?.id === second.id || current?.id === third.id);
-      const target = await database.findProjectConfigurationRollbackTarget(project.id);
+      const target = await database.findProjectConfigurationRollbackTarget(
+        project.id,
+      );
       assert.ok(target !== undefined);
-      const rolledBack = await database.rollbackProjectConfiguration(project.id, target.id, []);
+      const rolledBack = await database.rollbackProjectConfiguration(
+        project.id,
+        target.id,
+        [],
+      );
       assert.equal(rolledBack.version, current.version - 1);
     } finally {
       await database.close();
@@ -1035,16 +1174,27 @@ describe("database migration application", () => {
     const database = await createDatabase(url);
     try {
       const [project] = await createProjectFixtures(database, url);
-      const first = await database.insertProjectConfigurationRevision(revision(project.id));
-      const second = await database.insertProjectConfigurationRevision(revision(project.id));
+      const first = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
+      const second = await database.insertProjectConfigurationRevision(
+        revision(project.id),
+      );
       await database.activateProjectConfigurationRevision(project.id, first.id);
 
       const concurrent = await Promise.all([
         database.activateProjectConfigurationRevision(project.id, second.id),
         database.activateProjectConfigurationRevision(project.id, second.id),
       ]);
-      const retried = await database.activateProjectConfigurationRevision(project.id, second.id);
-      const rolledBack = await database.rollbackProjectConfiguration(project.id, first.id, []);
+      const retried = await database.activateProjectConfigurationRevision(
+        project.id,
+        second.id,
+      );
+      const rolledBack = await database.rollbackProjectConfiguration(
+        project.id,
+        first.id,
+        [],
+      );
 
       assert.deepEqual(
         [...concurrent, retried].map(({ id }) => id),
@@ -1055,277 +1205,6 @@ describe("database migration application", () => {
       await database.close();
     }
   });
-
-  it("atomically explodes mixed project workflows and remains idempotent across concurrent startup", async () => {
-    const url = databaseUrl(postgres, "organization_trigger_startup_migration");
-    const database = await createDatabase(url);
-    try {
-      const [project] = await createProjectFixtures(database, url);
-      await seedTestDaemon(url, "organization-a");
-      const slackConnectionId = "11111111-1111-4111-8111-111111111191";
-      await poolQuery(
-        url,
-        `insert into slack_connections
-           (id, organization_id, team_id, slug, team_name, bot_user_id, bot_access_token, scopes)
-         values ($1, 'organization-a', 'startup-team', 'startup-slack', 'Startup Slack',
-                 'startup-bot', 'startup-token', '[]'::jsonb)`,
-        [slackConnectionId],
-      );
-      const configuration = {
-        environments: [{ name: "runner", kind: "daemon", daemon: "daemon-10000000", cwd: "/repo" }],
-        triggers: [
-          {
-            name: "single",
-            on: "slack.mention",
-            max_runtime: "2h",
-            filters: { from_users: ["U1"] },
-            steps: [
-              {
-                id: "work",
-                environment: "runner",
-                max_runtime: "1h",
-                idle_timeout: "5m",
-                agent: { provider: "test" },
-                prompt: [{ text: "Work" }],
-              },
-            ],
-          },
-          {
-            name: "multi",
-            on: "manual.run",
-            max_runtime: "2h",
-            steps: [
-              {
-                id: "classify",
-                environment: "runner",
-                max_runtime: "5m",
-                idle_timeout: "1m",
-                agent: { provider: "test" },
-                prompt: [{ text: "Classify" }],
-              },
-              {
-                id: "work",
-                environment: "runner",
-                max_runtime: "1h",
-                idle_timeout: "5m",
-                agent: { provider: "test" },
-                prompt: [{ text: "Work" }],
-              },
-            ],
-          },
-        ],
-      };
-      const store = new ProjectConfigurationStore(database, project.id);
-      const configurationRevision = await store.insertManualBundleRevision({
-        files: configurationBundleFixture(dump(configuration)),
-        userId: "project-user",
-      });
-      await store.activate(configurationRevision.id);
-
-      await Promise.all([
-        migrateLegacyProjectTriggers(database),
-        migrateLegacyProjectTriggers(database),
-      ]);
-      const triggers = await database.listOrganizationTriggers("organization-a");
-      assert.deepEqual(
-        triggers.map(({ name, format }) => ({ name, format })),
-        [
-          { name: "multi", format: "legacy_multistep" },
-          { name: "single", format: "single_run" },
-        ],
-      );
-      assert.equal((await database.listPendingProjectTriggerMigrations()).length, 0);
-      assert.deepEqual(
-        (
-          await poolQuery<{
-            connection_id: string;
-            configured_event_name: string;
-            resource_id: string | null;
-          }>(
-            url,
-            `select connection_id::text, configured_event_name, resource_id
-             from organization_trigger_routes`,
-          )
-        ).rows,
-        [
-          {
-            connection_id: slackConnectionId,
-            configured_event_name: "slack.mention",
-            resource_id: null,
-          },
-        ],
-      );
-      assert.equal(
-        (
-          await poolQuery<{ count: number }>(
-            url,
-            `select count(*)::integer as count from organization_trigger_revisions`,
-          )
-        ).rows[0]?.count,
-        2,
-      );
-      const single = triggers.find(({ name }) => name === "single")!;
-      const multi = triggers.find(({ name }) => name === "multi")!;
-      assert.notEqual(single.runtimeProjectId, project.id);
-      assert.notEqual(multi.runtimeProjectId, project.id);
-      assert.notEqual(single.runtimeProjectId, multi.runtimeProjectId);
-      assert.equal((await database.listProjectsForOrganization("organization-a")).length, 0);
-      const accepted = await database.acceptSlackEvent({
-        teamId: "startup-team",
-        deliveryId: "organization-trigger-adapter-route",
-        source: "slack.mention",
-        payload: {},
-        receivedAt: new Date(0),
-      });
-      assert.equal(accepted.status, "accepted");
-      if (accepted.status === "accepted") {
-        assert.equal(accepted.events[0]?.projectId, single.runtimeProjectId);
-      }
-    } finally {
-      await database.close();
-    }
-  }, 120_000);
-
-  it("repairs implicit provider routes lost by the project trigger migration", async () => {
-    const url = await createHistoricalBaseline({
-      postgres,
-      prefix: "restore_implicit_trigger_routes",
-      through: "0044_charming_clint_barton",
-    });
-    await poolQuery(
-      url,
-      `insert into organization (id, name, slug)
-         values ('route-repair-org', 'Route repair', 'route-repair');
-       insert into slack_connections
-         (id, organization_id, team_id, slug, team_name, bot_user_id, bot_access_token, scopes)
-         values ('10000000-0000-4000-8000-000000000001', 'route-repair-org',
-                 'route-repair-team', 'route-repair-slack', 'Route repair Slack',
-                 'route-repair-bot', 'test-token', '[]'::jsonb);
-       insert into discord_connections
-         (id, organization_id, guild_id, slug, guild_name)
-         values ('10000000-0000-4000-8000-000000000002', 'route-repair-org',
-                 'route-repair-guild', 'route-repair-discord', 'Route repair Discord');
-       insert into projects (id, organization_id, name, slug) values
-         ('20000000-0000-4000-8000-000000000001', 'route-repair-org',
-          'Slack runtime', 'route-repair-slack-runtime'),
-         ('20000000-0000-4000-8000-000000000002', 'route-repair-org',
-          'Discord runtime', 'route-repair-discord-runtime');
-       insert into project_configuration_revisions
-         (id, project_id, organization_id, version, source_kind, source_evidence,
-          normalized_configuration, content_hash, validated_at) values
-         ('30000000-0000-4000-8000-000000000001',
-          '20000000-0000-4000-8000-000000000001', 'route-repair-org', 1, 'manual', '{}',
-          '{"environments":[],"triggers":[{"name":"slack","on":"slack.mention"}]}',
-          'slack-runtime', now()),
-         ('30000000-0000-4000-8000-000000000002',
-          '20000000-0000-4000-8000-000000000002', 'route-repair-org', 1, 'manual', '{}',
-          '{"environments":[],"triggers":[{"name":"discord","on":"discord.mention"}]}',
-          'discord-runtime', now());
-       update projects set active_configuration_revision_id =
-         case id
-           when '20000000-0000-4000-8000-000000000001'
-             then '30000000-0000-4000-8000-000000000001'::uuid
-           else '30000000-0000-4000-8000-000000000002'::uuid
-         end
-         where organization_id = 'route-repair-org';
-       insert into organization_triggers
-         (id, organization_id, name, enabled, format, runtime_project_id) values
-         ('40000000-0000-4000-8000-000000000001', 'route-repair-org', 'slack', true,
-          'legacy_multistep', '20000000-0000-4000-8000-000000000001'),
-         ('40000000-0000-4000-8000-000000000002', 'route-repair-org', 'discord', true,
-          'legacy_multistep', '20000000-0000-4000-8000-000000000002');
-       insert into organization_trigger_revisions
-         (id, trigger_id, organization_id, version, yaml, normalized_configuration,
-          content_hash, source_kind, source_evidence) values
-         ('50000000-0000-4000-8000-000000000001',
-          '40000000-0000-4000-8000-000000000001', 'route-repair-org', 1, 'slack',
-          '{"environments":[],"triggers":[{"name":"slack","on":"slack.mention"}]}',
-          'slack-trigger', 'project_migration', '{}'),
-         ('50000000-0000-4000-8000-000000000002',
-          '40000000-0000-4000-8000-000000000002', 'route-repair-org', 1, 'discord',
-          '{"environments":[],"triggers":[{"name":"discord","on":"discord.mention"}]}',
-          'discord-trigger', 'project_migration', '{}');
-       update organization_triggers set active_revision_id =
-         case id
-           when '40000000-0000-4000-8000-000000000001'
-             then '50000000-0000-4000-8000-000000000001'::uuid
-           else '50000000-0000-4000-8000-000000000002'::uuid
-         end
-         where organization_id = 'route-repair-org'`,
-    );
-    const client = await createPostgresQueryRuntime(url);
-    try {
-      const migration = await readFile(
-        join(DRIZZLE_MIGRATIONS, "0045_restore_implicit_trigger_routes.sql"),
-        "utf8",
-      );
-      await applyMigration(client, migration);
-      await applyMigration(client, migration);
-    } finally {
-      await client.close();
-    }
-
-    const repaired = await poolQuery<{
-      provider: string;
-      organization_routes: number;
-      project_routes: number;
-    }>(
-      url,
-      `select provider,
-              count(*) filter (where route_kind = 'organization')::integer as organization_routes,
-              count(*) filter (where route_kind = 'project')::integer as project_routes
-       from (
-         select provider, 'organization' as route_kind from organization_trigger_routes
-         where organization_id = 'route-repair-org'
-         union all
-         select provider, 'project' from project_trigger_routes
-         where organization_id = 'route-repair-org'
-       ) routes
-       group by provider order by provider`,
-    );
-    assert.deepEqual(repaired.rows, [
-      { provider: "discord", organization_routes: 1, project_routes: 1 },
-      { provider: "slack", organization_routes: 1, project_routes: 1 },
-    ]);
-  }, 120_000);
-
-  it("rolls back every trigger when an atomic project migration fails", async () => {
-    const url = databaseUrl(postgres, "organization_trigger_migration_rollback");
-    const database = await createDatabase(url);
-    try {
-      const [project] = await createProjectFixtures(database, url);
-      const revisionRecord = await database.insertProjectConfigurationRevision(
-        revision(project.id),
-      );
-      await database.activateProjectConfigurationRevision(project.id, revisionRecord.id);
-      const validTrigger = {
-        name: "valid",
-        format: "single_run" as const,
-        enabled: true,
-        yaml: "name: valid",
-        normalizedConfiguration: { environments: [], triggers: [] },
-        contentHash: "valid",
-        sourceEvidence: { legacyProjectId: project.id },
-      };
-      const input: MigrateProjectTriggersInput = {
-        projectId: project.id,
-        organizationId: project.organizationId,
-        configurationRevisionId: revisionRecord.id,
-        projectSlug: project.slug,
-        triggers: [
-          validTrigger,
-          // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion -- verifies the database constraint independently of TypeScript.
-          { ...validTrigger, name: "invalid", format: "invalid" as "single_run" },
-        ],
-      };
-
-      await assert.rejects(database.migrateProjectTriggers(input));
-      assert.equal((await database.listOrganizationTriggers("organization-a")).length, 0);
-      assert.equal((await database.listPendingProjectTriggerMigrations()).length, 1);
-    } finally {
-      await database.close();
-    }
-  }, 120_000);
 });
 
 interface RejectedPhaseOneFixtures {
@@ -1466,7 +1345,10 @@ function revision(projectId: string, validationErrors?: unknown) {
   };
 }
 
-async function seedTestDaemon(url: string, organizationId: string): Promise<void> {
+async function seedTestDaemon(
+  url: string,
+  organizationId: string,
+): Promise<void> {
   await poolQuery(
     url,
     `insert into machines (id, org_id, source, status)
@@ -1551,7 +1433,10 @@ async function createLegacyDatabase(
   await client.query(
     `insert into daemon_enrollment_tokens (id, verifier, expires_at)
      values ($1, $2, now() + interval '1 day')`,
-    [randomUUID(), createHash("sha256").update(legacyToken).digest("base64url")],
+    [
+      randomUUID(),
+      createHash("sha256").update(legacyToken).digest("base64url"),
+    ],
   );
   await client.query(
     `insert into machines (id, org_id, source, status, hub_config_version_id)
@@ -1592,8 +1477,13 @@ async function createLegacyDatabase(
   return { url, organizationId, legacyToken };
 }
 
-async function createPendingEnrollmentDatabase(postgres: StartedPostgreSqlContainer) {
-  const { client, url } = await createLegacySchema(postgres, "pending_enrollment");
+async function createPendingEnrollmentDatabase(
+  postgres: StartedPostgreSqlContainer,
+) {
+  const { client, url } = await createLegacySchema(
+    postgres,
+    "pending_enrollment",
+  );
   const token = "pending-legacy-enrollment-token";
   await client.query(
     `insert into daemon_enrollment_tokens (id, verifier, expires_at)
@@ -1604,7 +1494,10 @@ async function createPendingEnrollmentDatabase(postgres: StartedPostgreSqlContai
   return { url, token };
 }
 
-async function createLegacySchema(postgres: StartedPostgreSqlContainer, prefix: string) {
+async function createLegacySchema(
+  postgres: StartedPostgreSqlContainer,
+  prefix: string,
+) {
   const url = databaseUrl(postgres, prefix);
   const databaseName = new URL(url).pathname.slice(1);
   const admin = await createPostgresQueryRuntime(postgres.getConnectionUri());
@@ -1620,13 +1513,18 @@ async function createLegacySchema(postgres: StartedPostgreSqlContainer, prefix: 
       applied_at timestamp with time zone not null default now()
     )
   `);
-  const files = (await readdir(LEGACY_MIGRATIONS)).filter((file) => file.endsWith(".sql")).sort();
+  const files = (await readdir(LEGACY_MIGRATIONS))
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
   for (const file of files) {
     const migration = await readFile(join(LEGACY_MIGRATIONS, file), "utf8");
     for (const statement of migration.split("--> statement-breakpoint")) {
       if (statement.trim().length > 0) await client.query(statement);
     }
-    await client.query("insert into paseo_hub_migrations (filename) values ($1)", [file]);
+    await client.query(
+      "insert into paseo_hub_migrations (filename) values ($1)",
+      [file],
+    );
   }
   return { client, url };
 }
@@ -1637,16 +1535,23 @@ interface HistoricalBaselineOptions {
   through: string;
 }
 
-async function createHistoricalBaseline(options: HistoricalBaselineOptions): Promise<string> {
+async function createHistoricalBaseline(
+  options: HistoricalBaselineOptions,
+): Promise<string> {
   const baseline = await createLegacySchema(options.postgres, options.prefix);
   await baseline.client.close();
   await applyHistoricalMigrations(baseline.url, options.through);
   return baseline.url;
 }
 
-async function applyHistoricalMigrations(url: string, through: string): Promise<void> {
+async function applyHistoricalMigrations(
+  url: string,
+  through: string,
+): Promise<void> {
   const journal = migrationJournalSchema.parse(
-    JSON.parse(await readFile(join(DRIZZLE_MIGRATIONS, "meta/_journal.json"), "utf8")),
+    JSON.parse(
+      await readFile(join(DRIZZLE_MIGRATIONS, "meta/_journal.json"), "utf8"),
+    ),
   );
   const migrations: typeof journal.entries = [];
   for (const entry of journal.entries) {
@@ -1654,7 +1559,9 @@ async function applyHistoricalMigrations(url: string, through: string): Promise<
     if (entry.tag === through) break;
   }
   if (migrations.at(-1)?.tag !== through) {
-    throw new Error(`historical migration is absent from the journal: ${through}`);
+    throw new Error(
+      `historical migration is absent from the journal: ${through}`,
+    );
   }
 
   const client = await createPostgresQueryRuntime(url);
@@ -1670,7 +1577,10 @@ async function applyHistoricalMigrations(url: string, through: string): Promise<
     `);
     await client.transaction(async (transaction) => {
       for (const entry of migrations) {
-        const migration = await readFile(join(DRIZZLE_MIGRATIONS, `${entry.tag}.sql`), "utf8");
+        const migration = await readFile(
+          join(DRIZZLE_MIGRATIONS, `${entry.tag}.sql`),
+          "utf8",
+        );
         await applyMigration(transaction, migration);
         const hash = createHash("sha256").update(migration).digest("hex");
         await transaction.query(
@@ -1684,7 +1594,10 @@ async function applyHistoricalMigrations(url: string, through: string): Promise<
   }
 }
 
-async function applyMigration(client: QueryHandle, migration: string): Promise<void> {
+async function applyMigration(
+  client: QueryHandle,
+  migration: string,
+): Promise<void> {
   for (const statement of migration.split("--> statement-breakpoint")) {
     if (statement.trim().length > 0) await client.query(statement);
   }
@@ -1792,7 +1705,8 @@ async function historicalShape(url: string) {
       daemonInvariantChecks: row.daemon_invariant_checks,
       enrollmentOrganizationNullable: row.enrollment_organization_nullable,
       idleDeadlineNullable: row.idle_deadline_nullable,
-      pendingExecutionsWithoutLegacyDeadline: row.pending_executions_without_legacy_deadline,
+      pendingExecutionsWithoutLegacyDeadline:
+        row.pending_executions_without_legacy_deadline,
       unownedEnrollmentTokens: row.unowned_enrollment_tokens,
     };
   } finally {
@@ -1805,8 +1719,12 @@ class LegacyUpgrade {
 
   private constructor(
     private readonly database: Awaited<ReturnType<typeof createDatabase>>,
-    private readonly operations: ReturnType<typeof createHubApplication>["operations"],
-    private readonly publicApi: ReturnType<typeof createHubApplication>["publicApi"],
+    private readonly operations: ReturnType<
+      typeof createHubApplication
+    >["operations"],
+    private readonly publicApi: ReturnType<
+      typeof createHubApplication
+    >["publicApi"],
     private readonly hub: ReturnType<typeof createHubApplication>["hub"],
     private readonly apiKey: string,
     private readonly legacyToken: string,
@@ -1827,7 +1745,11 @@ class LegacyUpgrade {
         `insert into organization_api_keys
            (id, organization_id, name, prefix, verifier, scopes)
          values ($1, $2, 'Migration test', 'paseo_pk_migration', 'migration-verifier', $3)`,
-        [apiKeyId, organizationId, ["configuration:install", "runs:dispatch", "daemons:enroll"]],
+        [
+          apiKeyId,
+          organizationId,
+          ["configuration:install", "runs:dispatch", "daemons:enroll"],
+        ],
       );
     } finally {
       await client.close();
@@ -1841,7 +1763,11 @@ class LegacyUpgrade {
                 kind: "apiKey" as const,
                 credentialId: apiKeyId,
                 organizationId,
-                scopes: ["configuration:install", "runs:dispatch", "daemons:enroll"] as const,
+                scopes: [
+                  "configuration:install",
+                  "runs:dispatch",
+                  "daemons:enroll",
+                ] as const,
               },
             }
           : { status: "unauthorized" as const };
@@ -2029,7 +1955,10 @@ async function exactIdentitySnapshot(url: string) {
   }
 }
 
-function databaseUrl(postgres: StartedPostgreSqlContainer, prefix: string): string {
+function databaseUrl(
+  postgres: StartedPostgreSqlContainer,
+  prefix: string,
+): string {
   const url = new URL(postgres.getConnectionUri());
   url.pathname = `/${prefix}_${randomUUID().replaceAll("-", "")}`;
   return url.toString();

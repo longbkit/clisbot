@@ -92,7 +92,9 @@ describe("durable multi-step workflow engine", () => {
   );
 
   it("materializes ambient context only for the step that authors paseo.context", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: contextOptInConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: contextOptInConfiguration(),
+    });
     const prompts: string[] = [];
     const materializedExecutionIds: string[] = [];
     const baseProvider = providerMatch(fixture.configuration, fixture.revisionId);
@@ -149,7 +151,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("fails an explicit context opt-in when its provider cannot materialize context", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: contextOnlyConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: contextOnlyConfiguration(),
+    });
     const { handler, engine } = engineFor(fixture, []);
 
     await handler(fixture.trigger("the triggering body"));
@@ -197,7 +201,10 @@ describe("durable multi-step workflow engine", () => {
       await fixture.database.findTriggerRunsByProviderEventReceiptId(fixture.providerEventReceiptId)
     )[0]!;
     const persistedStep = (await fixture.database.listWorkflowStepRunsForTriggerRun(run.id))[0]!;
-    assert.deepEqual(persistedStep.dispatchIntent?.agent, { provider: "codex", options });
+    assert.deepEqual(persistedStep.dispatchIntent?.agent, {
+      provider: "codex",
+      options,
+    });
   });
 
   it("logs an initial recovery rejection and retries on the next interval", async () => {
@@ -251,7 +258,9 @@ describe("durable multi-step workflow engine", () => {
   ] as const)(
     "notifies the provider once when the whole workflow %s",
     async (stepStatus, expected) => {
-      const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+      const fixture = await workflowFixture({
+        rawConfiguration: deadlineConfiguration(),
+      });
       const terminalStatuses: string[] = [];
       const { handler, engine } = engineFor(fixture, [], undefined, undefined, async (run) => {
         terminalStatuses.push(run.status);
@@ -286,7 +295,9 @@ describe("durable multi-step workflow engine", () => {
   );
 
   it("retries a failed workflow terminal outbox delivery", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     let now = new Date("2026-08-06T12:00:00.000Z");
     const delivered: string[] = [];
     let failFirst = true;
@@ -364,7 +375,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("does not lose a terminal notification requested during an empty recovery pass", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: allSkippedConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: allSkippedConfiguration(),
+    });
     let releaseInitialClaim!: () => void;
     const initialClaimRelease = new Promise<void>((resolve) => {
       releaseInitialClaim = resolve;
@@ -406,7 +419,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("keeps processing ready wakeups while a terminal provider hook is held", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     let releaseTerminalHook: (() => void) | undefined;
     const terminalHookStarted = new Promise<void>((resolve) => {
       releaseTerminalHook = resolve;
@@ -443,7 +458,8 @@ describe("durable multi-step workflow engine", () => {
 
       const secondReceipt = await fixture.database.persistManualEvent({
         organizationId: "org-1",
-        projectId: fixture.projectId,
+        triggerId: fixture.workflowId,
+        triggerRevisionId: fixture.revisionId,
         deliveryId: randomUUID(),
         source: "manual.run",
         payload: {},
@@ -464,27 +480,23 @@ describe("durable multi-step workflow engine", () => {
     }
   });
 
-  it("keeps a shared accepted receipt replayable when one project route has no workflow match", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
-    const secondProject = await fixture.database.createProject({
-      organizationId: "org-1",
-      name: "Other Workflow",
-      slug: randomUUID(),
-      createdByUserId: "user-1",
+  it("keeps a shared accepted receipt replayable when one workflow route has no workflow match", async () => {
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
     });
-    const secondRevision = await fixture.database.insertProjectConfigurationRevision({
-      projectId: secondProject.id,
+    const secondWorkflow = await fixture.database.saveOrganizationTrigger({
+      organizationId: "org-1",
+      name: `other-workflow-${randomUUID()}`,
+      enabled: true,
+      format: "legacy_multistep",
+      yaml: "name: other-workflow",
       sourceKind: "manual",
       sourceEvidence: { kind: "test" },
       normalizedConfiguration: fixture.configuration,
       contentHash: compiledConfigurationHash(fixture.configuration),
-      createdByUserId: "user-1",
+      createdByUserId: null,
+      routes: [],
     });
-    await fixture.database.activateProjectConfigurationRevision(
-      secondProject.id,
-      secondRevision.id,
-      [],
-    );
     const receipt = await fixture.database.findProviderEventReceiptById(
       fixture.providerEventReceiptId,
     );
@@ -493,14 +505,14 @@ describe("durable multi-step workflow engine", () => {
       ...receipt,
       acceptedRoutes: [
         {
-          projectId: fixture.projectId,
+          workflowId: fixture.workflowId,
           configurationRevisionId: fixture.revisionId,
           connectionId: null,
           resourceId: null,
         },
         {
-          projectId: secondProject.id,
-          configurationRevisionId: secondRevision.id,
+          workflowId: secondWorkflow.id,
+          configurationRevisionId: secondWorkflow.activeRevisionId,
           connectionId: null,
           resourceId: null,
         },
@@ -514,7 +526,7 @@ describe("durable multi-step workflow engine", () => {
           name: "manual",
           eventNames: ["manual.run"] as const,
           async match(external) {
-            if (external.projectId === fixture.projectId) return "no_trigger_for_source";
+            if (external.workflowId === fixture.workflowId) return "no_trigger_for_source";
             throw new Error("enqueue unavailable");
           },
         },
@@ -524,8 +536,8 @@ describe("durable multi-step workflow engine", () => {
     await assert.rejects(
       handler({
         ...fixture.trigger("run"),
-        projectId: secondProject.id,
-        configurationRevisionId: secondRevision.id,
+        workflowId: secondWorkflow.id,
+        configurationRevisionId: secondWorkflow.activeRevisionId,
       }),
       /enqueue unavailable/iu,
     );
@@ -534,7 +546,8 @@ describe("durable multi-step workflow engine", () => {
     });
     const replay = await fixture.database.persistManualEvent({
       organizationId: "org-1",
-      projectId: fixture.projectId,
+      triggerId: fixture.workflowId,
+      triggerRevisionId: fixture.revisionId,
       deliveryId: fixture.deliveryId,
       source: "manual.run",
       payload: {},
@@ -612,7 +625,9 @@ describe("durable multi-step workflow engine", () => {
     await fixture.database.transitionAgentExecution(execution.id, "succeeded", {
       result: { status: "succeeded" },
     });
-    await fixture.database.completeWorkflowStep(execution.id, "succeeded", { status: "succeeded" });
+    await fixture.database.completeWorkflowStep(execution.id, "succeeded", {
+      status: "succeeded",
+    });
     await engine.processAvailable();
     run = await fixture.database.findTriggerRunById(run.id);
     assert.equal(run?.status, "succeeded");
@@ -719,7 +734,9 @@ describe("durable multi-step workflow engine", () => {
 
   it("activates and executes the migrated current-project classifier-to-worker fixture", async () => {
     const bundle = compileHubBundle(await currentProjectConfigurationFiles());
-    const fixture = await workflowFixture({ compiledConfiguration: bundle.configuration });
+    const fixture = await workflowFixture({
+      compiledConfiguration: bundle.configuration,
+    });
     const dispatches: LaunchMachineIntent[] = [];
     const { handler, engine } = engineFor(fixture, [], async (intent) => {
       dispatches.push(intent);
@@ -736,7 +753,10 @@ describe("durable multi-step workflow engine", () => {
     );
     assert.ok(classifier);
     assert.equal(dispatches[0]?.environmentName, "hub");
-    assert.deepEqual(dispatches[0]?.agent, { provider: "claude", mode: "bypassPermissions" });
+    assert.deepEqual(dispatches[0]?.agent, {
+      provider: "claude",
+      mode: "bypassPermissions",
+    });
 
     await fixture.database.completeWorkflowAgentExecution({
       executionId: classifier.id,
@@ -789,8 +809,165 @@ describe("durable multi-step workflow engine", () => {
     assert.deepEqual(dispatches, []);
   });
 
+  it("reuses an earlier step Agent without coupling reuse to auto_archive", async () => {
+    const base = deadlineConfiguration();
+    const trigger = (base["triggers"] as Array<Record<string, unknown>>)[0]!;
+    const step = (trigger["steps"] as Array<Record<string, unknown>>)[0]!;
+    const fixture = await workflowFixture({
+      rawConfiguration: {
+        ...base,
+        triggers: [
+          {
+            ...trigger,
+            steps: [
+              { ...step, id: "prepare", auto_archive: true },
+              {
+                ...step,
+                id: "deliver",
+                reuse: "steps.prepare",
+                auto_archive: false,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const dispatches: LaunchMachineIntent[] = [];
+    const { handler, engine } = createDurableWorkflowHandler({
+      database: fixture.database,
+      entitlements: fixture.entitlements,
+      providers: [providerMatch(fixture.configuration, fixture.revisionId)],
+      dispatchLaunchMachineIntent: async (intent) => {
+        dispatches.push(intent);
+        const execution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+          intent.workflowStepRunId!,
+        );
+        assert.ok(execution);
+        const attached = await fixture.database.attachAgentToExecution(
+          execution.id,
+          "daemon-1",
+          "agent-shared",
+        );
+        if (intent.workflowStepRunId === dispatches[0]!.workflowStepRunId) {
+          await fixture.database.completeWorkflowAgentExecution({
+            executionId: execution.id,
+            executionStatus: "succeeded",
+            stepStatus: "succeeded",
+            result: { status: "succeeded" },
+            stepOutput: {},
+            completedByAgent: true,
+            hubAction: "archive",
+          });
+          return {
+            execution: await fixture.database.findAgentExecutionById(execution.id),
+          };
+        }
+        return { execution: attached };
+      },
+    });
+
+    await handler(fixture.trigger("run"));
+    await engine.processAvailable();
+    const firstExecution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+      dispatches[0]!.workflowStepRunId!,
+    );
+    assert.ok(firstExecution);
+    await fixture.database.recordAgentExecutionHubAcknowledgement(firstExecution.id, {
+      kind: "terminal",
+      observedAt: new Date(),
+    });
+    await fixture.database.recordAgentExecutionHubAcknowledgement(firstExecution.id, {
+      kind: "idle",
+      observedAt: new Date(),
+    });
+    assert.equal(await fixture.database.completeHubAction(firstExecution.id, "archive"), true);
+    await engine.processAvailable();
+
+    assert.equal(dispatches.length, 2);
+    assert.equal(dispatches[1]!.reuse, "steps.prepare");
+    assert.equal(dispatches[1]!.reuseAgentId, "agent-shared");
+    assert.equal(dispatches[0]!.autoArchive, true);
+    assert.equal(dispatches[1]!.autoArchive, false);
+  });
+
+  it("serializes Channel workflow runs by receipt order for one binding", async () => {
+    const fixture = await workflowFixture();
+    const firstReceipt = await fixture.database.findProviderEventReceiptById(
+      fixture.providerEventReceiptId,
+    );
+    assert.ok(firstReceipt);
+    const secondReceipt = await fixture.database.persistManualEvent({
+      organizationId: "org-1",
+      triggerId: fixture.workflowId,
+      triggerRevisionId: fixture.revisionId,
+      deliveryId: randomUUID(),
+      source: "manual.run",
+      payload: { input: "repo=hub work" },
+      receivedAt: new Date(firstReceipt.receivedAt.getTime() + 1),
+    });
+    if (secondReceipt.status !== "accepted") throw new Error("second receipt was not accepted");
+    const baseProvider = providerMatch(fixture.configuration, fixture.revisionId);
+    const provider = {
+      ...baseProvider,
+      async match(event) {
+        const matches = await baseProvider.match(event);
+        return matches.map((match) => ({
+          ...match,
+          outputContext: {
+            provider: "channel",
+            channel: { binding_key: "shared-binding" },
+          },
+        }));
+      },
+    } satisfies import("../triggers/index.js").TriggerProvider;
+    let now = new Date(Date.now() + 10_000);
+    const dispatches: LaunchMachineIntent[] = [];
+    const { handler, engine } = createDurableWorkflowHandler({
+      database: fixture.database,
+      entitlements: fixture.entitlements,
+      providers: [provider],
+      now: () => now,
+      dispatchLaunchMachineIntent: async (intent) => {
+        dispatches.push(intent);
+        const execution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+          intent.workflowStepRunId!,
+        );
+        assert.ok(execution);
+        return { execution };
+      },
+    });
+    await handler(fixture.trigger("repo=hub work"));
+    await handler({
+      ...fixture.trigger("repo=hub work"),
+      providerEventReceiptId: secondReceipt.event.providerEventReceiptId,
+      deliveryId: secondReceipt.event.deliveryId,
+      receivedAt: secondReceipt.event.receivedAt,
+      payload: { input: "repo=hub work" },
+    });
+
+    await engine.processAvailable();
+    assert.equal(dispatches.length, 1);
+    const firstExecution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+      dispatches[0]!.workflowStepRunId!,
+    );
+    assert.ok(firstExecution);
+    await fixture.database.completeWorkflowAgentExecution({
+      executionId: firstExecution.id,
+      executionStatus: "succeeded",
+      stepStatus: "succeeded",
+      result: { status: "succeeded" },
+      stepOutput: null,
+      completedByAgent: true,
+    });
+    now = new Date(now.getTime() + 1_000);
+    await engine.processAvailable();
+    assert.equal(dispatches.length, 2);
+  });
+
   it("fails prompt interpolation that reads a skipped prior step output without dispatching", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: skippedOutputPromptConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: skippedOutputPromptConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches);
     await handler(fixture.trigger("run"));
@@ -814,7 +991,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("does not persist or dispatch skipped-step GitHub authority", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: skippedAuthorityConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: skippedAuthorityConfiguration(),
+    });
     const intents: LaunchMachineIntent[] = [];
     const { handler, engine } = engineFor(fixture, [], async (intent) => {
       intents.push(intent);
@@ -846,7 +1025,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("persists final values composed from a one-step structured output", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: finalValueConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: finalValueConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches);
     await handler(fixture.trigger("run"));
@@ -962,7 +1143,10 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it.each([
-    { terminalStatus: "succeeded" as const, expectedRunStatus: "running" as const },
+    {
+      terminalStatus: "succeeded" as const,
+      expectedRunStatus: "running" as const,
+    },
     { terminalStatus: "failed" as const, expectedRunStatus: "failed" as const },
   ])(
     "reconciles a terminal $terminalStatus execution before evaluating downstream work",
@@ -1071,7 +1255,9 @@ describe("durable multi-step workflow engine", () => {
 
   it("persists step hard and idle deadlines capped by the whole-run deadline", async () => {
     let now = new Date("2026-08-06T12:00:00.000Z");
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches, undefined, () => now);
 
@@ -1144,7 +1330,9 @@ describe("durable multi-step workflow engine", () => {
 
   it("refreshes only the persisted idle deadline for a live workflow step", async () => {
     let now = new Date("2026-08-06T12:00:00.000Z");
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches, undefined, () => now);
 
@@ -1176,7 +1364,9 @@ describe("durable multi-step workflow engine", () => {
 
   it("does not dispatch a later step after the whole-run deadline between steps", async () => {
     let now = new Date("2026-08-06T12:00:00.000Z");
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches, undefined, () => now);
 
@@ -1238,7 +1428,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("meters one unit per execution, not once per trigger, across a multi-step workflow", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches);
     await handler(fixture.trigger("run"));
@@ -1269,7 +1461,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("denies the second execution once the meter is full and fails that run with the reason", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     await fixture.entitlements.override(
       "org-1",
       { meters: { "executions.monthly": { limit: 1 } } },
@@ -1326,7 +1520,8 @@ describe("durable multi-step workflow engine", () => {
 
     const second = await fixture.database.persistManualEvent({
       organizationId: "org-1",
-      projectId: fixture.projectId,
+      triggerId: fixture.workflowId,
+      triggerRevisionId: fixture.revisionId,
       deliveryId: randomUUID(),
       source: "manual.run",
       payload: {},
@@ -1351,7 +1546,9 @@ describe("durable multi-step workflow engine", () => {
   });
 
   it("meters nothing when an accepted trigger skips every step", async () => {
-    const fixture = await workflowFixture({ rawConfiguration: allSkippedConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: allSkippedConfiguration(),
+    });
     const dispatches: string[] = [];
     const { handler, engine } = engineFor(fixture, dispatches);
     await handler(fixture.trigger("run"));
@@ -1387,7 +1584,9 @@ describe("durable multi-step workflow engine", () => {
 
   it("does not double-consume when dispatch crashes after an execution is reserved", async () => {
     let now = new Date("2026-08-06T12:00:00.000Z");
-    const fixture = await workflowFixture({ rawConfiguration: deadlineConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: deadlineConfiguration(),
+    });
     let crashNextDispatch = true;
     const { handler, engine } = createDurableWorkflowHandler({
       database: fixture.database,
@@ -1421,7 +1620,9 @@ describe("durable multi-step workflow engine", () => {
 
   it("does not rematerialize context when recovering a persisted pre-handoff execution", async () => {
     let now = new Date("2026-08-06T12:00:00.000Z");
-    const fixture = await workflowFixture({ rawConfiguration: contextOnlyConfiguration() });
+    const fixture = await workflowFixture({
+      rawConfiguration: contextOnlyConfiguration(),
+    });
     let materializations = 0;
     let crashNextDispatch = true;
     const provider = {
@@ -1469,7 +1670,7 @@ interface Fixture {
   entitlements: EntitlementsService;
   providerEventReceiptId: string;
   deliveryId: string;
-  projectId: string;
+  workflowId: string;
   revisionId: string;
   configuration: CompiledHubConfig;
   trigger(message: string): DurableProviderEvent;
@@ -1490,13 +1691,12 @@ async function workflowFixture(
   // proxy over a separate store. Metering the engine performs is therefore observable here, and
   // a per-execution regression actually fails these tests. Stamped unlimited by default; tests
   // that exercise the meter override it down.
-  const entitlements = new EntitlementsService(database, { seats: async () => 0 });
-  await entitlements.stamp("org-1", UNLIMITED_TEMPLATE, { source: "provisioning", planId: null });
-  const project = await database.createProject({
-    organizationId: "org-1",
-    name: "Workflow",
-    slug: randomUUID(),
-    createdByUserId: "user-1",
+  const entitlements = new EntitlementsService(database, {
+    seats: async () => 0,
+  });
+  await entitlements.stamp("org-1", UNLIMITED_TEMPLATE, {
+    source: "provisioning",
+    planId: null,
   });
   const raw =
     options.rawConfiguration ??
@@ -1523,18 +1723,28 @@ async function workflowFixture(
     }),
     triggers: compiled.triggers,
   };
-  const revision = await database.insertProjectConfigurationRevision({
-    projectId: project.id,
+  const workflow = await database.saveOrganizationTrigger({
+    organizationId: "org-1",
+    name: `workflow-${randomUUID()}`,
+    enabled: true,
+    format: "legacy_multistep",
+    yaml: "name: workflow",
     sourceKind: "manual",
     sourceEvidence: { kind: "test" },
     normalizedConfiguration: configuration,
     contentHash: compiledConfigurationHash(configuration),
-    createdByUserId: "user-1",
+    createdByUserId: null,
+    routes: [],
   });
-  await database.activateProjectConfigurationRevision(project.id, revision.id, []);
+  const revision = await database.findOrganizationTriggerRevision(
+    workflow.id,
+    workflow.activeRevisionId,
+  );
+  if (revision === undefined) throw new Error("workflow revision was not persisted");
   const receipt = await database.persistManualEvent({
     organizationId: "org-1",
-    projectId: project.id,
+    triggerId: workflow.id,
+    triggerRevisionId: revision.id,
     deliveryId: randomUUID(),
     source: "manual.run",
     payload: {},
@@ -1546,14 +1756,14 @@ async function workflowFixture(
     entitlements,
     providerEventReceiptId: receipt.event.providerEventReceiptId,
     deliveryId: receipt.event.deliveryId,
-    projectId: project.id,
+    workflowId: workflow.id,
     revisionId: revision.id,
     configuration,
     trigger(message) {
       return {
         providerEventReceiptId: receipt.event.providerEventReceiptId,
         organizationId: "org-1",
-        projectId: project.id,
+        workflowId: workflow.id,
         configurationRevisionId: revision.id,
         source: "manual.run",
         deliveryId: receipt.event.deliveryId,
@@ -1680,7 +1890,11 @@ function contextOptInConfiguration(): Record<string, unknown> {
             max_runtime: "10m",
             idle_timeout: "1m",
             agent: { provider: "codex" },
-            prompt: [{ text: "Context: ${{ paseo.context }}\nTrigger: ${{ paseo.prompt }}" }],
+            prompt: [
+              {
+                text: "Context: ${{ paseo.context }}\nTrigger: ${{ paseo.prompt }}",
+              },
+            ],
           },
         ],
       },
@@ -1770,7 +1984,12 @@ function skippedOutputPromptConfiguration(): Record<string, unknown> {
 function namedSelectionConfiguration(): Record<string, unknown> {
   return {
     environments: [
-      { name: "paseo", kind: "daemon", daemon: "runner", cwd: "/workspace/paseo" },
+      {
+        name: "paseo",
+        kind: "daemon",
+        daemon: "runner",
+        cwd: "/workspace/paseo",
+      },
       { name: "hub", kind: "daemon", daemon: "runner", cwd: "/workspace/hub" },
     ],
     triggers: [
@@ -1847,7 +2066,9 @@ function skippedAuthorityConfiguration(): Record<string, unknown> {
             idle_timeout: "1m",
             agent: { provider: "codex" },
             prompt: [{ text: "Work" }],
-            env: { SOME_TOKEN: "${{ paseo.connections.some-connection.token }}" },
+            env: {
+              SOME_TOKEN: "${{ paseo.connections.some-connection.token }}",
+            },
           },
         ],
       },
@@ -2022,7 +2243,10 @@ function executionWorktreeConfiguration(): Record<string, unknown> {
         kind: "daemon",
         daemon: "runner",
         cwd: "/workspace",
-        worktree: { mode: "branch-off", newBranch: "trigger-${{ paseo.execution.id }}" },
+        worktree: {
+          mode: "branch-off",
+          newBranch: "trigger-${{ paseo.execution.id }}",
+        },
       },
     ],
     triggers: ["first", "second"].map((name) => ({

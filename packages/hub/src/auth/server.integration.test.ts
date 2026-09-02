@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import {
+  PostgreSqlContainer,
+  type StartedPostgreSqlContainer,
+} from "@testcontainers/postgresql";
 import { createPostgresQueryRuntime } from "../db/test-utils/runtime.js";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { z } from "zod";
@@ -18,8 +21,14 @@ import {
   type ActiveAccountState,
 } from "./organization-contract.js";
 import { createAuthServer, type AuthServer } from "./server.js";
-import { composeEntitlements, type ComposedEntitlements } from "./entitlements.js";
-import type { InvitationEmail, InvitationMailer } from "../invitations/index.js";
+import {
+  composeEntitlements,
+  type ComposedEntitlements,
+} from "./entitlements.js";
+import type {
+  InvitationEmail,
+  InvitationMailer,
+} from "../invitations/index.js";
 
 type ActiveState = ActiveAccountState;
 
@@ -85,23 +94,53 @@ describe("account and organization boundary", () => {
     const orbitResources = await hub.seedResources(orbit, "orbit");
     await alice.selectOrganization(acme);
 
-    assert.deepEqual(await alice.resourcePresence(acmeResources), RESOURCE_NAMES);
-    assert.deepEqual(await alice.resourcePresence(orbitResources), MISSING_RESOURCES);
-    assert.deepEqual(await alice.resourcePresence(missingResources()), MISSING_RESOURCES);
+    assert.deepEqual(
+      await alice.resourcePresence(acmeResources),
+      RESOURCE_NAMES,
+    );
+    assert.deepEqual(
+      await alice.resourcePresence(orbitResources),
+      MISSING_RESOURCES,
+    );
+    assert.deepEqual(
+      await alice.resourcePresence(missingResources()),
+      MISSING_RESOURCES,
+    );
   });
 
   it("enforces owner, admin, and member policy through the same active boundary", async () => {
     const hub = await startAccounts(postgres);
     const team = await hub.createThreePersonTeam();
 
-    assert.equal(await team.member.createInvitation("blocked@example.com", "member"), 403);
-    assert.equal(await team.admin.changeRole(team.owner.memberId, "member"), 403);
-    assert.equal(await team.admin.changeRole(team.member.memberId, "owner"), 403);
-    assert.equal(await team.owner.changeRole(team.owner.memberId, "member"), 409);
+    assert.equal(
+      await team.member.createInvitation("blocked@example.com", "member"),
+      403,
+    );
+    assert.equal(
+      await team.admin.changeRole(team.owner.memberId, "member"),
+      403,
+    );
+    assert.equal(
+      await team.admin.changeRole(team.member.memberId, "owner"),
+      403,
+    );
+    assert.equal(
+      await team.owner.changeRole(team.owner.memberId, "member"),
+      409,
+    );
 
-    assert.equal(await team.owner.changeRole(team.admin.memberId, "owner"), 200);
-    assert.equal(await team.owner.changeRole(team.owner.memberId, "member"), 200);
-    assert.equal((await team.owner.requireActiveState()).membership.role, "member");
+    assert.equal(
+      await team.owner.changeRole(team.admin.memberId, "owner"),
+      200,
+    );
+    assert.equal(
+      await team.owner.changeRole(team.owner.memberId, "member"),
+      200,
+    );
+    assert.equal(
+      (await team.owner.requireActiveState()).membership.role,
+      "member",
+    );
   });
 
   it("removes members without exposing foreign targets or abandoning the last owner", async () => {
@@ -134,7 +173,10 @@ describe("account and organization boundary", () => {
       replacement.id,
       replacement.id,
     ]);
-    assert.equal(await hub.pendingInvitationCount(organizationId, bob.email), 1);
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, bob.email),
+      1,
+    );
   });
 
   it("delivers a committed invitation through the configured mailer", async () => {
@@ -168,16 +210,26 @@ describe("account and organization boundary", () => {
     await bob.acceptInvitationSuccessfully(invitation.id);
 
     assert.equal(await alice.createInvitation(bob.email, "member"), 409);
-    assert.equal(await hub.pendingInvitationCount(organizationId, bob.email), 0);
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, bob.email),
+      0,
+    );
   });
 
   it("refuses a genuinely new invite once the seat cap has no headroom, and admits it once raised", async () => {
     const hub = await startAccounts(postgres);
     const alice = await hub.signUp("Alice", "alice@example.com");
     const organizationId = await alice.createOrganization("Acme");
-    await hub.capSeats(organizationId, 1, "regression test: enforce the seat cap");
+    await hub.capSeats(
+      organizationId,
+      1,
+      "regression test: enforce the seat cap",
+    );
 
-    const denied = await alice.createInvitationDenied("blocked@example.com", "member");
+    const denied = await alice.createInvitationDenied(
+      "blocked@example.com",
+      "member",
+    );
     assert.deepEqual(denied, {
       error: "entitlement_denied",
       entitlement: "seats",
@@ -185,9 +237,16 @@ describe("account and organization boundary", () => {
       limit: 1,
       current: 1,
     });
-    assert.equal(await hub.pendingInvitationCount(organizationId, "blocked@example.com"), 0);
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, "blocked@example.com"),
+      0,
+    );
 
-    await hub.capSeats(organizationId, 2, "regression test: raise the seat cap");
+    await hub.capSeats(
+      organizationId,
+      2,
+      "regression test: raise the seat cap",
+    );
     const invitation = await alice.invite("allowed@example.com", "member");
     assert.ok(invitation.id);
   });
@@ -196,9 +255,15 @@ describe("account and organization boundary", () => {
     const hub = await startAccounts(postgres);
     const alice = await hub.signUp("Alice", "alice@example.com");
     const organizationId = await alice.createOrganization("Acme");
-    await hub.disableInvites(organizationId, "regression test: enforce the can-invite flag");
+    await hub.disableInvites(
+      organizationId,
+      "regression test: enforce the can-invite flag",
+    );
 
-    const denied = await alice.createInvitationDenied("blocked@example.com", "member");
+    const denied = await alice.createInvitationDenied(
+      "blocked@example.com",
+      "member",
+    );
     assert.deepEqual(denied, {
       error: "entitlement_denied",
       entitlement: "canInviteMembers",
@@ -206,9 +271,15 @@ describe("account and organization boundary", () => {
       limit: null,
       current: null,
     });
-    assert.equal(await hub.pendingInvitationCount(organizationId, "blocked@example.com"), 0);
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, "blocked@example.com"),
+      0,
+    );
 
-    await hub.restoreInvites(organizationId, "regression test: restore the can-invite flag");
+    await hub.restoreInvites(
+      organizationId,
+      "regression test: restore the can-invite flag",
+    );
     const invitation = await alice.invite("allowed@example.com", "member");
     assert.ok(invitation.id);
   });
@@ -220,12 +291,19 @@ describe("account and organization boundary", () => {
     const invitation = await alice.invite("bob@example.com", "member");
     const bob = await hub.signUp("Bob", "bob@example.com");
 
-    const result = await hub.createInvitationWhileAccepting(alice, bob, invitation);
+    const result = await hub.createInvitationWhileAccepting(
+      alice,
+      bob,
+      invitation,
+    );
 
     assert.equal(result.acceptanceStatus, 200);
     assert.ok(result.creationStatus === 201 || result.creationStatus === 409);
     assert.equal(await hub.membershipCount(bob.email, organizationId), 1);
-    assert.equal(await hub.pendingInvitationCount(organizationId, bob.email), 0);
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, bob.email),
+      0,
+    );
   });
 
   it("retires a pending legacy credential when membership already exists", async () => {
@@ -238,7 +316,10 @@ describe("account and organization boundary", () => {
 
     assert.equal(await bob.acceptInvitation(invitation.id), 200);
     assert.equal(await hub.membershipCount(bob.email, organizationId), 1);
-    assert.equal(await hub.pendingInvitationCount(organizationId, bob.email), 0);
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, bob.email),
+      0,
+    );
   });
 
   it("denies every active-organization mutation without its request boundary", async () => {
@@ -246,8 +327,14 @@ describe("account and organization boundary", () => {
     const signedOut = hub.signedOut();
     const withoutOrganization = await hub.signUp("Alice", "alice@example.com");
 
-    assert.deepEqual(await signedOut.teamMutationStatuses(), [401, 401, 401, 401]);
-    assert.deepEqual(await withoutOrganization.teamMutationStatuses(), [403, 403, 403, 403]);
+    assert.deepEqual(
+      await signedOut.teamMutationStatuses(),
+      [401, 401, 401, 401],
+    );
+    assert.deepEqual(
+      await withoutOrganization.teamMutationStatuses(),
+      [403, 403, 403, 403],
+    );
   });
 
   it("validates cookie mutations against the adapter's trusted request origin", async () => {
@@ -280,10 +367,17 @@ describe("account and organization boundary", () => {
   it("revalidates an actor whose membership is revoked during a request", async () => {
     const hub = await startAccounts(postgres);
     const team = await hub.createThreePersonTeam();
-    const organizationId = (await team.admin.requireActiveState()).organization.id;
+    const organizationId = (await team.admin.requireActiveState()).organization
+      .id;
 
-    assert.equal(await hub.revokeDuringInvitation(team.admin, organizationId), 403);
-    assert.equal(await hub.pendingInvitationCount(organizationId, "blocked@example.com"), 0);
+    assert.equal(
+      await hub.revokeDuringInvitation(team.admin, organizationId),
+      403,
+    );
+    assert.equal(
+      await hub.pendingInvitationCount(organizationId, "blocked@example.com"),
+      0,
+    );
   });
 
   it("keeps invitation credentials manager-only and bound to the exact account email", async () => {
@@ -314,7 +408,9 @@ describe("account and organization boundary", () => {
     const bob = await hub.signUp("Bob", "bob@example.com");
 
     assert.deepEqual(
-      (await bob.acceptConcurrently(invitation.id)).sort((left, right) => left - right),
+      (await bob.acceptConcurrently(invitation.id)).sort(
+        (left, right) => left - right,
+      ),
       [200, 404],
     );
     assert.equal(await hub.membershipCount(bob.email, organizationId), 1);
@@ -331,9 +427,18 @@ describe("account and organization boundary", () => {
 
     assert.equal(await alice.cancelInvitation(invitation.id), 404);
     assert.equal(await alice.changeRole(acmeMemberId, "admin"), 404);
-    assert.equal(await alice.createInvitationWithTenantOverride("foreign"), 400);
-    assert.deepEqual(await alice.unsupportedOrganizationPaths(), [404, 404, 404, 404, 404]);
-    assert.equal((await alice.requireActiveState()).organization.id === acme, false);
+    assert.equal(
+      await alice.createInvitationWithTenantOverride("foreign"),
+      400,
+    );
+    assert.deepEqual(
+      await alice.unsupportedOrganizationPaths(),
+      [404, 404, 404, 404, 404],
+    );
+    assert.equal(
+      (await alice.requireActiveState()).organization.id === acme,
+      false,
+    );
   });
 
   it("rejects expired invitations and invalid stored roles at the request edge", async () => {
@@ -377,7 +482,9 @@ async function startAccounts(
 }
 
 async function stopAccounts(): Promise<void> {
-  await Promise.all(activeAccounts.splice(0).map(async (accounts) => accounts.stop()));
+  await Promise.all(
+    activeAccounts.splice(0).map(async (accounts) => accounts.stop()),
+  );
 }
 
 class PaseoAccounts {
@@ -398,7 +505,10 @@ class PaseoAccounts {
   ): Promise<PaseoAccounts> {
     const url = isolatedDatabaseUrl(postgres);
     const database = await createDatabase(url);
-    const entitlements = composeEntitlements(database, testDatabaseRuntime(database));
+    const entitlements = composeEntitlements(
+      database,
+      testDatabaseRuntime(database),
+    );
     return new PaseoAccounts(
       url,
       database,
@@ -409,7 +519,11 @@ class PaseoAccounts {
         entitlements: entitlements.service,
         secret: "phase-one-auth-secret-at-least-32-characters",
         baseURL: "http://localhost:3000",
-        policy: { registrationMode: "open", organizationCreation: "open", bootstrap: undefined },
+        policy: {
+          registrationMode: "open",
+          organizationCreation: "open",
+          bootstrap: undefined,
+        },
         ...(invitationMailer === undefined ? {} : { invitationMailer }),
       }),
     );
@@ -438,7 +552,12 @@ class PaseoAccounts {
   }
 
   signedOut(): AccountBrowser {
-    return new AccountBrowser(this.auth, this.resources, "signed-out@example.com", "unused");
+    return new AccountBrowser(
+      this.auth,
+      this.resources,
+      "signed-out@example.com",
+      "unused",
+    );
   }
 
   cookieMutationRejection(request: Request): Response | undefined {
@@ -459,8 +578,12 @@ class PaseoAccounts {
     const member = await this.signUp("Carol", "carol@example.com");
     await member.acceptInvitationSuccessfully(memberInvitation.id);
     const activeOwner = await owner.requireActiveState();
-    const ownerMemberId = activeOwner.team.members.find(({ email }) => email === owner.email)!.id;
-    const memberMemberId = activeOwner.team.members.find(({ email }) => email === member.email)!.id;
+    const ownerMemberId = activeOwner.team.members.find(
+      ({ email }) => email === owner.email,
+    )!.id;
+    const memberMemberId = activeOwner.team.members.find(
+      ({ email }) => email === member.email,
+    )!.id;
     return {
       owner: Object.assign(owner, { memberId: ownerMemberId }),
       admin: Object.assign(admin, { memberId: adminMemberId }),
@@ -468,8 +591,17 @@ class PaseoAccounts {
     };
   }
 
-  async capSeats(organizationId: string, max: number, reason: string): Promise<void> {
-    await this.entitlements.service.override(organizationId, { seats: { max } }, null, reason);
+  async capSeats(
+    organizationId: string,
+    max: number,
+    reason: string,
+  ): Promise<void> {
+    await this.entitlements.service.override(
+      organizationId,
+      { seats: { max } },
+      null,
+      reason,
+    );
   }
 
   async disableInvites(organizationId: string, reason: string): Promise<void> {
@@ -523,7 +655,10 @@ class PaseoAccounts {
     return { creationStatus, acceptanceStatus };
   }
 
-  async membershipCount(email: string, organizationId: string): Promise<number> {
+  async membershipCount(
+    email: string,
+    organizationId: string,
+  ): Promise<number> {
     const result = await this.query<{ count: number }>(
       `select count(*)::integer as count from member
        join "user" on "user".id = member.user_id
@@ -533,7 +668,10 @@ class PaseoAccounts {
     return result[0]!.count;
   }
 
-  async ownerMembershipCount(email: string, organizationId: string): Promise<number> {
+  async ownerMembershipCount(
+    email: string,
+    organizationId: string,
+  ): Promise<number> {
     const result = await this.query<{ count: number }>(
       `select count(*)::integer as count from member
        join "user" on "user".id = member.user_id
@@ -545,8 +683,14 @@ class PaseoAccounts {
 
   async projects(
     organizationId: string,
-  ): Promise<Array<{ name: string; slug: string; createdByEmail: string | null }>> {
-    return this.query<{ name: string; slug: string; createdByEmail: string | null }>(
+  ): Promise<
+    Array<{ name: string; slug: string; createdByEmail: string | null }>
+  > {
+    return this.query<{
+      name: string;
+      slug: string;
+      createdByEmail: string | null;
+    }>(
       `select projects.name, projects.slug, "user".email as "createdByEmail"
        from projects
        left join "user" on "user".id = projects.created_by_user_id
@@ -556,7 +700,10 @@ class PaseoAccounts {
     );
   }
 
-  async pendingInvitationCount(organizationId: string, email: string): Promise<number> {
+  async pendingInvitationCount(
+    organizationId: string,
+    email: string,
+  ): Promise<number> {
     const result = await this.query<{ count: number }>(
       `select count(*)::integer as count from invitation
        where organization_id = $1 and lower(email) = $2 and status = 'pending'`,
@@ -565,7 +712,10 @@ class PaseoAccounts {
     return result[0]!.count;
   }
 
-  async revokeDuringInvitation(actor: AccountBrowser, organizationId: string): Promise<number> {
+  async revokeDuringInvitation(
+    actor: AccountBrowser,
+    organizationId: string,
+  ): Promise<number> {
     const blocker = await createPostgresQueryRuntime(this.url);
 
     try {
@@ -610,7 +760,10 @@ class PaseoAccounts {
     );
   }
 
-  async seedResources(organizationId: string, suffix: string): Promise<ResourceIds> {
+  async seedResources(
+    organizationId: string,
+    suffix: string,
+  ): Promise<ResourceIds> {
     const projectId = randomUUID();
     await this.query(
       `insert into projects (id, organization_id, name, slug) values ($1, $2, $3, $4)`,
@@ -627,13 +780,26 @@ class PaseoAccounts {
       orgId: organizationId,
       source: { kind: "manual", userId: "seed" },
     });
+    const workflow = await this.database.saveOrganizationTrigger({
+      organizationId,
+      name: `workflow-${suffix}`,
+      enabled: true,
+      format: "legacy_multistep",
+      yaml: `name: workflow-${suffix}`,
+      normalizedConfiguration: { environments: [], triggers: [] },
+      contentHash: `workflow-config-${suffix}`,
+      sourceKind: "manual",
+      sourceEvidence: { kind: "test" },
+      createdByUserId: null,
+      routes: [],
+    });
     const execution = await this.database.insertAgentExecution({
       organizationId,
-      projectId,
+      workflowId: workflow.id,
       machineId: machine.id,
       triggerContext: {},
       outputContext: {},
-      configurationRevisionId: deployment.id,
+      configurationRevisionId: workflow.activeRevisionId,
     });
     const daemon = randomUUID();
     await this.query(
@@ -653,7 +819,12 @@ class PaseoAccounts {
         `credential-${suffix}`,
       ],
     );
-    return { machine: machine.id, daemon, deployment: deployment.id, execution: execution.id };
+    return {
+      machine: machine.id,
+      daemon,
+      deployment: deployment.id,
+      execution: execution.id,
+    };
   }
 
   async stop(): Promise<void> {
@@ -662,10 +833,9 @@ class PaseoAccounts {
     await this.database.close();
   }
 
-  private async query<TRow extends Record<string, unknown> = Record<string, unknown>>(
-    text: string,
-    values: unknown[] = [],
-  ): Promise<TRow[]> {
+  private async query<
+    TRow extends Record<string, unknown> = Record<string, unknown>,
+  >(text: string, values: unknown[] = []): Promise<TRow[]> {
     const client = await createPostgresQueryRuntime(this.url);
 
     try {
@@ -750,9 +920,12 @@ class AccountBrowser {
   }
 
   async createOrganization(name: string): Promise<string> {
-    const response = await this.post("/api/auth/paseo/create-organization", { name });
+    const response = await this.post("/api/auth/paseo/create-organization", {
+      name,
+    });
     assert.equal(response.status, 201);
-    return z.object({ organizationId: z.string() }).parse(await response.json()).organizationId;
+    return z.object({ organizationId: z.string() }).parse(await response.json())
+      .organizationId;
   }
 
   async selectOrganization(organizationId: string): Promise<void> {
@@ -760,17 +933,32 @@ class AccountBrowser {
   }
 
   async selectUnavailableOrganization(organizationId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/select-organization", { organizationId })).status;
+    return (
+      await this.post("/api/auth/paseo/select-organization", { organizationId })
+    ).status;
   }
 
-  async invite(email: string, role: "admin" | "member"): Promise<InvitationCredential> {
-    const response = await this.post("/api/auth/paseo/create-invitation", { email, role });
+  async invite(
+    email: string,
+    role: "admin" | "member",
+  ): Promise<InvitationCredential> {
+    const response = await this.post("/api/auth/paseo/create-invitation", {
+      email,
+      role,
+    });
     assert.equal(response.status, 201);
-    return z.object({ id: z.string(), link: z.string() }).parse(await response.json());
+    return z
+      .object({ id: z.string(), link: z.string() })
+      .parse(await response.json());
   }
 
-  async createInvitation(email: string, role: "admin" | "member"): Promise<number> {
-    return (await this.post("/api/auth/paseo/create-invitation", { email, role })).status;
+  async createInvitation(
+    email: string,
+    role: "admin" | "member",
+  ): Promise<number> {
+    return (
+      await this.post("/api/auth/paseo/create-invitation", { email, role })
+    ).status;
   }
 
   async createInvitationDenied(
@@ -783,7 +971,10 @@ class AccountBrowser {
     limit: number | null;
     current: number | null;
   }> {
-    const response = await this.post("/api/auth/paseo/create-invitation", { email, role });
+    const response = await this.post("/api/auth/paseo/create-invitation", {
+      email,
+      role,
+    });
     assert.equal(response.status, 409);
     return z
       .object({
@@ -804,7 +995,9 @@ class AccountBrowser {
     return invitations.map(({ id }) => id);
   }
 
-  async createInvitationWithTenantOverride(organizationId: string): Promise<number> {
+  async createInvitationWithTenantOverride(
+    organizationId: string,
+  ): Promise<number> {
     return (
       await this.post("/api/auth/paseo/create-invitation", {
         email: "target@example.com",
@@ -815,11 +1008,15 @@ class AccountBrowser {
   }
 
   async cancelInvitation(invitationId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/cancel-invitation", { invitationId })).status;
+    return (
+      await this.post("/api/auth/paseo/cancel-invitation", { invitationId })
+    ).status;
   }
 
   async acceptInvitation(invitationId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/accept-invitation", { invitationId })).status;
+    return (
+      await this.post("/api/auth/paseo/accept-invitation", { invitationId })
+    ).status;
   }
 
   async acceptInvitationSuccessfully(invitationId: string): Promise<void> {
@@ -834,7 +1031,10 @@ class AccountBrowser {
     return responses.map(({ status }) => status);
   }
 
-  async changeRole(memberId: string, role: "owner" | "admin" | "member"): Promise<number> {
+  async changeRole(
+    memberId: string,
+    role: "owner" | "admin" | "member",
+  ): Promise<number> {
     return (
       await this.post("/api/auth/paseo/change-member-role", {
         memberId,
@@ -851,12 +1051,16 @@ class AccountBrowser {
   }
 
   async removeMember(memberId: string): Promise<number> {
-    return (await this.post("/api/auth/paseo/remove-member", { memberId })).status;
+    return (await this.post("/api/auth/paseo/remove-member", { memberId }))
+      .status;
   }
 
   async lastOwnerRace(memberId: string): Promise<number[]> {
     const responses = await Promise.all([
-      this.post("/api/auth/paseo/change-member-role", { memberId, role: "member" }),
+      this.post("/api/auth/paseo/change-member-role", {
+        memberId,
+        role: "member",
+      }),
       this.post("/api/auth/paseo/remove-member", { memberId }),
     ]);
     return responses.map(({ status }) => status);
@@ -868,7 +1072,9 @@ class AccountBrowser {
         email: "target@example.com",
         role: "member",
       }),
-      this.post("/api/auth/paseo/cancel-invitation", { invitationId: randomUUID() }),
+      this.post("/api/auth/paseo/cancel-invitation", {
+        invitationId: randomUUID(),
+      }),
       this.post("/api/auth/paseo/change-member-role", {
         memberId: randomUUID(),
         role: "member",
@@ -886,18 +1092,25 @@ class AccountBrowser {
       "/api/auth/organization/delete",
       "/api/auth/organization/add-member",
     ];
-    const responses = await Promise.all(paths.map((path) => this.post(path, {})));
+    const responses = await Promise.all(
+      paths.map((path) => this.post(path, {})),
+    );
     return responses.map(({ status }) => status);
   }
 
   async resourcePresence(ids: ResourceIds): Promise<string[]> {
-    const reader = await this.auth.resources(this.request("/resources"), this.resources);
+    const reader = await this.auth.resources(
+      this.request("/resources"),
+      this.resources,
+    );
     const values = await Promise.all([
       reader.machine(ids.machine),
       reader.daemon(ids.daemon),
       reader.execution(ids.execution),
     ]);
-    return values.map((value, index) => (value === undefined ? "missing" : RESOURCE_NAMES[index]!));
+    return values.map((value, index) =>
+      value === undefined ? "missing" : RESOURCE_NAMES[index]!,
+    );
   }
 
   private get(path: string): Promise<Response> {
@@ -950,7 +1163,9 @@ function missingResources(): ResourceIds {
   };
 }
 
-async function waitForBlockedTransaction(client: DatabaseRuntime): Promise<void> {
+async function waitForBlockedTransaction(
+  client: DatabaseRuntime,
+): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const result = await client.query<{ blocked: boolean }>(
       `select exists (

@@ -1,5 +1,5 @@
 // Tests for the channel control-plane source (plan S8, implementation doc §4.3):
-// the single builder that turns the active project configuration into the
+// the single builder that turns the active organization configuration into the
 // control plane the ops handlers, the supervisor, and the plane all consume.
 // The contract under test: org resolution is single-organization (P0), the
 // snapshot carries the active revision's authored files + compiled control
@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { createMemoryDatabase } from "../db/memory.js";
 import { enrollTestDaemon } from "../test-utils/project-configuration.js";
-import { ProjectConfigurationStore } from "../configuration/store.js";
+import { OrganizationTriggerStore } from "../triggers/store.js";
 import type { Database } from "../db/types.js";
 import {
   ChannelAgentSpecError,
@@ -95,7 +95,7 @@ users:
 const ACCOUNT_YAML = `
 channel: slack
 accountId: work
-secretRef: slack:work
+connectionId: slack:work
 transport:
   mode: socket
 routes:
@@ -154,23 +154,21 @@ function memoryDatabase(): Database {
 
 async function withActiveConfiguration(database: Database): Promise<ChannelControlPlaneSnapshot> {
   await enrollTestDaemon(database, ORG_ID);
-  const project = await database.createProject({
-    organizationId: ORG_ID,
-    name: "Default",
-    slug: "default",
-    createdByUserId: "user-1",
-  });
-  const store = new ProjectConfigurationStore(database, project.id);
-  const revision = await store.insertManualBundleRevision({
-    files: [
-      { path: ".paseo/hub.yml", content: HUB_YAML },
-      { path: ".paseo/workflows/handoff.yml", content: WORKFLOW_YAML },
-      { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
-      { path: ".paseo/channels/slack/work.yml", content: ACCOUNT_YAML },
-    ],
+  await new OrganizationTriggerStore(database, ORG_ID).save({
+    yaml: `name: handoff\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: daemon-10000000, cwd: /workspace/app }\n  agent: { provider: codex, mode: default }\n  prompt: hand off\n  max_runtime: 1h\n  idle_timeout: 5m\n`,
     userId: null,
   });
-  await store.activate(revision.id);
+  const files = [
+    { path: ".paseo/hub.yml", content: HUB_YAML },
+    { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
+    { path: ".paseo/channels/slack/work.yml", content: ACCOUNT_YAML },
+  ];
+  await database.saveChannelConfiguration({
+    organizationId: ORG_ID,
+    files,
+    contentHash: "test-channel-configuration",
+    createdByUserId: null,
+  });
   return loadChannelControlPlane(database);
 }
 
@@ -307,25 +305,11 @@ describe("loadChannelControlPlane", () => {
     );
   });
 
-  it("fails closed when the default project is missing or has no active configuration", async () => {
-    await assert.rejects(
-      loadChannelControlPlane(memoryDatabase()),
-      (error: unknown) =>
-        error instanceof ChannelControlPlaneError && error.code === "project_not_found",
-    );
-
-    const database = memoryDatabase();
-    await database.createProject({
-      organizationId: ORG_ID,
-      name: "Default",
-      slug: "default",
-      createdByUserId: "user-1",
-    });
-    await assert.rejects(
-      loadChannelControlPlane(database),
-      (error: unknown) =>
-        error instanceof ChannelControlPlaneError && error.code === "no_active_configuration",
-    );
+  it("loads an empty organization control plane before its first revision", async () => {
+    const snapshot = await loadChannelControlPlane(memoryDatabase());
+    assert.equal(snapshot.organizationId, ORG_ID);
+    assert.equal(snapshot.revision, null);
+    assert.deepEqual(snapshot.controlPlane.accounts, []);
   });
 });
 

@@ -56,6 +56,7 @@ const configurationSchema = z.discriminatedUnion("provider", [
 ]);
 const connectionSchema = z.object({
   provider: providerSchema,
+  providerApplicationId: z.string().min(1),
   organizationId: z.string().min(1),
   surface: surfaceSchema,
 });
@@ -120,6 +121,7 @@ export const beginProviderConnection = createServerFn({ method: "POST" })
         await capability.beginConnection(
           getRequest(),
           data.provider,
+          data.providerApplicationId,
           data.organizationId,
           data.surface,
         ),
@@ -167,12 +169,13 @@ export const configureSlackSocketApplication = createServerFn({ method: "POST" }
     }
   });
 
-export const retrySlackSocketDelivery = createServerFn({ method: "POST" }).handler(
-  async (): Promise<Result<void>> => {
+export const retrySlackSocketDelivery = createServerFn({ method: "POST" })
+  .validator(z.object({ providerApplicationId: z.string().min(1) }))
+  .handler(async ({ data }): Promise<Result<void>> => {
     try {
       const capability = (await getApplication()).providerApplications;
       if (capability === null) throw new Error("unavailable");
-      await capability.retrySlackSocket(getRequest());
+      await capability.retrySlackSocket(getRequest(), data.providerApplicationId);
       return respondOk(undefined);
     } catch (error) {
       return respondWithFailure(
@@ -183,8 +186,7 @@ export const retrySlackSocketDelivery = createServerFn({ method: "POST" }).handl
         },
       );
     }
-  },
-);
+  });
 
 function sensitiveConfigurationValues(
   configuration: z.infer<typeof configurationSchema>,

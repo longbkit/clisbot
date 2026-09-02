@@ -34,7 +34,7 @@ export function logProviderEventRouting(input: {
   source: string;
   deliveryId: string;
   receiptId: string;
-  projectId: string;
+  workflowId: string;
   triggerNames: readonly string[];
   acceptedCount: number;
   rejectedCount: number;
@@ -46,7 +46,7 @@ export function logProviderEventRouting(input: {
       source: input.source,
       deliveryId: input.deliveryId,
       receiptId: input.receiptId,
-      projectId: input.projectId,
+      workflowId: input.workflowId,
       outcome: input.dropReason === undefined ? "matched" : "dropped",
       ...(input.dropReason === undefined
         ? {

@@ -7,6 +7,8 @@ import { afterEach, describe, it } from "vitest";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { embeddedDatabaseRuntime, postgresDatabaseRuntime } from "../db/runtime/index.js";
 import { createRuntimeConfiguration } from "./index.js";
+import { createCredentialCipher, CredentialCipherError } from "../credentials/credential-cipher.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 
 const roots: string[] = [];
 
@@ -23,11 +25,12 @@ describe("runtime configuration", () => {
 
     assert.equal(new Set(secrets).size, 1);
     assert.match(secrets[0]!, /^[a-f0-9]{64}$/u);
-    const persisted = await runtime.query<{ count: number; auth_secret: string }>(
-      `select count(*)::integer as count, min(auth_secret) as auth_secret
+    const persisted = await runtime.query<{ count: number; envelope: string }>(
+      `select count(*)::integer as count, min(auth_secret_envelope::text) as envelope
        from runtime_configuration`,
     );
-    assert.deepEqual(persisted.rows[0], { count: 1, auth_secret: secrets[0] });
+    assert.equal(persisted.rows[0]?.count, 1);
+    assert.equal(persisted.rows[0]?.envelope.includes(secrets[0]!), false);
     await runtime.close();
   });
 
@@ -48,11 +51,12 @@ describe("runtime configuration", () => {
 
       assert.equal(new Set(secrets).size, 1);
       assert.match(secrets[0]!, /^[a-f0-9]{64}$/u);
-      const persisted = await owners[0]!.runtime.query<{ count: number; auth_secret: string }>(
-        `select count(*)::integer as count, min(auth_secret) as auth_secret
+      const persisted = await owners[0]!.runtime.query<{ count: number; envelope: string }>(
+        `select count(*)::integer as count, min(auth_secret_envelope::text) as envelope
          from runtime_configuration`,
       );
-      assert.deepEqual(persisted.rows[0], { count: 1, auth_secret: secrets[0] });
+      assert.equal(persisted.rows[0]?.count, 1);
+      assert.equal(persisted.rows[0]?.envelope.includes(secrets[0]!), false);
     } finally {
       await Promise.all(owners.map(({ runtime }) => runtime.close()));
       await postgres.stop();
@@ -87,10 +91,25 @@ describe("runtime configuration", () => {
       override,
     );
     assert.equal(await createConfiguration(runtime).authSecret(), stored);
-    const persisted = await runtime.query<{ auth_secret: string }>(
-      `select auth_secret from runtime_configuration`,
+    const persisted = await runtime.query<{ envelope: string }>(
+      `select auth_secret_envelope::text as envelope from runtime_configuration`,
     );
-    assert.equal(persisted.rows[0]?.auth_secret, stored);
+    assert.equal(persisted.rows[0]?.envelope.includes(stored), false);
+    await runtime.close();
+  });
+
+  it("fails a restart with the wrong master key even when auth is overridden", async () => {
+    const { runtime } = await freshRuntime();
+    await createConfiguration(runtime).authSecret();
+    const wrongCipher = createCredentialCipher({
+      keyId: "test-key",
+      masterKey: Buffer.alloc(32, 99),
+    });
+
+    await assert.rejects(
+      createConfiguration(runtime, { authSecret: "override" }, 3000, wrongCipher).authSecret(),
+      CredentialCipherError,
+    );
     await runtime.close();
   });
 
@@ -129,6 +148,13 @@ function createConfiguration(
   database: Awaited<ReturnType<typeof freshRuntime>>["runtime"],
   environment: { authSecret?: string; appUrl?: string } = {},
   effectivePort = 3000,
+  credentialCipher = createTestCredentialCipher(),
 ) {
-  return createRuntimeConfiguration({ database, environment, effectivePort, randomBytes });
+  return createRuntimeConfiguration({
+    database,
+    environment,
+    effectivePort,
+    randomBytes,
+    credentialCipher,
+  });
 }

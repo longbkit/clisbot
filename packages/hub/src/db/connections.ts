@@ -8,6 +8,7 @@ import {
   ConnectionConflictError,
 } from "./errors.js";
 import * as schema from "./schema.js";
+import type { CredentialCipher } from "../credentials/credential-cipher.js";
 import type {
   AdvanceGitHubConnectionAttemptInput,
   BindDiscordConnectionInput,
@@ -41,6 +42,7 @@ export class ConnectionRepository {
   constructor(
     private readonly runtime: DatabaseRuntime,
     private readonly locks: Locks,
+    private readonly credentialCipher: CredentialCipher,
   ) {
     this.database = runtime.drizzle();
   }
@@ -61,7 +63,10 @@ export class ConnectionRepository {
         configurationVersion: input.configurationVersion,
         providerApplicationId: input.providerApplicationId,
         callbackOrigin: input.callbackOrigin,
-        configurationSnapshot: input.configurationSnapshot,
+        configurationEnvelope: this.credentialCipher.encrypt(
+          connectionAttemptCredentialOwner(input),
+          input.configurationSnapshot,
+        ),
         expectedConfigurationVersion: input.expectedConfigurationVersion,
         activateConfiguration: input.activateConfiguration,
         expiresAt: sql`clock_timestamp() + (${input.lifetimeMinutes} * interval '1 minute')`,
@@ -75,12 +80,13 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      return toAttempt(attempt);
+      return toAttempt(this.credentialCipher, attempt);
     });
   }
 
   async findAttemptConfiguration(stateVerifier: string): Promise<
     | {
+        providerApplicationId: string;
         configurationVersion: number;
         callbackOrigin: string;
         configurationSnapshot: unknown;
@@ -92,8 +98,10 @@ export class ConnectionRepository {
     const [attempt] = await this.database
       .select({
         configurationVersion: schema.organizationConnectionAttempts.configurationVersion,
+        provider: schema.organizationConnectionAttempts.provider,
+        providerApplicationId: schema.organizationConnectionAttempts.providerApplicationId,
         callbackOrigin: schema.organizationConnectionAttempts.callbackOrigin,
-        configurationSnapshot: schema.organizationConnectionAttempts.configurationSnapshot,
+        configurationEnvelope: schema.organizationConnectionAttempts.configurationEnvelope,
         expectedConfigurationVersion:
           schema.organizationConnectionAttempts.expectedConfigurationVersion,
         activateConfiguration: schema.organizationConnectionAttempts.activateConfiguration,
@@ -106,7 +114,18 @@ export class ConnectionRepository {
         ),
       )
       .limit(1);
-    return attempt;
+    if (attempt === undefined || attempt.providerApplicationId === null) return undefined;
+    return {
+      providerApplicationId: attempt.providerApplicationId,
+      configurationVersion: attempt.configurationVersion,
+      callbackOrigin: attempt.callbackOrigin,
+      configurationSnapshot: this.credentialCipher.decrypt(
+        connectionAttemptCredentialOwner(attempt),
+        attempt.configurationEnvelope,
+      ),
+      expectedConfigurationVersion: attempt.expectedConfigurationVersion,
+      activateConfiguration: attempt.activateConfiguration,
+    };
   }
 
   async consumeAttempt(input: ReadConnectionAttemptInput): Promise<void> {
@@ -115,7 +134,12 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      await lockProviderApplication(this.locks, runtimeTransaction, attempt.provider);
+      await lockProviderApplication(
+        this.locks,
+        runtimeTransaction,
+        attempt.provider,
+        requireAttemptApplicationId(attempt),
+      );
       await requireConsumableAttempt(transaction, attempt);
       await consumeLockedAttempt(transaction, attempt.id);
     });
@@ -127,7 +151,12 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      await lockProviderApplication(this.locks, runtimeTransaction, attempt.provider);
+      await lockProviderApplication(
+        this.locks,
+        runtimeTransaction,
+        attempt.provider,
+        requireAttemptApplicationId(attempt),
+      );
       await requireCurrentAttempt(transaction, attempt);
       await transaction
         .update(schema.organizationConnectionAttempts)
@@ -147,7 +176,12 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      await lockProviderApplication(this.locks, runtimeTransaction, "github");
+      await lockProviderApplication(
+        this.locks,
+        runtimeTransaction,
+        "github",
+        input.providerApplicationId,
+      );
       await requireCurrentAttempt(transaction, attempt, input.providerApplicationId);
       await lockExternal(this.locks, runtimeTransaction, "github", String(input.installationId));
       const [existing] = await transaction
@@ -239,7 +273,12 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      await lockProviderApplication(this.locks, runtimeTransaction, "slack");
+      await lockProviderApplication(
+        this.locks,
+        runtimeTransaction,
+        "slack",
+        input.providerApplicationId,
+      );
       if (providerConfiguration === undefined) {
         await requireCurrentAttempt(transaction, attempt, input.providerApplicationId);
       } else {
@@ -250,14 +289,24 @@ export class ConnectionRepository {
           providerConfiguration,
         );
       }
-      await lockExternal(this.locks, runtimeTransaction, "slack", input.teamId);
+      await lockExternal(
+        this.locks,
+        runtimeTransaction,
+        "slack",
+        `${input.providerApplicationId}:${input.teamId}`,
+      );
       const [existing] = await transaction
         .select({
           id: schema.slackConnections.id,
           organizationId: schema.slackConnections.organizationId,
         })
         .from(schema.slackConnections)
-        .where(eq(schema.slackConnections.teamId, input.teamId))
+        .where(
+          and(
+            eq(schema.slackConnections.providerApplicationId, input.providerApplicationId),
+            eq(schema.slackConnections.teamId, input.teamId),
+          ),
+        )
         .for("update");
       if (existing !== undefined && existing.organizationId !== attempt.organizationId) {
         throw new ConnectionConflictError();
@@ -275,7 +324,10 @@ export class ConnectionRepository {
             input.teamName,
           ),
           botUserId: input.botUserId,
-          botAccessToken: input.botAccessToken,
+          credentialEnvelope: this.credentialCipher.encrypt(
+            slackConnectionCredentialOwner(input.providerApplicationId, input.teamId),
+            { botAccessToken: input.botAccessToken },
+          ),
           scopes: input.scopes,
           connectedByUserId: attempt.userId,
         });
@@ -286,7 +338,10 @@ export class ConnectionRepository {
             teamName: input.teamName,
             providerApplicationId: input.providerApplicationId,
             botUserId: input.botUserId,
-            botAccessToken: input.botAccessToken,
+            credentialEnvelope: this.credentialCipher.encrypt(
+              slackConnectionCredentialOwner(input.providerApplicationId, input.teamId),
+              { botAccessToken: input.botAccessToken },
+            ),
             scopes: input.scopes,
             connectedByUserId: attempt.userId,
             updatedAt: sql`clock_timestamp()`,
@@ -297,7 +352,15 @@ export class ConnectionRepository {
         const [stored] = await transaction
           .select({ version: schema.runtimeProviderConfiguration.version })
           .from(schema.runtimeProviderConfiguration)
-          .where(eq(schema.runtimeProviderConfiguration.provider, "slack"))
+          .where(
+            and(
+              eq(schema.runtimeProviderConfiguration.provider, "slack"),
+              eq(
+                schema.runtimeProviderConfiguration.providerApplicationId,
+                input.providerApplicationId,
+              ),
+            ),
+          )
           .for("update");
         if (stored?.version !== providerConfiguration.expectedVersion) {
           const error = new Error("provider configuration changed");
@@ -307,7 +370,11 @@ export class ConnectionRepository {
         if (stored === undefined) {
           await transaction.insert(schema.runtimeProviderConfiguration).values({
             provider: "slack",
-            configuration: providerConfiguration.configuration,
+            providerApplicationId: input.providerApplicationId,
+            configurationEnvelope: this.credentialCipher.encrypt(
+              providerApplicationCredentialOwner("slack", input.providerApplicationId),
+              providerConfiguration.configuration,
+            ),
             verifiedExternalIdentity: providerConfiguration.identity,
             version: 1,
             verifiedAt: sql`clock_timestamp()`,
@@ -318,14 +385,25 @@ export class ConnectionRepository {
           await transaction
             .update(schema.runtimeProviderConfiguration)
             .set({
-              configuration: providerConfiguration.configuration,
+              configurationEnvelope: this.credentialCipher.encrypt(
+                providerApplicationCredentialOwner("slack", input.providerApplicationId),
+                providerConfiguration.configuration,
+              ),
               verifiedExternalIdentity: providerConfiguration.identity,
               version: sql`${schema.runtimeProviderConfiguration.version} + 1`,
               verifiedAt: sql`clock_timestamp()`,
               updatedAt: sql`clock_timestamp()`,
               updatedByUserId: providerConfiguration.updatedByUserId,
             })
-            .where(eq(schema.runtimeProviderConfiguration.provider, "slack"));
+            .where(
+              and(
+                eq(schema.runtimeProviderConfiguration.provider, "slack"),
+                eq(
+                  schema.runtimeProviderConfiguration.providerApplicationId,
+                  input.providerApplicationId,
+                ),
+              ),
+            );
         }
         await writeProviderActivation(
           transaction,
@@ -357,7 +435,12 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      await lockProviderApplication(this.locks, runtimeTransaction, "linear");
+      await lockProviderApplication(
+        this.locks,
+        runtimeTransaction,
+        "linear",
+        input.providerApplicationId,
+      );
       if (providerConfiguration === undefined) {
         await requireCurrentAttempt(transaction, attempt, input.providerApplicationId);
       } else {
@@ -393,8 +476,17 @@ export class ConnectionRepository {
             input.linearOrganizationName,
           ),
           appUserId: input.appUserId,
-          accessToken: input.accessToken,
-          refreshToken: input.refreshToken ?? null,
+          credentialEnvelope: this.credentialCipher.encrypt(
+            linearConnectionCredentialOwner(
+              input.providerApplicationId,
+              input.linearOrganizationId,
+            ),
+            {
+              accessToken: input.accessToken,
+              refreshToken: input.refreshToken ?? null,
+            },
+          ),
+          refreshTokenAvailable: input.refreshToken !== undefined && input.refreshToken !== null,
           accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
           scopes: input.scopes,
           connectedByUserId: attempt.userId,
@@ -406,8 +498,17 @@ export class ConnectionRepository {
             providerApplicationId: input.providerApplicationId,
             linearOrganizationName: input.linearOrganizationName,
             appUserId: input.appUserId,
-            accessToken: input.accessToken,
-            refreshToken: input.refreshToken ?? null,
+            credentialEnvelope: this.credentialCipher.encrypt(
+              linearConnectionCredentialOwner(
+                input.providerApplicationId,
+                input.linearOrganizationId,
+              ),
+              {
+                accessToken: input.accessToken,
+                refreshToken: input.refreshToken ?? null,
+              },
+            ),
+            refreshTokenAvailable: input.refreshToken !== undefined && input.refreshToken !== null,
             accessTokenExpiresAt: input.accessTokenExpiresAt ?? null,
             scopes: input.scopes,
             connectedByUserId: attempt.userId,
@@ -419,7 +520,15 @@ export class ConnectionRepository {
         const [stored] = await transaction
           .select({ version: schema.runtimeProviderConfiguration.version })
           .from(schema.runtimeProviderConfiguration)
-          .where(eq(schema.runtimeProviderConfiguration.provider, "linear"))
+          .where(
+            and(
+              eq(schema.runtimeProviderConfiguration.provider, "linear"),
+              eq(
+                schema.runtimeProviderConfiguration.providerApplicationId,
+                input.providerApplicationId,
+              ),
+            ),
+          )
           .for("update");
         if (stored?.version !== providerConfiguration.expectedVersion) {
           const error = new Error("provider configuration changed");
@@ -429,7 +538,11 @@ export class ConnectionRepository {
         if (stored === undefined) {
           await transaction.insert(schema.runtimeProviderConfiguration).values({
             provider: "linear",
-            configuration: providerConfiguration.configuration,
+            providerApplicationId: input.providerApplicationId,
+            configurationEnvelope: this.credentialCipher.encrypt(
+              providerApplicationCredentialOwner("linear", input.providerApplicationId),
+              providerConfiguration.configuration,
+            ),
             verifiedExternalIdentity: providerConfiguration.identity,
             version: 1,
             verifiedAt: sql`clock_timestamp()`,
@@ -440,14 +553,25 @@ export class ConnectionRepository {
           await transaction
             .update(schema.runtimeProviderConfiguration)
             .set({
-              configuration: providerConfiguration.configuration,
+              configurationEnvelope: this.credentialCipher.encrypt(
+                providerApplicationCredentialOwner("linear", input.providerApplicationId),
+                providerConfiguration.configuration,
+              ),
               verifiedExternalIdentity: providerConfiguration.identity,
               version: sql`${schema.runtimeProviderConfiguration.version} + 1`,
               verifiedAt: sql`clock_timestamp()`,
               updatedAt: sql`clock_timestamp()`,
               updatedByUserId: providerConfiguration.updatedByUserId,
             })
-            .where(eq(schema.runtimeProviderConfiguration.provider, "linear"));
+            .where(
+              and(
+                eq(schema.runtimeProviderConfiguration.provider, "linear"),
+                eq(
+                  schema.runtimeProviderConfiguration.providerApplicationId,
+                  input.providerApplicationId,
+                ),
+              ),
+            );
         }
         await writeProviderActivation(
           transaction,
@@ -461,18 +585,40 @@ export class ConnectionRepository {
   }
 
   async updateLinearTokens(input: UpdateLinearConnectionTokensInput): Promise<void> {
-    await this.database
-      .update(schema.linearConnections)
-      .set({
-        accessToken: input.accessToken,
-        ...(input.refreshToken === undefined ? {} : { refreshToken: input.refreshToken }),
-        ...(input.accessTokenExpiresAt === undefined
-          ? {}
-          : { accessTokenExpiresAt: input.accessTokenExpiresAt }),
-        ...(input.scopes === undefined ? {} : { scopes: input.scopes }),
-        updatedAt: sql`clock_timestamp()`,
-      })
-      .where(eq(schema.linearConnections.id, input.connectionId));
+    await this.runtime.transaction(async (runtimeTransaction) => {
+      const transaction = runtimeTransaction.drizzle();
+      const [row] = await transaction
+        .select()
+        .from(schema.linearConnections)
+        .where(eq(schema.linearConnections.id, input.connectionId))
+        .for("update");
+      if (row === undefined || row.providerApplicationId === null) {
+        throw new Error("Linear connection unavailable");
+      }
+      const current = linearConnection(this.credentialCipher, row);
+      await transaction
+        .update(schema.linearConnections)
+        .set({
+          credentialEnvelope: this.credentialCipher.encrypt(
+            linearConnectionCredentialOwner(row.providerApplicationId, row.linearOrganizationId),
+            {
+              accessToken: input.accessToken,
+              refreshToken:
+                input.refreshToken === undefined ? current.refreshToken : input.refreshToken,
+            },
+          ),
+          refreshTokenAvailable:
+            input.refreshToken === undefined
+              ? current.refreshToken !== null
+              : input.refreshToken !== null,
+          ...(input.accessTokenExpiresAt === undefined
+            ? {}
+            : { accessTokenExpiresAt: input.accessTokenExpiresAt }),
+          ...(input.scopes === undefined ? {} : { scopes: input.scopes }),
+          updatedAt: sql`clock_timestamp()`,
+        })
+        .where(eq(schema.linearConnections.id, input.connectionId));
+    });
   }
 
   async withLinearRefresh<T>(
@@ -490,14 +636,28 @@ export class ConnectionRepository {
         .from(schema.linearConnections)
         .where(eq(schema.linearConnections.linearOrganizationId, linearOrganizationId))
         .for("update");
-      const connection = row === undefined ? undefined : linearConnection(row);
+      const connection =
+        row === undefined ? undefined : linearConnection(this.credentialCipher, row);
       return operation(connection, async (input) => {
         if (connection === undefined) throw new Error("Linear connection unavailable");
         await transaction
           .update(schema.linearConnections)
           .set({
-            accessToken: input.accessToken,
-            ...(input.refreshToken === undefined ? {} : { refreshToken: input.refreshToken }),
+            credentialEnvelope: this.credentialCipher.encrypt(
+              linearConnectionCredentialOwner(
+                connection.providerApplicationId!,
+                connection.linearOrganizationId,
+              ),
+              {
+                accessToken: input.accessToken,
+                refreshToken:
+                  input.refreshToken === undefined ? connection.refreshToken : input.refreshToken,
+              },
+            ),
+            refreshTokenAvailable:
+              input.refreshToken === undefined
+                ? connection.refreshToken !== null
+                : input.refreshToken !== null,
             ...(input.accessTokenExpiresAt === undefined
               ? {}
               : { accessTokenExpiresAt: input.accessTokenExpiresAt }),
@@ -520,7 +680,12 @@ export class ConnectionRepository {
       await lockAccountSession(transaction, input.access);
       const attempt = await lockAttempt(transaction, input);
       await lockStoredAuthority(transaction, attempt);
-      await lockProviderApplication(this.locks, runtimeTransaction, provider);
+      await lockProviderApplication(
+        this.locks,
+        runtimeTransaction,
+        provider,
+        input.providerApplicationId,
+      );
       await requireCurrentAttempt(transaction, attempt, input.providerApplicationId);
       await lockExternal(this.locks, runtimeTransaction, provider, externalId);
       const conflict =
@@ -619,7 +784,8 @@ export class ConnectionRepository {
         const [connection] = await transaction
           .select({
             linearOrganizationId: schema.linearConnections.linearOrganizationId,
-            accessToken: schema.linearConnections.accessToken,
+            credentialEnvelope: schema.linearConnections.credentialEnvelope,
+            providerApplicationId: schema.linearConnections.providerApplicationId,
           })
           .from(schema.linearConnections)
           .where(
@@ -639,13 +805,25 @@ export class ConnectionRepository {
         return {
           provider,
           linearOrganizationId: connection.linearOrganizationId,
-          accessToken: connection.accessToken,
+          accessToken:
+            connection.providerApplicationId === null
+              ? undefined
+              : requireLinearConnectionCredential(
+                  this.credentialCipher.decrypt(
+                    linearConnectionCredentialOwner(
+                      connection.providerApplicationId,
+                      connection.linearOrganizationId,
+                    ),
+                    connection.credentialEnvelope,
+                  ),
+                ).accessToken,
         } as const;
       }
       const [connection] = await transaction
         .select({
           teamId: schema.slackConnections.teamId,
-          botAccessToken: schema.slackConnections.botAccessToken,
+          credentialEnvelope: schema.slackConnections.credentialEnvelope,
+          providerApplicationId: schema.slackConnections.providerApplicationId,
         })
         .from(schema.slackConnections)
         .where(
@@ -665,7 +843,12 @@ export class ConnectionRepository {
       return {
         provider,
         teamId: connection.teamId,
-        botAccessToken: connection.botAccessToken,
+        botAccessToken: requireSlackConnectionCredential(
+          this.credentialCipher.decrypt(
+            slackConnectionCredentialOwner(connection.providerApplicationId, connection.teamId),
+            connection.credentialEnvelope,
+          ),
+        ).botAccessToken,
       } as const;
     });
   }
@@ -696,17 +879,26 @@ export class ConnectionRepository {
     return row === undefined ? undefined : discordConnection(row);
   }
 
-  async findSlack(teamId: string): Promise<SlackConnectionRecord | undefined> {
+  async findSlack(
+    providerApplicationId: string,
+    teamId: string,
+  ): Promise<SlackConnectionRecord | undefined> {
     const [row] = await this.database
       .select()
       .from(schema.slackConnections)
-      .where(eq(schema.slackConnections.teamId, teamId))
+      .where(
+        and(
+          eq(schema.slackConnections.providerApplicationId, providerApplicationId),
+          eq(schema.slackConnections.teamId, teamId),
+        ),
+      )
       .limit(1);
-    return row === undefined ? undefined : slackConnection(row);
+    return row === undefined ? undefined : slackConnection(this.credentialCipher, row);
   }
 
   async findSlackForOrganization(
     organizationId: string,
+    providerApplicationId: string,
     teamId: string,
   ): Promise<SlackConnectionRecord | undefined> {
     const [row] = await this.database
@@ -715,11 +907,29 @@ export class ConnectionRepository {
       .where(
         and(
           eq(schema.slackConnections.organizationId, organizationId),
+          eq(schema.slackConnections.providerApplicationId, providerApplicationId),
           eq(schema.slackConnections.teamId, teamId),
         ),
       )
       .limit(1);
-    return row === undefined ? undefined : slackConnection(row);
+    return row === undefined ? undefined : slackConnection(this.credentialCipher, row);
+  }
+
+  async findSlackByIdForOrganization(
+    organizationId: string,
+    connectionId: string,
+  ): Promise<SlackConnectionRecord | undefined> {
+    const [row] = await this.database
+      .select()
+      .from(schema.slackConnections)
+      .where(
+        and(
+          eq(schema.slackConnections.organizationId, organizationId),
+          eq(schema.slackConnections.id, connectionId),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? undefined : slackConnection(this.credentialCipher, row);
   }
 
   async findLinear(linearOrganizationId: string): Promise<LinearConnectionRecord | undefined> {
@@ -728,7 +938,7 @@ export class ConnectionRepository {
       .from(schema.linearConnections)
       .where(eq(schema.linearConnections.linearOrganizationId, linearOrganizationId))
       .limit(1);
-    return row === undefined ? undefined : linearConnection(row);
+    return row === undefined ? undefined : linearConnection(this.credentialCipher, row);
   }
 
   async findLinearForOrganization(
@@ -745,7 +955,7 @@ export class ConnectionRepository {
         ),
       )
       .limit(1);
-    return row === undefined ? undefined : linearConnection(row);
+    return row === undefined ? undefined : linearConnection(this.credentialCipher, row);
   }
 
   async removeDiscord(guildId: string): Promise<void> {
@@ -892,8 +1102,12 @@ async function lockProviderApplication(
   locks: Locks,
   transaction: TransactionHandle,
   provider: ConnectionProvider,
+  applicationId: string,
 ): Promise<void> {
-  await locks.withTxLock(transaction, JSON.stringify(["provider-application", provider]));
+  await locks.withTxLock(
+    transaction,
+    JSON.stringify(["provider-application", provider, applicationId]),
+  );
 }
 
 async function requireCurrentAttempt(
@@ -914,7 +1128,12 @@ async function requireCurrentAttempt(
       configurationVersion: schema.runtimeProviderActivations.configurationVersion,
     })
     .from(schema.runtimeProviderActivations)
-    .where(eq(schema.runtimeProviderActivations.provider, attempt.provider))
+    .where(
+      and(
+        eq(schema.runtimeProviderActivations.provider, attempt.provider),
+        eq(schema.runtimeProviderActivations.providerApplicationId, applicationId),
+      ),
+    )
     .for("update");
   if (
     activation?.applicationId !== applicationId ||
@@ -936,13 +1155,19 @@ async function requireConsumableAttempt(
     throw providerApplicationChanged();
   }
   const provider = attempt.provider;
+  const applicationId = requireAttemptApplicationId(attempt);
   const [stored] = await transaction
     .select({
       version: schema.runtimeProviderConfiguration.version,
       identity: schema.runtimeProviderConfiguration.verifiedExternalIdentity,
     })
     .from(schema.runtimeProviderConfiguration)
-    .where(eq(schema.runtimeProviderConfiguration.provider, provider))
+    .where(
+      and(
+        eq(schema.runtimeProviderConfiguration.provider, provider),
+        eq(schema.runtimeProviderConfiguration.providerApplicationId, applicationId),
+      ),
+    )
     .for("update");
   const [activation] = await transaction
     .select({
@@ -950,7 +1175,12 @@ async function requireConsumableAttempt(
       configurationVersion: schema.runtimeProviderActivations.configurationVersion,
     })
     .from(schema.runtimeProviderActivations)
-    .where(eq(schema.runtimeProviderActivations.provider, provider))
+    .where(
+      and(
+        eq(schema.runtimeProviderActivations.provider, provider),
+        eq(schema.runtimeProviderActivations.providerApplicationId, applicationId),
+      ),
+    )
     .for("update");
   if (stored?.version !== (attempt.expectedConfigurationVersion ?? undefined)) {
     throw providerApplicationChanged();
@@ -981,13 +1211,6 @@ async function requireSlackActivationCandidate(
   ) {
     throw providerApplicationChanged();
   }
-  const connections = await transaction
-    .select({ applicationId: schema.slackConnections.providerApplicationId })
-    .from(schema.slackConnections)
-    .for("update");
-  if (connections.some((connection) => connection.applicationId !== bindingApplicationId)) {
-    throw providerApplicationChanged();
-  }
 }
 
 async function requireLinearActivationCandidate(
@@ -1004,13 +1227,6 @@ async function requireLinearActivationCandidate(
   ) {
     throw providerApplicationChanged();
   }
-  const connections = await transaction
-    .select({ applicationId: schema.linearConnections.providerApplicationId })
-    .from(schema.linearConnections)
-    .for("update");
-  if (connections.some((connection) => connection.applicationId !== bindingApplicationId)) {
-    throw providerApplicationChanged();
-  }
 }
 
 async function writeProviderActivation(
@@ -1023,13 +1239,20 @@ async function writeProviderActivation(
     .insert(schema.runtimeProviderActivations)
     .values({ provider, providerApplicationId: applicationId, configurationVersion })
     .onConflictDoUpdate({
-      target: schema.runtimeProviderActivations.provider,
+      target: [
+        schema.runtimeProviderActivations.provider,
+        schema.runtimeProviderActivations.providerApplicationId,
+      ],
       set: {
-        providerApplicationId: applicationId,
         configurationVersion,
         activatedAt: sql`clock_timestamp()`,
       },
     });
+}
+
+function requireAttemptApplicationId(attempt: AttemptRow): string {
+  if (attempt.providerApplicationId === null) throw providerApplicationChanged();
+  return attempt.providerApplicationId;
 }
 
 function externalIdentityId(value: unknown): string | undefined {
@@ -1057,7 +1280,8 @@ function initialConnectionAttemptPhase(provider: ConnectionProvider): Connection
   return provider === "slack" ? "slack_authorization" : "linear_authorization";
 }
 
-function toAttempt(row: AttemptRow): ConnectionAttemptRecord {
+function toAttempt(credentialCipher: CredentialCipher, row: AttemptRow): ConnectionAttemptRecord {
+  if (row.providerApplicationId === null) throw new Error("connection attempt has no application");
   return {
     id: row.id,
     provider: row.provider,
@@ -1071,7 +1295,10 @@ function toAttempt(row: AttemptRow): ConnectionAttemptRecord {
     configurationVersion: row.configurationVersion,
     providerApplicationId: row.providerApplicationId,
     callbackOrigin: row.callbackOrigin,
-    configurationSnapshot: row.configurationSnapshot,
+    configurationSnapshot: credentialCipher.decrypt(
+      connectionAttemptCredentialOwner(row),
+      row.configurationEnvelope,
+    ),
     expectedConfigurationVersion: row.expectedConfigurationVersion,
     activateConfiguration: row.activateConfiguration,
     expiresAt: row.expiresAt,
@@ -1106,7 +1333,17 @@ function discordConnection(
     providerApplicationId: row.providerApplicationId,
   };
 }
-function slackConnection(row: typeof schema.slackConnections.$inferSelect): SlackConnectionRecord {
+function slackConnection(
+  credentialCipher: CredentialCipher,
+  row: typeof schema.slackConnections.$inferSelect,
+): SlackConnectionRecord {
+  const credentials = requireSlackConnectionCredential(
+    credentialCipher.decrypt(
+      slackConnectionCredentialOwner(row.providerApplicationId, row.teamId),
+      row.credentialEnvelope,
+    ),
+  );
+
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -1114,14 +1351,34 @@ function slackConnection(row: typeof schema.slackConnections.$inferSelect): Slac
     teamId: row.teamId,
     teamName: row.teamName,
     botUserId: row.botUserId,
-    botAccessToken: row.botAccessToken,
+    botAccessToken: credentials.botAccessToken,
     scopes: row.scopes,
     providerApplicationId: row.providerApplicationId,
   };
 }
+
+function requireSlackConnectionCredential(value: unknown): { botAccessToken: string } {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    typeof Reflect.get(value, "botAccessToken") !== "string"
+  ) {
+    throw new Error("Slack connection credential envelope is malformed");
+  }
+  return { botAccessToken: String(Reflect.get(value, "botAccessToken")) };
+}
 function linearConnection(
+  credentialCipher: CredentialCipher,
   row: typeof schema.linearConnections.$inferSelect,
 ): LinearConnectionRecord {
+  if (row.providerApplicationId === null) throw new Error("Linear connection has no application");
+  const credentials = requireLinearConnectionCredential(
+    credentialCipher.decrypt(
+      linearConnectionCredentialOwner(row.providerApplicationId, row.linearOrganizationId),
+      row.credentialEnvelope,
+    ),
+  );
+
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -1130,11 +1387,60 @@ function linearConnection(
     linearOrganizationId: row.linearOrganizationId,
     linearOrganizationName: row.linearOrganizationName,
     appUserId: row.appUserId,
-    accessToken: row.accessToken,
-    refreshToken: row.refreshToken,
+    accessToken: credentials.accessToken,
+    refreshToken: credentials.refreshToken,
     accessTokenExpiresAt: row.accessTokenExpiresAt,
     scopes: row.scopes,
   };
+}
+
+function requireLinearConnectionCredential(credentials: unknown): {
+  accessToken: string;
+  refreshToken: string | null;
+} {
+  const accessToken: unknown =
+    credentials === null || typeof credentials !== "object"
+      ? undefined
+      : Reflect.get(credentials, "accessToken");
+  const refreshToken: unknown =
+    credentials === null || typeof credentials !== "object"
+      ? undefined
+      : Reflect.get(credentials, "refreshToken");
+  if (
+    typeof accessToken !== "string" ||
+    (refreshToken !== null && typeof refreshToken !== "string")
+  ) {
+    throw new Error("Linear connection credential envelope is malformed");
+  }
+  return { accessToken, refreshToken };
+}
+
+function providerApplicationCredentialOwner(
+  provider: ConnectionProvider,
+  applicationId: string,
+): string {
+  return `provider-application:${provider}:${applicationId}`;
+}
+
+function connectionAttemptCredentialOwner(input: {
+  provider: ConnectionProvider;
+  providerApplicationId: string | null;
+  configurationVersion: number;
+}): string {
+  if (input.providerApplicationId === null)
+    throw new Error("connection attempt has no application");
+  return `connection-attempt:${input.provider}:${input.providerApplicationId}:${input.configurationVersion}`;
+}
+
+function slackConnectionCredentialOwner(applicationId: string, teamId: string): string {
+  return `slack-connection:${applicationId}:${teamId}`;
+}
+
+function linearConnectionCredentialOwner(
+  applicationId: string,
+  linearOrganizationId: string,
+): string {
+  return `linear-connection:${applicationId}:${linearOrganizationId}`;
 }
 
 async function uniqueConnectionSlug(

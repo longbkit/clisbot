@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { AuthServer } from "../auth/server.js";
 import { createMemoryDatabase } from "../db/memory.js";
-import { enrollTestDaemon, TEST_DAEMON_SLUG } from "../test-utils/project-configuration.js";
+import {
+  enrollTestDaemon,
+  TEST_DAEMON_SLUG,
+} from "../test-utils/project-configuration.js";
 import { TriggerDashboard } from "./dashboard.js";
 import { OrganizationTriggerStore } from "./store.js";
 
@@ -33,12 +36,16 @@ describe("trigger dashboard read model", () => {
     assert.equal(before.triggers[0]?.event, "manual.run");
     assert.equal(before.triggers[0]?.lastTriggered, null);
 
-    const revision = await database.findActiveProjectConfiguration(trigger.runtimeProjectId);
+    const revision = await database.findOrganizationTriggerRevision(
+      trigger.id,
+      trigger.activeRevisionId,
+    );
     assert.ok(revision);
     const receivedAt = new Date("2026-08-30T09:30:00.000Z");
-    const receipt = await database.persistManualEvent({
+    const receipt = await database.persistChannelEvent({
       organizationId: "org-1",
-      projectId: trigger.runtimeProjectId,
+      triggerId: trigger.id,
+      triggerRevisionId: trigger.activeRevisionId,
       deliveryId: "dashboard-manual-run",
       source: "manual.run",
       payload: {},
@@ -48,7 +55,7 @@ describe("trigger dashboard read model", () => {
     if (receipt.status !== "accepted") return;
     await database.createAcceptedTriggerRun({
       organizationId: "org-1",
-      projectId: trigger.runtimeProjectId,
+      workflowId: trigger.id,
       configurationRevisionId: revision.id,
       providerEventReceiptId: receipt.event.providerEventReceiptId,
       configuredTriggerName: "manual-task",

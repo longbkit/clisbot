@@ -319,7 +319,8 @@ export type RouteMatch = z.infer<typeof RouteMatchSchema>;
 
 /**
  * A route's target: exactly one of `agent` + `environment` (continuous session,
- * names into `hub.yml`) or `workflow` (hand-off to `workflows/<name>.yml`).
+ * names into the Channel resource registry) or `workflow` (hand-off to the
+ * enabled organization Trigger with that name).
  * Enforced as a refinement, not a discriminated union, so per-route overrides
  * can be shared across both shapes.
  */
@@ -358,7 +359,7 @@ export const AccountFileSchema = z
     channel: z.string().min(1),
     accountId: z.string().min(1),
     enabled: z.boolean().default(true),
-    secretRef: z.string().min(1),
+    connectionId: z.string().min(1),
     transport: z.unknown(), // channel-specific; validated against the channel's transport schema in compile
     // Vertical-owned account settings (e.g. Telegram's `richMessages`,
     // `timeoutSeconds`, `apiRoot`): passed through verbatim to the vertical's

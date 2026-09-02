@@ -1,7 +1,12 @@
-import type { ProjectConfigurationStore } from "../configuration/store.js";
-import type { ConnectionResolutionContext, ConnectionResolver } from "../config/connections.js";
+import type {
+  ConnectionResolutionContext,
+  ConnectionResolver,
+} from "../config/connections.js";
 import type { OrganizationConnectionUsage } from "../db/types.js";
-import type { OutputExecutor, OutputToolDefinition } from "../execution-capabilities/outputs.js";
+import type {
+  OutputExecutor,
+  OutputToolDefinition,
+} from "../execution-capabilities/outputs.js";
 import type { TriggerProvider, TriggerSource } from "../triggers/index.js";
 import type { GitHubConfigurationProvider } from "../configuration/github-sync.js";
 import type {
@@ -10,10 +15,10 @@ import type {
   AttachmentResolver,
 } from "../attachments/capabilities.js";
 import type { SlackDeliveryStatus } from "../triggers/slack/source/index.js";
+import type { WorkflowConfigurationResolver } from "../triggers/configuration.js";
 
 export interface TriggerProviderResources {
-  configurationStoreForProject: (projectId: string) => ProjectConfigurationStore;
-  connectionsForProject: (projectId: string) => ConnectionResolver;
+  configurationForWorkflow: WorkflowConfigurationResolver;
   attachments?: AttachmentCapabilityRegistry;
 }
 
@@ -23,7 +28,7 @@ export type TriggerProviderFactory = (
 
 export interface ProviderIntegrationRegistration {
   resolve(
-    projectId: string,
+    organizationId: string,
     connectionSlug: string,
     value: string,
     context?: ConnectionResolutionContext,
@@ -33,7 +38,7 @@ export interface ProviderIntegrationRegistration {
 
 export interface GitHubAuthorityRegistration {
   mint(input: {
-    projectId: string;
+    organizationId: string;
     connectionSlug: string;
     repositories: readonly string[];
     permissions: Readonly<Record<string, "read" | "write" | "admin">>;

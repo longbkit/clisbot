@@ -3824,7 +3824,11 @@ export class CodexAppServerAgentSession implements AgentSession {
     }
     try {
       const loaded = toObjectRecord(await this.client.request("thread/loaded/list", {}));
-      const ids = Array.isArray(loaded?.data) ? loaded.data : [];
+      const ids = Array.isArray(loaded?.data)
+        ? loaded.data
+            .map((entry) => (typeof entry === "string" ? entry : toObjectRecord(entry)?.id))
+            .filter((id): id is string => typeof id === "string")
+        : [];
       if (ids.includes(this.currentThreadId)) {
         return;
       }

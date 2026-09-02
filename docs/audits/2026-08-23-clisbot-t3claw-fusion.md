@@ -1,5 +1,9 @@
 # Clisbot T3Claw Fusion — Research Audit
 
+> Credential-model update, 2026-09-01: active revisions now reference encrypted canonical
+> Connections by `connectionId`; `secretRef` and `channel_accounts` were removed. See
+> [the Hub credential, Application, and Connection gap decision](2026-09-01-hub-credential-application-connection-gaps.md).
+
 Audit date: 2026-08-23. Subject: the sibling exploration `clisbot-t3claw-fusion` (a fork of T3 Code `main`), audited from its working tree at branch `clisbot-t3claw-fusion`, HEAD `70023dc55`. This doc is reference material for the PaseoClaw Fusion direction (see [../overview/product-vision.md](../overview/product-vision.md)); it carries forward design and experience, not code.
 
 ## What T3Claw Fusion is

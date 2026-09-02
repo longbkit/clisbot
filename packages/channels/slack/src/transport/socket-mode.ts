@@ -19,7 +19,10 @@
 // transport talks to the SocketModeClient directly (DEVIATIONS D-003).
 
 import type { SocketModeClient } from "@slack/socket-mode";
-import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
+import type {
+  ChannelInboundEvent,
+  HostChildLogger,
+} from "@getpaseo/channels-shared";
 import {
   buildSlackInboundEvent,
   buildSlackSlashCommandEvent,
@@ -31,7 +34,10 @@ import {
   type SlackTransportIdentity,
 } from "./socket-event-filter.js";
 import { foldInboundSlackMedia } from "./media.js";
-import { runSlackSocketReconnectLoop, stopSlackSocketClient } from "./socket-reconnect.js";
+import {
+  runSlackSocketReconnectLoop,
+  stopSlackSocketClient,
+} from "./socket-reconnect.js";
 
 export { SocketModeClient } from "@slack/socket-mode";
 export type { SocketModeOptions } from "@slack/socket-mode";
@@ -45,6 +51,11 @@ export type {
 export interface SlackSocketTransportOptions {
   /** The Socket Mode client (constructed by L4 with the account's appToken). */
   client: SocketModeClient;
+  /** One SocketModeClient may serve several installations of the same Slack
+   * app. In that posture every account installs a listener, but only the
+   * listener whose probed identity matches the envelope may handle and ack
+   * it. The shared lifecycle owner starts/stops the client. */
+  sharedClient?: boolean;
   /** The identity facts L4 probed from `auth.test` — explicit-mention
    * detection + own-message filtering. Empty when the token is not a bot
    * token (mention detection then fails closed, pinned behavior). */
@@ -106,7 +117,15 @@ export interface SlackSocketTransport {
 export function createSlackSocketTransport(
   options: SlackSocketTransportOptions,
 ): SlackSocketTransport {
-  const { client, identity, onInbound, onInteractive, slashCommand, abortSignal, logger } = options;
+  const {
+    client,
+    identity,
+    onInbound,
+    onInteractive,
+    slashCommand,
+    abortSignal,
+    logger,
+  } = options;
 
   // In-flight envelope ids: the transport-level redelivery guard for the
   // socket reconnect window. The L3's event-id set + ledger row are the
@@ -125,18 +144,39 @@ export function createSlackSocketTransport(
     return true;
   };
 
+  const matchesEnvelope = (envelope: SocketEventEnvelope): boolean => {
+    const drop = shouldDropMismatchedSlackEvent(envelope.body, identity);
+    if (drop === null) {
+      if (options.sharedClient !== true) return true;
+      const rawTeam = envelope.body["team"];
+      const incomingTeamId =
+        typeof envelope.body["team_id"] === "string"
+          ? envelope.body["team_id"]
+          : rawTeam !== null && typeof rawTeam === "object" && "id" in rawTeam
+            ? (rawTeam as { id?: unknown }).id
+            : undefined;
+      // Shared sockets must route exactly once. A missing team id is not
+      // attributable to an installation and therefore fails closed.
+      return (
+        typeof incomingTeamId === "string" && incomingTeamId === identity.teamId
+      );
+    }
+    logger?.debug?.(`slack: drop event with mismatched ${drop}`);
+    return false;
+  };
+
   const handleEnvelope = async (
     envelope: SocketEventEnvelope,
     source: SlackInboundSource,
   ): Promise<void> => {
-    const drop = shouldDropMismatchedSlackEvent(envelope.body, identity);
-    if (drop !== null) {
-      logger?.debug?.(`slack: drop event with mismatched ${drop}`);
-      return;
-    }
     const event = envelope.event;
     if (event === undefined || typeof event !== "object") return;
-    const inbound = buildSlackInboundEvent(event as never, source, identity, options.botId);
+    const inbound = buildSlackInboundEvent(
+      event as never,
+      source,
+      identity,
+      options.botId,
+    );
     if (inbound === undefined) return;
     // F-06/G5+G6: fold the message's `files[]` into the body BEFORE the L3
     // handoff (the body must be final before dedupe/record). Per-file faults
@@ -150,7 +190,9 @@ export function createSlackSocketTransport(
           botToken: options.media.botToken,
           downloadDir: options.media.downloadDir,
           abortSignal,
-          ...(options.media.fetchImpl !== undefined ? { fetchImpl: options.media.fetchImpl } : {}),
+          ...(options.media.fetchImpl !== undefined
+            ? { fetchImpl: options.media.fetchImpl }
+            : {}),
           ...(logger !== undefined ? { logger } : {}),
         },
         event as never,
@@ -181,13 +223,16 @@ export function createSlackSocketTransport(
   // Ack FIRST (Slack redelivers unacked events on reconnect — the blueprint
   // §1 redelivery semantic), then hand to the L3. The client's EventEmitter
   // keeps these handlers across its internal auto-reconnects.
-  client.on("message", async (envelope: SocketEventEnvelope) => {
+  const onMessage = async (envelope: SocketEventEnvelope): Promise<void> => {
+    if (!matchesEnvelope(envelope)) return;
+    await ackSafe(envelope);
     if (rememberEnvelope(envelope.envelope_id)) {
       await handleEnvelope(envelope, "message");
     }
+  };
+  const onAppMention = async (envelope: SocketEventEnvelope): Promise<void> => {
+    if (!matchesEnvelope(envelope)) return;
     await ackSafe(envelope);
-  });
-  client.on("app_mention", async (envelope: SocketEventEnvelope) => {
     // Pinned: app_mention in im/mpim duplicates the `message` event
     // (events/messages.ts:2453-2454).
     const channelType = normalizeSlackChannelType(
@@ -199,14 +244,14 @@ export function createSlackSocketTransport(
         : undefined,
     );
     if (channelType === "im" || channelType === "mpim") {
-      await ackSafe(envelope);
       return;
     }
     if (rememberEnvelope(envelope.envelope_id)) {
       await handleEnvelope(envelope, "app_mention");
     }
-    await ackSafe(envelope);
-  });
+  };
+  client.on("message", onMessage);
+  client.on("app_mention", onAppMention);
 
   // COMPAT(clisbot-control-plane): native approval-card button clicks arrive
   // as Socket Mode `interactive` envelopes (a Block Kit interactive
@@ -229,7 +274,11 @@ export function createSlackSocketTransport(
   // longer; an empty ack means Slack shows no ephemeral response and the
   // plane's own thread posts everything (the same surface the typed command
   // uses). Then rewrite to the plain-text form and hand to `onInbound`.
-  client.on("slash_commands", async (envelope: SocketEventEnvelope) => {
+  const onSlashCommand = async (
+    envelope: SocketEventEnvelope,
+  ): Promise<void> => {
+    if (!matchesEnvelope(envelope)) return;
+    await ackSafe(envelope);
     if (slashCommand !== undefined && slashCommand !== "") {
       const inbound = buildSlackSlashCommandEvent(
         envelope.body as SlackSlashCommandBody,
@@ -239,31 +288,39 @@ export function createSlackSocketTransport(
         try {
           await onInbound(inbound);
         } catch (error) {
-          logger?.warn?.("slack slash-command handoff fault (kept socket alive)", {
-            error: error instanceof Error ? error.message : String(error),
-          });
+          logger?.warn?.(
+            "slack slash-command handoff fault (kept socket alive)",
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
         }
       }
     }
-    await ackSafe(envelope);
-  });
+  };
+  client.on("slash_commands", onSlashCommand);
 
-  client.on("interactive", async (envelope: SocketEventEnvelope) => {
+  const onInteractiveEnvelope = async (
+    envelope: SocketEventEnvelope,
+  ): Promise<void> => {
+    if (!matchesEnvelope(envelope)) return;
+    await ackSafe(envelope);
     // Only message-component clicks matter here; a modal or Home-tab
     // interaction (or a `block_suggestion`, which needs a 3s response the
     // plane never mints) is acked and dropped before the seam.
     if (envelope.body["type"] !== "block_actions") {
-      await ackSafe(envelope);
       return;
     }
     // The approval card's buttons are the native answer surface: log the
     // arrival — without it a click that never arrives (Slack interactivity
     // off) and a click that dies hub-side are indistinguishable.
     if (onInteractive === undefined) {
-      logger?.warn?.("slack interactive click dropped (no approval seam wired)", {
-        envelopeId: envelope.envelope_id,
-      });
-      await ackSafe(envelope);
+      logger?.warn?.(
+        "slack interactive click dropped (no approval seam wired)",
+        {
+          envelopeId: envelope.envelope_id,
+        },
+      );
       return;
     }
     if (rememberEnvelope(envelope.envelope_id)) {
@@ -278,16 +335,27 @@ export function createSlackSocketTransport(
         });
       }
     }
-    await ackSafe(envelope);
-  });
+  };
+  client.on("interactive", onInteractiveEnvelope);
+
+  const detachListeners = (): void => {
+    client.off("message", onMessage);
+    client.off("app_mention", onAppMention);
+    client.off("slash_commands", onSlashCommand);
+    client.off("interactive", onInteractiveEnvelope);
+  };
 
   return {
     start(): Promise<void> {
+      if (options.sharedClient === true) {
+        return waitForAbort(abortSignal).finally(detachListeners);
+      }
       // The loop resolves only when the account aborts — the transport's
       // lifetime is over, so tear down the SocketModeClient: its internal
       // auto-reconnect keeps the socket alive across socket closes until
       // disconnected, and would otherwise hold the host process open.
-      const stopClient = (): Promise<void> => stopSlackSocketClient(client, logger);
+      const stopClient = (): Promise<void> =>
+        stopSlackSocketClient(client, logger);
       return runSlackSocketReconnectLoop({
         startSession: async (): Promise<void> => {
           await client.start();
@@ -296,9 +364,19 @@ export function createSlackSocketTransport(
           waitSocketDisconnect(client, abortSignal),
         signal: abortSignal,
         ...(logger !== undefined ? { logger } : {}),
-      }).finally(stopClient);
+      }).finally(async () => {
+        detachListeners();
+        await stopClient();
+      });
     },
   };
+}
+
+function waitForAbort(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) =>
+    signal.addEventListener("abort", () => resolve(), { once: true }),
+  );
 }
 
 /** Wait for the socket client's `disconnected`, or the account abort. */

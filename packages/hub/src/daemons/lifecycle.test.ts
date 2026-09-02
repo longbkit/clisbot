@@ -49,7 +49,7 @@ describe("durable Hub action acknowledgement state", () => {
     await database.insertAgentExecution({
       id: executionId,
       organizationId: "organization-lifecycle-log",
-      projectId: "project-lifecycle-log",
+      workflowId: "project-lifecycle-log",
       machineId: null,
       daemonId: daemon.id,
       triggerContext: {},
@@ -109,7 +109,7 @@ describe("durable Hub action acknowledgement state", () => {
     const run = (
       await database.createAcceptedTriggerRun({
         organizationId: "org-workflow-terminal",
-        projectId: "project-workflow-terminal",
+        workflowId: "project-workflow-terminal",
         configurationRevisionId: "revision-workflow-terminal",
         providerEventReceiptId: "receipt-workflow-terminal",
         configuredTriggerName: "terminal",
@@ -125,7 +125,7 @@ describe("durable Hub action acknowledgement state", () => {
     const execution = await database.insertAgentExecution({
       id: "00000000-0000-4000-8000-0000000000dd",
       organizationId: run.organizationId,
-      projectId: run.projectId,
+      workflowId: run.workflowId,
       machineId: null,
       daemonId: DAEMON_ID,
       triggerContext: run.triggerContext,
@@ -250,7 +250,7 @@ async function acknowledgementFixture() {
   await database.insertAgentExecution({
     id: EXECUTION_ID,
     organizationId: "org-ack-test",
-    projectId: "project-ack-test",
+    workflowId: "project-ack-test",
     machineId: null,
     daemonId: DAEMON_ID,
     triggerContext: {},

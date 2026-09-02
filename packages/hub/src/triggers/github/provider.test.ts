@@ -3,7 +3,7 @@ import { describe, it } from "vitest";
 import { Octokit } from "octokit";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { DurableProviderEvent } from "../../db/types.js";
-import { createActiveProjectConfiguration } from "../../test-utils/project-configuration.js";
+import { createActiveWorkflowConfiguration } from "../../test-utils/project-configuration.js";
 import { createDurableWorkflowHandler } from "../../workflows/engine.js";
 import type { GitHubReactionClient } from "./provider.js";
 import { createGitHubReactionClient, createGitHubTriggerProvider } from "./provider.js";
@@ -14,13 +14,13 @@ import { createUnlimitedEntitlementsService } from "../../entitlements/test-util
 
 describe("GitHub Phase 1 trigger provider", () => {
   it("normalizes typed inputs identically at the provider boundary", async () => {
-    const { project, revision, store } = await activeConfiguration(inputConfiguration());
-    const provider = createProvider(store, new TestReactions());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputConfiguration());
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
 
     const match = (
       await provider.match(
         external(
-          project.id,
+          workflow.id,
           revision.id,
           createEvent({ body: "@paseo repo=hub agent=opus investigate" }),
         ),
@@ -36,13 +36,13 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("parses typed inputs after a matched contains marker in leading prose", async () => {
-    const { project, revision, store } = await activeConfiguration(inputConfiguration());
-    const provider = createProvider(store, new TestReactions());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputConfiguration());
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
 
     const match = (
       await provider.match(
         external(
-          project.id,
+          workflow.id,
           revision.id,
           createEvent({ body: "please @paseo repo=hub agent=opus investigate" }),
         ),
@@ -58,12 +58,12 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("preserves the complete comment when the marker is last", async () => {
-    const { project, revision, store } = await activeConfiguration();
-    const provider = createProvider(store, new TestReactions());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
     const prompt = "Do the whole thing first @paseo";
 
     const match = (
-      await provider.match(external(project.id, revision.id, createEvent({ body: prompt })))
+      await provider.match(external(workflow.id, revision.id, createEvent({ body: prompt })))
     )[0];
 
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
@@ -71,17 +71,17 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("matches a literal one-step prompt only after the security filters pass", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const reactions = new TestReactions();
-    const provider = createProvider(store, reactions);
-    const match = (await provider.match(external(project.id, revision.id, createEvent())))[0];
+    const provider = createProvider(configurationForWorkflow, reactions);
+    const match = (await provider.match(external(workflow.id, revision.id, createEvent())))[0];
 
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     assert.equal(match.configurationRevisionId, revision.id);
     assert.equal(reactions.created.length, 0);
 
     const wrongActor = await provider.match(
-      external(project.id, revision.id, createEvent({ actor: "untrusted" })),
+      external(workflow.id, revision.id, createEvent({ actor: "untrusted" })),
     );
     assert.equal(wrongActor, "trigger_filters_rejected");
   });
@@ -95,8 +95,8 @@ describe("GitHub Phase 1 trigger provider", () => {
         on: "github.issue_created",
       },
     ];
-    const { project, revision, store } = await activeConfiguration(configuration);
-    const provider = createProvider(store, new TestReactions());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
     const event: NormalizedGitHubEvent = {
       ...createEvent(),
       type: "issues",
@@ -112,7 +112,7 @@ describe("GitHub Phase 1 trigger provider", () => {
       },
     };
 
-    const matches = await provider.match(external(project.id, revision.id, event));
+    const matches = await provider.match(external(workflow.id, revision.id, event));
     assert.equal(typeof matches === "string" ? 0 : matches.length, 1);
   });
 
@@ -124,10 +124,10 @@ describe("GitHub Phase 1 trigger provider", () => {
   ] as const)("derives an item reaction target for %s %s", async (type, action, source, number) => {
     const configuration = githubConfiguration();
     configuration.triggers[0] = { ...configuration.triggers[0]!, on: source };
-    const { project, revision, store } = await activeConfiguration(configuration);
-    const provider = createProvider(store, new TestReactions());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
     const matches = await provider.match(
-      external(project.id, revision.id, createItemEvent(type, action, number)),
+      external(workflow.id, revision.id, createItemEvent(type, action, number)),
     );
     if (typeof matches === "string") throw new Error("expected item match");
 
@@ -148,11 +148,11 @@ describe("GitHub Phase 1 trigger provider", () => {
         ...configuration.triggers[0]!,
         on: "github.pull_request_created",
       };
-      const { project, revision, store } = await activeConfiguration(configuration);
+      const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
       const reactions = new TestReactions();
-      const provider = createProvider(store, reactions);
+      const provider = createProvider(configurationForWorkflow, reactions);
       const matches = await provider.match(
-        external(project.id, revision.id, createItemEvent("pull_request", "opened", 312)),
+        external(workflow.id, revision.id, createItemEvent("pull_request", "opened", 312)),
       );
       if (typeof matches === "string") throw new Error("expected pull request match");
       const match = matches[0]!;
@@ -240,14 +240,14 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("exposes safe issue and pull-request item context without the raw webhook", async () => {
-    const { project, revision, store } = await activeConfiguration();
-    const provider = createProvider(store, new TestReactions());
-    const issueMatch = (await provider.match(external(project.id, revision.id, createEvent())))[0];
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
+    const issueMatch = (await provider.match(external(workflow.id, revision.id, createEvent())))[0];
     if (!isAcceptedTriggerProviderMatch(issueMatch)) throw new Error("expected issue match");
     const issueContext = await provider.materializeContext?.({
       executionId: "github-issue-context",
       organizationId: "org_1",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111111",
       triggerContext: issueMatch.triggerContext,
     });
@@ -271,13 +271,13 @@ describe("GitHub Phase 1 trigger provider", () => {
     assert.equal(JSON.stringify(issueContext).includes("comment-credential"), false);
 
     const prMatch = (
-      await provider.match(external(project.id, revision.id, createEvent({ pullRequest: true })))
+      await provider.match(external(workflow.id, revision.id, createEvent({ pullRequest: true })))
     )[0];
     if (!isAcceptedTriggerProviderMatch(prMatch)) throw new Error("expected pull request match");
     const prContext = await provider.materializeContext?.({
       executionId: "github-pr-context",
       organizationId: "org_1",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111112",
       triggerContext: prMatch.triggerContext,
     });
@@ -288,17 +288,17 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("does not materialize a GitHub credential for a GitHub trigger", async () => {
-    const { store } = await activeConfiguration();
-    const provider = createProvider(store, new TestReactions());
+    const { configurationForWorkflow } = await activeConfiguration();
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
 
     assert.equal("materializeLaunch" in provider, false);
   });
 
   it("preserves lifecycle reactions and reply-capability configuration", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const reactions = new TestReactions();
-    const provider = createProvider(store, reactions);
-    const match = (await provider.match(external(project.id, revision.id, createEvent())))[0];
+    const provider = createProvider(configurationForWorkflow, reactions);
+    const match = (await provider.match(external(workflow.id, revision.id, createEvent())))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     const reactionState =
       (await provider.onDispatchAccepted?.(match.triggerContext, match.outputContext)) ?? null;
@@ -315,10 +315,10 @@ describe("GitHub Phase 1 trigger provider", () => {
   });
 
   it("replaces GitHub in-progress reactions on terminal failure at the event target", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const reactions = new TestReactions();
-    const provider = createProvider(store, reactions);
-    const match = (await provider.match(external(project.id, revision.id, createEvent())))[0];
+    const provider = createProvider(configurationForWorkflow, reactions);
+    const match = (await provider.match(external(workflow.id, revision.id, createEvent())))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     const reactionState =
@@ -348,9 +348,9 @@ describe("GitHub Phase 1 trigger provider", () => {
 
   it("hands every matching configured GitHub trigger to the durable fan-out boundary", async () => {
     const database = createMemoryDatabase();
-    const { project, revision, store } = await activeFanoutConfiguration(database);
-    const provider = createProvider(store, new TestReactions());
-    const matches = await provider.match(external(project.id, revision.id, createEvent()));
+    const { workflow, revision, configurationForWorkflow } = await activeFanoutConfiguration(database);
+    const provider = createProvider(configurationForWorkflow, new TestReactions());
+    const matches = await provider.match(external(workflow.id, revision.id, createEvent()));
     if (typeof matches === "string") throw new Error("expected matches");
     assert.deepEqual(
       matches.map((match) => match.triggerName),
@@ -377,7 +377,7 @@ describe("GitHub Phase 1 trigger provider", () => {
     const trigger = {
       providerEventReceiptId: "github-fanout-trigger",
       organizationId: "org_1",
-      projectId: project.id,
+      workflowId: workflow.id,
       configurationRevisionId: revision.id,
       source: "github.issue_comment",
       deliveryId: "github-fanout-delivery",
@@ -414,17 +414,17 @@ describe("GitHub Phase 1 trigger provider", () => {
 });
 
 function createProvider(
-  store: Awaited<ReturnType<typeof activeConfiguration>>["store"],
+  configurationForWorkflow: Awaited<ReturnType<typeof activeConfiguration>>["configurationForWorkflow"],
   reactions: TestReactions,
 ) {
   return createGitHubTriggerProvider({
-    configurationStoreForProject: () => store,
+    configurationForWorkflow,
     reactions,
   });
 }
 
 async function activeConfiguration(rawConfiguration = githubConfiguration()) {
-  return createActiveProjectConfiguration(createMemoryDatabase(), rawConfiguration);
+  return createActiveWorkflowConfiguration(createMemoryDatabase(), rawConfiguration);
 }
 
 function inputConfiguration() {
@@ -460,7 +460,7 @@ async function activeFanoutConfiguration(database: ReturnType<typeof createMemor
     name: "github-mention-secondary",
     steps: [{ ...first.steps[0]!, id: "github-step-secondary" }],
   });
-  return createActiveProjectConfiguration(database, configuration);
+  return createActiveWorkflowConfiguration(database, configuration);
 }
 
 function githubConfiguration() {
@@ -497,14 +497,14 @@ function githubConfiguration() {
 }
 
 function external(
-  projectId: string,
+  workflowId: string,
   configurationRevisionId: string,
   payload: NormalizedGitHubEvent,
 ) {
   return {
     providerEventReceiptId: "11111111-1111-4111-8111-111111111119",
     organizationId: "org_1",
-    projectId,
+    workflowId,
     configurationRevisionId,
     source: `github.${payload.type}`,
     deliveryId: payload.id,

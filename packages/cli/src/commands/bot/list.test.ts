@@ -89,13 +89,13 @@ describe("buildBotListEntry", () => {
       manifest({
         channel: "slack",
         account: "work",
-        credentials: { "slack:work": { persisted: false } },
+        credentials: { "slack:work": { persisted: true } },
       }),
       LIVE,
     );
     assert.equal(entry.running, false);
     assert.equal(entry.transport, undefined);
-    assert.equal(entry.credential, "runtime-only");
+    assert.equal(entry.credential, "persisted");
   });
 });
 
@@ -112,7 +112,7 @@ describe("runBotListCommand", () => {
           channel: "slack",
           account: "work",
           agentId: "ag-2",
-          credentials: { "slack:work": { persisted: false } },
+          credentials: { "slack:work": { persisted: true } },
         }),
       );
       const result = await runBotListCommand({ home, hub: target.origin }, undefined as never);
@@ -123,7 +123,7 @@ describe("runBotListCommand", () => {
       assert.equal(telegram?.running, true);
       assert.equal(slack?.name, "slack-bot");
       assert.equal(slack?.running, false);
-      assert.equal(slack?.credential, "runtime-only");
+      assert.equal(slack?.credential, "persisted");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

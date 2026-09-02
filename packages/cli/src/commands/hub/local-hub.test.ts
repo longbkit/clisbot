@@ -13,8 +13,10 @@ import {
   AlreadyRunningError,
   getLocalHubStatus,
   isProcessRunning,
+  localHubMasterKeyPath,
   readDaemonPasswordFile,
   readHubStateFile,
+  readOrCreateLocalHubMasterKey,
   resolveHubPort,
   resolveLocalHubHome,
   resolveLocalHubState,
@@ -199,6 +201,37 @@ describe("readDaemonPasswordFile", () => {
   });
 });
 
+describe("local Hub credential master key", () => {
+  test("creates one stable private key outside the Hub data directory", async () => {
+    const home = await createHome();
+    const keyPath = localHubMasterKeyPath(home);
+
+    const first = readOrCreateLocalHubMasterKey(home);
+    const second = readOrCreateLocalHubMasterKey(home);
+
+    expect(first).toBe(second);
+    expect(Buffer.from(first, "base64")).toHaveLength(32);
+    expect(path.dirname(keyPath)).toBe(path.dirname(home));
+    expect(keyPath.startsWith(`${home}${path.sep}`)).toBe(false);
+    if (process.platform !== "win32") {
+      expect(fs.statSync(keyPath).mode & 0o777).toBe(0o600);
+    }
+  });
+
+  test("rejects a malformed existing key", async () => {
+    const home = await createHome();
+    writeFileSync(localHubMasterKeyPath(home), "not-a-key\n");
+    expect(() => readOrCreateLocalHubMasterKey(home)).toThrow(/malformed/);
+  });
+
+  test("places the key outside an explicit Hub data directory", async () => {
+    const home = await createHome();
+    const dataDirectory = path.dirname(home);
+    const keyPath = localHubMasterKeyPath(home, dataDirectory);
+    expect(keyPath.startsWith(`${dataDirectory}${path.sep}`)).toBe(false);
+  });
+});
+
 describe("startLocalHubDetached", () => {
   test("spawns the fork bin detached and records hub-local.json at loopback :6868", async () => {
     const home = await createHome();
@@ -215,6 +248,12 @@ describe("startLocalHubDetached", () => {
     expect(launch?.options?.detached).toBe(true);
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6868");
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_BIND).toBe("127.0.0.1");
+    expect(
+      Buffer.from(
+        (launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_CREDENTIAL_MASTER_KEY ?? "",
+        "base64",
+      ),
+    ).toHaveLength(32);
 
     expect(readHubStateFile(home)).toMatchObject({
       url: "http://127.0.0.1:6868",

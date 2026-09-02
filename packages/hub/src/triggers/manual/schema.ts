@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const ManualTriggerPayloadSchema = z.object({
   organizationId: z.string().min(1, "organizationId is required"),
-  projectId: z.string().uuid("projectId is required"),
+  triggerId: z.string().uuid("triggerId is required"),
+  triggerRevisionId: z.string().uuid("triggerRevisionId is required"),
   connectionId: z.string().uuid().nullable().optional(),
   resourceId: z.string().nullable().optional(),
   source: z

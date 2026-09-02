@@ -68,7 +68,11 @@ export interface KeyedStoreTtlOptions {
  * JSON-file store (implementation doc §4.2). */
 export interface HostKeyedStore<T = unknown> {
   register(key: string, value: T, opts?: KeyedStoreTtlOptions): Promise<void>;
-  registerIfAbsent(key: string, value: T, opts?: KeyedStoreTtlOptions): Promise<boolean>;
+  registerIfAbsent(
+    key: string,
+    value: T,
+    opts?: KeyedStoreTtlOptions,
+  ): Promise<boolean>;
   update(
     key: string,
     updateValue: (current: T | undefined) => T | undefined,
@@ -163,6 +167,10 @@ export interface StartAccountContext {
   cfg: Record<string, unknown>;
   runtime: ChannelAccountRuntimeEnv;
   channelRuntime?: Record<string, unknown>;
+  /** Account-scoped runtime supplied directly by the in-process Hub adapter.
+   * The module-global setter remains a compatibility fallback only; it cannot
+   * isolate concurrent accounts loaded from one cached ESM module. */
+  hostRuntime?: HostRuntime;
   abortSignal: AbortSignal;
   setStatus: (status: unknown) => void;
   getStatus: () => unknown;

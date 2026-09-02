@@ -185,22 +185,22 @@ export function createPublicOperations(
     },
     async dispatchManualRun(authorization, input) {
       try {
-        const project = await repository.resolveManualRunProject(
+        const workflow = await repository.resolveManualRunWorkflow(
           authorization.organizationId,
           input.trigger,
-          input.projectSlug,
         );
-        if (project === undefined) return { status: "project_not_found" };
-        if (project.status === "disabled") return { status: "trigger_not_found" };
+        if (workflow === undefined || workflow.status === "disabled") {
+          return { status: "trigger_not_found" };
+        }
         let result: DispatchManualRunResult;
         try {
           result = await dispatchManualRun(
             repository,
             capabilities,
             authorization,
-            project.id,
+            workflow,
             input,
-            internalDeliveryId(authorization.organizationId, project.id, input.deliveryKey),
+            internalDeliveryId(authorization.organizationId, workflow.id, input.deliveryKey),
           );
         } catch (error) {
           if (error instanceof ManualRunRejected) result = { status: error.code };
@@ -244,13 +244,14 @@ async function dispatchManualRun(
     kind: "apiKey" | "cliCredential";
     credentialId: string;
   },
-  projectId: string,
+  workflow: { id: string; revisionId: string },
   input: DispatchManualRunInput,
   deliveryId: string,
 ): Promise<DispatchManualRunResult> {
   const outcome = await capabilities.dispatchManualEvent({
     organizationId: authorization.organizationId,
-    projectId,
+    triggerId: workflow.id,
+    triggerRevisionId: workflow.revisionId,
     source: "manual.run",
     deliveryId,
     receivedAt: new Date(),
@@ -361,11 +362,11 @@ async function resolveConfigurationDeployment(
 
 function internalDeliveryId(
   organizationId: string,
-  projectId: string,
+  workflowId: string,
   deliveryKey: string,
 ): string {
   return `public-manual-${createHash("sha256")
-    .update([organizationId, projectId, deliveryKey].map((part) => JSON.stringify(part)).join(":"))
+    .update([organizationId, workflowId, deliveryKey].map((part) => JSON.stringify(part)).join(":"))
     .digest("base64url")}`;
 }
 

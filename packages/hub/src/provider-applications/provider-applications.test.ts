@@ -155,7 +155,7 @@ describe("provider applications", () => {
     fixture.runtime.block("github");
     const save = fixture.applications.verifyAndSave(request("POST"), "github", githubConfiguration);
     await fixture.runtime.waitUntilPrepared("github");
-    const connect = fixture.applications.beginConnection(request("POST"), "github", "org");
+    const connect = fixture.applications.beginConnection(request("POST"), "github", "42", "org");
     let connectError: unknown;
     const observedConnect = connect.catch((error: unknown) => {
       connectError = error;
@@ -259,7 +259,7 @@ describe("provider applications", () => {
     );
   });
 
-  it("refuses a changed environment-managed identity when restarting with existing connections", async () => {
+  it("allows an environment-managed app alongside connections owned by another app", async () => {
     const fixture = createFixture();
     await fixture.store.save({
       provider: "github",
@@ -280,8 +280,8 @@ describe("provider applications", () => {
       callbackOrigin: "https://hub.test",
     });
 
-    assert.equal(failures[0]?.provider, "github");
-    assert.equal(fixture.runtime.active("github"), undefined);
+    assert.deepEqual(failures, []);
+    assert.equal(fixture.runtime.active("github")?.configurationId, "84");
   });
 
   it("allows a same-identity environment secret rotation when restarting with connections", async () => {
@@ -407,7 +407,12 @@ describe("provider applications", () => {
     const fixture = createFixture({ environment: { linear: linearConfiguration } });
 
     await assert.rejects(
-      fixture.applications.beginConnection(request("POST", "http://hub.test"), "linear", "org"),
+      fixture.applications.beginConnection(
+        request("POST", "http://hub.test"),
+        "linear",
+        "linear-client",
+        "org",
+      ),
       (error: unknown) =>
         error instanceof ProviderApplicationError &&
         error.code === "httpsRequired" &&
@@ -531,9 +536,9 @@ describe("provider applications", () => {
     const fixture = createFixture();
     await fixture.applications.verifyAndSave(request("POST"), "github", githubConfiguration);
 
-    await fixture.applications.beginConnection(request("POST"), "github", "org", "appSetup");
-    await fixture.applications.beginConnection(request("POST"), "github", "org", "apps");
-    await fixture.applications.beginConnection(request("POST"), "github", "org");
+    await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "appSetup");
+    await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "apps");
+    await fixture.applications.beginConnection(request("POST"), "github", "42", "org");
 
     assert.deepEqual(fixture.returnRoutes, ["/", "/apps", "/apps"]);
   });
@@ -699,9 +704,15 @@ class MemoryStore implements ProviderApplicationStore {
     this.failSlackCompletion = true;
   }
 
-  read(provider: Provider) {
+  read(provider: Provider, _providerApplicationId: string) {
     this.reads += 1;
     return Promise.resolve(this.values.get(provider));
+  }
+
+  list(provider: Provider) {
+    this.reads += 1;
+    const value = this.values.get(provider);
+    return Promise.resolve(value === undefined ? [] : [value]);
   }
 
   readAll() {

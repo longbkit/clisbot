@@ -79,7 +79,11 @@ export interface StoredProviderApplication {
 }
 
 export interface ProviderApplicationStore {
-  read(provider: Provider): Promise<StoredProviderApplication | undefined>;
+  read(
+    provider: Provider,
+    providerApplicationId: string,
+  ): Promise<StoredProviderApplication | undefined>;
+  list(provider: Provider): Promise<readonly StoredProviderApplication[]>;
   readAll(): Promise<readonly StoredProviderApplication[]>;
   save(input: {
     provider: Provider;
@@ -138,7 +142,10 @@ export interface ProviderRuntimeOwner {
       activateConfiguration: boolean;
     },
   ): Promise<ProviderRuntimeCandidate>;
-  identity?(provider: Provider): ProviderApplicationIdentity | undefined;
+  identity?(
+    provider: Provider,
+    providerApplicationId: string,
+  ): ProviderApplicationIdentity | undefined;
   onSlackInstallation?(
     handler: (input: {
       configuration: unknown;
@@ -176,7 +183,10 @@ export interface ConnectedProviderIdentity {
 }
 
 export interface ProviderApplicationInventory {
-  connectedIdentities(provider: Provider): Promise<readonly ConnectedProviderIdentity[]>;
+  connectedIdentities(
+    provider: Provider,
+    providerApplicationId?: string,
+  ): Promise<readonly ConnectedProviderIdentity[]>;
   /** Durably assigns pre-feature, unowned connections before their environment runtime publishes. */
   claimLegacyConnections(
     provider: Provider,
@@ -218,6 +228,7 @@ export interface ProviderApplicationView {
 export interface ProviderApplicationOverview {
   callbackOrigin: string;
   providers: Record<Provider, ProviderApplicationView>;
+  applications: Record<Provider, readonly ProviderApplicationView[]>;
 }
 
 export interface ProviderApplicationResult {
@@ -336,6 +347,7 @@ export interface ProviderApplications {
   beginConnection(
     request: Request,
     provider: Provider,
+    providerApplicationId: string,
     organizationId: string,
     surface?: ProviderApplicationSurface,
   ): Promise<{ url: string }>;
@@ -343,7 +355,7 @@ export interface ProviderApplications {
     request: Request,
     input: { appToken: string; botToken: string; expectedVersion?: number },
   ): Promise<ProviderApplicationResult>;
-  retrySlackSocket(request: Request): Promise<void>;
+  retrySlackSocket(request: Request, providerApplicationId: string): Promise<void>;
 }
 
 interface ProviderApplicationsOptions {
@@ -364,7 +376,10 @@ interface ProviderApplicationsOptions {
     begin: (request: Request) => Promise<{ url: string }>,
   ) => Promise<{ url: string }>;
   slackSocketVerifier?: SlackSocketInstallationVerifier;
-  slackDelivery?: { status(): SlackDeliveryStatus; retry(): Promise<void> };
+  slackDelivery?: {
+    status(providerApplicationId?: string): SlackDeliveryStatus;
+    retry(providerApplicationId?: string): Promise<void>;
+  };
 }
 
 export function createProviderApplications(
@@ -382,20 +397,26 @@ export function createProviderApplications(
     async overview(request) {
       await requireOperator(options, request);
       const callbackOrigin = await safeCallbackOrigin(options, request);
-      const stored = new Map(
-        (await options.store.readAll()).map((value) => [value.provider, value]),
-      );
+      const stored = await options.store.readAll();
       const entries = await Promise.all(
         // eslint-disable-next-line complexity -- this is the single projection of provider state.
         PROVIDERS.map(async (provider) => {
           const environment = options.environment[provider];
-          const persisted = stored.get(provider);
+          const persisted = stored.find((application) => application.provider === provider);
           const resolved = environment ?? persisted?.configuration;
           const connections = await options.inventory.connectedIdentities(provider);
-          const identity = options.runtime.identity?.(provider) ?? persisted?.identity ?? null;
+          const identity =
+            (persisted === undefined
+              ? undefined
+              : options.runtime.identity?.(provider, persisted.identity.id)) ??
+            persisted?.identity ??
+            null;
           const status = providerStatus(environment !== undefined, identity, connections);
           const configurationVersion = environment === undefined ? (persisted?.version ?? null) : 0;
-          const deliveryStatus = provider === "slack" ? options.slackDelivery?.status() : undefined;
+          const deliveryStatus =
+            provider === "slack"
+              ? options.slackDelivery?.status(identity?.id ?? undefined)
+              : undefined;
           const view: ProviderApplicationView = {
             provider,
             status,
@@ -426,7 +447,54 @@ export function createProviderApplications(
       ) {
         throw new Error("provider overview is incomplete");
       }
-      return { callbackOrigin, providers: { github, slack, discord, linear } };
+      const applications: Record<Provider, ProviderApplicationView[]> = {
+        github: [],
+        slack: [],
+        discord: [],
+        linear: [],
+      };
+      for (const provider of PROVIDERS) {
+        applications[provider] = await Promise.all(
+          stored
+            .filter((application) => application.provider === provider)
+            .map(async (application) => {
+              const connections = await options.inventory.connectedIdentities(
+                provider,
+                application.identity.id,
+              );
+              const identity =
+                options.runtime.identity?.(provider, application.identity.id) ??
+                application.identity;
+              const view: ProviderApplicationView = {
+                provider,
+                status: providerStatus(false, identity, connections),
+                managedByEnvironment: false,
+                identifiers: publicIdentifiers(application.configuration),
+                identity,
+                connections,
+                eventsConfigured: acceptsEvents(application.configuration),
+                lastEventAt:
+                  provider === "discord"
+                    ? null
+                    : ((
+                        await options.inventory.lastEventAt(provider, identity, application.version)
+                      )?.toISOString() ?? null),
+                replaceable: connections.length === 0,
+                configurationVersion: application.version,
+              };
+              if (provider === "slack") {
+                const deliveryStatus = options.slackDelivery?.status(application.identity.id);
+                if (deliveryStatus !== undefined) view.deliveryStatus = deliveryStatus;
+              }
+              return view;
+            }),
+        );
+      }
+      return {
+        callbackOrigin,
+        providers: { github, slack, discord, linear },
+        applications,
+      };
     },
 
     async verifyAndSave(request, provider, input, surface) {
@@ -463,20 +531,21 @@ export function createProviderApplications(
       });
     },
 
-    async beginConnection(request, provider, organizationId, surface) {
+    async beginConnection(request, provider, providerApplicationId, organizationId, surface) {
       rejectMutation(options, request);
       await requireOperator(options, request);
       const callbackOrigin = await safeCallbackOrigin(options, request);
       if (provider === "linear") requireHttpsOrigin(callbackOrigin);
       return serialize(queues, provider, async () => {
-        const stored = await options.store.read(provider);
+        const stored = await options.store.read(provider, providerApplicationId);
         const configuration = options.environment[provider] ?? stored?.configuration;
         if (configuration === undefined || options.beginCandidateConnection === undefined) {
           throw new ProviderApplicationError("invalidInput");
         }
         const configurationVersion =
           options.environment[provider] === undefined ? stored!.version : 0;
-        const identity = options.runtime.identity?.(provider) ?? stored?.identity;
+        const identity =
+          options.runtime.identity?.(provider, providerApplicationId) ?? stored?.identity;
         if (identity === undefined) throw new ProviderApplicationError("invalidInput");
         let candidate: ProviderRuntimeCandidate | undefined;
         try {
@@ -579,13 +648,13 @@ export function createProviderApplications(
         }
       });
     },
-    async retrySlackSocket(request) {
+    async retrySlackSocket(request, providerApplicationId) {
       rejectMutation(options, request);
       await requireOperator(options, request);
       if (options.slackDelivery === undefined) {
         throw new ProviderApplicationError("invalidInput");
       }
-      await options.slackDelivery.retry();
+      await options.slackDelivery.retry(providerApplicationId);
     },
   };
 }
@@ -769,58 +838,43 @@ export async function activateProviderApplicationsAtStartup(options: {
   callbackOrigin: string;
 }): Promise<readonly { provider: Provider; error: unknown }[]> {
   const failures: { provider: Provider; error: unknown }[] = [];
-  const storedProviders = new Map(
-    (await options.store.readAll()).map((configuration) => [configuration.provider, configuration]),
-  );
+  const storedProviders = await options.store.readAll();
   for (const provider of PROVIDERS) {
     const environmentConfiguration = options.environment[provider];
-    const stored = storedProviders.get(provider);
-    const configuration = environmentConfiguration ?? stored?.configuration;
-    if (configuration === undefined) continue;
-    try {
-      const identity = await startupIdentity(
-        provider,
-        environmentConfiguration,
-        stored,
-        options.verifier,
-      );
-      const connections = await options.inventory.connectedIdentities(provider);
-      const claimLegacyConnections =
-        stored === undefined &&
-        connections.length > 0 &&
-        connections.every((connection) => connection.applicationId === null);
-      if (
-        identityConflictsWithConnections(identity, stored, connections) &&
-        !claimLegacyConnections
-      ) {
-        throw new ProviderApplicationError("identityConflict", stored?.identity.name);
-      }
-      let candidate: ProviderRuntimeCandidate | undefined;
+    const persisted = storedProviders.filter((application) => application.provider === provider);
+    const applications =
+      environmentConfiguration === undefined
+        ? persisted.map((stored) => ({ configuration: stored.configuration, stored }))
+        : [{ configuration: environmentConfiguration, stored: undefined }];
+    for (const application of applications) {
       try {
-        const configurationVersion = environmentConfiguration === undefined ? stored!.version : 0;
-        candidate = await options.runtime.prepare(
+        const identity = await startupIdentity(
           provider,
-          configuration,
-          options.callbackOrigin,
-          identity,
-          configurationVersion,
+          environmentConfiguration,
+          application.stored,
+          options.verifier,
         );
-        await candidate.start();
-        if (
-          claimLegacyConnections &&
-          !(await options.inventory.claimLegacyConnections(provider, identity))
-        ) {
-          throw new ProviderApplicationError("identityConflict");
+        let candidate: ProviderRuntimeCandidate | undefined;
+        try {
+          const configurationVersion = application.stored?.version ?? 0;
+          candidate = await options.runtime.prepare(
+            provider,
+            application.configuration,
+            options.callbackOrigin,
+            identity,
+            configurationVersion,
+          );
+          await candidate.start();
+          await options.store.activate({ provider, identity, configurationVersion });
+          candidate.publish();
+          candidate = undefined;
+        } catch (error) {
+          await closeCandidate(candidate, provider, "activate_at_startup");
+          throw error;
         }
-        await options.store.activate({ provider, identity, configurationVersion });
-        candidate.publish();
-        candidate = undefined;
       } catch (error) {
-        await closeCandidate(candidate, provider, "activate_at_startup");
-        throw error;
+        failures.push({ provider, error });
       }
-    } catch (error) {
-      failures.push({ provider, error });
     }
   }
   return failures;
@@ -867,7 +921,7 @@ async function beginSlackConfiguration(
   returnRoute: string,
 ): Promise<ProviderApplicationContinuation> {
   requireHttpsOrigin(callbackOrigin);
-  const previous = await options.store.read("slack");
+  const previous = await options.store.read("slack", input.appId);
   if (previous?.version !== input.expectedVersion) {
     throw new ProviderApplicationError("configurationConflict");
   }
@@ -923,7 +977,7 @@ async function beginLinearConfiguration(
   returnRoute: string,
 ): Promise<ProviderApplicationContinuation> {
   requireHttpsOrigin(callbackOrigin);
-  const previous = await options.store.read("linear");
+  const previous = await options.store.read("linear", input.clientId);
   if (previous?.version !== input.expectedVersion) {
     throw new ProviderApplicationError("configurationConflict");
   }
@@ -984,8 +1038,8 @@ async function verifyAndActivateProvider(
     throw new ProviderApplicationError("internal", undefined, { cause: error });
   }
   if (identity.provider !== provider) throw new ProviderApplicationError("credentialsRejected");
-  const previous = await options.store.read(provider);
-  const connections = await options.inventory.connectedIdentities(provider);
+  const previous = await options.store.read(provider, identity.id);
+  const connections = await options.inventory.connectedIdentities(provider, identity.id);
   if (identityConflictsWithConnections(identity, previous, connections)) {
     throw new ProviderApplicationError("identityConflict", previous?.identity.name);
   }
@@ -1065,13 +1119,13 @@ async function completeSlackInstallation(
   if (configuration.provider !== "slack" || configuration.appId !== input.installation.appId) {
     throw new ProviderApplicationError("credentialsRejected");
   }
-  const previous = await options.store.read("slack");
-  const connections = await options.inventory.connectedIdentities("slack");
+  const previous = await options.store.read("slack", input.installation.appId);
   const identity: ProviderApplicationIdentity = {
     provider: "slack",
     id: input.installation.appId,
     name: input.installation.appId,
   };
+  const connections = await options.inventory.connectedIdentities("slack", identity.id);
   if (identityConflictsWithConnections(identity, previous, connections)) {
     throw new ProviderApplicationError("identityConflict", previous?.identity.name);
   }
@@ -1118,8 +1172,11 @@ async function completeLinearInstallation(
   ) {
     throw new ProviderApplicationError("credentialsRejected");
   }
-  const previous = await options.store.read("linear");
-  const connections = await options.inventory.connectedIdentities("linear");
+  const previous = await options.store.read("linear", input.binding.providerApplicationId);
+  const connections = await options.inventory.connectedIdentities(
+    "linear",
+    input.binding.providerApplicationId,
+  );
   const identity: ProviderApplicationIdentity = {
     provider: "linear",
     id: configuration.clientId,

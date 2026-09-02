@@ -8,6 +8,7 @@
 // flows through this same consumer to the approval engine — the relay and the
 // approvals are two handlers on one stream path, never two consumers.
 import type { ChannelStore } from "../../db/channels.js";
+import { isHubFinishExecutionToolName } from "../../hub/protocol.js";
 import type { EffectiveDefaults } from "../config/compile.js";
 import type { AgentStreamTimelineItem } from "../daemon/types.js";
 import type { RelayedStreamEvent, SubagentStreamEvent } from "../plane/stream.js";
@@ -94,6 +95,10 @@ interface TurnState {
   pendingAssistantText: string;
   /** The `messageId` of the in-flight assistant message (undefined = none open). */
   pendingAssistantMessageId: string | undefined;
+  /** Message ids already closed and posted before a terminal tool event. */
+  postedAssistantMessageIds: Set<string>;
+  /** Exact assistant payloads already closed in this turn (guards id drift/replay). */
+  postedAssistantTexts: Set<string>;
   /** Clock time of the last posted progress snapshot (the throttle cursor). */
   lastProgressAt: number | null;
   /** Ledger sequence counter for this turn's relay posts, in order. */
@@ -330,6 +335,7 @@ export class RelayEngine {
     if (text === "") return;
     const turn = this.turn(stream, key);
     const messageId = item.messageId;
+    if (messageId !== undefined && turn.postedAssistantMessageIds.has(messageId)) return;
     if (turn.pendingAssistantText !== "" && turn.pendingAssistantMessageId !== messageId) {
       await this.postAssistantMessage(stream, key, sync, prefix, false);
     }
@@ -355,13 +361,17 @@ export class RelayEngine {
     const turn = stream.turns.get(key);
     if (turn === undefined || turn.pendingAssistantText === "") return;
     const text = turn.pendingAssistantText;
+    const messageId = turn.pendingAssistantMessageId;
     turn.pendingAssistantText = "";
     turn.pendingAssistantMessageId = undefined;
+    if (messageId !== undefined) turn.postedAssistantMessageIds.add(messageId);
     if (!sync.finalAnswers) return;
+    if (turn.postedAssistantTexts.has(text)) return;
+    turn.postedAssistantTexts.add(text);
     const caption = `${prefix}${text}`;
     // The caption posts verbatim: files leave through the explicit `send_file`
     // tool (channel-reply.ts), never through a text parse of the answer.
-    await this.post(stream, key, turn, caption, finalAnswer);
+    await this.post(stream, key, turn, caption, finalAnswer, "assistant");
   }
 
   private async onToolCall(
@@ -371,6 +381,10 @@ export class RelayEngine {
     item: AgentStreamTimelineItem,
     prefix: string,
   ): Promise<void> {
+    // `finish_execution` is Workflow control-plane plumbing, not work the
+    // user asked the Agent to perform. Keep it out of both the progress and
+    // terminal tool-call surfaces without muting useful tool visibility.
+    if (item.name !== undefined && isHubFinishExecutionToolName(item.name)) return;
     const turn = this.turn(stream, key);
     if (item.status === "running") {
       if (!sync.progress || item.name === undefined) return;
@@ -379,7 +393,7 @@ export class RelayEngine {
     }
     if (!isTerminalToolStatus(item.status)) return;
     if (!sync.toolCalls) return;
-    await this.post(stream, key, turn, `${prefix}${toolCallLine(item)}`, false);
+    await this.post(stream, key, turn, `${prefix}${toolCallLine(item)}`, false, "tool");
   }
 
   private async onTurnCompleted(stream: RelayStream, turnId: string) {
@@ -418,7 +432,7 @@ export class RelayEngine {
     const now = this.relay.clock.now();
     const lastAt = turn.lastProgressAt;
     if (lastAt !== null && now - lastAt < this.relay.progressThrottleMs) return;
-    await this.post(stream, key, turn, line, false);
+    await this.post(stream, key, turn, line, false, "progress");
     turn.lastProgressAt = this.relay.clock.now();
   }
 
@@ -430,10 +444,11 @@ export class RelayEngine {
     turn: TurnState,
     text: string,
     finalAnswer: boolean,
+    outputKind: "assistant" | "progress" | "tool",
   ) {
     const context = stream.context;
     const sync = context.route.defaults.sync;
-    const eventTurnId = ledgerTurnId(context.agentId, turnId);
+    const eventTurnId = ledgerTurnId(context.deliveryScopeId ?? context.agentId, turnId);
     // One post per recorded sequence, in order; the final answer is the turn's
     // last relay post.
     const sequence = turn.nextSequence;
@@ -455,7 +470,28 @@ export class RelayEngine {
       sequence,
     });
     if (!recorded.created) return; // replay/restart: already posted (or posted elsewhere)
+    const outputAttemptId = await context.outputDelivery?.begin();
+    if (context.outputDelivery !== undefined && outputAttemptId === undefined) {
+      await this.relay.store.failDelivery({
+        organizationId: this.relay.organizationId,
+        accountId: context.accountId,
+        externalConversationId: context.externalConversationId,
+        externalThreadId: context.externalThreadId,
+        eventTurnId,
+        sequence,
+        failureReason: "workflow output limit reached",
+      });
+      return;
+    }
     const location = replyLocationFor(context);
+    this.relay.logger.info?.("relay post started", {
+      channel: context.channel,
+      accountId: context.accountId,
+      agentId: context.agentId,
+      eventTurnId,
+      sequence,
+      outputKind,
+    });
     const result = await this.relay.post({
       channel: context.channel,
       accountId: context.accountId,
@@ -474,8 +510,19 @@ export class RelayEngine {
         externalMessageId: result.externalMessageId ?? "",
         postedAt: new Date(),
       });
+      if (outputAttemptId !== undefined) await context.outputDelivery?.complete(outputAttemptId);
+      this.relay.logger.info?.("relay post completed", {
+        channel: context.channel,
+        accountId: context.accountId,
+        agentId: context.agentId,
+        eventTurnId,
+        sequence,
+        outputKind,
+        externalMessageId: result.externalMessageId ?? "",
+      });
       return;
     }
+    if (outputAttemptId !== undefined) await context.outputDelivery?.fail(outputAttemptId);
     await this.relay.store.failDelivery({
       organizationId: this.relay.organizationId,
       accountId: context.accountId,
@@ -499,6 +546,8 @@ export class RelayEngine {
       turn = {
         pendingAssistantText: "",
         pendingAssistantMessageId: undefined,
+        postedAssistantMessageIds: new Set(),
+        postedAssistantTexts: new Set(),
         lastProgressAt: null,
         nextSequence: 0,
         closed: false,
@@ -568,8 +617,8 @@ export function appendThreadLink(
 }
 
 /** The ledger event-turn id: the agent + stream turn id (stable across replay). */
-function ledgerTurnId(agentId: string, turnId: string): string {
-  return `${agentId}:${turnId}`;
+function ledgerTurnId(scopeId: string, turnId: string): string {
+  return `${scopeId}:${turnId}`;
 }
 
 // Media is sent only through the Hub's explicit `send_file` MCP tool.

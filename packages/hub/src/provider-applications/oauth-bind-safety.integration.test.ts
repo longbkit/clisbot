@@ -10,6 +10,7 @@ import {
   type DatabaseRuntimeBundle,
 } from "../db/runtime/index.js";
 import { createDatabase } from "../db/pg.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import type { Database } from "../db/types.js";
 import { SLACK_REQUIRED_BOT_SCOPES } from "../providers/slack/client.js";
 import {
@@ -53,8 +54,9 @@ describe("provider application OAuth bind authority", () => {
 });
 
 async function rejectsStoredReplacement(bundle: DatabaseRuntimeBundle, provider: Provider) {
-  const database = createDatabase(bundle.runtime, bundle.locks);
-  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, database);
+  const cipher = createTestCredentialCipher();
+  const database = createDatabase(bundle.runtime, bundle.locks, cipher);
+  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, cipher, database);
   const first = application(provider, "A");
   const replacement = application(provider, "B");
   await store.save({
@@ -80,8 +82,11 @@ async function rejectsStoredReplacement(bundle: DatabaseRuntimeBundle, provider:
   });
 
   await assertStaleBindRollsBack(bundle, database, provider, state, first.identity.id);
-  assert.equal((await store.read(provider))?.identity.id, replacement.identity.id);
-  assert.equal((await store.read(provider))?.version, 2);
+  assert.equal(
+    (await store.read(provider, replacement.identity.id))?.identity.id,
+    replacement.identity.id,
+  );
+  assert.equal((await store.read(provider, replacement.identity.id))?.version, 2);
 
   const current = await startAttempt(
     database,
@@ -95,8 +100,9 @@ async function rejectsStoredReplacement(bundle: DatabaseRuntimeBundle, provider:
 }
 
 async function serializesReplacementRace(bundle: DatabaseRuntimeBundle, provider: Provider) {
-  const database = createDatabase(bundle.runtime, bundle.locks);
-  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, database);
+  const cipher = createTestCredentialCipher();
+  const database = createDatabase(bundle.runtime, bundle.locks, cipher);
+  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, cipher, database);
   const first = application(provider, "RACE-A");
   const replacement = application(provider, "RACE-B");
   await store.save({
@@ -122,19 +128,23 @@ async function serializesReplacementRace(bundle: DatabaseRuntimeBundle, provider
   assert.equal([saved, bound].filter((result) => result.status === "fulfilled").length, 1);
   if (saved.status === "fulfilled") {
     assert.equal(await connectionApplicationId(bundle, provider), undefined);
-    assert.equal((await store.read(provider))?.identity.id, replacement.identity.id);
+    assert.equal(
+      (await store.read(provider, replacement.identity.id))?.identity.id,
+      replacement.identity.id,
+    );
     await assertAttemptConsumed(bundle, state, false);
   } else {
     assert.equal(bound.status, "fulfilled");
     assert.equal(await connectionApplicationId(bundle, provider), first.identity.id);
-    assert.equal((await store.read(provider))?.identity.id, first.identity.id);
+    assert.equal((await store.read(provider, first.identity.id))?.identity.id, first.identity.id);
     await assertAttemptConsumed(bundle, state, true);
   }
 }
 
 async function rejectsEnvironmentFallback(bundle: DatabaseRuntimeBundle, provider: Provider) {
-  const database = createDatabase(bundle.runtime, bundle.locks);
-  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, database);
+  const cipher = createTestCredentialCipher();
+  const database = createDatabase(bundle.runtime, bundle.locks, cipher);
+  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, cipher, database);
   const environment = application(provider, "ENV");
   const fallback = application(provider, "STORED");
   await store.save({

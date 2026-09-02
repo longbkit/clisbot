@@ -65,7 +65,10 @@ class FakeDaemon {
       client.send(
         JSON.stringify({
           type: "session",
-          message: { type: "status", payload: { status: "server_info", serverId: "fake" } },
+          message: {
+            type: "status",
+            payload: { status: "server_info", serverId: "fake" },
+          },
         }),
       );
       return;
@@ -74,13 +77,17 @@ class FakeDaemon {
       client.send(JSON.stringify({ type: "pong" }));
       return;
     }
-    if (frame.type !== "session" || typeof frame["message"] !== "object") return;
+    if (frame.type !== "session" || typeof frame["message"] !== "object")
+      return;
     const message = frame["message"] as RecordedMessage;
     this.messages.push(message);
     this.respond(client, message);
   }
 
-  private respond(client: import("ws").WebSocket, message: RecordedMessage): void {
+  private respond(
+    client: import("ws").WebSocket,
+    message: RecordedMessage,
+  ): void {
     switch (message["type"]) {
       case "create_agent_request": {
         client.send(
@@ -92,7 +99,11 @@ class FakeDaemon {
                 status: "agent_created",
                 requestId: message["requestId"],
                 agentId: "agent-1",
-                agent: { id: "agent-1", provider: "codex", status: "initializing" },
+                agent: {
+                  id: "agent-1",
+                  provider: "codex",
+                  status: "initializing",
+                },
               },
             },
           }),
@@ -106,7 +117,10 @@ class FakeDaemon {
               type: "session",
               message: {
                 type: "rpc_error",
-                payload: { requestId: message["requestId"], error: "fake daemon: agent not found" },
+                payload: {
+                  requestId: message["requestId"],
+                  error: "fake daemon: agent not found",
+                },
               },
             }),
           );
@@ -134,7 +148,28 @@ class FakeDaemon {
             type: "session",
             message: {
               type: "send_agent_message_response",
-              payload: { requestId: message["requestId"], agentId: "agent-1", accepted: true },
+              payload: {
+                requestId: message["requestId"],
+                agentId: "agent-1",
+                accepted: true,
+              },
+            },
+          }),
+        );
+        return;
+      }
+      case "cancel_agent_request": {
+        client.send(
+          JSON.stringify({
+            type: "session",
+            message: {
+              type: "cancel_agent_response",
+              payload: {
+                requestId: message["requestId"],
+                agentId: message["agentId"],
+                agent: null,
+                error: null,
+              },
             },
           }),
         );
@@ -170,10 +205,22 @@ class FakeDaemon {
               payload: {
                 requestId: message["requestId"],
                 entries: [
-                  { agent: { id: "agent-1", provider: "codex", status: "idle" } },
-                  { agent: { id: "agent-2", provider: "claude", status: "closed" } },
+                  {
+                    agent: { id: "agent-1", provider: "codex", status: "idle" },
+                  },
+                  {
+                    agent: {
+                      id: "agent-2",
+                      provider: "claude",
+                      status: "closed",
+                    },
+                  },
                 ],
-                pageInfo: { nextCursor: null, prevCursor: null, hasMore: false },
+                pageInfo: {
+                  nextCursor: null,
+                  prevCursor: null,
+                  hasMore: false,
+                },
               },
             },
           }),
@@ -186,7 +233,10 @@ class FakeDaemon {
             type: "session",
             message: {
               type: "agent.timeline.set_subscription.response",
-              payload: { agentIds: message["agentIds"], requestId: message["requestId"] },
+              payload: {
+                agentIds: message["agentIds"],
+                requestId: message["requestId"],
+              },
             },
           }),
         );
@@ -224,11 +274,16 @@ async function waitForMessage(daemon: FakeDaemon, type: string): Promise<void> {
 
 // Push frames reach the callbacks on their own event-loop ticks: poll the
 // recorded array until it carries the expected number of invocations.
-async function waitForCount(items: readonly unknown[], count: number): Promise<void> {
+async function waitForCount(
+  items: readonly unknown[],
+  count: number,
+): Promise<void> {
   const deadline = Date.now() + 5000;
   while (items.length < count) {
     if (Date.now() > deadline) {
-      throw new Error(`timed out waiting for ${items.length}/${count} callbacks`);
+      throw new Error(
+        `timed out waiting for ${items.length}/${count} callbacks`,
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
@@ -241,7 +296,10 @@ describe("channel trusted-client daemon connection", () => {
   beforeAll(async () => {
     daemon = new FakeDaemon();
     await daemon.listen(0);
-    client = connectChannelDaemon({ host: `127.0.0.1:${daemon.port}`, rpcTimeoutMs: 5000 });
+    client = connectChannelDaemon({
+      host: `127.0.0.1:${daemon.port}`,
+      rpcTimeoutMs: 5000,
+    });
     await client.waitForConnected(5000);
   });
 
@@ -257,7 +315,9 @@ describe("channel trusted-client daemon connection", () => {
     );
     assert.equal(result.agentId, "agent-1");
     assert.equal(result.agent.id, "agent-1");
-    const frame = daemon.messages.find((message) => message["type"] === "create_agent_request");
+    const frame = daemon.messages.find(
+      (message) => message["type"] === "create_agent_request",
+    );
     assert.ok(frame !== undefined, "create_agent_request was not sent");
     const config = frame["config"] as Record<string, unknown>;
     assert.equal(config["provider"], "codex");
@@ -284,6 +344,23 @@ describe("channel trusted-client daemon connection", () => {
     assert.equal(frames.at(-1)?.["activeTurnBehavior"], "interrupt");
   });
 
+  it("cancels an active turn without sending a replacement prompt", async () => {
+    const before = daemon.messages.filter(
+      (message) => message["type"] === "send_agent_message_request",
+    ).length;
+    await client.cancelAgent("agent-1");
+    const frame = daemon.messages.find(
+      (message) => message["type"] === "cancel_agent_request",
+    );
+    assert.equal(frame?.["agentId"], "agent-1");
+    assert.equal(
+      daemon.messages.filter(
+        (message) => message["type"] === "send_agent_message_request",
+      ).length,
+      before,
+    );
+  });
+
   it("answers a pending permission via the trusted agent_permission_response", async () => {
     await client.respondToAgentPermission("agent-1", "perm-1", {
       behavior: "allow",
@@ -296,7 +373,9 @@ describe("channel trusted-client daemon connection", () => {
     assert.ok(frame !== undefined, "agent_permission_response was not sent");
     const response = frame["response"] as Record<string, unknown>;
     assert.equal(response["behavior"], "allow");
-    assert.deepEqual(response["updatedPermissions"], [{ rules: ["Bash(npm:*)"] }]);
+    assert.deepEqual(response["updatedPermissions"], [
+      { rules: ["Bash(npm:*)"] },
+    ]);
   });
 
   it("lists agents through fetch_agents_request", async () => {
@@ -310,14 +389,18 @@ describe("channel trusted-client daemon connection", () => {
   it("sets the selective timeline subscription", async () => {
     await client.setTimelineSubscription(["agent-1"]);
     const frame = daemon.messages.find(
-      (message) => message["type"] === "agent.timeline.set_subscription.request",
+      (message) =>
+        message["type"] === "agent.timeline.set_subscription.request",
     );
     assert.ok(frame !== undefined, "subscription request was not sent");
     assert.deepEqual(frame["agentIds"], ["agent-1"]);
   });
 
   it("surfaces rpc_error as a rejected promise", async () => {
-    await assert.rejects(client.sendAgentMessage("agent-missing", "fail-me"), /agent not found/);
+    await assert.rejects(
+      client.sendAgentMessage("agent-missing", "fail-me"),
+      /agent not found/,
+    );
   });
 
   it("rejects when the daemon declines the message", async () => {
@@ -380,11 +463,18 @@ describe("channel trusted-client daemon connection", () => {
       await streaming.waitForConnected(5000);
       daemon.push({
         type: "agent_stream",
-        payload: { agentId: "agent-7", seq: 41, event: { type: "turn_completed" } },
+        payload: {
+          agentId: "agent-7",
+          seq: 41,
+          event: { type: "turn_completed" },
+        },
       });
       daemon.push({
         type: "agent_stream",
-        payload: { agentId: "agent-7", event: { type: "message_delta", text: "…" } },
+        payload: {
+          agentId: "agent-7",
+          event: { type: "message_delta", text: "…" },
+        },
       });
       await waitForCount(events, 2);
       assert.deepEqual(events, [
@@ -420,11 +510,18 @@ describe("channel trusted-client daemon connection", () => {
       await watching.waitForConnected(5000);
       daemon.push({
         type: "agent_update",
-        payload: { agent: { id: "agent-7", provider: "codex", status: "running" } },
+        payload: {
+          agent: { id: "agent-7", provider: "codex", status: "running" },
+        },
       });
-      daemon.push({ type: "agent_update", payload: { status: "no agent here" } });
+      daemon.push({
+        type: "agent_update",
+        payload: { status: "no agent here" },
+      });
       await waitForCount(updates, 1);
-      assert.deepEqual(updates, [{ id: "agent-7", provider: "codex", status: "running" }]);
+      assert.deepEqual(updates, [
+        { id: "agent-7", provider: "codex", status: "running" },
+      ]);
       watching.stop();
     });
   });

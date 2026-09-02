@@ -10,6 +10,8 @@
 // isolated: one account's failure never aborts the others.
 
 import type { Database } from "../../db/types.js";
+import type { AgentExecutionRecord } from "../../db/types.js";
+import type { DaemonAgentStreamEvent } from "../../daemons/protocol.js";
 import type { DatabaseRuntime } from "../../db/runtime/index.js";
 import type {
   ChannelReplyBindingRef,
@@ -65,7 +67,9 @@ export interface ChannelSupervisorOptions {
   database: Database;
   /** The runtime handle: `ChannelStore` (org-scoped channel runtime state). */
   databaseRuntime: DatabaseRuntime;
-  /** The Hub data directory (`PASEO_HUB_DATA_DIR`): installs, secrets, state. */
+  /** Test seam; production resolves encrypted credentials through `database`. */
+  resolveConnection?: Database["resolveChannelConnection"];
+  /** The Hub data directory (`PASEO_HUB_DATA_DIR`): installs and state. */
   dataDir: string;
   /** Pass-through for `connectChannelDaemon` (loopback host/home or relay url). */
   daemon?: ChannelDaemonClientOptions;
@@ -74,6 +78,12 @@ export interface ChannelSupervisorOptions {
   logger?: PlaneLogger;
   /** The process environment the channel gate + policy read; default `process.env`. */
   env?: NodeJS.ProcessEnv;
+  dispatchWorkflow?: import("../plane/types.js").ChannelPlaneDeps["dispatchWorkflow"];
+  /** Transfer one Slack app's Socket Mode consumer to this Channel account. */
+  claimSlackInbound?: (
+    providerApplicationId: string,
+    owner: string,
+  ) => Promise<() => Promise<void>>;
 }
 
 /**
@@ -88,7 +98,10 @@ export interface ChannelSupervisor {
   /** Teardown: stop every account's transport, plane, and daemon connection. */
   stopAll(): Promise<void>;
   /** One account's install → load → start (the `channels add` transport step). */
-  startAccount(channel: string, accountId: string): Promise<ChannelAccountStartResult>;
+  startAccount(
+    channel: string,
+    accountId: string,
+  ): Promise<ChannelAccountStartResult>;
   /** After a revision activates: reconcile running accounts to the new config. */
   reconcile(): Promise<ChannelReconcileResult>;
   /** Per-account pin / integrity / load-trace / transport (the status endpoint). */
@@ -100,6 +113,17 @@ export interface ChannelSupervisor {
    * Fail-closed for an unstarted/unknown account (`{ok: false}`) — the
    * endpoint maps that to a clean tool error.
    */
-  channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult>;
-  channelReplyMediaPost(ref: ChannelReplyBindingRef, filePath: string): Promise<MediaPostResult>;
+  channelReplyPost(
+    ref: ChannelReplyBindingRef,
+    text: string,
+  ): Promise<OutboundPostResult>;
+  channelReplyMediaPost(
+    ref: ChannelReplyBindingRef,
+    filePath: string,
+  ): Promise<MediaPostResult>;
+  workflowStreamEvent?(input: {
+    execution: AgentExecutionRecord;
+    agentId: string;
+    event: DaemonAgentStreamEvent;
+  }): Promise<void>;
 }

@@ -23,7 +23,7 @@ const JsonValueSchema: z.ZodType = z.lazy(() =>
 const McpToolRefSchema = z
   .object({
     kind: z.literal("mcp"),
-    server: z.literal("hub"),
+    server: z.enum(["hub", "channel_reply"]),
     tool: z.string(),
   })
   .strict();
@@ -131,6 +131,7 @@ export const HubExecutionAgentCreateRequestSchema = z.object({
   type: z.literal("hub.execution.agent.create.request"),
   requestId: z.string(),
   executionId: z.string(),
+  reuseAgentId: z.string().optional(),
   provider: z.string(),
   cwd: z.string(),
   prompt: z.string(),

@@ -330,6 +330,62 @@
       "when": 1788251462728,
       "tag": "0046_lumpy_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1788264425406,
+      "tag": "0047_needy_nightmare",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1788264555317,
+      "tag": "0048_amused_mad_thinker",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1788265233493,
+      "tag": "0049_omniscient_living_tribunal",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1788266343992,
+      "tag": "0050_parallel_shriek",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1788325103588,
+      "tag": "0051_broad_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1788328145312,
+      "tag": "0052_wide_gideon",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1788336415579,
+      "tag": "0053_illegal_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1788360260517,
+      "tag": "0054_colorful_red_wolf",
+      "breakpoints": true
     }
   ]
 }

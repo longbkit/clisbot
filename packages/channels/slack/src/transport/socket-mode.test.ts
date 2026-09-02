@@ -56,7 +56,9 @@ function envelope(
   };
 }
 
-function makeTransport(onInbound: (event: ChannelInboundEvent) => Promise<void>) {
+function makeTransport(
+  onInbound: (event: ChannelInboundEvent) => Promise<void>,
+) {
   const client = fakeSocketClient() as unknown as SocketModeClient;
   const transport = createSlackSocketTransport({
     client,
@@ -67,7 +69,9 @@ function makeTransport(onInbound: (event: ChannelInboundEvent) => Promise<void>)
   return { client, transport };
 }
 
-function makeInteractiveTransport(onInteractive: (body: Record<string, unknown>) => Promise<void>) {
+function makeInteractiveTransport(
+  onInteractive: (body: Record<string, unknown>) => Promise<void>,
+) {
   const client = fakeSocketClient() as unknown as SocketModeClient;
   const transport = createSlackSocketTransport({
     client,
@@ -87,16 +91,94 @@ function blockActionsEnvelope(overrides: Record<string, unknown> = {}): {
     type: "block_actions",
     user: { id: "U0BOB" },
     channel: "C123",
-    container: { type: "message", message_ts: "1700.000009", channel_id: "C123" },
+    container: {
+      type: "message",
+      message_ts: "1700.000009",
+      channel_id: "C123",
+    },
     message: { channel: "C123", ts: "1700.000009", thread_ts: "1700.000008" },
     actions: [
-      { action_id: "approval_action_1", block_id: "b1", value: "allow:req-1", type: "button" },
+      {
+        action_id: "approval_action_1",
+        block_id: "b1",
+        value: "allow:req-1",
+        type: "button",
+      },
     ],
     trigger_id: "T1",
     ...overrides,
   };
   return { body, event: { ...body } };
 }
+
+describe("slack socket transport: shared app routing", () => {
+  it("routes and acks one envelope only in the matching workspace", async () => {
+    const fake = fakeSocketClient();
+    const client = fake as unknown as SocketModeClient;
+    const teamOne: ChannelInboundEvent[] = [];
+    const teamTwo: ChannelInboundEvent[] = [];
+    for (const [teamId, sink] of [
+      ["T1", teamOne],
+      ["T2", teamTwo],
+    ] as const) {
+      createSlackSocketTransport({
+        client,
+        sharedClient: true,
+        identity: { teamId, botUserId: `BOT_${teamId}` },
+        onInbound: async (event) => {
+          sink.push(event);
+        },
+        abortSignal: new AbortController().signal,
+      });
+    }
+    let ackCount = 0;
+    client.emit("message", {
+      envelope_id: "env-team-two",
+      body: { team_id: "T2" },
+      event: {
+        type: "message",
+        user: "U1",
+        channel: "C1",
+        ts: "1700.000001",
+        text: "hello",
+      },
+      ack: async () => {
+        ackCount += 1;
+      },
+    } as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(teamOne).toHaveLength(0);
+    expect(teamTwo).toHaveLength(1);
+    expect(ackCount).toBe(1);
+  });
+
+  it("fails closed instead of broadcasting an envelope without team identity", async () => {
+    const fake = fakeSocketClient();
+    const client = fake as unknown as SocketModeClient;
+    let dispatches = 0;
+    let acknowledgements = 0;
+    createSlackSocketTransport({
+      client,
+      sharedClient: true,
+      identity: { teamId: "T1", botUserId: "BOT_T1" },
+      onInbound: async () => {
+        dispatches += 1;
+      },
+      abortSignal: new AbortController().signal,
+    });
+    client.emit("message", {
+      envelope_id: "env-unattributed",
+      body: {},
+      event: { type: "message", user: "U1", channel: "C1", ts: "1700.000002" },
+      ack: async () => {
+        acknowledgements += 1;
+      },
+    } as never);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(dispatches).toBe(0);
+    expect(acknowledgements).toBe(0);
+  });
+});
 
 describe("slack socket transport: block_actions (the approval-card click)", () => {
   it("hands the raw body to onInteractive and acks the envelope", async () => {
@@ -120,9 +202,15 @@ describe("slack socket transport: block_actions (the approval-card click)", () =
     // The RAW wire body goes to the seam: the vertical's parser narrows the
     // envelope, the hub's card-value parser owns the value format.
     assert.equal(seen[0]?.["type"], "block_actions");
-    const firstAction = (seen[0]?.["actions"] as Record<string, unknown>[] | undefined)?.[0];
+    const firstAction = (
+      seen[0]?.["actions"] as Record<string, unknown>[] | undefined
+    )?.[0];
     assert.deepEqual(firstAction?.["value"], "allow:req-1");
-    assert.equal(acked, true, "the envelope is acked (ack-first redelivery semantic)");
+    assert.equal(
+      acked,
+      true,
+      "the envelope is acked (ack-first redelivery semantic)",
+    );
   });
 
   it("acks and drops a non-block_actions interaction before the seam", async () => {
@@ -176,7 +264,11 @@ describe("slack socket transport: block_actions (the approval-card click)", () =
       },
     } as never);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(acked, true, "no seam: the envelope is still acked (never redelivered)");
+    assert.equal(
+      acked,
+      true,
+      "no seam: the envelope is still acked (never redelivered)",
+    );
   });
 });
 
@@ -215,8 +307,13 @@ describe("slack socket transport: inbound media fold (F-06, G5+G6)", () => {
     const { join } = await import("node:path");
     const dir = await mkdtemp(join(tmpdir(), "slack-transport-media-"));
     const seen: ChannelInboundEvent[] = [];
-    const mediaFetch = (async (_url: string | URL | Request, _init?: RequestInit) =>
-      new Response("img-bytes", { status: 200 })) as unknown as typeof globalThis.fetch;
+    const mediaFetch = (async (
+      _url: string | URL | Request,
+      _init?: RequestInit,
+    ) =>
+      new Response("img-bytes", {
+        status: 200,
+      })) as unknown as typeof globalThis.fetch;
     const { client } = makeMediaTransport(
       async (event) => {
         seen.push(event);
@@ -279,7 +376,9 @@ describe("slack socket transport: inbound media fold (F-06, G5+G6)", () => {
     const dir = await mkdtemp(join(tmpdir(), "slack-transport-mediafail-"));
     const seen: ChannelInboundEvent[] = [];
     const failingFetch = (async () =>
-      new Response("gone", { status: 404 })) as unknown as typeof globalThis.fetch;
+      new Response("gone", {
+        status: 404,
+      })) as unknown as typeof globalThis.fetch;
     const { client } = makeMediaTransport(
       async (event) => {
         seen.push(event);

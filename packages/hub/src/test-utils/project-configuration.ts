@@ -5,6 +5,11 @@ import {
   type CompiledProjectConfiguration,
 } from "../configuration/store.js";
 import type { Database, ProjectConfigurationRevisionRecord, ProjectRecord } from "../db/types.js";
+import type {
+  OrganizationTriggerRecord,
+  OrganizationTriggerRevisionRecord,
+} from "../db/types.js";
+import { createWorkflowConfigurationResolver } from "../triggers/configuration.js";
 
 export const TEST_DAEMON_ID = "10000000-0000-4000-8000-000000000001";
 export const TEST_DAEMON_SLUG = "daemon-10000000";
@@ -13,6 +18,45 @@ export interface ActiveProjectConfigurationFixture {
   project: ProjectRecord;
   revision: ProjectConfigurationRevisionRecord;
   store: ProjectConfigurationStore;
+}
+
+export interface ActiveWorkflowConfigurationFixture {
+  workflow: OrganizationTriggerRecord;
+  revision: OrganizationTriggerRevisionRecord;
+  configurationForWorkflow: ReturnType<typeof createWorkflowConfigurationResolver>;
+}
+
+export async function createActiveWorkflowConfiguration(
+  database: Database,
+  rawConfiguration: unknown,
+  options: { organizationId?: string } = {},
+): Promise<ActiveWorkflowConfigurationFixture> {
+  const organizationId = options.organizationId ?? "org_1";
+  const configuration = compileTestDaemonReferences(rawConfiguration);
+  const triggerName = configuration.triggers[0]?.name ?? `workflow-${randomUUID()}`;
+  const workflow = await database.saveOrganizationTrigger({
+    organizationId,
+    name: triggerName,
+    enabled: true,
+    format: "legacy_multistep",
+    yaml: `name: ${triggerName}`,
+    normalizedConfiguration: configuration,
+    contentHash: compiledConfigurationHash(configuration),
+    sourceKind: "manual",
+    sourceEvidence: { kind: "test" },
+    createdByUserId: null,
+    routes: [],
+  });
+  const revision = await database.findOrganizationTriggerRevision(
+    workflow.id,
+    workflow.activeRevisionId,
+  );
+  if (revision === undefined) throw new Error("workflow revision was not persisted");
+  return {
+    workflow,
+    revision,
+    configurationForWorkflow: createWorkflowConfigurationResolver(database),
+  };
 }
 
 export async function createActiveProjectConfiguration(

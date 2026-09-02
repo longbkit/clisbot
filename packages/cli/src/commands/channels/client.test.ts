@@ -76,7 +76,7 @@ function closeServer(server: ReturnType<typeof createServer>): Promise<void> {
 }
 
 describe("channels control-plane client", () => {
-  it("POSTs the account and secret to /api/v1/channels and parses the result", async () => {
+  it("POSTs the account and canonical connection id to /api/v1/channels", async () => {
     const requests: RecordedRequest[] = [];
     const target = await startServer((_method, url) => {
       if (url === "/api/v1/channels") {
@@ -98,7 +98,7 @@ describe("channels control-plane client", () => {
     const result = await addChannel(target, {
       channel: "slack",
       account: "main",
-      secret: "xoxb-secret",
+      connectionId: "00000000-0000-4000-8000-000000000001",
     });
 
     assert.deepEqual(result, {
@@ -114,7 +114,11 @@ describe("channels control-plane client", () => {
         method: "POST",
         url: "/api/v1/channels",
         authorization: null,
-        body: JSON.stringify({ channel: "slack", account: "main", secret: "xoxb-secret" }),
+        body: JSON.stringify({
+          channel: "slack",
+          account: "main",
+          connectionId: "00000000-0000-4000-8000-000000000001",
+        }),
       },
     ]);
   });
@@ -142,7 +146,7 @@ describe("channels control-plane client", () => {
       {
         channel: "slack",
         account: "main",
-        secret: "xoxb-secret",
+        connectionId: "00000000-0000-4000-8000-000000000001",
       },
     );
 
@@ -252,9 +256,12 @@ describe("channels control-plane client", () => {
       return { status: 404, rawBody: "Not Found" };
     }, requests);
 
-    await assert.rejects(addChannel(target, { channel: "slack", account: "main", secret: "s" }), {
-      code: "HUB_INVALID_RESPONSE",
-    });
+    await assert.rejects(
+      addChannel(target, { channel: "slack", account: "main", connectionId: "connection" }),
+      {
+        code: "HUB_INVALID_RESPONSE",
+      },
+    );
   });
 
   it("does not swallow non-404 failures", async () => {

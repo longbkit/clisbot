@@ -1,5 +1,9 @@
 # PaseoClaw Fusion — Channel Capability: Problem Map, Foundation, and Reuse Plan
 
+> Credential-model update, 2026-09-01: active revisions now reference encrypted canonical
+> Connections by `connectionId`; `secretRef` and `channel_accounts` were removed. See
+> [the Hub credential, Application, and Connection gap decision](2026-09-01-hub-credential-application-connection-gaps.md).
+
 Date: 2026-08-24, final decisions 2026-08-25. Subject: the full channel capability for the fusion — same-machine channels, native per-channel formatting, and how it relates to the existing Paseo Hub trigger layer — built on OpenClaw's published channel code. Registry and package claims were verified against the public npm registry and published tarballs on 2026-08-23/24; code claims in this repo carry paths; Hub claims come from [2026-08-23-paseo-hub.md](2026-08-23-paseo-hub.md).
 
 > Upstream merge update, 2026-09-01: Hub Automations now build on organization-owned Triggers, not

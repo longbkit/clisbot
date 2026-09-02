@@ -9,7 +9,10 @@ import {
   enrollTestDaemon,
   TEST_DAEMON_SLUG,
 } from "../../test-utils/project-configuration.js";
-import type { ProjectRecord, StartConnectionAttemptInput } from "../../db/types.js";
+import type {
+  ProjectRecord,
+  StartConnectionAttemptInput,
+} from "../../db/types.js";
 import type { GitHubConnectionClient } from "./client.js";
 import { createGitHubRegistration } from "./index.js";
 import type { GitHubConfigurationProvider } from "../../configuration/github-sync.js";
@@ -24,7 +27,14 @@ describe("GitHub registration", () => {
       revision: initial,
       store,
     } = await createActiveProjectConfiguration(database, {
-      environments: [{ name: "runner", kind: "daemon", daemon: TEST_DAEMON_SLUG, cwd: "/repo" }],
+      environments: [
+        {
+          name: "runner",
+          kind: "daemon",
+          daemon: TEST_DAEMON_SLUG,
+          cwd: "/repo",
+        },
+      ],
       triggers: [],
     });
     await database.setProjectGitHubConfigurationSource({
@@ -68,14 +78,17 @@ describe("GitHub registration", () => {
           {
             providerEventReceiptId: `trigger-${input.deliveryId}`,
             organizationId: project.organizationId,
-            projectId: project.id,
+            workflowId: "11111111-1111-4111-8111-111111111129",
             configurationRevisionId: "11111111-1111-4111-8111-111111111130",
             deliveryId: input.deliveryId,
             source: input.source,
             payload: input.payload,
             receivedAt: input.receivedAt,
             connectionId: "connection-1",
-            resourceId: input.repositoryId === undefined ? null : String(input.repositoryId),
+            resourceId:
+              input.repositoryId === undefined
+                ? null
+                : String(input.repositoryId),
           },
         ],
         receiptId: `receipt-${input.deliveryId}`,
@@ -93,33 +106,47 @@ describe("GitHub registration", () => {
       appAuth: githubAuth(),
       connectionClient: new GitHubClientFake(),
       configurationProvider: configuration,
+      configurationForProject: () => store,
       reactionClient: {
         createReaction: () => Promise.resolve({ id: 1 }),
         deleteReaction: () => Promise.resolve(),
       },
     });
     registration.triggerProviders[0]?.({
-      configurationStoreForProject: () => store,
-      connectionsForProject: () => async () => "unused",
+      configurationForWorkflow: async () => undefined,
     });
 
     await configuration.push(registration, "valid-sha", "push-valid");
     const active = await database.findActiveProjectConfiguration(project.id);
     assert.notEqual(active?.id, initial.id);
     await configuration.push(registration, "invalid-sha", "push-invalid");
-    assert.equal((await database.findActiveProjectConfiguration(project.id))?.id, active?.id);
+    assert.equal(
+      (await database.findActiveProjectConfiguration(project.id))?.id,
+      active?.id,
+    );
     assert.deepEqual(configuration.reads, [
-      { installationId: 42, repositoryId: 9001, commitSha: "valid-sha", path: ".paseo/hub.yml" },
+      {
+        installationId: 42,
+        repositoryId: 9001,
+        commitSha: "valid-sha",
+        path: ".paseo/hub.yml",
+      },
       {
         installationId: 42,
         repositoryId: 9001,
         commitSha: "valid-sha",
         path: ".paseo/workflows/noop.yml",
       },
-      { installationId: 42, repositoryId: 9001, commitSha: "invalid-sha", path: ".paseo/hub.yml" },
+      {
+        installationId: 42,
+        repositoryId: 9001,
+        commitSha: "invalid-sha",
+        path: ".paseo/hub.yml",
+      },
     ]);
     assert.equal(
-      (await database.projectConfigurationReadModel(project.id)).lastSyncAttempt?.outcome,
+      (await database.projectConfigurationReadModel(project.id)).lastSyncAttempt
+        ?.outcome,
       "invalid",
     );
   });
@@ -160,8 +187,12 @@ describe("GitHub registration", () => {
         getInstallationToken: () => Promise.resolve("token"),
         mintInstallationToken: () => Promise.resolve("token"),
         mintInstallationAccessToken: () =>
-          Promise.resolve({ token: "scoped-token", expiresAt: Date.now() + 3_600_000 }),
-        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+          Promise.resolve({
+            token: "scoped-token",
+            expiresAt: Date.now() + 3_600_000,
+          }),
+        getAppBotIdentity: () =>
+          Promise.resolve({ id: 123, login: "paseo[bot]" }),
         revokeInstallationToken: () => Promise.resolve(),
         createInstallationOctokit: () => Promise.reject(new Error("unused")),
       },
@@ -185,7 +216,9 @@ describe("GitHub registration", () => {
     );
 
     const response = await registration.connection.actions["start"]!(
-      new Request("https://hub.test/start?organizationSlug=org", { method: "POST" }),
+      new Request("https://hub.test/start?organizationSlug=org", {
+        method: "POST",
+      }),
     );
     assert.equal(response.status, 200);
     assert.equal(attempt?.provider, "github");
@@ -205,7 +238,12 @@ describe("GitHub registration", () => {
     });
 
     assert.deepEqual(
-      registration.connection.status({ github: [], discord: [], slack: [], linear: [] }),
+      registration.connection.status({
+        github: [],
+        discord: [],
+        slack: [],
+        linear: [],
+      }),
       {
         status: "notConfigured",
       },
@@ -251,8 +289,12 @@ describe("GitHub registration", () => {
           return Promise.resolve("test-installation-token");
         },
         mintInstallationAccessToken: () =>
-          Promise.resolve({ token: "scoped-token", expiresAt: Date.now() + 3_600_000 }),
-        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+          Promise.resolve({
+            token: "scoped-token",
+            expiresAt: Date.now() + 3_600_000,
+          }),
+        getAppBotIdentity: () =>
+          Promise.resolve({ id: 123, login: "paseo[bot]" }),
         revokeInstallationToken: () => Promise.resolve(),
         createInstallationOctokit: () => Promise.reject(new Error("unused")),
       },
@@ -264,12 +306,21 @@ describe("GitHub registration", () => {
     });
 
     assert.equal(
-      await registration.integration?.resolve("project-1", "getpaseo-github", "token"),
+      await registration.integration?.resolve(
+        "project-1",
+        "getpaseo-github",
+        "token",
+      ),
       "test-installation-token",
     );
     assert.deepEqual(installations, [142]);
     await assert.rejects(
-      () => registration.integration!.resolve("project-2", "getpaseo-github", "token"),
+      () =>
+        registration.integration!.resolve(
+          "project-2",
+          "getpaseo-github",
+          "token",
+        ),
       /connection is unavailable/u,
     );
   });
@@ -313,12 +364,16 @@ describe("GitHub registration", () => {
         mintInstallationToken: () => Promise.resolve("token"),
         mintInstallationAccessToken: (input) => {
           requests.push(input);
-          return Promise.resolve({ token: "scoped-token", expiresAt: Date.now() + 3_600_000 });
+          return Promise.resolve({
+            token: "scoped-token",
+            expiresAt: Date.now() + 3_600_000,
+          });
         },
         getAppBotIdentity: (_appSlug, token) => {
           identityLookups += 1;
           identityTokens.push(token);
-          if (identityFailure !== undefined) return Promise.reject(identityFailure);
+          if (identityFailure !== undefined)
+            return Promise.reject(identityFailure);
           return Promise.resolve({ id: 123, login: "paseo[bot]" });
         },
         revokeInstallationToken: (token) => {
@@ -337,7 +392,7 @@ describe("GitHub registration", () => {
     const authority = registration.integration?.githubAuthority;
     assert.ok(authority);
     const minted = await authority.mint({
-      projectId: "project-1",
+      organizationId: "org_1",
       connectionSlug: "getpaseo-github",
       repositories: ["getpaseo/paseo", "getpaseo/hub"],
       permissions: { contents: "write", pull_requests: "read" },
@@ -362,7 +417,7 @@ describe("GitHub registration", () => {
     await assert.rejects(
       () =>
         authority.mint({
-          projectId: "project-1",
+          organizationId: "org_1",
           connectionSlug: "getpaseo-github",
           repositories: ["other-owner/paseo"],
           permissions: { contents: "read" },
@@ -373,7 +428,7 @@ describe("GitHub registration", () => {
     assert.equal(identityLookups, 1);
 
     const caseInsensitive = await authority.mint({
-      projectId: "project-1",
+      organizationId: "org_1",
       connectionSlug: "getpaseo-github",
       repositories: ["GETPASEO/private"],
       permissions: { contents: "read" },
@@ -389,7 +444,7 @@ describe("GitHub registration", () => {
     await assert.rejects(
       () =>
         authority.mint({
-          projectId: "project-1",
+          organizationId: "org_1",
           connectionSlug: "getpaseo-github",
           repositories: ["getpaseo/hub"],
           permissions: { contents: "read" },
@@ -404,7 +459,7 @@ describe("GitHub registration", () => {
     await assert.rejects(
       () =>
         authority.mint({
-          projectId: "project-2",
+          organizationId: "org_2",
           connectionSlug: "getpaseo-github",
           repositories: ["getpaseo/paseo"],
           permissions: { contents: "read" },
@@ -501,8 +556,12 @@ describe("GitHub registration", () => {
         getInstallationToken: () => Promise.resolve("token"),
         mintInstallationToken: () => Promise.resolve("token"),
         mintInstallationAccessToken: () =>
-          Promise.resolve({ token: "scoped-token", expiresAt: Date.now() + 3_600_000 }),
-        getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
+          Promise.resolve({
+            token: "scoped-token",
+            expiresAt: Date.now() + 3_600_000,
+          }),
+        getAppBotIdentity: () =>
+          Promise.resolve({ id: 123, login: "paseo[bot]" }),
         revokeInstallationToken: () => Promise.resolve(),
         createInstallationOctokit: () => Promise.reject(new Error("unused")),
       },
@@ -512,8 +571,13 @@ describe("GitHub registration", () => {
         deleteReaction: () => Promise.resolve(),
       },
     });
-    const body = JSON.stringify({ action: "suspend", installation: { id: 42 } });
-    const signature = "sha256=" + createHmac("sha256", "webhook-secret").update(body).digest("hex");
+    const body = JSON.stringify({
+      action: "suspend",
+      installation: { id: 42 },
+    });
+    const signature =
+      "sha256=" +
+      createHmac("sha256", "webhook-secret").update(body).digest("hex");
     const response = await registration.requests[0]!.handle(
       new Request("https://hub.test/webhook", {
         method: "POST",
@@ -533,7 +597,11 @@ describe("GitHub registration", () => {
 });
 
 class RegistrationConfigurationFake implements GitHubConfigurationProvider {
-  readonly reads: Array<{ repositoryId: number; commitSha: string; path: string }> = [];
+  readonly reads: Array<{
+    repositoryId: number;
+    commitSha: string;
+    path: string;
+  }> = [];
   private head = "";
   constructor(private readonly files: Readonly<Record<string, string>>) {}
   listInstallationRepositories() {
@@ -547,13 +615,22 @@ class RegistrationConfigurationFake implements GitHubConfigurationProvider {
     if (yaml === undefined) return Promise.resolve([]);
     try {
       return Promise.resolve(
-        configurationBundleFixture(yaml).map(({ path }) => ({ path, kind: "file" as const })),
+        configurationBundleFixture(yaml).map(({ path }) => ({
+          path,
+          kind: "file" as const,
+        })),
       );
     } catch {
-      return Promise.resolve([{ path: ".paseo/hub.yml", kind: "file" as const }]);
+      return Promise.resolve([
+        { path: ".paseo/hub.yml", kind: "file" as const },
+      ]);
     }
   }
-  readFileAtCommit(input: { repositoryId: number; commitSha: string; path: string }) {
+  readFileAtCommit(input: {
+    repositoryId: number;
+    commitSha: string;
+    path: string;
+  }) {
     this.reads.push(input);
     const rawYaml = this.files[input.commitSha];
     let content: string | undefined;
@@ -566,7 +643,9 @@ class RegistrationConfigurationFake implements GitHubConfigurationProvider {
         content = input.path === ".paseo/hub.yml" ? rawYaml : undefined;
       }
     }
-    return Promise.resolve(content === undefined ? undefined : { kind: "file" as const, content });
+    return Promise.resolve(
+      content === undefined ? undefined : { kind: "file" as const, content },
+    );
   }
   async push(
     registration: ReturnType<typeof createGitHubRegistration>,
@@ -626,7 +705,12 @@ class RegistrationAuth implements AuthServer {
       account: { id: "user", name: "User", email: "user@example.test" },
       organization: { id: "org", name: "Org" },
       membership: { id: "membership", role: "owner" },
-      capabilities: { view: true, manageMembers: true, manageOwners: true, manageResources: true },
+      capabilities: {
+        view: true,
+        manageMembers: true,
+        manageOwners: true,
+        manageResources: true,
+      },
     });
   }
   async resolveAccount() {
@@ -678,7 +762,10 @@ function githubAuth() {
     getInstallationToken: () => Promise.resolve("token"),
     mintInstallationToken: () => Promise.resolve("token"),
     mintInstallationAccessToken: () =>
-      Promise.resolve({ token: "scoped-token", expiresAt: Date.now() + 3_600_000 }),
+      Promise.resolve({
+        token: "scoped-token",
+        expiresAt: Date.now() + 3_600_000,
+      }),
     getAppBotIdentity: () => Promise.resolve({ id: 123, login: "paseo[bot]" }),
     revokeInstallationToken: () => Promise.resolve(),
     createInstallationOctokit: () => Promise.reject(new Error("unused")),
@@ -686,8 +773,13 @@ function githubAuth() {
 }
 
 function signedWebhookRequest(deliveryId: string): Request {
-  const body = JSON.stringify({ installation: { id: 42 }, repository: { full_name: "acme/app" } });
-  const signature = "sha256=" + createHmac("sha256", "webhook-secret").update(body).digest("hex");
+  const body = JSON.stringify({
+    installation: { id: 42 },
+    repository: { full_name: "acme/app" },
+  });
+  const signature =
+    "sha256=" +
+    createHmac("sha256", "webhook-secret").update(body).digest("hex");
   return new Request("https://hub.test/webhook", {
     method: "POST",
     headers: {

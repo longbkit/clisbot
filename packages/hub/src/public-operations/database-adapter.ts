@@ -55,19 +55,14 @@ export function createDatabasePublicOperationRepository(
         slack: connections.slack.map(({ teamId, teamName }) => ({ teamId, teamName })),
       };
     },
-    async resolveManualRunProject(organizationId, triggerName, projectSlug) {
-      const organizationTrigger = (await database.listOrganizationTriggers(organizationId)).find(
-        ({ name }) => name === triggerName,
+    async resolveManualRunWorkflow(organizationId, triggerName) {
+      const workflow = (await database.listOrganizationTriggers(organizationId)).find(
+        (candidate) => candidate.name === triggerName,
       );
-      if (organizationTrigger !== undefined) {
-        return organizationTrigger.enabled
-          ? { status: "resolved", id: organizationTrigger.runtimeProjectId }
-          : { status: "disabled" };
-      }
-      const project = await database.findProjectBySlugForOrganization(organizationId, projectSlug);
-      return project === undefined || project.status !== "active"
-        ? undefined
-        : { status: "resolved", id: project.id };
+      if (workflow === undefined) return undefined;
+      return workflow.enabled
+        ? { status: "resolved", id: workflow.id, revisionId: workflow.activeRevisionId }
+        : { status: "disabled" };
     },
     resolveDeploymentProject: (input) => deploymentProjects.resolve(input),
     async findManualRun(providerEventReceiptId, trigger) {

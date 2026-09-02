@@ -22,7 +22,7 @@ describe("Hub execution authority", () => {
     async (provider) => {
       const connectionRevocations: string[] = [];
       const authority = createExecutionAuthority({
-        connectionsForProject: () => async (slug, value, context) => {
+        connectionsForOrganization: () => async (slug, value, context) => {
           await context?.registerToken?.(`${slug}-${value}`, async () => {
             connectionRevocations.push(`${slug}-${value}`);
           });
@@ -37,7 +37,7 @@ describe("Hub execution authority", () => {
 
       const launch = await authority.materialize({
         executionId: "execution-discord",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider },
         env: authoredEnv,
       });
@@ -61,7 +61,7 @@ describe("Hub execution authority", () => {
   it("mints only explicit scoped GitHub authority and installs ordinary Git environment", async () => {
     const mint = githubAuthorityFake();
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: mint,
     });
     const github: CompiledGitHubAuthority = {
@@ -73,14 +73,14 @@ describe("Hub execution authority", () => {
 
     const launch = await authority.materialize({
       executionId: "execution-manual",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github,
     });
 
     assert.deepEqual(mint.inputs, [
       {
-        projectId: "project-1",
+        organizationId: "org-1",
         connectionSlug: "getpaseo-github",
         repositories: ["getpaseo/paseo", "getpaseo/hub"],
         permissions: { contents: "write", pull_requests: "write", issues: "read" },
@@ -108,13 +108,13 @@ describe("Hub execution authority", () => {
   it("defaults an omitted repository list to only the GitHub event repository", async () => {
     const mint = githubAuthorityFake();
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: mint,
     });
 
     await authority.materialize({
       executionId: "execution-github",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: {
         provider: "github",
         target: { repository: "getpaseo/paseo" },
@@ -132,14 +132,14 @@ describe("Hub execution authority", () => {
   it("rejects an omitted repository list when no safe event repository exists", async () => {
     const mint = githubAuthorityFake();
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: mint,
     });
 
     await assert.rejects(
       authority.materialize({
         executionId: "execution-manual-missing-repo",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider: "manual" },
         github: {
           connection: "getpaseo-github",
@@ -159,7 +159,7 @@ describe("Hub execution authority", () => {
     const clock = new TestClock();
     const mint = githubAuthorityFake(() => clock.now());
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: mint,
       clock,
     });
@@ -172,7 +172,7 @@ describe("Hub execution authority", () => {
 
     await authority.materialize({
       executionId: "execution-short",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github,
     });
@@ -183,7 +183,7 @@ describe("Hub execution authority", () => {
 
     await authority.materialize({
       executionId: "execution-terminal",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github,
     });
@@ -194,7 +194,7 @@ describe("Hub execution authority", () => {
   it("isolates per-step leases so terminal cleanup cannot revoke another step", async () => {
     const mint = githubAuthorityFake();
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: mint,
     });
     const github = {
@@ -206,13 +206,13 @@ describe("Hub execution authority", () => {
 
     await authority.materialize({
       executionId: "step-one-execution",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github,
     });
     await authority.materialize({
       executionId: "step-two-execution",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       env: { CLASSIFIER_ONLY: "no-credential" },
     });
@@ -226,7 +226,7 @@ describe("Hub execution authority", () => {
     let mints = 0;
     let active = true;
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         ...githubAuthorityFake(),
         mint: async () => {
@@ -248,7 +248,7 @@ describe("Hub execution authority", () => {
     await assert.rejects(
       authority.materialize({
         executionId: "terminal-tombstone",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider: "manual" },
         github: {
           connection: "getpaseo-github",
@@ -267,7 +267,7 @@ describe("Hub execution authority", () => {
     let active = true;
     const revocations: string[] = [];
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async (_slug, _value, context) => {
+      connectionsForOrganization: () => async (_slug, _value, context) => {
         await context?.registerToken?.("durable-token", () => {
           revocations.push("durable-token");
         });
@@ -280,7 +280,7 @@ describe("Hub execution authority", () => {
     await assert.rejects(
       authority.materialize({
         executionId: "durable-status-race",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider: "manual" },
         env: { TOKEN: "${{ paseo.connections.some-connection.token }}" },
       }),
@@ -301,7 +301,7 @@ describe("Hub execution authority", () => {
     });
     const revocations: string[] = [];
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async (_slug, _value, context) => {
+      connectionsForOrganization: () => async (_slug, _value, context) => {
         await context?.registerToken?.("final-query-token", () => {
           revocations.push("final-query-token");
         });
@@ -317,7 +317,7 @@ describe("Hub execution authority", () => {
 
     const materialization = authority.materialize({
       executionId: "terminal-during-final-query",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       env: { TOKEN: "${{ paseo.connections.some-connection.token }}" },
     });
@@ -340,7 +340,7 @@ describe("Hub execution authority", () => {
       resolveActivityQuery = resolve;
     });
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       isExecutionActive: async () => {
         activityQueryStarted();
         return activityQuery;
@@ -349,7 +349,7 @@ describe("Hub execution authority", () => {
 
     const materialization = authority.materialize({
       executionId: "stop-during-initial-query",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       env: { VALUE: "literal" },
     });
@@ -372,7 +372,7 @@ describe("Hub execution authority", () => {
     let active = true;
     const revoked: string[] = [];
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => {
           active = false;
@@ -393,7 +393,7 @@ describe("Hub execution authority", () => {
     await assert.rejects(
       authority.materialize({
         executionId: "durable-github-status-race",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider: "manual" },
         github: {
           connection: "getpaseo-github",
@@ -428,7 +428,7 @@ describe("Hub execution authority", () => {
     });
     const revoked: string[] = [];
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => {
           mintStarted();
@@ -441,7 +441,7 @@ describe("Hub execution authority", () => {
     });
     const materialization = authority.materialize({
       executionId: "terminal-mint-race",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -471,7 +471,7 @@ describe("Hub execution authority", () => {
       releaseMint = resolve;
     });
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async (_slug, _value, context) => {
+      connectionsForOrganization: () => async (_slug, _value, context) => {
         await context?.registerToken?.("held-connection-token", () => {
           revoked.push("held-connection-token");
         });
@@ -495,13 +495,13 @@ describe("Hub execution authority", () => {
     });
     await authority.materialize({
       executionId: "terminal-ordering",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       env: { TOKEN: "${{ paseo.connections.some-connection.token }}" },
     });
     const hungMaterialization = authority.materialize({
       executionId: "terminal-ordering",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -525,12 +525,12 @@ describe("Hub execution authority", () => {
   it("revokes active leases when the authority owner stops", async () => {
     const mint = githubAuthorityFake();
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: mint,
     });
     await authority.materialize({
       executionId: "graceful-stop",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -546,7 +546,7 @@ describe("Hub execution authority", () => {
     await assert.rejects(
       authority.materialize({
         executionId: "new-after-stop",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider: "manual" },
         env: { TOKEN: "literal" },
       }),
@@ -564,7 +564,7 @@ describe("Hub execution authority", () => {
       firstAttempt = resolve;
     });
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => ({
           token: "shutdown-retry-token",
@@ -585,7 +585,7 @@ describe("Hub execution authority", () => {
     });
     await authority.materialize({
       executionId: "shutdown-retry",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -622,7 +622,7 @@ describe("Hub execution authority", () => {
     const clock = new TestClock();
     let attempts = 0;
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => ({
           token: "must-not-appear-in-stop-evidence",
@@ -640,7 +640,7 @@ describe("Hub execution authority", () => {
     });
     await authority.materialize({
       executionId: "bounded-shutdown",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -680,7 +680,7 @@ describe("Hub execution authority", () => {
     let attempts = 0;
     const revoked: string[] = [];
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => ({
           token: "retry-deadline-token",
@@ -698,7 +698,7 @@ describe("Hub execution authority", () => {
     });
     await authority.materialize({
       executionId: "retry-deadline",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -721,7 +721,7 @@ describe("Hub execution authority", () => {
     let attempts = 0;
     const revoked: string[] = [];
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => ({
           token: "retry-terminal-token",
@@ -739,7 +739,7 @@ describe("Hub execution authority", () => {
     });
     await authority.materialize({
       executionId: "retry-terminal",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -761,7 +761,7 @@ describe("Hub execution authority", () => {
     const clock = new TestClock();
     let attempts = 0;
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       githubAuthority: {
         mint: async () => ({
           token: "upstream-expiry-token",
@@ -778,7 +778,7 @@ describe("Hub execution authority", () => {
     });
     await authority.materialize({
       executionId: "upstream-expiry",
-      projectId: "project-1",
+      organizationId: "org-1",
       triggerContext: { provider: "manual" },
       github: {
         connection: "getpaseo-github",
@@ -801,7 +801,7 @@ describe("Hub execution authority", () => {
   it("does not retain empty terminal execution states", async () => {
     const inactive = new Set<string>();
     const authority = createExecutionAuthority({
-      connectionsForProject: () => async () => "unused",
+      connectionsForOrganization: () => async () => "unused",
       isExecutionActive: async (executionId) => !inactive.has(executionId),
     });
 
@@ -819,7 +819,7 @@ describe("Hub execution authority", () => {
     await assert.rejects(
       authority.materialize({
         executionId: "completed-249",
-        projectId: "project-1",
+        organizationId: "org-1",
         triggerContext: { provider: "manual" },
         env: { VALUE: "literal" },
       }),
@@ -830,7 +830,7 @@ describe("Hub execution authority", () => {
 
 function githubAuthorityFake(now: () => number = Date.now) {
   const inputs: Array<{
-    projectId: string;
+    organizationId: string;
     connectionSlug: string;
     repositories: readonly string[];
     permissions: Readonly<Record<string, "read" | "write" | "admin">>;

@@ -13,6 +13,7 @@ export interface DaemonAgentSnapshot {
 
 export interface DaemonCreateAgentOptions {
   executionId: string;
+  reuseAgentId?: string;
   provider: string;
   mode?: string;
   model?: string;
@@ -28,7 +29,7 @@ export interface DaemonCreateAgentOptions {
 
 export interface McpToolRef {
   kind: "mcp";
-  server: "hub";
+  server: "hub" | "channel_reply";
   tool: string;
 }
 

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { describe, it } from "vitest";
 import { deriveAgentExecutionCompletionToken } from "../agent-executions/completion-token.js";
-import { ProjectConfigurationStore } from "../configuration/store.js";
 import { createMemoryDatabase } from "../db/memory.js";
 import type { Database } from "../db/types.js";
 import {
@@ -12,7 +11,7 @@ import {
 import type { DaemonConnection } from "../daemons/protocol.js";
 import { createUnlimitedEntitlementsService } from "../entitlements/test-utils.js";
 import {
-  createActiveProjectConfiguration,
+  createActiveWorkflowConfiguration,
   TEST_DAEMON_ID,
   TEST_DAEMON_SLUG,
 } from "../test-utils/project-configuration.js";
@@ -104,7 +103,9 @@ describe("workflow-owned provider reactions", () => {
   it.each(["step_failure", "timeout", "prelaunch_failure"] as const)(
     "converges Slack %s without a stale workflow reaction",
     async (outcome) => {
-      const result = await runTwoStepWorkflow(createSlackReactionFixture(), { outcome });
+      const result = await runTwoStepWorkflow(createSlackReactionFixture(), {
+        outcome,
+      });
 
       assert.deepEqual(result.visible(), ["x"]);
       assert.deepEqual(result.calls(), [
@@ -119,7 +120,9 @@ describe("workflow-owned provider reactions", () => {
   it.each(["step_failure", "timeout", "prelaunch_failure"] as const)(
     "converges GitHub %s without a stale workflow reaction",
     async (outcome) => {
-      const result = await runTwoStepWorkflow(createGitHubReactionFixture(), { outcome });
+      const result = await runTwoStepWorkflow(createGitHubReactionFixture(), {
+        outcome,
+      });
 
       assert.deepEqual(result.visible(), ["-1"]);
       assert.deepEqual(result.calls(), {
@@ -134,8 +137,7 @@ describe("workflow-owned provider reactions", () => {
 function createDiscordReactionFixture() {
   const bot = new RecordingDiscordBot();
   const provider = createDiscordTriggerProvider({
-    configurationStoreForProject: () =>
-      new ProjectConfigurationStore(createMemoryDatabase(), "unused"),
+    configurationForWorkflow: async () => undefined,
     bot,
   });
   return {
@@ -169,8 +171,7 @@ function createDiscordReactionFixture() {
 function createSlackReactionFixture() {
   const client = new RecordingSlackClient();
   const provider = createSlackTriggerProvider({
-    configurationStoreForProject: () =>
-      new ProjectConfigurationStore(createMemoryDatabase(), "unused"),
+    configurationForWorkflow: async () => undefined,
     botUserIdForWorkspace: async () => "bot-1",
     client,
   });
@@ -204,8 +205,7 @@ function createSlackReactionFixture() {
 function createGitHubReactionFixture() {
   const reactions = new RecordingGitHubReactions();
   const provider = createGitHubTriggerProvider({
-    configurationStoreForProject: () =>
-      new ProjectConfigurationStore(createMemoryDatabase(), "unused"),
+    configurationForWorkflow: async () => undefined,
     reactions,
   });
   return {
@@ -240,7 +240,12 @@ async function runTwoStepWorkflow<
   Calls,
 >(
   input: {
-    provider: TriggerProvider<Name, TriggerContext, OutputContext, MaterializedContext>;
+    provider: TriggerProvider<
+      Name,
+      TriggerContext,
+      OutputContext,
+      MaterializedContext
+    >;
     triggerContext: unknown;
     outputContext: unknown;
     visible: () => readonly string[];
@@ -250,7 +255,10 @@ async function runTwoStepWorkflow<
 ) {
   let now = new Date();
   const organizationId = `org-reactions-${randomUUID()}`;
-  const database = createMemoryDatabase({ organizationIds: [organizationId], now: () => now });
+  const database = createMemoryDatabase({
+    organizationIds: [organizationId],
+    now: () => now,
+  });
   const tokenVerifier = `verifier-${randomUUID()}`;
   await database.issueEnrollmentToken({
     id: randomUUID(),
@@ -269,7 +277,7 @@ async function runTwoStepWorkflow<
     permissions: ["hub.execute"],
     now: new Date("2026-08-10T00:00:00.000Z"),
   });
-  const { project, revision } = await createActiveProjectConfiguration(
+  const { workflow, revision } = await createActiveWorkflowConfiguration(
     database,
     {
       environments: [
@@ -312,7 +320,7 @@ async function runTwoStepWorkflow<
   );
   const { run } = await database.createAcceptedTriggerRun({
     organizationId,
-    projectId: project.id,
+    workflowId: workflow.id,
     configurationRevisionId: revision.id,
     providerEventReceiptId: randomUUID(),
     configuredTriggerName: "multi",
@@ -339,7 +347,8 @@ async function runTwoStepWorkflow<
   };
   const lifecycle = createDaemonDispatchLifecycle({
     database,
-    connectionForDaemon: (daemonId) => (daemonId === TEST_DAEMON_ID ? connection : undefined),
+    connectionForDaemon: (daemonId) =>
+      daemonId === TEST_DAEMON_ID ? connection : undefined,
     providers: [input.provider],
     publicBaseUrl: "https://hub.test",
     completionTokenSecret: "reaction-secret",
@@ -351,10 +360,14 @@ async function runTwoStepWorkflow<
       providers: [input.provider],
       now: () => now,
       leaseMs: 1_000,
-      dispatchLaunchMachineIntent: (intent) => lifecycle.handoffLaunchMachineIntent(intent),
-      onWorkflowRunAccepted: (accepted) => lifecycle.notifyWorkflowRunAccepted(accepted),
-      onWorkflowRunStarted: (started) => lifecycle.notifyWorkflowRunStarted(started),
-      onWorkflowRunTerminal: (terminal) => lifecycle.notifyWorkflowRunTerminal(terminal),
+      dispatchLaunchMachineIntent: (intent) =>
+        lifecycle.handoffLaunchMachineIntent(intent),
+      onWorkflowRunAccepted: (accepted) =>
+        lifecycle.notifyWorkflowRunAccepted(accepted),
+      onWorkflowRunStarted: (started) =>
+        lifecycle.notifyWorkflowRunStarted(started),
+      onWorkflowRunTerminal: (terminal) =>
+        lifecycle.notifyWorkflowRunTerminal(terminal),
     }).engine;
   const engine = createEngine();
 
@@ -392,7 +405,8 @@ async function runTwoStepWorkflow<
     await engine.stop();
     await lifecycle.stop();
     const terminalRun = await database.findTriggerRunById(run.id);
-    if (terminalRun?.outcome !== "accepted") throw new Error("accepted workflow run not found");
+    if (terminalRun?.outcome !== "accepted")
+      throw new Error("accepted workflow run not found");
     return {
       run: terminalRun,
       visible: input.visible,
@@ -405,12 +419,18 @@ async function runTwoStepWorkflow<
   }
 }
 
-async function runningStepExecution(database: Database, triggerRunId: string, stepId: string) {
+async function runningStepExecution(
+  database: Database,
+  triggerRunId: string,
+  stepId: string,
+) {
   const steps = await database.listWorkflowStepRunsForTriggerRun(triggerRunId);
   const step = steps.find((candidate) => candidate.stepId === stepId);
   assert.ok(step);
   return waitFor(async () => {
-    const execution = await database.findAgentExecutionByWorkflowStepRunId(step.id);
+    const execution = await database.findAgentExecutionByWorkflowStepRunId(
+      step.id,
+    );
     return execution?.status === "running" ? execution : undefined;
   });
 }
@@ -432,7 +452,9 @@ async function completeStep(
   const step = steps.find((candidate) => candidate.stepId === stepId);
   assert.ok(step);
   const execution = await waitFor(async () => {
-    const candidate = await database.findAgentExecutionByWorkflowStepRunId(step.id);
+    const candidate = await database.findAgentExecutionByWorkflowStepRunId(
+      step.id,
+    );
     return candidate?.status === "running" ? candidate : undefined;
   });
   await lifecycle.completeAgentExecutionFromCallback({
@@ -450,14 +472,19 @@ async function waitFor<T>(read: () => Promise<T | undefined>): Promise<T> {
   throw new Error("timed out waiting for workflow execution");
 }
 
-function visibleDiscordReactions(client: RecordingDiscordBot): readonly string[] {
+function visibleDiscordReactions(
+  client: RecordingDiscordBot,
+): readonly string[] {
   const visible = new Set<string>();
   for (const reaction of client.reactions) visible.add(reaction.emoji);
-  for (const reaction of client.deletedOwnReactions) visible.delete(reaction.emoji);
+  for (const reaction of client.deletedOwnReactions)
+    visible.delete(reaction.emoji);
   return [...visible];
 }
 
-function visibleSlackReactions(client: RecordingSlackClient): readonly string[] {
+function visibleSlackReactions(
+  client: RecordingSlackClient,
+): readonly string[] {
   const visible = new Set<string>();
   for (const reaction of client.reactions) {
     const [operation, name] = reaction.split(":");
@@ -467,7 +494,9 @@ function visibleSlackReactions(client: RecordingSlackClient): readonly string[] 
   return [...visible];
 }
 
-function visibleGitHubReactions(client: RecordingGitHubReactions): readonly string[] {
+function visibleGitHubReactions(
+  client: RecordingGitHubReactions,
+): readonly string[] {
   const deleted = new Set(client.deleted);
   return client.created
     .filter((reaction) => !deleted.has(reaction.id))

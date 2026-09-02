@@ -1,0 +1,1 @@
+ALTER TABLE "linear_connections" ADD COLUMN "refresh_token_available" boolean DEFAULT false NOT NULL;

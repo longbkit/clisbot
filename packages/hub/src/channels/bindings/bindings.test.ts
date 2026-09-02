@@ -60,6 +60,7 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
     sendAgentMessage: async (agentId, text, options) => {
       messages.push({ agentId, text, steer: options?.steer ?? null });
     },
+    cancelAgent: async () => undefined,
     respondToAgentPermission: async (agentId, requestId, response) => {
       responses.push({ agentId, requestId, response });
     },
@@ -118,7 +119,7 @@ function makeAccount(route: CompiledRoute): CompiledChannelAccount {
     accountId: ACCOUNT_ID,
     enabled: true,
     channelEnabled: true,
-    secretRef: "secret-ref",
+    connectionId: "connection-id",
     transport: {},
     config: {},
     defaultRoles: ["interactor"],

@@ -1,5 +1,9 @@
 # Channel Configuration UI — Gap Audit
 
+> Credential-model update, 2026-09-01: Channel configuration now selects canonical Connections by
+> `connectionId`, with credentials encrypted in Hub DB. See
+> [the Hub credential, Application, and Connection gap decision](2026-09-01-hub-credential-application-connection-gaps.md).
+
 Date: 2026-08-27. Subject: the channel control plane's configuration surface in the Hub web UI —
 what exists, what is missing, and what a dedicated surface would take. Companion to the
 [channel-reuse plan](2026-08-23-openclaw-channel-reuse-plan.md) (config shape, §4.3) and the

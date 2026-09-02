@@ -84,7 +84,6 @@ export type InstallConfigurationResult =
   | InfrastructureUnavailable;
 
 export interface DispatchManualRunInput {
-  projectSlug: string;
   expectedVersionId?: string | undefined;
   trigger: string;
   actor: string;
@@ -101,7 +100,6 @@ export type DispatchManualRunResult =
       configuredTriggerName: string;
       workflowStatus: "running" | "succeeded" | "failed" | "timed_out";
     }
-  | { status: "project_not_found" }
   | { status: "actor_forbidden" }
   | { status: "daemon_offline" }
   | { status: "expected_configuration_not_current" }
@@ -198,11 +196,14 @@ export interface PublicOperationRepository {
   listActiveProjects(organizationId: string): Promise<readonly PublicProject[]>;
   listConfigurationResources(organizationId: string): Promise<ConfigurationResources>;
   listSetupResources(organizationId: string): Promise<SetupResources>;
-  resolveManualRunProject(
+  resolveManualRunWorkflow(
     organizationId: string,
     triggerName: string,
-    projectSlug: string,
-  ): Promise<{ status: "resolved"; id: string } | { status: "disabled" } | undefined>;
+  ): Promise<
+    | { status: "resolved"; id: string; revisionId: string }
+    | { status: "disabled" }
+    | undefined
+  >;
   resolveDeploymentProject(input: {
     organizationId: string;
     explicitProjectSlug?: string | undefined;
@@ -249,7 +250,8 @@ export interface PublicOperationCapabilities {
   ): Promise<{ valid: true } | { valid: false; validationErrors: unknown }>;
   dispatchManualEvent(input: {
     organizationId: string;
-    projectId: string;
+    triggerId: string;
+    triggerRevisionId: string;
     source: "manual.run";
     deliveryId: string;
     receivedAt: Date;

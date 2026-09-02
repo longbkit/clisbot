@@ -6,7 +6,7 @@ describe("LaunchMachineIntent", () => {
   it("builds the dispatcher intent from a trigger match", async () => {
     const intent = buildLaunchMachineIntent({
       organizationId: "org_1",
-      projectId: "project-1",
+      workflowId: "project-1",
       triggerRunId: "trigger-run-1",
       configurationRevisionId: "config-version-1",
       triggerName: "discord-ping",
@@ -37,7 +37,7 @@ describe("LaunchMachineIntent", () => {
     assert.deepEqual(intent, {
       kind: "launch_machine",
       organizationId: "org_1",
-      projectId: "project-1",
+      workflowId: "project-1",
       triggerRunId: "trigger-run-1",
       triggerName: "discord-ping",
       environmentName: "hetzner-faro",

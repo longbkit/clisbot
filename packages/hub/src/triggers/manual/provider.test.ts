@@ -1,43 +1,54 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { createMemoryDatabase } from "../../db/memory.js";
-import { createActiveProjectConfiguration } from "../../test-utils/project-configuration.js";
+import { createActiveWorkflowConfiguration } from "../../test-utils/project-configuration.js";
 import { createManualRunProvider } from "./provider.js";
 
 describe("manual invocation provider", () => {
   it("uses the same typed invocation evidence as message providers", async () => {
     const database = createMemoryDatabase();
-    const { project, revision, store } = await createActiveProjectConfiguration(database, {
-      environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
-      triggers: [
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(
+        database,
         {
-          name: "manual-request",
-          on: "manual.run",
-          max_runtime: "1h",
-          filters: { from_users: ["*"], inputs: { repo: "hub" } },
-          inputs: {
-            repo: { type: "string", choices: ["paseo", "hub"] },
-            agent: { type: "string", default: "codex", choices: ["codex", "opus"] },
-          },
-          steps: [
+          environments: [
+            { name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" },
+          ],
+          triggers: [
             {
-              id: "work",
-              environment: "runner",
-              max_runtime: "10m",
-              idle_timeout: "1m",
-              agent: { provider: "codex" },
-              prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+              name: "manual-request",
+              on: "manual.run",
+              max_runtime: "1h",
+              filters: { from_users: ["*"], inputs: { repo: "hub" } },
+              inputs: {
+                repo: { type: "string", choices: ["paseo", "hub"] },
+                agent: {
+                  type: "string",
+                  default: "codex",
+                  choices: ["codex", "opus"],
+                },
+              },
+              steps: [
+                {
+                  id: "work",
+                  environment: "runner",
+                  max_runtime: "10m",
+                  idle_timeout: "1m",
+                  agent: { provider: "codex" },
+                  prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+                },
+              ],
             },
           ],
         },
-      ],
-    });
-    const provider = createManualRunProvider(() => store);
+        { organizationId: "org-1" },
+      );
+    const provider = createManualRunProvider(configurationForWorkflow);
     const match = (
       await provider.match({
         providerEventReceiptId: "11111111-1111-4111-8111-111111111122",
         organizationId: "org-1",
-        projectId: project.id,
+        workflowId: workflow.id,
         configurationRevisionId: revision.id,
         source: "manual.run",
         deliveryId: "manual-1",
@@ -60,33 +71,40 @@ describe("manual invocation provider", () => {
 
   it("returns a rejected branch before resolving an unusable launch environment", async () => {
     const database = createMemoryDatabase();
-    const { project, revision, store } = await createActiveProjectConfiguration(database, {
-      environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
-      triggers: [
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(
+        database,
         {
-          name: "manual-request",
-          on: "manual.run",
-          max_runtime: "1h",
-          filters: { from_users: ["operator"] },
-          inputs: { repo: { type: "string", choices: ["hub"] } },
-          steps: [
+          environments: [
+            { name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" },
+          ],
+          triggers: [
             {
-              id: "work",
-              environment: "runner",
-              max_runtime: "10m",
-              idle_timeout: "1m",
-              agent: { provider: "codex" },
-              prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+              name: "manual-request",
+              on: "manual.run",
+              max_runtime: "1h",
+              filters: { from_users: ["operator"] },
+              inputs: { repo: { type: "string", choices: ["hub"] } },
+              steps: [
+                {
+                  id: "work",
+                  environment: "runner",
+                  max_runtime: "10m",
+                  idle_timeout: "1m",
+                  agent: { provider: "codex" },
+                  prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+                },
+              ],
             },
           ],
         },
-      ],
-    });
-    const provider = createManualRunProvider(() => store);
+        { organizationId: "org-1" },
+      );
+    const provider = createManualRunProvider(configurationForWorkflow);
     const matches = await provider.match({
       providerEventReceiptId: "11111111-1111-4111-8111-111111111123",
       organizationId: "org-1",
-      projectId: project.id,
+      workflowId: workflow.id,
       configurationRevisionId: revision.id,
       source: "manual.run",
       deliveryId: "manual-invalid-environment",

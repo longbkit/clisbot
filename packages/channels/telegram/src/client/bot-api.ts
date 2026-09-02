@@ -220,6 +220,11 @@ export interface TelegramClientOptions {
   timeoutSeconds: number | undefined;
 }
 
+// A Bot API request must never be allowed to hold the account's per-chat
+// throttler forever. The throttler serializes group sends, so one fetch with
+// no deadline also blocks every later assistant/progress post for that chat.
+const DEFAULT_TELEGRAM_API_TIMEOUT_SECONDS = 30;
+
 /** Build the client options (injected fetch + per-method timeouts + apiRoot)
  * — the pinned `resolveTelegramClientOptions` at its L1 boundary. */
 export function buildTelegramClientOptions(
@@ -230,9 +235,9 @@ export function buildTelegramClientOptions(
     typeof account.config.timeoutSeconds === "number" &&
     Number.isFinite(account.config.timeoutSeconds)
       ? Math.max(1, Math.floor(account.config.timeoutSeconds))
-      : undefined;
+      : DEFAULT_TELEGRAM_API_TIMEOUT_SECONDS;
   const fetchImpl = createTelegramClientFetch({
-    ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+    timeoutSeconds,
     ...(transport?.fetch !== undefined ? { transport } : {}),
   });
   return {

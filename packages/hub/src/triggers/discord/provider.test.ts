@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import { createMemoryDatabase } from "../../db/memory.js";
 import { createAttachmentCapabilityRegistry } from "../../attachments/capabilities.js";
-import { createActiveProjectConfiguration } from "../../test-utils/project-configuration.js";
+import { createActiveWorkflowConfiguration } from "../../test-utils/project-configuration.js";
 import { MemoryDiscordBotClient } from "./memory-bot.js";
 import { createDiscordTriggerProvider } from "./provider.js";
 import type { NormalizedDiscordMessageEvent } from "./events.js";
@@ -10,16 +10,16 @@ import { isAcceptedTriggerProviderMatch } from "../index.js";
 
 describe("Discord Phase 1 trigger provider", () => {
   it("normalizes typed inputs identically at the provider boundary", async () => {
-    const { project, revision, store } = await activeConfiguration(inputConfiguration());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputConfiguration());
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
     });
 
     const match = (
       await provider.match(
         external(
-          project.id,
+          workflow.id,
           revision.id,
           event({ content: "<@900> repo=hub agent=opus investigate" }),
         ),
@@ -35,15 +35,15 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("parses typed inputs after a matched command marker", async () => {
-    const { project, revision, store } = await activeConfiguration(inputMarkerConfiguration());
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(inputMarkerConfiguration());
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
     });
 
     const match = (
       await provider.match(
-        external(project.id, revision.id, event({ content: "<@900> run repo=hub investigate" })),
+        external(workflow.id, revision.id, event({ content: "<@900> run repo=hub investigate" })),
       )
     )[0];
 
@@ -63,15 +63,15 @@ describe("Discord Phase 1 trigger provider", () => {
         },
       ],
     };
-    const { project, revision, store } = await activeConfiguration(configuration);
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(configuration);
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
     });
     const prompt = "Do the whole thing first <@900>";
 
     const match = (
-      await provider.match(external(project.id, revision.id, event({ content: prompt })))
+      await provider.match(external(workflow.id, revision.id, event({ content: prompt })))
     )[0];
 
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
@@ -79,30 +79,30 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("matches a literal one-step prompt and keeps the mention allowlist fail-closed", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const bot = new MemoryDiscordBotClient({ selfUserId: "900" });
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot,
     });
-    const match = (await provider.match(external(project.id, revision.id, event())))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, event())))[0];
 
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     assert.equal(match.configurationRevisionId, revision.id);
     assert.equal(
-      await provider.match(external(project.id, revision.id, event({ authorId: "401" }))),
+      await provider.match(external(workflow.id, revision.id, event({ authorId: "401" }))),
       "trigger_filters_rejected",
     );
   });
 
   it("preserves reply lifecycle actions and auto-archive in the provider match", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const bot = new MemoryDiscordBotClient({ selfUserId: "900" });
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot,
     });
-    const match = (await provider.match(external(project.id, revision.id, event())))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, event())))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     await provider.onDispatchAccepted?.(match.triggerContext, match.outputContext);
     await provider.onAgentExecutionStarted?.(match.triggerContext, match.outputContext);
@@ -128,17 +128,17 @@ describe("Discord Phase 1 trigger provider", () => {
     database.organizationConnectionUsage = () =>
       Promise.resolve({ github: [], slack: [], discord: [connection], linear: [] });
     database.findDiscordConnectionForOrganization = () => Promise.resolve(connection);
-    const { project, revision, store } = await createActiveProjectConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
       database,
       discordConnectionConfiguration(),
     );
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
     });
 
     const matches = await provider.match({
-      ...external(project.id, revision.id, event()),
+      ...external(workflow.id, revision.id, event()),
       connectionId: "22222222-2222-4222-8222-222222222222",
     });
     if (typeof matches === "string") throw new Error("expected matches");
@@ -150,7 +150,7 @@ describe("Discord Phase 1 trigger provider", () => {
 
   it("preserves Discord attachments, references, and thread context as durable evidence", async () => {
     const database = createMemoryDatabase();
-    const { project, revision, store } = await createActiveProjectConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await createActiveWorkflowConfiguration(
       database,
       discordConfiguration(),
     );
@@ -182,14 +182,14 @@ describe("Discord Phase 1 trigger provider", () => {
       ],
     });
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot,
       attachments,
     });
     const match = (
       await provider.match({
         ...external(
-          project.id,
+          workflow.id,
           revision.id,
           event({
             channelId: "207",
@@ -228,7 +228,7 @@ describe("Discord Phase 1 trigger provider", () => {
     const materialized = await provider.materializeContext!({
       executionId: "execution-discord-materialize",
       organizationId: "org_1",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111118",
       triggerContext: match.triggerContext,
     });
@@ -296,7 +296,7 @@ describe("Discord Phase 1 trigger provider", () => {
     const secondMaterialized = await provider.materializeContext!({
       executionId: "execution-discord-materialize-2",
       organizationId: "org_1",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111118",
       triggerContext: match.triggerContext,
     });
@@ -309,7 +309,7 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("hydrates the direct message referenced by a channel trigger only on demand", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const referencedMessage = {
       id: "298",
       channelId: "200",
@@ -324,13 +324,13 @@ describe("Discord Phase 1 trigger provider", () => {
       messages: [referencedMessage],
     });
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot,
     });
     const match = (
       await provider.match(
         external(
-          project.id,
+          workflow.id,
           revision.id,
           event({ referencedMessage: { id: "298", channelId: "200", guildId: "100" } }),
         ),
@@ -344,7 +344,7 @@ describe("Discord Phase 1 trigger provider", () => {
     const materialized = await provider.materializeContext!({
       executionId: "execution-discord-reference",
       organizationId: "org_1",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111118",
       triggerContext: match.triggerContext,
     });
@@ -368,15 +368,15 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("does not require attachment capability during Discord ingestion", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: new MemoryDiscordBotClient({ selfUserId: "900" }),
     });
     const match = (
       await provider.match(
         external(
-          project.id,
+          workflow.id,
           revision.id,
           event({
             attachments: [
@@ -399,23 +399,23 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("fails explicit Discord context materialization when thread history cannot be read", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: new MemoryDiscordBotClient({
         selfUserId: "900",
         threadContextFetchError: new Error("missing history permission"),
       }),
     });
     const match = (
-      await provider.match(external(project.id, revision.id, event({ threadId: "207" })))
+      await provider.match(external(workflow.id, revision.id, event({ threadId: "207" })))
     )[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
     await assert.rejects(
       provider.materializeContext!({
         executionId: "execution-discord-unavailable",
         organizationId: "org-1",
-        projectId: project.id,
+        workflowId: workflow.id,
         providerEventReceiptId: "11111111-1111-4111-8111-111111111118",
         triggerContext: match.triggerContext,
       }),
@@ -424,14 +424,14 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("targets lifecycle reactions and termination notices at the original Discord message", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const bot = new MemoryDiscordBotClient({ selfUserId: "900" });
     const provider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot,
     });
     const match = (
-      await provider.match(external(project.id, revision.id, event({ threadId: "207" })))
+      await provider.match(external(workflow.id, revision.id, event({ threadId: "207" })))
     )[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
@@ -471,16 +471,16 @@ describe("Discord Phase 1 trigger provider", () => {
   });
 
   it("propagates terminal Discord reaction and notice failures", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const reactionBot = new FailingDiscordBotClient({
       selfUserId: "900",
       failReactionEmoji: "✅",
     });
     const reactionProvider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: reactionBot,
     });
-    const match = (await reactionProvider.match(external(project.id, revision.id, event())))[0];
+    const match = (await reactionProvider.match(external(workflow.id, revision.id, event())))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     await assert.rejects(async () => {
@@ -498,7 +498,7 @@ describe("Discord Phase 1 trigger provider", () => {
       failMessages: true,
     });
     const noticeProvider = createDiscordTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       bot: noticeBot,
     });
     await assert.rejects(async () => {
@@ -516,7 +516,7 @@ describe("Discord Phase 1 trigger provider", () => {
 });
 
 async function activeConfiguration(rawConfiguration: unknown = discordConfiguration()) {
-  return createActiveProjectConfiguration(createMemoryDatabase(), rawConfiguration);
+  return createActiveWorkflowConfiguration(createMemoryDatabase(), rawConfiguration);
 }
 
 class FailingDiscordBotClient extends MemoryDiscordBotClient {
@@ -646,14 +646,14 @@ function discordConnectionConfiguration() {
 }
 
 function external(
-  projectId: string,
+  workflowId: string,
   configurationRevisionId: string,
   payload: NormalizedDiscordMessageEvent,
 ) {
   return {
     providerEventReceiptId: "11111111-1111-4111-8111-111111111118",
     organizationId: "org_1",
-    projectId,
+    workflowId,
     configurationRevisionId,
     source: "discord.mention",
     deliveryId: payload.id,

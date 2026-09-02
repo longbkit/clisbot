@@ -65,6 +65,7 @@ interface SaveMutationInput {
 
 // eslint-disable-next-line complexity -- this component owns one provider card's complete workflow.
 export function ProviderSection({
+  instanceId,
   guide,
   view,
   callbackOrigin,
@@ -74,6 +75,7 @@ export function ProviderSection({
   onOpenChange,
   returned,
 }: {
+  instanceId: string;
   guide: ProviderGuide;
   view: ProviderApplicationView;
   callbackOrigin: string;
@@ -103,9 +105,9 @@ export function ProviderSection({
     else if (outcome !== undefined) result.current?.focus();
   }, [outcome]);
   useEffect(() => {
-    if (replacing) document.getElementById(`${activeGuide.provider}-${fields[0]?.name}`)?.focus();
+    if (replacing) document.getElementById(`${instanceId}-${fields[0]?.name}`)?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the first field name is stable per guide
-  }, [activeGuide, replacing]);
+  }, [activeGuide, fields, instanceId, replacing]);
 
   const saveProvider = useServerFn(verifyAndSaveProviderApplication) as (
     input: SaveMutationInput,
@@ -161,7 +163,9 @@ export function ProviderSection({
     onError: () => setOutcome({ tone: "error", message: unreachable(guide.name) }),
   });
   const retryDelivery = useMutation({
-    mutationFn: useServerFn(retrySlackSocketDelivery) as (input: {}) => Promise<VoidResponse>,
+    mutationFn: useServerFn(retrySlackSocketDelivery) as (
+      input: Parameters<typeof retrySlackSocketDelivery>[0],
+    ) => Promise<VoidResponse>,
     onSuccess: async (response) => {
       if (response.status === "error") {
         setOutcome({ tone: "error", message: response.error.message });
@@ -216,8 +220,12 @@ export function ProviderSection({
   );
 
   const startConnection = useCallback(() => {
-    connect.mutate({ data: { provider: guide.provider, organizationId, surface } });
-  }, [connect, guide.provider, organizationId, surface]);
+    const providerApplicationId = view.identity?.id;
+    if (providerApplicationId === undefined) return;
+    connect.mutate({
+      data: { provider: guide.provider, providerApplicationId, organizationId, surface },
+    });
+  }, [connect, guide.provider, organizationId, surface, view.identity?.id]);
 
   const status = statusPresentation(view.status);
   // Once anything is saved the instructions become reference material and move behind a
@@ -227,7 +235,8 @@ export function ProviderSection({
   const form =
     phase === "guiding" || phase === "replacing" ? (
       <PasteForm
-        id={`${activeGuide.provider}-application-form`}
+        id={`${instanceId}-application-form`}
+        fieldIdPrefix={instanceId}
         guide={activeGuide}
         origin={callbackOrigin}
         errors={errors}
@@ -245,7 +254,7 @@ export function ProviderSection({
 
   return (
     <Disclosure
-      id={guide.provider}
+      id={instanceId}
       open={open}
       onOpenChange={onOpenChange}
       media={<ProviderGlyph provider={guide.provider} />}
@@ -273,7 +282,12 @@ export function ProviderSection({
           connecting={connect.isPending || leaving}
           replaceRef={replace}
           onConnect={startConnection}
-          onRetry={() => retryDelivery.mutate({})}
+          onRetry={() => {
+            const providerApplicationId = view.identity?.id;
+            if (providerApplicationId !== undefined) {
+              retryDelivery.mutate({ data: { providerApplicationId } });
+            }
+          }}
           onReplace={() => {
             setErrors({});
             setOutcome(undefined);
@@ -557,6 +571,7 @@ function slackSocketEventState(
  */
 function PasteForm({
   id,
+  fieldIdPrefix,
   guide,
   origin,
   errors,
@@ -568,6 +583,7 @@ function PasteForm({
   onCancel,
 }: {
   id: string;
+  fieldIdPrefix: string;
   guide: ProviderGuide;
   origin: string;
   errors: Readonly<Record<string, string>>;
@@ -604,7 +620,7 @@ function PasteForm({
           {group.fields.map((field) => (
             <ApplicationField
               key={field.name}
-              id={`${guide.provider}-${field.name}`}
+              id={`${fieldIdPrefix}-${field.name}`}
               name={field.name}
               label={field.label}
               kind={field.kind}

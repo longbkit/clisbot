@@ -1,4 +1,4 @@
-import type { ProjectConfigurationStore } from "../../configuration/store.js";
+import type { WorkflowConfigurationResolver } from "../configuration.js";
 import type {
   AttachmentCapabilityRegistry,
   AttachmentDescriptor,
@@ -89,7 +89,7 @@ export interface DiscordOutputContext {
 type DiscordReactionPhase = "accepted" | "started";
 
 export function createDiscordTriggerProvider(options: {
-  configurationStoreForProject: (projectId: string) => ProjectConfigurationStore;
+  configurationForWorkflow: WorkflowConfigurationResolver;
   bot: DiscordBotClient;
   attachments?: AttachmentCapabilityRegistry;
 }): TriggerProvider<
@@ -103,9 +103,7 @@ export function createDiscordTriggerProvider(options: {
     eventNames: ["discord.mention"],
     async match(externalTrigger) {
       const event = NormalizedDiscordMessageEventSchema.parse(externalTrigger.payload);
-      const stored = await options
-        .configurationStoreForProject(externalTrigger.projectId)
-        .getRevision(externalTrigger.configurationRevisionId);
+      const stored = await options.configurationForWorkflow(externalTrigger);
       if (stored === undefined) return "configuration_unavailable";
       if (
         !stored.configuration.triggers.some((candidate) => candidate.on === externalTrigger.source)

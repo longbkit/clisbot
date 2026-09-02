@@ -173,6 +173,9 @@ const StepSchema = z
     if: z.string().min(1).optional(),
     output: z.object({ schema: JsonSchemaSchema }).strict().optional(),
     allow_outputs: z.array(AllowOutputSchema).optional(),
+    reuse: z
+      .union([z.literal("binding"), z.templateLiteral(["steps.", z.string().regex(IDENTIFIER)])])
+      .optional(),
     auto_archive: z.boolean().optional(),
   })
   .strict();
@@ -247,6 +250,7 @@ export interface CompiledStep {
   condition?: Expression | undefined;
   output?: { schema: JsonValue } | undefined;
   allowOutputs: readonly { type: string; max?: number | undefined; required: boolean }[];
+  reuse?: `binding` | `steps.${string}` | undefined;
   autoArchive: boolean;
 }
 
@@ -402,6 +406,9 @@ const CompiledStepSchema: z.ZodType<CompiledStep> = z
         })
         .strict(),
     ),
+    reuse: z
+      .union([z.literal("binding"), z.templateLiteral(["steps.", z.string().regex(IDENTIFIER)])])
+      .optional(),
     autoArchive: z.boolean(),
   })
   .strict();
@@ -519,6 +526,7 @@ function compileTrigger(
   const steps = trigger.steps.map((step) =>
     compileStep(trigger, step, environmentNames, environments, resolvedPromptPartials, namedAgents),
   );
+  validateStepReuse(trigger.name, steps);
   const values = compileValues(trigger);
   const compiled = {
     name: trigger.name,
@@ -534,6 +542,24 @@ function compileTrigger(
   };
   validateExpressionContract(trigger.name, compiled, environments);
   return compiled;
+}
+
+function validateStepReuse(triggerName: string, steps: readonly CompiledStep[]): void {
+  for (const [index, step] of steps.entries()) {
+    if (step.reuse === undefined || step.reuse === "binding") continue;
+    const sourceId = step.reuse.slice("steps.".length);
+    const sourceIndex = steps.findIndex((candidate) => candidate.id === sourceId);
+    if (sourceIndex < 0) {
+      throw new Error(
+        `trigger ${triggerName} step ${step.id} reuse references unknown step ${sourceId}`,
+      );
+    }
+    if (sourceIndex >= index) {
+      throw new Error(
+        `trigger ${triggerName} step ${step.id} reuse must reference an earlier step`,
+      );
+    }
+  }
 }
 
 function compileStep(
@@ -598,6 +624,7 @@ function compileStep(
       max: allowOutput.max ?? 1,
       required: allowOutput.required ?? false,
     })),
+    ...(step.reuse === undefined ? {} : { reuse: step.reuse as `binding` | `steps.${string}` }),
     autoArchive: step.auto_archive ?? false,
   };
 }
@@ -1368,6 +1395,7 @@ function rejectTriggerFields(value: unknown, index: number): void {
     "idle_timeout",
     "auto_archive",
     "allow_outputs",
+    "reuse",
   ]) {
     if (field in value) {
       throw new Error(

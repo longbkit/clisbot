@@ -10,6 +10,7 @@ import {
   type DatabaseRuntimeBundle,
 } from "../db/runtime/index.js";
 import { createDatabase } from "../db/pg.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { createProviderApplicationInventory, createProviderApplicationStore } from "./index.js";
 
 const roots: string[] = [];
@@ -30,9 +31,11 @@ describe("provider application persistence", () => {
 
     const reopened = await embeddedDatabaseRuntime(root);
     await reopened.runtime.migrate();
-    const stored = await createProviderApplicationStore(reopened.runtime, reopened.locks).read(
-      "github",
-    );
+    const stored = await createProviderApplicationStore(
+      reopened.runtime,
+      reopened.locks,
+      createTestCredentialCipher(),
+    ).read("github", "42");
     assert.equal(stored?.version, 2);
     assert.equal(stored?.configuration.provider, "github");
     if (stored?.configuration.provider === "github") {
@@ -51,9 +54,11 @@ describe("provider application persistence", () => {
       await bundle.runtime.close();
 
       const reopened = await postgresDatabaseRuntime(postgres.getConnectionUri());
-      const stored = await createProviderApplicationStore(reopened.runtime, reopened.locks).read(
-        "github",
-      );
+      const stored = await createProviderApplicationStore(
+        reopened.runtime,
+        reopened.locks,
+        createTestCredentialCipher(),
+      ).read("github", "42");
       assert.equal(stored?.version, 2);
       await reopened.runtime.close();
     } finally {
@@ -69,7 +74,11 @@ async function exercisePersistence(bundle: DatabaseRuntimeBundle) {
                          must_change_password, is_instance_operator)
      values ('operator', 'Operator', 'operator@example.test', true, now(), now(), false, true)`,
   );
-  const store = createProviderApplicationStore(bundle.runtime, bundle.locks);
+  const store = createProviderApplicationStore(
+    bundle.runtime,
+    bundle.locks,
+    createTestCredentialCipher(),
+  );
   const configuration = {
     provider: "github" as const,
     appId: "42",
@@ -120,7 +129,7 @@ async function exercisePersistence(bundle: DatabaseRuntimeBundle) {
 }
 
 async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
-  const database = createDatabase(bundle.runtime, bundle.locks);
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
   await bundle.runtime.query(
     `insert into organization (id, name, slug) values ('org', 'Org', 'org')`,
   );
@@ -140,7 +149,12 @@ async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
     clientSecret: "secret",
     signingSecret: "signing-secret",
   };
-  const store = createProviderApplicationStore(bundle.runtime, bundle.locks, database);
+  const store = createProviderApplicationStore(
+    bundle.runtime,
+    bundle.locks,
+    createTestCredentialCipher(),
+    database,
+  );
   const startAttempt = async (stateVerifier: string, expectedVersion: number | null) => {
     await database.startConnectionAttempt({
       provider: "slack",
@@ -182,8 +196,25 @@ async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
 
   await startAttempt("state-ok", null);
   await complete("state-ok", "T1", undefined);
-  assert.equal((await store.read("slack"))?.version, 1);
-  assert.equal((await database.findSlackConnection("T1"))?.providerApplicationId, "A1");
+  assert.equal((await store.read("slack", "A1"))?.version, 1);
+  assert.equal((await database.findSlackConnection("A1", "T1"))?.providerApplicationId, "A1");
+  await store.completeSlackSocketApplication({
+    configuration: { provider: "slack", transport: "socket", appId: "A2", appToken: "xapp-a2" },
+    identity: { provider: "slack", id: "A2", name: "Second app" },
+    expectedVersion: undefined,
+    updatedByUserId: "operator",
+    organizationId: "org",
+    installation: {
+      appId: "A2",
+      teamId: "T1",
+      teamName: "Acme",
+      botUserId: "UBOT2",
+      botAccessToken: "xoxb-a2",
+      scopes: ["app_mentions:read", "chat:write"],
+    },
+  });
+  assert.equal((await store.read("slack", "A2"))?.version, 1);
+  assert.equal((await database.findSlackConnection("A2", "T1"))?.botUserId, "UBOT2");
   assert.equal(
     (await createProviderApplicationInventory(bundle.runtime).connectedIdentities("slack"))[0]
       ?.status,
@@ -192,8 +223,8 @@ async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
 
   await startAttempt("state-conflict", 1);
   await assert.rejects(() => complete("state-conflict", "T2", 99));
-  assert.equal(await database.findSlackConnection("T2"), undefined);
-  assert.equal((await store.read("slack"))?.version, 1);
+  assert.equal(await database.findSlackConnection("A1", "T2"), undefined);
+  assert.equal((await store.read("slack", "A1"))?.version, 1);
   assert.equal(
     (
       await bundle.runtime.query<{ consumed_at: Date | null }>(
@@ -227,8 +258,8 @@ async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
       String(Reflect.get(Reflect.get(error, "cause") ?? {}, "message")) ===
         "simulated crash boundary",
   );
-  assert.equal(await database.findSlackConnection("T3"), undefined);
-  assert.equal((await store.read("slack"))?.version, 1);
+  assert.equal(await database.findSlackConnection("A1", "T3"), undefined);
+  assert.equal((await store.read("slack", "A1"))?.version, 1);
   assert.equal(
     (
       await bundle.runtime.query<{ consumed_at: Date | null }>(
@@ -272,16 +303,21 @@ async function exerciseSlackAtomicTransition(bundle: DatabaseRuntimeBundle) {
     socket.configuration.provider === "slack" ? socket.configuration.transport : undefined,
     "socket",
   );
-  assert.equal((await database.findSlackConnection("T2"))?.providerApplicationId, "A1");
+  assert.equal((await database.findSlackConnection("A1", "T2"))?.providerApplicationId, "A1");
 }
 
 async function exerciseLinearScopeHealth(bundle: DatabaseRuntimeBundle) {
+  const credentialEnvelope = createTestCredentialCipher().encrypt(
+    "linear-connection:linear-app:linear-org",
+    { accessToken: "linear-token", refreshToken: null },
+  );
   await bundle.runtime.query(
     `insert into linear_connections
        (organization_id, linear_organization_id, provider_application_id, slug,
-        linear_organization_name, app_user_id, access_token, scopes, connected_by_user_id)
+        linear_organization_name, app_user_id, credential_envelope, scopes, connected_by_user_id)
      values ('org', 'linear-org', 'linear-app', 'acme-linear', 'Acme', 'linear-app-user',
-             'linear-token', '["read"]'::jsonb, 'operator')`,
+             $1, '["read"]'::jsonb, 'operator')`,
+    [JSON.stringify(credentialEnvelope)],
   );
 
   assert.equal(
@@ -294,7 +330,7 @@ async function exerciseLinearScopeHealth(bundle: DatabaseRuntimeBundle) {
     `update linear_connections
      set scopes = '["read", "comments:create"]'::jsonb,
          access_token_expires_at = '2000-01-01T00:00:00.000Z',
-         refresh_token = null
+         refresh_token_available = false
      where linear_organization_id = 'linear-org'`,
   );
   assert.equal(
@@ -304,7 +340,7 @@ async function exerciseLinearScopeHealth(bundle: DatabaseRuntimeBundle) {
   );
 
   await bundle.runtime.query(
-    `update linear_connections set refresh_token = 'linear-refresh-token'
+    `update linear_connections set refresh_token_available = true
      where linear_organization_id = 'linear-org'`,
   );
   assert.equal(

@@ -9,6 +9,7 @@ import { readInstanceAuthPolicy } from "../../auth/instance-policy.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntime } from "../../db/runtime/index.js";
 import { createDatabase } from "../../db/pg.js";
 import type { Database } from "../../db/types.js";
+import { createTestCredentialCipher } from "../../credentials/test-utils.js";
 import { createFetchServer } from "../../http/node-server.js";
 import { loadBuiltStartServer } from "../../server/build.js";
 import { createGitHubRegistration } from "../../providers/github/index.js";
@@ -368,7 +369,10 @@ async function createBrowserDatabase() {
   try {
     await bundle.runtime.migrate();
     process.stdout.write("database runtime ready: embedded\n");
-    return { ...bundle, database: createDatabase(bundle.runtime, bundle.locks) };
+    return {
+      ...bundle,
+      database: createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher()),
+    };
   } catch (error) {
     await bundle.runtime.close().catch(() => undefined);
     throw error;
@@ -1109,7 +1113,12 @@ async function activateStaticProviderApplications(
   if (input.scenario === "slack-only") {
     identities.push({ provider: "slack", id: "browser-slack-app", name: "Paseo" });
   }
-  const store = createProviderApplicationStore(input.databaseRuntime, input.locks, input.database);
+  const store = createProviderApplicationStore(
+    input.databaseRuntime,
+    input.locks,
+    createTestCredentialCipher(),
+    input.database,
+  );
   for (const identity of identities) {
     await store.activate({ provider: identity.provider, identity, configurationVersion: 0 });
   }
@@ -1137,7 +1146,12 @@ async function composeProviderApplications(input: {
 } | null> {
   if (process.env["PASEO_BROWSER_PROVIDER_APPS"] !== "dynamic") return null;
   const environment = await readProviderApplicationEnvironment(process.env);
-  const store = createProviderApplicationStore(input.databaseRuntime, input.locks, input.database);
+  const store = createProviderApplicationStore(
+    input.databaseRuntime,
+    input.locks,
+    createTestCredentialCipher(),
+    input.database,
+  );
   const verifier = new BrowserProviderApplicationVerifier(input.scenario);
   const inventory = createProviderApplicationInventory(input.databaseRuntime);
   const providerRuntime = new DynamicProviderRuntime({
@@ -1174,8 +1188,10 @@ async function composeProviderApplications(input: {
     verifier,
     slackSocketVerifier: input.slackSocket.verifier(),
     slackDelivery: {
-      status: () => providerRuntime.slackDelivery()?.status() ?? { state: "stopped" },
-      retry: () => providerRuntime.slackDelivery()?.retry() ?? Promise.resolve(),
+      status: (providerApplicationId) =>
+        providerRuntime.slackDelivery(providerApplicationId)?.status() ?? { state: "stopped" },
+      retry: (providerApplicationId) =>
+        providerRuntime.slackDelivery(providerApplicationId)?.retry() ?? Promise.resolve(),
     },
     inventory,
     callbackOrigin: (request) => resolveCallbackOrigin(request, process.env["PASEO_HUB_APP_URL"]),

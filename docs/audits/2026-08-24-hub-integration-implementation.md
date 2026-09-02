@@ -1,5 +1,9 @@
 # Hub integration: build, publish, onboarding, and source changes
 
+> Credential-model update, 2026-09-01: Hub now persists encrypted canonical Connections; active
+> revisions no longer contain `secretRef` and `bot stop` never deletes Connection credentials. See
+> [the Hub credential, Application, and Connection gap decision](2026-09-01-hub-credential-application-connection-gaps.md).
+
 Implementation companion to [2026-08-23-openclaw-channel-reuse-plan.md](2026-08-23-openclaw-channel-reuse-plan.md). The plan owns _what_ and _why_ (control plane in the Hub, in-process verticals §14.5; **P0: the Hub reaches the daemon as an ordinary client — both forms: embedded pairs over loopback, team/remote over the relay, `scopes: ["*"]`, existing RPCs — zero daemon diff; P1: a flag-gated per-resource grant engine in the daemon** — plan §4-S3/§14.6/§14.7). This doc owns _how it is built, shipped, installed, and where every source change lands_. Verified against both codebases 2026-08-24/25.
 
 > Upstream merge update, 2026-09-01: use organization Trigger APIs and

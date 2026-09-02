@@ -1,5 +1,10 @@
 # `gateway.startAccount(ctx)`
 
+> Host integration update, 2026-09-01: the pinned vertical's token entry contract below remains
+> supply evidence, but the active Hub host no longer resolves `secretRef`. It injects credentials
+> decrypted from canonical Hub Connections. See
+> [the credential/Application/Connection audit](../2026-09-01-hub-credential-application-connection-gaps.md).
+
 ## The flat account
 
 Slack (`slack/dist/channel-BjlsaGHn.js:1050-1068`) reads off `ctx.account`: `accountId`, `botToken?.trim()`, `appToken?.trim()`, `config.mediaMaxMb`, `config.slashCommand`. Telegram (`main/dist/channel-DP5CkqKN.js:1148-1228`) reads `accountId`, `token` (via `resolveTelegramAccount`'s merge + `findTelegramTokenOwnerAccountId`), and `config.{timeoutSeconds, proxy, network, apiRoot, webhook*}`. Both read off `ctx`: `log?.info`, `cfg`, `runtime`, `channelRuntime`, `abortSignal`, `setStatus`, `getStatus`. `ctx.cfg` must be truthy — `requireRuntimeConfig` throws on a falsy cfg (`main/dist/plugin-config-runtime-DqLEI0ep.js`).

@@ -13,7 +13,9 @@ import { createInboundEventProcessor } from "@getpaseo/channels-shared";
 
 interface AccountInbound {
   hostRuntime: HostRuntime;
-  processor: { process(event: ChannelInboundEvent): Promise<InboundEventDecision> };
+  processor: {
+    process(event: ChannelInboundEvent): Promise<InboundEventDecision>;
+  };
   handleInbound(event: ChannelInboundEvent): Promise<InboundEventDecision>;
 }
 
@@ -28,23 +30,31 @@ export function setChannelHostRuntime(runtime: HostRuntime): void {
 /** The stored HostRuntime; throws when driven before `setChannelRuntime`. */
 export function getHostRuntime(): HostRuntime {
   if (hostRuntime === undefined) {
-    throw new Error("telegram channel runtime not set (call entry.setChannelRuntime first)");
+    throw new Error(
+      "telegram channel runtime not set (call entry.setChannelRuntime first)",
+    );
   }
   return hostRuntime;
 }
 
 /** The L3 processor for one account (created once per (runtime, account));
  * the transport's `onEvent` hands its normalized updates to it. */
-export function registerAccountInbound(accountId: string, botId?: number): AccountInbound {
+export function registerAccountInbound(
+  accountId: string,
+  botId?: number,
+  runtime: HostRuntime = getHostRuntime(),
+): AccountInbound {
   let entry = accounts.get(accountId);
-  if (entry === undefined) {
-    const runtime = getHostRuntime();
+  if (entry === undefined || entry.hostRuntime !== runtime) {
     const processor = createInboundEventProcessor({
       hostRuntime: runtime,
       channel: "telegram",
       accountId,
       ...(botId !== undefined ? { botId: String(botId) } : {}),
-      logger: runtime.logging.getChildLogger({ channel: "telegram", accountId }),
+      logger: runtime.logging.getChildLogger({
+        channel: "telegram",
+        accountId,
+      }),
     });
     entry = {
       hostRuntime: runtime,
@@ -60,7 +70,18 @@ export function registerAccountInbound(accountId: string, botId?: number): Accou
 export function getAccountRuntime(accountId: string): AccountInbound {
   const entry = accounts.get(accountId);
   if (entry === undefined) {
-    throw new Error(`telegram account "${accountId}" has no inbound processor (not started?)`);
+    throw new Error(
+      `telegram account "${accountId}" has no inbound processor (not started?)`,
+    );
   }
   return entry;
+}
+
+/** Remove only the registration owned by this account lifecycle. */
+export function unregisterAccountInbound(
+  accountId: string,
+  runtime: HostRuntime,
+): void {
+  if (accounts.get(accountId)?.hostRuntime === runtime)
+    accounts.delete(accountId);
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { LinearApiClient, LinearIssueCommentHistory } from "../../providers/linear/client.js";
 import { createMemoryDatabase } from "../../db/memory.js";
-import { createActiveProjectConfiguration } from "../../test-utils/project-configuration.js";
+import { createActiveWorkflowConfiguration } from "../../test-utils/project-configuration.js";
 import { isAcceptedTriggerProviderMatch, type ExternalTrigger } from "../index.js";
 import type { NormalizedLinearCommentEvent } from "./events.js";
 import { createLinearTriggerProvider } from "./provider.js";
@@ -14,10 +14,10 @@ describe("Linear trigger provider", () => {
   ] as const)(
     "parses inputs after a matched Linear %s marker while preserving the original comment prompt",
     async (_filterName, marker, body) => {
-      const { project, revision, store } = await activeConfiguration(commandConfiguration(marker));
-      const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+      const { workflow, revision, configurationForWorkflow } = await activeConfiguration(commandConfiguration(marker));
+      const provider = createLinearTriggerProvider({ configurationForWorkflow });
 
-      const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+      const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
       if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
       assert.deepEqual(match.invocation, {
@@ -29,13 +29,13 @@ describe("Linear trigger provider", () => {
   );
 
   it("keeps an input-shaped contains marker available to parsing and input filters", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       inputShapedMarkerConfiguration(),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "please repo=hub priority=high investigate";
 
-    const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(match.invocation, {
@@ -46,13 +46,13 @@ describe("Linear trigger provider", () => {
   });
 
   it("parses after a contains command marker following a matched pattern", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       commandConfiguration({ pattern: "@paseo", contains: "/run" }),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "@paseo please /run priority=high investigate";
 
-    const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(match.invocation, {
@@ -63,13 +63,13 @@ describe("Linear trigger provider", () => {
   });
 
   it("keeps an input-shaped contains marker after a matched pattern", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       inputShapedMarkerConfiguration({ pattern: "@paseo" }),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "@paseo please repo=hub priority=high investigate";
 
-    const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(match.invocation, {
@@ -80,13 +80,13 @@ describe("Linear trigger provider", () => {
   });
 
   it("keeps an input-shaped suffix of an overlapping contains marker", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       inputShapedMarkerConfiguration({ pattern: "@paseo", contains: "@paseo repo=hub" }),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "@paseo repo=hub priority=high investigate";
 
-    const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(match.invocation, {
@@ -97,13 +97,13 @@ describe("Linear trigger provider", () => {
   });
 
   it("retains a leading input-shaped pattern when stripping a later command marker", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       inputShapedMarkerConfiguration({ pattern: "repo=hub", contains: "/run" }),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "repo=hub /run priority=high investigate";
 
-    const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(match.invocation, {
@@ -114,13 +114,13 @@ describe("Linear trigger provider", () => {
   });
 
   it("does not treat an inside-word contains match as a command marker", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       commandConfiguration({ contains: "run" }),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "please prerun priority=high investigate";
 
-    const matches = await provider.match(external(project.id, revision.id, undefined, body));
+    const matches = await provider.match(external(workflow.id, revision.id, undefined, body));
     if (typeof matches === "string") throw new Error("expected invocation rejection");
     const match = matches[0];
     if (match === undefined || match.invocation.status !== "rejected") {
@@ -136,13 +136,13 @@ describe("Linear trigger provider", () => {
   });
 
   it("uses the first boundary-delimited contains marker after prose", async () => {
-    const { project, revision, store } = await activeConfiguration(
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration(
       commandConfiguration({ contains: "run" }),
     );
-    const provider = createLinearTriggerProvider({ configurationStoreForProject: () => store });
+    const provider = createLinearTriggerProvider({ configurationForWorkflow });
     const body = "please prerun run priority=high investigate";
 
-    const match = (await provider.match(external(project.id, revision.id, undefined, body)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, undefined, body)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(match.invocation, {
@@ -153,7 +153,7 @@ describe("Linear trigger provider", () => {
   });
 
   it("defers a bounded, causal issue history until context materialization", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const triggerAt = "2026-01-02T00:00:00.000Z";
     const beforeTrigger = Array.from({ length: 55 }, (_, index) => ({
       id: `comment-${index + 1}`,
@@ -170,11 +170,11 @@ describe("Linear trigger provider", () => {
       ],
     });
     const provider = createLinearTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       client,
     });
 
-    const match = (await provider.match(external(project.id, revision.id, triggerAt)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id, triggerAt)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     assert.deepEqual(client.historyReads, []);
@@ -187,7 +187,7 @@ describe("Linear trigger provider", () => {
     const context = await provider.materializeContext!({
       executionId: "execution-linear-history",
       organizationId: "hub-org",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111119",
       triggerContext: match.triggerContext,
     });
@@ -218,18 +218,18 @@ describe("Linear trigger provider", () => {
   });
 
   it("keeps a valid Linear run usable when optional history retrieval fails", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const provider = createLinearTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       client: new RecordingHistoryClient(undefined, new Error("Linear history unavailable")),
     });
-    const match = (await provider.match(external(project.id, revision.id)))[0];
+    const match = (await provider.match(external(workflow.id, revision.id)))[0];
     if (!isAcceptedTriggerProviderMatch(match)) throw new Error("expected accepted match");
 
     const context = await provider.materializeContext!({
       executionId: "execution-linear-unavailable",
       organizationId: "hub-org",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111120",
       triggerContext: match.triggerContext,
     });
@@ -248,16 +248,16 @@ describe("Linear trigger provider", () => {
   });
 
   it("does not fetch history without a causal event timestamp", async () => {
-    const { project, revision, store } = await activeConfiguration();
+    const { workflow, revision, configurationForWorkflow } = await activeConfiguration();
     const client = new RecordingHistoryClient({ complete: true, comments: [] });
     const provider = createLinearTriggerProvider({
-      configurationStoreForProject: () => store,
+      configurationForWorkflow,
       client,
     });
     const { occurredAt: _occurredAt, ...payload } = event("2026-01-02T00:00:00.000Z");
     const match = (
       await provider.match({
-        ...external(project.id, revision.id),
+        ...external(workflow.id, revision.id),
         payload,
       })
     )[0];
@@ -266,7 +266,7 @@ describe("Linear trigger provider", () => {
     const context = await provider.materializeContext!({
       executionId: "execution-linear-no-anchor",
       organizationId: "hub-org",
-      projectId: project.id,
+      workflowId: workflow.id,
       providerEventReceiptId: "11111111-1111-4111-8111-111111111121",
       triggerContext: match.triggerContext,
     });
@@ -298,7 +298,7 @@ class RecordingHistoryClient implements Pick<LinearApiClient, "readIssueComments
 }
 
 function activeConfiguration(configuration = linearCommentConfiguration()) {
-  return createActiveProjectConfiguration(createMemoryDatabase(), configuration, {
+  return createActiveWorkflowConfiguration(createMemoryDatabase(), configuration, {
     organizationId: "hub-org",
   });
 }
@@ -372,7 +372,7 @@ function inputShapedMarkerConfiguration(marker: { pattern?: string; contains?: s
 }
 
 function external(
-  projectId: string,
+  workflowId: string,
   configurationRevisionId: string,
   occurredAt = "2026-01-02T00:00:00.000Z",
   commentBody = "@paseo please investigate",
@@ -380,7 +380,7 @@ function external(
   return {
     providerEventReceiptId: "11111111-1111-4111-8111-111111111119",
     organizationId: "hub-org",
-    projectId,
+    workflowId,
     configurationRevisionId,
     source: "linear.comment",
     deliveryId: "delivery-1",

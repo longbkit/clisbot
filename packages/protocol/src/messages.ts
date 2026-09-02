@@ -2924,6 +2924,8 @@ export const HubExecutionAgentCreateRequestSchema = z.object({
   type: z.literal("hub.execution.agent.create.request"),
   requestId: z.string(),
   executionId: z.string(),
+  // COMPAT(hubExecutionAgentReuse): optional so older Hubs keep creating fresh agents.
+  reuseAgentId: z.string().optional(),
   provider: z.string(),
   cwd: z.string(),
   prompt: z.string(),

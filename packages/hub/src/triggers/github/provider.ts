@@ -1,4 +1,4 @@
-import type { ProjectConfigurationStore } from "../../configuration/store.js";
+import type { WorkflowConfigurationResolver } from "../configuration.js";
 import type { JsonValue } from "../../config/compiler.js";
 import {
   type TriggerProvider,
@@ -139,7 +139,7 @@ interface GitHubReactionState {
 }
 
 export function createGitHubTriggerProvider(options: {
-  configurationStoreForProject: (projectId: string) => ProjectConfigurationStore;
+  configurationForWorkflow: WorkflowConfigurationResolver;
   reactions: GitHubReactionClient;
 }): TriggerProvider<"github", GitHubTriggerContext> {
   return {
@@ -147,9 +147,7 @@ export function createGitHubTriggerProvider(options: {
     eventNames: GITHUB_TRIGGER_SOURCE_NAMES,
     async match(externalTrigger) {
       const event = NormalizedGitHubEventSchema.parse(externalTrigger.payload);
-      const stored = await options
-        .configurationStoreForProject(externalTrigger.projectId)
-        .getRevision(externalTrigger.configurationRevisionId);
+      const stored = await options.configurationForWorkflow(externalTrigger);
       if (stored === undefined) return "configuration_unavailable";
       if (
         !stored.configuration.triggers.some((candidate) =>

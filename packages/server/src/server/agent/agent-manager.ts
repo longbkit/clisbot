@@ -1337,7 +1337,7 @@ export class AgentManager {
   reloadAgentSession(
     agentId: string,
     overrides?: Partial<AgentSessionConfig>,
-    options?: { rehydrateFromDisk?: boolean },
+    options?: { rehydrateFromDisk?: boolean; owner?: AgentOwner },
   ): Promise<ManagedAgent> {
     return this.trackAgentRegistrationOperation(
       this.reloadAgentSessionInternal(agentId, overrides, options),
@@ -1347,7 +1347,7 @@ export class AgentManager {
   private async reloadAgentSessionInternal(
     agentId: string,
     overrides?: Partial<AgentSessionConfig>,
-    options?: { rehydrateFromDisk?: boolean },
+    options?: { rehydrateFromDisk?: boolean; owner?: AgentOwner },
   ): Promise<ManagedAgent> {
     this.assertAcceptingAgentRegistrations();
     let existing = this.requireSessionAgent(agentId);
@@ -1403,7 +1403,7 @@ export class AgentManager {
       return this.registerSession(session, storedConfig, agentId, {
         labels: existing.labels,
         workspaceId: existing.workspaceId,
-        owner: existing.owner,
+        owner: options?.owner ?? existing.owner,
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
         lastUserMessageAt: existing.lastUserMessageAt,
@@ -1938,7 +1938,11 @@ export class AgentManager {
 
   async unarchiveSnapshot(
     agentId: string,
-    updates?: { workspaceId?: string; labels?: AgentLabelPatch },
+    updates?: {
+      workspaceId?: string;
+      labels?: AgentLabelPatch;
+      restoreNativeSession?: boolean;
+    },
   ): Promise<boolean> {
     const registry = this.requireRegistry();
     const record = await registry.get(agentId);
@@ -1946,7 +1950,9 @@ export class AgentManager {
       return false;
     }
 
-    await this.syncNativeArchiveState(record.provider, record.persistence, "restore");
+    if (updates?.restoreNativeSession !== false) {
+      await this.syncNativeArchiveState(record.provider, record.persistence, "restore");
+    }
 
     await registry.upsert({
       ...record,

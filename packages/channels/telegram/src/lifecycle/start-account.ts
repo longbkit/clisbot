@@ -4,7 +4,10 @@
 // off to the L2 poll transport. The startAccount promise resolves only when
 // `ctx.abortSignal` fires — "start" is the transport lifetime.
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
+import type {
+  HostRuntime,
+  StartAccountContext,
+} from "@getpaseo/channels-shared";
 import {
   buildTelegramClientOptions,
   createTelegramApi,
@@ -13,15 +16,40 @@ import {
   type TelegramBotInfo,
   type TelegramCfg,
 } from "../client/bot-api.js";
-import { registerAccountInbound } from "../runtime-store.js";
+import {
+  registerAccountInbound,
+  unregisterAccountInbound,
+} from "../runtime-store.js";
 import {
   approvalCallbackRootKind,
   parseApprovalCallbackClick,
   type TelegramCallbackQueryShape,
 } from "../transport/approval-callback.js";
-import { fingerprintTelegramBotToken, runTelegramPoll } from "../transport/poll.js";
+import {
+  fingerprintTelegramBotToken,
+  runTelegramPoll,
+} from "../transport/poll.js";
 
 export const TELEGRAM_BOT_INFO_CACHE_TTL_MS = 86_400_000;
+
+const activeBotPollers = new Map<number, string>();
+
+export function claimTelegramBotPoller(
+  botId: number,
+  accountId: string,
+): () => void {
+  const owner = activeBotPollers.get(botId);
+  if (owner !== undefined) {
+    throw new Error(
+      `Telegram bot ${botId} is already polled by account "${owner}"; one Bot API token may have only one active poller`,
+    );
+  }
+  activeBotPollers.set(botId, accountId);
+  return () => {
+    if (activeBotPollers.get(botId) === accountId)
+      activeBotPollers.delete(botId);
+  };
+}
 
 export interface TelegramBotInfoCacheState {
   tokenFingerprint: string;
@@ -50,7 +78,10 @@ export async function readBotInfoCache(
   if (stored.tokenFingerprint !== fingerprint) return null;
   const fetchedAt = stored.fetchedAt;
   const nowMs = now ?? Date.now();
-  if (!Number.isFinite(fetchedAt) || nowMs - fetchedAt > TELEGRAM_BOT_INFO_CACHE_TTL_MS) {
+  if (
+    !Number.isFinite(fetchedAt) ||
+    nowMs - fetchedAt > TELEGRAM_BOT_INFO_CACHE_TTL_MS
+  ) {
     return null;
   }
   return stored;
@@ -81,7 +112,8 @@ export async function withTelegramStartupProbeSlot<T>(
   abortSignal: AbortSignal | undefined,
   run: () => Promise<T>,
 ): Promise<T> {
-  if (abortSignal?.aborted === true) throw new Error("telegram startup probe aborted");
+  if (abortSignal?.aborted === true)
+    throw new Error("telegram startup probe aborted");
   if (activeProbes >= TELEGRAM_STARTUP_PROBE_CONCURRENCY) {
     await new Promise<void>((resolve) => {
       if (abortSignal?.aborted === true) {
@@ -117,7 +149,10 @@ export async function probeTelegramBotInfo(
   abortSignal?: AbortSignal,
 ): Promise<TelegramBotInfo> {
   const account = resolveTelegramAccount(cfg, accountId, { token });
-  const api = await createTelegramApi(token, buildTelegramClientOptions(account));
+  const api = await createTelegramApi(
+    token,
+    buildTelegramClientOptions(account),
+  );
   return withTelegramStartupProbeSlot(abortSignal, () => api.getMe());
 }
 
@@ -125,7 +160,10 @@ export async function probeTelegramBotInfo(
  * the same token under two ids fails at drive time (one poller per token —
  * Telegram allows a single getUpdates consumer per bot). Blank tokens are
  * skipped, not collisions. */
-export function assertNoDuplicateTelegramTokens(cfg: TelegramCfg, activeAccountId: string): void {
+export function assertNoDuplicateTelegramTokens(
+  cfg: TelegramCfg,
+  activeAccountId: string,
+): void {
   void activeAccountId;
   const accounts = telegramConfiguredAccounts(cfg);
   let owner: [string, string] | null = null; // [accountId, trimmedToken]
@@ -143,10 +181,16 @@ function duplicateTokenMessage(owner: string, other: string): string {
   return `duplicate Telegram bot token configured for accounts "${owner}" and "${other}" — one bot token may serve one account (Telegram allows a single poller per bot). Remove the stray account entry.`;
 }
 
-function telegramConfiguredAccounts(cfg: TelegramCfg): Array<[string, string | null]> {
+function telegramConfiguredAccounts(
+  cfg: TelegramCfg,
+): Array<[string, string | null]> {
   const channels = cfg["channels"] as Record<string, unknown> | undefined;
-  const telegram = channels?.["telegram"] as Record<string, unknown> | undefined;
-  const accounts = telegram?.["accounts"] as Record<string, Record<string, unknown>> | undefined;
+  const telegram = channels?.["telegram"] as
+    | Record<string, unknown>
+    | undefined;
+  const accounts = telegram?.["accounts"] as
+    | Record<string, Record<string, unknown>>
+    | undefined;
   if (accounts === undefined) return [];
   return Object.entries(accounts).map(([accountId, entry]) => [
     accountId,
@@ -173,7 +217,9 @@ export async function startTelegramAccount(
   const cfg = ctx.cfg as unknown as TelegramCfg;
   const { accountId, abortSignal } = ctx;
   if (cfg === undefined || cfg === null) {
-    throw new Error("telegram startAccount requires a runtime config (ctx.cfg)");
+    throw new Error(
+      "telegram startAccount requires a runtime config (ctx.cfg)",
+    );
   }
   assertNoDuplicateTelegramTokens(cfg, accountId);
   const account = resolveTelegramAccount(cfg, accountId, ctx.account);
@@ -181,12 +227,25 @@ export async function startTelegramAccount(
   const botInfo: TelegramBotInfo =
     cached?.bot !== undefined
       ? cached.bot
-      : await probeTelegramBotInfo(account.token, cfg, accountId, hostRuntime, abortSignal);
+      : await probeTelegramBotInfo(
+          account.token,
+          cfg,
+          accountId,
+          hostRuntime,
+          abortSignal,
+        );
   if (typeof botInfo.id !== "number") {
     throw new Error("telegram getMe probe returned no bot id");
   }
   await writeBotInfoCache(hostRuntime, accountId, account.token, botInfo);
-  const inbound = registerAccountInbound(accountId, botInfo.id);
+  const releasePoller = claimTelegramBotPoller(botInfo.id, accountId);
+  let inbound: ReturnType<typeof registerAccountInbound>;
+  try {
+    inbound = registerAccountInbound(accountId, botInfo.id, hostRuntime);
+  } catch (error) {
+    releasePoller();
+    throw error;
+  }
   log?.info?.("telegram account started", { accountId, botId: botInfo.id });
   ctx.setStatus({
     state: "polling",
@@ -202,24 +261,34 @@ export async function startTelegramAccount(
   // the SAME exactly-once resolver as a typed command — the click is data,
   // never authority). Absent (unit posture, pinned vertical) = no card
   // clicks; the typed command still answers the prompt.
-  const onApprovalCallback = telegramApprovalCallback(ctx.channelRuntime, accountId);
-  await runTelegramPoll({
+  const onApprovalCallback = telegramApprovalCallback(
+    ctx.channelRuntime,
     accountId,
-    botToken: account.token,
-    apiRoot: account.config.apiRoot?.trim() || "https://api.telegram.org",
-    botId: botInfo.id,
-    ...(botInfo.username !== undefined ? { botUsername: botInfo.username } : {}),
-    abortSignal,
-    updateOffsetStore,
-    ...(downloadDir !== undefined ? { downloadDir } : {}),
-    ...(log !== undefined ? { logger: log } : {}),
-    ...(onApprovalCallback !== undefined ? { onApprovalCallback } : {}),
-    onEvent: async (event) => {
-      // L3 dedupe/ledger/handoff: the shared processor this account registered.
-      await inbound.handleInbound(event);
-    },
-  });
-  ctx.setStatus({ state: "stopped", accountId });
+  );
+  try {
+    await runTelegramPoll({
+      accountId,
+      botToken: account.token,
+      apiRoot: account.config.apiRoot?.trim() || "https://api.telegram.org",
+      botId: botInfo.id,
+      ...(botInfo.username !== undefined
+        ? { botUsername: botInfo.username }
+        : {}),
+      abortSignal,
+      updateOffsetStore,
+      ...(downloadDir !== undefined ? { downloadDir } : {}),
+      ...(log !== undefined ? { logger: log } : {}),
+      ...(onApprovalCallback !== undefined ? { onApprovalCallback } : {}),
+      onEvent: async (event) => {
+        // L3 dedupe/ledger/handoff: the shared processor this account registered.
+        await inbound.handleInbound(event);
+      },
+    });
+  } finally {
+    unregisterAccountInbound(accountId, hostRuntime);
+    releasePoller();
+    ctx.setStatus({ state: "stopped", accountId });
+  }
 }
 
 /**
@@ -238,7 +307,9 @@ function telegramApprovalCallback(
 ): ((callbackQuery: TelegramCallbackQueryShape) => Promise<void>) | undefined {
   const approvalAction = channelRuntime?.["approvalAction"];
   if (typeof approvalAction !== "function") return undefined;
-  const invoke = approvalAction as (params: Record<string, unknown>) => Promise<unknown>;
+  const invoke = approvalAction as (
+    params: Record<string, unknown>,
+  ) => Promise<unknown>;
   return async (callbackQuery): Promise<void> => {
     // The vertical parses the CHANNEL envelope only (who clicked, where the
     // card sits); the card value is opaque to the vertical — the hub's card

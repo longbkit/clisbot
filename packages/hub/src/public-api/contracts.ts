@@ -274,7 +274,6 @@ export const SetupResourcesSchema = z
 
 export const DispatchManualRunRequestSchema = z
   .object({
-    projectSlug: z.string().trim().min(1).max(100),
     expectedVersionId: z.string().uuid().optional(),
     trigger: z.string().trim().min(1).max(200),
     actor: z.string().trim().min(1).max(200),
@@ -284,7 +283,6 @@ export const DispatchManualRunRequestSchema = z
   .strict()
   .openapi("DispatchManualRunRequest", {
     example: {
-      projectSlug: "payments",
       trigger: "deploy",
       actor: "automation",
       deliveryKey: "deploy-2026-08-06",

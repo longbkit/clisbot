@@ -30,6 +30,8 @@ export class HubExecutionController {
   private readonly pendingCreates = new Set<Promise<void>>();
   private readonly pendingControls = new Set<Promise<void>>();
   private readonly pendingValidations = new Set<Promise<void>>();
+  private readonly creatingExecutions = new Set<string>();
+  private readonly bufferedCreateEvents = new Map<string, OwnedAgentEvent[]>();
   private cleanupPromise: Promise<void> | null = null;
   private closed = false;
 
@@ -142,6 +144,7 @@ export class HubExecutionController {
   }
 
   private async createAgentWithResponse(message: HubExecutionAgentCreateRequest): Promise<void> {
+    this.creatingExecutions.add(message.executionId);
     try {
       requireNonBlankHubAgentField("executionId", message.executionId);
       requireNonBlankHubAgentField("prompt", message.prompt);
@@ -149,6 +152,7 @@ export class HubExecutionController {
       if (!isAbsolute(message.cwd)) throw new Error("Hub agent cwd must be absolute");
       const result = await this.agents.create({
         executionId: message.executionId,
+        reuseAgentId: message.reuseAgentId,
         provider: message.provider,
         cwd: message.cwd,
         prompt: message.prompt,
@@ -175,6 +179,7 @@ export class HubExecutionController {
           error: null,
         },
       });
+      this.flushCreateEvents(message.executionId);
     } catch (error) {
       if (this.closed) return;
       this.send({
@@ -188,10 +193,31 @@ export class HubExecutionController {
           error: toHubCreateError(error),
         },
       });
+      this.bufferedCreateEvents.delete(message.executionId);
+    } finally {
+      this.creatingExecutions.delete(message.executionId);
     }
   }
 
   private sendOwnedEvent(event: OwnedAgentEvent): void {
+    if (this.closed) return;
+    if (this.creatingExecutions.has(event.executionId)) {
+      const buffered = this.bufferedCreateEvents.get(event.executionId) ?? [];
+      buffered.push(event);
+      this.bufferedCreateEvents.set(event.executionId, buffered);
+      return;
+    }
+    this.sendOwnedEventNow(event);
+  }
+
+  private flushCreateEvents(executionId: string): void {
+    const buffered = this.bufferedCreateEvents.get(executionId) ?? [];
+    this.bufferedCreateEvents.delete(executionId);
+    this.creatingExecutions.delete(executionId);
+    for (const event of buffered) this.sendOwnedEventNow(event);
+  }
+
+  private sendOwnedEventNow(event: OwnedAgentEvent): void {
     if (this.closed) return;
     if (event.type === "update") {
       this.send({

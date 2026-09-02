@@ -65,12 +65,12 @@ describe("buildStatusReport", () => {
     assert.equal(report.pin, undefined);
   });
 
-  it("reports a runtime-only credential when the record is not persisted", () => {
+  it("reports the durable encrypted Hub credential", () => {
     const report: BotStatusReport = buildStatusReport(
-      manifest({ credentials: { "telegram:personal-assistant": { persisted: false } } }),
+      manifest({ credentials: { "telegram:personal-assistant": { persisted: true } } }),
       LIVE[0],
     );
-    assert.equal(report.credential, "runtime-only");
+    assert.equal(report.credential, "persisted");
   });
 });
 
@@ -155,7 +155,7 @@ describe("runBotStatusCommand", () => {
           name: "slack-bot",
           channel: "slack",
           account: "work",
-          credentials: { "slack:work": { persisted: false } },
+          credentials: { "slack:work": { persisted: true } },
         }),
       );
       const result = await runBotStatusCommand(
@@ -164,7 +164,7 @@ describe("runBotStatusCommand", () => {
         undefined as never,
       );
       assert.equal(result.data.running, false);
-      assert.equal(result.data.credential, "runtime-only");
+      assert.equal(result.data.credential, "persisted");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

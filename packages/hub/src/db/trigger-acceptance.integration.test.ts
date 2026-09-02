@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, it } from "vitest";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { createPostgresQueryRuntime } from "./test-utils/runtime.js";
 import { createDatabase } from "./test-utils/runtime.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 
 describe("trigger acceptance persistence", () => {
   let postgres: StartedPostgreSqlContainer;
@@ -25,31 +26,16 @@ describe("trigger acceptance persistence", () => {
       insert into organization (id, name, slug) values
         ('manual-org-a', 'Manual A', 'manual-a'),
         ('manual-org-b', 'Manual B', 'manual-b');
-      insert into projects (id, organization_id, name, slug)
-      values
-        ('10000000-0000-4000-8000-000000000001', 'manual-org-a', 'Default', 'same-project'),
-        ('20000000-0000-4000-8000-000000000001', 'manual-org-b', 'Default', 'same-project');
     `);
     await client.close();
-    for (const [projectId, contentHash] of [
-      ["10000000-0000-4000-8000-000000000001", "manual-org-a-config"],
-      ["20000000-0000-4000-8000-000000000001", "manual-org-b-config"],
-    ] as const) {
-      const revision = await database.insertProjectConfigurationRevision({
-        projectId,
-        sourceKind: "manual",
-        sourceEvidence: { kind: "test" },
-        normalizedConfiguration: { environments: [], triggers: [] },
-        contentHash,
-      });
-      await database.activateProjectConfigurationRevision(projectId, revision.id);
-    }
+    const firstWorkflow = await saveWorkflow(database, "manual-org-a", "manual-org-a-config");
+    const secondWorkflow = await saveWorkflow(database, "manual-org-b", "manual-org-b-config");
 
     const first = await database.persistManualEvent(
-      input("manual-org-a", "10000000-0000-4000-8000-000000000001"),
+      input("manual-org-a", firstWorkflow.id, firstWorkflow.activeRevisionId),
     );
     const second = await database.persistManualEvent(
-      input("manual-org-b", "20000000-0000-4000-8000-000000000001"),
+      input("manual-org-b", secondWorkflow.id, secondWorkflow.activeRevisionId),
     );
     assert.equal(first.status, "accepted");
     assert.equal(second.status, "accepted");
@@ -58,13 +44,13 @@ describe("trigger acceptance persistence", () => {
     assert.notEqual(first.event.providerEventReceiptId, second.event.providerEventReceiptId);
 
     const duplicate = await database.persistManualEvent(
-      input("manual-org-a", "10000000-0000-4000-8000-000000000001"),
+      input("manual-org-a", firstWorkflow.id, firstWorkflow.activeRevisionId),
     );
     assert.equal(duplicate.status, "accepted");
     if (duplicate.status !== "accepted") throw new Error("expected replayed accepted trigger");
     assert.equal(duplicate.event.providerEventReceiptId, first.event.providerEventReceiptId);
     assert.equal(duplicate.event.organizationId, "manual-org-a");
-    assert.equal(duplicate.event.projectId, "10000000-0000-4000-8000-000000000001");
+    assert.equal(duplicate.event.workflowId, firstWorkflow.id);
     await database.close();
   }, 120_000);
 
@@ -72,27 +58,18 @@ describe("trigger acceptance persistence", () => {
     const database = await createDatabase(databaseUrl);
     const client = await createPostgresQueryRuntime(databaseUrl);
 
-    await client.query(`
+    await client.query(
+      `
       insert into organization (id, name, slug)
       values ('drop-reason-org', 'Drop Reason', 'drop-reason');
-      insert into projects (id, organization_id, name, slug)
-      values ('30000000-0000-4000-8000-000000000001', 'drop-reason-org', 'Default', 'default');
-    `);
-    await client.close();
-    const revision = await database.insertProjectConfigurationRevision({
-      projectId: "30000000-0000-4000-8000-000000000001",
-      sourceKind: "manual",
-      sourceEvidence: { kind: "test" },
-      normalizedConfiguration: { environments: [], triggers: [] },
-      contentHash: "drop-reason-config",
-    });
-    await database.activateProjectConfigurationRevision(
-      "30000000-0000-4000-8000-000000000001",
-      revision.id,
+    `,
     );
+    await client.close();
+    const workflow = await saveWorkflow(database, "drop-reason-org", "drop-reason-config");
     const receipt = await database.persistManualEvent({
       organizationId: "drop-reason-org",
-      projectId: "30000000-0000-4000-8000-000000000001",
+      triggerId: workflow.id,
+      triggerRevisionId: workflow.activeRevisionId,
       source: "manual.run",
       deliveryId: "drop-reason-delivery",
       receivedAt: new Date(),
@@ -118,35 +95,31 @@ describe("trigger acceptance persistence", () => {
     const database = await createDatabase(databaseUrl);
     const client = await createPostgresQueryRuntime(databaseUrl);
     const organizationId = "linear-scope-org";
-    const projectId = "40000000-0000-4000-8000-000000000001";
     const connectionId = "40000000-0000-4000-8000-000000000002";
+    const credentialEnvelope = createTestCredentialCipher().encrypt(
+      "linear-connection:linear-app:linear-scope-workspace",
+      { accessToken: "linear-access-token", refreshToken: "linear-refresh-token" },
+    );
 
-    await client.query(`
+    await client.query(
+      `
       insert into organization (id, name, slug)
       values ('${organizationId}', 'Linear Scope', 'linear-scope');
-      insert into projects (id, organization_id, name, slug)
-      values ('${projectId}', '${organizationId}', 'Default', 'default');
       insert into linear_connections
         (id, organization_id, linear_organization_id, provider_application_id, slug,
-         linear_organization_name, app_user_id, access_token, refresh_token, scopes)
+         linear_organization_name, app_user_id, credential_envelope, refresh_token_available, scopes)
       values
         ('${connectionId}', '${organizationId}', 'linear-scope-workspace', 'linear-app',
-         'linear-scope', 'Linear Scope', 'linear-app-user', 'linear-access-token',
-         'linear-refresh-token', '["read"]'::jsonb);
-    `);
-    const revision = await database.insertProjectConfigurationRevision({
-      projectId,
-      sourceKind: "manual",
-      sourceEvidence: { kind: "test" },
-      normalizedConfiguration: { environments: [], triggers: [] },
-      contentHash: "linear-scope-config",
-    });
-    await database.activateProjectConfigurationRevision(projectId, revision.id, [
+         'linear-scope', 'Linear Scope', 'linear-app-user', $1, true, '["read"]'::jsonb);
+    `,
+      [JSON.stringify(credentialEnvelope)],
+    );
+    const workflow = await saveWorkflow(database, organizationId, "linear-scope-config", [
       {
         provider: "linear",
         connectionId,
         resourceId: "linear-project",
-        triggerName: "linear-issue",
+        configuredEventName: "linear.issue",
       },
     ]);
 
@@ -180,11 +153,11 @@ describe("trigger acceptance persistence", () => {
       receivedAt: new Date(1),
     });
     assert.equal(accepted.status, "accepted");
-    if (accepted.status === "accepted") assert.equal(accepted.events[0]?.projectId, projectId);
+    if (accepted.status === "accepted") assert.equal(accepted.events[0]?.workflowId, workflow.id);
 
     await client.query(
       `update linear_connections
-       set refresh_token = null, access_token_expires_at = '1970-01-01T00:00:00.000Z'
+       set refresh_token_available = false, access_token_expires_at = '1970-01-01T00:00:00.000Z'
        where id = '${connectionId}'`,
     );
     const expired = await database.acceptLinearEvent({
@@ -204,13 +177,35 @@ describe("trigger acceptance persistence", () => {
   }, 120_000);
 });
 
-function input(organizationId: string, projectId: string) {
+function input(organizationId: string, triggerId: string, triggerRevisionId: string) {
   return {
     organizationId,
-    projectId,
+    triggerId,
+    triggerRevisionId,
     source: "manual.run",
     deliveryId: "same-delivery-key",
     receivedAt: new Date(),
     payload: { authenticatedBy: { kind: "api-key", keyId: `key-${organizationId}` } },
   } as const;
+}
+
+function saveWorkflow(
+  database: Awaited<ReturnType<typeof createDatabase>>,
+  organizationId: string,
+  contentHash: string,
+  routes: import("./types.js").OrganizationTriggerRoute[] = [],
+) {
+  return database.saveOrganizationTrigger({
+    organizationId,
+    name: `workflow-${contentHash}`,
+    enabled: true,
+    format: "legacy_multistep",
+    yaml: `name: workflow-${contentHash}`,
+    normalizedConfiguration: { environments: [], triggers: [] },
+    contentHash,
+    sourceKind: "manual",
+    sourceEvidence: { kind: "test" },
+    createdByUserId: null,
+    routes,
+  });
 }

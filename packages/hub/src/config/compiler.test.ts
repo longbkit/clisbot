@@ -56,6 +56,50 @@ function legacyCompiledConfiguration(compiled: CompiledHubConfig): unknown {
 }
 
 describe("workflow compiler", () => {
+  it("compiles binding and prior-step reuse independently of auto_archive", () => {
+    const base = configuration().triggers[0]!;
+    const work = base.steps[0]!;
+    const compiled = compileHubConfig({
+      ...configuration(),
+      triggers: [
+        {
+          ...base,
+          steps: [
+            { ...work, id: "prepare", reuse: "binding", auto_archive: true },
+            { ...work, id: "deliver", reuse: "steps.prepare", auto_archive: false },
+          ],
+        },
+      ],
+    });
+    assert.equal(compiled.triggers[0]!.steps[0]!.reuse, "binding");
+    assert.equal(compiled.triggers[0]!.steps[0]!.autoArchive, true);
+    assert.equal(compiled.triggers[0]!.steps[1]!.reuse, "steps.prepare");
+    assert.equal(compiled.triggers[0]!.steps[1]!.autoArchive, false);
+  });
+
+  it("rejects reuse of a missing or later workflow step", () => {
+    const base = configuration().triggers[0]!;
+    const work = base.steps[0]!;
+    for (const reuse of ["steps.missing", "steps.deliver"] as const) {
+      assert.throws(
+        () =>
+          compileHubConfig({
+            ...configuration(),
+            triggers: [
+              {
+                ...base,
+                steps: [
+                  { ...work, id: "prepare", reuse },
+                  { ...work, id: "deliver" },
+                ],
+              },
+            ],
+          }),
+        /reuse (references unknown step|must reference an earlier step)/u,
+      );
+    }
+  });
+
   it.each([
     "paseo.event.github.delivery_id",
     "paseo.prompt",

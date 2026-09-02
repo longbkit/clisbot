@@ -27,8 +27,8 @@ export interface BotManifest {
   account: string;
   /** The intended route, recorded so `bot stop`/`bot status` can re-explain it. */
   routeNote?: string;
-  /** Where each channel secret lives: a `--persist`-ed file or runtime-only. */
-  credentials: Record<string, { persisted: boolean; secretPath?: string }>;
+  /** Channel credential durability; current manifests point to encrypted Hub storage. */
+  credentials: Record<string, { persisted: true }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -59,10 +59,9 @@ export function assertBotName(name: string): void {
   }
 }
 
-/** The credential kind for a bot's channel account: `persisted` or `runtime-only`. */
-export function credentialKindFor(manifest: BotManifest): "persisted" | "runtime-only" {
-  const credential = manifest.credentials[`${manifest.channel}:${manifest.account}`];
-  return credential?.persisted ? "persisted" : "runtime-only";
+/** Channel credentials are durable encrypted Hub Connections. */
+export function credentialKindFor(_manifest: BotManifest): "persisted" {
+  return "persisted";
 }
 
 export function botNameFromPath(filePath: string): string | null {
@@ -177,20 +176,15 @@ function asManifestRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function parseManifestCredentials(
-  value: unknown,
-): Record<string, { persisted: boolean; secretPath?: string }> {
+function parseManifestCredentials(value: unknown): Record<string, { persisted: true }> {
   if (typeof value !== "object" || value === null) throw new Error("invalid bot manifest");
-  const credentials: Record<string, { persisted: boolean; secretPath?: string }> = {};
+  const credentials: Record<string, { persisted: true }> = {};
   for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
     const cred = entry as Record<string, unknown>;
-    if (typeof cred !== "object" || cred === null || typeof cred["persisted"] !== "boolean") {
+    if (typeof cred !== "object" || cred === null || cred["persisted"] !== true) {
       throw new Error("invalid bot manifest credential");
     }
-    credentials[key] = {
-      persisted: cred["persisted"],
-      ...(typeof cred["secretPath"] === "string" ? { secretPath: cred["secretPath"] } : {}),
-    };
+    credentials[key] = { persisted: true };
   }
   return credentials;
 }

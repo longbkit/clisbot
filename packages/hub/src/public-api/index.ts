@@ -466,14 +466,6 @@ function manualRunResponse(requestId: string, result: DispatchManualRunResult): 
         configuredTriggerName: result.configuredTriggerName,
         workflowStatus: result.workflowStatus,
       });
-    case "project_not_found":
-      return problem(
-        requestId,
-        404,
-        "project_not_found",
-        "Project not found",
-        "No active project with that slug exists in the credential's organization.",
-      );
     case "actor_forbidden":
       return problem(
         requestId,

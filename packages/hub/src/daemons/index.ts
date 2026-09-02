@@ -8,6 +8,7 @@ import {
   DaemonDispatchFailure,
   DaemonSpawnAckTimeoutError,
   type DaemonDispatchLifecycle,
+  type DaemonDispatchLifecycleOptions,
   type DaemonDispatchResult,
 } from "./lifecycle.js";
 import type {
@@ -42,6 +43,7 @@ export interface DaemonModuleOptions {
   connectionForDaemon(daemonId: string): DaemonConnection | undefined;
   publicBaseUrl?: string;
   completionTokenSecret?: string;
+  onWorkflowChannelStream?: DaemonDispatchLifecycleOptions["onWorkflowChannelStream"];
   test?: DaemonModuleTestOptions;
 }
 
@@ -67,6 +69,9 @@ export function createDaemonModule(options: DaemonModuleOptions): DaemonModule {
       ...(options.completionTokenSecret === undefined
         ? {}
         : { completionTokenSecret: options.completionTokenSecret }),
+      ...(options.onWorkflowChannelStream === undefined
+        ? {}
+        : { onWorkflowChannelStream: options.onWorkflowChannelStream }),
       ...(options.test === undefined ? {} : { test: options.test }),
     }),
   };

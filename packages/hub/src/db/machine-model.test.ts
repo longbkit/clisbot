@@ -6,6 +6,7 @@ import { createMemoryDatabase } from "./memory.js";
 describe("machine model database contract", () => {
   it("inserts, selects, and transitions machines and agent executions", async () => {
     const database = createMemoryDatabase();
+    const workflow = await createWorkflowFixture(database);
     const triggerContext = { provider: "manual", deliveryId: "delivery-1" };
 
     const machine = await database.insertMachine({
@@ -24,11 +25,11 @@ describe("machine model database contract", () => {
     const execution = await database.insertAgentExecution({
       id: executionId,
       organizationId: "org-1",
-      projectId: "project-1",
+      workflowId: workflow.id,
       machineId: machine.id,
       triggerContext,
       outputContext: triggerContext,
-      configurationRevisionId: "config-version-1",
+      configurationRevisionId: workflow.activeRevisionId,
     });
 
     assert.equal(execution.status, "spawning");
@@ -49,6 +50,14 @@ describe("machine model database contract", () => {
     assert.notEqual(succeeded.execution.completedAt, null);
     assert.deepEqual(succeeded.execution.result, { summary: "done" });
 
+    const finalOutput = await database.beginAgentExecutionOutput(
+      execution.id,
+      "telegram.reply",
+      1,
+      new Date(),
+    );
+    assert.ok(finalOutput);
+
     const terminated = await database.transitionMachine(machine.id, "terminated", {
       reason: "daemon_disconnected",
     });
@@ -59,6 +68,7 @@ describe("machine model database contract", () => {
 
   it("does not overwrite terminal agent executions", async () => {
     const database = createMemoryDatabase();
+    const workflow = await createWorkflowFixture(database);
     const machine = await database.insertMachine({
       orgId: "org-1",
       source: { kind: "daemon", daemonId: "mob-hetzner" },
@@ -66,11 +76,11 @@ describe("machine model database contract", () => {
     });
     const execution = await database.insertAgentExecution({
       organizationId: "org-1",
-      projectId: "project-1",
+      workflowId: workflow.id,
       machineId: machine.id,
       triggerContext: null,
       outputContext: null,
-      configurationRevisionId: "config-version-1",
+      configurationRevisionId: workflow.activeRevisionId,
     });
 
     const failed = await database.transitionAgentExecution(execution.id, "failed", {
@@ -87,5 +97,30 @@ describe("machine model database contract", () => {
       status: "failed",
       reason: "daemon_disconnected",
     });
+    assert.equal(
+      await database.beginAgentExecutionOutput(
+        execution.id,
+        "telegram.reply",
+        1,
+        new Date(),
+      ),
+      undefined,
+    );
   });
 });
+
+async function createWorkflowFixture(database: ReturnType<typeof createMemoryDatabase>) {
+  return database.saveOrganizationTrigger({
+    organizationId: "org-1",
+    name: `machine-model-${randomUUID()}`,
+    enabled: true,
+    format: "single_run",
+    yaml: "",
+    normalizedConfiguration: {},
+    contentHash: randomUUID(),
+    sourceKind: "manual",
+    sourceEvidence: { kind: "test" },
+    createdByUserId: null,
+    routes: [],
+  });
+}

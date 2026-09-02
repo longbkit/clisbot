@@ -6,7 +6,10 @@
 
 import { load } from "js-yaml";
 import type { z } from "zod";
-import { CHANNEL_POLICY_PATH, type HubBundleFile } from "../../config/bundle-contract.js";
+import {
+  CHANNEL_POLICY_PATH,
+  type HubBundleFile,
+} from "../../config/bundle-contract.js";
 import {
   SlackTransportSchema,
   TelegramTransportSchema,
@@ -25,13 +28,20 @@ export interface ChannelCompilationIssue {
 
 export class ChannelCompilationError extends Error {
   constructor(readonly issues: readonly ChannelCompilationIssue[]) {
-    super(issues.map((entry) => `${entry.path.join(".")}: ${entry.message}`).join("\n"));
+    super(
+      issues
+        .map((entry) => `${entry.path.join(".")}: ${entry.message}`)
+        .join("\n"),
+    );
     this.name = "ChannelCompilationError";
   }
 }
 
 /** Every compiler invariant violation funnels here — one error shape. */
-export function issue(path: readonly (string | number)[], message: string): never {
+export function issue(
+  path: readonly (string | number)[],
+  message: string,
+): never {
   throw new ChannelCompilationError([{ path, message }]);
 }
 
@@ -45,7 +55,10 @@ export function parseYaml<Schema extends z.ZodType>(
   try {
     parsed = load(file.content);
   } catch (error) {
-    issue([file.path], `invalid YAML: ${error instanceof Error ? error.message : String(error)}`);
+    issue(
+      [file.path],
+      `invalid YAML: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   const result = schema.safeParse(parsed);
   if (!result.success) {
@@ -66,7 +79,10 @@ export interface AuthoredRole {
   extends?: string[] | undefined;
 }
 
-export type CompiledRoleRecord = Record<string, CompiledRole & { closure: readonly string[] }>;
+export type CompiledRoleRecord = Record<
+  string,
+  CompiledRole & { closure: readonly string[] }
+>;
 
 export function compileRoles(
   authored: Record<string, AuthoredRole> | undefined,
@@ -75,7 +91,10 @@ export function compileRoles(
   for (const [name, role] of Object.entries(authored ?? {})) {
     for (const entry of [...role.grants, ...(role.deny ?? [])]) {
       if (!isPrivilegePattern(entry)) {
-        issue([CHANNEL_POLICY_PATH, "roles", name], `unknown privilege ${entry}`);
+        issue(
+          [CHANNEL_POLICY_PATH, "roles", name],
+          `unknown privilege ${entry}`,
+        );
       }
     }
     roles[name] = {
@@ -99,7 +118,10 @@ function resolveRoleClosure(
     for (const next of authored[current]?.extends ?? []) {
       if (authored[next] === undefined) continue;
       if (chain.has(next)) {
-        issue([CHANNEL_POLICY_PATH, "roles", name], `role extends cycle through ${next}`);
+        issue(
+          [CHANNEL_POLICY_PATH, "roles", name],
+          `role extends cycle through ${next}`,
+        );
       }
       if (!closure.has(next)) {
         closure.add(next);
@@ -116,7 +138,9 @@ function resolveRoleClosure(
 /** An authored user with the optional `name` resolved to an explicit null. */
 export type CompiledUser = Omit<UserRecord, "name"> & { name: string | null };
 
-export function compileUsers(authored: Record<string, UserRecord> | undefined): {
+export function compileUsers(
+  authored: Record<string, UserRecord> | undefined,
+): {
   users: Record<string, CompiledUser>;
   identityOwners: Record<string, string>;
 } {
@@ -163,7 +187,10 @@ export function compileTransport(
   authored: unknown,
 ): Record<string, unknown> {
   // P0 supports two channels; the transport block is channel-native (§4.3.3).
-  let schema: typeof SlackTransportSchema | typeof TelegramTransportSchema | null;
+  let schema:
+    | typeof SlackTransportSchema
+    | typeof TelegramTransportSchema
+    | null;
   if (channel === "slack") {
     schema = SlackTransportSchema;
   } else if (channel === "telegram") {
@@ -172,7 +199,10 @@ export function compileTransport(
     schema = null;
   }
   if (schema === null) {
-    issue([file, "transport"], `channel ${channel} is not supported at P0 (slack, telegram)`);
+    issue(
+      [file, "transport"],
+      `channel ${channel} is not supported at P0 (slack, telegram)`,
+    );
   }
   const result = schema.safeParse(authored);
   if (!result.success) {
@@ -180,6 +210,15 @@ export function compileTransport(
     issue(
       [file, "transport", ...(first?.path ?? []).map(String)],
       first?.message ?? "invalid transport block",
+    );
+  }
+  if (
+    (channel === "slack" && result.data.mode !== "socket") ||
+    (channel === "telegram" && result.data.mode !== "polling")
+  ) {
+    issue(
+      [file, "transport", "mode"],
+      `${channel} ${String(result.data.mode)} transport is not implemented; refusing a configuration that cannot receive events`,
     );
   }
   return result.data;

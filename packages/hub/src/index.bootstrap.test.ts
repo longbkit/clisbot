@@ -58,8 +58,10 @@ describe("production Hub cold start", () => {
         "PASEO_BOOTSTRAP_ORGANIZATION",
         "PASEO_BOOTSTRAP_OWNER_EMAIL",
         "PASEO_BOOTSTRAP_OWNER_PASSWORD",
+        "PASEO_HUB_CREDENTIAL_MASTER_KEY",
       ].map((name) => [name, process.env[name]]),
     );
+    process.env["PASEO_HUB_CREDENTIAL_MASTER_KEY"] = Buffer.alloc(32, 7).toString("base64");
   });
 
   afterEach(async () => {
@@ -99,15 +101,15 @@ describe("production Hub cold start", () => {
     const result = await verification.query<{
       bootstraps: number;
       runtimeConfigurations: number;
-      authSecret: string;
+      authSecretEnvelope: unknown;
     }>(`select
           (select count(*)::integer from instance_bootstrap) as "bootstraps",
           (select count(*)::integer from runtime_configuration) as "runtimeConfigurations",
-          (select auth_secret from runtime_configuration) as "authSecret"`);
+          (select auth_secret_envelope from runtime_configuration) as "authSecretEnvelope"`);
     await verification.close();
     assert.equal(result.rows[0]?.bootstraps, 0);
     assert.equal(result.rows[0]?.runtimeConfigurations, 1);
-    assert.match(result.rows[0]?.authSecret ?? "", /^[a-f0-9]{64}$/u);
+    assert.equal(typeof result.rows[0]?.authSecretEnvelope, "object");
     assert.notEqual(
       (await runtime.auth(new Request("http://localhost:3000/api/auth/get-session"))).status,
       503,

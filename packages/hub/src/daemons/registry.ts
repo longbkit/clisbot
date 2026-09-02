@@ -233,6 +233,7 @@ export class ActiveDaemonRegistry {
       type: "hub.execution.agent.create.request",
       requestId,
       executionId,
+      reuseAgentId: options.reuseAgentId,
       provider: options.provider,
       cwd: options.cwd,
       prompt: options.prompt,

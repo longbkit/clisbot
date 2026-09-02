@@ -29,7 +29,7 @@ import {
 
 export interface StoredProjectConfiguration {
   revision: ProjectConfigurationRevisionRecord;
-  configuration: CompiledProjectConfiguration;
+  configuration: CompiledExecutionConfiguration;
 }
 
 export interface DaemonAgentConfigurationValidator {
@@ -45,13 +45,16 @@ export interface DaemonAgentConfigurationValidator {
   >;
 }
 
-export type CompiledProjectConfiguration = Omit<CompiledHubConfig, "environments" | "triggers"> & {
+export type CompiledExecutionConfiguration = Omit<CompiledHubConfig, "environments" | "triggers"> & {
   environments: readonly (
     | Exclude<EnvironmentConfig, { kind: "daemon" }>
     | (Extract<EnvironmentConfig, { kind: "daemon" }> & { daemonId: string })
   )[];
   triggers: readonly CompiledTrigger[];
 };
+
+/** Project configuration remains an authoring/deployment concern; execution uses the neutral type. */
+export type CompiledProjectConfiguration = CompiledExecutionConfiguration;
 
 const storedPromptPartialsSchema = z.object({
   partials: z.array(z.object({ path: z.string(), content: z.string() })),
@@ -307,11 +310,13 @@ export async function validateHubBundleForOrganization(
 
 export function parseProjectConfiguration(
   revision: ProjectConfigurationRevisionRecord,
-): CompiledProjectConfiguration {
-  return toProjectConfiguration(parseCompiledHubConfig(revision.normalizedConfiguration));
+): CompiledExecutionConfiguration {
+  return toExecutionConfiguration(parseCompiledHubConfig(revision.normalizedConfiguration));
 }
 
-function toProjectConfiguration(configuration: CompiledHubConfig): CompiledProjectConfiguration {
+export function toExecutionConfiguration(
+  configuration: CompiledHubConfig,
+): CompiledExecutionConfiguration {
   const environments = configuration.environments.map((environment) => {
     if (environment.kind !== "daemon") return environment;
     if (environment.daemonId === undefined) {
@@ -503,7 +508,7 @@ async function resolveCompiledConfiguration(
   };
   return {
     success: true,
-    configuration: toProjectConfiguration(parseCompiledHubConfig(resolvedConfiguration)),
+    configuration: toExecutionConfiguration(parseCompiledHubConfig(resolvedConfiguration)),
   };
 }
 

@@ -10,6 +10,8 @@ import type { AgentManager, AgentManagerEvent, ManagedAgent } from "../agent/age
 import type { McpServerConfig } from "../agent/agent-sdk-types.js";
 import type { AgentStorage, StoredAgentRecord } from "../agent/agent-storage.js";
 import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
+import { sendPromptToAgent } from "../agent/agent-prompt.js";
+import type { Logger } from "pino";
 import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
 import { buildStoredAgentPayload } from "../agent/agent-projections.js";
 import { serializeAgentSnapshot, serializeAgentStreamEvent } from "../messages.js";
@@ -17,6 +19,7 @@ import { daemonExecutionKey, type DaemonAgentOwner } from "../agent/agent-owner.
 
 export interface HubExecutionAgentCreateInput {
   executionId: string;
+  reuseAgentId?: string;
   provider: string;
   cwd: string;
   prompt: string;
@@ -57,7 +60,7 @@ interface DaemonExecutionsOptions {
   agentStorage: AgentStorage;
   createAgent: BoundCreateAgentCommand;
   interruptAgent: (agentId: string) => Promise<unknown>;
-  archiveWorkspace: (workspaceId: string, requestId: string) => Promise<unknown>;
+  logger: Logger;
   cleanupFailedCreate?: (input: {
     createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
     createdAgentId: string | null;
@@ -180,6 +183,10 @@ export class DaemonExecutions implements HubExecutionAgents {
     requireHubMcpNamespace(input.mcpServers);
     requireToolPolicyServers(input.toolPolicy, input.mcpServers);
 
+    if (input.reuseAgentId !== undefined) {
+      return this.reuseAgent(owner, input, authorityGeneration);
+    }
+
     let createdWorktree: CreatePaseoWorktreeWorkflowResult | null = null;
     let createdAgentId: string | null = null;
     let result: Awaited<ReturnType<BoundCreateAgentCommand>>;
@@ -247,6 +254,75 @@ export class DaemonExecutions implements HubExecutionAgents {
     };
   }
 
+  private async reuseAgent(
+    owner: DaemonAgentOwner,
+    input: HubExecutionAgentCreateInput,
+    authorityGeneration: number,
+  ): Promise<OwnedAgentSnapshot> {
+    if (input.worktree !== undefined)
+      throw new Error("A reused Hub agent cannot create a worktree");
+    const record = await this.agentStorage.get(input.reuseAgentId!);
+    if (record === null || record.persistence == null)
+      throw new Error("Reusable Hub agent not found");
+    const previousOwner = this.requireOwner(record);
+    if (previousOwner.executionId === owner.executionId) return this.resolveRecord(record);
+    if (record.provider !== input.provider || record.cwd !== input.cwd) {
+      throw new Error("Reusable Hub agent is not compatible with this execution");
+    }
+    this.requireAuthority(authorityGeneration, "agent reuse");
+    const overrides = {
+      provider: input.provider,
+      cwd: input.cwd,
+      modeId: input.modeId,
+      model: input.model,
+      thinkingOptionId: input.thinkingOptionId,
+      featureValues: input.featureValues,
+      providerOptions: input.providerOptions,
+      toolPolicy: input.toolPolicy,
+      env: input.env,
+      mcpServers: input.mcpServers,
+    };
+    let agent: ManagedAgent;
+    if (this.agentManager.getAgent(record.id) && !record.archivedAt) {
+      agent = await this.agentManager.reloadAgentSession(record.id, overrides, { owner });
+    } else {
+      agent = await this.agentManager.resumeAgentFromPersistence(
+        record.persistence,
+        overrides,
+        record.id,
+        {
+          createdAt: new Date(record.createdAt),
+          updatedAt: new Date(),
+          lastUserMessageAt:
+            record.lastUserMessageAt == null ? null : new Date(record.lastUserMessageAt),
+          labels: record.labels,
+          workspaceId: requireExecutionWorkspaceId(record),
+          owner,
+        },
+      );
+      // Provider resume owns native restoration. In particular, Codex first tries
+      // thread/resume and only unarchives when the provider reports an archived
+      // thread. Calling thread/unarchive eagerly can hang when the native thread
+      // is already active after a best-effort archive.
+      if (record.archivedAt) {
+        await this.agentManager.unarchiveSnapshot(record.id, {
+          restoreNativeSession: false,
+        });
+      }
+    }
+    await this.agentStorage.applySnapshot(agent);
+    await sendPromptToAgent({
+      agentId: agent.id,
+      prompt: input.prompt,
+      agentManager: this.agentManager,
+      agentStorage: this.agentStorage,
+      logger: this.options.logger,
+      activeTurnBehavior: "interrupt",
+    });
+    this.requireAuthority(authorityGeneration, "agent reuse");
+    return { executionId: owner.executionId, agent: serializeAgentSnapshot(agent) };
+  }
+
   private async controlOwnedExecution(
     owner: DaemonAgentOwner,
     input: HubExecutionControlInput,
@@ -267,9 +343,13 @@ export class DaemonExecutions implements HubExecutionAgents {
       return;
     }
 
-    const workspaceId = requireExecutionWorkspaceId(record);
     this.requireAuthority(authorityGeneration, "execution control");
-    await this.options.archiveWorkspace(workspaceId, input.requestId);
+    if (record.archivedAt) return;
+    if (this.agentManager.getAgent(record.id)) {
+      await this.agentManager.archiveAgent(record.id);
+    } else {
+      await this.agentManager.archiveSnapshot(record.id, new Date().toISOString());
+    }
   }
 
   private resolveRecord(record: StoredAgentRecord): OwnedAgentSnapshot {

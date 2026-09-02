@@ -166,9 +166,9 @@ export function createLinearRegistration(
     },
     connection,
     triggerProviders: [
-      ({ configurationStoreForProject }) =>
+      ({ configurationForWorkflow }) =>
         createLinearTriggerProvider({
-          configurationStoreForProject,
+          configurationForWorkflow,
           ...(api === undefined ? {} : { client: api }),
         }),
     ],

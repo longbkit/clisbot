@@ -14,6 +14,7 @@ import { HubFaultProxy } from "./fault-proxy.js";
 import { SourcePaseo } from "./source-paseo.js";
 import { configurationBundleFixture } from "../../test-utils/configuration-bundle.js";
 import { currentProjectConfigurationFiles } from "../../test-utils/current-project-configuration.js";
+import { createTestCredentialCipher } from "../../credentials/test-utils.js";
 
 const exec = promisify(execFile);
 const HUB_ROOT = process.cwd();
@@ -1456,12 +1457,19 @@ export class HubE2E {
   }
 
   private async seedCurrentProjectResources(): Promise<void> {
+    const providerApplicationId = "A-E2E";
+    const credentialEnvelope = createTestCredentialCipher().encrypt(
+      `slack-connection:${providerApplicationId}:paseo`,
+      { botAccessToken: "xoxb-test" },
+    );
     await this.requirePool().query(
       `insert into slack_connections
-         (id, organization_id, team_id, slug, team_name, bot_user_id, bot_access_token, scopes)
-       values ('00000000-0000-4000-8000-0000000000c1', 'hub-e2e', 'paseo', 'paseo',
-               'Paseo', 'UBOT', 'xoxb-test', '["app_mentions:read", "chat:write"]'::jsonb)
-       on conflict (team_id) do nothing`,
+         (id, organization_id, provider_application_id, team_id, slug, team_name, bot_user_id,
+          credential_envelope, scopes)
+       values ('00000000-0000-4000-8000-0000000000c1', 'hub-e2e', $1, 'paseo', 'paseo',
+               'Paseo', 'UBOT', $2, '["app_mentions:read", "chat:write"]'::jsonb)
+       on conflict (provider_application_id, team_id) do nothing`,
+      [providerApplicationId, credentialEnvelope],
     );
     await this.requirePool().query(
       `insert into discord_connections

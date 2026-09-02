@@ -161,6 +161,47 @@ describe("telegram poll transport", () => {
     expect(await readUpdateOffset(store, BOT_TOKEN)).toBe(2);
   });
 
+  it("aborts an in-flight HTTP long poll during account shutdown", async () => {
+    const store = new FakeKeyedStore<OffsetState>();
+    const controller = new AbortController();
+    let observedSignal: AbortSignal | undefined;
+    let markFetchStarted: (() => void) | undefined;
+    const fetchStarted = new Promise<void>((resolve) => {
+      markFetchStarted = resolve;
+    });
+    const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+      observedSignal = init?.signal instanceof AbortSignal ? init.signal : undefined;
+      markFetchStarted?.();
+      return await new Promise<Response>((_resolve, reject) => {
+        if (observedSignal?.aborted) {
+          reject(new DOMException("aborted", "AbortError"));
+          return;
+        }
+        observedSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    }) as typeof globalThis.fetch;
+
+    const polling = runTelegramPoll({
+      accountId: "acct",
+      botToken: BOT_TOKEN,
+      apiRoot: "https://api.telegram.org",
+      botId: BOT_ID,
+      abortSignal: controller.signal,
+      updateOffsetStore: store,
+      onEvent: async () => undefined,
+      fetchImpl,
+    });
+    await fetchStarted;
+    controller.abort();
+    await polling;
+
+    expect(observedSignal).toBe(controller.signal);
+  });
+
   // --- Group G: inbound media at the poll level (download + manifest fold).
 
   /** A fetch that answers `getFile` (keying off the file_id in the URL) and

@@ -1,5 +1,6 @@
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { RuntimeConfigurationStore } from "./internal/store.js";
+import type { CredentialCipher } from "../credentials/credential-cipher.js";
 
 export interface RuntimeConfiguration {
   authSecret(): Promise<string>;
@@ -16,14 +17,18 @@ export function createRuntimeConfiguration(options: {
   environment: RuntimeConfigurationEnvironment;
   effectivePort: number;
   randomBytes(size: number): Uint8Array;
+  credentialCipher: CredentialCipher;
 }): RuntimeConfiguration {
-  const store = new RuntimeConfigurationStore(options.database);
+  const store = new RuntimeConfigurationStore(options.database, options.credentialCipher);
   return {
-    authSecret: () => {
+    authSecret: async () => {
       const override = nonEmpty(options.environment.authSecret);
-      return override === undefined
-        ? store.resolveAuthSecret(() => encodeSecret(options.randomBytes(32)))
-        : Promise.resolve(override);
+      // Always resolve the encrypted database value, even when an advanced
+      // deployment overrides the effective auth secret. This row is the
+      // startup key-check sentinel: a wrong master key must not be masked by
+      // an unrelated auth override.
+      const stored = await store.resolveAuthSecret(() => encodeSecret(options.randomBytes(32)));
+      return override ?? stored;
     },
     publicUrl: () =>
       Promise.resolve(

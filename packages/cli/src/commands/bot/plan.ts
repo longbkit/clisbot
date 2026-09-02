@@ -27,12 +27,10 @@ export interface BotStartOptions {
   workspace?: string;
   cwd?: string;
   newWorkspace?: string;
-  slackBotToken?: string;
-  slackAppToken?: string;
+  slackConnectionId?: string;
   slackAccount?: string;
   telegramBotToken?: string;
   telegramAccount?: string;
-  persist?: boolean;
 }
 
 /** The fully-resolved bot bundle, ready for side effects. */
@@ -49,20 +47,15 @@ export interface BotStartPlan {
   agentTitle: string;
   channel: BotChannel;
   account: string;
-  persist: boolean;
   /** The channel credential input, resolved to its secret before side effects. */
   credential: BotCredentialPlan;
   /** The intended route, as a one-line note for the manifest and output. */
   routeNote: string;
 }
 
-export interface BotCredentialPlan {
-  channel: BotChannel;
-  account: string;
-  input: ParsedTokenInput;
-  /** A second, channel-specific credential (Slack's app token). */
-  secondary?: ParsedTokenInput;
-}
+export type BotCredentialPlan =
+  | { channel: "slack"; account: string; connectionId: string }
+  | { channel: "telegram"; account: string; input: ParsedTokenInput };
 
 const DEFAULT_ISOLATION = "local";
 const WORKSPACE_ISOLATIONS = ["local", "worktree"] as const;
@@ -89,7 +82,6 @@ export function buildBotStartPlan(options: BotStartOptions, home: string): BotSt
     agentTitle,
     channel: credential.channel,
     account: credential.account,
-    persist: options.persist === true,
     credential,
     routeNote: buildRouteNote(credential.channel, credential.account, agentTitle),
   };
@@ -122,23 +114,20 @@ function resolveWorkspacePath(options: BotStartOptions, home: string): string {
 
 /** At least one channel credential is required; one bot answers on one channel. */
 function resolveCredential(options: BotStartOptions, botName: string): BotCredentialPlan {
-  const slackBot = options.slackBotToken?.trim();
+  const slackConnectionId = options.slackConnectionId?.trim();
   const telegramBot = options.telegramBotToken?.trim();
-  if (slackBot !== undefined && telegramBot !== undefined) {
+  if (slackConnectionId !== undefined && telegramBot !== undefined) {
     throw commandError(
       "MULTIPLE_CHANNELS",
-      "one bot answers on one channel: pass either --slack-bot-token or --telegram-bot-token, " +
+      "one bot answers on one channel: pass either --slack-connection-id or --telegram-bot-token, " +
         "and run `bot start` again for a second channel",
     );
   }
-  if (slackBot !== undefined) {
+  if (slackConnectionId !== undefined) {
     return {
       channel: "slack",
       account: options.slackAccount?.trim() || botName,
-      input: parseRequiredToken("slack-bot-token", slackBot),
-      ...(options.slackAppToken?.trim()
-        ? { secondary: parseTokenInput(options.slackAppToken.trim()) }
-        : {}),
+      connectionId: slackConnectionId,
     };
   }
   if (telegramBot !== undefined) {
@@ -150,7 +139,7 @@ function resolveCredential(options: BotStartOptions, botName: string): BotCreden
   }
   throw commandError(
     "MISSING_CREDENTIAL",
-    "a channel credential is required to start a bot: pass --slack-bot-token or --telegram-bot-token " +
+    "a channel credential is required to start a bot: pass --slack-connection-id or --telegram-bot-token " +
       "(a literal value, ${ENV_VAR}, or a secret-file path)",
   );
 }
@@ -205,7 +194,7 @@ export function buildBotManifest(
     agentTitle: plan.agentTitle,
     channel: plan.channel,
     account: plan.account,
-    credentials: { [credentialKey]: { persisted: plan.persist } },
+    credentials: { [credentialKey]: { persisted: true } },
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };

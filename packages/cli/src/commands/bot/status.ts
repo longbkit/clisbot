@@ -35,7 +35,7 @@ export interface BotStatusReport {
   agentTitle: string;
   workspaceId: string;
   workspacePath: string;
-  credential: "persisted" | "runtime-only";
+  credential: "persisted";
   routeNote?: string;
   /** True when the account appears in the running Hub's channel status. */
   running: boolean;

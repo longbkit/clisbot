@@ -205,15 +205,16 @@ async function fetchUpdates(params: {
   apiRoot: string;
   offset: number;
   timeoutSeconds: number;
+  abortSignal: AbortSignal;
   fetchImpl: typeof globalThis.fetch | undefined;
 }): Promise<TelegramUpdateShape[]> {
-  const { botToken, apiRoot, offset, timeoutSeconds, fetchImpl } = params;
+  const { botToken, apiRoot, offset, timeoutSeconds, abortSignal, fetchImpl } = params;
   const fetchFn = fetchImpl ?? globalThis.fetch;
   const url =
     `${apiRoot}/bot${encodeURIComponent(botToken)}/getUpdates?offset=${encodeURIComponent(String(offset))}` +
     `&limit=${TELEGRAM_POLL_LIMIT}&timeout=${timeoutSeconds}` +
     `&allowed_updates=${encodeURIComponent(JSON.stringify(resolveTelegramAllowedUpdates()))}`;
-  const response = await fetchFn(url, { method: "GET" });
+  const response = await fetchFn(url, { method: "GET", signal: abortSignal });
   if (!response.ok) {
     throw new Error(`Telegram getUpdates failed: HTTP ${response.status}`);
   }
@@ -385,10 +386,13 @@ async function fetchBatch(
       apiRoot: opts.apiRoot,
       offset,
       timeoutSeconds: TELEGRAM_POLL_TIMEOUT_SECONDS,
+      abortSignal: opts.abortSignal,
       fetchImpl: opts.fetchImpl,
     });
   } catch (error) {
-    if (opts.abortSignal.aborted) throw error;
+    // Shutdown aborts the in-flight long poll. Treat that as the normal end
+    // of the account lifetime, not as a transport failure.
+    if (opts.abortSignal.aborted) return [];
     opts.logger?.warn("telegram poll fault (kept polling)", {
       accountId: opts.accountId,
       error: error instanceof Error ? error.message : String(error),

@@ -16,7 +16,10 @@
 // or agent code path is reachable from it, so a channel fault cannot reach the
 // daemon (plan §14.5 / P13).
 
-import { createHostKeyedStoreRoot, type HostKeyedStoreRoot } from "../state/keyed-store.js";
+import {
+  createHostKeyedStoreRoot,
+  type HostKeyedStoreRoot,
+} from "../state/keyed-store.js";
 
 /** The normalized inbound event the channel hands the host
  * (`dispatchChannelInboundReply`'s `ctxPayload`). Channel-specific, but always
@@ -163,6 +166,7 @@ export interface StartAccountContext {
   /** Open channel-specific runtime surface; P0 carries
    * `session.resolveEntryResetFreshness`, wider verticals add their own keys. */
   channelRuntime?: Record<string, unknown>;
+  hostRuntime?: HostRuntime;
   abortSignal: AbortSignal;
   setStatus: (status: unknown) => void;
   getStatus: () => unknown;
@@ -208,7 +212,9 @@ export function createHostRuntime(options: {
     },
     channel: options.channel ?? {},
     ...(options.outbound !== undefined ? { outbound: options.outbound } : {}),
-    ...(options.inboundLedger !== undefined ? { inboundLedger: options.inboundLedger } : {}),
+    ...(options.inboundLedger !== undefined
+      ? { inboundLedger: options.inboundLedger }
+      : {}),
   };
 }
 

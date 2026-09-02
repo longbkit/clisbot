@@ -48,7 +48,7 @@ describe("provider event audit logs", () => {
       source: "slack.mention",
       deliveryId: "delivery-2",
       receiptId: "receipt-2",
-      projectId: "project-1",
+      workflowId: "project-1",
       triggerNames: ["classify", "maintain"],
       acceptedCount: 1,
       rejectedCount: 1,

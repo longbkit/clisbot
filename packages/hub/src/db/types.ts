@@ -1,7 +1,6 @@
 // COMPAT(clisbot-channels): fork-owned channel control plane status enums (schema.ts).
 import type {
   AgentExecutionStatus,
-  ChannelAccountStatus,
   ChannelLedgerDirection,
   DeliveryLedgerStatus,
   MachineSource,
@@ -9,6 +8,7 @@ import type {
   ThreadBindingStatus,
 } from "./schema.js";
 import type { JsonValue } from "../config/compiler.js";
+import type { HubBundleFile } from "../config/bundle-contract.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { InvocationRejection } from "../triggers/invocation.js";
 import type { ProviderEventDropReasonCode } from "../triggers/drop-reason.js";
@@ -23,7 +23,7 @@ export type WorkflowDeadlineKind = "step_hard" | "step_idle" | "whole_run";
 export interface ProviderEventReceiptRecord {
   id: string;
   organizationId: string;
-  provider: "github" | "slack" | "discord" | "linear" | "manual";
+  provider: "github" | "slack" | "discord" | "linear" | "manual" | "channel";
   connectionId: string | null;
   resourceId: string | null;
   deliveryId: string;
@@ -53,7 +53,7 @@ export interface ProviderEventReceiptSummary {
 }
 
 export interface ProviderEventRouteSnapshot {
-  projectId: string;
+  workflowId: string;
   configurationRevisionId: string;
   connectionId: string | null;
   resourceId: string | null;
@@ -103,7 +103,7 @@ export interface MachineRecord {
 export interface AgentExecutionRecord {
   id: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   machineId: string | null;
   status: AgentExecutionStatus;
   startedAt: Date;
@@ -131,7 +131,10 @@ export interface AgentExecutionRecord {
   hubActionAcknowledgements: AgentExecutionHubAcknowledgements;
 }
 
-export type AgentExecutionOutputAttemptStatus = "pending" | "succeeded" | "failed";
+export type AgentExecutionOutputAttemptStatus =
+  | "pending"
+  | "succeeded"
+  | "failed";
 
 export interface AgentExecutionOutputAttempt {
   id: string;
@@ -337,8 +340,6 @@ export interface OrganizationTriggerRecord {
   name: string;
   enabled: boolean;
   format: "single_run" | "legacy_multistep";
-  /** Temporary workflow-engine adapter; never exposed as a product project. */
-  runtimeProjectId: string;
   activeRevisionId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -352,15 +353,27 @@ export interface OrganizationTriggerRevisionRecord {
   yaml: string;
   normalizedConfiguration: unknown;
   contentHash: string;
-  sourceKind: "manual" | "github" | "project_migration";
+  sourceKind: "manual" | "github";
   sourceEvidence: unknown;
   createdByUserId: string | null;
   createdAt: Date;
 }
 
-export interface PendingProjectTriggerMigration {
-  project: ProjectRecord;
-  revision: ProjectConfigurationRevisionRecord;
+export interface ChannelConfigurationRevisionRecord {
+  id: string;
+  organizationId: string;
+  version: number;
+  files: readonly HubBundleFile[];
+  contentHash: string;
+  createdByUserId: string | null;
+  createdAt: Date;
+}
+
+export interface SaveChannelConfigurationInput {
+  organizationId: string;
+  files: readonly HubBundleFile[];
+  contentHash: string;
+  createdByUserId: string | null;
 }
 
 export type ConnectionProvider = "github" | "discord" | "slack" | "linear";
@@ -404,6 +417,7 @@ export interface ConnectionAttemptRecord {
 }
 
 export interface ConnectionAttemptConfigurationSnapshot {
+  providerApplicationId: string;
   configurationVersion: number;
   callbackOrigin: string;
   configurationSnapshot: unknown;
@@ -441,7 +455,7 @@ export interface SlackConnectionRecord {
   botUserId: string;
   botAccessToken: string;
   scopes: string[];
-  providerApplicationId: string | null;
+  providerApplicationId: string;
 }
 
 export interface LinearConnectionRecord {
@@ -544,7 +558,10 @@ export interface UpdateLinearConnectionTokensInput {
   scopes?: string[];
 }
 
-export type LinearConnectionTokenUpdate = Omit<UpdateLinearConnectionTokensInput, "connectionId">;
+export type LinearConnectionTokenUpdate = Omit<
+  UpdateLinearConnectionTokensInput,
+  "connectionId"
+>;
 
 export type LinearConnectionRefreshOperation<T> = (
   connection: LinearConnectionRecord | undefined,
@@ -595,7 +612,7 @@ export interface InsertProviderEventResult {
 export interface DurableProviderEvent {
   providerEventReceiptId: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   configurationRevisionId: string;
   deliveryId: string;
   source: string;
@@ -640,9 +657,22 @@ export interface AcceptLinearEventInput extends ProviderEventEvidence {
   projectId?: string;
 }
 
-export interface PersistManualEventInput extends InsertProviderEventInput {
+export interface PersistManualEventInput extends Omit<
+  InsertProviderEventInput,
+  "projectId" | "configurationRevisionId"
+> {
   organizationId: string;
-  projectId: string;
+  triggerId: string;
+  triggerRevisionId: string;
+}
+
+export interface PersistChannelEventInput extends Omit<
+  InsertProviderEventInput,
+  "projectId" | "configurationRevisionId"
+> {
+  organizationId: string;
+  triggerId: string;
+  triggerRevisionId: string;
 }
 
 export type ManualEventPersistence =
@@ -659,7 +689,11 @@ export interface GitHubLifecycleReceiptClaimInput {
 }
 
 export type GitHubLifecycleReceiptClaim =
-  | { status: "claimed"; providerEventReceiptId: string; installationId: number }
+  | {
+      status: "claimed";
+      providerEventReceiptId: string;
+      installationId: number;
+    }
   | { status: "duplicate"; providerEventReceiptId: string };
 
 export type GitHubLifecycleResult =
@@ -678,7 +712,7 @@ export interface InsertMachineInput {
 export interface InsertAgentExecutionInput {
   id?: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   machineId: string | null;
   daemonId?: string | null;
   startedAt?: Date;
@@ -698,7 +732,7 @@ export interface InsertAgentExecutionInput {
 interface TriggerRunEvidence {
   id: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   configurationRevisionId: string;
   providerEventReceiptId: string;
   configuredTriggerName: string;
@@ -730,15 +764,17 @@ export interface RejectedTriggerRunRecord extends TriggerRunEvidence {
   completedAt: Date;
 }
 
-export type TriggerRunRecord = AcceptedTriggerRunRecord | RejectedTriggerRunRecord;
+export type TriggerRunRecord =
+  | AcceptedTriggerRunRecord
+  | RejectedTriggerRunRecord;
 
-export interface ProjectActivityRunRecord {
+export interface WorkflowActivityRunRecord {
   run: TriggerRunRecord;
   receipt: ProviderEventReceiptRecord;
   steps: readonly WorkflowStepRunRecord[];
 }
 
-export interface ProjectActivityRunListRecord {
+export interface WorkflowActivityRunListRecord {
   run: TriggerRunRecord;
   receipt: ProviderEventReceiptSummary;
 }
@@ -748,7 +784,13 @@ export interface WorkflowStepRunRecord {
   triggerRunId: string;
   stepId: string;
   ordinal: number;
-  status: "pending" | "running" | "succeeded" | "skipped" | "failed" | "timed_out";
+  status:
+    | "pending"
+    | "running"
+    | "succeeded"
+    | "skipped"
+    | "failed"
+    | "timed_out";
   agentExecutionId: string | null;
   output: unknown;
   failureReason: string | null;
@@ -770,7 +812,7 @@ export interface WorkflowWakeupRecord {
 export interface CreateAcceptedTriggerRunInput {
   id?: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   configurationRevisionId: string;
   providerEventReceiptId: string;
   configuredTriggerName: string;
@@ -787,7 +829,7 @@ export interface CreateAcceptedTriggerRunInput {
 export interface CreateRejectedTriggerRunInput {
   id?: string;
   organizationId: string;
-  projectId: string;
+  workflowId: string;
   configurationRevisionId: string;
   providerEventReceiptId: string;
   configuredTriggerName: string;
@@ -825,7 +867,10 @@ export interface WorkflowStepExecutionInput {
   stepId: string;
   ordinal: number;
   executionId: string;
-  execution: Omit<InsertAgentExecutionInput, "deadlineAt" | "idleDeadlineAt" | "startedAt"> & {
+  execution: Omit<
+    InsertAgentExecutionInput,
+    "deadlineAt" | "idleDeadlineAt" | "startedAt"
+  > & {
     deadlineAt: Date;
     idleDeadlineAt: Date;
     startedAt: Date;
@@ -867,7 +912,10 @@ export interface CreateProjectInput {
   createdByUserId: string | null;
 }
 
-export type EntitlementChangeSource = "provisioning" | "plan_stamp" | "override";
+export type EntitlementChangeSource =
+  | "provisioning"
+  | "plan_stamp"
+  | "override";
 
 export interface OrganizationEntitlementsRecord {
   organizationId: string;
@@ -1051,24 +1099,6 @@ export interface OrganizationTriggerRoute {
   configuredEventName: string;
 }
 
-export interface MigrateProjectTriggerInput {
-  name: string;
-  format: "single_run" | "legacy_multistep";
-  enabled: boolean;
-  yaml: string;
-  normalizedConfiguration: unknown;
-  contentHash: string;
-  sourceEvidence: unknown;
-}
-
-export interface MigrateProjectTriggersInput {
-  projectId: string;
-  organizationId: string;
-  configurationRevisionId: string;
-  projectSlug: string;
-  triggers: readonly MigrateProjectTriggerInput[];
-}
-
 export interface SaveOrganizationTriggerInput {
   organizationId: string;
   triggerId?: string;
@@ -1090,7 +1120,10 @@ export interface SwitchProjectConfigurationToManualInput {
   rawYaml: string;
   normalizedConfiguration: unknown;
   contentHash: string;
-  bundle: { authoredHash: string; files: readonly { path: string; content: string }[] };
+  bundle: {
+    authoredHash: string;
+    files: readonly { path: string; content: string }[];
+  };
   routes: readonly ProjectTriggerRoute[];
 }
 
@@ -1157,25 +1190,38 @@ export interface Database {
   findTriggerRunsByProviderEventReceiptId(
     providerEventReceiptId: string,
   ): Promise<TriggerRunRecord[]>;
-  listTriggerRunsForProject(projectId: string, limit: number): Promise<TriggerRunRecord[]>;
-  listProjectActivityRuns(
-    projectId: string,
+  listWorkflowActivityRuns(
+    workflowId: string,
     limit: number,
-  ): Promise<ProjectActivityRunListRecord[]>;
-  findProjectActivityRun(
-    projectId: string,
-    runId: string,
-  ): Promise<ProjectActivityRunRecord | undefined>;
-  updateTriggerRunValues(triggerRunId: string, values: unknown): Promise<TriggerRunRecord>;
-  findWorkflowStepRunById(id: string): Promise<WorkflowStepRunRecord | undefined>;
-  findWorkflowStepRunByTriggerRun(triggerRunId: string): Promise<WorkflowStepRunRecord | undefined>;
-  listWorkflowStepRunsForTriggerRun(triggerRunId: string): Promise<WorkflowStepRunRecord[]>;
+  ): Promise<WorkflowActivityRunListRecord[]>;
+  updateTriggerRunValues(
+    triggerRunId: string,
+    values: unknown,
+  ): Promise<TriggerRunRecord>;
+  findWorkflowStepRunById(
+    id: string,
+  ): Promise<WorkflowStepRunRecord | undefined>;
+  findWorkflowStepRunByTriggerRun(
+    triggerRunId: string,
+  ): Promise<WorkflowStepRunRecord | undefined>;
+  listWorkflowStepRunsForTriggerRun(
+    triggerRunId: string,
+  ): Promise<WorkflowStepRunRecord[]>;
   findAgentExecutionByWorkflowStepRunId(
     stepRunId: string,
   ): Promise<AgentExecutionRecord | undefined>;
-  claimWorkflowWakeup(now: Date, leaseMs: number): Promise<WorkflowWakeupRecord | undefined>;
+  claimWorkflowWakeup(
+    now: Date,
+    leaseMs: number,
+  ): Promise<WorkflowWakeupRecord | undefined>;
   wakeWorkflowRun(triggerRunId: string, availableAt: Date): Promise<void>;
+  deferWorkflowWakeup(triggerRunId: string, availableAt: Date): Promise<void>;
   deleteWorkflowWakeup(triggerRunId: string): Promise<void>;
+  hasEarlierRunningChannelWorkflow(input: {
+    organizationId: string;
+    triggerRunId: string;
+    bindingKey: string;
+  }): Promise<boolean>;
   createWorkflowStepExecution(input: WorkflowStepExecutionInput): Promise<{
     stepRun: WorkflowStepRunRecord;
     execution: AgentExecutionRecord | undefined;
@@ -1193,7 +1239,9 @@ export interface Database {
     status: "succeeded" | "failed" | "timed_out",
     result: unknown,
     failureReason?: string,
-  ): Promise<{ stepRun: WorkflowStepRunRecord; run: TriggerRunRecord } | undefined>;
+  ): Promise<
+    { stepRun: WorkflowStepRunRecord; run: TriggerRunRecord } | undefined
+  >;
   completeWorkflowAgentExecution(
     input: WorkflowAgentCompletionInput,
   ): Promise<TransitionAgentExecutionResult>;
@@ -1201,15 +1249,24 @@ export interface Database {
     triggerRunId: string,
     stepId: string,
     reason: string,
-  ): Promise<{ stepRun: WorkflowStepRunRecord; run: TriggerRunRecord } | undefined>;
-  succeedTriggerRun(triggerRunId: string): Promise<TransitionTriggerRunResult | undefined>;
+  ): Promise<
+    { stepRun: WorkflowStepRunRecord; run: TriggerRunRecord } | undefined
+  >;
+  succeedTriggerRun(
+    triggerRunId: string,
+  ): Promise<TransitionTriggerRunResult | undefined>;
   failWorkflowRun(
     triggerRunId: string,
     status: "failed" | "timed_out",
     failureReason: string,
     stepId?: string,
   ): Promise<
-    { stepRun: WorkflowStepRunRecord; run: TriggerRunRecord; transitioned: boolean } | undefined
+    | {
+        stepRun: WorkflowStepRunRecord;
+        run: TriggerRunRecord;
+        transitioned: boolean;
+      }
+    | undefined
   >;
   claimPendingWorkflowRunTerminalNotification(
     now: Date,
@@ -1224,17 +1281,32 @@ export interface Database {
     triggerRunId: string,
     reactionState: JsonValue | null,
   ): Promise<AcceptedTriggerRunRecord | undefined>;
-  recoverWorkflowDeadlines(now: Date): Promise<readonly WorkflowDeadlineRecovery[]>;
+  recoverWorkflowDeadlines(
+    now: Date,
+  ): Promise<readonly WorkflowDeadlineRecovery[]>;
   recoverWorkflowWakeups(now: Date): Promise<void>;
   markProviderEventDropped(
     providerEventReceiptId: string,
     reason: ProviderEventDropReasonCode,
   ): Promise<void>;
-  acceptGitHubEvent(input: AcceptGitHubEventInput): Promise<ProviderEventAcceptance>;
-  acceptDiscordEvent(input: AcceptDiscordEventInput): Promise<ProviderEventAcceptance>;
-  acceptSlackEvent(input: AcceptSlackEventInput): Promise<ProviderEventAcceptance>;
-  acceptLinearEvent(input: AcceptLinearEventInput): Promise<ProviderEventAcceptance>;
-  persistManualEvent(input: PersistManualEventInput): Promise<ManualEventPersistence>;
+  acceptGitHubEvent(
+    input: AcceptGitHubEventInput,
+  ): Promise<ProviderEventAcceptance>;
+  acceptDiscordEvent(
+    input: AcceptDiscordEventInput,
+  ): Promise<ProviderEventAcceptance>;
+  acceptSlackEvent(
+    input: AcceptSlackEventInput,
+  ): Promise<ProviderEventAcceptance>;
+  acceptLinearEvent(
+    input: AcceptLinearEventInput,
+  ): Promise<ProviderEventAcceptance>;
+  persistManualEvent(
+    input: PersistManualEventInput,
+  ): Promise<ManualEventPersistence>;
+  persistChannelEvent(
+    input: PersistChannelEventInput,
+  ): Promise<ManualEventPersistence>;
   claimGitHubLifecycleReceipt(
     input: GitHubLifecycleReceiptClaimInput,
   ): Promise<GitHubLifecycleReceiptClaim>;
@@ -1247,7 +1319,9 @@ export interface Database {
     deliveryId: string,
     organizationId?: string,
   ): Promise<ProviderEventReceiptRecord | undefined>;
-  findProviderEventReceiptById(id: string): Promise<ProviderEventReceiptRecord | undefined>;
+  findProviderEventReceiptById(
+    id: string,
+  ): Promise<ProviderEventReceiptRecord | undefined>;
   insertAttachment(input: InsertAttachmentInput): Promise<AttachmentRecord>;
   findAttachmentBySource(
     providerEventReceiptId: string,
@@ -1269,7 +1343,9 @@ export interface Database {
     toStatus: MachineStatus,
     fields?: TerminateMachineFields,
   ): Promise<MachineRecord>;
-  insertAgentExecution(input: InsertAgentExecutionInput): Promise<AgentExecutionRecord>;
+  insertAgentExecution(
+    input: InsertAgentExecutionInput,
+  ): Promise<AgentExecutionRecord>;
   insertAgentExecutionIfAbsent(
     input: InsertAgentExecutionInput & { id: string },
   ): Promise<AgentExecutionRecord | undefined>;
@@ -1277,7 +1353,9 @@ export interface Database {
   startCliAuthorization(
     input: StartCliAuthorizationInput,
   ): Promise<CliAuthorizationRecord | undefined>;
-  inspectCliAuthorization(userCodeVerifier: string): Promise<CliAuthorizationRecord | undefined>;
+  inspectCliAuthorization(
+    userCodeVerifier: string,
+  ): Promise<CliAuthorizationRecord | undefined>;
   decideCliAuthorization(
     input: CliAuthorizationDecisionInput,
   ): Promise<"approved" | "denied" | "unavailable" | "forbidden">;
@@ -1291,7 +1369,10 @@ export interface Database {
     slug: string,
   ): Promise<DaemonRecord | undefined>;
   findDaemonById(id: string): Promise<DaemonRecord | undefined>;
-  findDaemonForOrganization(organizationId: string, id: string): Promise<DaemonRecord | undefined>;
+  findDaemonForOrganization(
+    organizationId: string,
+    id: string,
+  ): Promise<DaemonRecord | undefined>;
   listDaemonsForOrganization(organizationId: string): Promise<DaemonRecord[]>;
   renameDaemonForOrganization(
     organizationId: string,
@@ -1299,8 +1380,14 @@ export interface Database {
     slug: string,
   ): Promise<DaemonWriteResult>;
   touchDaemon(id: string): Promise<void>;
-  setDaemonPresence(id: string, presence: "offline" | "connected"): Promise<void>;
-  setDaemonPermissions(id: string, permissions: string[]): Promise<DaemonRecord | undefined>;
+  setDaemonPresence(
+    id: string,
+    presence: "offline" | "connected",
+  ): Promise<void>;
+  setDaemonPermissions(
+    id: string,
+    permissions: string[],
+  ): Promise<DaemonRecord | undefined>;
   revokeDaemon(id: string): Promise<boolean>;
   attachAgentToExecution(
     executionId: string,
@@ -1320,12 +1407,27 @@ export interface Database {
     completionTokenHash: string,
   ): Promise<AgentExecutionRecord>;
   findAgentExecutionById(id: string): Promise<AgentExecutionRecord | undefined>;
+  findWorkflowAgentReuseBinding(input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    stepId: string;
+  }): Promise<AgentExecutionRecord | undefined>;
+  /** Latest Agent execution belonging to one Channel Workflow conversation. */
+  findLatestChannelWorkflowExecution(input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+  }): Promise<AgentExecutionRecord | undefined>;
+  upsertWorkflowAgentReuseBinding(input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    stepId: string;
+    agentExecutionId: string;
+  }): Promise<void>;
   findAgentExecutionForOrganization(
     organizationId: string,
-    id: string,
-  ): Promise<AgentExecutionRecord | undefined>;
-  findAgentExecutionForProject(
-    projectId: string,
     id: string,
   ): Promise<AgentExecutionRecord | undefined>;
   beginAgentExecutionOutput(
@@ -1353,7 +1455,9 @@ export interface Database {
     executionId: string,
     reactionState: JsonValue | null,
   ): Promise<AgentExecutionRecord>;
-  findRunningAgentExecutionsForMachine(machineId: string): Promise<AgentExecutionRecord[]>;
+  findRunningAgentExecutionsForMachine(
+    machineId: string,
+  ): Promise<AgentExecutionRecord[]>;
   findPendingAgentExecutions(): Promise<AgentExecutionRecord[]>;
   findPendingHubActions(daemonId?: string): Promise<AgentExecutionRecord[]>;
   markAgentExecutionHubActionReady(
@@ -1366,7 +1470,10 @@ export interface Database {
   ): Promise<AgentExecutionRecord | undefined>;
   completeHubAction(executionId: string, action: HubAction): Promise<boolean>;
   createProject(input: CreateProjectInput): Promise<ProjectRecord>;
-  restoreProject(organizationId: string, projectId: string): Promise<ProjectRecord>;
+  restoreProject(
+    organizationId: string,
+    projectId: string,
+  ): Promise<ProjectRecord>;
   getOrganizationEntitlements(
     organizationId: string,
   ): Promise<OrganizationEntitlementsRecord | undefined>;
@@ -1380,7 +1487,10 @@ export interface Database {
   clearOrganizationEntitlementsOverride(
     input: ClearOrganizationEntitlementsOverrideInput,
   ): Promise<OrganizationEntitlementsRecord>;
-  listEntitlementChanges(organizationId: string, limit: number): Promise<EntitlementChangeRecord[]>;
+  listEntitlementChanges(
+    organizationId: string,
+    limit: number,
+  ): Promise<EntitlementChangeRecord[]>;
   /**
    * Every organization, for the instance-operator picker. Not a membership read — the operator
    * acts on organizations it does not belong to, so the caller must gate this on the operator
@@ -1391,7 +1501,9 @@ export interface Database {
    * One organization by slug, without any membership check. The operator resolution path; gate on
    * the operator flag at the caller. Undefined when no organization has that slug.
    */
-  findOrganizationForOperator(slug: string): Promise<OperatorOrganizationRecord | undefined>;
+  findOrganizationForOperator(
+    slug: string,
+  ): Promise<OperatorOrganizationRecord | undefined>;
   /**
    * Single atomic conditional upsert: increments `used` by `amount` and returns the new
    * row, unless doing so would exceed `limit` (when non-null), in which case it returns
@@ -1433,17 +1545,22 @@ export interface Database {
    * another instance handling the same organization. Released even if `fn` throws.
    */
   withAdvisoryLock<T>(key: string, fn: () => Promise<T>): Promise<T>;
-  listPendingProjectTriggerMigrations(): Promise<PendingProjectTriggerMigration[]>;
-  migrateProjectTriggers(input: MigrateProjectTriggersInput): Promise<OrganizationTriggerRecord[]>;
-  listOrganizationTriggers(organizationId: string): Promise<OrganizationTriggerRecord[]>;
+  listOrganizationTriggers(
+    organizationId: string,
+  ): Promise<OrganizationTriggerRecord[]>;
   findOrganizationTriggerRevision(
     triggerId: string,
     revisionId: string,
   ): Promise<OrganizationTriggerRevisionRecord | undefined>;
-  findOrganizationTriggerMigrationRevision(
-    triggerId: string,
-  ): Promise<OrganizationTriggerRevisionRecord | undefined>;
-  saveOrganizationTrigger(input: SaveOrganizationTriggerInput): Promise<OrganizationTriggerRecord>;
+  saveOrganizationTrigger(
+    input: SaveOrganizationTriggerInput,
+  ): Promise<OrganizationTriggerRecord>;
+  findActiveChannelConfiguration(
+    organizationId: string,
+  ): Promise<ChannelConfigurationRevisionRecord | undefined>;
+  saveChannelConfiguration(
+    input: SaveChannelConfigurationInput,
+  ): Promise<ChannelConfigurationRevisionRecord>;
   listProjectsForOrganization(organizationId: string): Promise<ProjectRecord[]>;
   findProjectForOrganization(
     organizationId: string,
@@ -1459,7 +1576,11 @@ export interface Database {
     organizationSlug: string,
     projectSlug?: string,
   ): Promise<TenantRouteAccess | undefined>;
-  archiveProject(organizationId: string, projectId: string, userId: string): Promise<ProjectRecord>;
+  archiveProject(
+    organizationId: string,
+    projectId: string,
+    userId: string,
+  ): Promise<ProjectRecord>;
   updateProjectSlug(
     organizationId: string,
     projectId: string,
@@ -1498,9 +1619,15 @@ export interface Database {
   recordConfigurationSyncAttempt(
     input: RecordConfigurationSyncAttemptInput,
   ): Promise<ConfigurationSyncAttemptRecord>;
-  projectConfigurationReadModel(projectId: string): Promise<ProjectConfigurationReadModel>;
-  organizationConnectionUsage(organizationId: string): Promise<OrganizationConnectionUsage>;
-  listGitHubRepositories(organizationId: string): Promise<GitHubRepositoryRecord[]>;
+  projectConfigurationReadModel(
+    projectId: string,
+  ): Promise<ProjectConfigurationReadModel>;
+  organizationConnectionUsage(
+    organizationId: string,
+  ): Promise<OrganizationConnectionUsage>;
+  listGitHubRepositories(
+    organizationId: string,
+  ): Promise<GitHubRepositoryRecord[]>;
   findGitHubRepositoryForOrganization(
     organizationId: string,
     fullName: string,
@@ -1509,7 +1636,10 @@ export interface Database {
     organizationId: string,
     connectionId: string,
     repositories: Array<
-      Pick<GitHubRepositoryRecord, "repositoryId" | "fullName" | "defaultBranch">
+      Pick<
+        GitHubRepositoryRecord,
+        "repositoryId" | "fullName" | "defaultBranch"
+      >
     >,
   ): Promise<void>;
   findGitHubConfigurationTarget(
@@ -1524,21 +1654,34 @@ export interface Database {
   listUnroutedProviderEventsForOrganization(
     organizationId: string,
   ): Promise<ProviderEventReceiptSummary[]>;
-  isOrganizationMember(userId: string, organizationId: string): Promise<boolean>;
+  isOrganizationMember(
+    userId: string,
+    organizationId: string,
+  ): Promise<boolean>;
   startConnectionAttempt(input: StartConnectionAttemptInput): Promise<void>;
   findConnectionAttemptConfiguration(
     stateVerifier: string,
   ): Promise<ConnectionAttemptConfigurationSnapshot | undefined>;
-  readConnectionAttempt(input: ReadConnectionAttemptInput): Promise<ConnectionAttemptRecord>;
+  readConnectionAttempt(
+    input: ReadConnectionAttemptInput,
+  ): Promise<ConnectionAttemptRecord>;
   consumeConnectionAttempt(input: ReadConnectionAttemptInput): Promise<void>;
-  advanceGitHubConnectionAttempt(input: AdvanceGitHubConnectionAttemptInput): Promise<void>;
+  advanceGitHubConnectionAttempt(
+    input: AdvanceGitHubConnectionAttemptInput,
+  ): Promise<void>;
   bindGitHubConnection(input: BindGitHubConnectionInput): Promise<void>;
   bindDiscordConnection(input: BindDiscordConnectionInput): Promise<void>;
   bindSlackConnection(input: BindSlackConnectionInput): Promise<void>;
-  completeSlackProviderApplication(input: CompleteSlackProviderApplicationInput): Promise<void>;
+  completeSlackProviderApplication(
+    input: CompleteSlackProviderApplicationInput,
+  ): Promise<void>;
   bindLinearConnection(input: BindLinearConnectionInput): Promise<void>;
-  completeLinearProviderApplication(input: CompleteLinearProviderApplicationInput): Promise<void>;
-  updateLinearConnectionTokens(input: UpdateLinearConnectionTokensInput): Promise<void>;
+  completeLinearProviderApplication(
+    input: CompleteLinearProviderApplicationInput,
+  ): Promise<void>;
+  updateLinearConnectionTokens(
+    input: UpdateLinearConnectionTokensInput,
+  ): Promise<void>;
   /**
    * Runs a Linear refresh decision under the same transaction-scoped external-connection lock
    * used by OAuth rebind. The connection re-read and any token update use that transaction, so a
@@ -1553,13 +1696,27 @@ export interface Database {
     connectionId: string,
     access: ConnectionStartAuthority,
   ): Promise<DisconnectConnectionResult>;
-  findGitHubConnection(installationId: number): Promise<GitHubConnectionRecord | undefined>;
-  findDiscordConnection(guildId: string): Promise<DiscordConnectionRecord | undefined>;
-  findSlackConnection(teamId: string): Promise<SlackConnectionRecord | undefined>;
-  findLinearConnection(linearOrganizationId: string): Promise<LinearConnectionRecord | undefined>;
+  findGitHubConnection(
+    installationId: number,
+  ): Promise<GitHubConnectionRecord | undefined>;
+  findDiscordConnection(
+    guildId: string,
+  ): Promise<DiscordConnectionRecord | undefined>;
+  findSlackConnection(
+    providerApplicationId: string,
+    teamId: string,
+  ): Promise<SlackConnectionRecord | undefined>;
+  findLinearConnection(
+    linearOrganizationId: string,
+  ): Promise<LinearConnectionRecord | undefined>;
   findSlackConnectionForOrganization(
     organizationId: string,
+    providerApplicationId: string,
     teamId: string,
+  ): Promise<SlackConnectionRecord | undefined>;
+  findSlackConnectionByIdForOrganization(
+    organizationId: string,
+    connectionId: string,
   ): Promise<SlackConnectionRecord | undefined>;
   findLinearConnectionForOrganization(
     organizationId: string,
@@ -1570,6 +1727,19 @@ export interface Database {
     guildId: string,
   ): Promise<DiscordConnectionRecord | undefined>;
   removeDiscordConnection(guildId: string): Promise<void>;
+  configureTelegramConnection(input: {
+    organizationId: string;
+    accountId: string;
+    botToken: string;
+  }): Promise<{ connectionId: string }>;
+  resolveChannelConnection(input: {
+    organizationId: string;
+    channel: "slack" | "telegram";
+    connectionId: string;
+  }): Promise<
+    | { botToken: string; appToken?: string; providerApplicationId?: string }
+    | undefined
+  >;
   close(): Promise<void>;
 }
 
@@ -1579,42 +1749,6 @@ export interface Database {
 // implementation doc §3.1/§4.2/§4.3.4). The query functions live in src/db/channels.ts;
 // this block holds only their record/input shapes. Additive; an unmodified upstream
 // Hub never imports these types.
-
-/** Runtime record for one channel account (one Slack app, one Telegram bot). */
-export interface ChannelAccountRecord {
-  id: string;
-  organizationId: string;
-  channel: "slack" | "telegram";
-  accountId: string;
-  status: ChannelAccountStatus;
-  pinVersion: string | null;
-  distIntegrity: string | null;
-  gitHead: string | null;
-  installDir: string | null;
-  installedAt: Date | null;
-  secretRef: string | null;
-  providerApplicationId: string | null;
-  externalIdentity: unknown | null;
-  transport: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface UpsertChannelAccountInput {
-  organizationId: string;
-  channel: "slack" | "telegram";
-  accountId: string;
-  status: ChannelAccountStatus;
-  pinVersion?: string | null;
-  distIntegrity?: string | null;
-  gitHead?: string | null;
-  installDir?: string | null;
-  installedAt?: Date | null;
-  secretRef?: string | null;
-  providerApplicationId?: string | null;
-  externalIdentity?: unknown | null;
-  transport: unknown;
-}
 
 /** Durable external-thread ↔ agent-session binding (one per account + thread key). */
 export interface ThreadBindingRecord {

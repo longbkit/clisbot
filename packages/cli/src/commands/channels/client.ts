@@ -41,11 +41,9 @@ export type ChannelAddResult = z.infer<typeof channelAddResultSchema>;
 export type ChannelAccount = z.infer<typeof channelAccountSchema>;
 export type ChannelStatusAccount = z.infer<typeof channelStatusAccountSchema>;
 
-export interface ChannelAddInput {
-  channel: string;
-  account: string;
-  secret: string;
-}
+export type ChannelAddInput =
+  | { channel: "slack"; account: string; connectionId: string }
+  | { channel: "telegram"; account: string; botToken: string };
 
 /** POST /api/v1/channels — install an account and start or defer its transport. */
 export function addChannel(
@@ -58,7 +56,7 @@ export function addChannel(
       ...(target.apiKey === undefined ? {} : { apiKey: target.apiKey }),
       path: "/api/v1/channels",
       method: "POST",
-      body: { channel: input.channel, account: input.account, secret: input.secret },
+      body: input,
       successStatus: 200,
       schema: channelAddResultSchema,
       failureMessage: "Hub channel add failed",

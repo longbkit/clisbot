@@ -108,9 +108,9 @@ export function createDiscordRegistration(
     },
     connection,
     triggerProviders: [
-      ({ configurationStoreForProject, attachments }) =>
+      ({ configurationForWorkflow, attachments }) =>
         createDiscordTriggerProvider({
-          configurationStoreForProject,
+          configurationForWorkflow,
           ...(attachments === undefined ? {} : { attachments }),
           bot,
         }),

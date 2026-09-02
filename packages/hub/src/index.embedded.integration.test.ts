@@ -8,6 +8,7 @@ import { startProductionRuntime, stopProductionRuntime } from "./index.js";
 import { runWithFailureTracking } from "./failures/index.js";
 import { createLogger } from "./logger.js";
 import { assertOneFailure, FailureLogStream } from "./test-utils/failure-logs.js";
+import { createCredentialCipher } from "./credentials/credential-cipher.js";
 
 const ENVIRONMENT_NAMES = [
   "DATABASE_URL",
@@ -20,9 +21,11 @@ const ENVIRONMENT_NAMES = [
   "PASEO_BOOTSTRAP_ORGANIZATION",
   "PASEO_BOOTSTRAP_OWNER_EMAIL",
   "PASEO_BOOTSTRAP_OWNER_PASSWORD",
+  "PASEO_HUB_CREDENTIAL_MASTER_KEY",
 ] as const;
 
 const APP_URL = "http://localhost:3000";
+const MASTER_KEY = Buffer.alloc(32, 7).toString("base64");
 
 let root: string;
 let previousEnvironment: Map<string, string | undefined>;
@@ -41,6 +44,7 @@ beforeEach(async () => {
   process.env["PASEO_BOOTSTRAP_ORGANIZATION"] = "Embedded owner";
   process.env["PASEO_BOOTSTRAP_OWNER_EMAIL"] = "owner@embedded.test";
   process.env["PASEO_BOOTSTRAP_OWNER_PASSWORD"] = "embedded-owner-password";
+  process.env["PASEO_HUB_CREDENTIAL_MASTER_KEY"] = MASTER_KEY;
 });
 
 afterEach(async () => {
@@ -165,22 +169,21 @@ it("selects embedded storage without DATABASE_URL and preserves it across restar
     organizations: number;
     bootstraps: number;
     runtime_configurations: number;
-    auth_secret: string;
+    auth_secret_envelope: unknown;
   }>(`
     select
       (select count(*)::integer from organization) as organizations,
       (select count(*)::integer from instance_bootstrap) as bootstraps,
       (select count(*)::integer from runtime_configuration) as runtime_configurations,
-      (select auth_secret from runtime_configuration) as auth_secret
+      (select auth_secret_envelope from runtime_configuration) as auth_secret_envelope
   `);
   await bundle.runtime.close();
 
-  assert.deepEqual(result.rows[0], {
-    organizations: 1,
-    bootstraps: 1,
-    runtime_configurations: 1,
-    auth_secret: firstSecret,
-  });
+  assert.equal(result.rows[0]?.organizations, 1);
+  assert.equal(result.rows[0]?.bootstraps, 1);
+  assert.equal(result.rows[0]?.runtime_configurations, 1);
+  assert.ok(result.rows[0]?.auth_secret_envelope !== undefined);
+  assert.equal(JSON.stringify(result.rows[0]?.auth_secret_envelope).includes(firstSecret), false);
 });
 
 it("selects the XDG data directory when no explicit data directory is configured", async () => {
@@ -202,12 +205,16 @@ it("selects the XDG data directory when no explicit data directory is configured
 
 async function storedAuthSecret(): Promise<string> {
   const bundle = await embeddedDatabaseRuntime(process.env["PASEO_HUB_DATA_DIR"]!);
-  const result = await bundle.runtime.query<{ auth_secret: string }>(
-    `select auth_secret from runtime_configuration`,
+  const result = await bundle.runtime.query<{ auth_secret_envelope: unknown }>(
+    `select auth_secret_envelope from runtime_configuration`,
   );
   await bundle.runtime.close();
-  const secret = result.rows[0]?.auth_secret;
-  assert.ok(secret);
+  const envelope = result.rows[0]?.auth_secret_envelope;
+  const secret = createCredentialCipher({
+    keyId: "primary",
+    masterKey: Buffer.from(MASTER_KEY, "base64"),
+  }).decrypt("runtime-configuration:auth-secret", envelope);
+  assert.ok(typeof secret === "string");
   return secret;
 }
 

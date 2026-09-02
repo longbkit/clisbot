@@ -4,6 +4,7 @@ import { describe, it } from "vitest";
 import { createDatabase } from "./pg.js";
 import { postgresDatabaseRuntime } from "./runtime/index.js";
 import type { DatabaseRuntimeBundle, TransactionHandle } from "./runtime/index.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import type { Locks } from "./runtime/locks/index.js";
 import type { Database } from "./types.js";
 
@@ -51,8 +52,8 @@ describe("Linear token refresh persistence", () => {
       };
       // Separate database facades model independent Hub processes. Their only coordination is
       // the PostgreSQL transaction lock, not the client-local refresh promise map.
-      const refreshDatabase = createDatabase(bundle.runtime, locks);
-      const rebindDatabase = createDatabase(bundle.runtime, locks);
+      const refreshDatabase = createDatabase(bundle.runtime, locks, createTestCredentialCipher());
+      const rebindDatabase = createDatabase(bundle.runtime, locks, createTestCredentialCipher());
 
       await startLinearAttempt(rebindDatabase, "initial");
       await bindLinearConnection(rebindDatabase, "initial", {

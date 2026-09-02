@@ -5,7 +5,10 @@ import type { OrganizationAccessValue } from "./auth/organization-access.js";
 import { createMemoryDatabase } from "./db/memory.js";
 import type { Database } from "./db/types.js";
 import { EntitlementsService } from "./entitlements/service.js";
-import type { ProviderRegistration, TriggerProviderResources } from "./providers/registration.js";
+import type {
+  ProviderRegistration,
+  TriggerProviderResources,
+} from "./providers/registration.js";
 import { createApplicationRuntime } from "./application-runtime.js";
 import { replyOutputTool } from "./execution-capabilities/outputs.js";
 
@@ -23,7 +26,11 @@ describe("application runtime provider composition", () => {
       triggerProviders: [
         () => {
           events.push("provider");
-          return { name: "fake", eventNames: ["fake.event"], match: () => Promise.resolve([]) };
+          return {
+            name: "fake",
+            eventNames: ["fake.event"],
+            match: () => Promise.resolve([]),
+          };
         },
       ],
       sources: [
@@ -66,28 +73,41 @@ describe("application runtime provider composition", () => {
 
     assert.deepEqual(events, ["provider", "source:start"]);
     assert.equal(
-      await (await runtime.webhook(new Request("https://hub.test/webhook"))).text(),
+      await (
+        await runtime.webhook(new Request("https://hub.test/webhook"))
+      ).text(),
       "fake webhook",
     );
     assert.equal(
       await (
-        await runtime.providerRequest("webhook", new Request("https://hub.test/webhook"))
+        await runtime.providerRequest(
+          "webhook",
+          new Request("https://hub.test/webhook"),
+        )
       ).text(),
       "fake webhook",
     );
     assert.deepEqual(
       await (
-        await runtime.connectionAction(new Request("https://hub.test/start"), "fake", "start")
+        await runtime.connectionAction(
+          new Request("https://hub.test/start"),
+          "fake",
+          "start",
+        )
       ).json(),
       { provider: "fake" },
     );
     assert.deepEqual(
-      await (await runtime.connectionStatus(new Request(scopedStatusUrl()))).json(),
+      await (
+        await runtime.connectionStatus(new Request(scopedStatusUrl()))
+      ).json(),
       { canManage: true, fake: { status: "connected" } },
     );
     assert.deepEqual(
       await (
-        await runtime.connectionStatus(new Request("https://hub.test/status?organizationSlug=org"))
+        await runtime.connectionStatus(
+          new Request("https://hub.test/status?organizationSlug=org"),
+        )
       ).json(),
       { canManage: true, fake: { status: "connected" } },
     );
@@ -102,11 +122,15 @@ describe("application runtime provider composition", () => {
     const first = fakeRegistration();
     first.connection = { ...first.connection, name: "first" };
     first.sources = [trackedSource("first", events)];
-    first.requests = [{ name: "events", handle: () => Promise.resolve(new Response()) }];
+    first.requests = [
+      { name: "events", handle: () => Promise.resolve(new Response()) },
+    ];
     const second = fakeRegistration();
     second.connection = { ...second.connection, name: "second" };
     second.sources = [trackedSource("second", events)];
-    second.requests = [{ name: "events", handle: () => Promise.resolve(new Response()) }];
+    second.requests = [
+      { name: "events", handle: () => Promise.resolve(new Response()) },
+    ];
 
     const database = createMemoryDatabase();
     await assert.rejects(
@@ -144,65 +168,32 @@ describe("application runtime provider composition", () => {
     });
 
     assert.deepEqual(
-      await (await runtime.connectionStatus(new Request(scopedStatusUrl()))).json(),
+      await (
+        await runtime.connectionStatus(new Request(scopedStatusUrl()))
+      ).json(),
       { canManage: false, fake: { status: "connected" } },
     );
     await runtime.stop();
   });
 
-  it("shares provider integrations with every trigger provider for the same organization", async () => {
-    const calls: Array<{ projectId: string; slug: string; value: string }> = [];
+  it("shares the organization workflow resolver with every trigger provider", async () => {
     let providerResources: TriggerProviderResources | undefined;
-    const database = createMemoryDatabase();
-    database.findProjectById = async () => ({
-      id: "project-1",
+    const database = createMemoryDatabase({ organizationIds: ["org-1"] });
+    const workflow = await database.saveOrganizationTrigger({
       organizationId: "org-1",
-      name: "Project",
-      slug: "project",
-      status: "active",
+      name: "manual-workflow",
+      enabled: true,
+      format: "legacy_multistep",
+      yaml: "name: manual-workflow",
+      normalizedConfiguration: { environments: [], triggers: [] },
+      contentHash: "workflow-config",
+      sourceKind: "manual",
+      sourceEvidence: { kind: "test" },
       createdByUserId: null,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-      archivedAt: null,
-      activeConfigurationRevisionId: null,
-    });
-    database.organizationConnectionUsage = async () => ({
-      github: [
-        {
-          id: "connection-1",
-          organizationId: "org-1",
-          slug: "getpaseo-github",
-          installationId: 42,
-          accountId: "account-1",
-          accountLogin: "getpaseo",
-          accountType: "Organization",
-          status: "active",
-          providerApplicationId: "42",
-        },
-        {
-          id: "connection-2",
-          organizationId: "org-1",
-          slug: "secondary-getpaseo-github",
-          installationId: 84,
-          accountId: "account-2",
-          accountLogin: "paseo",
-          accountType: "Organization",
-          status: "active",
-          providerApplicationId: "42",
-        },
-      ],
-      discord: [],
-      slack: [],
-      linear: [],
+      routes: [],
     });
     const registration: ProviderRegistration = {
       ...fakeRegistration("github"),
-      integration: {
-        resolve: (projectId, slug, value) => {
-          calls.push({ projectId, slug, value });
-          return Promise.resolve("organization-secret");
-        },
-      },
       triggerProviders: [
         (resources) => {
           providerResources = resources;
@@ -220,22 +211,19 @@ describe("application runtime provider composition", () => {
     });
 
     assert.ok(providerResources);
-    const resolveConnection = providerResources.connectionsForProject("project-1");
-    assert.equal(
-      await resolveConnection("secondary-getpaseo-github", "token"),
-      "organization-secret",
-    );
-    assert.deepEqual(calls, [
-      { projectId: "project-1", slug: "secondary-getpaseo-github", value: "token" },
-    ]);
-    await assert.rejects(
-      async () => resolveConnection("missing-github", "token"),
-      /connection slug is unavailable/u,
-    );
-    await assert.rejects(
-      async () => resolveConnection("org-2-github", "token"),
-      /connection slug is unavailable/u,
-    );
+    const stored = await providerResources.configurationForWorkflow({
+      providerEventReceiptId: "receipt-1",
+      organizationId: "org-1",
+      workflowId: workflow.id,
+      configurationRevisionId: workflow.activeRevisionId,
+      source: "manual.run",
+      deliveryId: "delivery-1",
+      payload: {},
+      receivedAt: new Date(0),
+      connectionId: null,
+      resourceId: null,
+    });
+    assert.equal(stored?.revision.id, workflow.activeRevisionId);
     await runtime.stop();
   });
 });

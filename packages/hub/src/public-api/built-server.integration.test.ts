@@ -26,6 +26,7 @@ import {
   ValidatedConfigurationSchema,
 } from "./contracts.js";
 import { loadBuiltStartServer, type BuiltStartServer } from "../server/build.js";
+import { createTestCredentialCipher } from "../credentials/test-utils.js";
 
 const builtServerTests = describe.runIf(process.env["RUN_BUILT_PUBLIC_API_TESTS"] === "1");
 
@@ -67,12 +68,27 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
       insert into discord_connections (organization_id, guild_id, slug, guild_name) values
         ('organization-a', 'guild-a', 'discord-a', 'Discord A'),
         ('organization-b', 'guild-b', 'discord-b', 'Discord B');
-      insert into slack_connections
-        (organization_id, team_id, slug, team_name, bot_user_id, bot_access_token, scopes)
-      values
-        ('organization-a', 'team-a', 'slack-a', 'Slack A', 'bot-a', 'token-a', '[]'::jsonb),
-        ('organization-b', 'team-b', 'slack-b', 'Slack B', 'bot-b', 'token-b', '[]'::jsonb);
     `);
+    const cipher = createTestCredentialCipher();
+    for (const [organizationId, appId, teamId, slug, botId, token] of [
+      ["organization-a", "A-PUBLIC-A", "team-a", "slack-a", "bot-a", "token-a"],
+      ["organization-b", "A-PUBLIC-B", "team-b", "slack-b", "bot-b", "token-b"],
+    ] as const) {
+      await client.query(
+        `insert into slack_connections
+          (organization_id, provider_application_id, team_id, slug, team_name, bot_user_id,
+           credential_envelope, scopes)
+         values ($1, $2, $3, $4, $4, $5, $6, '[]'::jsonb)`,
+        [
+          organizationId,
+          appId,
+          teamId,
+          slug,
+          botId,
+          cipher.encrypt(`slack-connection:${appId}:${teamId}`, { botAccessToken: token }),
+        ],
+      );
+    }
     await client.close();
     for (const [organizationId, userId] of [
       ["organization-a", "user-a"],

@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  buildTelegramClientOptions,
   editTelegramMessageText,
   resolveTelegramAccount,
   sendTelegramText,
@@ -358,5 +359,31 @@ describe("resolveTelegramAccount — richMessages default (D-003, amended 2026-0
     expect(resolveTelegramAccount(cfg({ richMessages: false }), "bot").config.richMessages).toBe(
       false,
     );
+  });
+});
+
+describe("buildTelegramClientOptions — bounded Bot API requests", () => {
+  it("applies a finite default when the account omits timeoutSeconds", () => {
+    const account = resolveTelegramAccount(
+      {
+        channels: { telegram: { accounts: { bot: { botToken: "tg-token" } } } },
+      },
+      "bot",
+    );
+    expect(buildTelegramClientOptions(account).timeoutSeconds).toBe(30);
+  });
+
+  it("keeps an explicit account timeout", () => {
+    const account = resolveTelegramAccount(
+      {
+        channels: {
+          telegram: {
+            accounts: { bot: { botToken: "tg-token", config: { timeoutSeconds: 12 } } },
+          },
+        },
+      },
+      "bot",
+    );
+    expect(buildTelegramClientOptions(account).timeoutSeconds).toBe(12);
   });
 });

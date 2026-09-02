@@ -28,7 +28,7 @@ describe("structured daemon completion", () => {
     const intent: LaunchMachineIntent = {
       kind: "launch_machine",
       organizationId: "org-1",
-      projectId: "project-1",
+      workflowId: "project-1",
       triggerRunId: "trigger-run-1",
       workflowStepRunId: "step-run-1",
       triggerName: "route",
@@ -51,7 +51,7 @@ describe("structured daemon completion", () => {
     };
     const createdRun = await database.createAcceptedTriggerRun({
       organizationId: "org-1",
-      projectId: "project-1",
+      workflowId: "project-1",
       configurationRevisionId: "revision-1",
       providerEventReceiptId: "trigger-1",
       configuredTriggerName: "route",
@@ -67,7 +67,7 @@ describe("structured daemon completion", () => {
     const execution = await database.insertAgentExecution({
       id: executionId,
       organizationId: "org-1",
-      projectId: "project-1",
+      workflowId: "project-1",
       machineId: null,
       triggerContext: intent.triggerContext,
       outputContext: intent.outputContext,

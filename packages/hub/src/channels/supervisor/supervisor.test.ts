@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { createMemoryDatabase } from "../../db/memory.js";
 import type { DatabaseRuntime } from "../../db/runtime/index.js";
-import { ProjectConfigurationStore } from "../../configuration/store.js";
+import { OrganizationTriggerStore } from "../../triggers/store.js";
 import type { Database } from "../../db/types.js";
 import { enrollTestDaemon } from "../../test-utils/project-configuration.js";
 import type { PlaneLogger } from "../plane/types.js";
@@ -64,7 +64,7 @@ function accountYaml(accountId: string, enabled: boolean): string {
   return `
 channel: slack
 accountId: ${accountId}
-secretRef: slack:${accountId}
+connectionId: slack:${accountId}
 transport:
   mode: socket
 ${enabled ? "" : "enabled: false\n"}routes:
@@ -105,29 +105,27 @@ function memoryDatabase(): Database {
   });
 }
 
-/** The single org's `default` project with an active revision: two enabled
+/** The single org's active Channel revision: two enabled
  * slack accounts (`work`, `ops`) and one disabled one (`off`). */
 async function seedConfiguration(database: Database): Promise<void> {
   await enrollTestDaemon(database, ORG_ID);
-  const project = await database.createProject({
-    organizationId: ORG_ID,
-    name: "Default",
-    slug: "default",
-    createdByUserId: "user-1",
-  });
-  const store = new ProjectConfigurationStore(database, project.id);
-  const revision = await store.insertManualBundleRevision({
-    files: [
-      { path: ".paseo/hub.yml", content: HUB_YAML },
-      { path: ".paseo/workflows/handoff.yml", content: WORKFLOW_YAML },
-      { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
-      { path: ".paseo/channels/slack/work.yml", content: accountYaml("work", true) },
-      { path: ".paseo/channels/slack/ops.yml", content: accountYaml("ops", true) },
-      { path: ".paseo/channels/slack/off.yml", content: accountYaml("off", false) },
-    ],
+  await new OrganizationTriggerStore(database, ORG_ID).save({
+    yaml: `name: handoff\nenabled: true\non:\n  manual.run: {}\nrun:\n  target: { daemon: daemon-10000000, cwd: /workspace/app }\n  agent: { provider: codex, mode: default }\n  prompt: hand off\n  max_runtime: 1h\n  idle_timeout: 5m\n`,
     userId: null,
   });
-  await store.activate(revision.id);
+  const files = [
+    { path: ".paseo/hub.yml", content: HUB_YAML },
+    { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
+    { path: ".paseo/channels/slack/work.yml", content: accountYaml("work", true) },
+    { path: ".paseo/channels/slack/ops.yml", content: accountYaml("ops", true) },
+    { path: ".paseo/channels/slack/off.yml", content: accountYaml("off", false) },
+  ];
+  await database.saveChannelConfiguration({
+    organizationId: ORG_ID,
+    files,
+    contentHash: "test-channel-configuration",
+    createdByUserId: null,
+  });
 }
 
 /** The supervisor only calls `runtime.drizzle()` at construction (ChannelStore);
@@ -164,6 +162,8 @@ describe("createChannelSupervisor", () => {
       dataDir,
       pinsPath,
       logger,
+      resolveConnection: () =>
+        Promise.resolve({ botToken: "test-bot-token", appToken: "test-app-token" }),
       ...(options.env !== undefined ? { env: options.env } : {}),
     });
   }
@@ -245,12 +245,12 @@ describe("createChannelSupervisor", () => {
       });
     });
 
-    it("defers cleanly when no active configuration exists (log, not throw)", async () => {
+    it("defers cleanly before the first Channel revision exists (log, not throw)", async () => {
       const supervisor = supervisorFor({ database: memoryDatabase() });
       const result = await supervisor.startAccount("slack", "work");
       assert.equal(result.transport, "deferred");
-      assert.match(result.detail ?? "", /project|configuration|organization/u);
-      assert.ok(warnings.includes("channel account start failed"));
+      assert.match(result.detail ?? "", /account|configuration|organization/u);
+      assert.deepEqual(warnings, []);
     });
   });
 

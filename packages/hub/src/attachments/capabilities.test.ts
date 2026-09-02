@@ -44,7 +44,10 @@ describe("attachment capability boundary", () => {
     assert.equal(await response.text(), "exact bytes");
     assert.equal(response.headers.get("content-type"), "image/png");
     assert.equal(response.headers.get("cache-control"), "no-store");
-    assert.match(response.headers.get("content-disposition") ?? "", /pixel\.png/u);
+    assert.match(
+      response.headers.get("content-disposition") ?? "",
+      /pixel\.png/u,
+    );
     assert.deepEqual(resolverCalls, [
       {
         organizationId: "org-1",
@@ -85,11 +88,22 @@ describe("attachment capability boundary", () => {
       byteSize: 4,
     });
 
-    const validUrl = new URL(registry.urlFor(attachment.id, fixture.executionId));
+    const validUrl = new URL(
+      registry.urlFor(attachment.id, fixture.executionId),
+    );
     const forgedUrl = new URL(validUrl);
-    forgedUrl.searchParams.set("signature", `${validUrl.searchParams.get("signature")}forged`);
+    forgedUrl.searchParams.set(
+      "signature",
+      `${validUrl.searchParams.get("signature")}forged`,
+    );
     assert.equal(
-      (await registry.handle(new Request(forgedUrl), fixture.executionId, attachment.id)).status,
+      (
+        await registry.handle(
+          new Request(forgedUrl),
+          fixture.executionId,
+          attachment.id,
+        )
+      ).status,
       404,
     );
     assert.equal(
@@ -104,10 +118,19 @@ describe("attachment capability boundary", () => {
     );
     nowMs += 11_000;
     assert.equal(
-      (await registry.handle(new Request(validUrl), fixture.executionId, attachment.id)).status,
+      (
+        await registry.handle(
+          new Request(validUrl),
+          fixture.executionId,
+          attachment.id,
+        )
+      ).status,
       404,
     );
-    await fixture.database.transitionAgentExecution(fixture.executionId, "failed");
+    await fixture.database.transitionAgentExecution(
+      fixture.executionId,
+      "failed",
+    );
     assert.equal(
       (
         await registry.handle(
@@ -125,8 +148,13 @@ describe("attachment capability boundary", () => {
     const fixture = await workflowExecution();
     const resolver = createDiscordAttachmentResolver({
       fetch: async (input) => {
-        assert.equal(requestUrl(input), "https://cdn.discordapp.com/attachments/1/2/file.bin");
-        return new Response("discord-bytes", { headers: { etag: '"discord-1"' } });
+        assert.equal(
+          requestUrl(input),
+          "https://cdn.discordapp.com/attachments/1/2/file.bin",
+        );
+        return new Response("discord-bytes", {
+          headers: { etag: '"discord-1"' },
+        });
       },
     });
     const registry = createAttachmentCapabilityRegistry({
@@ -191,28 +219,27 @@ describe("attachment capability boundary", () => {
   });
 });
 
-async function workflowExecution(database = createMemoryDatabase(), deliveryId = "delivery-1") {
-  let project = (await database.listProjectsForOrganization("org-1"))[0];
-  project ??= await database.createProject({
+async function workflowExecution(
+  database = createMemoryDatabase(),
+  deliveryId = "delivery-1",
+) {
+  const workflow = await database.saveOrganizationTrigger({
     organizationId: "org-1",
-    name: "Project 1",
-    slug: "project-1",
-    createdByUserId: "test-user",
+    name: `attachment-workflow-${deliveryId}`,
+    enabled: true,
+    format: "legacy_multistep",
+    yaml: `name: attachment-workflow-${deliveryId}`,
+    sourceKind: "manual",
+    sourceEvidence: { kind: "test" },
+    normalizedConfiguration: { environments: [], triggers: [] },
+    contentHash: `attachment-test-configuration-${deliveryId}`,
+    createdByUserId: null,
+    routes: [],
   });
-  let revision = await database.findActiveProjectConfiguration(project.id);
-  if (revision === undefined) {
-    revision = await database.insertProjectConfigurationRevision({
-      projectId: project.id,
-      sourceKind: "manual",
-      sourceEvidence: { kind: "test" },
-      normalizedConfiguration: { environments: [], triggers: [] },
-      contentHash: "attachment-test-configuration",
-    });
-    await database.activateProjectConfigurationRevision(project.id, revision.id);
-  }
   const persisted = await database.persistManualEvent({
     organizationId: "org-1",
-    projectId: project.id,
+    triggerId: workflow.id,
+    triggerRevisionId: workflow.activeRevisionId,
     connectionId: null,
     resourceId: null,
     deliveryId,
@@ -220,11 +247,12 @@ async function workflowExecution(database = createMemoryDatabase(), deliveryId =
     payload: {},
     receivedAt: new Date(),
   });
-  if (persisted.status !== "accepted") throw new Error("receipt was not accepted");
+  if (persisted.status !== "accepted")
+    throw new Error("receipt was not accepted");
   const run = await database.createAcceptedTriggerRun({
     organizationId: "org-1",
-    projectId: project.id,
-    configurationRevisionId: revision.id,
+    workflowId: workflow.id,
+    configurationRevisionId: workflow.activeRevisionId,
     providerEventReceiptId: persisted.event.providerEventReceiptId,
     configuredTriggerName: "attachment-run",
     prompt: "inspect",
@@ -245,7 +273,7 @@ async function workflowExecution(database = createMemoryDatabase(), deliveryId =
     execution: {
       id: executionId,
       organizationId: "org-1",
-      projectId: project.id,
+      workflowId: workflow.id,
       machineId: null,
       triggerContext: {},
       outputContext: {},

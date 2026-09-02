@@ -52,7 +52,6 @@ function fakeDeps(overrides: Partial<BotStartDeps> = {}): BotStartDeps & {
         transport: "started",
       },
     ],
-    persistCredential: () => `${HOME}/secrets/telegram-personal-assistant.json`,
     readManifest: (home, name) => readBotManifest(home, name),
     writeManifest: (home, manifest) => writeBotManifest(home, manifest),
     ...overrides,
@@ -71,7 +70,7 @@ describe("runBotStart", () => {
       assert.equal(report.workspaceId, "ws-new");
       assert.equal(report.channel, "telegram");
       assert.equal(report.account, "personal-assistant");
-      assert.equal(report.credential, "runtime-only");
+      assert.equal(report.credential, "persisted");
       assert.equal(report.hub, "already-running");
       assert.equal(report.hubUrl, "http://127.0.0.1:6868");
       assert.equal(report.daemon, "already-running");
@@ -85,32 +84,33 @@ describe("runBotStart", () => {
       assert.equal(manifest?.agentId, "ag-new");
       assert.equal(manifest?.workspaceId, "ws-new");
       assert.deepEqual(manifest?.credentials, {
-        "telegram:personal-assistant": { persisted: false },
+        "telegram:personal-assistant": { persisted: true },
       });
       assert.equal(deps.addChannelCalls.length, 1);
-      const call = deps.addChannelCalls[0] as { channel: string; account: string; secret: string };
+      const call = deps.addChannelCalls[0] as {
+        channel: string;
+        account: string;
+        botToken: string;
+      };
       assert.equal(call.channel, "telegram");
-      assert.deepEqual(JSON.parse(call.secret), { botToken: "tg-token" });
+      assert.equal(call.botToken, "tg-token");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
   });
 
-  it("persists the credential file and records it in the manifest", async () => {
+  it("records the encrypted Hub credential as durable", async () => {
     const home = mkdtempSync(path.join(tmpdir(), "bot-run-"));
     const deps = fakeDeps();
     try {
       const report = await runBotStart(
-        { options: options({ persist: true, provider: "claude" }), home, env: {} },
+        { options: options({ provider: "claude" }), home, env: {} },
         deps,
       );
       assert.equal(report.credential, "persisted");
       const manifest = await readBotManifest(home, "personal-assistant");
       assert.deepEqual(manifest?.credentials, {
-        "telegram:personal-assistant": {
-          persisted: true,
-          secretPath: `${HOME}/secrets/telegram-personal-assistant.json`,
-        },
+        "telegram:personal-assistant": { persisted: true },
       });
     } finally {
       rmSync(home, { recursive: true, force: true });

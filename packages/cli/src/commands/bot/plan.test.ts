@@ -17,7 +17,7 @@ function options(overrides: Partial<BotStartOptions> = {}): BotStartOptions {
 
 describe("buildBotStartPlan", () => {
   it("resolves the personal-assistant default name, account, and title", () => {
-    const plan = buildBotStartPlan(options({ telegramBotToken: "tg-token", persist: true }), HOME);
+    const plan = buildBotStartPlan(options({ telegramBotToken: "tg-token" }), HOME);
     assert.equal(plan.name, "personal-assistant");
     assert.equal(plan.botType, "personal");
     assert.equal(plan.channel, "telegram");
@@ -25,7 +25,6 @@ describe("buildBotStartPlan", () => {
     assert.equal(plan.agentTitle, "personal-assistant");
     assert.equal(plan.provider, "codex");
     assert.equal(plan.model, undefined);
-    assert.equal(plan.persist, true);
     assert.equal(plan.workspacePath, `${HOME}/workspaces/default`);
     assert.equal(plan.isolation, "local");
   });
@@ -36,8 +35,7 @@ describe("buildBotStartPlan", () => {
         botType: "team",
         botName: "ops-bot",
         agentName: "Ops Agent",
-        slackBotToken: "xoxb-1",
-        slackAppToken: "xapp-1",
+        slackConnectionId: "00000000-0000-4000-8000-000000000001",
         slackAccount: "ops",
       }),
       HOME,
@@ -47,7 +45,10 @@ describe("buildBotStartPlan", () => {
     assert.equal(plan.account, "ops");
     assert.equal(plan.agentTitle, "Ops Agent");
     assert.equal(plan.channel, "slack");
-    assert.equal(plan.credential.secondary?.kind, "literal");
+    assert.equal(
+      plan.credential.channel === "slack" ? plan.credential.connectionId : undefined,
+      "00000000-0000-4000-8000-000000000001",
+    );
   });
 
   it("splits provider/model from the --provider slash form", () => {
@@ -68,7 +69,10 @@ describe("buildBotStartPlan", () => {
   });
 
   it("defaults the account to the bot name when no channel account flag is given", () => {
-    const plan = buildBotStartPlan(options({ botName: "my-bot", slackBotToken: "xoxb" }), HOME);
+    const plan = buildBotStartPlan(
+      options({ botName: "my-bot", slackConnectionId: "connection-id" }),
+      HOME,
+    );
     assert.equal(plan.account, "my-bot");
   });
 
@@ -81,7 +85,14 @@ describe("buildBotStartPlan", () => {
 
   it("rejects both channel credentials at once", () => {
     assert.throws(
-      () => buildBotStartPlan(options({ slackBotToken: "xoxb", telegramBotToken: "tg" }), HOME),
+      () =>
+        buildBotStartPlan(
+          options({
+            slackConnectionId: "00000000-0000-4000-8000-000000000001",
+            telegramBotToken: "tg",
+          }),
+          HOME,
+        ),
       (error: unknown) => (error as { code?: string }).code === "MULTIPLE_CHANNELS",
     );
   });

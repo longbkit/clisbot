@@ -99,8 +99,9 @@ function parseProviderEventRouteSnapshots(
   return value.map((candidate) => {
     if (!isRecord(candidate)) throw new Error("invalid provider event route snapshot");
     const route = candidate;
+    const workflowId = route["workflowId"];
     if (
-      typeof route["projectId"] !== "string" ||
+      typeof workflowId !== "string" ||
       typeof route["configurationRevisionId"] !== "string" ||
       (route["connectionId"] !== null && typeof route["connectionId"] !== "string") ||
       (route["resourceId"] !== null && typeof route["resourceId"] !== "string")
@@ -108,7 +109,7 @@ function parseProviderEventRouteSnapshots(
       throw new Error("invalid provider event route snapshot");
     }
     return {
-      projectId: route["projectId"],
+      workflowId,
       configurationRevisionId: route["configurationRevisionId"],
       connectionId: route["connectionId"],
       resourceId: route["resourceId"],
@@ -135,7 +136,7 @@ export function toAgentExecutionRecord(row: AgentExecutionRow): AgentExecutionRe
   return {
     id: row.id,
     organizationId: row.organization_id,
-    projectId: row.project_id,
+    workflowId: row.workflow_id,
     machineId: row.machine_id,
     status: row.status,
     startedAt: row.started_at,

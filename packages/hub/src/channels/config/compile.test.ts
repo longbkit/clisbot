@@ -6,7 +6,12 @@ import {
   type ChannelCompileInput,
 } from "./compile.js";
 
-const AGENTS = ["worker-app", "worker-infra", "assistant-personal", "telegram-butler"];
+const AGENTS = [
+  "worker-app",
+  "worker-infra",
+  "assistant-personal",
+  "telegram-butler",
+];
 const ENVIRONMENTS = ["repo-app", "repo-infra", "personal-lab"];
 const WORKFLOWS = ["infra-runbook"];
 
@@ -23,10 +28,14 @@ function input(
   };
 }
 
-function expectCompileError(files: Record<string, string>, message: RegExp): void {
+function expectCompileError(
+  files: Record<string, string>,
+  message: RegExp,
+): void {
   assert.throws(
     () => compileChannelControlPlane(input(files)),
-    (error: unknown) => error instanceof ChannelCompilationError && message.test(error.message),
+    (error: unknown) =>
+      error instanceof ChannelCompilationError && message.test(error.message),
   );
 }
 
@@ -40,7 +49,7 @@ const SLACK_WORK = `
 channel: slack
 accountId: work
 enabled: true
-secretRef: ~/.config/clisbot/secrets/slack-work.json
+connectionId: slack-work
 transport: { mode: socket, errorPolicy: once }
 policy:
   defaultRoles: [user]
@@ -163,7 +172,7 @@ describe("compileChannelControlPlane", () => {
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 config:
   richMessages: true
@@ -173,7 +182,10 @@ config:
     );
     // The hub never interprets these keys; the vertical's account resolution
     // type-checks each one on read (bot-api resolveTelegramAccount).
-    assert.deepEqual(plane.accounts[0]!.config, { richMessages: true, timeoutSeconds: 90 });
+    assert.deepEqual(plane.accounts[0]!.config, {
+      richMessages: true,
+      timeoutSeconds: 90,
+    });
   });
 
   it("defaults the account config block to empty when omitted", () => {
@@ -183,12 +195,32 @@ config:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 `,
       }),
     );
     assert.deepEqual(plane.accounts[0]!.config, {});
+  });
+
+  it("rejects two accounts that would start competing transports for one connection", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/slack/first.yml"]: `
+channel: slack
+accountId: first
+connectionId: shared-connection
+transport: { mode: socket }
+`,
+        [".paseo/channels/slack/second.yml"]: `
+channel: slack
+accountId: second
+connectionId: shared-connection
+transport: { mode: socket }
+`,
+      },
+      /connection shared-connection is already used by account first/u,
+    );
   });
 
   it("folds route overrides over account defaults", () => {
@@ -224,7 +256,10 @@ transport: { mode: socket }
       environment: "repo-app",
       template: "team",
     });
-    assert.deepEqual(routes[2]!.target, { kind: "workflow", workflow: "infra-runbook" });
+    assert.deepEqual(routes[2]!.target, {
+      kind: "workflow",
+      workflow: "infra-runbook",
+    });
   });
 
   it("computes role closures with extends and fail-closed unknowns", () => {
@@ -259,7 +294,7 @@ users:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 policy:
   assignments:
@@ -307,7 +342,7 @@ roles:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: personal
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 `,
       },
@@ -321,7 +356,7 @@ transport: { mode: socket }
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 routes:
   - match: { kind: channel, ids: [C0APP] }
@@ -340,7 +375,7 @@ routes:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 routes:
   - match: { kind: channel, ids: [C0APP] }
@@ -358,7 +393,7 @@ routes:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   approval:
@@ -375,7 +410,7 @@ defaults:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   approval:
@@ -393,7 +428,7 @@ defaults:
         [".paseo/channels/telegram/support.yml"]: `
 channel: telegram
 accountId: support
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: polling }
 defaults:
   interaction: { requireMention: false, followUp: { mode: auto, ttlMinutes: 120 } }
@@ -409,6 +444,11 @@ defaults:
     assert.equal(account.defaults.bindingKey, "thread");
     assert.equal(account.defaults.sync.finalAnswers, true);
     assert.equal(account.defaults.sync.threadLink, "final-only");
+    assert.deepEqual(account.defaults.sync.progress, {
+      progressMessage: true,
+      typingIndicator: true,
+      messageReaction: "off",
+    });
     // The subagent relay knobs floor off, even though root relay is on.
     assert.deepEqual(account.defaults.sync.subagents, {
       finalAnswers: false,
@@ -423,7 +463,7 @@ defaults:
         [".paseo/channels/slack/main.yml"]: `
 channel: slack
 accountId: main
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   sync: { subagents: { finalAnswers: true } }
@@ -454,7 +494,7 @@ routes:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   sync: { progress: true }
@@ -481,7 +521,7 @@ defaults:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   sync: { progress: { messageReaction: hourglass_flowing_sand } }
@@ -520,7 +560,7 @@ routes:
         [".paseo/channels/slack/work.yml"]: `
 channel: slack
 accountId: work
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   sync: { progress: { messageReaction: "Hourglass Flowing Sand" } }
@@ -536,7 +576,7 @@ defaults:
         [".paseo/channels/slack/main.yml"]: `
 channel: slack
 accountId: main
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 defaults:
   outbound: { path: tool }
@@ -583,7 +623,7 @@ routes:
         [".paseo/channels/slack/main.yml"]: `
 channel: slack
 accountId: main
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: socket }
 routes:
   - match: { kind: channel, ids: [C0APP] }
@@ -606,11 +646,82 @@ routes:
         [".paseo/channels/discord/main.yml"]: `
 channel: discord
 accountId: main
-secretRef: /tmp/secret.json
+connectionId: connection-id
 transport: { mode: polling }
 `,
       },
       /not supported at P0/,
+    );
+  });
+
+  it("rejects an organization assignment to an unknown user even with no accounts", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/policy.yml"]: `
+assignments:
+  - identities: [user:missing]
+    roles: [operator]
+`,
+      },
+      /unknown user user:missing/,
+    );
+  });
+
+  it("rejects transport modes whose inbound runtime is not implemented", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: webhook, webhookPath: /channels/slack/work/webhook }
+`,
+      },
+      /webhook transport is not implemented/,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/telegram/work.yml"]: `
+channel: telegram
+accountId: work
+connectionId: connection-id
+transport: { mode: webhook }
+`,
+      },
+      /webhook transport is not implemented/,
+    );
+  });
+
+  it("rejects route kinds a channel can never emit", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/slack/work.yml"]: `
+channel: slack
+accountId: work
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: topic }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /slack never emits a topic conversation/,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/telegram/work.yml"]: `
+channel: telegram
+accountId: work
+connectionId: connection-id
+transport: { mode: polling }
+routes:
+  - match: { kind: thread }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /telegram never emits a thread conversation/,
     );
   });
 });

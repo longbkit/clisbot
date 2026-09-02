@@ -71,7 +71,9 @@ function context(
     externalThreadId?: string | null;
     triggerThreadId?: string | null;
     triggerMessageId?: string;
+    deliveryScopeId?: string;
     rootKind?: StreamContext["rootKind"];
+    outputDelivery?: StreamContext["outputDelivery"];
   } = {},
 ): StreamContext {
   const route: CompiledRoute = overrides.route ?? {
@@ -87,7 +89,7 @@ function context(
     accountId: "work",
     enabled: true,
     channelEnabled: true,
-    secretRef: "secret-ref",
+    connectionId: "connection-id",
     transport: {},
     config: {},
     defaultRoles: [],
@@ -99,6 +101,9 @@ function context(
   };
   return {
     agentId: overrides.agentId ?? AGENT_ID,
+    ...(overrides.deliveryScopeId === undefined
+      ? {}
+      : { deliveryScopeId: overrides.deliveryScopeId }),
     channel: overrides.channel ?? "slack",
     accountId: "work",
     externalConversationId: overrides.externalConversationId ?? CONVERSATION,
@@ -116,6 +121,7 @@ function context(
     // The binding's stored route-summary kind: a Slack thread's root is a
     // channel.
     rootKind: overrides.rootKind ?? "channel",
+    ...(overrides.outputDelivery === undefined ? {} : { outputDelivery: overrides.outputDelivery }),
   };
 }
 
@@ -164,6 +170,36 @@ afterAll(async () => {
 });
 
 describe("relay final answer", () => {
+  it("accounts a successful automatic relay against the Workflow output limit", async () => {
+    const calls: string[] = [];
+    const engine = makeEngine(store, async () => ({ ok: true }));
+    engine.attach(
+      context({
+        externalConversationId: "C0OUTPUT",
+        externalThreadId: "output.1",
+        outputDelivery: {
+          begin: async () => {
+            calls.push("begin");
+            return "attempt-1";
+          },
+          complete: async (id) => {
+            calls.push(`complete:${id}`);
+          },
+          fail: async (id) => {
+            calls.push(`fail:${id}`);
+          },
+        },
+      }),
+    );
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-output",
+      item: { type: "assistant_message", messageId: "m-output", text: "done" },
+    });
+    await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-output" });
+    assert.deepEqual(calls, ["begin", "complete:attempt-1"]);
+  });
+
   it("posts one message's coalesced items as a single post on turn_completed", async () => {
     const posted: string[] = [];
     const engine = makeEngine(store, async (p) => {
@@ -188,6 +224,61 @@ describe("relay final answer", () => {
     await engine.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-a" });
 
     assert.deepEqual(posted, ["step one"]);
+  });
+
+  it("does not re-post one assistant message replayed after a terminal tool call", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (post) => {
+      posted.push(post.text);
+      return { ok: true };
+    });
+    engine.attach(context({ externalConversationId: "C0R", externalThreadId: "1.1" }));
+
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-replayed-message",
+      item: { type: "assistant_message", messageId: "m1", text: "answer" },
+    });
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-replayed-message",
+      item: { type: "tool_call", name: "finish_execution", status: "completed" },
+    });
+    await engine.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "turn-replayed-message",
+      item: { type: "assistant_message", messageId: "m1", text: "answer" },
+    });
+    await engine.onStream(AGENT_ID, {
+      kind: "turn_completed",
+      turnId: "turn-replayed-message",
+    });
+
+    assert.deepEqual(posted, ["answer"]);
+  });
+
+  it("does not re-post identical assistant text when a replay changes messageId", async () => {
+    const posted: string[] = [];
+    const engine = makeEngine(store, async (post) => {
+      posted.push(post.text);
+      return { ok: true };
+    });
+    engine.attach(context({ externalConversationId: "C0S", externalThreadId: "1.2" }));
+
+    for (const messageId of ["m1", "m2"]) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-message-id-drift",
+        item: { type: "assistant_message", messageId, text: "answer" },
+      });
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "turn-message-id-drift",
+        item: { type: "tool_call", name: "finish_execution", status: "completed" },
+      });
+    }
+
+    assert.deepEqual(posted, ["answer"]);
   });
 
   it("posts two messages with different messageIds as two separate posts, in order", async () => {
@@ -344,6 +435,46 @@ describe("relay final answer", () => {
 });
 
 describe("relay progress + tool calls", () => {
+  it("never exposes the Hub finish_execution control tool", async () => {
+    const posted: string[] = [];
+    const ctx = context({
+      externalConversationId: "C0INTERNAL",
+      externalThreadId: "3.5",
+      route: {
+        ...context().route,
+        defaults: defaults({
+          sync: {
+            finalAnswers: true,
+            progress: { progressMessage: true, typingIndicator: false, messageReaction: "off" },
+            toolCalls: true,
+            threadLink: "none",
+            subagents: SUBAGENTS_OFF,
+          },
+        }),
+      },
+    });
+    const engine = makeEngine(store, async (post) => {
+      posted.push(post.text);
+      return { ok: true };
+    });
+    engine.attach(ctx);
+
+    for (const name of ["hub.finish_execution", "mcp__hub__finish_execution"]) {
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: `turn-${name}`,
+        item: { type: "tool_call", name, status: "running" },
+      });
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: `turn-${name}`,
+        item: { type: "tool_call", name, status: "completed" },
+      });
+    }
+
+    assert.deepEqual(posted, []);
+  });
+
   it("posts a progress snapshot when sync.progress is on, throttled by the clock", async () => {
     const clock = new ManualClock(0);
     const posted: string[] = [];
@@ -458,6 +589,79 @@ describe("ledger dedupe (restart / replay)", () => {
     });
     await second.onStream(AGENT_ID, { kind: "turn_completed", turnId: "turn-f" });
     assert.equal(posts, 1, "the replayed final answer does not re-post");
+  });
+
+  it("does not collide when a reused Agent restarts its provider-local turn id", async () => {
+    let posts = 0;
+    const post = async (): Promise<OutboundPostResult> => {
+      posts += 1;
+      return { ok: true, externalMessageId: String(posts) };
+    };
+    const base = {
+      channel: "telegram" as const,
+      externalConversationId: "telegram-root",
+      externalThreadId: null,
+    };
+
+    for (const deliveryScopeId of ["execution-one", "execution-two"]) {
+      const engine = makeEngine(store, post);
+      engine.attach(context({ ...base, deliveryScopeId }));
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "codex-turn-0",
+        item: { type: "assistant_message", text: deliveryScopeId },
+      });
+      await engine.onStream(AGENT_ID, {
+        kind: "turn_completed",
+        turnId: "codex-turn-0",
+      });
+    }
+
+    assert.equal(posts, 2, "each Workflow execution owns a distinct delivery scope");
+
+    const replay = makeEngine(store, post);
+    replay.attach(context({ ...base, deliveryScopeId: "execution-two" }));
+    await replay.onStream(AGENT_ID, {
+      kind: "timeline",
+      turnId: "codex-turn-0",
+      item: { type: "assistant_message", text: "execution-two" },
+    });
+    await replay.onStream(AGENT_ID, {
+      kind: "turn_completed",
+      turnId: "codex-turn-0",
+    });
+    assert.equal(posts, 2, "replaying the same Workflow execution remains idempotent");
+  });
+
+  it("retries a known failed post once while preserving replay dedupe", async () => {
+    let calls = 0;
+    const post = async (): Promise<OutboundPostResult> => {
+      calls += 1;
+      return calls === 1
+        ? { ok: false, error: "rate limited" }
+        : { ok: true, externalMessageId: "telegram-1" };
+    };
+    const ctx = context({
+      channel: "telegram",
+      deliveryScopeId: "execution-retry",
+      externalConversationId: "telegram-retry",
+      externalThreadId: null,
+    });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const engine = makeEngine(store, post);
+      engine.attach(ctx);
+      await engine.onStream(AGENT_ID, {
+        kind: "timeline",
+        turnId: "codex-turn-0",
+        item: { type: "assistant_message", text: "retry me" },
+      });
+      await engine.onStream(AGENT_ID, {
+        kind: "turn_completed",
+        turnId: "codex-turn-0",
+      });
+    }
+
+    assert.equal(calls, 2, "failure retries once; replay after success stays silent");
   });
 
   it("does not re-post a progress snapshot on replay (dedupe by sequence)", async () => {

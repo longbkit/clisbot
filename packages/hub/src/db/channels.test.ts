@@ -45,103 +45,6 @@ afterAll(async () => {
   await rm(dataDirectory, { recursive: true, force: true });
 });
 
-describe("channel_accounts", () => {
-  it("inserts, round-trips, and re-uses one account record", async () => {
-    const account = await store.upsertChannelAccount({
-      organizationId: ORGANIZATION_ID,
-      channel: "slack",
-      accountId: SLACK_ACCOUNT,
-      status: "active",
-      pinVersion: "2026.7.1-2",
-      distIntegrity: "sha512-slack-pin",
-      gitHead: "2d2ddc43",
-      installDir: join(dataDirectory, "channels", SLACK_ACCOUNT),
-      installedAt: new Date("2026-08-25T00:00:00Z"),
-      secretRef: "~/.config/clisbot/secrets/slack-work.json",
-      providerApplicationId: "slack-app-1",
-      externalIdentity: { teamId: "T0APP", botUserId: "U0BOT" },
-      transport: { mode: "socket" },
-    });
-
-    assert.equal(account.channel, "slack");
-    assert.equal(account.accountId, SLACK_ACCOUNT);
-    assert.equal(account.status, "active");
-    assert.deepEqual(account.transport, { mode: "socket" });
-
-    const reinserted = await store.upsertChannelAccount({
-      organizationId: ORGANIZATION_ID,
-      channel: "slack",
-      accountId: SLACK_ACCOUNT,
-      status: "suspended",
-      transport: { mode: "webhook", webhookPath: "/channels/slack/work/webhook" },
-    });
-    assert.equal(reinserted.id, account.id, "upsert updates instead of duplicating");
-    assert.equal(reinserted.status, "suspended");
-
-    const found = await store.findChannelAccount(ORGANIZATION_ID, "slack", SLACK_ACCOUNT);
-    assert.ok(found !== undefined);
-    assert.equal(found?.id, account.id);
-    assert.equal(found?.providerApplicationId, "slack-app-1");
-    assert.deepEqual(found?.transport, {
-      mode: "webhook",
-      webhookPath: "/channels/slack/work/webhook",
-    });
-
-    await store.upsertChannelAccount({
-      organizationId: ORGANIZATION_ID,
-      channel: "telegram",
-      accountId: TELEGRAM_ACCOUNT,
-      status: "active",
-      transport: { mode: "polling" },
-    });
-    const accounts = await store.listChannelAccounts(ORGANIZATION_ID);
-    assert.deepEqual(
-      accounts.map(({ channel, accountId }) => `${channel}:${accountId}`),
-      ["slack:work", "telegram:personal"],
-    );
-  });
-
-  it("admits two accounts of the same channel (multi-account, plan P4)", async () => {
-    // A second Slack app under a different account id must not be blocked by a
-    // global-unique provider index: uniqueness is scoped to (org, channel, account id).
-    const work = await store.upsertChannelAccount({
-      organizationId: ORGANIZATION_ID,
-      channel: "slack",
-      accountId: "work",
-      status: "active",
-      providerApplicationId: "app-a",
-      transport: { mode: "socket" },
-    });
-    const ops = await store.upsertChannelAccount({
-      organizationId: ORGANIZATION_ID,
-      channel: "slack",
-      accountId: "ops",
-      status: "active",
-      providerApplicationId: "app-b",
-      transport: { mode: "webhook" },
-    });
-    assert.notEqual(work.id, ops.id);
-    assert.equal(
-      (await store.findChannelAccount(ORGANIZATION_ID, "slack", "ops"))?.providerApplicationId,
-      "app-b",
-    );
-  });
-
-  it("enforces one account per (organization, channel, account id)", async () => {
-    // The upsert above collapsed the re-insert to the same row; a raw second row for the
-    // same key must hit the unique index and be rejected at the database level.
-    await assert.rejects(
-      bundle.runtime.query(
-        `insert into channel_accounts
-           (id, organization_id, channel, account_id, status, transport)
-         values (gen_random_uuid(), $1, 'slack', 'work', 'active', '{}')`,
-        [ORGANIZATION_ID],
-      ),
-      /unique|duplicate/,
-    );
-  });
-});
-
 describe("thread_bindings", () => {
   it("records a pending marker, resolves it, and round-trips the binding", async () => {
     const pending = await store.recordPendingThreadBinding({
@@ -246,6 +149,18 @@ describe("thread_bindings", () => {
     assert.equal(channelLevel.externalThreadId, null);
     assert.ok(threadLevel !== undefined);
     assert.notEqual(channelLevel.id, threadLevel.id, "channel and thread levels are distinct");
+
+    const channelReplay = await store.recordPendingThreadBinding({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: SLACK_ACCOUNT,
+      externalConversationId: SLACK_CONVERSATION,
+      externalThreadId: null,
+      pendingExecutionId: "execution-3",
+      initiator: INITIATOR,
+      route: ROUTE,
+    });
+    assert.equal(channelReplay.id, channelLevel.id, "a null-thread binding is deduplicated");
   });
 
   it("lists pending markers for orphan recovery", async () => {
@@ -297,6 +212,30 @@ describe("delivery_ledger", () => {
 
     const next = await store.recordDelivery({ ...key, eventTurnId: "turn-1", sequence: 1 });
     assert.equal(next.created, true, "a new sequence in the same turn is a new attempt");
+  });
+
+  it("dedupes root-conversation deliveries where the thread id is null", async () => {
+    const rootKey = {
+      ...key,
+      channel: "telegram" as const,
+      accountId: TELEGRAM_ACCOUNT,
+      externalConversationId: TELEGRAM_CONVERSATION,
+      externalThreadId: null,
+    };
+    const first = await store.recordDelivery({
+      ...rootKey,
+      eventTurnId: "telegram-root-turn",
+      sequence: 0,
+    });
+    const replay = await store.recordDelivery({
+      ...rootKey,
+      eventTurnId: "telegram-root-turn",
+      sequence: 0,
+    });
+
+    assert.equal(first.created, true);
+    assert.equal(replay.created, false);
+    assert.equal(replay.record.id, first.record.id);
   });
 
   it("confirms a delivery and idempotently re-confirms it", async () => {
@@ -366,6 +305,7 @@ describe("delivery_ledger", () => {
     });
     assert.equal(failed.status, "failed");
     assert.equal(failed.failureReason, "rate limited");
+    assert.equal(failed.attempts, 1);
     assert.equal(failed.externalMessageId, null, "a failed post has no native id yet");
 
     // The row is not "posted", so it does not count toward the replay cursor.
@@ -379,6 +319,12 @@ describe("delivery_ledger", () => {
       !listed.some(({ eventTurnId, sequence }) => eventTurnId === "turn-2" && sequence === 0),
       "a failed delivery is not a posted delivery",
     );
+
+    const retry = await store.recordDelivery({ ...key, eventTurnId: "turn-2", sequence: 0 });
+    assert.equal(retry.created, true, "a known failed handoff is safe to retry");
+    assert.equal(retry.record.id, failed.id);
+    assert.equal(retry.record.status, "recorded");
+    assert.equal(retry.record.attempts, 2);
 
     // A later retry confirms the same record — the ledger does not need a new row.
     const posted = await store.confirmDelivery({

@@ -814,6 +814,24 @@ describe("Codex app-server provider", () => {
     );
   });
 
+  test("recognizes object-shaped entries from thread/loaded/list", async () => {
+    const session = createSession();
+    const request = vi.fn(async (method: string) => {
+      if (method === "thread/loaded/list") return { data: [{ id: "test-thread" }] };
+      if (method === "turn/start") return {};
+      throw new Error(`Unexpected request: ${method}`);
+    });
+    session.activeForegroundTurnId = null;
+    session.client = createStub<CodexClientLike>({ request });
+
+    await session.startTurn("continue loaded thread");
+
+    expect(request.mock.calls.map(([method]) => method)).toEqual([
+      "thread/loaded/list",
+      "turn/start",
+    ]);
+  });
+
   test("omitted mode preserves Codex resolved approval and sandbox config", async () => {
     const session = createSession({ modeId: undefined });
     const request = vi.fn(async (method: string) => {

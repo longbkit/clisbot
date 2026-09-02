@@ -2,7 +2,7 @@
 // export name `telegramPlugin` carrying `gateway.startAccount` +
 // `outbound.sendText`. The Hub loader imports this chunk and drives it.
 
-import type { ChannelPlugin } from "@getpaseo/channels-shared";
+import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
 import { startTelegramAccount } from "./lifecycle/start-account.js";
 import { getHostRuntime } from "./runtime-store.js";
 import { sendMedia, sendText, updateText } from "./outbound.js";
@@ -10,7 +10,11 @@ import { telegramTyping } from "./typing.js";
 
 export const telegramPlugin: ChannelPlugin = {
   gateway: {
-    startAccount: (ctx) => startTelegramAccount(ctx, getHostRuntime()),
+    startAccount: (ctx) =>
+      startTelegramAccount(
+        ctx,
+        (ctx["hostRuntime"] as HostRuntime | undefined) ?? getHostRuntime(),
+      ),
   },
   outbound: {
     sendText,

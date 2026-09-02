@@ -14,15 +14,19 @@
 // No OpenClaw imports: the probe runs against a straight @slack/web-api
 // WebClient (client/web-api.ts).
 
-import { SocketModeClient } from "@slack/socket-mode";
 import {
   createInboundEventProcessor,
   type HostChildLogger,
+  type HostRuntime,
   type StartAccountContext,
 } from "@getpaseo/channels-shared";
 import { probeSlackAuth } from "../client/web-api.js";
 import { getSlackRuntime } from "../runtime.js";
-import { approvalRootKind, parseApprovalCardClick } from "../transport/approval-card.js";
+import {
+  approvalRootKind,
+  parseApprovalCardClick,
+} from "../transport/approval-card.js";
+import { acquireSharedSlackSocket } from "../transport/socket-pool.js";
 import { createSlackSocketTransport } from "../transport/socket-mode.js";
 
 /** The pinned default account id when `ctx.account` carries no `accountId`. */
@@ -39,7 +43,10 @@ function resolveMediaDownloadDir(ctx: StartAccountContext): string | undefined {
 }
 
 /** Read one `string` field off a `Record` account/cfg entry. */
-function readStringField(record: Record<string, unknown>, key: string): string | undefined {
+function readStringField(
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = record[key];
   return typeof value === "string" ? value : undefined;
 }
@@ -50,7 +57,8 @@ export function readSlackAccountTokens(account: Record<string, unknown>): {
   botToken?: string;
   appToken?: string;
 } {
-  const accountId = readStringField(account, "accountId") ?? SLACK_DEFAULT_ACCOUNT_ID;
+  const accountId =
+    readStringField(account, "accountId") ?? SLACK_DEFAULT_ACCOUNT_ID;
   const botToken = readStringField(account, "botToken")?.trim();
   const appToken = readStringField(account, "appToken")?.trim();
   return {
@@ -85,7 +93,9 @@ export function assertNoDuplicateSlackBotTokens(
 ): void {
   const channels = cfg["channels"] as Record<string, unknown> | undefined;
   const slack = channels?.["slack"] as Record<string, unknown> | undefined;
-  const accounts = slack?.["accounts"] as Record<string, Record<string, unknown>> | undefined;
+  const accounts = slack?.["accounts"] as
+    | Record<string, Record<string, unknown>>
+    | undefined;
   if (accounts === undefined) return;
   const activeConfig = readSlackAccountConfig(cfg, activeAccountId);
   const activeToken = readStringField(activeConfig, "botToken");
@@ -110,8 +120,12 @@ export function assertNoDuplicateSlackBotTokens(
  * is not mounted yet (unit-test posture): the inboundLedger sink is the
  * Hub's durable dedupe when present; without a Hub the in-flight set is the
  * whole dedupe. */
-function createSlackL3Processor(accountId: string, botId?: string) {
-  const hostRuntime = getSlackRuntime();
+function createSlackL3Processor(
+  accountId: string,
+  botId?: string,
+  runtime = getSlackRuntime(),
+) {
+  const hostRuntime = runtime;
   if (hostRuntime === undefined) return undefined;
   return createInboundEventProcessor({
     hostRuntime,
@@ -132,7 +146,9 @@ function createSlackL3Processor(accountId: string, botId?: string) {
 /** `plugin.gateway.startAccount` — probe the tokens, then run the Socket
  * Mode transport for the account's lifetime. */
 // eslint-disable-next-line complexity -- this is the single account lifecycle transaction.
-export async function startSlackAccount(ctx: StartAccountContext): Promise<void> {
+export async function startSlackAccount(
+  ctx: StartAccountContext,
+): Promise<void> {
   const log = ctx.log;
   const { accountId, botToken, appToken } = readSlackAccountTokens(ctx.account);
   if (botToken === undefined || appToken === undefined) {
@@ -151,14 +167,24 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
     );
   }
   if (probe.warning !== undefined) log?.warn?.(probe.warning);
+  if (probe.teamId === undefined) {
+    throw new Error(
+      `Slack auth.test for account "${accountId}" returned no teamId; cannot route a shared app socket safely`,
+    );
+  }
 
-  const processor = createSlackL3Processor(accountId, probe.botId);
-
-  const client = new SocketModeClient({
+  const processor = createSlackL3Processor(
+    accountId,
+    probe.botId,
+    ctx["hostRuntime"] as HostRuntime | undefined,
+  );
+  const socket = acquireSharedSlackSocket({
     appToken,
-    autoReconnectEnabled: true,
-    clientPingTimeout: 15000,
+    ...(log === undefined ? {} : { logger: log }),
   });
+  const accountLifetime = new AbortController();
+  const abortAccount = (): void => accountLifetime.abort();
+  ctx.abortSignal.addEventListener("abort", abortAccount, { once: true });
   // COMPAT(clisbot-control-plane): the approval card's button-click seam. The
   // Hub supervisor mounts `channelRuntime.approvalAction` (the plane's
   // onApprovalCallback, the SAME exactly-once resolver as a typed command —
@@ -166,7 +192,11 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
   // vertical) = no card clicks; the typed command still answers the prompt.
   // L4 narrows the channel envelope only (approval-card.ts); the card value
   // stays opaque to the vertical — the hub's card parser owns its format.
-  const onInteractive = slackApprovalInteractive(ctx.channelRuntime, accountId, log);
+  const onInteractive = slackApprovalInteractive(
+    ctx.channelRuntime,
+    accountId,
+    log,
+  );
   // COMPAT(clisbot-control-plane): inbound media (F-06, G5+G6). When the Hub
   // fills `ctx.mediaDownloadDir`, the L2 folds a message's `files[]` into the
   // inbound body before the L3 handoff (the mirror of the Telegram vertical's
@@ -190,7 +220,8 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
       ? { accountId, botToken, downloadDir: mediaDownloadDir }
       : undefined;
   const transport = createSlackSocketTransport({
-    client,
+    client: socket.client,
+    sharedClient: true,
     identity: {
       ...(probe.botUserId !== undefined ? { botUserId: probe.botUserId } : {}),
       ...(probe.botId !== undefined ? { botId: probe.botId } : {}),
@@ -206,17 +237,26 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
             // No runtime yet (unit posture): drop the event — a drive surface
             // with no host is not a channel.
           },
-    abortSignal: ctx.abortSignal,
+    abortSignal: accountLifetime.signal,
     ...(log !== undefined ? { logger: log } : {}),
     ...(onInteractive !== undefined ? { onInteractive } : {}),
     ...(slashCommand !== undefined ? { slashCommand } : {}),
     ...(media !== undefined ? { media } : {}),
   });
 
-  ctx.setStatus?.({ channel: "slack", accountId, connected: true, lifecycle: "ready" });
+  ctx.setStatus?.({
+    channel: "slack",
+    accountId,
+    connected: true,
+    lifecycle: "ready",
+  });
   try {
-    await transport.start();
+    socket.start();
+    await Promise.all([transport.start(), socket.wait(accountLifetime.signal)]);
   } finally {
+    accountLifetime.abort();
+    ctx.abortSignal.removeEventListener("abort", abortAccount);
+    await socket.release();
     ctx.setStatus?.({ channel: "slack", accountId, connected: false });
   }
 }
@@ -238,7 +278,9 @@ function slackApprovalInteractive(
 ): ((body: Record<string, unknown>) => Promise<void>) | undefined {
   const approvalAction = channelRuntime?.["approvalAction"];
   if (typeof approvalAction !== "function") return undefined;
-  const invoke = approvalAction as (params: Record<string, unknown>) => Promise<unknown>;
+  const invoke = approvalAction as (
+    params: Record<string, unknown>,
+  ) => Promise<unknown>;
   return async (body: Record<string, unknown>): Promise<void> => {
     // The vertical parses the CHANNEL envelope only (who clicked, where the
     // card sits); the card value is opaque to the vertical — the hub's card

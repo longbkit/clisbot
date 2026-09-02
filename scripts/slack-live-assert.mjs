@@ -3,7 +3,7 @@
 // docs/lessons/2026-08-28-live-e2e-speedups.md "one assertion script per
 // surface"). Replaces the ~10 manual tool calls per live assertion with:
 // post marker (user cred, mention-shaped text as passed) -> poll hub.log for
-// bind/steer since t0 -> diff the send ledger -> read the channel/thread back
+// bind/steer since t0 -> read the channel/thread back
 // and match on content (per-observer ids, F-02 — never cross-observer ids)
 // -> print PASS/FAIL + the evidence lines.
 //
@@ -17,7 +17,7 @@
 // Prints a single VERDICT line (PASS/FAIL + evidence) as the last line.
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, openSync, readSync, closeSync, statSync } from "node:fs";
+import { openSync, readSync, closeSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 
 const args = process.argv.slice(2);
@@ -32,7 +32,6 @@ const opt = (name, fallback) => {
 };
 const HOME = process.env.CLISBOT_HOME || `${homedir()}/.clisbot-dev`;
 const HUB_LOG = `${HOME}/hub.log`;
-const LEDGER = `${HOME}/channels/work/state/slack.sent-messages.json`;
 const CHANNEL = opt("channel", process.env.SLACK_TEST_CHANNEL);
 if (!CHANNEL) {
   console.error("no channel: set SLACK_TEST_CHANNEL or pass --channel");
@@ -104,7 +103,7 @@ function hubEventsSince(sinceMs) {
     const t = parseLogTime(line);
     if (t === null || t < sinceMs) continue;
     if (
-      !/bound a thread|bound a channel|bound a conversation|conversation bound to a new agent session|steered an existing session|inbound answered/i.test(
+      !/provider event routing completed|bound a thread|bound a channel|bound a conversation|conversation bound to a new agent session|steered an existing session|inbound answered/i.test(
         line,
       )
     )
@@ -115,19 +114,11 @@ function hubEventsSince(sinceMs) {
     for (let j = i + 1; j < clean.length && /^\s{2,}\S/.test(clean[j]); j++) {
       block += " " + clean[j].trim();
     }
+    if (/provider event routing completed/i.test(line) && !/deliveryId: "slack:/.test(block))
+      continue;
     events.push({ t: new Date(t).toISOString(), line: block.slice(0, 400) });
   }
   return events;
-}
-
-function ledgerEntries() {
-  try {
-    const d = JSON.parse(readFileSync(LEDGER, "utf8"));
-    const arr = Array.isArray(d) ? d : Object.values(d).find(Array.isArray);
-    return arr ?? [];
-  } catch {
-    return [];
-  }
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -174,7 +165,6 @@ if (mode === "post") {
   const threadTs = opt("thread-ts");
   const expect = opt("expect", "PONG-");
   const t0 = Date.now();
-  const before = ledgerEntries().length;
   const argv = ["--channel-id", CHANNEL, "--text", text];
   if (threadTs) argv.push("--thread-ts", threadTs);
   let markerTs;
@@ -194,36 +184,33 @@ if (mode === "post") {
   console.log(`[t+0ms] marker posted ts=${markerTs}${threadTs ? ` thread=${threadTs}` : ""}`);
 
   const deadline = t0 + TIMEOUT_S * 1000;
-  let steer = null;
+  let admission = null;
   let reply = null;
   while (Date.now() < deadline) {
     await sleep(POLL_MS);
     const events = hubEventsSince(t0);
-    if (!steer && events.length > 0) steer = events[events.length - 1];
+    if (!admission && events.length > 0) admission = events[events.length - 1];
     if (!reply) {
       // A root marker becomes the thread root for the reply. Reading channel
       // history alone cannot see that threaded response.
       const rows = readBack(threadTs ?? markerTs);
       reply = findMatch(rows, expect, text);
     }
-    if (steer && reply) break;
+    if (admission && reply) break;
   }
-  const after = ledgerEntries().length;
-  const agentId = steer?.line.match(/agentId: "([a-f0-9-]{36})"/)?.[1] ?? null;
-  const ok = Boolean(steer && reply && agentId);
+  const ok = Boolean(admission && reply);
   console.log(
-    `[t+${Math.round((Date.now() - t0) / 1000)}s] hub.log: ${steer ? `${steer.t} ${steer.line}` : "NO bind/steer"}`,
+    `[t+${Math.round((Date.now() - t0) / 1000)}s] hub.log: ${admission ? `${admission.t} ${admission.line}` : "NO admission"}`,
   );
   console.log(
     `[t+${Math.round((Date.now() - t0) / 1000)}s] reply: ${
       reply ? `${reply.Time} ts=${reply.MsgID} "${(reply.Text ?? "").slice(0, 120)}"` : "NOT FOUND"
     }`,
   );
-  console.log(`[ledger] entries ${before} -> ${after} (+${after - before})`);
   console.log(
     ok
-      ? `VERDICT PASS steer=${agentId} replyTs=${reply.MsgID}`
-      : `VERDICT FAIL steer=${steer ? "yes" : "no"} reply=${reply ? "yes" : "no"}`,
+      ? `VERDICT PASS admission=yes replyTs=${reply.MsgID}`
+      : `VERDICT FAIL admission=${admission ? "yes" : "no"} reply=${reply ? "yes" : "no"}`,
   );
   process.exit(ok ? 0 : 1);
 } else {

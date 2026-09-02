@@ -7,6 +7,7 @@ import type {
 } from "@getpaseo/protocol/messages";
 
 import type {
+  HubExecutionAgentCreateInput,
   HubExecutionAgents,
   OwnedAgentEvent,
   OwnedAgentSnapshot,
@@ -36,16 +37,23 @@ function deferred<T>(): Deferred<T> {
 class ControlledHubExecutionAgents implements HubExecutionAgents {
   private readonly createObserved = deferred<void>();
   private readonly createGate = deferred<OwnedAgentSnapshot>();
+  private listener: ((event: OwnedAgentEvent) => void) | undefined;
 
-  create(): Promise<OwnedAgentSnapshot> {
+  lastCreate: HubExecutionAgentCreateInput | undefined;
+
+  create(input: HubExecutionAgentCreateInput): Promise<OwnedAgentSnapshot> {
+    this.lastCreate = input;
     this.createObserved.resolve();
     return this.createGate.promise;
   }
 
   async control(): Promise<void> {}
 
-  subscribe(_listener: (event: OwnedAgentEvent) => void): () => void {
-    return () => undefined;
+  subscribe(listener: (event: OwnedAgentEvent) => void): () => void {
+    this.listener = listener;
+    return () => {
+      this.listener = undefined;
+    };
   }
 
   async invalidateAuthority(): Promise<void> {}
@@ -62,6 +70,10 @@ class ControlledHubExecutionAgents implements HubExecutionAgents {
         status: "running",
       } as AgentSnapshotPayload,
     });
+  }
+
+  emit(event: OwnedAgentEvent): void {
+    this.listener?.(event);
   }
 }
 
@@ -173,6 +185,63 @@ describe("HubExecutionController", () => {
           toolPolicyApplied: true,
         }),
       }),
+    ]);
+  });
+
+  test("forwards reuseAgentId on the existing create execution RPC", async () => {
+    const agents = new ControlledHubExecutionAgents();
+    const controller = new HubExecutionController({
+      agents,
+      validateAgentConfiguration: async () => [],
+      send: () => undefined,
+    });
+    const create = controller.createAgent({
+      type: "hub.execution.agent.create.request",
+      requestId: "reuse-create",
+      executionId: "execution-next",
+      reuseAgentId: "agent-existing",
+      provider: "codex",
+      cwd: "/tmp/paseo",
+      prompt: "follow up",
+    });
+    await agents.creationStarted();
+    agents.finishCreate();
+    await create;
+
+    expect(agents.lastCreate?.reuseAgentId).toBe("agent-existing");
+  });
+
+  test("delivers create response before stream events emitted during Agent creation", async () => {
+    const agents = new ControlledHubExecutionAgents();
+    const messages: SessionOutboundMessage[] = [];
+    const controller = new HubExecutionController({
+      agents,
+      validateAgentConfiguration: async () => [],
+      send: (message) => messages.push(message),
+    });
+    const create = controller.createAgent({
+      type: "hub.execution.agent.create.request",
+      requestId: "racing-create",
+      executionId: "execution-shutdown",
+      provider: "codex",
+      cwd: "/tmp/paseo",
+      prompt: "finish quickly",
+    });
+    await agents.creationStarted();
+    agents.emit({
+      type: "stream",
+      executionId: "execution-shutdown",
+      agentId: "agent-shutdown",
+      event: { type: "turn_completed", provider: "codex", turnId: "turn-1" },
+    });
+
+    expect(messages).toEqual([]);
+    agents.finishCreate();
+    await create;
+
+    expect(messages.map((message) => message.type)).toEqual([
+      "hub.execution.agent.create.response",
+      "hub.execution.agent.stream",
     ]);
   });
 

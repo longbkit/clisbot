@@ -1,7 +1,7 @@
 // COMPAT(clisbot-hub-local): `hub stop` — stop the embedded Hub (and, since the
-// channel verticals run in-process, every channel it hosts). Discards the local
-// discovery state; runtime-only channel credentials live in the Hub process and
-// die with it — persisted secret files survive (implementation doc §3.2).
+// channel verticals run in-process, every channel it hosts). Discards only the
+// local discovery state; durable encrypted Connection credentials remain in Hub
+// storage (implementation doc §3.2).
 
 import { Command } from "commander";
 import { withOutput } from "../../output/index.js";

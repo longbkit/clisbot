@@ -31,12 +31,10 @@ function extractBotStartOptions(options: CommandOptions): BotStartOptions {
     workspace: pick("workspace"),
     cwd: pick("cwd"),
     newWorkspace: pick("newWorkspace"),
-    slackBotToken: pick("slackBotToken"),
-    slackAppToken: pick("slackAppToken"),
+    slackConnectionId: pick("slackConnectionId"),
     slackAccount: pick("slackAccount"),
     telegramBotToken: pick("telegramBotToken"),
     telegramAccount: pick("telegramAccount"),
-    persist: options.persist === true,
   };
 }
 
@@ -108,18 +106,13 @@ export function startCommand(): Command {
     .option("--workspace <path>", "Workspace directory (default: $CLISBOT_HOME/workspaces/default)")
     .option("--cwd <path>", "Alias for --workspace")
     .option("--new-workspace <kind>", "Workspace isolation: local or worktree (default: local)")
-    .option(
-      "--slack-bot-token <value>",
-      "Slack bot token (literal, ${ENV_VAR}, or a secret-file path)",
-    )
-    .option("--slack-app-token <value>", "Slack app token")
+    .option("--slack-connection-id <uuid>", "Existing Hub Slack connection id")
     .option("--slack-account <id>", "Slack account id (default: the bot name)")
     .option(
       "--telegram-bot-token <value>",
       "Telegram bot token (literal, ${ENV_VAR}, or a secret-file path)",
     )
     .option("--telegram-account <id>", "Telegram account id (default: the bot name)")
-    .option("--persist", "Persist the channel credential to a 0600 file (survives `bot stop`)")
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)");
   command.action(withOutput(runStartCommand));
   return command;

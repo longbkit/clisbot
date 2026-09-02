@@ -134,7 +134,14 @@ export function createSlackRegistration(
     options.botClient ??
     createSlackBotClient({
       tokenForWorkspace: async (organizationId, teamId) =>
-        (await findSlackBindingForOrganization(database, organizationId, teamId))?.botAccessToken,
+        (
+          await findSlackBindingForOrganization(
+            database,
+            organizationId,
+            configuration.appId,
+            teamId,
+          )
+        )?.botAccessToken,
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
     });
   const connection =
@@ -162,12 +169,19 @@ export function createSlackRegistration(
     },
     connection,
     triggerProviders: [
-      ({ configurationStoreForProject, attachments }) =>
+      ({ configurationForWorkflow, attachments }) =>
         createSlackTriggerProvider({
-          configurationStoreForProject,
+          configurationForWorkflow,
           ...(attachments === undefined ? {} : { attachments }),
           botUserIdForWorkspace: async (organizationId, teamId) =>
-            (await findSlackBindingForOrganization(database, organizationId, teamId))?.botUserId,
+            (
+              await findSlackBindingForOrganization(
+                database,
+                organizationId,
+                configuration.appId,
+                teamId,
+              )
+            )?.botUserId,
           client: bot,
         }),
     ],
@@ -196,9 +210,14 @@ function slackSocketOptions(
 async function findSlackBindingForOrganization(
   database: Database,
   organizationId: string,
+  providerApplicationId: string,
   teamId: string,
 ): Promise<SlackConnectionRecord | undefined> {
-  const binding = await database.findSlackConnectionForOrganization(organizationId, teamId);
+  const binding = await database.findSlackConnectionForOrganization(
+    organizationId,
+    providerApplicationId,
+    teamId,
+  );
   return binding?.organizationId === organizationId && hasRequiredSlackScopes(binding.scopes)
     ? binding
     : undefined;

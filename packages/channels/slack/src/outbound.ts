@@ -11,8 +11,15 @@
 // `telegram.sent-messages` (state-store-namespaces.md §Slack; D-001).
 
 import { statSync } from "node:fs";
-import type { SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
-import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
+import type {
+  HostRuntime,
+  SendMediaFn,
+  SendTextFn,
+} from "@getpaseo/channels-shared";
+import {
+  evaluateOutboundMedia,
+  mediaFileName,
+} from "@getpaseo/channels-shared";
 import { getSlackWriteClient, isSilentReplyText } from "./client/web-api.js";
 import { readSlackAccountConfig } from "./lifecycle/start-account.js";
 import { getSlackRuntime } from "./runtime.js";
@@ -44,7 +51,11 @@ export function resolveOutboundBotToken(
 }
 
 /** The keyed-store key for one sent message (accountId-scoped). */
-export function slackSentMessageKey(accountId: string, conversationId: string, ts: string): string {
+export function slackSentMessageKey(
+  accountId: string,
+  conversationId: string,
+  ts: string,
+): string {
   return `${accountId}:${conversationId}:${ts}`;
 }
 
@@ -56,8 +67,9 @@ export async function recordSlackSentMessage(params: {
   accountId: string;
   conversationId: string;
   ts: string;
+  hostRuntime?: HostRuntime;
 }): Promise<void> {
-  const runtime = getSlackRuntime();
+  const runtime = params.hostRuntime ?? getSlackRuntime();
   if (runtime === undefined) return;
   const { accountId, conversationId, ts } = params;
   if (accountId === "" || conversationId === "" || ts === "") return;
@@ -85,7 +97,9 @@ export async function recordSlackSentMessage(params: {
  * pipeline as plain text before posting — Block Kit mrkdwn is NOT CommonMark
  * (`**bold**` would show literal asterisks), and posting the block text
  * verbatim is how the card drifted from the fallback rendering. */
-function cardBlocksOf(args: Parameters<SendTextFn>[0]): Record<string, unknown>[] | undefined {
+function cardBlocksOf(
+  args: Parameters<SendTextFn>[0],
+): Record<string, unknown>[] | undefined {
   const blocks = args["blocks"];
   if (!Array.isArray(blocks) || blocks.length === 0) return undefined;
   return (blocks as Record<string, unknown>[]).map(renderBlockMrkdwn);
@@ -94,7 +108,9 @@ function cardBlocksOf(args: Parameters<SendTextFn>[0]): Record<string, unknown>[
 /** Render one block's `mrkdwn` text fields (section-ish shapes) through
  * `renderSlackMrkdwn`; anything else (actions, dividers, context) passes
  * through untouched. */
-function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unknown> {
+function renderBlockMrkdwn(
+  block: Record<string, unknown>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = { ...block };
   const text = block["text"];
   if (
@@ -116,7 +132,9 @@ function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unkno
         typeof (field as Record<string, unknown>)["text"] === "string"
       ) {
         const f = field as Record<string, unknown>;
-        return Object.assign({}, f, { text: renderSlackMrkdwn(String(f["text"])) });
+        return Object.assign({}, f, {
+          text: renderSlackMrkdwn(String(f["text"])),
+        });
       }
       return field;
     });
@@ -132,10 +150,13 @@ function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unkno
  * posts with the escaped text as its fallback rendering (Slack requires a
  * `text` fallback for block posts); `cardPosted` tells the plane the post
  * carries interactive markup (the in-place-update target). */
-export async function sendSlackText(
-  args: Parameters<SendTextFn>[0],
-): Promise<{ messageId: string; channel?: string | undefined; cardPosted?: boolean }> {
+export async function sendSlackText(args: Parameters<SendTextFn>[0]): Promise<{
+  messageId: string;
+  channel?: string | undefined;
+  cardPosted?: boolean;
+}> {
   const { cfg, accountId, to, text, threadId } = args;
+  const hostRuntime = args["hostRuntime"] as HostRuntime | undefined;
   const botToken = resolveOutboundBotToken(cfg, accountId);
   if (botToken === undefined) {
     throw new Error(
@@ -159,11 +180,18 @@ export async function sendSlackText(
     channel: to,
     text: renderSlackMrkdwn(text),
     ...(blocks !== undefined ? { blocks } : {}),
-    ...(threadId !== undefined && threadId !== "" ? { thread_ts: threadId } : {}),
+    ...(threadId !== undefined && threadId !== ""
+      ? { thread_ts: threadId }
+      : {}),
   });
   /* eslint-enable eslint-plugin-unicorn/require-post-message-target-origin */
   const messageId = result.ts ?? "";
-  void recordSlackSentMessage({ accountId, conversationId: to, ts: messageId });
+  void recordSlackSentMessage({
+    accountId,
+    conversationId: to,
+    ts: messageId,
+    ...(hostRuntime === undefined ? {} : { hostRuntime }),
+  });
   return {
     messageId,
     channel: result.channel,
@@ -189,9 +217,19 @@ export async function updateSlackText(
     senderMention?: string;
   },
 ): Promise<{ ok: boolean }> {
-  const { cfg, accountId, to, text, externalMessageId, clearCard, senderMention } = args;
+  const {
+    cfg,
+    accountId,
+    to,
+    text,
+    externalMessageId,
+    clearCard,
+    senderMention,
+  } = args;
   const finalText =
-    senderMention !== undefined && senderMention !== "" ? `${senderMention} ${text}` : text;
+    senderMention !== undefined && senderMention !== ""
+      ? `${senderMention} ${text}`
+      : text;
   const botToken = resolveOutboundBotToken(cfg, accountId);
   if (botToken === undefined) {
     throw new Error(
@@ -227,6 +265,7 @@ export async function updateSlackText(
  */
 export const sendMedia: SendMediaFn = async (args) => {
   const { cfg, accountId, to, threadId, filePath } = args;
+  const hostRuntime = args["hostRuntime"] as HostRuntime | undefined;
   const botToken = resolveOutboundBotToken(cfg, accountId);
   if (botToken === undefined) {
     throw new Error(
@@ -237,6 +276,7 @@ export const sendMedia: SendMediaFn = async (args) => {
   const postNotice = (text: string): Promise<{ messageId: string }> =>
     sendSlackText({
       cfg,
+      ...(hostRuntime === undefined ? {} : { hostRuntime }),
       accountId,
       to: String(to),
       ...(threadId !== undefined && threadId !== "" ? { threadId } : {}),
@@ -264,10 +304,17 @@ export const sendMedia: SendMediaFn = async (args) => {
     filePath,
     fileName,
     channelId: String(to),
-    ...(threadId !== undefined && threadId !== "" ? { threadTs: threadId } : {}),
+    ...(threadId !== undefined && threadId !== ""
+      ? { threadTs: threadId }
+      : {}),
   });
   // `completeUploadExternal` returns the file id, not the new message ts; the
   // sent-file record keys on the file id (a file post's channel-native id).
-  void recordSlackSentMessage({ accountId, conversationId: String(to), ts: fileId });
+  void recordSlackSentMessage({
+    accountId,
+    conversationId: String(to),
+    ts: fileId,
+    ...(hostRuntime === undefined ? {} : { hostRuntime }),
+  });
   return { messageId: fileId, mediaPosted: true };
 };

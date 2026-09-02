@@ -753,6 +753,7 @@ export class HubRelationshipHarness {
       mcpServers?: AgentSessionConfig["mcpServers"];
       providerOptions?: AgentSessionConfig["providerOptions"];
       toolPolicy?: AgentSessionConfig["toolPolicy"];
+      reuseAgentId?: string;
     } = {},
   ): void {
     const { prompt = "Create through the Hub", provider = "codex", ...requestOptions } = options;
@@ -1560,9 +1561,9 @@ export class HubRelationshipHarness {
             providerSnapshotManager: providerCatalog,
           },
           input,
-        ),
+      ),
       interruptAgent: (agentId) => manager.cancelAgentRun(agentId),
-      archiveWorkspace: async () => undefined,
+      logger: pino({ level: "silent" }),
     });
   }
 

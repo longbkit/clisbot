@@ -37,7 +37,7 @@ export interface InboundConversationDetail {
  * shape from the raw `ctxPayload`; the plane never reads the raw payload.
  */
 export interface InboundMessage {
-  channel: string;
+  channel: P0ChannelName;
   accountId: string;
   /** The channel identity of the sender (`<channel>:<provider-id>`). */
   senderIdentity: string;
@@ -74,6 +74,7 @@ export type InboundOutcome =
       /** The conversation's human label when the vertical carries it. */
       conversationLabel?: string | undefined;
     }
+  | { kind: "workflow"; workflow: string; deliveryId: string }
   | { kind: "command"; handled: boolean; detail?: string | undefined }
   | { kind: "ignored"; reason: string };
 
@@ -126,7 +127,9 @@ export interface OutboundPostResult {
 }
 
 /** The channel's send path (its published send adapter, in-process). */
-export type PostFn = (params: OutboundPostParams) => Promise<OutboundPostResult>;
+export type PostFn = (
+  params: OutboundPostParams,
+) => Promise<OutboundPostResult>;
 
 /** COMPAT(clisbot-control-plane): one OUTBOUND native-media post (group G,
  * G7–G11) — the account's vertical `outbound.sendMedia` (one file per call),
@@ -192,7 +195,9 @@ export interface OutboundUpdateResult {
 }
 
 /** The channel's in-place update path (its published update adapter). */
-export type UpdateFn = (params: OutboundUpdateParams) => Promise<OutboundUpdateResult>;
+export type UpdateFn = (
+  params: OutboundUpdateParams,
+) => Promise<OutboundUpdateResult>;
 
 /** COMPAT(clisbot-control-plane): the account's vertical liveness drive
  * (`outbound.typing`) — the `sync.progress` "the bot is working" surface.
@@ -291,21 +296,25 @@ export type ChannelReplyFilePostFn = (
 
 /** Encode the binding ref into the URL segment of the tool-path mcpServers URL
  * (`/mcp/channel/<ref>`). */
-export function encodeChannelReplyBindingRef(ref: ChannelReplyBindingRef): string {
+export function encodeChannelReplyBindingRef(
+  ref: ChannelReplyBindingRef,
+): string {
   return Buffer.from(JSON.stringify(ref), "utf8").toString("base64url");
 }
 
 /** Decode a binding ref; undefined when the token is not a well-formed ref
  * (the endpoint maps that to a clean tool error, never a crash). */
-export function decodeChannelReplyBindingRef(token: string): ChannelReplyBindingRef | undefined {
+export function decodeChannelReplyBindingRef(
+  token: string,
+): ChannelReplyBindingRef | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
   } catch {
     return undefined;
   }
-  if (typeof parsed !== "object" || parsed === null) return undefined;
-  const candidate = parsed as Record<string, unknown>;
+  if (!isUnknownRecord(parsed)) return undefined;
+  const candidate = parsed;
   const channel = candidate["channel"];
   const threadId = candidate["externalThreadId"];
   if (
@@ -322,8 +331,12 @@ export function decodeChannelReplyBindingRef(token: string): ChannelReplyBinding
     channel,
     accountId: candidate["accountId"],
     externalConversationId: candidate["externalConversationId"],
-    externalThreadId: threadId as string | null,
+    externalThreadId: threadId,
   };
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** The tool-path post seam: the account's outbound (the vertical's `sendText`
@@ -352,11 +365,15 @@ export type SessionLinkRenderer = (agentId: string) => string;
  * sender identity, and mention flag are read. Null = the event is not a
  * plane-bound message (e.g. a media-only event) and is ignored.
  */
-export type InboundNormalizer = (params: InboundReplyParams) => InboundMessage | null;
+export type InboundNormalizer = (
+  params: InboundReplyParams,
+) => InboundMessage | null;
 
 /** Everything the execution plane is built with (the facade's deps). */
 export interface ChannelPlaneDeps {
   organizationId: string;
+  /** This plane's transport owner; recovery and inbound never cross it. */
+  accountScope: { channel: P0ChannelName; accountId: string };
   /** Normalize the channel's raw inbound event into the plane's flat shape. */
   normalizeInbound: InboundNormalizer;
   /** The process-level kill switch (`CLISBOT_HUB_CHANNELS_ENABLED`); the per-decision
@@ -387,6 +404,19 @@ export interface ChannelPlaneDeps {
   clock?: PlaneClock | undefined;
   /** Resolve a route's agent target into a `create_agent_request` config. */
   resolveAgentSpec: AgentSpecResolver;
+  dispatchWorkflow: (input: {
+    organizationId: string;
+    deliveryId: string;
+    payload: import("../../triggers/channel/provider.js").ChannelWorkflowRequestPayload;
+    receivedAt: Date;
+  }) => Promise<void>;
+  workflowOutputStore: Pick<
+    import("../../db/types.js").Database,
+    | "beginAgentExecutionOutput"
+    | "completeAgentExecutionOutput"
+    | "failAgentExecutionOutput"
+    | "findLatestChannelWorkflowExecution"
+  >;
   /** Back-link renderer for `sync.threadLink`; absent posts no link. */
   sessionLink?: SessionLinkRenderer | undefined;
   /** Progress-snapshot throttle window (ms); default `DEFAULT_PROGRESS_THROTTLE_MS`. */
@@ -414,6 +444,10 @@ export interface ThreadRef {
 /** The per-agent stream context both the relay and the approval engine share. */
 export interface StreamContext {
   agentId: string;
+  /** Durable scope for outbound dedupe when one daemon Agent serves multiple
+   * Workflow executions. Provider-local turn ids may restart at zero after
+   * restore/reload, so they are not globally unique for a reused Agent. */
+  deliveryScopeId?: string;
   channel: P0ChannelName;
   accountId: string;
   externalConversationId: string;
@@ -439,4 +473,9 @@ export interface StreamContext {
    * matched (the stored route summary's `kind`; "channel" when unparseable) —
    * the approval card's `inlineButtons` dm/group gate decides on it. */
   rootKind: "dm" | "channel" | "thread" | "group" | "topic";
+  outputDelivery?: {
+    begin(): Promise<string | undefined>;
+    complete(attemptId: string): Promise<void>;
+    fail(attemptId: string): Promise<void>;
+  };
 }
