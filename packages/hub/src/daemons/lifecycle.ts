@@ -50,8 +50,8 @@ import {
   CHANNEL_REPLY_FILE_TOOL_NAME,
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
-  encodeChannelReplyBindingRef,
 } from "../channels/plane/types.js";
+import type { ChannelReplyCapabilityService } from "../channels/channel-reply-capabilities.js";
 import { composeMessageToolPrompt } from "../channels/outbound-template.js";
 import { isHubFinishExecutionToolName } from "../hub/protocol.js";
 
@@ -73,6 +73,11 @@ interface HubExecutionEnv {
   executionId: string;
   completionToken: string;
   publicBaseUrl: string;
+}
+
+interface PreparedDaemonCreateOptions {
+  createOptions: DaemonCreateAgentOptions;
+  channelReplyCapabilityToken?: string;
 }
 
 const DEFAULT_DISPATCH_TIMEOUT_MS = 30_000;
@@ -109,6 +114,7 @@ export interface DaemonDispatchLifecycleOptions {
   executionAuthority?: ExecutionAuthority;
   publicBaseUrl?: string;
   completionTokenSecret?: string;
+  channelReplyCapabilities?: ChannelReplyCapabilityService;
   onWorkflowChannelStream?: (input: {
     execution: AgentExecutionRecord;
     agentId: string;
@@ -611,7 +617,7 @@ export class DaemonDispatchLifecycle {
   private async buildCreateAgentOptions(
     intent: LaunchMachineIntent,
     hubExecutionEnv: HubExecutionEnv,
-  ): Promise<DaemonCreateAgentOptions> {
+  ): Promise<PreparedDaemonCreateOptions> {
     const provider = this.findProviderForTriggerContext(intent.triggerContext);
     const materialized = await this.materializeLaunch(
       intent,
@@ -623,6 +629,7 @@ export class DaemonDispatchLifecycle {
       hubExecutionEnv,
       this.executionCapabilities,
       materialized.env,
+      this.options.channelReplyCapabilities,
     );
   }
 
@@ -1073,7 +1080,7 @@ export class DaemonDispatchLifecycle {
     const intent = current.launchIntent;
     if (intent === null || this.options.publicBaseUrl === undefined)
       throw new Error("execution launch intent cannot be recovered");
-    const createOptions = await this.buildCreateAgentOptions(intent, {
+    const preparedCreate = await this.buildCreateAgentOptions(intent, {
       executionId: current.id,
       completionToken: this.completionToken(current.id),
       publicBaseUrl: this.options.publicBaseUrl,
@@ -1082,15 +1089,36 @@ export class DaemonDispatchLifecycle {
     });
     this.subscribeRecoveredExecution(current.id, daemon.id, connection);
     this.armExecutionDeadline(current);
-    const agent = await connection.createAgent(createOptions).catch((error: unknown) => {
-      throw toDaemonTransportFailure(error);
-    });
-    if (isInterruptedAgentState(agent.state)) {
-      await this.failAgentExecution(current.id, "agent_interrupted");
-      return;
+    try {
+      const agent = await connection
+        .createAgent(preparedCreate.createOptions)
+        .catch((error: unknown) => {
+          throw toDaemonTransportFailure(error);
+        });
+      if (
+        preparedCreate.channelReplyCapabilityToken !== undefined &&
+        this.options.channelReplyCapabilities?.bind(
+          preparedCreate.channelReplyCapabilityToken,
+          agent.id,
+        ) !== true
+      ) {
+        throw new Error("Channel reply capability could not bind to the recovered Agent");
+      }
+      if (isInterruptedAgentState(agent.state)) {
+        await this.failAgentExecution(current.id, "agent_interrupted");
+        if (preparedCreate.channelReplyCapabilityToken !== undefined) {
+          this.options.channelReplyCapabilities?.revoke(preparedCreate.channelReplyCapabilityToken);
+        }
+        return;
+      }
+      await this.options.database.attachAgentToExecution(current.id, daemon.id, agent.id);
+      await this.restoreAgentState(current.id, agent);
+    } catch (error) {
+      if (preparedCreate.channelReplyCapabilityToken !== undefined) {
+        this.options.channelReplyCapabilities?.revoke(preparedCreate.channelReplyCapabilityToken);
+      }
+      throw error;
     }
-    await this.options.database.attachAgentToExecution(current.id, daemon.id, agent.id);
-    await this.restoreAgentState(current.id, agent);
   }
 
   private subscribeRecoveredExecution(
@@ -1601,13 +1629,16 @@ export class DaemonDispatchLifecycle {
     if (connection === undefined) {
       throw new DaemonDispatchFailure("daemon_unreachable");
     }
-    const createOptions = await this.buildCreateAgentOptions(
+    const preparedCreate = await this.buildCreateAgentOptions(
       input.intent,
       input.hubExecutionEnv,
     ).catch((error: unknown) => {
       throw toDispatchPreparationFailure(error);
     });
     if (isCanceled()) {
+      if (preparedCreate.channelReplyCapabilityToken !== undefined) {
+        this.options.channelReplyCapabilities?.revoke(preparedCreate.channelReplyCapabilityToken);
+      }
       throw new DaemonSpawnAckTimeoutError(this.dispatchTimeoutMs);
     }
     const pendingHandlers = new Set<Promise<void>>();
@@ -1633,6 +1664,9 @@ export class DaemonDispatchLifecycle {
       disposed = true;
       unsubscribeEvents();
       this.completionWatchersByExecution.delete(input.executionId);
+      if (preparedCreate.channelReplyCapabilityToken !== undefined) {
+        this.options.channelReplyCapabilities?.revoke(preparedCreate.channelReplyCapabilityToken);
+      }
       await Promise.all(Array.from(pendingHandlers));
     };
 
@@ -1669,12 +1703,21 @@ export class DaemonDispatchLifecycle {
       }
       const agent = await Promise.race([
         connection
-          .createAgent(createOptions)
+          .createAgent(preparedCreate.createOptions)
           .catch((error: unknown) => Promise.reject(toDaemonTransportFailure(error))),
         terminal.then<never>(() => new Promise<never>(() => undefined)),
       ]);
       if (isCanceled()) {
         throw new DaemonSpawnAckTimeoutError(this.dispatchTimeoutMs);
+      }
+      if (
+        preparedCreate.channelReplyCapabilityToken !== undefined &&
+        this.options.channelReplyCapabilities?.bind(
+          preparedCreate.channelReplyCapabilityToken,
+          agent.id,
+        ) !== true
+      ) {
+        throw new Error("Channel reply capability could not bind to the created Agent");
       }
       await this.options.database.attachAgentToExecution(
         input.executionId,
@@ -2067,15 +2110,20 @@ async function buildCreateAgentOptions(
   },
   capabilities: OutputExecutorRegistry,
   materializedEnv: Readonly<Record<string, string>>,
-): Promise<DaemonCreateAgentOptions> {
-  const channelTool = workflowChannelTool(intent, hubExecutionEnv.publicBaseUrl);
+  channelReplyCapabilities?: ChannelReplyCapabilityService,
+): Promise<PreparedDaemonCreateOptions> {
   const executionPolicy = executionToolPolicy({
     allowOutputs: intent.allowOutputs,
     outputContext: intent.outputContext,
     ...(intent.outputSchema === undefined ? {} : { outputSchema: intent.outputSchema }),
     capabilities,
   });
-  return {
+  const channelTool = workflowChannelTool(
+    intent,
+    hubExecutionEnv.publicBaseUrl,
+    channelReplyCapabilities,
+  );
+  const createOptions: DaemonCreateAgentOptions = {
     executionId: hubExecutionEnv.executionId,
     ...(intent.reuseAgentId === undefined ? {} : { reuseAgentId: intent.reuseAgentId }),
     provider: intent.agent.provider,
@@ -2084,14 +2132,22 @@ async function buildCreateAgentOptions(
     ...(intent.agent.thinkingOptionId === undefined
       ? {}
       : { thinkingOptionId: intent.agent.thinkingOptionId }),
+    ...(intent.agent.featureValues === undefined
+      ? {}
+      : { featureValues: structuredClone(intent.agent.featureValues) }),
     ...(intent.agent.options === undefined
       ? {}
       : { providerOptions: structuredClone(intent.agent.options) }),
     cwd: intent.environment.cwd,
+    ...(intent.environment.projectId === undefined
+      ? {}
+      : { projectId: intent.environment.projectId }),
     prompt:
       channelTool === undefined
         ? intent.prompt
-        : `${intent.prompt}\n\n${composeMessageToolPrompt(channelTool.template)}`,
+        : `${intent.prompt}\n\n${composeMessageToolPrompt(channelTool.template, {
+            canSendFiles: channelTool.canSendFiles,
+          })}`,
     env: buildAgentEnv(intent, materializedEnv),
     mcpServers: {
       hub: buildExecutionCapabilityMcpServer(hubExecutionEnv),
@@ -2115,11 +2171,15 @@ async function buildCreateAgentOptions(
                 server: "channel_reply" as const,
                 tool: CHANNEL_REPLY_TOOL_NAME,
               },
-              {
-                kind: "mcp" as const,
-                server: "channel_reply" as const,
-                tool: CHANNEL_REPLY_FILE_TOOL_NAME,
-              },
+              ...(channelTool.canSendFiles
+                ? [
+                    {
+                      kind: "mcp" as const,
+                      server: "channel_reply" as const,
+                      tool: CHANNEL_REPLY_FILE_TOOL_NAME,
+                    },
+                  ]
+                : []),
             ]),
       ],
     },
@@ -2129,12 +2189,26 @@ async function buildCreateAgentOptions(
           worktree: intent.environment.worktree,
         }),
   };
+  return {
+    createOptions,
+    ...(channelTool === undefined
+      ? {}
+      : { channelReplyCapabilityToken: channelTool.capabilityToken }),
+  };
 }
 
 function workflowChannelTool(
   intent: LaunchMachineIntent,
   publicBaseUrl: string,
-): { url: string; template: string | null } | undefined {
+  capabilities?: ChannelReplyCapabilityService,
+):
+  | {
+      url: string;
+      template: string | null;
+      capabilityToken: string;
+      canSendFiles: boolean;
+    }
+  | undefined {
   const context = channelReplyContext(intent.outputContext);
   if (context === undefined) return undefined;
   const { channel, outbound } = context;
@@ -2153,15 +2227,40 @@ function workflowChannelTool(
   }
   const rawTemplate = Reflect.get(outbound, "template");
   const template = typeof rawTemplate === "string" ? rawTemplate : null;
-  const ref = encodeChannelReplyBindingRef({
-    channel: name,
-    accountId,
-    externalConversationId: conversationId,
-    externalThreadId: threadId,
+  if (capabilities === undefined) {
+    throw new Error("Channel reply capability service is unavailable");
+  }
+  const revisionId = Reflect.get(channel, "revision_id");
+  const routePosition = Reflect.get(channel, "route_position");
+  const routeFingerprint = Reflect.get(channel, "route_fingerprint");
+  if (
+    (revisionId !== null && typeof revisionId !== "string") ||
+    (routePosition !== "fallback" &&
+      (!Number.isInteger(routePosition) || Number(routePosition) < 0)) ||
+    typeof routeFingerprint !== "string" ||
+    routeFingerprint === ""
+  ) {
+    throw new Error("Channel reply capability has no valid Route authority");
+  }
+  const projectRoot = intent.environment.cwd.startsWith("/") ? intent.environment.cwd : undefined;
+  const capabilityToken = capabilities.issue({
+    organizationId: intent.organizationId,
+    channelRevisionId: revisionId as string | null,
+    routePosition: routePosition as number | "fallback",
+    routeFingerprint,
+    ref: {
+      channel: name,
+      accountId,
+      externalConversationId: conversationId,
+      externalThreadId: threadId,
+    },
+    ...(projectRoot === undefined ? {} : { projectRoot }),
   });
   return {
-    url: `${publicBaseUrl.replace(/\/$/u, "")}/mcp/channel/${ref}`,
+    url: `${publicBaseUrl.replace(/\/$/u, "")}/mcp/channel/${capabilityToken}`,
     template,
+    capabilityToken,
+    canSendFiles: projectRoot !== undefined,
   };
 }
 

@@ -131,6 +131,15 @@ import {
 import { useLastWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { returnFromSettings, type SettingsView } from "@/navigation/settings-navigation";
 import { isNative, isWeb } from "@/constants/platform";
+import { useFetchQuery } from "@/data/query";
+import { useHubAccount } from "@/clisbot/hub/account-provider";
+import { HubEffectiveAccessSchema } from "@/clisbot/hub/contracts";
+import { buildHubSettingsRoute, type HubSectionSlug } from "@/clisbot/hub/navigation";
+import {
+  HubSettingsContent,
+  hubSettingsNavigationItems,
+  hubSettingsSection,
+} from "@/clisbot/hub/settings";
 
 // ---------------------------------------------------------------------------
 // View model
@@ -853,21 +862,21 @@ function useSortedHosts(hosts: HostProfile[], localServerId: string | null): Hos
   return useMemo(() => orderHostsLocalFirst(hosts, localServerId), [hosts, localServerId]);
 }
 
-interface SidebarSectionButtonProps {
-  itemId: SettingsSectionSlug;
+interface SidebarSectionButtonProps<Section extends string> {
+  itemId: Section;
   label: string;
   icon: ComponentType<{ size: number; color: string }>;
   isSelected: boolean;
-  onSelect: (section: SettingsSectionSlug) => void;
+  onSelect: (section: Section) => void;
 }
 
-function SidebarSectionButton({
+function SidebarSectionButton<Section extends string>({
   itemId,
   label,
   icon: IconComponent,
   isSelected,
   onSelect,
-}: SidebarSectionButtonProps) {
+}: SidebarSectionButtonProps<Section>) {
   const { theme } = useUnistyles();
   const handlePress = useCallback(() => {
     onSelect(itemId);
@@ -1023,6 +1032,7 @@ function HostPicker({
 interface SettingsSidebarProps {
   view: SettingsView;
   onSelectSection: (section: SettingsSectionSlug) => void;
+  onSelectHubSection: (section: HubSectionSlug) => void;
   onSelectHostSection: (section: HostSectionSlug) => void;
   onSelectHost: (serverId: string) => void;
   onAddHost: () => void;
@@ -1034,6 +1044,7 @@ interface SettingsSidebarProps {
 function SettingsSidebar({
   view,
   onSelectSection,
+  onSelectHubSection,
   onSelectHostSection,
   onSelectHost,
   onAddHost,
@@ -1049,6 +1060,36 @@ function SettingsSidebar({
   const hasHosts = sortedHosts.length > 0;
   const enableBuiltInDaemonOption = useEnableBuiltInDaemonOption();
   const isDesktopApp = isElectronRuntime();
+  const hub = useHubAccount();
+  const canManageHub = hub.signedIn?.capabilities.manageResources === true;
+  const effectiveHubAccess = useFetchQuery({
+    queryKey: [
+      "clisbot",
+      "hub",
+      hub.origin,
+      hub.signedIn?.organization.id ?? "",
+      "access-assignments",
+      "effective",
+    ],
+    queryFn: () => hub.api().get("access-assignments/effective", HubEffectiveAccessSchema),
+    enabled: hub.signedIn !== null && !canManageHub,
+    retry: false,
+    dataShape: "value",
+    staleTimeMs: 15_000,
+  });
+  const canRunAutomations =
+    effectiveHubAccess.data?.owner === true ||
+    effectiveHubAccess.data?.grants.some(
+      ({ resource, privileges }) =>
+        resource.kind === "automation" &&
+        resource.available &&
+        privileges.includes("automation.run"),
+    ) === true;
+  const hubItems = hubSettingsNavigationItems({
+    signedIn: hub.signedIn !== null,
+    canManage: canManageHub,
+    canRunAutomations,
+  });
   const items = SIDEBAR_SECTION_ITEMS.filter(
     (item) => (!item.desktopOnly || isDesktopApp) && (!item.webOnly || isWeb),
   );
@@ -1063,6 +1104,7 @@ function SettingsSidebar({
     [insets.top, isDesktop],
   );
   const selectedSectionId = view.kind === "section" ? view.section : null;
+  const selectedHubSection = view.kind === "hub" ? view.section : null;
   let selectedHostSection: HostSectionSlug | null = null;
   if (view.kind === "host") selectedHostSection = view.section;
   if (view.kind === "project") selectedHostSection = "projects";
@@ -1083,6 +1125,24 @@ function SettingsSidebar({
         ))}
       </View>
       <SidebarSeparator />
+      {hub.enabled ? (
+        <>
+          <View style={sidebarStyles.list}>
+            <Text style={sidebarStyles.groupLabel}>Hub</Text>
+            {hubItems.map((item) => (
+              <SidebarSectionButton
+                key={item.section}
+                itemId={item.section}
+                label={item.label}
+                icon={item.icon}
+                isSelected={selectedHubSection === item.section}
+                onSelect={onSelectHubSection}
+              />
+            ))}
+          </View>
+          <SidebarSeparator />
+        </>
+      ) : null}
       {hasHosts ? (
         <View style={sidebarStyles.list}>
           <Text style={sidebarStyles.groupLabel}>{t("settings.groups.host")}</Text>
@@ -1184,6 +1244,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   const router = useRouter();
   const { theme } = useUnistyles();
   const { t } = useTranslation();
+  const hub = useHubAccount();
   const voiceAudioEngine = useVoiceAudioEngineOptional();
   const { settings, isLoading: settingsLoading, updateSettings } = useAppSettings();
   const [isAddHostMethodVisible, setIsAddHostMethodVisible] = useState(false);
@@ -1357,6 +1418,18 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
     [isCompactLayout, router],
   );
 
+  const handleSelectHubSection = useCallback(
+    (section: HubSectionSlug) => {
+      const target = buildHubSettingsRoute(section);
+      if (isCompactLayout) {
+        router.push(target);
+      } else {
+        router.replace(target);
+      }
+    },
+    [isCompactLayout, router],
+  );
+
   // Picker: choose the host for host-section rows. If the user is already on a
   // host detail route, keep that detail section and swap only the host segment.
   const handleSelectHost = useCallback(
@@ -1440,6 +1513,13 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
       if (!item) return null;
       return { title: t(item.labelKey), Icon: item.icon };
     }
+    if (view.kind === "hub") {
+      const item = hubSettingsSection(view.section);
+      return {
+        title: view.section === "account" && hub.signedIn ? hub.signedIn.account.name : item.label,
+        Icon: item.icon,
+      };
+    }
     if (view.kind === "project") {
       return { title: t("settings.projects"), Icon: FolderGit2 };
     }
@@ -1463,6 +1543,9 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
             showBackToProjects={!isCompactLayout}
           />
         );
+      }
+      if (view.kind === "hub") {
+        return <HubSettingsContent section={view.section} />;
       }
       if (view.kind === "section") {
         switch (view.section) {
@@ -1575,6 +1658,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           <SettingsSidebar
             view={view}
             onSelectSection={handleSelectSection}
+            onSelectHubSection={handleSelectHubSection}
             onSelectHostSection={handleSelectHostSection}
             onSelectHost={handleSelectHost}
             onAddHost={handleAddHost}
@@ -1614,6 +1698,7 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           <SettingsSidebar
             view={view}
             onSelectSection={handleSelectSection}
+            onSelectHubSection={handleSelectHubSection}
             onSelectHostSection={handleSelectHostSection}
             onSelectHost={handleSelectHost}
             onAddHost={handleAddHost}

@@ -890,6 +890,118 @@ describe("durable multi-step workflow engine", () => {
     assert.equal(dispatches[1]!.autoArchive, false);
   });
 
+  it("reuses the captured Agent for later Channel receipts on the same binding", async () => {
+    const base = deadlineConfiguration();
+    const trigger = (base["triggers"] as Array<Record<string, unknown>>)[0]!;
+    const step = (trigger["steps"] as Array<Record<string, unknown>>)[0]!;
+    const fixture = await workflowFixture({
+      rawConfiguration: {
+        ...base,
+        environments: [
+          {
+            ...(base["environments"] as Array<Record<string, unknown>>)[0]!,
+            projectId: "project-support",
+          },
+        ],
+        triggers: [
+          {
+            ...trigger,
+            steps: [{ ...step, id: "respond", reuse: "binding" }],
+          },
+        ],
+      },
+    });
+    const baseProvider = providerMatch(fixture.configuration, fixture.revisionId);
+    const provider = {
+      ...baseProvider,
+      async match(event) {
+        const matches = await baseProvider.match(event);
+        return matches.map((match) =>
+          Object.assign({}, match, {
+            outputContext: {
+              provider: "channel",
+              channel: { binding_key: "channel-binding" },
+            },
+          }),
+        );
+      },
+    } satisfies import("../triggers/index.js").TriggerProvider;
+    const dispatches: LaunchMachineIntent[] = [];
+    const { handler, engine } = createDurableWorkflowHandler({
+      database: fixture.database,
+      entitlements: fixture.entitlements,
+      providers: [provider],
+      dispatchLaunchMachineIntent: async (intent) => {
+        dispatches.push(intent);
+        const execution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+          intent.workflowStepRunId!,
+        );
+        assert.ok(execution);
+        return {
+          execution: await fixture.database.attachAgentToExecution(
+            execution.id,
+            "daemon-1",
+            "agent-bound",
+          ),
+        };
+      },
+    });
+
+    await handler(fixture.trigger("first"));
+    await engine.processAvailable();
+    const firstExecution = await fixture.database.findAgentExecutionByWorkflowStepRunId(
+      dispatches[0]!.workflowStepRunId!,
+    );
+    assert.ok(firstExecution);
+    await fixture.database.completeWorkflowAgentExecution({
+      executionId: firstExecution.id,
+      executionStatus: "succeeded",
+      stepStatus: "succeeded",
+      result: { status: "succeeded" },
+      stepOutput: null,
+      completedByAgent: true,
+    });
+    await fixture.database.recordAgentExecutionHubAcknowledgement(firstExecution.id, {
+      kind: "terminal",
+      observedAt: new Date(),
+    });
+    await fixture.database.recordAgentExecutionHubAcknowledgement(firstExecution.id, {
+      kind: "idle",
+      observedAt: new Date(),
+    });
+    await engine.processAvailable();
+
+    const firstReceipt = await fixture.database.findProviderEventReceiptById(
+      fixture.providerEventReceiptId,
+    );
+    assert.ok(firstReceipt);
+    const secondReceipt = await fixture.database.persistManualEvent({
+      organizationId: "org-1",
+      triggerId: fixture.workflowId,
+      triggerRevisionId: fixture.revisionId,
+      deliveryId: randomUUID(),
+      source: "manual.run",
+      payload: { input: "second" },
+      receivedAt: new Date(firstReceipt.receivedAt.getTime() + 1),
+    });
+    if (secondReceipt.status !== "accepted") throw new Error("second receipt was not accepted");
+    await handler({
+      ...fixture.trigger("second"),
+      providerEventReceiptId: secondReceipt.event.providerEventReceiptId,
+      deliveryId: secondReceipt.event.deliveryId,
+      receivedAt: secondReceipt.event.receivedAt,
+      payload: { input: "second" },
+    });
+    await engine.processAvailable();
+
+    assert.equal(dispatches.length, 2);
+    assert.equal(dispatches[0]!.reuse, "binding");
+    assert.equal(dispatches[0]!.reuseAgentId, undefined);
+    assert.equal(dispatches[0]!.environment.projectId, "project-support");
+    assert.equal(dispatches[1]!.reuse, "binding");
+    assert.equal(dispatches[1]!.reuseAgentId, "agent-bound");
+  });
+
   it("serializes Channel workflow runs by receipt order for one binding", async () => {
     const fixture = await workflowFixture();
     const firstReceipt = await fixture.database.findProviderEventReceiptById(
@@ -1719,6 +1831,7 @@ async function workflowFixture(
         daemon: environment.daemon,
         daemonId: "daemon-1",
         cwd: environment.cwd,
+        ...(environment.projectId === undefined ? {} : { projectId: environment.projectId }),
         ...(environment.worktree === undefined ? {} : { worktree: environment.worktree }),
       };
     }),

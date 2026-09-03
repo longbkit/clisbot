@@ -231,6 +231,13 @@ export interface ProviderApplicationOverview {
   applications: Record<Provider, readonly ProviderApplicationView[]>;
 }
 
+/** A verified Application that an organization manager may use to create a Connection. */
+export interface ProviderApplicationCatalogEntry {
+  provider: Provider;
+  id: string;
+  name: string;
+}
+
 export interface ProviderApplicationResult {
   status: "verified";
   provider: Provider;
@@ -320,15 +327,15 @@ export class ProviderVerificationError extends Error {
 }
 
 /**
- * Which Hub surface an OAuth or install round trip has to come back to. An enum rather than a
- * route, so a browser can only choose between Hub's own two app surfaces and never supply a
- * redirect target of its own.
+ * Which first-party surface an OAuth or install round trip has to come back to. An enum rather
+ * than a caller-supplied route keeps the redirect allowlisted while the legacy Hub pages and the
+ * unified Paseo client coexist.
  */
-export type ProviderApplicationSurface = "appSetup" | "apps";
+export type ProviderApplicationSurface = "appSetup" | "apps" | "paseo";
 
 export const PROVIDER_APPLICATION_RETURN_ROUTES: Readonly<
   Record<ProviderApplicationSurface, string>
-> = { appSetup: "/", apps: "/apps" };
+> = { appSetup: "/", apps: "/apps", paseo: "/settings/hub/configuration" };
 
 export function providerApplicationReturnRoute(
   surface: ProviderApplicationSurface | undefined,
@@ -338,6 +345,7 @@ export function providerApplicationReturnRoute(
 
 export interface ProviderApplications {
   overview(request: Request): Promise<ProviderApplicationOverview>;
+  connectionCatalog(request: Request): Promise<readonly ProviderApplicationCatalogEntry[]>;
   verifyAndSave(
     request: Request,
     provider: Provider,
@@ -356,6 +364,15 @@ export interface ProviderApplications {
     input: { appToken: string; botToken: string; expectedVersion?: number },
   ): Promise<ProviderApplicationResult>;
   retrySlackSocket(request: Request, providerApplicationId: string): Promise<void>;
+  /** Redacted post-commit signal; optional for older/injected implementations. */
+  onConfigurationChanged?(
+    listener: (change: ProviderApplicationConfigurationChange) => Promise<void>,
+  ): () => void;
+}
+
+export interface ProviderApplicationConfigurationChange {
+  provider: Provider;
+  providerApplicationId: string;
 }
 
 interface ProviderApplicationsOptions {
@@ -386,14 +403,25 @@ export function createProviderApplications(
   options: ProviderApplicationsOptions,
 ): ProviderApplications {
   const queues = new Map<Provider, Promise<void>>();
+  const configurationListeners = new Set<
+    (change: ProviderApplicationConfigurationChange) => Promise<void>
+  >();
   options.runtime.onSlackInstallation?.((input) =>
-    serialize(queues, "slack", () => completeSlackInstallation(options, input)),
+    serialize(queues, "slack", () =>
+      completeSlackInstallation(options, input, configurationListeners),
+    ),
   );
   options.runtime.onLinearInstallation?.((input) =>
-    serialize(queues, "linear", () => completeLinearInstallation(options, input)),
+    serialize(queues, "linear", () =>
+      completeLinearInstallation(options, input, configurationListeners),
+    ),
   );
 
   return {
+    onConfigurationChanged(listener) {
+      configurationListeners.add(listener);
+      return () => configurationListeners.delete(listener);
+    },
     async overview(request) {
       await requireOperator(options, request);
       const callbackOrigin = await safeCallbackOrigin(options, request);
@@ -497,6 +525,35 @@ export function createProviderApplications(
       };
     },
 
+    async connectionCatalog(request) {
+      await requireAccount(options, request);
+      const stored = await options.store.readAll();
+      const catalog = new Map<string, ProviderApplicationCatalogEntry>();
+      for (const application of stored) {
+        if (!supportsManagedConnection(application.configuration)) continue;
+        catalog.set(`${application.provider}:${application.identity.id}`, {
+          provider: application.provider,
+          id: application.identity.id,
+          name: application.identity.name,
+        });
+      }
+      for (const provider of PROVIDERS) {
+        const configuration = options.environment[provider];
+        if (configuration === undefined || !supportsManagedConnection(configuration)) continue;
+        const id = providerApplicationIdentityId(configuration);
+        const identity = options.runtime.identity?.(provider, id);
+        catalog.set(`${provider}:${id}`, {
+          provider,
+          id,
+          name: identity?.name ?? id,
+        });
+      }
+      return Array.from(catalog.values()).sort(
+        (left, right) =>
+          left.provider.localeCompare(right.provider) || left.name.localeCompare(right.name),
+      );
+    },
+
     async verifyAndSave(request, provider, input, surface) {
       rejectMutation(options, request);
       const account = await requireOperator(options, request);
@@ -527,13 +584,23 @@ export function createProviderApplications(
             returnRoute,
           );
         }
-        return verifyAndActivateProvider(options, account, provider, input, callbackOrigin);
+        return verifyAndActivateProvider(
+          options,
+          account,
+          provider,
+          input,
+          callbackOrigin,
+          configurationListeners,
+        );
       });
     },
 
     async beginConnection(request, provider, providerApplicationId, organizationId, surface) {
       rejectMutation(options, request);
-      await requireOperator(options, request);
+      // The Application remains instance-operator managed, but an organization owner or admin may
+      // create a Connection from an already verified Application. The provider's existing start
+      // operation rechecks that organization authority before it persists an attempt.
+      await requireAccount(options, request);
       const callbackOrigin = await safeCallbackOrigin(options, request);
       if (provider === "linear") requireHttpsOrigin(callbackOrigin);
       return serialize(queues, provider, async () => {
@@ -570,7 +637,9 @@ export function createProviderApplications(
         } catch (error) {
           await closeCandidate(candidate, provider, "begin_connection");
           if (error instanceof ProviderApplicationError) throw error;
-          throw new ProviderApplicationError("internal", undefined, { cause: error });
+          throw new ProviderApplicationError("internal", undefined, {
+            cause: error,
+          });
         }
       });
     },
@@ -594,9 +663,13 @@ export function createProviderApplications(
           installation = await options.slackSocketVerifier!.verify(input.appToken, input.botToken);
         } catch (error) {
           if (error instanceof ProviderVerificationError) {
-            throw new ProviderApplicationError(error.reason, error.subject, { cause: error });
+            throw new ProviderApplicationError(error.reason, error.subject, {
+              cause: error,
+            });
           }
-          throw new ProviderApplicationError("internal", undefined, { cause: error });
+          throw new ProviderApplicationError("internal", undefined, {
+            cause: error,
+          });
         }
         const configuration = {
           provider: "slack" as const,
@@ -629,6 +702,10 @@ export function createProviderApplications(
           });
           candidate.publish();
           candidate = undefined;
+          await notifyConfigurationChanged(configurationListeners, {
+            provider: "slack",
+            providerApplicationId: identity.id,
+          });
           return {
             status: "verified",
             provider: "slack",
@@ -644,7 +721,9 @@ export function createProviderApplications(
             throw new ProviderApplicationError("identityConflict");
           }
           if (error instanceof ProviderApplicationError) throw error;
-          throw new ProviderApplicationError("internal", undefined, { cause: error });
+          throw new ProviderApplicationError("internal", undefined, {
+            cause: error,
+          });
         }
       });
     },
@@ -670,13 +749,23 @@ async function requireOperator(
   options: ProviderApplicationsOptions,
   request: Request,
 ): Promise<AccountAccessValue> {
+  const account = await requireAccount(options, request);
+  if (!account.isInstanceOperator) throw new ProviderApplicationError("forbidden");
+  return account;
+}
+
+async function requireAccount(
+  options: ProviderApplicationsOptions,
+  request: Request,
+): Promise<AccountAccessValue> {
   let account: AccountAccessValue;
   try {
     account = await options.auth.resolveAccount(request);
   } catch (error) {
-    throw new ProviderApplicationError("forbidden", undefined, { cause: error });
+    throw new ProviderApplicationError("forbidden", undefined, {
+      cause: error,
+    });
   }
-  if (!account.isInstanceOperator) throw new ProviderApplicationError("forbidden");
   return account;
 }
 
@@ -687,7 +776,9 @@ async function safeCallbackOrigin(
   try {
     return await options.callbackOrigin(request);
   } catch (error) {
-    throw new ProviderApplicationError("invalidOrigin", undefined, { cause: error });
+    throw new ProviderApplicationError("invalidOrigin", undefined, {
+      cause: error,
+    });
   }
 }
 
@@ -755,6 +846,19 @@ function publicIdentifiers(
       return { clientId: configuration.clientId };
   }
   throw new Error("unknown provider configuration");
+}
+
+function providerApplicationIdentityId(configuration: ProviderApplicationConfiguration): string {
+  if (configuration.provider === "github" || configuration.provider === "slack") {
+    return configuration.appId;
+  }
+  return configuration.provider === "discord"
+    ? configuration.applicationId
+    : configuration.clientId;
+}
+
+function supportsManagedConnection(configuration: ProviderApplicationConfiguration): boolean {
+  return configuration.provider !== "slack" || configuration.transport === "webhook";
 }
 
 function withoutExpectedVersion(
@@ -844,7 +948,10 @@ export async function activateProviderApplicationsAtStartup(options: {
     const persisted = storedProviders.filter((application) => application.provider === provider);
     const applications =
       environmentConfiguration === undefined
-        ? persisted.map((stored) => ({ configuration: stored.configuration, stored }))
+        ? persisted.map((stored) => ({
+            configuration: stored.configuration,
+            stored,
+          }))
         : [{ configuration: environmentConfiguration, stored: undefined }];
     for (const application of applications) {
       try {
@@ -865,7 +972,11 @@ export async function activateProviderApplicationsAtStartup(options: {
             configurationVersion,
           );
           await candidate.start();
-          await options.store.activate({ provider, identity, configurationVersion });
+          await options.store.activate({
+            provider,
+            identity,
+            configurationVersion,
+          });
           candidate.publish();
           candidate = undefined;
         } catch (error) {
@@ -891,10 +1002,18 @@ async function startupIdentity(
     return stored.identity;
   }
   if (provider === "slack" && environmentConfiguration.provider === "slack") {
-    return { provider: "slack", id: environmentConfiguration.appId, name: "Slack app" };
+    return {
+      provider: "slack",
+      id: environmentConfiguration.appId,
+      name: "Slack app",
+    };
   }
   if (provider === "linear" && environmentConfiguration.provider === "linear") {
-    return { provider: "linear", id: environmentConfiguration.clientId, name: "Linear app" };
+    return {
+      provider: "linear",
+      id: environmentConfiguration.clientId,
+      name: "Linear app",
+    };
   }
   return verifier.verify(provider, environmentConfiguration);
 }
@@ -1025,6 +1144,9 @@ async function verifyAndActivateProvider(
   provider: Provider,
   input: ProviderApplicationConfiguration,
   callbackOrigin: string,
+  configurationListeners: ReadonlySet<
+    (change: ProviderApplicationConfigurationChange) => Promise<void>
+  >,
 ): Promise<ProviderApplicationResult> {
   let identity: ProviderApplicationIdentity;
   try {
@@ -1033,7 +1155,9 @@ async function verifyAndActivateProvider(
     if (error instanceof ProviderVerificationError) {
       // The subject travels as safe context so the copy can name the field the provider
       // objected to instead of sending the operator back over all of them.
-      throw new ProviderApplicationError(error.reason, error.subject, { cause: error });
+      throw new ProviderApplicationError(error.reason, error.subject, {
+        cause: error,
+      });
     }
     throw new ProviderApplicationError("internal", undefined, { cause: error });
   }
@@ -1062,7 +1186,16 @@ async function verifyAndActivateProvider(
     });
     candidate.publish();
     candidate = undefined;
-    return { status: "verified", provider, identity, configurationVersion: saved.version };
+    await notifyConfigurationChanged(configurationListeners, {
+      provider,
+      providerApplicationId: identity.id,
+    });
+    return {
+      status: "verified",
+      provider,
+      identity,
+      configurationVersion: saved.version,
+    };
   } catch (error) {
     await closeCandidate(candidate, provider, "verify_and_save");
     if (error instanceof ProviderApplicationError) throw error;
@@ -1114,6 +1247,9 @@ async function completeSlackInstallation(
     installation: VerifiedSlackInstallation;
     binding: BindSlackConnectionInput;
   },
+  configurationListeners: ReadonlySet<
+    (change: ProviderApplicationConfigurationChange) => Promise<void>
+  >,
 ): Promise<void> {
   const configuration = parseProviderApplicationConfiguration(input.configuration);
   if (configuration.provider !== "slack" || configuration.appId !== input.installation.appId) {
@@ -1148,6 +1284,10 @@ async function completeSlackInstallation(
     });
     candidate.publish();
     candidate = undefined;
+    await notifyConfigurationChanged(configurationListeners, {
+      provider: "slack",
+      providerApplicationId: identity.id,
+    });
   } catch (error) {
     await closeCandidate(candidate, "slack", "complete_installation");
     throw error;
@@ -1164,6 +1304,9 @@ async function completeLinearInstallation(
     installation: LinearInstallation;
     binding: BindLinearConnectionInput;
   },
+  configurationListeners: ReadonlySet<
+    (change: ProviderApplicationConfigurationChange) => Promise<void>
+  >,
 ): Promise<void> {
   const configuration = parseProviderApplicationConfiguration(input.configuration);
   if (
@@ -1205,9 +1348,30 @@ async function completeLinearInstallation(
     });
     candidate.publish();
     candidate = undefined;
+    await notifyConfigurationChanged(configurationListeners, {
+      provider: "linear",
+      providerApplicationId: identity.id,
+    });
   } catch (error) {
     await closeCandidate(candidate, "linear", "complete_installation");
     throw error;
+  }
+}
+
+async function notifyConfigurationChanged(
+  listeners: ReadonlySet<(change: ProviderApplicationConfigurationChange) => Promise<void>>,
+  change: ProviderApplicationConfigurationChange,
+): Promise<void> {
+  for (const listener of listeners) {
+    try {
+      await listener(change);
+    } catch (error) {
+      reportFailure(error, {
+        operation: "provider_application.configuration_changed.notify",
+        component: "provider_applications",
+        provider: change.provider,
+      });
+    }
   }
 }
 

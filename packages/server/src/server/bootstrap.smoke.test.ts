@@ -6,7 +6,13 @@ import pino from "pino";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { WebSocket } from "ws";
 
-import { createPaseoDaemon, parseListenString, type PaseoDaemonConfig } from "./bootstrap.js";
+import {
+  createHubAgentConfigurationCatalog,
+  createPaseoDaemon,
+  parseListenString,
+  type PaseoDaemonConfig,
+} from "./bootstrap.js";
+import type { ProviderSnapshotEntry } from "./agent/agent-sdk-types.js";
 import { loadConfig } from "./config.js";
 import { AgentManagerShuttingDownError } from "./agent/agent-manager.js";
 import { hashDaemonPassword } from "./auth.js";
@@ -53,9 +59,58 @@ describe("paseo daemon bootstrap", () => {
     vi.restoreAllMocks();
   });
 
+  test("publishes known Agent Mode safety while leaving dynamic Modes unclassified", () => {
+    const entries: ProviderSnapshotEntry[] = [
+      {
+        provider: "claude",
+        status: "ready",
+        enabled: true,
+        defaultModeId: "default",
+        modes: [
+          { id: "default", label: "Always Ask" },
+          { id: "bypassPermissions", label: "Bypass" },
+        ],
+        models: [],
+      },
+      {
+        provider: "custom-acp",
+        status: "ready",
+        enabled: true,
+        defaultModeId: null,
+        modes: [{ id: "dynamic", label: "Dynamic" }],
+        models: [],
+      },
+    ];
+
+    expect(createHubAgentConfigurationCatalog(entries)).toEqual({
+      providers: [
+        {
+          id: "claude",
+          label: "claude",
+          defaultModeId: "default",
+          modes: [
+            { id: "default", label: "Always Ask", isUnattended: false },
+            { id: "bypassPermissions", label: "Bypass", isUnattended: true },
+          ],
+          models: [],
+        },
+        {
+          id: "custom-acp",
+          label: "custom-acp",
+          defaultModeId: null,
+          modes: [{ id: "dynamic", label: "Dynamic" }],
+          models: [],
+        },
+      ],
+    });
+  });
+
   test("starts and serves health endpoint", async () => {
     const daemonHandle = await createTestPaseoDaemon({
-      openai: { stt: { apiKey: "test-openai-api-key" }, tts: { apiKey: "test-openai-api-key" } },
+      openai: {
+        stt: { apiKey: "test-openai-api-key" },
+        tts: { apiKey: "test-openai-api-key" },
+      },
       speech: {
         providers: {
           dictationStt: { provider: "openai", explicit: true },
@@ -87,9 +142,14 @@ describe("paseo daemon bootstrap", () => {
     await mkdir(obsoleteTimelineDirectory, { recursive: true });
     await writeFile(path.join(obsoleteTimelineDirectory, "obsolete.json"), "{}\n", "utf-8");
 
-    const daemonHandle = await createTestPaseoDaemon({ paseoHomeRoot, cleanup: false });
+    const daemonHandle = await createTestPaseoDaemon({
+      paseoHomeRoot,
+      cleanup: false,
+    });
     try {
-      await expect(access(obsoleteTimelineDirectory)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(access(obsoleteTimelineDirectory)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
 
       const agent = await daemonHandle.daemon.agentManager.createAgent(
         { provider: "codex", cwd: agentCwd },
@@ -102,7 +162,9 @@ describe("paseo daemon bootstrap", () => {
       });
       await daemonHandle.daemon.agentManager.flush();
 
-      await expect(access(obsoleteTimelineDirectory)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(access(obsoleteTimelineDirectory)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
     } finally {
       await daemonHandle.close();
       await Promise.all([
@@ -115,7 +177,10 @@ describe("paseo daemon bootstrap", () => {
   test("does not create a timeline directory for live timeline activity", async () => {
     const paseoHomeRoot = await mkdtemp(path.join(os.tmpdir(), "paseo-timeline-memory-"));
     const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-timeline-agent-"));
-    const daemonHandle = await createTestPaseoDaemon({ paseoHomeRoot, cleanup: false });
+    const daemonHandle = await createTestPaseoDaemon({
+      paseoHomeRoot,
+      cleanup: false,
+    });
     const timelineDirectory = path.join(daemonHandle.paseoHome, "agent-timelines");
     try {
       const agent = await daemonHandle.daemon.agentManager.createAgent(
@@ -129,7 +194,9 @@ describe("paseo daemon bootstrap", () => {
       });
       await daemonHandle.daemon.agentManager.flush();
 
-      await expect(access(timelineDirectory)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(access(timelineDirectory)).rejects.toMatchObject({
+        code: "ENOENT",
+      });
     } finally {
       await daemonHandle.close();
       await Promise.all([
@@ -174,7 +241,11 @@ describe("paseo daemon bootstrap", () => {
     config.speech = {
       providers: {
         dictationStt: { provider: "local", explicit: true, enabled: false },
-        voiceTurnDetection: { provider: "local", explicit: true, enabled: false },
+        voiceTurnDetection: {
+          provider: "local",
+          explicit: true,
+          enabled: false,
+        },
         voiceStt: { provider: "local", explicit: true, enabled: false },
         voiceTts: { provider: "local", explicit: true, enabled: false },
       },
@@ -340,7 +411,12 @@ describe("paseo daemon bootstrap", () => {
   ): Promise<Response> {
     return new Promise((resolve, reject) => {
       const req = http.get(
-        { hostname: "127.0.0.1", port, path: requestPath, headers: { host, ...headers } },
+        {
+          hostname: "127.0.0.1",
+          port,
+          path: requestPath,
+          headers: { host, ...headers },
+        },
         (res) => {
           const chunks: Buffer[] = [];
           res.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -517,7 +593,10 @@ describe("paseo daemon bootstrap", () => {
         },
         credential: { secret: "credential" },
         enrollment: { token: "enrollment-token" },
-        identity: { serverId: "server-startup-race", daemonPublicKey: "public-key" },
+        identity: {
+          serverId: "server-startup-race",
+          daemonPublicKey: "public-key",
+        },
       })}\n`,
       "utf-8",
     );
@@ -546,6 +625,11 @@ describe("paseo daemon bootstrap", () => {
       async consumeAccessTicket() {
         throw new Error("not used by this smoke test");
       },
+      async refreshAccessLease() {
+        throw new Error("not used by this smoke test");
+      },
+      async replaceProjects() {},
+      async replaceConnectionOffer() {},
       async revoke(_input: HubRevocation): Promise<void> {},
       openSocket(_input: HubSocketCredentials, _events: HubSocketEvents): HubSocketConnection {
         return { close: () => undefined };
@@ -704,7 +788,9 @@ export default function contribute(plugin: unknown) {
       pluginsEnabled: !isPlatform("win32"),
       plugins: isPlatform("win32")
         ? {}
-        : { "startup-rollback": { source: "directory", path: pluginDirectory } },
+        : {
+            "startup-rollback": { source: "directory", path: pluginDirectory },
+          },
     };
     const daemon = await createPaseoDaemon(config, pino({ level: "silent" }));
 
@@ -712,7 +798,9 @@ export default function contribute(plugin: unknown) {
       await expect(daemon.start()).rejects.toThrow();
       await expect(fetch(`http://127.0.0.1:${standalonePort}/api/health`)).rejects.toThrow();
       if (!isPlatform("win32")) {
-        await expect(readFile(pluginPidPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+        await expect(readFile(pluginPidPath, "utf8")).rejects.toMatchObject({
+          code: "ENOENT",
+        });
       }
     } finally {
       await daemon.stop().catch(() => undefined);
@@ -827,7 +915,11 @@ export default function contribute(plugin: unknown) {
       speech: {
         providers: {
           dictationStt: { provider: "local", explicit: true, enabled: true },
-          voiceTurnDetection: { provider: "local", explicit: true, enabled: false },
+          voiceTurnDetection: {
+            provider: "local",
+            explicit: true,
+            enabled: false,
+          },
           voiceStt: { provider: "local", explicit: true, enabled: false },
           voiceTts: { provider: "local", explicit: true, enabled: false },
         },
@@ -983,7 +1075,9 @@ async function beginDaemonShutdownWithAgentClosing(): Promise<BlockedDaemonShutd
   const heldAgentClose = holdAgentClose();
   const daemonHandle = await createTestPaseoDaemon({
     cleanup: false,
-    agentClients: createTestAgentClients({ closeSession: heldAgentClose.closeSession }),
+    agentClients: createTestAgentClients({
+      closeSession: heldAgentClose.closeSession,
+    }),
   });
   const agentCwd = await mkdtemp(path.join(os.tmpdir(), "paseo-shutdown-agent-"));
   await daemonHandle.daemon.agentManager.createAgent(
@@ -1024,7 +1118,10 @@ async function beginDaemonShutdownWithAgentClosing(): Promise<BlockedDaemonShutd
       await stopPromise;
       await daemonHandle.daemon.agentManager.flush().catch(() => undefined);
       await Promise.all([
-        rm(path.dirname(daemonHandle.paseoHome), { recursive: true, force: true }),
+        rm(path.dirname(daemonHandle.paseoHome), {
+          recursive: true,
+          force: true,
+        }),
         rm(daemonHandle.staticDir, { recursive: true, force: true }),
         rm(agentCwd, { recursive: true, force: true }),
       ]);

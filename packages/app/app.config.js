@@ -10,6 +10,29 @@ const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
 const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
 
+function resolveHubOrigin(value) {
+  if (typeof value !== "string" || value.trim().length === 0) return undefined;
+  const url = new URL(value.trim());
+  const loopbackHttp =
+    url.protocol === "http:" &&
+    (url.hostname === "127.0.0.1" || url.hostname === "[::1]" || url.hostname === "localhost");
+  if (
+    (url.protocol !== "https:" && !loopbackHttp) ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== "/" ||
+    url.search !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error(
+      "CLISBOT_HUB_ORIGIN must be an HTTPS origin or loopback HTTP origin without a path",
+    );
+  }
+  return url.origin;
+}
+
+const clisbotHubOrigin = resolveHubOrigin(process.env.CLISBOT_HUB_ORIGIN);
+
 const buildProfile = isFdroidBuild
   ? {
       androidPermissions: [
@@ -140,6 +163,8 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
       withPasteInput,
       [withAndroidAsyncStorageSize, 64],
       ...buildProfile.cameraPlugins,
@@ -186,6 +211,7 @@ export default {
     extra: {
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
+      ...(clisbotHubOrigin === undefined ? {} : { clisbotHub: { origin: clisbotHubOrigin } }),
       router: {},
       eas: {
         projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",

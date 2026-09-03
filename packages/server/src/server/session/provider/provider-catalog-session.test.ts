@@ -43,6 +43,18 @@ function makeEntries(): ProviderSnapshotEntry[] {
   ];
 }
 
+function safeCodexEntries(candidates: ProviderSnapshotEntry[]): ProviderSnapshotEntry[] {
+  return candidates.flatMap((entry) => {
+    if (entry.provider !== "codex") return [];
+    return [
+      {
+        ...entry,
+        modes: entry.modes?.filter((mode) => mode.id === "safe"),
+      },
+    ];
+  });
+}
+
 function makeSubsystem(options: MakeOptions = {}) {
   const emitted: SessionOutboundMessage[] = [];
   const visible = options.visibleProviders ?? new Set(["codex"]);
@@ -54,6 +66,7 @@ function makeSubsystem(options: MakeOptions = {}) {
     supportsCompactProviderSnapshots: () => options.supportsCompactProviderSnapshots ?? false,
     listProviderAvailability: async () => [],
     listDraftFeatures: async () => [],
+    filterProviderEntries: (entries) => entries,
     ...options.host,
   };
   const providerSnapshotManager = createStub<ProviderSnapshotManager>({
@@ -113,6 +126,31 @@ describe("ProviderCatalogSession", () => {
 
     const push = findByType(emitted, "providers_snapshot_update");
     const pull = findByType(emitted, "get_providers_snapshot_response");
+    expect(pull?.payload.entries).toEqual(push?.payload.entries);
+  });
+
+  it("applies the Session resource projection before encoding PUSH and PULL snapshots", async () => {
+    const entries = makeEntries();
+    const { subsystem, emitted, pushSnapshotChange } = makeSubsystem({
+      visibleProviders: new Set(["codex", "claude"]),
+      supportsCustomModeIcons: true,
+      snapshot: { getSnapshot: () => entries },
+      host: {
+        filterProviderEntries: safeCodexEntries,
+      },
+    });
+
+    subsystem.start();
+    pushSnapshotChange(entries);
+    await subsystem.handleGetProvidersSnapshotRequest({
+      type: "get_providers_snapshot_request",
+      requestId: "projected-pull",
+    });
+
+    const push = findByType(emitted, "providers_snapshot_update");
+    const pull = findByType(emitted, "get_providers_snapshot_response");
+    expect(push?.payload.entries.map(({ provider }) => provider)).toEqual(["codex"]);
+    expect(push?.payload.entries[0]?.modes?.map(({ id }) => id)).toEqual(["safe"]);
     expect(pull?.payload.entries).toEqual(push?.payload.entries);
   });
 
@@ -221,7 +259,9 @@ describe("ProviderCatalogSession", () => {
     // warmUpSnapshotForCwd is intentionally unstubbed: createStub throws if it is called,
     // so the disabled short-circuit is proven by the absence of a throw.
     const { subsystem, emitted } = makeSubsystem({
-      snapshot: { getSnapshot: () => [{ provider: "codex", status: "loading", enabled: false }] },
+      snapshot: {
+        getSnapshot: () => [{ provider: "codex", status: "loading", enabled: false }],
+      },
     });
 
     await subsystem.handleListProviderModelsRequest({

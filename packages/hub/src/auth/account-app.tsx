@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { accountState } from "./functions.js";
 import { DaemonHandoffEntry } from "../daemons/handoff.js";
 import { AccountEntry, InvitationEntry, OrganizationGate } from "./account-entry.js";
@@ -9,6 +9,20 @@ import { DashboardShell } from "./dashboard-shell.js";
 import { InstanceSetupEntry } from "./instance-setup-entry.js";
 import { AppSetupEntry } from "../provider-applications/panel.js";
 import { PasswordChangeEntry } from "./password-change.js";
+import { PASEO_CLIENT_ID } from "./client-authorization.js";
+import type { AccountState } from "./organization-contract.js";
+
+const AUTHORIZATION_QUERY_FIELDS = [
+  "response_type",
+  "client_id",
+  "redirect_uri",
+  "scope",
+  "state",
+  "code_challenge",
+  "code_challenge_method",
+  "nonce",
+  "prompt",
+] as const;
 
 export function AccountApp() {
   const loadAccount = useServerFn(accountState);
@@ -40,7 +54,34 @@ export function AccountApp() {
       />
     );
   }
-  const state = account.data.data;
+  return (
+    <ResolvedAccountApp
+      state={account.data.data}
+      handoff={handoff}
+      enterHandoff={enterHandoff}
+      leaveHandoff={leaveHandoff}
+    />
+  );
+}
+
+function ResolvedAccountApp({
+  state,
+  handoff,
+  enterHandoff,
+  leaveHandoff,
+}: {
+  state: AccountState;
+  handoff: boolean;
+  enterHandoff(): void;
+  leaveHandoff(): void;
+}) {
+  const authorizationQuery = readClientAuthorizationQuery();
+  if (
+    authorizationQuery !== null &&
+    (state.status === "appSetupRequired" || state.status === "active")
+  ) {
+    return <ClientAuthorizationContinuation query={authorizationQuery} />;
+  }
   if (handoff && (state.status === "appSetupRequired" || state.status === "active")) {
     return (
       <DaemonHandoffEntry
@@ -66,4 +107,26 @@ export function AccountApp() {
   }
   if (state.status === "organizationRequired") return <OrganizationGate account={state} />;
   return <DashboardShell account={state} />;
+}
+
+/** Returns the signed-in browser to the pending first-party OAuth authorization request. */
+function ClientAuthorizationContinuation({ query }: { query: string }) {
+  const destination = useMemo(() => {
+    const url = new URL("/api/auth/oauth2/authorize", window.location.origin);
+    url.search = query;
+    return url.toString();
+  }, [query]);
+  useEffect(() => window.location.replace(destination), [destination]);
+  return <LoadingEntry />;
+}
+
+function readClientAuthorizationQuery(): string | null {
+  if (typeof window === "undefined") return null;
+  const current = new URLSearchParams(window.location.search);
+  if (current.get("client_id") !== PASEO_CLIENT_ID) return null;
+  const query = new URLSearchParams();
+  for (const field of AUTHORIZATION_QUERY_FIELDS) {
+    for (const value of current.getAll(field)) query.append(field, value);
+  }
+  return query.has("redirect_uri") && query.has("code_challenge") ? query.toString() : null;
 }

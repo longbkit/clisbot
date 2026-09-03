@@ -68,7 +68,10 @@ export function migrateLegacyBundle(input: {
       : {
           format: "legacy_multistep" as const,
           name: trigger.name,
-          yaml: serializeLegacyTrigger({ trigger, environments: configuration.environments }),
+          yaml: serializeLegacyTrigger({
+            trigger,
+            environments: configuration.environments,
+          }),
           normalized: { trigger, environments: configuration.environments },
           legacySourceFile: sourceFile,
           conversionBlockers: converted.blockers,
@@ -111,7 +114,10 @@ function convertSingleRun(
     return { success: false, blockers };
   }
 
-  return { success: true, trigger: singleRunDocument(trigger, step, environment) };
+  return {
+    success: true,
+    trigger: singleRunDocument(trigger, step, environment),
+  };
 }
 
 function singleRunDocument(
@@ -169,7 +175,11 @@ function singleRunDocument(
           }),
       ...(step.output === undefined
         ? {}
-        : { output: { schema: structuredClone(asJsonObject(step.output.schema)) } }),
+        : {
+            output: {
+              schema: structuredClone(asJsonObject(step.output.schema)),
+            },
+          }),
       ...(Object.keys(outputs).length === 0 ? {} : { outputs }),
       auto_archive: step.autoArchive,
     },
@@ -189,6 +199,9 @@ function authoredAgent(agent: CompiledAgentSelection): TriggerDocument["run"]["a
 function cloneAgent(agent: CompiledAgent): CompiledAgent {
   return {
     ...agent,
+    ...(agent.featureValues === undefined
+      ? {}
+      : { featureValues: structuredClone(agent.featureValues) }),
     ...(agent.options === undefined ? {} : { options: structuredClone(agent.options) }),
   };
 }

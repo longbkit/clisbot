@@ -21,6 +21,7 @@ import {
 import { Session } from "./session.js";
 import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
+import type { PushTokenAuthorization } from "./push/index.js";
 import { StructuredAgentFallbackError } from "./agent/agent-response-loop.js";
 import type { StoredAgentRecord } from "./agent/agent-storage.js";
 import type { AgentManagerEvent } from "./agent/agent-manager.js";
@@ -29,6 +30,7 @@ import { WorkspaceLabelError, type WorkspaceLabelService } from "./workspace-lab
 import { createPersistedProjectRecord } from "./workspace-registry.js";
 import { deriveProjectKey } from "./project-key.js";
 import type { SessionOptions } from "./session.js";
+import type { SessionResourceAuthorization } from "./managed-access/types.js";
 import type { SessionInboundMessage, SessionOutboundMessage } from "./messages.js";
 import {
   asSessionInternals as asSessionInternalsHelper,
@@ -283,6 +285,7 @@ vi.mock("./worktree-bootstrap.js", async (importOriginal) => {
 
 interface SessionForTestOptions {
   permissions?: readonly DaemonPermission[];
+  resourceAuthorization?: SessionResourceAuthorization;
   agentManager?: { [K in keyof SessionOptions["agentManager"]]?: unknown };
   agentStorage?: { [K in keyof SessionOptions["agentStorage"]]?: unknown };
   github?: Partial<ForgeService & GitHubService>;
@@ -428,6 +431,9 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     daemonVersion: options.daemonVersion,
     daemonRuntimeConfig: options.daemonRuntimeConfig,
     permissions: options.permissions ?? OWNER_PERMISSIONS,
+    ...(options.resourceAuthorization
+      ? { resourceAuthorization: options.resourceAuthorization }
+      : {}),
   };
   return new Session(sessionOptions);
 }
@@ -1764,6 +1770,65 @@ test("push token registration can be revoked by the connected client", async () 
       payload: { requestId: "revoke-1" },
     },
   ]);
+});
+
+test("managed push registration carries Project and lease authority", async () => {
+  const registrations: Array<{
+    token: string;
+    authorization: PushTokenAuthorization | undefined;
+  }> = [];
+  const revoked: string[] = [];
+  const messages: SessionOutboundMessage[] = [];
+  const projectAuthorization = {
+    privileges: new Set(["project.use"] as const),
+    agentConfigurations: [],
+  };
+  const session = createSessionForTest({
+    messages,
+    permissions: ["workspace.read"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map([["project-a", projectAuthorization]]),
+      leaseId: "lease-a",
+      leaseExpiresAt: Date.now() + 15 * 60 * 1000,
+    },
+    pushNotifications: asPushNotifications({
+      renew: (token: string, authorization?: PushTokenAuthorization) =>
+        registrations.push({ token, authorization }),
+      revoke: (token: string) => revoked.push(token),
+    }),
+  });
+
+  await session.handleMessage({
+    type: "register_push_token",
+    token: "ExponentPushToken[project-a]",
+  });
+  await session.handleMessage({
+    type: "push.unregister.request",
+    token: "ExponentPushToken[another-device]",
+    requestId: "revoke-guessed",
+  });
+
+  expect(registrations).toEqual([
+    {
+      token: "ExponentPushToken[project-a]",
+      authorization: {
+        leaseId: "lease-a",
+        leaseExpiresAt: expect.any(Number),
+        projectIds: ["project-a"],
+      },
+    },
+  ]);
+  expect(revoked).toEqual([]);
+  expect(messages).toContainEqual({
+    type: "rpc_error",
+    payload: {
+      requestId: "revoke-guessed",
+      requestType: "push.unregister.request",
+      error: "Resource not found",
+      code: "resource_not_found",
+    },
+  });
 });
 
 test("push token revocation only acknowledges durable removal", async () => {

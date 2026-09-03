@@ -59,6 +59,7 @@ const sessionMock = vi.hoisted(() => {
     getPermissions = vi.fn(() => this.args.permissions as string[]);
     allowsInbound = vi.fn(() => true);
     allowsPermission = vi.fn(() => true);
+    extendManagedLease = vi.fn(() => true);
     publish = vi.fn((message: unknown) => {
       const onMessage = this.args.onMessage as ((message: unknown) => void) | undefined;
       onMessage?.(message);
@@ -97,6 +98,7 @@ vi.mock("./push/index.js", () => ({
   createPushNotifications: () => ({
     renew: () => undefined,
     revoke: () => undefined,
+    revokeLease: () => undefined,
     send: async () => undefined,
   }),
 }));
@@ -108,6 +110,7 @@ import type { SpeechReadinessSnapshot } from "./speech/speech-runtime.js";
 
 interface WebSocketServerInternals {
   attachSocket(ws: unknown, req: unknown): Promise<void>;
+  applyManagedAccessMode(mode: "off" | "external"): void;
 }
 
 const TEST_DAEMON_VERSION = "1.2.3-test";
@@ -129,6 +132,11 @@ function parseSentEnvelope(data: unknown): z.infer<typeof WireEnvelopeSchema> {
 
 function sentEnvelopes(socket: MockSocket): z.infer<typeof WireEnvelopeSchema>[] {
   return socket.sent.filter((data) => typeof data === "string").map(parseSentEnvelope);
+}
+
+function rpcErrorPayload(socket: MockSocket): unknown {
+  return sentEnvelopes(socket).find(({ message }) => message?.type === "rpc_error")?.message
+    ?.payload;
 }
 
 function sentServerInfoEnvelopes(socket: MockSocket): z.infer<typeof WireEnvelopeSchema>[] {
@@ -237,6 +245,14 @@ function createServer(options?: {
         transport: "direct" | "relay";
         peer: "loopback" | "external";
       }) => Promise<{
+        principalId: string;
+        permissions: readonly (typeof DAEMON_PERMISSIONS)[number][];
+        resourceMode: "daemon" | "projects";
+        projects: ReadonlyMap<string, never>;
+        leaseId: string;
+        leaseExpiresAt: number;
+      }>;
+      refresh?: (leaseId: string) => Promise<{
         principalId: string;
         permissions: readonly (typeof DAEMON_PERMISSIONS)[number][];
         resourceMode: "daemon" | "projects";
@@ -415,15 +431,19 @@ function createHelloMessage(
   };
 }
 
-function createDirectRequest() {
+function createDirectRequest(
+  remoteAddress = "127.0.0.1",
+  host = "localhost:6767",
+  origin = `http://${host}`,
+) {
   return {
     headers: {
-      host: "localhost:6767",
-      origin: "http://localhost:6767",
+      host,
+      origin,
       "user-agent": "vitest",
     },
     socket: {
-      remoteAddress: "127.0.0.1",
+      remoteAddress,
     },
     url: "/ws",
   };
@@ -434,7 +454,9 @@ async function attachRelayAndHello(params: {
   socket: MockSocket;
   clientId: string;
 }) {
-  await params.server.attachExternalSocket(params.socket, { transport: "relay" });
+  await params.server.attachExternalSocket(params.socket, {
+    transport: "relay",
+  });
   params.socket.emit("message", JSON.stringify(createHelloMessage(params.clientId)));
   expect(params.socket.sent.length).toBeGreaterThan(0);
   const envelope = parseSentEnvelope(params.socket.sent[0]);
@@ -568,28 +590,91 @@ describe("relay external socket reconnect behavior", () => {
     await server.close();
   });
 
-  test("external mode requires a ticket for relay and loopback TCP before session creation", async () => {
+  test("external mode requires a ticket for relay and every TCP connection", async () => {
     const resolver = vi.fn();
     const server = createServer({
       managedAccess: { mode: "external", resolver: { resolve: resolver } },
     });
     const relaySocket = new MockSocket();
-    const directSocket = new MockSocket();
+    const externalDirectSocket = new MockSocket();
+    const proxiedExternalSocket = new MockSocket();
+    const publicOriginSocket = new MockSocket();
+    const loopbackSocket = new MockSocket();
+    const localhostSubdomainSocket = new MockSocket();
 
     await server.attachExternalSocket(relaySocket, { transport: "relay" });
     relaySocket.emit("message", JSON.stringify(createHelloMessage("relay-client")));
     await asInternals<WebSocketServerInternals>(server).attachSocket(
-      directSocket,
+      externalDirectSocket,
+      createDirectRequest("100.64.0.10"),
+    );
+    externalDirectSocket.emit("message", JSON.stringify(createHelloMessage("direct-client")));
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      proxiedExternalSocket,
+      createDirectRequest("127.0.0.1", "paseo.example.com"),
+    );
+    proxiedExternalSocket.emit("message", JSON.stringify(createHelloMessage("proxied-client")));
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      publicOriginSocket,
+      createDirectRequest("127.0.0.1", "localhost:6767", "https://paseo.example.com"),
+    );
+    publicOriginSocket.emit("message", JSON.stringify(createHelloMessage("public-origin-client")));
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      loopbackSocket,
       createDirectRequest(),
     );
-    directSocket.emit("message", JSON.stringify(createHelloMessage("direct-client")));
+    loopbackSocket.emit("message", JSON.stringify(createHelloMessage("loopback-client")));
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      localhostSubdomainSocket,
+      createDirectRequest("127.0.0.1", "paseo.localhost:6767"),
+    );
+    localhostSubdomainSocket.emit(
+      "message",
+      JSON.stringify(createHelloMessage("localhost-subdomain-client")),
+    );
 
     await vi.waitFor(() => {
       expect(relaySocket.readyState).toBe(3);
-      expect(directSocket.readyState).toBe(3);
+      expect(externalDirectSocket.readyState).toBe(3);
+      expect(proxiedExternalSocket.readyState).toBe(3);
+      expect(publicOriginSocket.readyState).toBe(3);
+      expect(loopbackSocket.readyState).toBe(3);
+      expect(localhostSubdomainSocket.readyState).toBe(3);
     });
     expect(resolver).not.toHaveBeenCalled();
     expect(sessionMock.instances).toHaveLength(0);
+    await server.close();
+  });
+
+  test("enabling external mode closes unticketed TCP sessions but keeps local IPC recovery", async () => {
+    const server = createServer({
+      managedAccess: {
+        mode: "off",
+        resolver: {
+          resolve: async () => {
+            throw new Error("not used");
+          },
+        },
+      },
+    });
+    const tcp = new MockSocket();
+    const localIpc = new MockSocket();
+
+    await asInternals<WebSocketServerInternals>(server).attachSocket(
+      tcp,
+      createDirectRequest("192.168.1.10"),
+    );
+    tcp.emit("message", JSON.stringify(createHelloMessage("tcp-client")));
+    await asInternals<WebSocketServerInternals>(server).attachSocket(localIpc, undefined);
+    localIpc.emit("message", JSON.stringify(createHelloMessage("ipc-client")));
+    expect(sessionMock.instances).toHaveLength(2);
+
+    asInternals<WebSocketServerInternals>(server).applyManagedAccessMode("external");
+
+    await vi.waitFor(() => expect(tcp.readyState).toBe(3));
+    expect(localIpc.readyState).toBe(1);
+    expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
+    expect(sessionMock.instances[1]?.cleanup).not.toHaveBeenCalled();
     await server.close();
   });
 
@@ -611,7 +696,9 @@ describe("relay external socket reconnect behavior", () => {
       socket,
       { transport: "relay" },
       undefined,
-      createHelloMessage("managed-client", { accessTicket: "paseo_dat_ticket" }),
+      createHelloMessage("managed-client", {
+        accessTicket: "paseo_dat_ticket",
+      }),
     );
 
     expect(resolver).toHaveBeenCalledWith({
@@ -633,6 +720,227 @@ describe("relay external socket reconnect behavior", () => {
       parseSentEnvelope(socket.sent[0]).message?.payload,
     );
     expect(serverInfo?.features?.managedAccessTickets).toBe(true);
+    await server.close();
+  });
+
+  test("managed reconnect replaces the prior lease and proactive revocation closes the session", async () => {
+    let issue = 0;
+    const resolver = vi.fn(async () => {
+      issue += 1;
+      return {
+        principalId: "member:user-1",
+        permissions: ["workspace.read" as const],
+        resourceMode: "projects" as const,
+        projects: new Map<string, never>(),
+        leaseId: `00000000-0000-4000-8000-${String(issue).padStart(12, "0")}`,
+        leaseExpiresAt: Date.now() + 60_000,
+      };
+    });
+    const server = createServer({
+      managedAccess: { mode: "external", resolver: { resolve: resolver } },
+    });
+    const first = new MockSocket();
+    await server.attachExternalSocket(
+      first,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", { accessTicket: "paseo_dat_first" }),
+    );
+    await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(1));
+
+    const second = new MockSocket();
+    await server.attachExternalSocket(
+      second,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", {
+        accessTicket: "paseo_dat_second",
+      }),
+    );
+    await vi.waitFor(() => expect(sessionMock.instances).toHaveLength(2));
+    expect(first.readyState).toBe(3);
+    expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
+
+    expect(server.revokeManagedLeases(["00000000-0000-4000-8000-000000000002"])).toBe(1);
+    await vi.waitFor(() => expect(second.readyState).toBe(3));
+    expect(sessionMock.instances[1]?.cleanup).toHaveBeenCalledOnce();
+    await server.close();
+  });
+
+  test("refreshes an active managed lease without minting another access ticket", async () => {
+    vi.useFakeTimers();
+    try {
+      const leaseId = "00000000-0000-4000-8000-000000000010";
+      const initialExpiry = Date.now() + 1_500;
+      const refresh = vi.fn(async () => ({
+        principalId: "member:user-1",
+        permissions: ["workspace.read" as const],
+        resourceMode: "projects" as const,
+        projects: new Map<string, never>(),
+        leaseId,
+        leaseExpiresAt: Date.now() + 60_000,
+      }));
+      const server = createServer({
+        managedAccess: {
+          mode: "external",
+          resolver: {
+            resolve: async () => ({
+              principalId: "member:user-1",
+              permissions: ["workspace.read" as const],
+              resourceMode: "projects" as const,
+              projects: new Map<string, never>(),
+              leaseId,
+              leaseExpiresAt: initialExpiry,
+            }),
+            refresh,
+          },
+        },
+      });
+      const socket = new MockSocket();
+      await server.attachExternalSocket(
+        socket,
+        { transport: "relay" },
+        undefined,
+        createHelloMessage("managed-client", {
+          accessTicket: "paseo_dat_ticket",
+        }),
+      );
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(refresh).toHaveBeenCalledOnce();
+      expect(refresh).toHaveBeenCalledWith(leaseId);
+      expect(sessionMock.instances[0]?.extendManagedLease).toHaveBeenCalledWith(
+        leaseId,
+        expect.any(Number),
+      );
+      expect(socket.readyState).toBe(1);
+      await server.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("closes a managed session when refreshed authority no longer matches", async () => {
+    vi.useFakeTimers();
+    try {
+      const leaseId = "00000000-0000-4000-8000-000000000011";
+      const server = createServer({
+        managedAccess: {
+          mode: "external",
+          resolver: {
+            resolve: async () => ({
+              principalId: "member:user-1",
+              permissions: ["workspace.read" as const],
+              resourceMode: "projects" as const,
+              projects: new Map<string, never>(),
+              leaseId,
+              leaseExpiresAt: Date.now() + 1_500,
+            }),
+            refresh: async () => ({
+              principalId: "member:user-1",
+              permissions: ["workspace.write" as const],
+              resourceMode: "projects" as const,
+              projects: new Map<string, never>(),
+              leaseId,
+              leaseExpiresAt: Date.now() + 60_000,
+            }),
+          },
+        },
+      });
+      const socket = new MockSocket();
+      await server.attachExternalSocket(
+        socket,
+        { transport: "relay" },
+        undefined,
+        createHelloMessage("managed-client", {
+          accessTicket: "paseo_dat_ticket",
+        }),
+      );
+
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      expect(socket.readyState).toBe(3);
+      expect(sessionMock.instances[0]?.cleanup).toHaveBeenCalledOnce();
+      await server.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("accepts lease revocation only from the enrolled Hub service connection", async () => {
+    const leaseId = "00000000-0000-4000-8000-000000000003";
+    const server = createServer({
+      managedAccess: {
+        mode: "external",
+        resolver: {
+          resolve: async () => ({
+            principalId: "member:user-1",
+            permissions: ["workspace.read" as const],
+            resourceMode: "projects" as const,
+            projects: new Map<string, never>(),
+            leaseId,
+            leaseExpiresAt: Date.now() + 60_000,
+          }),
+        },
+      },
+    });
+    const managed = new MockSocket();
+    await server.attachExternalSocket(
+      managed,
+      { transport: "relay" },
+      undefined,
+      createHelloMessage("managed-client", {
+        accessTicket: "paseo_dat_ticket",
+      }),
+    );
+
+    const hub = new MockSocket();
+    await server.attachExternalSocket(
+      hub,
+      { transport: "hub", hubDaemonId: "daemon-1" },
+      { principalId: "hub:daemon-1", permissions: ["hub.execute"] },
+      createHelloMessage("hub:daemon-1"),
+    );
+    hub.emit(
+      "message",
+      JSON.stringify({
+        type: "session",
+        message: {
+          type: "managed_access.lease.revoke.request",
+          requestId: "revoke-1",
+          leaseIds: [leaseId],
+        },
+      }),
+    );
+
+    await vi.waitFor(() => expect(managed.readyState).toBe(3));
+    expect(
+      sentEnvelopes(hub).find(
+        ({ message }) => message?.type === "managed_access.lease.revoke.response",
+      )?.message?.payload,
+    ).toEqual({ requestId: "revoke-1", revokedCount: 1 });
+
+    const directOwner = new MockSocket();
+    await asInternals<WebSocketServerInternals>(server).attachSocket(directOwner, undefined);
+    directOwner.emit("message", JSON.stringify(createHelloMessage("owner-client")));
+    directOwner.emit(
+      "message",
+      JSON.stringify({
+        type: "session",
+        message: {
+          type: "managed_access.lease.revoke.request",
+          requestId: "revoke-2",
+          leaseIds: [leaseId],
+        },
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(rpcErrorPayload(directOwner)).toMatchObject({
+        requestId: "revoke-2",
+        code: "access_denied",
+      });
+    });
     await server.close();
   });
 
@@ -691,7 +999,9 @@ describe("relay external socket reconnect behavior", () => {
   test("accepts plugin startup sessions while application sessions remain paused", async () => {
     const server = createServer({ startPaused: true });
     const applicationSocket = new MockSocket();
-    await server.attachExternalSocket(applicationSocket, { transport: "relay" });
+    await server.attachExternalSocket(applicationSocket, {
+      transport: "relay",
+    });
     expect(applicationSocket.readyState).toBe(3);
 
     const pluginSocket = new MockSocket();
@@ -701,7 +1011,11 @@ describe("relay external socket reconnect behavior", () => {
 
     server.beginAcceptingConnections();
     const readySocket = new MockSocket();
-    await attachRelayAndHello({ server, socket: readySocket, clientId: "ready-client" });
+    await attachRelayAndHello({
+      server,
+      socket: readySocket,
+      clientId: "ready-client",
+    });
     expect(sessionMock.instances).toHaveLength(2);
 
     pluginSocket.emit("close", 1000, "done");
@@ -781,7 +1095,11 @@ describe("relay external socket reconnect behavior", () => {
     const ownerSocket = new MockSocket();
     const hubSocket = new MockSocket();
 
-    const ownerInfo = await attachRelayAndHello({ server, socket: ownerSocket, clientId });
+    const ownerInfo = await attachRelayAndHello({
+      server,
+      socket: ownerSocket,
+      clientId,
+    });
     await server.attachExternalSocket(
       hubSocket,
       { transport: "hub", hubDaemonId: "daemon-1" },
@@ -894,7 +1212,9 @@ describe("relay external socket reconnect behavior", () => {
     socket.emit("message", JSON.stringify({ type: "ping" }));
     await Promise.resolve();
 
-    expect(sentEnvelopes(socket).slice(sentBeforeDiagnostic)).toContainEqual({ type: "pong" });
+    expect(sentEnvelopes(socket).slice(sentBeforeDiagnostic)).toContainEqual({
+      type: "pong",
+    });
 
     providerDiagnostic.finish();
     await Promise.resolve();

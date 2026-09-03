@@ -1,4 +1,6 @@
 // COMPAT(clisbot-channels): fork-owned channel control plane status enums (schema.ts).
+import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import type {
   AgentExecutionStatus,
   ChannelLedgerDirection,
@@ -178,6 +180,8 @@ export interface DaemonRecord {
   machineId: string;
   serverId: string;
   daemonPublicKey: string;
+  connectionOffer: ConnectionOffer | null;
+  managedAccessMode: ManagedAccessMode;
   credentialVerifier: string;
   permissions: string[];
   registeredByApiKeyId: string | null;
@@ -1325,6 +1329,11 @@ export interface Database {
   touchDaemon(id: string): Promise<void>;
   setDaemonPresence(id: string, presence: "offline" | "connected"): Promise<void>;
   setDaemonPermissions(id: string, permissions: string[]): Promise<DaemonRecord | undefined>;
+  setDaemonConnectionOffer(
+    id: string,
+    connectionOffer: ConnectionOffer | null,
+    managedAccessMode: ManagedAccessMode,
+  ): Promise<DaemonRecord | undefined>;
   revokeDaemon(id: string): Promise<boolean>;
   attachAgentToExecution(
     executionId: string,
@@ -1473,6 +1482,11 @@ export interface Database {
    */
   withAdvisoryLock<T>(key: string, fn: () => Promise<T>): Promise<T>;
   listOrganizationTriggers(organizationId: string): Promise<OrganizationTriggerRecord[]>;
+  listOrganizationTriggerRevisions(
+    organizationId: string,
+    triggerId: string,
+    limit: number,
+  ): Promise<OrganizationTriggerRevisionRecord[]>;
   findOrganizationTriggerRevision(
     triggerId: string,
     revisionId: string,
@@ -1481,6 +1495,10 @@ export interface Database {
   findActiveChannelConfiguration(
     organizationId: string,
   ): Promise<ChannelConfigurationRevisionRecord | undefined>;
+  listChannelConfigurationRevisions(
+    organizationId: string,
+    limit: number,
+  ): Promise<ChannelConfigurationRevisionRecord[]>;
   saveChannelConfiguration(
     input: SaveChannelConfigurationInput,
   ): Promise<ChannelConfigurationRevisionRecord>;

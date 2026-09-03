@@ -407,6 +407,41 @@
       "when": 1788376227841,
       "tag": "0057_legal_luminals",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788383385666,
+      "tag": "0058_thankful_brother_voodoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788386481128,
+      "tag": "0059_naive_blue_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788388647846,
+      "tag": "0060_exotic_landau",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788432512519,
+      "tag": "0061_powerful_squadron_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788455947723,
+      "tag": "0062_bent_spitfire",
+      "breakpoints": true
     }
   ]
 }

@@ -70,6 +70,7 @@ export function compileTriggerDocument(yaml: string): CompiledTriggerDocument {
           ...(authored.run.github === undefined ? {} : { github: authored.run.github }),
           ...(authored.run.output === undefined ? {} : { output: authored.run.output }),
           ...(allowOutputs.length === 0 ? {} : { allow_outputs: allowOutputs }),
+          ...(authored.run.reuse === undefined ? {} : { reuse: authored.run.reuse }),
           auto_archive: authored.run.auto_archive,
         },
       ],

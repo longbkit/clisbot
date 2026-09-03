@@ -13,6 +13,7 @@ import {
   type AgentMode,
   type AgentModelDefinition,
   type AgentProvider,
+  type AgentSessionConfig,
   type FetchCatalogOptions,
   type ProviderSnapshotEntry,
 } from "./agent-sdk-types.js";
@@ -249,7 +250,9 @@ export class ProviderSnapshotManager {
     const snapshotCwd = resolveSnapshotCwd(options.cwd);
     const target = createWorkspaceSnapshotTarget(snapshotCwd);
     const providers = this.resolveRefreshProviders(options.providers);
-    this.resetSnapshotToLoading(snapshotCwd, providers, { preserveExisting: false });
+    this.resetSnapshotToLoading(snapshotCwd, providers, {
+      preserveExisting: false,
+    });
     this.emitChange(snapshotCwd);
     await this.refreshProviders(target, providers ?? this.getProviderIds());
   }
@@ -263,7 +266,9 @@ export class ProviderSnapshotManager {
     const providersToRefresh = providers ?? this.getProviderIds();
 
     this.clearCachedProviders(providers);
-    this.resetSnapshotToLoading(homeCwd, providers, { preserveExisting: false });
+    this.resetSnapshotToLoading(homeCwd, providers, {
+      preserveExisting: false,
+    });
     this.emitChange(homeCwd);
     await this.refreshProviders(target, providersToRefresh);
   }
@@ -336,7 +341,10 @@ export class ProviderSnapshotManager {
   async listProviders(input: ProviderSnapshotReadOptions = {}): Promise<ProviderSnapshotEntry[]> {
     const target = resolveProviderSnapshotTarget(input.cwd);
     if (input.wait) {
-      await this.warmUpSnapshotForCwd({ cwd: input.cwd, providers: input.providers });
+      await this.warmUpSnapshotForCwd({
+        cwd: input.cwd,
+        providers: input.providers,
+      });
     }
     const providerFilter = input.providers ? new Set(input.providers) : null;
     const entries = this.getSnapshotForTarget(target);
@@ -370,7 +378,12 @@ export class ProviderSnapshotManager {
       wait: true,
     });
     if (!provider.enabled) {
-      return [{ path: ["provider"], message: `Provider '${input.provider}' is disabled` }];
+      return [
+        {
+          path: ["provider"],
+          message: `Provider '${input.provider}' is disabled`,
+        },
+      ];
     }
     if (provider.status !== "ready") {
       return [
@@ -400,6 +413,25 @@ export class ProviderSnapshotManager {
   async listModes(input: ProviderSnapshotProviderOptions): Promise<AgentMode[]> {
     const entry = await this.getReadyProvider(input);
     return entry.modes ?? [];
+  }
+
+  /**
+   * Ask the provider that owns a configuration whether it suppresses approval
+   * prompts. Managed access uses this semantic answer instead of knowing
+   * provider-specific mode or feature ids.
+   */
+  async isUnattendedConfiguration(config: AgentSessionConfig): Promise<boolean> {
+    const entry = await this.getReadyProvider({
+      provider: config.provider,
+      cwd: config.cwd,
+      wait: true,
+    });
+    const definition = this.requireProvider(config.provider);
+    return definition.isCreateConfigUnattended({
+      modeId: config.modeId ?? null,
+      config,
+      availableModes: entry.modes ?? [],
+    });
   }
 
   async resolveDefaultModel(input: ResolveDefaultModelOptions): Promise<string | undefined> {
@@ -668,7 +700,9 @@ export class ProviderSnapshotManager {
   ): Promise<ProviderSnapshotEntry> {
     try {
       const target = createGlobalSnapshotTarget();
-      this.resetSnapshotToLoading(target.snapshotCwd, [provider], { preserveExisting: false });
+      this.resetSnapshotToLoading(target.snapshotCwd, [provider], {
+        preserveExisting: false,
+      });
       this.emitChange(target.snapshotCwd);
       await this.refreshProviders(target, [provider]);
       return await this.getProvider({ provider, wait: false });

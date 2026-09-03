@@ -22,6 +22,7 @@ import {
   createDaemonUpgradeHandler,
   createDaemonModule,
   enrollDaemon,
+  replaceDaemonConnectionOffer,
   revokeDaemon,
   updateDaemonPermissions,
   type DaemonClock,
@@ -57,12 +58,13 @@ import type { ChannelSupervisor } from "./channels/supervisor/types.js";
 import type { DatabaseRuntime } from "./db/runtime/index.js";
 import type { BrowserOrganizationAccess } from "./auth/browser-organization-access.js";
 import { createPublicApi, type PublicApi, type PublicApiComposition } from "./public-api/index.js";
-import { createPublicOperations } from "./public-operations/index.js";
+import { createPublicOperations, type PublicOperations } from "./public-operations/index.js";
 import { createDatabasePublicOperationRepository } from "./public-operations/database-adapter.js";
 import type { EntitlementsService } from "./entitlements/service.js";
 import type { ExecutionAuthority } from "./execution-authority/index.js";
+import { replaceDaemonProjects } from "./access/daemon-projects.js";
 import { AccessStore } from "./access/store.js";
-import { consumeDaemonAccessTicket } from "./managed-access/http.js";
+import { consumeDaemonAccessTicket, refreshDaemonAccessLease } from "./managed-access/http.js";
 import { AccessTicketService } from "./managed-access/tickets.js";
 
 export interface HubRuntimeOptions {
@@ -84,13 +86,15 @@ export interface HubRuntimeOptions {
   databaseRuntime?: DatabaseRuntime;
   /** Shared authority instance used by daemon consumption and the app management API. */
   accessTickets?: AccessTicketService;
+  /** Shared Access repository used by management and daemon-owned catalog operations. */
+  accessStore?: AccessStore;
   /** COMPAT(clisbot-control-plane): the Hub data directory operator secrets mirror into. */
   hubDataDir?: string;
   /** COMPAT(clisbot-control-plane): the channel supervisor, or null to degrade the transport step. */
   channelSupervisor?: ChannelSupervisor | null;
   /**
    * COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint
-   * (E4); null degrades the `/mcp/channel/<ref>` route to a 503.
+   * (E4); null degrades the `/mcp/channel/<opaque-capability>` route to a 503.
    */
   channelReplyServer?: ChannelReplyServer | null;
   publicBaseUrl?: string;
@@ -113,6 +117,7 @@ export interface HubRuntime {
     payload: ChannelWorkflowRequestPayload;
     receivedAt: Date;
   }): Promise<void>;
+  revokeAccessLeases(daemonId: string, leaseIds: readonly string[]): boolean;
   handleUpgrade: ReturnType<typeof createDaemonUpgradeHandler> | null;
   start(sources?: readonly TriggerSource[]): Promise<void>;
   stop(): Promise<void>;
@@ -123,6 +128,9 @@ export interface HubOperations {
   handleDaemonRevocation(request: Request, daemonId: string): Promise<Response>;
   handleDaemonPermissionUpdate(request: Request, daemonId: string): Promise<Response>;
   handleDaemonAccessTicketConsumption(request: Request): Promise<Response>;
+  handleDaemonAccessLeaseRefresh(request: Request): Promise<Response>;
+  handleDaemonProjectsReplacement(request: Request, daemonId: string): Promise<Response>;
+  handleDaemonConnectionOfferReplacement(request: Request, daemonId: string): Promise<Response>;
   handleCliAuthorizationStart(request: Request): Promise<Response>;
   handleCliAuthorizationPoll(request: Request): Promise<Response>;
   handleCliAuthorizationInspect(request: Request): Promise<Response>;
@@ -153,6 +161,8 @@ export interface HubApplication {
   hub: HubRuntime;
   operations: HubOperations;
   publicApi: PublicApi;
+  /** Shared domain operations reused by authenticated management adapters. */
+  publicOperations: PublicOperations | null;
   configurationForProject(projectId: string): ProjectConfigurationStore;
 }
 
@@ -160,6 +170,7 @@ export function createHubRuntime(options: HubRuntimeOptions): HubRuntime {
   return createHubApplication(options).hub;
 }
 
+// eslint-disable-next-line complexity -- the composition root wires optional Hub subsystems in one place.
 export function createHubApplication(options: HubRuntimeOptions): HubApplication {
   const daemons = createActiveDaemonRegistry(options);
   const storeForProject = (projectId: string) => {
@@ -214,7 +225,10 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
           options.browserOrganizationAccess,
           options.publicBaseUrl,
         );
-  const accessTickets = createAccessTicketService(options);
+  const accessStore =
+    options.accessStore ??
+    (options.databaseRuntime === undefined ? null : new AccessStore(options.databaseRuntime));
+  const accessTickets = createAccessTicketService(options, accessStore);
 
   // COMPAT(clisbot-control-plane): one ops holder, built synchronously; the
   // kill-switch and database precedence are applied per request inside it.
@@ -302,6 +316,8 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       });
       if (persisted.status === "accepted") await workflowDispatcher(persisted.event);
     },
+    revokeAccessLeases: (daemonId, leaseIds) =>
+      daemons?.revokeAccessLeases(daemonId, leaseIds) ?? false,
     handleUpgrade:
       options.database === null ? null : createDaemonUpgradeHandler(options.database, daemons!),
     async start(sources = []) {
@@ -347,6 +363,18 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       options.database === null || accessTickets === null
         ? databaseUnavailable()
         : consumeDaemonAccessTicket(request, options.database, accessTickets),
+    handleDaemonAccessLeaseRefresh: (request) =>
+      options.database === null || accessTickets === null
+        ? databaseUnavailable()
+        : refreshDaemonAccessLease(request, options.database, accessTickets),
+    handleDaemonProjectsReplacement: (request, daemonId) =>
+      options.database === null || accessStore === null
+        ? databaseUnavailable()
+        : replaceDaemonProjects(request, daemonId, options.database, accessStore),
+    handleDaemonConnectionOfferReplacement: (request, daemonId) =>
+      options.database === null
+        ? databaseUnavailable()
+        : replaceDaemonConnectionOffer(request, daemonId, options.database),
     handleCliAuthorizationStart: (request) =>
       cliAuthorizations === null ? databaseUnavailable() : cliAuthorizations.start(request),
     handleCliAuthorizationPoll: (request) =>
@@ -383,7 +411,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
     handleChannelReplyMcp: (request, token) =>
       channelControlPlane.handleChannelReplyMcp(request, token),
   };
-  return { hub, operations, publicApi, configurationForProject: storeForProject };
+  return { hub, operations, publicApi, publicOperations, configurationForProject: storeForProject };
 }
 
 function createActiveDaemonRegistry(options: HubRuntimeOptions): ActiveDaemonRegistry | null {
@@ -391,10 +419,13 @@ function createActiveDaemonRegistry(options: HubRuntimeOptions): ActiveDaemonReg
   return new ActiveDaemonRegistry(options.database, options.daemonClock);
 }
 
-function createAccessTicketService(options: HubRuntimeOptions): AccessTicketService | null {
+function createAccessTicketService(
+  options: HubRuntimeOptions,
+  accessStore: AccessStore | null,
+): AccessTicketService | null {
   if (options.accessTickets !== undefined) return options.accessTickets;
-  if (options.databaseRuntime === undefined) return null;
-  return new AccessTicketService(options.databaseRuntime, new AccessStore(options.databaseRuntime));
+  if (options.databaseRuntime === undefined || accessStore === null) return null;
+  return new AccessTicketService(options.databaseRuntime, accessStore);
 }
 
 function createAppPublicOperations(
@@ -558,6 +589,11 @@ function createAppDaemonModule(
     ...(options.channelSupervisor === null || options.channelSupervisor === undefined
       ? {}
       : {
+          ...(options.channelSupervisor.channelReplyCapabilities === undefined
+            ? {}
+            : {
+                channelReplyCapabilities: options.channelSupervisor.channelReplyCapabilities,
+              }),
           onWorkflowChannelStream: (
             input: Parameters<NonNullable<ChannelSupervisor["workflowStreamEvent"]>>[0],
           ) => options.channelSupervisor!.workflowStreamEvent?.(input) ?? Promise.resolve(),

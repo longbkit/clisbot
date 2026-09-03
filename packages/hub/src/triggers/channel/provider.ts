@@ -14,13 +14,23 @@ export const ChannelWorkflowRequestPayloadSchema = z.object({
     binding_key: z.string().min(1),
     external_conversation_id: z.string().min(1),
     external_thread_id: z.string().nullable(),
+    conversation_label: z.string().trim().min(1).max(200).optional(),
     sender_identity: z.string().min(1),
     sender_name: z.string().optional(),
     root_kind: z.enum(["dm", "channel", "group"]),
     trigger_thread_id: z.string().nullable(),
     trigger_message_id: z.string().optional(),
+    // Additive so executions created before route capture remain readable.
+    revision_id: z.string().uuid().nullable().optional(),
+    route_position: z.union([z.number().int().nonnegative(), z.literal("fallback")]).optional(),
+    route_fingerprint: z.string().min(1).optional(),
     route:
-      z.custom<Pick<CompiledRoute, "defaultRoles" | "assignments" | "defaults" | "approval">>(),
+      z.custom<
+        Pick<
+          CompiledRoute,
+          "audience" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
+        >
+      >(),
   }),
 });
 

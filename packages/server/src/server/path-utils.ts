@@ -28,15 +28,22 @@ export function resolvePathFromBase(baseCwd: string, requestedPath: string): str
 }
 
 export function isSameOrDescendantPath(basePath: string, candidatePath: string): boolean {
-  let normalizedBase = basePath.replace(/\\/g, "/").replace(/\/$/, "");
-  let normalizedCandidate = candidatePath.replace(/\\/g, "/").replace(/\/$/, "");
+  const compareAsWindows = looksLikeWindowsPath(basePath) || looksLikeWindowsPath(candidatePath);
+  const normalizedBase = normalizeContainmentPath(basePath, compareAsWindows);
+  const normalizedCandidate = normalizeContainmentPath(candidatePath, compareAsWindows);
+  const boundary = normalizedBase.endsWith("/") ? normalizedBase : `${normalizedBase}/`;
 
-  if (/^[a-zA-Z]:\//.test(normalizedBase) || /^[a-zA-Z]:\//.test(normalizedCandidate)) {
-    normalizedBase = normalizedBase.toLowerCase();
-    normalizedCandidate = normalizedCandidate.toLowerCase();
-  }
+  return normalizedCandidate === normalizedBase || normalizedCandidate.startsWith(boundary);
+}
 
-  return (
-    normalizedCandidate === normalizedBase || normalizedCandidate.startsWith(normalizedBase + "/")
-  );
+function looksLikeWindowsPath(value: string): boolean {
+  return /^[a-zA-Z]:[\\/]/.test(value) || /^[/\\]{2}[^/\\]+[/\\][^/\\]+/.test(value);
+}
+
+function normalizeContainmentPath(value: string, compareAsWindows: boolean): string {
+  const normalized = compareAsWindows
+    ? win32.normalize(value)
+    : posix.normalize(value.replace(/\\/g, "/"));
+  const comparable = normalized.replace(/\\/g, "/");
+  return compareAsWindows ? comparable.toLowerCase() : comparable;
 }

@@ -1,5 +1,7 @@
 import { WebSocket } from "ws";
 import { z } from "zod";
+import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import type { WebSocketLike } from "../websocket-server.js";
 import { PROJECT_PRIVILEGES, type ManagedAccessAdmission } from "../managed-access/types.js";
 import { parseDaemonPermissions } from "../authorization/index.js";
@@ -49,6 +51,53 @@ export interface HubAccessTicketConsumption {
   clientId: string;
 }
 
+export interface HubAccessLeaseRefresh {
+  daemonId: string;
+  hubOrigin: string;
+  credential: string;
+  leaseId: string;
+}
+
+export interface HubProject {
+  projectId: string;
+  name: string;
+  agentConfigurationCatalog?: HubAgentConfigurationCatalog;
+}
+
+export interface HubAgentConfigurationCatalog {
+  providers: readonly {
+    id: string;
+    label: string;
+    defaultModeId?: string | null;
+    modes?: readonly {
+      id: string;
+      label: string;
+      /** Absent means the daemon could not classify this Mode safely. */
+      isUnattended?: boolean;
+    }[];
+    models: readonly {
+      id: string;
+      label: string;
+      thinkingOptions: readonly { id: string; label: string }[];
+    }[];
+  }[];
+}
+
+export interface HubProjectReplacement {
+  daemonId: string;
+  hubOrigin: string;
+  credential: string;
+  projects: readonly HubProject[];
+}
+
+export interface HubConnectionOfferReplacement {
+  daemonId: string;
+  hubOrigin: string;
+  credential: string;
+  connectionOffer: ConnectionOffer | null;
+  managedAccessMode: ManagedAccessMode;
+}
+
 export interface HubSocketEvents {
   connected(socket: WebSocketLike, sessionProtocol: "legacy" | "session-v1"): void;
   rejected(statusCode: 401 | 403): void;
@@ -65,6 +114,9 @@ export interface HubRelationshipRemote {
   updatePermissions(input: HubPermissionUpdate): Promise<{ permissions: string[] }>;
   revoke(input: HubRevocation): Promise<void>;
   consumeAccessTicket(input: HubAccessTicketConsumption): Promise<ManagedAccessAdmission>;
+  refreshAccessLease(input: HubAccessLeaseRefresh): Promise<ManagedAccessAdmission>;
+  replaceProjects(input: HubProjectReplacement): Promise<void>;
+  replaceConnectionOffer(input: HubConnectionOfferReplacement): Promise<void>;
   openSocket(input: HubSocketCredentials, events: HubSocketEvents): HubSocketConnection;
 }
 
@@ -201,27 +253,72 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
           authorization: `Bearer ${input.credential}`,
           "x-paseo-daemon-id": input.daemonId,
         },
-        body: JSON.stringify({ accessTicket: input.accessTicket, clientId: input.clientId }),
+        body: JSON.stringify({
+          accessTicket: input.accessTicket,
+          clientId: input.clientId,
+        }),
         signal,
       });
       if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
-      const admission = AccessTicketAdmissionSchema.parse(await response.json());
-      return {
-        leaseId: admission.leaseId,
-        principalId: admission.principalId,
-        permissions: parseDaemonPermissions(admission.permissions),
-        resourceMode: admission.resourceMode,
-        projects: new Map(
-          admission.projects.map((project) => [
-            project.projectId,
-            {
-              privileges: new Set(project.privileges),
-              agentConfigurations: project.agentConfigurations,
-            },
-          ]),
-        ),
-        leaseExpiresAt: Date.parse(admission.leaseExpiresAt),
-      };
+      return parseAccessAdmission(await response.json());
+    });
+  }
+
+  async refreshAccessLease(input: HubAccessLeaseRefresh): Promise<ManagedAccessAdmission> {
+    return this.withRequestTimeout(async (signal) => {
+      const response = await fetch(`${input.hubOrigin}/api/daemons/access-leases/refresh`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${input.credential}`,
+          "x-paseo-daemon-id": input.daemonId,
+        },
+        body: JSON.stringify({ leaseId: input.leaseId }),
+        signal,
+      });
+      if (!response.ok) throw new HubEnrollmentRejectedError(response.status);
+      return parseAccessAdmission(await response.json());
+    });
+  }
+
+  async replaceProjects(input: HubProjectReplacement): Promise<void> {
+    await this.withRequestTimeout(async (signal) => {
+      const response = await fetch(
+        `${input.hubOrigin}/api/daemons/${encodeURIComponent(input.daemonId)}/projects`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${input.credential}`,
+          },
+          body: JSON.stringify({ projects: input.projects }),
+          signal,
+        },
+      );
+      if (!response.ok) throw new Error(`Hub Project replacement failed (${response.status})`);
+    });
+  }
+
+  async replaceConnectionOffer(input: HubConnectionOfferReplacement): Promise<void> {
+    await this.withRequestTimeout(async (signal) => {
+      const response = await fetch(
+        `${input.hubOrigin}/api/daemons/${encodeURIComponent(input.daemonId)}/connection-offer`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${input.credential}`,
+          },
+          body: JSON.stringify({
+            connectionOffer: input.connectionOffer,
+            managedAccessMode: input.managedAccessMode,
+          }),
+          signal,
+        },
+      );
+      if (!response.ok) {
+        throw new Error(`Hub Connection Offer replacement failed (${response.status})`);
+      }
     });
   }
 
@@ -285,4 +382,24 @@ export class DirectHubRelationshipRemote implements HubRelationshipRemote {
       clearTimeout(timeout);
     }
   }
+}
+
+function parseAccessAdmission(value: unknown): ManagedAccessAdmission {
+  const admission = AccessTicketAdmissionSchema.parse(value);
+  return {
+    leaseId: admission.leaseId,
+    principalId: admission.principalId,
+    permissions: parseDaemonPermissions(admission.permissions),
+    resourceMode: admission.resourceMode,
+    projects: new Map(
+      admission.projects.map((project) => [
+        project.projectId,
+        {
+          privileges: new Set(project.privileges),
+          agentConfigurations: project.agentConfigurations,
+        },
+      ]),
+    ),
+    leaseExpiresAt: Date.parse(admission.leaseExpiresAt),
+  };
 }

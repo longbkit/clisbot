@@ -144,7 +144,10 @@ export type OutboundDefaults = z.infer<typeof OutboundDefaultsSchema>;
  */
 export const ORG_DEFAULTS = {
   defaultRoles: [],
-  interaction: { requireMention: true, followUp: { mode: "auto", ttlMinutes: 60 } },
+  interaction: {
+    requireMention: true,
+    followUp: { mode: "auto", ttlMinutes: 60 },
+  },
   binding: { key: "thread" },
   reply: { anchor: "default" },
   outbound: { path: "relay" as const, template: null },
@@ -153,7 +156,11 @@ export const ORG_DEFAULTS = {
     // The progress group's floor: the relay line and the native typing
     // indicator are on; the inbound-message reaction is off (it leaves an
     // artefact on the user's own message, so it stays opt-in).
-    progress: { progressMessage: true, typingIndicator: true, messageReaction: "off" },
+    progress: {
+      progressMessage: true,
+      typingIndicator: true,
+      messageReaction: "off",
+    },
     toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
@@ -264,7 +271,9 @@ export const OrgPolicySchema = z
     roles: z.record(z.string().min(1), RoleSchema).optional(),
     users: z.record(z.string().min(1), UserRecordSchema).optional(),
     assignments: z.array(RoleAssignmentSchema).optional(),
-    defaults: ChannelDefaultsSchema.extend({ defaultRoles: DefaultRolesSchema }).optional(),
+    defaults: ChannelDefaultsSchema.extend({
+      defaultRoles: DefaultRolesSchema,
+    }).optional(),
   })
   .strict();
 export type OrgPolicy = z.infer<typeof OrgPolicySchema>;
@@ -313,9 +322,69 @@ export const RouteMatchSchema = z
     // Native provider ids: Slack channel/thread ids, Telegram chat ids (numbers
     // in YAML are accepted and normalized to strings at compile).
     ids: z.array(z.union([z.string(), z.number()])).optional(),
+    // Optional literal content discriminator. This selects a route only when
+    // no durable direct-Agent binding already owns the inbound conversation.
+    contains: z.string().min(1).optional(),
   })
   .strict();
 export type RouteMatch = z.infer<typeof RouteMatchSchema>;
+
+export const RouteAudienceSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("members") }).strict(),
+  z.object({ kind: z.literal("conversationParticipants") }).strict(),
+]);
+export type RouteAudience = z.infer<typeof RouteAudienceSchema>;
+
+/**
+ * Instance safety ceilings for one Route. An authored value may be lower but
+ * never higher. Open-audience Routes inherit the conservative preset when a
+ * leaf is omitted; Member Routes remain unchanged unless they opt in.
+ */
+export const ROUTE_LIMIT_CEILINGS = {
+  maxInputCharacters: 8_000,
+  messagesPerMinutePerSender: 10,
+  messagesPerMinute: 60,
+  maxConcurrentRuns: 2,
+  maxRuntimeSeconds: 15 * 60,
+} as const;
+
+export const OPEN_AUDIENCE_ROUTE_LIMITS = ROUTE_LIMIT_CEILINGS;
+
+export const RouteLimitsSchema = z
+  .object({
+    maxInputCharacters: z
+      .number()
+      .int()
+      .positive()
+      .max(ROUTE_LIMIT_CEILINGS.maxInputCharacters)
+      .optional(),
+    messagesPerMinutePerSender: z
+      .number()
+      .int()
+      .positive()
+      .max(ROUTE_LIMIT_CEILINGS.messagesPerMinutePerSender)
+      .optional(),
+    messagesPerMinute: z
+      .number()
+      .int()
+      .positive()
+      .max(ROUTE_LIMIT_CEILINGS.messagesPerMinute)
+      .optional(),
+    maxConcurrentRuns: z
+      .number()
+      .int()
+      .positive()
+      .max(ROUTE_LIMIT_CEILINGS.maxConcurrentRuns)
+      .optional(),
+    maxRuntimeSeconds: z
+      .number()
+      .int()
+      .positive()
+      .max(ROUTE_LIMIT_CEILINGS.maxRuntimeSeconds)
+      .optional(),
+  })
+  .strict();
+export type RouteLimits = z.infer<typeof RouteLimitsSchema>;
 
 /**
  * A route's target: exactly one of `agent` + `environment` (continuous session,
@@ -327,6 +396,7 @@ export type RouteMatch = z.infer<typeof RouteMatchSchema>;
 export const RouteSchema = z
   .object({
     match: RouteMatchSchema,
+    audience: RouteAudienceSchema.optional(),
     agent: z.string().min(1).optional(),
     environment: z.string().min(1).optional(),
     workflow: z.string().min(1).optional(),
@@ -344,6 +414,7 @@ export const RouteSchema = z
     outbound: OutboundDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),
     approval: z.array(ApprovalRuleSchema).optional(),
+    limits: RouteLimitsSchema.optional(),
   })
   .strict();
 export type Route = z.infer<typeof RouteSchema>;

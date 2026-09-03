@@ -1,12 +1,12 @@
 # Unified Paseo client and Managed Access Lite
 
-Date: 2026-08-31. Updated: 2026-09-02. Status: architecture proposal; no product code in this
-document is implemented unless a section is explicitly marked **CURRENT**. Scope: put Hub account
+Date: 2026-08-31. Updated: 2026-09-03. Status: Managed Access Lite MVP implemented; explicit
+post-MVP items remain in sections 5.4 and 12. Scope: put Hub account
 and management surfaces in the shared Paseo app, let an authenticated user discover and open the
 daemon Projects they may use, and preserve ordinary Paseo client/daemon compatibility when managed
 access is disabled.
 
-This proposal deliberately optimizes first for one-person and internal-company deployments. It is
+This design deliberately optimizes first for one-person and internal-company deployments. It is
 not a commitment to preserve the current Hub UI, API, or data model when those surfaces do not earn
 their place in the product vision.
 
@@ -23,7 +23,7 @@ and outbound RPC classification, Hub service principals, and live permission rep
 Access should extend that foundation with resource grants and lease-bound admission; it should not
 create a second RPC authorizer.
 
-Estimated ongoing upstream-merge complexity for the proposed MVP is **6/10**. The difficult changes
+Estimated ongoing upstream-merge complexity for the implemented MVP is **6/10**. The difficult changes
 that cannot be isolated completely are concentrated in four seams:
 
 1. **server admission:** resolve a ticket before `handleHello()` creates or resumes a Session;
@@ -92,15 +92,11 @@ Client-side hiding is only UX and is never the security boundary.
 | Upstream Paseo app | Clisbot daemon        | `external`   | Relay and TCP connections are rejected with an actionable upgrade/login error. Authenticated local socket/pipe recovery remains possible. |
 | Clisbot app        | Clisbot daemon        | `external`   | A Hub-managed external connection succeeds with a valid ticket and is restricted to its Projects/privileges.                              |
 
-**PROPOSED:** the Clisbot app must not require Clisbot-only daemon behavior for a normal manual Host.
-Its Hub module is an adapter, not a replacement for `@getpaseo/client` or `HostRuntimeStore`.
-
-**PROPOSED:** the Clisbot daemon must be byte-equivalent in authorization behavior when mode is
-`off`. Additive schemas remain parseable, but no ticket lookup, session narrowing, filtering, or
-Hub availability dependency runs in this mode.
-
-**GAP:** this matrix is not currently tested. It needs explicit old/new client-daemon fixtures in
-addition to ordinary unit tests.
+**IMPLEMENTED:** a manual Host has no Hub ticket resolver and continues through the ordinary
+`@getpaseo/client`/`HostRuntimeStore` path. A daemon in `off` keeps owner admission and performs no
+ticket lookup, session narrowing, resource filtering, or Hub availability check. Focused client,
+Host-runtime, and WebSocket tests cover absent-ticket compatibility and the `off`/`external`
+boundary; wire fields remain optional for old clients and daemons.
 
 ### 2.2 Managed access modes
 
@@ -128,16 +124,15 @@ mode is `off`.
 cannot wait for `server_info.features.managedAccessTickets` before deciding whether the first
 `hello` needs a ticket.
 
-**PROPOSED:** the Hub's Managed Host descriptor is the source of this pre-connection fact:
+**IMPLEMENTED:** each daemon registration publishes this pre-connection fact beside its existing
+connection offer:
 
 ```ts
-managedAccess?: {
-  mode: "external";
-  ticketIssuer: "hub";
-};
+managedAccessMode: "off" | "external";
 ```
 
-A manual Host has no such metadata and follows the upstream path. The post-hello
+A missing field from an older daemon resolves to `off`; a manual Host has no Hub binding and follows
+the upstream path. `HubHostBinding` registers a ticket resolver only for `external`. The post-hello
 `server_info.features.managedAccessTickets` field remains useful for diagnostics and version-drift
 validation, not initial ticket discovery. A Hub must not advertise an upstream daemon as a managed
 Host when that daemon cannot consume tickets.
@@ -168,7 +163,7 @@ The same `hello` serves all current application transports:
   application bytes. SSH only tunnels to an already-running daemon; it does not add a different
   authorization protocol.
 
-**PROPOSED:** add exactly one schema-optional field:
+**IMPLEMENTED:** hello has exactly one Clisbot admission field:
 
 ```ts
 accessTicket?: string;
@@ -207,28 +202,28 @@ The repository already has three authority vocabularies, and Managed Access adds
 These names are not interchangeable. A UI access level such as `Developer` or `Administrator` is a
 preset that expands into permissions; it is not itself a persisted permission.
 
-Status values below mean:
+Status values describe origin, not remaining work:
 
-- `CURRENT`: implemented and enforced now;
-- `MODIFY`: implemented under a narrower or obsolete meaning and must be extended or renamed; and
-- `NEW`: not implemented.
+- `EXISTING`: retained from the Paseo/Hub baseline;
+- `ADDED`: implemented for the unified client and Managed Access Lite; and
+- `EXTENDED`: an existing Channel/config concept now also applies to Paseo Members.
 
 ### 4.2 Daemon semantic permissions
 
 These exact names already exist in `packages/protocol/src/messages.ts` and are enforced through
 `packages/server/src/server/authorization/**`.
 
-| Permission          | Meaning today                                                                                            | Applies in | Status    | Required change for managed access                                                                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------- | ---------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `daemon.read`       | Read daemon status, diagnostics, configuration, and Provider information.                                | Daemon     | `CURRENT` | No rename. Grant only through owner/Daemon Administrator because output is daemon-global.                                                                                                                               |
-| `daemon.manage`     | Restart/update the daemon and change configuration, Providers, skills/plugins.                           | Daemon     | `CURRENT` | Keep this exact meaning; do not reuse the name for a broader Hub product privilege.                                                                                                                                     |
-| `tunnel.manage`     | Manage relay, Hub, service-tunnel, and public-endpoint relationships.                                    | Daemon     | `CURRENT` | No semantic change. Included only in the Daemon Administrator preset.                                                                                                                                                   |
-| `access.manage`     | Manage pairing offers, principals, credentials, grants, and revocation.                                  | Daemon     | `CURRENT` | No semantic change. Included only in the Daemon Administrator preset.                                                                                                                                                   |
-| `workspace.read`    | Read Projects, Workspaces, Agents, timelines, Files, diffs, terminal output.                             | Daemon     | `CURRENT` | Add Project/resource filtering to every request, subscription, and outbound projection.                                                                                                                                 |
-| `workspace.write`   | Send prompts; control Agents; mutate Files, terminals, git, and scripts.                                 | Daemon     | `CURRENT` | Add Project/resource and narrower product-action checks before side effects.                                                                                                                                            |
-| `workspace.manage`  | Create, rename, archive, and remove Projects and Workspaces.                                             | Daemon     | `CURRENT` | Keep separate from `project.use`; owner/Daemon Administrator only in the MVP.                                                                                                                                           |
-| `automation.manage` | Manage daemon-owned schedules, heartbeats, and loops.                                                    | Daemon     | `CURRENT` | Keep separate from Hub Automations; the same word does not make them one authority domain.                                                                                                                              |
-| `hub.execute`       | Let an enrolled Hub service principal create, validate, control, and observe Hub-owned Agent executions. | Daemon     | `CURRENT` | Enrollment stores `permissions: string[]`; Hub connections default to none, require this exact permission to execute, and reject a `server_info.permissions` mismatch. Never grant it to an interactive Member Session. |
+| Permission          | Meaning                                                                                                  | Applies in | Origin     | Managed-access handling                                                                                                           |
+| ------------------- | -------------------------------------------------------------------------------------------------------- | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `daemon.read`       | Read daemon status, diagnostics, configuration, and Provider information.                                | Daemon     | `EXISTING` | Project-scoped sessions retain only the filtered catalog/status subset; daemon-wide read remains owner/Daemon Administrator only. |
+| `daemon.manage`     | Restart/update the daemon and change configuration, Providers, skills/plugins.                           | Daemon     | `EXISTING` | Kept unchanged; not reused as a Hub product privilege.                                                                            |
+| `tunnel.manage`     | Manage relay, Hub, service-tunnel, and public-endpoint relationships.                                    | Daemon     | `EXISTING` | Included only in the Daemon Administrator preset.                                                                                 |
+| `access.manage`     | Manage pairing offers, principals, credentials, grants, and revocation.                                  | Daemon     | `EXISTING` | Included only in the Daemon Administrator preset.                                                                                 |
+| `workspace.read`    | Read Projects, Workspaces, Agents, timelines, Files, diffs, terminal output.                             | Daemon     | `EXISTING` | Project/resource filtering now applies to requests, subscriptions, and outbound projections.                                      |
+| `workspace.write`   | Send prompts; control Agents; mutate Files, terminals, git, and scripts.                                 | Daemon     | `EXISTING` | Project/resource and narrower product-action checks now run before side effects.                                                  |
+| `workspace.manage`  | Create, rename, archive, and remove Projects and Workspaces.                                             | Daemon     | `EXISTING` | Remains separate from `project.use`; owner/Daemon Administrator only in the MVP.                                                  |
+| `automation.manage` | Manage daemon-owned schedules, heartbeats, and loops.                                                    | Daemon     | `EXISTING` | Remains separate from Hub Automations.                                                                                            |
+| `hub.execute`       | Let an enrolled Hub service principal create, validate, control, and observe Hub-owned Agent executions. | Daemon     | `EXISTING` | Service-principal only; never included in an interactive owner/Member ticket.                                                     |
 
 The Daemon Administrator access level expands to the required current semantic permissions. Do not
 create a second Hub product privilege also named `daemon.manage`: the existing permission alone
@@ -240,26 +235,26 @@ Hub organization capabilities and the instance-operator flag are boolean checks 
 `packages/hub/src/auth/organization-policy.ts` and `organization-contract.ts`; they are not resource
 ACL rows.
 
-| Authority            | Meaning today                                                                                | Applies in | Status    | Required change                                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------- |
-| `view`               | View the active organization.                                                                | Hub        | `CURRENT` | Map to the target `hub.view` action at the Paseo API boundary.                                    |
-| `manageMembers`      | Invite/remove non-owner Members and change their roles.                                      | Hub        | `CURRENT` | Map to `hub.member.manage`; retain current owner safeguards.                                      |
-| `manageOwners`       | Change/remove owner membership.                                                              | Hub        | `CURRENT` | Keep owner-only; do not expose as a general assignable action.                                    |
-| `manageResources`    | Manage current organization Triggers, connections, Daemons, API keys, and related resources. | Hub        | `CURRENT` | Too coarse for unified UI; split endpoint checks into configuration, Channel, and access actions. |
-| `isInstanceOperator` | Identify the account allowed to use instance-wide operator surfaces.                         | Hub        | `CURRENT` | Map to `hub.instance.manage`; never derive it from an organization Team or `admin` role.          |
+| Authority            | Meaning                                                                                      | Applies in | Origin     | Unified-client handling                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------- | ---------- | ---------- | ----------------------------------------------------------------------------------- |
+| `view`               | View the active organization.                                                                | Hub        | `EXISTING` | Supplies `hub.view` at the Paseo API boundary.                                      |
+| `manageMembers`      | Invite/remove non-owner Members and change their roles.                                      | Hub        | `EXISTING` | Supplies `hub.member.manage`; owner safeguards remain unchanged.                    |
+| `manageOwners`       | Change/remove owner membership.                                                              | Hub        | `EXISTING` | Remains owner-only and is not a general assignable action.                          |
+| `manageResources`    | Manage current organization Triggers, connections, Daemons, API keys, and related resources. | Hub        | `EXISTING` | Adapts to `hub.configure`, `channel.manage`, or `hub.access.manage` per endpoint.   |
+| `isInstanceOperator` | Identify the account allowed to use instance-wide operator surfaces.                         | Hub        | `EXISTING` | Supplies `hub.instance.manage`; never derived from a Team or ordinary `admin` role. |
 
 Hub API-key scopes are also current, but apply only to API credentials:
 
-| API-key scope            | Meaning today                                   | Applies in | Status    | Required change                                                                                                                                  |
-| ------------------------ | ----------------------------------------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `projects:read`          | List legacy Hub deployment Projects.            | Hub API    | `CURRENT` | Keep the current API-key meaning; do not reuse it as Member Project access.                                                                      |
-| `configuration:validate` | Validate a legacy Project configuration bundle. | Hub API    | `CURRENT` | Keep the current meaning. Do not assume it is the Paseo Channel/Automation validation API before the management-API inventory is reviewed.       |
-| `configuration:install`  | Install a legacy Project configuration bundle.  | Hub API    | `CURRENT` | Keep the current meaning. Any reusable application-service seam and the Paseo activation contract remain part of the explicit API decision gate. |
-| `runs:dispatch`          | Dispatch a manual Workflow run.                 | Hub API    | `CURRENT` | Keep distinct from Member `automation.run`; whether its service is reused by Paseo remains an API-boundary decision.                             |
-| `daemons:enroll`         | Enroll a Daemon into the organization.          | Hub API    | `CURRENT` | Keep as a machine/API credential scope.                                                                                                          |
+| API-key scope            | Meaning                                         | Applies in | Origin     | Unified-client handling                      |
+| ------------------------ | ----------------------------------------------- | ---------- | ---------- | -------------------------------------------- |
+| `projects:read`          | List legacy Hub deployment Projects.            | Hub API    | `EXISTING` | Kept separate from Member Project access.    |
+| `configuration:validate` | Validate a legacy Project configuration bundle. | Hub API    | `EXISTING` | Kept as the API-key bundle-validation scope. |
+| `configuration:install`  | Install a legacy Project configuration bundle.  | Hub API    | `EXISTING` | Kept as the API-key bundle-install scope.    |
+| `runs:dispatch`          | Dispatch a manual Workflow run.                 | Hub API    | `EXISTING` | Kept distinct from Member `automation.run`.  |
+| `daemons:enroll`         | Enroll a Daemon into the organization.          | Hub API    | `EXISTING` | Remains a machine/API credential scope.      |
 
-The exact Paseo management API is not fixed by this permission catalog. Its existing-operation
-inventory and reuse/generalization decision are the open gate in section 12 of
+The Paseo management API adapts these existing authorities to semantic actions at its boundary;
+the resource operations themselves are documented in
 [Unified client Hub configuration UI](2026-09-01-unified-client-hub-configuration-ui.md).
 
 ### 4.4 Cross-surface product and resource privileges
@@ -268,27 +263,31 @@ This is the canonical target catalog used by web, native, Electron, Slack, and T
 and Team/direct assignments resolve these privileges. Only Project-scoped leaves needed by a
 managed Paseo Session are sent to the Daemon.
 
-| Privilege                      | Meaning                                                                                                       | Enforcement owner | Status   | Required change                                                                                                                           |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `hub.view`                     | View Hub account state and the resources already visible to the Member.                                       | Hub               | `NEW`    | Thin action over current `view`; it never reveals unassigned resources.                                                                   |
-| `hub.configure`                | Manage organization configuration, event connections, API keys, and Automation definitions/revisions.         | Hub               | `NEW`    | Split from coarse `manageResources`; does not grant resource use.                                                                         |
-| `hub.access.manage`            | Assign Team/direct access to Channels, Daemons, Projects, and Automations.                                    | Hub               | `NEW`    | Split from `manageResources`; every mutation remains organization-scoped and audited.                                                     |
-| `hub.member.manage`            | Invite/remove Members and change non-owner membership.                                                        | Hub               | `NEW`    | Map to current `manageMembers`; current owner rules remain authoritative.                                                                 |
-| `hub.instance.manage`          | Manage instance-wide Apps and operator settings.                                                              | Hub               | `NEW`    | Derived only from instance-operator authority, never from ordinary Team assignment.                                                       |
-| `channel.manage`               | Connect, edit, test, enable/disable, and remove Channel accounts and Routes.                                  | Hub               | `NEW`    | Replaces the unimplemented proposal `bot.manage`; there is no Bot product resource.                                                       |
-| `channel.use`                  | Invoke one fixed Route in the assigned Conversations.                                                         | Hub               | `NEW`    | May use only that Route's bound outbound actions; grants no generic Channel tool or direct Project, File, Terminal, or Automation access. |
-| `automation.run`               | Invoke an Automation directly from Paseo or a Member API.                                                     | Hub               | `NEW`    | A fixed Channel Route is authorized by `channel.use` instead.                                                                             |
-| `daemon.connect`               | Obtain managed admission to one Daemon.                                                                       | Hub + Daemon      | `NEW`    | Checked at ticket issue/consume; grants no RPC operation by itself.                                                                       |
-| `project.use`                  | See and work with Agents, Workspaces, Files, and Project projections in one Project.                          | Hub + Daemon      | `NEW`    | Compile to resource-scoped workspace read/write; do not include Project lifecycle management.                                             |
-| `agent.interact`               | Start or continue an Agent interaction on an authorized Project or fixed Channel Route.                       | Hub + Daemon      | `MODIFY` | Canonical replacement for current `bot.interact`; accept the old name only as a bounded config alias.                                     |
-| `agent.create`                 | Create an Agent in an authorized Project using one allowed Agent configuration.                               | Daemon            | `NEW`    | Enforce Project and resolved Provider/Model/Thinking constraints at creation.                                                             |
-| `agent.fast.use`               | Enable cost-bearing Fast mode for an Agent creation or fixed Route/Automation configuration.                  | Hub + Daemon      | `NEW`    | Check `featureValues.fast_mode` during activation and Agent creation; off by default.                                                     |
-| `terminal.use`                 | List, create, subscribe, read, input, capture, rename, kill, and receive binary frames for Project terminals. | Daemon            | `NEW`    | Apply to every terminal text/binary path; it is narrower than `workspace.write`.                                                          |
-| `approval.file`                | Approve a provider request classified as File work.                                                           | Hub + Daemon      | `MODIFY` | Already enforced for Channel responders; reuse the classifier and enforce in Paseo.                                                       |
-| `approval.config`              | Approve a provider request classified as configuration work.                                                  | Hub + Daemon      | `MODIFY` | Same cross-surface extension.                                                                                                             |
-| `approval.command`             | Approve command work; dot-subtree matching covers destructive commands unless explicitly denied.              | Hub + Daemon      | `MODIFY` | Same cross-surface extension; compile denies before sending exact leaves to the Daemon.                                                   |
-| `approval.command.destructive` | Approve commands classified as destructive.                                                                   | Hub + Daemon      | `MODIFY` | Already a Channel leaf; enforce as the narrower Paseo decision too.                                                                       |
-| `approval.channel`             | Answer a pending provider request classified as a Channel-native action.                                      | Hub + Daemon      | `MODIFY` | Approval never supplies the underlying action or resource authority; the broker rechecks that ceiling.                                    |
+In the MVP, `hub.*` and `channel.manage` are role-derived HTTP actions, not assignable resource
+grants. The Access API rejects them in Team/Member assignments. `channel.use`, `automation.run`, and
+Daemon/Project privileges are the assignable leaves.
+
+| Privilege                      | Meaning                                                                                                       | Enforcement owner | Origin     | Implemented handling                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `hub.view`                     | View Hub account state and the resources already visible to the Member.                                       | Hub               | `ADDED`    | Thin action over current `view`; it never reveals unassigned resources.                                                                   |
+| `hub.configure`                | Manage organization configuration, event connections, API keys, and Automation definitions/revisions.         | Hub               | `ADDED`    | Split from coarse `manageResources`; does not grant resource use.                                                                         |
+| `hub.access.manage`            | Assign Team/direct access to Channels, Daemons, Projects, and Automations.                                    | Hub               | `ADDED`    | Split from `manageResources`; every mutation remains organization-scoped and audited.                                                     |
+| `hub.member.manage`            | Invite/remove Members and change non-owner membership.                                                        | Hub               | `ADDED`    | Map to current `manageMembers`; current owner rules remain authoritative.                                                                 |
+| `hub.instance.manage`          | Manage instance-wide Apps and operator settings.                                                              | Hub               | `ADDED`    | Derived only from instance-operator authority, never from ordinary Team assignment.                                                       |
+| `channel.manage`               | Connect, edit, test, enable/disable, and remove Channel accounts and Routes.                                  | Hub               | `ADDED`    | Replaces the unimplemented proposal `bot.manage`; there is no Bot product resource.                                                       |
+| `channel.use`                  | Invoke one fixed Route in the assigned Conversations.                                                         | Hub               | `ADDED`    | May use only that Route's bound outbound actions; grants no generic Channel tool or direct Project, File, Terminal, or Automation access. |
+| `automation.run`               | Invoke an Automation directly from Paseo or a Member API.                                                     | Hub               | `ADDED`    | A fixed Channel Route is authorized by `channel.use` instead.                                                                             |
+| `daemon.connect`               | Obtain managed admission to one Daemon.                                                                       | Hub + Daemon      | `ADDED`    | Checked at ticket issue/consume; grants no RPC operation by itself.                                                                       |
+| `project.use`                  | See and work with Agents, Workspaces, Files, and Project projections in one Project.                          | Hub + Daemon      | `ADDED`    | Compile to resource-scoped workspace read/write; do not include Project lifecycle management.                                             |
+| `agent.interact`               | Start or continue an Agent interaction on an authorized Project or fixed Channel Route.                       | Hub + Daemon      | `EXTENDED` | Canonical replacement for current `bot.interact`; accept the old name only as a bounded config alias.                                     |
+| `agent.create`                 | Create an Agent in an authorized Project using one allowed Agent configuration.                               | Daemon            | `ADDED`    | Enforce Project and resolved Provider/Model/Thinking constraints at creation.                                                             |
+| `agent.fast.use`               | Enable cost-bearing Fast mode for an Agent creation or fixed Route/Automation configuration.                  | Hub + Daemon      | `ADDED`    | Check `featureValues.fast_mode` during activation and Agent creation; off by default.                                                     |
+| `terminal.use`                 | List, create, subscribe, read, input, capture, rename, kill, and receive binary frames for Project terminals. | Daemon            | `ADDED`    | Apply to every terminal text/binary path; it is narrower than `workspace.write`.                                                          |
+| `approval.file`                | Approve a provider request classified as File work.                                                           | Hub + Daemon      | `EXTENDED` | Already enforced for Channel responders; reuse the classifier and enforce in Paseo.                                                       |
+| `approval.config`              | Approve a provider request classified as configuration work.                                                  | Hub + Daemon      | `EXTENDED` | Same cross-surface extension.                                                                                                             |
+| `approval.command`             | Approve command work; dot-subtree matching covers destructive commands unless explicitly denied.              | Hub + Daemon      | `EXTENDED` | Same cross-surface extension; compile denies before sending exact leaves to the Daemon.                                                   |
+| `approval.command.destructive` | Approve commands classified as destructive.                                                                   | Hub + Daemon      | `EXTENDED` | Already a Channel leaf; enforce as the narrower Paseo decision too.                                                                       |
+| `approval.channel`             | Answer a pending provider request classified as a Channel-native action.                                      | Hub + Daemon      | `EXTENDED` | Approval never supplies the underlying action or resource authority; the broker rechecks that ceiling.                                    |
 
 `approval.other` remains deliberately unavailable: an unclassified request fails closed.
 
@@ -392,16 +391,16 @@ Both tools derive their target from the binding in the MCP URL and ultimately ca
 vertical's `outbound.sendText` or `outbound.sendMedia`. The in-repo
 `packages/channels/shared/src/plugin.ts:ChannelPlugin` contract has no `actions` adapter, so the
 OpenClaw action discovery, schema contributions, and action dispatcher are not present. Route
-compilation currently preapproves both tools whenever `outbound.path` is `tool`; it has no
-per-Route action list and does not consult `approval.channel`. File sending is restricted to the
-Hub home after symlink resolution, not to the Route's Project or declared output artifacts.
+compilation currently preapproves `message` whenever `outbound.path` is `tool`, plus `send_file`
+only when the target has an absolute Project root; it has no per-Route action list and does not
+consult `approval.channel`. File sending resolves both the root and requested file through symlinks
+before enforcing containment.
 
-There is also a capability-boundary gap: `encodeChannelReplyBindingRef` is base64-encoded JSON,
-not an opaque or authenticated capability. A caller accepted by the loopback/instance-secret gate
-can construct another syntactically valid account and Conversation reference. The supervisor
-checks that the account is running but does not prove that the reference belongs to the Agent's
-Route. This is acceptable only inside the present trusted-local boundary; it is not the public or
-team authorization boundary.
+Channel replies now use an opaque, random capability kept in Hub process memory. The URL contains
+no serialized routing data. Its server-side record fixes the organization, revision and Route,
+Channel account, Conversation/thread, Project root, and created Agent; unknown, expired, forged,
+cross-organization, rebound, or revoked capabilities fail closed. Replacing a revision or stopping
+its account revokes the affected capabilities. This feature needs no new database or transport.
 
 The minimum safe evolution is:
 
@@ -468,7 +467,7 @@ The first Project access levels expand as follows:
 | Use Fast mode        | Adds `agent.fast.use`; separate and off by default for non-owners                                                                                                                     |
 | Daemon Connect       | Adds `daemon.connect`; no Project or operation authority by itself                                                                                                                    |
 | Daemon Administrator | Expands to the required current daemon semantic permissions, including daemon read/manage, tunnel, access, workspace lifecycle, and daemon automation management; never `hub.execute` |
-| Channel Use          | `channel.use` plus `agent.interact` for the fixed Route only                                                                                                                          |
+| Channel Use          | `channel.use` for the fixed Route only                                                                                                                                                |
 | Automation Run       | `automation.run` for direct invocation                                                                                                                                                |
 
 Provider, Model, and Thinking grants are data constraints attached to a Project assignment, not
@@ -485,10 +484,10 @@ Team and direct assignments target Channel accounts/Conversations, Daemons, Proj
 Automations. Agent profiles are not resources. Selecting a Project also records its allowed Agent
 configuration grants and explicitly adds Daemon Connect in the same review.
 
-**GAP:** Hub does not currently own a catalog of daemon-local Paseo Projects or Agent capabilities.
-An enrolled Daemon must publish a minimal snapshot of stable Project identity plus Provider, Model,
-Thinking, Mode, and feature choices. Do not use filesystem paths as portable identity or expose
-them merely to render the access editor.
+An enrolled Daemon publishes a minimal snapshot of stable Project identity plus ready Provider,
+Model, Thinking, and Mode-safety metadata. Hub uses it for the access editor and fail-closed
+delegation checks. Filesystem paths are not portable identity and are not exposed merely to render
+the editor.
 
 These layers combine with `AND`, not `OR`:
 
@@ -513,7 +512,7 @@ paseo_dat_<base64url(32 cryptographically random bytes)>
 ```
 
 The prefix is for secret scanning, redaction, and operator diagnosis. The random body provides 256
-bits of entropy. Exact prefix spelling is proposed, not implemented.
+bits of entropy. The format and prefix are implemented by `AccessTicketService`.
 
 ### 5.1 Generation
 
@@ -649,29 +648,27 @@ implementation is itself a product goal.
 web build. `packages/app/src/runtime/host-runtime.ts` persists and connects Host profiles; it does
 not know about Hub accounts or managed ownership.
 
-**PROPOSED:** keep all Clisbot Hub UI/runtime code under an isolated boundary such as:
+**IMPLEMENTED:** Clisbot Hub UI/runtime code is isolated under:
 
 ```text
 packages/app/src/clisbot/hub/
-  auth/
-  api/
-  account-store.ts
-  managed-hosts.ts
-  managed-host-connection-policy.ts
+  transport/
+  account-provider.tsx
+  api-client.ts
+  contracts.ts
+  host-synchronization.tsx
   settings/
-  channels/
-  automations/
-  access/
+  *-configuration.ts
 ```
 
 The minimal shared-app hook sites are:
 
 - one conditional provider at the application root;
-- one conditional Account/Hub entry in Settings and the sidebar profile affordance;
+- one conditional Account/Hub group inside the existing Settings navigation;
 - one Managed Host reconciliation adapter around `HostRuntimeStore`;
 - one narrow connection-policy hook that disables inactive session probes only for Managed Hosts;
   and
-- one optional `getAccessTicket()` callback passed to `@getpaseo/client` for real connection and
+- one optional `resolveAccessTicket()` callback passed to `@getpaseo/client` for real connection and
   reconnection attempts.
 
 This is an app-distribution capability flag, not a user-facing Settings toggle. A user signs out to
@@ -734,7 +731,8 @@ That temporary-client behavior is valid for an ordinary trusted Paseo Host, but 
 Host: `hello` is session admission, so supplying `getAccessTicket()` to those probes would mint and
 consume one-use credentials merely to measure an unused route.
 
-**PROPOSED:** Hub bootstrap returns only existing descriptor shapes plus optional ownership facts:
+**IMPLEMENTED:** Hub bootstrap returns only existing descriptor shapes plus ownership facts and the
+daemon-published managed-access mode:
 
 ```ts
 management: {
@@ -742,7 +740,8 @@ management: {
   hubOrigin: string;
   organizationId: string;
   daemonId: string;
-}
+},
+managedAccessMode: "off" | "external";
 ```
 
 Relay remains an opaque E2EE router. Direct/TCP remains the existing direct WebSocket path. Hub may
@@ -785,9 +784,9 @@ leases. Preserve every manual Host.
 
 ## 9. Daemon enforcement boundary
 
-### 9.1 What establishes trust today
+### 9.1 Trust and authorization layers
 
-**CURRENT — transport/authentication:**
+**Existing transport authentication:**
 
 - A relay connection proves possession of the daemon public-key pairing material and establishes an
   E2EE application channel before the daemon processes `hello`.
@@ -796,7 +795,7 @@ leases. Preserve every manual Host.
 - Both paths then reach the same `handleHello` in
   `packages/server/src/server/websocket-server.ts`.
 
-**CURRENT — session creation:** after validating protocol version and `clientId`, `handleHello`
+**Existing session creation:** after validating protocol version and `clientId`, `handleHello`
 creates a reconnectable trusted session or resumes the session retained under that `clientId`.
 The connection already carries a `SessionAdmission` containing `principalId`, semantic
 `permissions`, and optional Hub-execution agents. Ordinary trusted connections use the built-in
@@ -804,21 +803,18 @@ owner admission; Hub execution uses its own service principal and narrower permi
 disconnected external session may be retained briefly for reconnect, keyed by principal plus
 `clientId`.
 
-**CURRENT — what authorization means:** `SessionAuthorization` checks every inbound message in
+**Implemented authorization:** `SessionAuthorization` checks every inbound message in
 `Session.handleMessage` and every outbound message in `Session.emit`. The exhaustive operation maps
 in `packages/server/src/server/authorization/operation-permissions.ts` classify RPCs by semantic
 permission. For example, agent fetch needs `workspace.read`, agent messaging and terminal input need
 `workspace.write`, daemon configuration needs `daemon.manage`, and pairing needs `access.manage`.
 
-The current permission set still does not contain Project, workspace, agent, terminal, or file-root
-grants. It answers “may this principal perform this kind of operation on this daemon?”, not “may
-Alice perform it on Project A?”. The same `fetch_agent_request` permission applies to every agent ID.
+`SessionAuthorization` now also carries daemon-wide or Project-restricted resource authority and a
+lease. `ManagedResourceAuthorizer` resolves each workspace, agent, terminal, and file root to a
+Project before a restricted operation runs. Semantic permission and resource privilege must both
+pass. Ordinary `off` sessions still receive owner admission and remain whole-daemon operators.
 
-**GAP:** there is currently no authenticated Hub principal or resource grant on an ordinary Paseo
-app `Session`. An ordinary trusted connection receives owner admission, so it remains an operator of
-the whole daemon.
-
-Concrete current case:
+Concrete `off` case:
 
 ```text
 Alice can establish a trusted connection
@@ -831,18 +827,18 @@ Alice can establish a trusted connection
 
 ### 9.2 Resource ownership facts that already exist
 
-The daemon already has most relationships needed to resolve a target to a Project; they are used
-for lifecycle and UI projection today, not authorization:
+The daemon's existing registries remain the source of ownership identity; managed authorization
+uses them instead of creating a parallel resource registry:
 
-| Target supplied by a request | **CURRENT** owner/resolution fact                                                                                                                | **GAP**                                                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `projectId`                  | `ProjectRegistry` owns the Project record.                                                                                                       | No session allow-list check.                                                                 |
-| `workspaceId`                | `WorkspaceRegistry` record contains `projectId` and `cwd`.                                                                                       | Lookup proves existence, not caller authority.                                               |
-| `agentId`                    | `agentId` identifies an agent session daemon-wide. Its live or stored record may carry `workspaceId`; that Workspace record carries `projectId`. | The lookup chain exists, but agent handlers do not use it to authorize the caller.           |
-| `terminalId`                 | `TerminalManager` returns a terminal carrying `workspaceId` and `cwd`.                                                                           | Subscribe/input/kill checks existence only.                                                  |
-| file `cwd` + relative path   | File service confines the relative path under the caller-supplied `cwd`.                                                                         | `cwd` itself is trusted input and is not required to belong to an allowed workspace/Project. |
+| Target supplied by a request | Existing owner/resolution fact                                                 | Managed-access enforcement                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `projectId`                  | `ProjectRegistry` owns the Project record.                                     | Require an exact Project grant.                                                                           |
+| `workspaceId`                | `WorkspaceRegistry` record contains `projectId` and `cwd`.                     | Resolve to Project, then require its exact privilege.                                                     |
+| `agentId`                    | A live/stored Agent carries `workspaceId`; that Workspace carries `projectId`. | Follow the full chain; unresolved legacy records fail closed.                                             |
+| `terminalId`                 | `TerminalManager` returns a terminal carrying `workspaceId` and `cwd`.         | Resolve before list/subscribe/control and retain the authorized identity for binary frames.               |
+| file `cwd` + relative path   | File service already confines the relative path under the root.                | Canonicalize the root, resolve it to an allowed Workspace/Project, then retain existing path confinement. |
 
-**PROPOSED:** extend the existing authorization module with one resource resolver that converts each
+**IMPLEMENTED:** `ManagedResourceAuthorizer` converts each
 target to its canonical `projectId`. A resource-limited request whose target cannot be resolved to an
 active, allowed Project fails closed. Existing registries remain owners of identity; authorization
 does not create a parallel Project/workspace/agent registry.
@@ -853,12 +849,8 @@ For `agentId`, the resolver must follow records rather than parse the ID:
 agentId -> live/stored agent.workspaceId -> Workspace.projectId -> allowed Project?
 ```
 
-**CURRENT:** Session already follows this chain when it adds Project placement to agent-list and
-agent-detail responses. That placement tells the client where to show the agent; it is not an access
-check. For example, `send_agent_message_request` resolves the agent and sends the prompt without
-checking whether the session may access the resolved Project.
-
-**PROPOSED cases:**
+The same relationship previously used for UI placement is now also evaluated before managed Agent
+operations. The concrete cases are:
 
 - `agent-a -> workspace-a -> project-a`, and the session may use `project-a`: allow the requested
   agent operation only when its narrower privilege such as `agent.interact` or `approval.*` also
@@ -871,16 +863,19 @@ checking whether the session may access the resolved Project.
 
 ### 9.3 What replaces the proposed `AccessContext`
 
-**CURRENT:** there is still no type named `AccessContext` and no
-`packages/server/src/server/managed-access/` directory. However, the nearest mechanism is no longer
-an RPC-scope array. `packages/server/src/server/websocket-server.ts` now defines
-`SessionAdmission { principalId, permissions, hubExecutionAgents? }`, and
-`packages/server/src/server/authorization/index.ts` defines `SessionAuthorization`. `Session`
-already owns one of these authorizers and can replace its semantic permissions.
+There is deliberately no parallel `AccessContext` type. The implemented chain is:
 
-Therefore do **not** add a parallel `AccessContext` authorizer. Extend the existing admission and
-authorization types with resource privileges and lease state. Keep ticket issue/consume HTTP code
-in a small managed-access adapter, but hand the result into the upstream authorization owner.
+```text
+ManagedAccessAdmissionResolver
+  -> SessionAdmission in websocket-server.ts
+  -> SessionAuthorization in authorization/index.ts
+  -> ManagedResourceAuthorizer in managed-access/resource-authorizer.ts
+```
+
+`SessionAdmission` carries the principal, semantic permissions, optional Project map, resource mode,
+lease identity/expiry, and the pre-existing Hub-execution capability. `SessionAuthorization` owns
+the active lease and Project map; `ManagedResourceAuthorizer` translates concrete IDs/paths through
+the daemon's registries. Ticket HTTP code remains on the Hub/relationship boundary.
 
 `packages/server/src/server/auth.ts` remains unrelated: it validates the daemon password for
 HTTP/WebSocket reachability. The app's React `SessionContext` is client state and is also unrelated.
@@ -889,7 +884,7 @@ Do not flatten Projects and privileges into two independent arrays; that would c
 cross-product. For example, terminal access on Project A plus ordinary access on Project B must not
 become terminal access on both.
 
-**PROPOSED shape:** Hub evaluates scoped role assignments and attaches exact effective privilege
+**Implemented shape:** Hub evaluates scoped role assignments and attaches exact effective privilege
 leaves to admission. Do not send role names, wildcard patterns, or deny rules to the daemon:
 
 ```ts
@@ -920,6 +915,7 @@ interface SessionAdmission {
   permissions: readonly DaemonPermission[];
   projects: ReadonlyMap<string, ProjectAuthorization>; // projectId -> exact grant
   resourceMode?: "daemon" | "projects";
+  leaseId?: string;
   leaseExpiresAt?: number;
   hubExecutionAgents?: HubExecutionAgents; // existing service-principal capability
 }
@@ -943,15 +939,10 @@ all execution authority.
 In mode `off`, the existing owner admission remains unchanged; no Hub ticket, resource grant, or
 lease is created or consulted.
 
-### 9.4 Where the context binds to a session
+### 9.4 Where managed authority binds to a session
 
-**CURRENT:** `attachSocket()` creates a `PendingConnection` with a `SessionAdmission` before
-`hello`. Direct and relay sockets currently default to owner admission. `handleHello()` is
-synchronous, derives the reconnect key from `admission.principalId + clientId`, then creates or
-resumes the Session. The existing seam is useful, but a ticket carried inside `hello` cannot have
-produced that admission yet.
-
-**PROPOSED — new external connection:**
+`attachSocket()` still creates a `PendingConnection` with default admission before `hello`. The
+implemented `handleHello()` path is asynchronous only when `external` policy applies:
 
 1. `handleHello` receives the schema-optional `accessTicket`.
 2. In mode `external`, a relay or TCP connection without a ticket is rejected before
@@ -963,13 +954,13 @@ produced that admission yet.
 5. The resolver replaces the pending owner/default admission before the reconnect key is computed.
    Only then may `createSessionConnection`, resume, `server_info`, or any resource snapshot run.
 
-**PROPOSED — reconnect:** every external physical reconnect presents a fresh ticket. It must resolve
+**Implemented reconnect:** every external physical reconnect presents a fresh ticket. It must resolve
 to the same principal as the retained logical session. If the effective grant fingerprint changed,
 the safest MVP behavior is to discard the retained Session and bootstrap a new one rather than try
 to purge every old subscription/cache in place. A different principal using the same `clientId` is
 rejected.
 
-**PROPOSED — lease change/revocation:** close the affected managed session and require a new ticket.
+**Implemented lease change/revocation:** close the affected managed session and require a new ticket.
 This is simpler and safer than mutating authority inside a live session. Loopback, plugin, and the
 existing daemon-owned Hub execution connection remain separate trust classes and must not
 accidentally inherit this external-user policy.
@@ -980,7 +971,7 @@ it also clears Project subscriptions, visibility caches, upload slots, and termi
 
 ### 9.5 Project, workspace, and agent discovery
 
-**CURRENT:**
+**Existing discovery mechanics:**
 
 - `project.list.request` lists every non-archived Project from `ProjectRegistry`.
 - `fetch_workspaces_request` and `fetch_agents_request` support filters, paging, sync cursors, and
@@ -990,7 +981,7 @@ it also clears Project subscriptions, visibility caches, upload slots, and termi
 - Selective timeline delivery limits streams to agent IDs the client says it is viewing. It is a
   performance/UI mechanism; the client may subscribe to any agent ID.
 
-**PROPOSED:** filter bootstrap lists before paging/sync state is seeded, and validate subscriptions
+**IMPLEMENTED:** filter bootstrap lists before paging/sync state is seeded, and validate subscriptions
 before recording them. Every pushed event resolves its Project again before delivery. A removal is
 sent only for a resource previously visible to that session.
 
@@ -1012,12 +1003,12 @@ hidden resource.
 
 ### 9.6 Direct requests and guessed IDs
 
-**CURRENT:** handlers such as `fetch_agent_request`, `send_agent_message_request`, timeline fetch,
+**Before managed resource enforcement:** handlers such as `fetch_agent_request`, `send_agent_message_request`, timeline fetch,
 archive/delete/cancel, and `agent_permission_response` resolve an ID and operate on it. Existence is
 checked; caller ownership is not. `create_agent_request` can also be driven by `workspaceId`, caller
 agent, or a client-supplied `cwd`.
 
-**PROPOSED:** resolve target → workspace → Project and require both its resource grant and the
+**IMPLEMENTED:** resolve target → workspace → Project and require both its resource grant and the
 operation privilege before calling the existing handler/manager. Do not move agent lifecycle side
 effects into managed-access code.
 
@@ -1035,13 +1026,19 @@ For managed external sessions, a Project must be registered before it can be use
 loopback/`off` flow may continue opening an arbitrary directory and thereby create/register a
 Project as Paseo does today.
 
+Hub-owned Channel and Automation execution uses the separate `hub.execute` service principal. It
+still cannot trust an authored `{ projectId, cwd }` pair: before Agent creation,
+`DaemonExecutions` asks the daemon-owned registry to resolve the `cwd` or worktree source and
+requires the result to equal `projectId`. Unknown or mismatched placement fails before provider or
+filesystem side effects, including for organization owners and Daemon Administrators.
+
 ### 9.7 Files and download/upload paths
 
 These are three different surfaces and must not be treated as one path flow.
 
 #### Workspace file operations
 
-**CURRENT:** browse/read, write, create/rename/duplicate/delete, file subscriptions, Project-icon
+**Existing file boundary:** browse/read, write, create/rename/duplicate/delete, file subscriptions, Project-icon
 lookup, and download-token requests carry a client-supplied `cwd`. The file service safely confines
 the relative `path` under that root, including canonical-path checks against symlink escape. However,
 the caller chooses the root itself and `WorkspaceFilesSession` does not consult `WorkspaceRegistry`.
@@ -1050,7 +1047,7 @@ This answers only “did `path` escape from `cwd`?”, not “may this user acce
 could send `cwd=/company/project-b` and `path=secrets.txt`; keeping the path under Project B still
 does not authorize Alice, who has access only to Project A.
 
-**PROPOSED:** in `external`, canonicalize `cwd`, resolve it to an active Workspace and Project, then
+**IMPLEMENTED:** in `external`, canonicalize `cwd`, resolve it to an active Workspace and Project, then
 require `project.use` before reading metadata/content, mutating a file, or installing a watcher. An
 unknown root fails closed. Session close or revocation disposes its authorized watchers. Owner
 wildcard covers every registered Project, not every path readable by the daemon OS user. Mode `off`
@@ -1058,7 +1055,7 @@ retains ordinary Paseo arbitrary-root behavior for local recovery and upstream c
 
 #### Download
 
-**CURRENT:** download is a two-step capability flow:
+**Existing download flow:** download is a two-step capability flow:
 
 ```text
 WebSocket file_download_token_request(cwd, path)
@@ -1070,7 +1067,7 @@ WebSocket file_download_token_request(cwd, path)
 The default token lifetime is 60 seconds. The HTTP request intentionally needs only that capability
 token, but token issuance currently has no Project authorization.
 
-**PROPOSED:** perform the Workspace/Project check before issuing the token. Keep the existing HTTP
+**IMPLEMENTED:** perform the Workspace/Project check before issuing the token. Keep the existing HTTP
 download route and one-use token format unchanged; it does not need to repeat Hub login. For the MVP,
 a token already issued remains usable once until its short expiry even if the Session is revoked.
 Per-Session token invalidation can be added later if immediate download revocation becomes a product
@@ -1078,14 +1075,14 @@ requirement.
 
 #### Upload and uploaded attachments
 
-**CURRENT:** `file.upload.request` does **not** contain `cwd` and does not write into a Project. It
+**Existing upload flow:** `file.upload.request` does **not** contain `cwd` and does not write into a Project. It
 opens a Session-owned transfer slot; binary frames identified by `requestId` write a temporary file
 under the daemon's Paseo home, then return an `uploaded_file` attachment containing its server path.
 When that attachment is sent to an agent, the prompt currently uses the supplied attachment path.
 This is safe only under Paseo's existing trusted-client assumption; Project authorization cannot be
 derived at upload start because no target Project or agent is named yet.
 
-**PROPOSED:** do not invent a Project check for the staging upload itself. Bind the upload slot and
+**IMPLEMENTED:** do not invent a Project check for the staging upload itself. Bind the upload slot and
 completed upload handle to the managed Session. When the client attaches it to an agent message:
 
 1. resolve the target `agentId` to an allowed Project and require `project.use`;
@@ -1098,7 +1095,7 @@ slot opened by the same authorized Session.
 
 ### 9.8 Terminals, including binary frames
 
-**CURRENT:** `TerminalSessionController` already associates terminals with `workspaceId` and `cwd`,
+**Existing terminal identity:** `TerminalSessionController` already associates terminals with `workspaceId` and `cwd`,
 and directory subscriptions use a `(cwd, workspaceId)` key. This is isolation between workspace
 identities for correct UI state, not user authorization.
 
@@ -1110,7 +1107,7 @@ Current sensitive paths include:
 - subscribe/capture/rename/input/kill using `terminalId`; and
 - input/resize binary frames using the stream slot assigned at subscription time.
 
-**PROPOSED:** every path requires `terminal.use` on the terminal/workspace's Project in addition to
+**IMPLEMENTED:** every path requires `terminal.use` on the terminal/workspace's Project in addition to
 the base Project being visible. A list without `cwd` returns only authorized terminals. A managed
 legacy cwd-only request must resolve unambiguously to an allowed workspace or fail closed.
 
@@ -1125,21 +1122,20 @@ and kill are denied.
 
 ### 9.9 Permission requests and permission-mode bypasses
 
-**CURRENT:** `agent_permission_response` accepts both `{ behavior: "allow" }` and
-`{ behavior: "deny" }` and forwards them to the provider through `respondToAgentPermission`. There
-is no caller check. Permission request/resolution events are broadcast from `AgentManager` like
-other agent events.
+**Existing provider flow:** `agent_permission_response` accepts both `{ behavior: "allow" }` and
+`{ behavior: "deny" }` and forwards them through `respondToAgentPermission`. Managed sessions now
+filter permission events by Project and authorize every response before forwarding it.
 
-**CURRENT:** sending or steering a normal human message sets `clearPendingPermissions: true`; the
+**Existing interaction behavior:** sending or steering a normal human message sets `clearPendingPermissions: true`; the
 provider uses this to deny/clear permissions blocking the steer. This does not approve the sensitive
 operation, but it means “respond” is broader than the authority that needs protection.
 
-**CURRENT:** agent creation/configuration can select provider permission modes and tool policy.
+**Existing Agent configuration:** agent creation/configuration can select provider permission modes and tool policy.
 Guarding only the approval button would be ineffective if the same user could launch an agent in a
 bypass/no-prompt mode or preapprove the tool. Voice mode also has a narrow daemon-owned auto-allow
 path for its recognized speak permission.
 
-**PROPOSED:**
+**IMPLEMENTED:**
 
 - require `project.use` to see the permission event or send an explicit deny;
 - classify every provider permission request with the same provider-neutral classifier used by the
@@ -1164,17 +1160,19 @@ cannot be bypassed at Agent creation.
 
 ### 9.10 Daemon-global operations
 
-**CURRENT:** upstream now classifies daemon-global operations explicitly. Configuration, update,
+**Existing semantic classification:** upstream classifies daemon-global operations explicitly. Configuration, update,
 restart, plugins, and skills use `daemon.manage`; pairing and grant changes use `access.manage`; Hub
 and relay relationship changes use `tunnel.manage`; diagnostics/status use `daemon.read`; Project
 and workspace lifecycle uses `workspace.manage`. A Session without the required semantic permission
 receives `access_denied` before the handler runs.
 
-**PROPOSED:** expose `Administrator` as a UI access level that compiles to the exact current daemon
+**IMPLEMENTED:** `Administrator` is a UI access level that compiles to the exact current daemon
 semantic permissions it is meant to receive. Do not add another product privilege named
 `daemon.manage`, and do not collapse upstream's `access.manage` or `tunnel.manage` boundaries inside
-daemon code. A Member with only `daemon.connect` plus Project grants receives none of these
-daemon-global permissions.
+daemon code. A Member with only `daemon.connect` plus Project grants receives no effective
+daemon-global access: the compatibility `daemon.read` namespace is narrowed to filtered Provider
+catalog, liveness, and resource-bearing Agent status frames, while config, diagnostics, usage,
+Provider diagnostics, skills, and daemon status fail closed.
 
 The exhaustive operation classification already exists and uses TypeScript `Record` coverage, so a
 new upstream RPC causes a compile failure until classified. Managed Access adds resource resolution
@@ -1182,11 +1180,11 @@ after this existing operation check; it does not maintain a second RPC-name tabl
 
 ### 9.11 Outbound enforcement and errors
 
-**CURRENT:** `Session.emit` checks the outbound message type against semantic permissions. It still
-cannot distinguish two `agent_stream` messages belonging to different Projects. Project updates are
-published across authorized sessions; selective subscriptions and query filters are not ACLs.
+**Existing base check:** `Session.emit` checks the outbound message type against semantic
+permissions. That check alone cannot distinguish two `agent_stream` messages belonging to different
+Projects; selective subscriptions and query filters are not ACLs.
 
-**PROPOSED:** authorize before constructing or emitting resource-bearing text and binary messages.
+**IMPLEMENTED:** authorize before constructing or emitting resource-bearing text and binary messages.
 Lists omit unauthorized entries. A direct lookup of an unauthorized resource normally returns the
 same not-found result as a nonexistent resource to avoid confirming IDs. A known daemon-global
 operation without its required privilege may return `access_denied` because daemon existence is
@@ -1248,7 +1246,7 @@ Sign in to Hub
 ```
 
 Managing the Channel account or Route requires `channel.manage`, but using one fixed Route requires
-`channel.use` and `agent.interact` only for its assigned Conversations. It does not grant direct
+only `channel.use` for its assigned Conversations. It does not grant direct
 Project, File, Terminal, or Automation access. `Open in Paseo` separately requires
 `daemon.connect`, `project.use`, and the narrower Project privileges in the catalog.
 
@@ -1266,97 +1264,80 @@ runtime-reconciliation contract is owned by
 
 ## 11. Minimum source-change map
 
-`CURRENT` symbols below exist now. `NEW` paths and symbols are the proposed implementation names,
-not claims about current code.
+The paths and symbols below are the implemented seams. They are intentionally concentrated so a
+future upstream merge sees small protocol/runtime hooks and Clisbot-owned policy modules.
 
 ### 11.1 Wire and daemon client
 
-| Relative file path                                   | Function / class / schema                                                                            | Smallest change                                                                                                                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/messages.ts`                  | `WSHelloMessageSchema` (**CURRENT**)                                                                 | Add optional `accessTicket`; keep old hello payloads valid.                                                                                                          |
-| `packages/protocol/src/messages.ts`                  | `ServerInfoStatusPayloadSchema` (**CURRENT**)                                                        | Add optional diagnostic feature `managedAccessTickets`.                                                                                                              |
-| `packages/protocol/src/messages.ts`                  | `MutableDaemonConfigSchema`, `MutableDaemonConfigPatchSchema` (**CURRENT**)                          | Add `managedAccess.mode` with `off` or `external`; default and missing value resolve to `off`.                                                                       |
-| `packages/protocol/src/access-privileges.ts`         | `ACCESS_PRIVILEGES`, `AccessPrivilege`, `privilegeCovers()`, `classifyPermissionRequest()` (**NEW**) | Own the pure cross-surface privilege catalog, dot-subtree matching, and provider-neutral approval classification used by Hub and daemon.                             |
-| `packages/protocol/src/messages.wire-compat.test.ts` | `WSHelloMessageSchema` and `ServerInfoStatusPayloadSchema` compatibility suites (**CURRENT**)        | Prove old/new hello and `server_info` parsing in both directions.                                                                                                    |
-| `packages/client/src/daemon-client.ts`               | `DaemonClientConfig`, `DaemonClient.sendHelloMessage()` (**CURRENT**)                                | Add optional async `getAccessTicket()` and await it for each actual initial hello or physical reconnect; absent callback preserves the current payload and behavior. |
-| `packages/client/src/daemon-client.test.ts`          | `DaemonClient` hello/reconnect suites (**CURRENT**)                                                  | Prove no-provider compatibility, fresh ticket per actual reconnect, heartbeat without ticket fetch, and ticket-fetch failure without an unticketed fallback hello.   |
+| Relative file path                          | Function / class / schema                                      | Implemented responsibility                                                                                                    |
+| ------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/managed-access.ts`   | `ManagedAccessModeSchema`, `MutableManagedAccessConfigSchema`  | Owns the shared `"off" / "external"` daemon-policy vocabulary.                                                                |
+| `packages/protocol/src/messages.ts`         | `WSHelloMessageSchema`, daemon config and server-info schemas  | Optional `accessTicket`, `managedAccess.mode`, and diagnostic capability. Missing optional fields preserve old-wire behavior. |
+| `packages/client/src/daemon-client.ts`      | `DaemonClientConfig.resolveAccessTicket`, `sendHelloMessage()` | Resolve a fresh ticket only for an actual hello. With no resolver, the hello is byte-compatible with ordinary Paseo.          |
+| `packages/client/src/daemon-client.test.ts` | `DaemonClient` hello tests                                     | Covers absent resolver, one ticket per actual hello, and fail-closed ticket-resolution errors.                                |
 
 ### 11.2 Daemon
 
-| Relative file path                                                             | Function / class / type                                                                                                                                                          | Smallest change                                                                                                                                                                                                    |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/server/src/server/persisted-config.ts`                               | `PersistedConfigSchema` (**CURRENT**)                                                                                                                                            | Accept and persist `daemon.managedAccess.mode`; missing value remains `off`.                                                                                                                                       |
-| `packages/server/src/server/bootstrap.ts`                                      | `createInitialMutableDaemonConfig()` (**CURRENT**)                                                                                                                               | Project the persisted managed-access setting into the live daemon config used by the WebSocket server.                                                                                                             |
-| `packages/server/src/server/daemon-config-store.ts`                            | `pickSupportedPatchFields()`, `DaemonConfigStore.applySupportedPatch()` (**CURRENT**)                                                                                            | Admit validated managed-access patches and publish the live change without bypassing the existing config owner.                                                                                                    |
-| `packages/server/src/server/authorization/index.ts`                            | `SessionAuthorization`, `OWNER_PERMISSIONS`, `DaemonPermission` (**CURRENT**)                                                                                                    | Extend the existing authorizer with daemon-wide versus Project privilege grants, Agent-configuration constraints, lease state, and narrower Agent/Fast/terminal/approval checks; do not add a parallel authorizer. |
-| `packages/server/src/server/authorization/operation-permissions.ts`            | `INBOUND_PERMISSION`, `OUTBOUND_PERMISSION`, `requiredPermissionForInbound()`, `requiredPermissionForOutbound()` (**CURRENT**)                                                   | Keep upstream's exhaustive RPC-to-semantic-permission classification unchanged except when a genuinely new operation is added; resource checks happen after it.                                                    |
-| `packages/server/src/server/managed-access/ticket-admission.ts`                | `ManagedTicketAdmissionResolver` (**NEW**)                                                                                                                                       | Consume a ticket through the enrolled Hub relationship and return daemon-native semantic permissions plus resolved resource privileges; own no Session dispatch policy.                                            |
-| `packages/server/src/server/authorization/resource-resolver.ts`                | `SessionResourceGrants`, `SessionResourceResolver` (**NEW**)                                                                                                                     | Resolve Project/workspace/agent/terminal/file targets through existing registries and choose not-found versus `access_denied`.                                                                                     |
-| `packages/server/src/server/websocket-server.ts`                               | `SessionAdmission`, `PendingConnection`, `VoiceAssistantWebSocketServer.handleHello()`, `.resumeSession()`, `.createSessionConnection()`, `.createSocketSession()` (**CURRENT**) | Make hello admission async in `external`, replace pending default admission before reconnect lookup, and exempt only authenticated local socket/pipe/internal sessions.                                            |
-| `packages/server/src/server/session.ts`                                        | `SessionOptions`, `Session.handleMessage()`, `.handleBinaryFrame()`, `.emit()`, `.setPermissions()` (**CURRENT**)                                                                | Carry resource privileges beside current semantic permissions; enforce them before side effects and before resource-bearing text/binary output.                                                                    |
-| `packages/server/src/server/session.ts`                                        | `Session.listFetchAgentsEntries()`, `.handleFetchAgent()`, `.handleSendAgentMessageRequest()`, `.handleAgentPermissionResponse()` (**CURRENT**)                                  | Resolve Agent → Workspace → Project; require `agent.interact` for interaction and the classified `approval.*` privilege for explicit allow.                                                                        |
-| `packages/server/src/server/session/files/workspace-files-session.ts`          | `WorkspaceFilesSession` and its `handleFile*` methods (**CURRENT**)                                                                                                              | Inject the authorizer; validate `cwd` before file I/O, watchers, and download-token issuance; bind uploads to the Session rather than trusting attachment paths.                                                   |
-| `packages/server/src/server/file-upload/index.ts`                              | `FileUploadStore` (**CURRENT**)                                                                                                                                                  | Retain completed upload handles long enough to verify Session ownership when an attachment is used; preserve current temp-file cleanup.                                                                            |
-| `packages/server/src/terminal/terminal-session-controller.ts`                  | `TerminalSessionController.dispatch()`, `.handleBinaryFrame()` (**CURRENT**)                                                                                                     | Gate list/create/subscribe/control with `terminal.use`; bind each binary slot to the authorized terminal and Project.                                                                                              |
-| `packages/server/src/server/hub/relationship-remote.ts`                        | `HubRelationshipRemote`, `DirectHubRelationshipRemote` (**CURRENT**)                                                                                                             | Add daemon-authenticated ticket consume/lease refresh operations beside enrollment and revocation.                                                                                                                 |
-| `packages/server/src/server/hub/relationship-controller.ts`                    | `HubRelationshipController`, `.updatePermissions()` (**CURRENT**)                                                                                                                | Reuse its authenticated service-principal relationship for Project catalog publication and lease invalidation; do not reinterpret Hub roles in the daemon.                                                         |
-| `packages/server/src/server/managed-access/managed-access.integration.test.ts` | managed Session matrix (**NEW**)                                                                                                                                                 | Cover owner/member, two Projects, guessed IDs, files, terminal JSON/binary, approvals, reconnect, revocation, `off`, direct, and relay paths.                                                                      |
+| Relative file path                                                    | Function / class / type                                                      | Implemented responsibility                                                                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/server/src/server/bootstrap.ts`                             | `initialManagedAccessConfig()`, daemon composition                           | Loads mutable mode, wires Hub ticket consume/lease refresh, republishes mode changes, and keeps `off` independent of Hub admission.                               |
+| `packages/server/src/server/authorization/index.ts`                   | `SessionAuthorization`                                                       | Combines existing daemon semantic permissions with Project grants and lease state.                                                                                |
+| `packages/server/src/server/authorization/operation-permissions.ts`   | `requiredPermissionForInbound()`, `requiredPermissionForOutbound()`          | Remains the exhaustive RPC-family classifier; Project/resource checks are a second authorization dimension.                                                       |
+| `packages/server/src/server/managed-access/types.ts`                  | `ManagedAccessAdmission`, `ProjectAuthorization`                             | Carries already-resolved exact privilege leaves and Agent-configuration constraints; the daemon does not interpret Hub roles.                                     |
+| `packages/server/src/server/managed-access/resource-authorizer.ts`    | `ManagedResourceAuthorizer`                                                  | Resolves Project/workspace/agent/terminal/file ownership through existing registries and fails closed when ownership cannot be proven.                            |
+| `packages/server/src/server/path-utils.ts`                            | `isSameOrDescendantPath()`                                                   | Normalizes POSIX/Windows traversal and sibling boundaries before containment checks; managed async paths also resolve symlinks and their nearest existing parent. |
+| `packages/server/src/server/websocket-server.ts`                      | `SessionAdmission`, `handleHello()`, `admitManagedAccess()`                  | Consumes the hello ticket before reconnect/session creation in `external`; local IPC and the daemon-owned Hub service session remain separate.                    |
+| `packages/server/src/server/session.ts`                               | `Session.handleMessage()`, `.handleBinaryFrame()`, `.emit()`                 | Filters discovery and pushed events, rejects guessed IDs, and applies Agent/approval checks before side effects.                                                  |
+| `packages/server/src/server/session/files/workspace-files-session.ts` | `WorkspaceFilesSession`                                                      | Resolves and authorizes canonical Workspace/Project roots before file I/O, subscriptions, or download-token issue.                                                |
+| `packages/server/src/server/file-upload/index.ts`                     | `FileUploadStore`                                                            | Binds staged uploads to the session that created them before later attachment use.                                                                                |
+| `packages/server/src/terminal/terminal-session-controller.ts`         | `TerminalSessionController.dispatch()`, `.handleBinaryFrame()`               | Applies `terminal.use` to terminal JSON and binary paths.                                                                                                         |
+| `packages/server/src/server/hub/relationship-remote.ts`               | `DirectHubRelationshipRemote.consumeAccessTicket()`, `.refreshAccessLease()` | Performs daemon-authenticated ticket consumption and lease refresh through the enrolled Hub relationship.                                                         |
+| `packages/server/src/server/hub/relationship-controller.ts`           | `HubRelationshipController`                                                  | Publishes daemon facts and receives targeted lease revocation without moving Hub policy into daemon code.                                                         |
+| `packages/server/src/server/hub/daemon-executions.ts`                 | `DaemonExecutions.create()`, `requireProjectPlacement()`                     | Verifies Project plus canonical daemon-owned cwd/worktree placement before a Hub service-principal Agent create or reuse.                                         |
 
 ### 11.3 Hub
 
-| Relative file path                                              | Function / class / type                                                                                                                  | Smallest change                                                                                                                                                                                        |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/hub/src/index.ts`                                     | `loadRuntimeConfig()` (**CURRENT**)                                                                                                      | Read `PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION`; absence produces the `15m` default rather than an unbounded lease.                                                                                     |
-| `packages/hub/src/application-runtime.ts`                       | `ApplicationCompositionOptions`, `hubApplicationOptions()` (**CURRENT**)                                                                 | Thread the compiled instance managed-access policy from the composition root into `HubRuntimeOptions`.                                                                                                 |
-| `packages/hub/src/auth/server.ts`                               | `createAuthServer()`, `AuthServer.resolveAccount()`, `.resolveOrganizationAccess()` (**CURRENT**)                                        | Reuse BetterAuth identity and active organization; add its OAuth Provider with registered first-party public clients, S256 PKCE, token refresh/revocation, and Hub-API resource binding.               |
-| `packages/hub/src/auth/organization-contract.ts`                | `OrganizationRole`, `ORGANIZATION_ROLES` (**CURRENT**)                                                                                   | Reuse `owner` / `admin` / `member` as the MVP role vocabulary.                                                                                                                                         |
-| `packages/hub/src/channels/config/enums.ts`                     | `PRIVILEGE_FAMILIES`, `PRIVILEGE_LEAVES`, `isPrivilegePattern()` (**CURRENT**)                                                           | Re-export/use the shared catalog; retain `bot.interact`/`bot.*` only as bounded read aliases, and diagnose inert `tool.*`/`channel.tool.*` instead of writing them.                                    |
-| `packages/hub/src/channels/config/schema.ts`                    | `RouteMatchSchema`, `OutboundDefaultsSchema`, `RouteSchema` (**CURRENT**); `ChannelActionPolicySchema` (**NEW**)                         | Add optional literal `contains` for new-binding target selection plus the exact Route-bound reply-action ceiling and Project/output roots; preserve ordered single-target Routes and current defaults. |
-| `packages/hub/src/channels/config/privileges.ts`                | `privilegeCovers()`, `roleGrants()`, `rolesGrant()` (**CURRENT**)                                                                        | Reuse the shared dot-subtree primitive and keep Hub role-composition semantics unchanged.                                                                                                              |
-| `packages/hub/src/channels/policy.ts`                           | `routeMatches()`, `matchRoute()`, `resolvePrincipal()`, `privilegeHolds()`, `effectivePrivileges()`, `classifyToolClass()` (**CURRENT**) | Keep first-match routing, Channel identity/scope adaptation, and `approval.channel` classification here; do not interpret a tool name as execution authority.                                          |
-| `packages/hub/src/channels/bindings/index.ts`                   | `BindingEngine.admit()`, `.bindOrSteer()`, `.createAgent()` (**CURRENT**)                                                                | Existing direct bindings win over later text selection; pass the durable binding and compiled Route action ceiling into Agent creation, and invalidate it with target/security changes.                |
-| `packages/hub/src/channels/plane/types.ts`                      | `ChannelReplyBindingRef`, `encodeChannelReplyBindingRef()`, `decodeChannelReplyBindingRef()` (**CURRENT**)                               | Replace client-decodable routing JSON with an opaque binding capability ID; keep old decoding only for bounded active-session compatibility.                                                           |
-| `packages/hub/src/channels/control-plane.ts`                    | `compileControlPlaneSnapshot()`, `createChannelAgentSpecResolver()` (**CURRENT**)                                                        | Compile candidate `hub.yml` with Channel documents, pass additive Agent feature values, attach the Channel broker, and preapprove only actions compiled for that Route.                                |
-| `packages/hub/src/channels/channel-reply.ts`                    | `createChannelReplyServer()`, `messageTool()`, `messageCall()`, `fileTool()`, `fileCall()` (**CURRENT**)                                 | Evolve `message` toward the OpenClaw action subset, resolve the binding server-side before every call, constrain files to Project/output roots, and retain `send_file` as a compatibility alias.       |
-| `packages/hub/src/channels/supervisor/index.ts`                 | `ChannelSupervisorImpl.reconcile()` (**CURRENT**)                                                                                        | Apply each active revision by stopping removed/disabled accounts and restarting every enabled account from the new snapshot; report retryable per-account runtime failures.                            |
-| `packages/hub/src/managed-access/config.ts`                     | `ManagedAccessConfigSchema`, `compileManagedAccessConfig()` (**NEW**)                                                                    | Own `managedAccess.leaseDuration`, default it to `15m`, validate `1m` through `1h`, and compile it to `leaseDurationMs`.                                                                               |
-| `packages/hub/src/managed-access/policy.ts`                     | `privilegesForOrganizationRole()`, `effectiveResourcePrivileges()` (**NEW**)                                                             | Map BetterAuth membership and scoped role assignments into the same privilege semantics used by channel principals; apply owner wildcard without changing dashboard capabilities.                      |
-| `packages/hub/src/db/schema.ts`                                 | resource-role assignment, Project catalog, access ticket, and lease tables (**NEW**)                                                     | Persist organization-scoped role assignments, daemon-local Project snapshots, ticket hashes/consumption, and lease state.                                                                              |
-| `packages/hub/src/db/types.ts`                                  | `Database` managed-access methods and record types (**NEW**)                                                                             | Add the storage contract used by the service; implement the same contract in `packages/hub/src/db/pg.ts` and `packages/hub/src/db/memory.ts`.                                                          |
-| `packages/hub/src/managed-access/contracts.ts`                  | bootstrap, issue, consume, refresh, and invalidation schemas (**NEW**)                                                                   | Define schema-validated HTTP inputs/outputs; never return filesystem paths or plaintext stored tickets.                                                                                                |
-| `packages/hub/src/managed-access/service.ts`                    | `ManagedAccessService.bootstrap()`, `.issueTicket()`, `.consumeTicket()`, `.refreshLease()`, `.invalidateLeases()` (**NEW**)             | Resolve scoped role assignments into exact effective privilege leaves, apply owner wildcard, atomically consume tickets, and own lease lifecycle.                                                      |
-| `packages/hub/src/app.ts`                                       | `HubRuntimeOptions`, `HubOperations`, `createHubApplication()` (**CURRENT**)                                                             | Compile the instance managed-access policy, compose `ManagedAccessService`, and expose narrow handlers; do not place policy in TanStack route components.                                              |
-| `packages/hub/src/routes/api/app/bootstrap.ts`                  | `Route` (**NEW**)                                                                                                                        | Authenticated browser/native app bootstrap.                                                                                                                                                            |
-| `packages/hub/src/routes/api/app/access-tickets.ts`             | `Route` (**NEW**)                                                                                                                        | Issue a one-use ticket for `{ daemonId, clientId }`.                                                                                                                                                   |
-| `packages/hub/src/routes/api/daemons/access-tickets/consume.ts` | `Route` (**NEW**)                                                                                                                        | Authenticate the enrolled daemon and atomically consume a ticket; lease refresh can be a sibling route when implemented.                                                                               |
+| Relative file path                                | Function / class / type                                         | Implemented responsibility                                                                                                           |
+| ------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/hub/src/auth/server.ts`                 | `createAuthServer()`, `AuthServer`                              | Reuses BetterAuth sessions/organizations and exposes first-party Authorization Code + S256 PKCE for native/Electron clients.         |
+| `packages/hub/src/auth/client-authorization.ts`   | `ClientAuthorization`                                           | Owns authorization-code, access-token, refresh-token, rotation, and revocation state for public app clients.                         |
+| `packages/hub/src/access/contract.ts`             | privilege/resource schemas and access-level catalog             | Defines shared stable names; Hub-management actions remain role-derived and are not assignable as Member resource grants.            |
+| `packages/hub/src/access/store.ts`                | `AccessStore`, `resolveDaemonAccess()`                          | Resolves Team/direct assignments, owner wildcard, exact daemon permissions, Project privileges, and Agent-configuration grants.      |
+| `packages/hub/src/access/delegation.ts`           | `assertAutomationConfigurationDelegation()`                     | Rejects unsafe delegated Agent configurations, including Fast/unattended/auto-approval and missing approval privileges.              |
+| `packages/hub/src/access/daemon-projects.ts`      | `listDaemonProjectCatalog()`                                    | Projects the daemon-published stable Project and Agent-configuration catalog for management and delegation checks.                   |
+| `packages/hub/src/managed-access/tickets.ts`      | `AccessTicketService`, `readAccessLeaseDuration()`              | Issues/atomically consumes opaque one-use tickets and refreshes configurable 15-minute leases from current authority.                |
+| `packages/hub/src/managed-access/revocation.ts`   | `AccessLeaseRevocation`                                         | Revokes affected leases after membership/access mutations and notifies connected daemons immediately; expiry remains the fallback.   |
+| `packages/hub/src/managed-access/http.ts`         | daemon ticket/lease handlers                                    | Provides authenticated daemon consume and refresh operations.                                                                        |
+| `packages/hub/src/management-api/index.ts`        | `ManagementApi`, `handleAccessAssignments()`, `handleDaemons()` | Exposes shared Paseo/CLI management resources, user ticket issue, daemon bootstrap, and semantic management-action checks.           |
+| `packages/hub/src/db/schema.ts`                   | access assignment, Project catalog, ticket, and lease tables    | Persists policy and only ticket verifiers; `memory.ts` and `pg.ts` implement the same database contract.                             |
+| `packages/hub/src/application-runtime.ts`         | `createApplicationRuntime()`, `createManagementApi()`           | Composes Access, ticket/lease, management, Channel, Automation, and daemon notification owners.                                      |
+| `packages/hub/src/provider-applications/index.ts` | `ProviderApplications.onConfigurationChanged()`                 | Emits a redacted post-commit credential-change fact so current runtime consumers can reload without exposing or duplicating secrets. |
 
 ### 11.4 Shared app
 
-| Relative file path                                               | Function / class / type                                                                                                                   | Smallest change                                                                                                                                                                                   |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/app/app.config.js`                                     | `expo.extra.clisbotHub` (**NEW optional config entry**)                                                                                   | Include `{ origin }` only when `CLISBOT_HUB_ORIGIN` is supplied; absence is the upstream-compatible default.                                                                                      |
-| `packages/app/src/clisbot/hub/config.ts`                         | `ClisbotHubAppConfig`, `resolveClisbotHubAppConfig()` (**NEW**)                                                                           | Return validated config or `null`; config presence is the capability flag and is not a Settings preference.                                                                                       |
-| `packages/app/src/clisbot/hub/api-client.ts`                     | `HubApiClient`, `HubRequestTransport` (**NEW**)                                                                                           | Call account, bootstrap, and ticket APIs through browser cookie, native bearer, or Electron IPC adapters; keep Hub credentials out of `HostProfile`.                                              |
-| `packages/app/src/clisbot/hub/auth/oauth-client.ts`              | `HubOAuthClient` (**NEW**)                                                                                                                | Own state, PKCE verifier/challenge, authorization URL, code exchange, in-memory access token, refresh rotation, and logout for native builds.                                                     |
-| `packages/app/src/clisbot/hub/auth/secure-store.native.ts`       | `HubRefreshTokenStore` (**NEW**)                                                                                                          | Persist only the native rotating refresh token through Expo SecureStore; clear it on logout, organization reset, or invalid refresh.                                                              |
-| `packages/app/src/clisbot/hub/account-provider.tsx`              | `HubAccountProvider`, `useHubAccount()` (**NEW**)                                                                                         | Own signed-out/loading/signed-in account state across web, iOS, Android, and Electron's renderer.                                                                                                 |
-| `packages/app/src/clisbot/hub/managed-host-reconciler.ts`        | `ManagedHostReconciler` (**NEW**)                                                                                                         | Convert Hub bootstrap descriptors into existing direct/relay `HostConnection` shapes and reconcile them with the host registry.                                                                   |
-| `packages/app/src/clisbot/hub/managed-host-connection-policy.ts` | `ManagedHostConnectionPolicy` (**NEW**)                                                                                                   | Order existing candidates, disable inactive session probes, and request failover only after the active connection fails; own no transport implementation.                                         |
-| `packages/app/src/types/host-connection.ts`                      | `HostProfile` (**CURRENT**)                                                                                                               | Add optional Hub-management metadata only; do not add a new transport type or persist tickets.                                                                                                    |
-| `packages/app/src/runtime/host-runtime.ts`                       | `HostRuntimeStartOptions`, `HostRuntimeController.start()`, `.runProbeCycle()`, `.switchToConnection()`, `HostRuntimeStore` (**CURRENT**) | Accept a narrow Managed Host policy hook: skip temporary inactive `DaemonClient` probes, but retain active liveness and event-driven connect/failover; leave manual/upstream Hosts unchanged.     |
-| `packages/app/src/runtime/host-runtime.test.ts`                  | `HostRuntimeController` probe/activation suites (**CURRENT**)                                                                             | Prove stable Managed Hosts create no inactive clients or tickets, transport failures before `hello` mint no ticket, failover performs a real admission, and manual Hosts retain adaptive probing. |
-| `packages/app/src/app/_layout.tsx`                               | `RootLayout` (**CURRENT**)                                                                                                                | Mount `HubAccountProvider` only when the Clisbot Hub app capability is enabled.                                                                                                                   |
-| `packages/app/src/screens/settings-screen.tsx`                   | `SettingsSidebar`, `SettingsScreen` (**CURRENT**)                                                                                         | Mount only the signed-out entry or signed-in Hub group; Channels, Automations, Team, Access, Configuration, and Managed access details remain Clisbot-owned screens.                              |
-| `packages/app/src/components/left-sidebar.tsx`                   | `LeftSidebar`, `SidebarFooter` (**CURRENT**)                                                                                              | Replace or augment the Settings affordance with the conditional user-profile entry without duplicating account state.                                                                             |
+| Relative file path                                        | Function / class / type                                           | Implemented responsibility                                                                                                                    |
+| --------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/app/app.config.js`                              | `expo.extra.clisbotHub`                                           | Build capability: absent means no Hub UI, request, storage, or Host side effect.                                                              |
+| `packages/app/src/clisbot/hub/config.ts`                  | `getHubConfiguration()`, `parseHubConfiguration()`                | Validates the Hub origin once for all platforms.                                                                                              |
+| `packages/app/src/clisbot/hub/transport/oauth.ts`         | PKCE URL/token helpers                                            | Shared state, verifier/challenge, callback, and token request contract.                                                                       |
+| `packages/app/src/clisbot/hub/transport/create.native.ts` | `NativeHubTransport`                                              | Uses system-browser PKCE and Expo SecureStore for the rotating app credential.                                                                |
+| `packages/app/src/clisbot/hub/transport/create.web.ts`    | `BrowserHubTransport`, `ElectronHubTransport`                     | Browser uses same-origin HTTP-only cookie; Electron delegates authenticated requests to the main-process IPC adapter.                         |
+| `packages/app/src/clisbot/hub/api-client.ts`              | `HubApiClient`                                                    | Shared typed HTTP operations for account, management resources, bootstrap, and access-ticket issue.                                           |
+| `packages/app/src/clisbot/hub/account-provider.tsx`       | `HubAccountProvider`, `useHubAccount()`                           | One cross-platform signed-out/loading/setup/signed-in state owner.                                                                            |
+| `packages/app/src/clisbot/hub/host-synchronization.tsx`   | `HubHostSynchronization`, `HubHostBinding`                        | Reconciles Hub daemons into existing Host profiles and registers a ticket resolver only for published `external` mode.                        |
+| `packages/app/src/runtime/host-session-access.ts`         | `registerHostAccessTicketResolver()`, `resolveHostAccessTicket()` | Isolates the optional Clisbot admission hook from the upstream Host transport model.                                                          |
+| `packages/app/src/runtime/host-runtime.ts`                | `HostRuntimeController`                                           | Resolves a ticket only for real connection admission/reconnect; no ticket is created for ordinary background health probes.                   |
+| `packages/app/src/screens/settings-screen.tsx`            | `SettingsSidebar`, `SettingsScreen`                               | Reuses the existing App/Host Settings shell and mounts Clisbot-owned Account, Channels, Automations, Team, Access, and Configuration screens. |
+| `packages/app/src/clisbot/hub/sidebar-account.tsx`        | `HubSidebarAccountButton`                                         | Opens the existing Account route; feature-off and signed-out states render no avatar.                                                         |
+| `packages/app/src/components/left-sidebar.tsx`            | `SidebarFooter`                                                   | Adds one optional Clisbot-owned avatar mount beside the unchanged Settings button.                                                            |
 
 ### 11.5 Electron
 
-| Relative file path                                            | Function / class / type                                                        | Smallest change                                                                                                                                                                                             |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/desktop/src/features/hub-auth/controller.ts`        | `HubAuthController`, `HubRefreshTokenStore` (**NEW**)                          | Launch the system browser, validate callback state, exchange code plus verifier, rotate tokens, and persist the refresh token with OS-backed encryption; fail closed when protected storage is unavailable. |
-| `packages/desktop/src/main.ts`                                | `bootstrap()`, `app.on("open-url")`, `app.on("second-instance")` (**CURRENT**) | Route only the registered Hub callback to `HubAuthController`; keep the main renderer on the packaged `paseo://app` origin.                                                                                 |
-| `packages/desktop/src/preload.ts`                             | `window.paseoDesktop` context bridge (**CURRENT**)                             | Expose a narrow Hub-auth/account/request IPC surface; never expose refresh-token values or arbitrary-URL authenticated fetch.                                                                               |
-| `packages/app/src/clisbot/hub/auth/electron-transport.web.ts` | `ElectronHubRequestTransport` (**NEW**)                                        | Adapt the shared `HubApiClient` to the desktop IPC bridge without putting OAuth credentials in renderer storage.                                                                                            |
+| Relative file path                            | Function / class / type                | Implemented responsibility                                                                                                                      |
+| --------------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/desktop/src/features/hub-client.ts` | `DesktopHubClient`, `allowedHubPath()` | Runs loopback PKCE in the main process, encrypts the refresh token with `safeStorage`, rotates it, and allows only fixed Hub API path families. |
+| `packages/desktop/src/main.ts`                | desktop bootstrap                      | Registers the Hub client while keeping the renderer on the packaged `paseo://app` origin.                                                       |
+| `packages/desktop/src/preload.ts`             | `window.paseoDesktop.hub` bridge       | Exposes sign-in/sign-out/account/request methods without exposing credentials or arbitrary authenticated URLs.                                  |
 
 No semantic source change is expected in `packages/relay`: `createClientChannel()` and
 `createDaemonChannel()` in `packages/relay/src/encrypted-channel.ts` continue carrying opaque hello
@@ -1365,40 +1346,26 @@ bytes.
 Avoid moving, renaming, or formatting upstream-owned files. Every shared-file change should be a
 small additive hook delegating to a Clisbot-owned module.
 
-## 12. Rollout
+## 12. Delivery and rollout
 
-### Phase A — prove compatibility and single-user value
+The MVP implementation includes the shared Account/Settings shell, browser/native/Electron
+authentication adapters, owner wildcard, daemon/Project bootstrap, opaque ticket and lease
+lifecycle, `external` admission, Project/resource enforcement, Team/direct access, Channel Route
+configuration, and Automation management. An owner can sign in and use every enrolled daemon
+without creating Team or Access rows.
 
-- Add the app capability flag and Account/profile shell.
-- Add the web cookie adapter plus native/Electron Authorization Code with S256 PKCE adapters; keep
-  Electron's renderer on `paseo://app` and its refresh token in the main process.
-- Add owner wildcard and Hub bootstrap.
-- Publish daemon Project catalog and existing connection descriptors.
-- Add opaque ticket issue/consume and the hello field.
-- Apply the Managed Host connection policy: no inactive session probes; ticket only at real
-  initial connect, physical reconnect, or failover admission.
-- Keep production daemons in `off`; exercise `external` only in integration tests or isolated
-  staging until its enforcement surface is complete.
-- Let an owner configure a fixed Channel Route and open its Project in Paseo.
+Rollout remains operationally staged:
 
-### Phase B — safe external operation
+1. ship the Clisbot client and daemon with every daemon defaulting to `off`;
+2. verify owner access and the local IPC recovery path for each daemon;
+3. enable `external` per daemon from its existing Host Settings page; and
+4. invite Members, place them in Teams, and add only the required Channel, Automation, Daemon, and
+   Project access.
 
-- Complete Project projection and guessed-ID enforcement.
-- Gate terminal, permission response, and daemon management.
-- Add lease refresh/invalidation.
-- Enable `external` per enrolled daemon through an owner-confirmed operation.
-- Ship actionable old-app and expired/revoked-ticket errors.
-
-### Phase C — company access UI
-
-- Add Team & Access assignments for admin/member.
-- Add Channel Route targeting rules and access audit events.
-- Port only useful Hub configuration surfaces into the shared app.
-- Retire the separate Hub dashboard after functional parity, not before.
-
-A Managed Access custom-role/deny editor, fine-grained file privileges, and signed offline grants
-are later work driven by demonstrated need. Existing channel role/deny/extends behavior remains in
-force and must not be replaced by a second evaluator.
+Deliberate post-MVP work is limited to demonstrated needs: custom role/deny editing, finer-grained
+file privileges, signed offline grants, multi-target Channel fanout/idempotency, provider-wide
+conversation discovery, and richer access-event reporting. None is required for the owner or the
+fixed public/customer Channel flows documented here.
 
 ## 13. Verification and decision gates
 
@@ -1448,6 +1415,19 @@ force and must not be replaced by a second evaluator.
   Clisbot-owned code.
 - Hub UI/API/data seams are evaluated against the target owner chain; existing implementation is
   not preserved without product value.
+
+### Efficient verification strategy
+
+Run the narrow owner of each changed seam first: protocol/hello, ticket/access resolution,
+WebSocket admission, resource authorization, Host synchronization, shared Hub UI helpers, and
+Electron IPC. Then run typechecks sequentially and one shared web build after all lanes are merged.
+Do not rerun an unchanged package's broad suite for every neighboring patch.
+
+Hub integration tests use in-process PGlite and require no container runtime. Real PostgreSQL or
+Testcontainers is reserved for a small parity gate around row locking, concurrent one-use ticket
+consumption, and migration behavior that PGlite cannot prove. Native and Electron reuse the shared
+TypeScript/UI tests; each platform adds only its credential/transport boundary tests. This keeps the
+matrix small without dropping checks at security or cross-platform boundaries.
 
 The unavoidable differences are concentrated in four seams: server admission, Session/resource
 enforcement, managed Host connection lifecycle, and client hello/reconnect. All remaining Hub

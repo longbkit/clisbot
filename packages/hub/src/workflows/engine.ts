@@ -1032,6 +1032,7 @@ function buildStepIntent(
         kind: "daemon",
         daemonId: environment.daemonId,
         authoredSlug: environment.daemon,
+        ...(environment.projectId === undefined ? {} : { projectId: environment.projectId }),
         cwd: environment.cwd,
         ...(environment.worktree === undefined
           ? {}
@@ -1076,6 +1077,9 @@ function materializeAgent(
   if (agent === undefined) throw new Error("workflow named agent is unavailable");
   return {
     ...agent,
+    ...(agent.featureValues === undefined
+      ? {}
+      : { featureValues: structuredClone(agent.featureValues) }),
     ...(agent.options === undefined ? {} : { options: structuredClone(agent.options) }),
   };
 }

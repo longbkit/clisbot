@@ -8,6 +8,7 @@ import path from "node:path";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Logger } from "pino";
 import { z } from "zod";
+import { getAgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
 import { createBranchChangeRouteHandler } from "./script-route-branch-handler.js";
 
 export type ListenTarget =
@@ -154,6 +155,7 @@ import { BrowserToolsBroker } from "./browser-tools/broker.js";
 import { DaemonConfigBrowserToolsPolicy } from "./browser-tools/policy.js";
 import { WorkspaceGitServiceImpl } from "./workspace-git-service.js";
 import { resolveWorkspaceIdForPath } from "./resolve-workspace-id-for-path.js";
+import { assertProjectCwdPlacement } from "./managed-access/resource-authorizer.js";
 import {
   archiveByScope,
   archivePersistedWorkspaceRecord,
@@ -170,7 +172,8 @@ import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
 import type { PushNotificationSender } from "./push/index.js";
 import { getOrCreateServerId } from "./server-id.js";
 import { resolveDaemonVersion } from "./daemon-version.js";
-import type { AgentClient, AgentProvider } from "./agent/agent-sdk-types.js";
+import type { AgentClient, AgentProvider, ProviderSnapshotEntry } from "./agent/agent-sdk-types.js";
+import { GLOBAL_PROVIDER_SNAPSHOT_KEY } from "./agent/provider-snapshot-manager.js";
 import type {
   AgentProfile,
   AgentSkillSelection,
@@ -222,9 +225,11 @@ import {
 } from "./hub/relationship-controller.js";
 import {
   DirectHubRelationshipRemote,
+  type HubAgentConfigurationCatalog,
   type HubRelationshipRemote,
 } from "./hub/relationship-remote.js";
 import { DaemonExecutions } from "./hub/daemon-executions.js";
+import { createConnectionOfferV2 } from "./connection-offer.js";
 import { PluginService } from "./plugins/index.js";
 import { ManagedPluginSources } from "./plugins/managed-source.js";
 
@@ -528,6 +533,63 @@ function initialManagedAccessConfig(
   return { mode: config.managedAccessMode ?? "off" };
 }
 
+export function createHubAgentConfigurationCatalog(
+  entries: readonly ProviderSnapshotEntry[],
+): HubAgentConfigurationCatalog {
+  return {
+    providers: entries
+      .filter((entry) => entry.enabled && entry.status === "ready")
+      .map((entry) => ({
+        id: entry.provider,
+        label: entry.label ?? entry.provider,
+        defaultModeId: entry.defaultModeId ?? null,
+        modes: (entry.modes ?? []).map((mode) => hubAgentMode(entry.provider, mode)),
+        models: (entry.models ?? [])
+          .filter((model) => model.isSelectable !== false)
+          .map((model) => ({
+            id: model.id,
+            label: model.label,
+            thinkingOptions: (model.thinkingOptions ?? []).map((option) => ({
+              id: option.id,
+              label: option.label,
+            })),
+          })),
+      })),
+  };
+}
+
+function hubAgentMode(
+  providerId: string,
+  mode: NonNullable<ProviderSnapshotEntry["modes"]>[number],
+): NonNullable<HubAgentConfigurationCatalog["providers"][number]["modes"]>[number] {
+  const projected: NonNullable<HubAgentConfigurationCatalog["providers"][number]["modes"]>[number] =
+    {
+      id: mode.id,
+      label: mode.label,
+    };
+  const isUnattended = classifyHubAgentMode(providerId, mode.id, mode.isUnattended);
+  if (isUnattended !== undefined) projected.isUnattended = isUnattended;
+  return projected;
+}
+
+function configuredServiceProxyPublicBaseUrl(config: PaseoDaemonConfig): string | null {
+  return config.serviceProxy?.publicBaseUrl ?? null;
+}
+
+function classifyHubAgentMode(
+  providerId: string,
+  modeId: string,
+  runtimeClassification: boolean | undefined,
+): boolean | undefined {
+  if (runtimeClassification !== undefined) return runtimeClassification;
+  try {
+    const mode = getAgentProviderDefinition(providerId).modes.find(({ id }) => id === modeId);
+    return mode === undefined ? undefined : mode.isUnattended === true;
+  } catch {
+    return undefined;
+  }
+}
+
 function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
@@ -656,9 +718,7 @@ export async function createPaseoDaemon(
   });
   applyTerminalAgentHookSetting({ store: daemonConfigStore, logger });
 
-  const serviceProxyPublicBaseUrl = config.serviceProxy?.publicBaseUrl
-    ? config.serviceProxy.publicBaseUrl
-    : null;
+  const serviceProxyPublicBaseUrl = configuredServiceProxyPublicBaseUrl(config);
   const serviceProxy = createServiceProxySubsystem({
     logger,
     publicBaseUrl: serviceProxyPublicBaseUrl,
@@ -994,10 +1054,12 @@ export async function createPaseoDaemon(
   const ensureWorkspaceForCreateExternal = async (
     cwd: string,
     firstAgentContext?: FirstAgentContext,
+    projectId?: string,
   ): Promise<string> => {
     const workspace = await workspaceProvisioning.createWorkspaceForDirectory(
       cwd,
       resolveFirstAgentPromptTitle(firstAgentContext),
+      projectId,
     );
     if (firstAgentContext) {
       workspaceAutoName.scheduleForDirectory({
@@ -1044,8 +1106,9 @@ export async function createPaseoDaemon(
   const ensureWorkspaceForCreateAndBroadcastExternal = async (
     cwd: string,
     firstAgentContext?: FirstAgentContext,
+    projectId?: string,
   ): Promise<string> => {
-    const workspaceId = await ensureWorkspaceForCreateExternal(cwd, firstAgentContext);
+    const workspaceId = await ensureWorkspaceForCreateExternal(cwd, firstAgentContext, projectId);
     await emitWorkspaceUpdatesExternal([workspaceId]);
     return workspaceId;
   };
@@ -1061,7 +1124,9 @@ export async function createPaseoDaemon(
     workspaceRegistry,
     workspaceGitService,
     providerSnapshotManager,
-    readDaemonConfig: () => ({ metadataGeneration: daemonConfigStore.get().metadataGeneration }),
+    readDaemonConfig: () => ({
+      metadataGeneration: daemonConfigStore.get().metadataGeneration,
+    }),
     gitMutation: createGitMutationService({
       workspaceGitService,
       logger,
@@ -1219,12 +1284,69 @@ export async function createPaseoDaemon(
         agentManager,
         agentStorage,
         createAgent,
+        assertProjectSourcePlacement: (cwd, projectId) =>
+          assertProjectCwdPlacement(cwd, projectId, projectRegistry, workspaceRegistry),
+        resolveWorkspaceProjectId: async (workspaceId) =>
+          (await workspaceRegistry.get(workspaceId))?.projectId,
         interruptAgent: (agentId) => cancelAgentRunCommand({ agentManager, logger }, agentId),
         logger,
         cleanupFailedCreate: (input) =>
           hubAgentLifecycle.cleanupCreatedWorktreeAfterFailedAgentCreate(input),
       }),
+    listProjects: async () => {
+      const agentConfigurationCatalog = createHubAgentConfigurationCatalog(
+        providerSnapshotManager.getSnapshot(),
+      );
+      return (await projectRegistry.list())
+        .filter((project) => project.archivedAt === null)
+        .map((project) => ({
+          projectId: project.projectId,
+          name: project.customName ?? project.displayName,
+          agentConfigurationCatalog,
+        }));
+    },
+    getConnectionOffer: async () => {
+      const relay = daemonConfigStore.get().relay;
+      const enabled = relay?.enabled ?? config.relayEnabled ?? true;
+      if (!enabled) return null;
+      const endpoint = config.relayPublicEndpoint ?? config.relayEndpoint ?? "relay.paseo.sh:443";
+      const useTls =
+        config.relayPublicUseTls ?? config.relayUseTls ?? endpoint === "relay.paseo.sh:443";
+      return createConnectionOfferV2({
+        serverId,
+        daemonPublicKeyB64: daemonKeyPair.publicKeyB64,
+        relay: { endpoint, useTls },
+      });
+    },
+    getManagedAccessMode: () => daemonConfigStore.get().managedAccess.mode,
   });
+  const stopHubProjectMutationPublishing =
+    projectRegistry.subscribeToMutations?.(() => {
+      void hubRelationships.publishProjects().catch((error: unknown) => {
+        logger.warn({ err: error }, "Failed to replace Hub Project catalog after mutation");
+      });
+    }) ?? (() => {});
+  let hubProviderCatalogPublishTimer: ReturnType<typeof setTimeout> | null = null;
+  const publishHubProviderCatalog = (_entries: ProviderSnapshotEntry[], cwdKey: string) => {
+    if (cwdKey !== GLOBAL_PROVIDER_SNAPSHOT_KEY) return;
+    if (hubProviderCatalogPublishTimer !== null) clearTimeout(hubProviderCatalogPublishTimer);
+    hubProviderCatalogPublishTimer = setTimeout(() => {
+      hubProviderCatalogPublishTimer = null;
+      void hubRelationships.publishProjects().catch((error: unknown) => {
+        logger.warn({ err: error }, "Failed to replace Hub Agent configuration catalog");
+      });
+    }, 250);
+    hubProviderCatalogPublishTimer.unref?.();
+  };
+  providerSnapshotManager.on("change", publishHubProviderCatalog);
+  const stopHubProjectPublishing = () => {
+    stopHubProjectMutationPublishing();
+    providerSnapshotManager.off("change", publishHubProviderCatalog);
+    if (hubProviderCatalogPublishTimer !== null) {
+      clearTimeout(hubProviderCatalogPublishTimer);
+      hubProviderCatalogPublishTimer = null;
+    }
+  };
 
   const createScheduleLocalWorkspaceExternal = async (input: {
     cwd: string;
@@ -1615,7 +1737,11 @@ export async function createPaseoDaemon(
                   mode: config.managedAccessMode ?? "off",
                   resolver: {
                     resolve: ({ accessTicket, clientId }) =>
-                      hubRelationships.consumeAccessTicket({ accessTicket, clientId }),
+                      hubRelationships.consumeAccessTicket({
+                        accessTicket,
+                        clientId,
+                      }),
+                    refresh: (leaseId) => hubRelationships.refreshAccessLease(leaseId),
                   },
                 },
               },
@@ -1693,6 +1819,17 @@ export async function createPaseoDaemon(
             });
             daemonConfigStore.onFieldChange("relay.enabled", (value) => {
               relayRuntime?.setEnabled(value === true);
+              void hubRelationships.publishConnectionOffer().catch((error: unknown) => {
+                logger.warn({ err: error }, "Failed to replace Hub Connection Offer");
+              });
+            });
+            daemonConfigStore.onFieldChange("managedAccess.mode", () => {
+              void hubRelationships.publishConnectionOffer().catch((error: unknown) => {
+                logger.warn(
+                  { err: error },
+                  "Failed to replace Hub Connection Offer after managed access change",
+                );
+              });
             });
             await hubRelationships.start();
           };
@@ -1717,6 +1854,7 @@ export async function createPaseoDaemon(
       speechService.start();
       scriptHealthMonitor.start();
     } catch (error) {
+      stopHubProjectPublishing();
       await pluginRuntime.stopAllPlugins().catch(() => undefined);
       await serviceProxy.stopStandalone().catch(() => undefined);
       await agentProviderRuntime.shutdown().catch(() => undefined);
@@ -1730,6 +1868,7 @@ export async function createPaseoDaemon(
 
   const stop = async () => {
     await pluginRuntime.stopAllPlugins();
+    stopHubProjectPublishing();
     await hubRelationships.stop();
     workspaceReconciliation.dispose();
     scriptHealthMonitor.stop();

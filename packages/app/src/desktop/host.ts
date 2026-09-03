@@ -172,6 +172,26 @@ export interface DesktopInvokeBridge {
   invoke?: (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 }
 
+export interface DesktopHubRequestInput {
+  origin: string;
+  path: string;
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export interface DesktopHubResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: string;
+}
+
+export interface DesktopHubBridge {
+  signIn?: (input: { origin: string; invitationId?: string }) => Promise<void>;
+  signOut?: (input: { origin: string }) => Promise<void>;
+  request?: (input: DesktopHubRequestInput) => Promise<DesktopHubResponse>;
+}
+
 export interface DesktopHostBridge {
   platform?: string;
   windowChromeMode?: string;
@@ -187,6 +207,7 @@ export interface DesktopHostBridge {
   webUtils?: DesktopWebUtilsBridge;
   menu?: DesktopMenuBridge;
   browser?: DesktopBrowserBridge;
+  hub?: DesktopHubBridge;
 }
 
 declare global {

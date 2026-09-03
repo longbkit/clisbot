@@ -47,6 +47,9 @@ import { Route as ApiIntegrationsGithubSetupRouteImport } from './routes/api/int
 import { Route as ApiIntegrationsGithubCallbackRouteImport } from './routes/api/integrations/github/callback'
 import { Route as ApiIntegrationsDiscordCallbackRouteImport } from './routes/api/integrations/discord/callback'
 import { Route as ApiDaemonsAccessTicketsConsumeRouteImport } from './routes/api/daemons/access-tickets/consume'
+import { Route as ApiDaemonsAccessLeasesRefreshRouteImport } from './routes/api/daemons/access-leases/refresh'
+import { Route as ApiDaemonsDaemonIdProjectsRouteImport } from './routes/api/daemons/$daemonId/projects'
+import { Route as ApiDaemonsDaemonIdConnectionOfferRouteImport } from './routes/api/daemons/$daemonId/connection-offer'
 import { Route as AgentExecutionsExecutionIdAttachmentsAttachmentIdRouteImport } from './routes/agent-executions/$executionId/attachments/$attachmentId'
 import { Route as ShellOOrganizationSlugTriggersRouteImport } from './routes/_shell/o/$organizationSlug/triggers'
 import { Route as ShellOOrganizationSlugSettingsRouteImport } from './routes/_shell/o/$organizationSlug/settings'
@@ -260,6 +263,24 @@ const ApiDaemonsAccessTicketsConsumeRoute =
     path: '/api/daemons/access-tickets/consume',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDaemonsAccessLeasesRefreshRoute =
+  ApiDaemonsAccessLeasesRefreshRouteImport.update({
+    id: '/api/daemons/access-leases/refresh',
+    path: '/api/daemons/access-leases/refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiDaemonsDaemonIdProjectsRoute =
+  ApiDaemonsDaemonIdProjectsRouteImport.update({
+    id: '/projects',
+    path: '/projects',
+    getParentRoute: () => ApiDaemonsDaemonIdRoute,
+  } as any)
+const ApiDaemonsDaemonIdConnectionOfferRoute =
+  ApiDaemonsDaemonIdConnectionOfferRouteImport.update({
+    id: '/connection-offer',
+    path: '/connection-offer',
+    getParentRoute: () => ApiDaemonsDaemonIdRoute,
+  } as any)
 const AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute =
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRouteImport.update({
     id: '/agent-executions/$executionId/attachments/$attachmentId',
@@ -358,7 +379,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/plans': typeof ApiBillingPlansRoute
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
-  '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
+  '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRouteWithChildren
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
@@ -371,6 +392,9 @@ export interface FileRoutesByFullPath {
   '/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsRouteWithChildren
   '/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersRouteWithChildren
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  '/api/daemons/$daemonId/connection-offer': typeof ApiDaemonsDaemonIdConnectionOfferRoute
+  '/api/daemons/$daemonId/projects': typeof ApiDaemonsDaemonIdProjectsRoute
+  '/api/daemons/access-leases/refresh': typeof ApiDaemonsAccessLeasesRefreshRoute
   '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -410,7 +434,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/plans': typeof ApiBillingPlansRoute
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
-  '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
+  '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRouteWithChildren
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
@@ -421,6 +445,9 @@ export interface FileRoutesByTo {
   '/o/$organizationSlug/connections': typeof ShellOOrganizationSlugConnectionsRoute
   '/o/$organizationSlug/daemons': typeof ShellOOrganizationSlugDaemonsRoute
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  '/api/daemons/$daemonId/connection-offer': typeof ApiDaemonsDaemonIdConnectionOfferRoute
+  '/api/daemons/$daemonId/projects': typeof ApiDaemonsDaemonIdProjectsRoute
+  '/api/daemons/access-leases/refresh': typeof ApiDaemonsAccessLeasesRefreshRoute
   '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -462,7 +489,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/plans': typeof ApiBillingPlansRoute
   '/api/billing/webhook': typeof ApiBillingWebhookRoute
-  '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRoute
+  '/api/daemons/$daemonId': typeof ApiDaemonsDaemonIdRouteWithChildren
   '/api/daemons/enroll': typeof ApiDaemonsEnrollRoute
   '/api/v1/$': typeof ApiV1SplatRoute
   '/api/v1/channels': typeof ApiV1ChannelsRouteWithChildren
@@ -475,6 +502,9 @@ export interface FileRoutesById {
   '/_shell/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsRouteWithChildren
   '/_shell/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersRouteWithChildren
   '/agent-executions/$executionId/attachments/$attachmentId': typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  '/api/daemons/$daemonId/connection-offer': typeof ApiDaemonsDaemonIdConnectionOfferRoute
+  '/api/daemons/$daemonId/projects': typeof ApiDaemonsDaemonIdProjectsRoute
+  '/api/daemons/access-leases/refresh': typeof ApiDaemonsAccessLeasesRefreshRoute
   '/api/daemons/access-tickets/consume': typeof ApiDaemonsAccessTicketsConsumeRoute
   '/api/integrations/discord/callback': typeof ApiIntegrationsDiscordCallbackRoute
   '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
@@ -529,6 +559,9 @@ export interface FileRouteTypes {
     | '/o/$organizationSlug/settings'
     | '/o/$organizationSlug/triggers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
+    | '/api/daemons/$daemonId/connection-offer'
+    | '/api/daemons/$daemonId/projects'
+    | '/api/daemons/access-leases/refresh'
     | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -579,6 +612,9 @@ export interface FileRouteTypes {
     | '/o/$organizationSlug/connections'
     | '/o/$organizationSlug/daemons'
     | '/agent-executions/$executionId/attachments/$attachmentId'
+    | '/api/daemons/$daemonId/connection-offer'
+    | '/api/daemons/$daemonId/projects'
+    | '/api/daemons/access-leases/refresh'
     | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -632,6 +668,9 @@ export interface FileRouteTypes {
     | '/_shell/o/$organizationSlug/settings'
     | '/_shell/o/$organizationSlug/triggers'
     | '/agent-executions/$executionId/attachments/$attachmentId'
+    | '/api/daemons/$daemonId/connection-offer'
+    | '/api/daemons/$daemonId/projects'
+    | '/api/daemons/access-leases/refresh'
     | '/api/daemons/access-tickets/consume'
     | '/api/integrations/discord/callback'
     | '/api/integrations/github/callback'
@@ -668,7 +707,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingPlansRoute: typeof ApiBillingPlansRoute
   ApiBillingWebhookRoute: typeof ApiBillingWebhookRoute
-  ApiDaemonsDaemonIdRoute: typeof ApiDaemonsDaemonIdRoute
+  ApiDaemonsDaemonIdRoute: typeof ApiDaemonsDaemonIdRouteWithChildren
   ApiDaemonsEnrollRoute: typeof ApiDaemonsEnrollRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
   ApiV1ChannelsRoute: typeof ApiV1ChannelsRouteWithChildren
@@ -676,6 +715,7 @@ export interface RootRouteChildren {
   ApiV1UsersRoute: typeof ApiV1UsersRouteWithChildren
   McpChannelTokenRoute: typeof McpChannelTokenRoute
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute: typeof AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute
+  ApiDaemonsAccessLeasesRefreshRoute: typeof ApiDaemonsAccessLeasesRefreshRoute
   ApiDaemonsAccessTicketsConsumeRoute: typeof ApiDaemonsAccessTicketsConsumeRoute
   ApiIntegrationsDiscordCallbackRoute: typeof ApiIntegrationsDiscordCallbackRoute
   ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
@@ -955,6 +995,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDaemonsAccessTicketsConsumeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/daemons/access-leases/refresh': {
+      id: '/api/daemons/access-leases/refresh'
+      path: '/api/daemons/access-leases/refresh'
+      fullPath: '/api/daemons/access-leases/refresh'
+      preLoaderRoute: typeof ApiDaemonsAccessLeasesRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/daemons/$daemonId/projects': {
+      id: '/api/daemons/$daemonId/projects'
+      path: '/projects'
+      fullPath: '/api/daemons/$daemonId/projects'
+      preLoaderRoute: typeof ApiDaemonsDaemonIdProjectsRouteImport
+      parentRoute: typeof ApiDaemonsDaemonIdRoute
+    }
+    '/api/daemons/$daemonId/connection-offer': {
+      id: '/api/daemons/$daemonId/connection-offer'
+      path: '/connection-offer'
+      fullPath: '/api/daemons/$daemonId/connection-offer'
+      preLoaderRoute: typeof ApiDaemonsDaemonIdConnectionOfferRouteImport
+      parentRoute: typeof ApiDaemonsDaemonIdRoute
+    }
     '/agent-executions/$executionId/attachments/$attachmentId': {
       id: '/agent-executions/$executionId/attachments/$attachmentId'
       path: '/agent-executions/$executionId/attachments/$attachmentId'
@@ -1125,6 +1186,20 @@ const ShellRouteChildren: ShellRouteChildren = {
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
+interface ApiDaemonsDaemonIdRouteChildren {
+  ApiDaemonsDaemonIdConnectionOfferRoute: typeof ApiDaemonsDaemonIdConnectionOfferRoute
+  ApiDaemonsDaemonIdProjectsRoute: typeof ApiDaemonsDaemonIdProjectsRoute
+}
+
+const ApiDaemonsDaemonIdRouteChildren: ApiDaemonsDaemonIdRouteChildren = {
+  ApiDaemonsDaemonIdConnectionOfferRoute:
+    ApiDaemonsDaemonIdConnectionOfferRoute,
+  ApiDaemonsDaemonIdProjectsRoute: ApiDaemonsDaemonIdProjectsRoute,
+}
+
+const ApiDaemonsDaemonIdRouteWithChildren =
+  ApiDaemonsDaemonIdRoute._addFileChildren(ApiDaemonsDaemonIdRouteChildren)
+
 interface ApiV1ChannelsRouteChildren {
   ApiV1ChannelsStatusRoute: typeof ApiV1ChannelsStatusRoute
 }
@@ -1178,7 +1253,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingPlansRoute: ApiBillingPlansRoute,
   ApiBillingWebhookRoute: ApiBillingWebhookRoute,
-  ApiDaemonsDaemonIdRoute: ApiDaemonsDaemonIdRoute,
+  ApiDaemonsDaemonIdRoute: ApiDaemonsDaemonIdRouteWithChildren,
   ApiDaemonsEnrollRoute: ApiDaemonsEnrollRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
   ApiV1ChannelsRoute: ApiV1ChannelsRouteWithChildren,
@@ -1187,6 +1262,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpChannelTokenRoute: McpChannelTokenRoute,
   AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute:
     AgentExecutionsExecutionIdAttachmentsAttachmentIdRoute,
+  ApiDaemonsAccessLeasesRefreshRoute: ApiDaemonsAccessLeasesRefreshRoute,
   ApiDaemonsAccessTicketsConsumeRoute: ApiDaemonsAccessTicketsConsumeRoute,
   ApiIntegrationsDiscordCallbackRoute: ApiIntegrationsDiscordCallbackRoute,
   ApiIntegrationsGithubCallbackRoute: ApiIntegrationsGithubCallbackRoute,

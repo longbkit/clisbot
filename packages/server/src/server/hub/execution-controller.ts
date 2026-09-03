@@ -155,6 +155,7 @@ export class HubExecutionController {
         reuseAgentId: message.reuseAgentId,
         provider: message.provider,
         cwd: message.cwd,
+        projectId: message.projectId,
         prompt: message.prompt,
         model: message.model,
         modeId: message.modeId,

@@ -50,7 +50,9 @@ import {
   readCredentialCipherEnvironment,
   type CredentialCipher,
 } from "./credentials/credential-cipher.js";
-import { readAccessLeaseDuration } from "./managed-access/tickets.js";
+import { AccessStore } from "./access/store.js";
+import { AccessLeaseRevocation } from "./managed-access/revocation.js";
+import { AccessTicketService, readAccessLeaseDuration } from "./managed-access/tickets.js";
 
 export function startProductionRuntime(): Promise<ApplicationRuntime> {
   return startApplication(createProductionRuntime);
@@ -90,6 +92,16 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
     );
     resources.own(() => database.close());
     const identity = await resolveHubIdentity(runtime, readPort(), credentialCipher);
+    const accessTickets = new AccessTicketService(runtime, new AccessStore(runtime), {
+      leaseDurationMs: readAccessLeaseDuration(
+        process.env["PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION"],
+      ),
+    });
+    let notifyAccessLeaseRevocation = (_daemonId: string, _leaseIds: readonly string[]): boolean =>
+      false;
+    const accessLeaseRevocation = new AccessLeaseRevocation(accessTickets, (daemonId, leaseIds) => {
+      notifyAccessLeaseRevocation(daemonId, leaseIds);
+    });
     const entitlements = composeEntitlements(database, runtime);
     resources.own(() => entitlements.close());
     const billingConfig = readBillingConfig();
@@ -122,6 +134,8 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       config.trustedClientIpHeader,
       billing,
       invitationMailer,
+      (organizationId) =>
+        accessLeaseRevocation.revokeOrganization(organizationId).then(() => undefined),
     );
     resources.own(() => auth.close());
     await auth.initialize?.();
@@ -226,12 +240,12 @@ async function createProductionRuntime(): Promise<ApplicationRuntime> {
       providerApplications,
       publicBaseUrl: identity.appUrl,
       completionTokenSecret: identity.authSecret,
-      managedAccessLeaseDurationMs: readAccessLeaseDuration(
-        process.env["PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION"],
-      ),
+      accessTickets,
+      accessLeaseRevocation,
       claimSlackInbound,
       close: () => resources.close(),
     });
+    notifyAccessLeaseRevocation = application.hub.revokeAccessLeases;
     const activationFailures = await activateProviderApplicationsAtStartup({
       store: providerStore,
       environment: providerEnvironment,
@@ -263,6 +277,7 @@ function createProductionAuthServer(
   trustedClientIpHeader: string | undefined,
   billing: BillingRuntime | null,
   invitationMailer: ReturnType<typeof composeInvitationMailer>,
+  onOrganizationAccessChanged: (organizationId: string) => Promise<void>,
 ) {
   return createAuthServer({
     database,
@@ -273,6 +288,7 @@ function createProductionAuthServer(
     policy: authPolicy,
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     ...(invitationMailer === undefined ? {} : { invitationMailer }),
+    onOrganizationAccessChanged,
     // Hosted: new organizations start on the Free plan from the catalog mirror. Self-hosted
     // (billing null) keeps the createAuthServer default, which stamps unlimited.
     ...(billing === null

@@ -22,6 +22,7 @@ export interface HubExecutionAgentCreateInput {
   reuseAgentId?: string;
   provider: string;
   cwd: string;
+  projectId?: string;
   prompt: string;
   model?: string;
   modeId?: string;
@@ -59,6 +60,8 @@ interface DaemonExecutionsOptions {
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   createAgent: BoundCreateAgentCommand;
+  assertProjectSourcePlacement?: (cwd: string, projectId: string) => Promise<void>;
+  resolveWorkspaceProjectId?: (workspaceId: string) => Promise<string | undefined>;
   interruptAgent: (agentId: string) => Promise<unknown>;
   logger: Logger;
   cleanupFailedCreate?: (input: {
@@ -176,12 +179,21 @@ export class DaemonExecutions implements HubExecutionAgents {
     const existing = await this.agentStorage.findByDaemonExecution(owner);
     if (existing) {
       requireExecutionWorkspaceId(existing);
+      await this.requireProjectPlacement(existing.workspaceId, input.projectId);
       this.requireAuthority(authorityGeneration);
       return this.resolveRecord(existing);
     }
     this.requireAuthority(authorityGeneration);
     requireHubMcpNamespace(input.mcpServers);
     requireToolPolicyServers(input.toolPolicy, input.mcpServers);
+    if (input.projectId !== undefined) {
+      const assertPlacement = this.options.assertProjectSourcePlacement;
+      if (!assertPlacement) {
+        throw new Error("Hub execution Project placement is unavailable");
+      }
+      await assertPlacement(input.cwd, input.projectId);
+      this.requireAuthority(authorityGeneration);
+    }
 
     if (input.reuseAgentId !== undefined) {
       return this.reuseAgent(owner, input, authorityGeneration);
@@ -198,6 +210,7 @@ export class DaemonExecutions implements HubExecutionAgents {
         initialPrompt: input.prompt,
         promptFailure: "throw",
         cwd: input.cwd,
+        projectId: input.projectId,
         mode: input.modeId,
         thinking: input.thinkingOptionId,
         features: input.featureValues,
@@ -224,6 +237,7 @@ export class DaemonExecutions implements HubExecutionAgents {
       });
       this.requireAuthority(authorityGeneration);
       requireExecutionWorkspaceId(result.liveSnapshot);
+      await this.requireProjectPlacement(result.liveSnapshot.workspaceId, input.projectId);
     } catch (error) {
       try {
         if (createdAgentId && this.agentManager.getAgent(createdAgentId)) {
@@ -269,6 +283,7 @@ export class DaemonExecutions implements HubExecutionAgents {
     if (record.provider !== input.provider || record.cwd !== input.cwd) {
       throw new Error("Reusable Hub agent is not compatible with this execution");
     }
+    await this.requireProjectPlacement(requireExecutionWorkspaceId(record), input.projectId);
     this.requireAuthority(authorityGeneration, "agent reuse");
     const overrides = {
       provider: input.provider,
@@ -355,6 +370,18 @@ export class DaemonExecutions implements HubExecutionAgents {
   private resolveRecord(record: StoredAgentRecord): OwnedAgentSnapshot {
     requireExecutionWorkspaceId(record);
     return this.projectRecord(record);
+  }
+
+  private async requireProjectPlacement(
+    workspaceId: string | undefined,
+    projectId: string | undefined,
+  ): Promise<void> {
+    if (projectId === undefined) return;
+    if (workspaceId === undefined) throw new Error("Hub agent has no Workspace");
+    const actual = await this.options.resolveWorkspaceProjectId?.(workspaceId);
+    if (actual !== projectId) {
+      throw new Error(`Hub agent Workspace does not belong to Project ${projectId}`);
+    }
   }
 
   private requireAuthority(authorityGeneration: number, operation = "agent creation"): void {

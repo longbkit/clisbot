@@ -1,4 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import { ConnectionOfferSchema } from "@getpaseo/protocol/connection-offer";
+import { ManagedAccessModeSchema } from "@getpaseo/protocol/managed-access";
 import { z } from "zod";
 import { ProductRequestError, type OrganizationAccessValue } from "../auth/organization-access.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
@@ -27,6 +29,14 @@ const enrollmentBody = z
     }
   });
 const permissionsBody = z.object({ permissions: z.array(z.string().min(1)) }).strict();
+const connectionOfferBody = z
+  .object({
+    connectionOffer: ConnectionOfferSchema.nullable(),
+    // COMPAT(managedAccessModePublication): added in v0.8.0, remove after
+    // 2027-03-03 once enrolled daemon floor includes managed access publication.
+    managedAccessMode: ManagedAccessModeSchema.optional().default("off"),
+  })
+  .strict();
 
 interface DaemonRegistrationOptions {
   database: Database;
@@ -179,6 +189,27 @@ export async function updateDaemonPermissions(
   if (updated === undefined) return Response.json({ error: "daemon unavailable" }, { status: 404 });
   registry.updatePermissions(updated);
   return Response.json({ permissions: updated.permissions });
+}
+
+export async function replaceDaemonConnectionOffer(
+  request: Request,
+  id: string,
+  database: Database,
+): Promise<Response> {
+  const daemon = await authenticateDaemonRequest(request, id, database);
+  if (daemon instanceof Response) return daemon;
+  const input = await parseRequest(request, connectionOfferBody);
+  if (input instanceof Response) return input;
+  const updated = await database.setDaemonConnectionOffer(
+    id,
+    input.connectionOffer,
+    input.managedAccessMode,
+  );
+  if (updated === undefined) return Response.json({ error: "daemon unavailable" }, { status: 404 });
+  return Response.json({
+    connectionOffer: updated.connectionOffer,
+    managedAccessMode: updated.managedAccessMode,
+  });
 }
 
 export async function revokeDaemon(

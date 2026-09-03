@@ -90,9 +90,7 @@ function createFacade(
     waitForConnected: (timeoutMs) => socket.waitForConnected(timeoutMs),
     createAgent: (config, options) =>
       socket
-        .call("create_agent_request", {
-          config: withTitle(config, options?.title),
-        })
+        .call("create_agent_request", createAgentPayload(config, options?.title))
         .then(mapCreatedAgent),
     sendAgentMessage: (agentId, text, options) =>
       socket
@@ -156,6 +154,15 @@ function mapCreatedAgent(payload: unknown): CreateAgentResult {
 function withTitle(config: CreateAgentConfig, title?: string): CreateAgentConfig {
   if (title === undefined) return config;
   return { ...config, title };
+}
+
+function createAgentPayload(config: CreateAgentConfig, title?: string) {
+  const { projectId, worktree, ...sessionConfig } = config;
+  return {
+    config: withTitle(sessionConfig, title),
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(worktree === undefined ? {} : { worktree }),
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

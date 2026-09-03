@@ -28,7 +28,10 @@ import {
 import { ProjectDashboard } from "./projects/dashboard.js";
 import { CompositionResources } from "./composition-resources.js";
 import { TriggerDashboard } from "./triggers/dashboard.js";
-import type { ProviderApplications } from "./provider-applications/index.js";
+import type {
+  ProviderApplicationConfigurationChange,
+  ProviderApplications,
+} from "./provider-applications/index.js";
 // COMPAT(clisbot-control-plane): the pino logger for the channel supervisor seam +
 // the kill-switch the composition consults.
 import { logger } from "./logger.js";
@@ -36,10 +39,15 @@ import { isChannelsEnabled } from "./channels/loader/channel-gate.js";
 import { runtimeFile } from "./runtime-files.js";
 import { ChannelStore } from "./db/channels.js";
 import type { ChannelReplyServer } from "./channels/channel-reply.js";
-import { resolveHome } from "./channels/daemon/discovery.js";
 import { AccessStore } from "./access/store.js";
+import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 import { AccessTicketService } from "./managed-access/tickets.js";
 import { ManagementApi } from "./management-api/index.js";
+import {
+  loadChannelControlPlane,
+  type ChannelControlPlaneSnapshot,
+} from "./channels/control-plane.js";
+import type { ChannelSupervisor } from "./channels/supervisor/types.js";
 
 export interface ApplicationCompositionOptions {
   database: Database | null;
@@ -57,6 +65,8 @@ export interface ApplicationCompositionOptions {
   publicBaseUrl?: string;
   completionTokenSecret?: string;
   managedAccessLeaseDurationMs?: number;
+  accessTickets?: AccessTicketService;
+  accessLeaseRevocation?: AccessLeaseRevocation;
   testTriggerRoutes?: boolean;
   daemonConnectionForId?: DaemonDispatchLifecycleOptions["connectionForDaemon"];
   /** COMPAT(clisbot-control-plane): exclusive Slack Socket Mode ownership. */
@@ -83,31 +93,10 @@ async function createOwnedApplicationRuntime(
   options: ApplicationCompositionOptions,
   ownership: CompositionResources,
 ): Promise<ApplicationRuntime> {
-  const accessStore =
-    options.databaseRuntime === undefined ? null : new AccessStore(options.databaseRuntime);
-  const accessTickets =
-    options.databaseRuntime === undefined || accessStore === null
-      ? null
-      : new AccessTicketService(
-          options.databaseRuntime,
-          accessStore,
-          options.managedAccessLeaseDurationMs === undefined
-            ? {}
-            : { leaseDurationMs: options.managedAccessLeaseDurationMs },
-        );
+  const { accessStore, accessTickets } = createManagedAccessServices(options);
   const registrations = options.registrations ?? [];
-  const connections = new Map(
-    registrations.map((registration) => [registration.connection.name, registration.connection]),
-  );
-  if (connections.size !== registrations.length) {
-    throw new Error("provider connection registrations must have unique names");
-  }
-  const integrations = new Map<string, ProviderIntegrationRegistration>();
-  for (const registration of registrations) {
-    if (registration.integration !== undefined) {
-      integrations.set(registration.connection.name, registration.integration);
-    }
-  }
+  const { connections, integrations, outputRegistry, requests, githubConfiguration } =
+    createProviderRuntimeCatalog(registrations);
   const connectionsForOrganization = createConnectionsForOrganization(
     options.database,
     integrations,
@@ -117,23 +106,32 @@ async function createOwnedApplicationRuntime(
     connectionsForOrganization,
     integrations,
   );
-  const outputRegistry = new OutputExecutorRegistry();
-  for (const output of registrations.flatMap((registration) => registration.outputs)) {
-    outputRegistry.register(output);
-  }
   let dispatchChannelWorkflow:
     | import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"]
     | undefined;
-  const channelSupervisor = await createChannelSupervisorAtComposition(options, (input) => {
-    if (dispatchChannelWorkflow === undefined) {
-      return Promise.reject(new Error("channel workflow dispatcher is not started"));
-    }
-    return dispatchChannelWorkflow(input);
-  });
+  const channelSupervisor = await createChannelSupervisorAtComposition(
+    options,
+    accessStore,
+    (input) => {
+      if (dispatchChannelWorkflow === undefined) {
+        return Promise.reject(new Error("channel workflow dispatcher is not started"));
+      }
+      return dispatchChannelWorkflow(input);
+    },
+  );
   const channelReplyServer = await createChannelReplyServerAtComposition(
     options,
     channelSupervisor,
   );
+  const unsubscribeProviderApplicationChanges =
+    options.providerApplications?.onConfigurationChanged?.((change) =>
+      restartProviderApplicationChannelConsumers(options.database, channelSupervisor, change),
+    );
+  if (unsubscribeProviderApplicationChanges !== undefined) {
+    ownership.own(async () => {
+      unsubscribeProviderApplicationChanges();
+    });
+  }
 
   const application = createHubApplication(
     hubApplicationOptions(
@@ -143,6 +141,7 @@ async function createOwnedApplicationRuntime(
       outputRegistry,
       channelSupervisor,
       channelReplyServer,
+      accessStore,
       accessTickets,
     ),
   );
@@ -165,20 +164,31 @@ async function createOwnedApplicationRuntime(
   await channelSupervisor?.startAll();
 
   const resources = options.database === null ? null : new OrganizationResources(options.database);
-  const requests = new Map<string, (incoming: Request) => Promise<Response>>();
-  for (const request of registrations.flatMap((registration) => registration.requests)) {
-    if (requests.has(request.name)) {
-      throw new Error(`provider request registrations must have unique names: ${request.name}`);
-    }
-    requests.set(request.name, (incoming) => request.handle(incoming));
-  }
-  const githubConfigurations = registrations.flatMap((registration) =>
-    registration.githubConfiguration === undefined ? [] : [registration.githubConfiguration],
+  const accessLeaseRevocation =
+    options.accessLeaseRevocation ??
+    (accessTickets === null
+      ? null
+      : new AccessLeaseRevocation(accessTickets, (daemonId, leaseIds) => {
+          application.hub.revokeAccessLeases(daemonId, leaseIds);
+        }));
+  const managementApi = createManagementApi(
+    options,
+    accessStore,
+    accessTickets,
+    channelSupervisor,
+    accessLeaseRevocation,
+    application.publicOperations,
+    async (request, input) => {
+      const action = connections.get(input.provider)?.actions["disconnect"];
+      if (action === undefined) {
+        return Response.json({ error: "provider_not_configured" }, { status: 409 });
+      }
+      const url = new URL(request.url);
+      url.searchParams.set("organizationSlug", input.organizationSlug);
+      url.searchParams.set("connectionId", input.connectionId);
+      return action(new Request(url, { method: "POST", headers: request.headers }));
+    },
   );
-  if (githubConfigurations.length > 1) {
-    throw new Error("GitHub configuration registrations must be unique");
-  }
-  const managementApi = createManagementApi(options, accessStore, accessTickets, channelSupervisor);
   return {
     hub: application.hub,
     operations: application.operations,
@@ -190,11 +200,8 @@ async function createOwnedApplicationRuntime(
     projectDashboard:
       options.database === null || options.auth === null
         ? null
-        : new ProjectDashboard(
-            options.database,
-            options.auth,
-            githubConfigurations[0],
-            (projectId) => application.configurationForProject(projectId),
+        : new ProjectDashboard(options.database, options.auth, githubConfiguration, (projectId) =>
+            application.configurationForProject(projectId),
           ),
     triggerDashboard: triggerDashboardFor(options),
     ...entitlementSurfaces(options),
@@ -377,18 +384,137 @@ async function createOwnedApplicationRuntime(
   };
 }
 
+function createManagedAccessServices(options: ApplicationCompositionOptions): {
+  accessStore: AccessStore | null;
+  accessTickets: AccessTicketService | null;
+} {
+  if (options.databaseRuntime === undefined) {
+    return { accessStore: null, accessTickets: options.accessTickets ?? null };
+  }
+  const accessStore = new AccessStore(options.databaseRuntime);
+  const accessTickets =
+    options.accessTickets ??
+    new AccessTicketService(
+      options.databaseRuntime,
+      accessStore,
+      options.managedAccessLeaseDurationMs === undefined
+        ? {}
+        : { leaseDurationMs: options.managedAccessLeaseDurationMs },
+    );
+  return { accessStore, accessTickets };
+}
+
+interface ProviderRuntimeCatalog {
+  connections: Map<string, ProviderRegistration["connection"]>;
+  integrations: Map<string, ProviderIntegrationRegistration>;
+  outputRegistry: OutputExecutorRegistry;
+  requests: Map<string, (incoming: Request) => Promise<Response>>;
+  githubConfiguration: NonNullable<ProviderRegistration["githubConfiguration"]> | undefined;
+}
+
+function createProviderRuntimeCatalog(
+  registrations: readonly ProviderRegistration[],
+): ProviderRuntimeCatalog {
+  const connections = new Map(
+    registrations.map((registration) => [registration.connection.name, registration.connection]),
+  );
+  if (connections.size !== registrations.length) {
+    throw new Error("provider connection registrations must have unique names");
+  }
+  const integrations = new Map<string, ProviderIntegrationRegistration>();
+  for (const registration of registrations) {
+    if (registration.integration !== undefined) {
+      integrations.set(registration.connection.name, registration.integration);
+    }
+  }
+  const outputRegistry = new OutputExecutorRegistry();
+  for (const output of registrations.flatMap((registration) => registration.outputs)) {
+    outputRegistry.register(output);
+  }
+  const requests = new Map<string, (incoming: Request) => Promise<Response>>();
+  for (const request of registrations.flatMap((registration) => registration.requests)) {
+    if (requests.has(request.name)) {
+      throw new Error(`provider request registrations must have unique names: ${request.name}`);
+    }
+    requests.set(request.name, (incoming) => request.handle(incoming));
+  }
+  const githubConfigurations = registrations.flatMap((registration) =>
+    registration.githubConfiguration === undefined ? [] : [registration.githubConfiguration],
+  );
+  if (githubConfigurations.length > 1) {
+    throw new Error("GitHub configuration registrations must be unique");
+  }
+  return {
+    connections,
+    integrations,
+    outputRegistry,
+    requests,
+    githubConfiguration: githubConfigurations[0],
+  };
+}
+
+/**
+ * Restarts every enabled account whose Connection reads the replaced
+ * Provider Application credential. The Channel runtime is deliberately
+ * single-organization today, so ambiguity fails closed instead of restarting
+ * an account with the same name from an arbitrary organization.
+ */
+export async function restartProviderApplicationChannelConsumers(
+  database: Database | null,
+  supervisor: ChannelSupervisor | null,
+  change: ProviderApplicationConfigurationChange,
+  loadControlPlane: (
+    database: Database,
+    organizationId?: string,
+  ) => Promise<ChannelControlPlaneSnapshot> = loadChannelControlPlane,
+): Promise<void> {
+  if (database === null || supervisor === null || change.provider !== "slack") return;
+  const organizations = await database.listOrganizationsForOperator();
+  if (organizations.length === 0) return;
+  if (organizations.length !== 1) {
+    throw new Error("Channel credential reload requires exactly one active organization");
+  }
+  const organization = organizations[0]!;
+  const usage = await database.organizationConnectionUsage(organization.id);
+  const connectionIds = new Set(
+    usage.slack
+      .filter(({ providerApplicationId }) => providerApplicationId === change.providerApplicationId)
+      .map(({ id }) => id),
+  );
+  if (connectionIds.size === 0) return;
+  const snapshot = await loadControlPlane(database, organization.id);
+  if (!snapshot.controlPlane.enabled) return;
+  for (const account of snapshot.controlPlane.accounts) {
+    if (
+      account.channel !== "slack" ||
+      !connectionIds.has(account.connectionId) ||
+      !account.enabled ||
+      !account.channelEnabled
+    ) {
+      continue;
+    }
+    await supervisor.startAccount(account.channel, account.accountId);
+  }
+}
+
 function createManagementApi(
   options: ApplicationCompositionOptions,
   accessStore: AccessStore | null,
   accessTickets: AccessTicketService | null,
   channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
+  accessLeaseRevocation: AccessLeaseRevocation | null,
+  publicOperations: import("./public-operations/index.js").PublicOperations | null,
+  disconnectProviderConnection: NonNullable<
+    ConstructorParameters<typeof ManagementApi>[0]["disconnectProviderConnection"]
+  >,
 ): ManagementApi | null {
   if (
     options.database === null ||
     options.databaseRuntime === undefined ||
     options.auth === null ||
     accessStore === null ||
-    accessTickets === null
+    accessTickets === null ||
+    accessLeaseRevocation === null
   ) {
     return null;
   }
@@ -399,6 +525,10 @@ function createManagementApi(
     access: accessStore,
     tickets: accessTickets,
     channelSupervisor,
+    providerApplications: options.providerApplications ?? null,
+    disconnectProviderConnection,
+    accessLeaseRevocation,
+    manualRuns: publicOperations,
   });
 }
 
@@ -412,6 +542,7 @@ function createManagementApi(
 // instead of failing the instance.
 async function createChannelSupervisorAtComposition(
   options: ApplicationCompositionOptions,
+  access: AccessStore | null,
   dispatchWorkflow: import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"],
 ): Promise<import("./channels/supervisor/types.js").ChannelSupervisor | null> {
   if (!isChannelsEnabled()) return null;
@@ -434,6 +565,57 @@ async function createChannelSupervisorAtComposition(
       pinsPath: runtimeFile("channel-pins.json"),
       logger: channelLogger,
       dispatchWorkflow,
+      ...(access === null
+        ? {}
+        : {
+            authorizeChannelUse: ({ organizationId, account, message }) =>
+              access.allowsChannelPrivilege({
+                organizationId,
+                connectionId: account.connectionId,
+                channel: account.channel,
+                accountId: account.accountId,
+                senderIdentity: message.senderIdentity,
+                conversation: message.conversation,
+                privilege: "channel.use",
+              }),
+            authorizeChannelApproval: ({
+              organizationId,
+              account,
+              responderIdentity,
+              target,
+              privilege,
+            }) =>
+              target.projectId === undefined
+                ? Promise.resolve(false)
+                : access.allowsChannelApproval({
+                    organizationId,
+                    connectionId: account.connectionId,
+                    channel: account.channel,
+                    senderIdentity: responderIdentity,
+                    daemonReference: target.daemonReference,
+                    projectId: target.projectId,
+                    privilege,
+                  }),
+            consumeChannelIdentityChallenge: async ({
+              organizationId,
+              account,
+              senderIdentity,
+              senderName,
+              code,
+            }) => {
+              const prefix = `${account.channel}:`;
+              const consumed = await access.consumeChannelIdentityChallenge({
+                organizationId,
+                connectionId: account.connectionId,
+                externalSubjectId: senderIdentity.startsWith(prefix)
+                  ? senderIdentity.slice(prefix.length)
+                  : senderIdentity,
+                displayName: senderName ?? null,
+                code,
+              });
+              return consumed.status;
+            },
+          }),
       ...(options.claimSlackInbound === undefined
         ? {}
         : { claimSlackInbound: options.claimSlackInbound }),
@@ -448,8 +630,8 @@ async function createChannelSupervisorAtComposition(
 }
 
 // COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint
-// (E4) — the hub-side `message` tool served on the loopback HTTP server at
-// `/mcp/channel/<ref>`. Built only when the channel plane is on and the
+// (E4) — the hub-side `message` tool served at
+// `/mcp/channel/<opaque-capability>`. Built only when the channel plane is on and the
 // supervisor is present; the single provisioned organization (P0) scopes its
 // delivery-ledger rows. The post path is the supervisor's `channelReplyPost`
 // (the vertical's `sendText` through `postFor`). Any construction failure
@@ -459,7 +641,7 @@ async function createChannelReplyServerAtComposition(
   options: ApplicationCompositionOptions,
   supervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
 ): Promise<ChannelReplyServer | null> {
-  if (supervisor === null) return null;
+  if (supervisor?.channelReplyCapabilities === undefined) return null;
   if (options.database === null || options.databaseRuntime === undefined) {
     return null;
   }
@@ -470,9 +652,10 @@ async function createChannelReplyServerAtComposition(
     return createChannelReplyServer({
       organizationId: organizations[0]!.id,
       store: new ChannelStore(options.databaseRuntime),
+      resolveCapability: (token) =>
+        supervisor.channelReplyCapabilities?.resolve(token, organizations[0]!.id),
       post: (ref, text) => supervisor.channelReplyPost(ref, text),
       mediaPost: (ref, filePath) => supervisor.channelReplyMediaPost(ref, filePath),
-      homeRoot: resolveHome(undefined, process.env),
     });
   } catch (error) {
     reportFailure(error, {
@@ -491,11 +674,13 @@ function hubApplicationOptions(
   outputRegistry: OutputExecutorRegistry,
   channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
   channelReplyServer: ChannelReplyServer | null,
+  accessStore: AccessStore | null,
   accessTickets: AccessTicketService | null,
 ): HubRuntimeOptions {
   return {
     database: options.database,
     ...(options.databaseRuntime === undefined ? {} : { databaseRuntime: options.databaseRuntime }),
+    ...(accessStore === null ? {} : { accessStore }),
     ...(accessTickets === null ? {} : { accessTickets }),
     entitlements: options.entitlements,
     providerFactories: registrations.flatMap((registration) => registration.triggerProviders),

@@ -334,6 +334,8 @@ function daemonRecord(): DaemonRecord {
     machineId: "machine-lifecycle",
     serverId: "server-lifecycle",
     daemonPublicKey: "public-key",
+    connectionOffer: null,
+    managedAccessMode: "off",
     credentialVerifier: "verifier",
     permissions: ["hub.execute"],
     registeredByApiKeyId: null,

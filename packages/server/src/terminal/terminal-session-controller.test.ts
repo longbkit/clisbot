@@ -654,7 +654,9 @@ describe("terminal-session-controller backpressure snapshot fallback", () => {
   async function setup(getClientBufferedAmount: () => number | null): Promise<{
     pushOutput: (data: string) => void;
     frames: TerminalStreamFrame[];
+    revoke: () => void;
   }> {
+    let authorized = true;
     let terminalListener: ((message: ServerMessage) => void) | null = null;
     const terminal: TerminalSession = {
       id: "term-1",
@@ -715,6 +717,7 @@ describe("terminal-session-controller backpressure snapshot fallback", () => {
       isPathWithinRoot: () => false,
       sessionLogger: createLogger(),
       getClientBufferedAmount,
+      canUseTerminal: () => authorized,
     });
 
     await controller.dispatch({
@@ -730,8 +733,21 @@ describe("terminal-session-controller backpressure snapshot fallback", () => {
     return {
       pushOutput: (data) => terminalListener?.({ type: "output", data, revision: 2 }),
       frames,
+      revoke: () => {
+        authorized = false;
+      },
     };
   }
+
+  test("stops binary output when terminal authority is revoked", async () => {
+    const { pushOutput, frames, revoke } = await setup(() => 0);
+
+    revoke();
+    pushOutput("must-not-leak\n");
+    await waitForCoalescerFlush();
+
+    expect(frames).toEqual([]);
+  });
 
   test("streams all output without a snapshot when the client keeps up", async () => {
     const { pushOutput, frames } = await setup(() => 0);

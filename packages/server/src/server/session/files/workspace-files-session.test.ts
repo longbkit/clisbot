@@ -327,7 +327,9 @@ describe("WorkspaceFilesSession", () => {
   test("reads file content inline when the client has no binary channel", async () => {
     const cwd = makeDir("workspace-files-read-");
     writeFileSync(join(cwd, "notes.txt"), "hello world");
-    const { subsystem, emitted, binary } = makeSubsystem({ hasBinaryChannel: false });
+    const { subsystem, emitted, binary } = makeSubsystem({
+      hasBinaryChannel: false,
+    });
 
     await subsystem.handleFileExplorerRequest({
       type: "file_explorer_request",
@@ -351,7 +353,9 @@ describe("WorkspaceFilesSession", () => {
   test("streams binary frames when the client accepts binary and has a channel", async () => {
     const cwd = makeDir("workspace-files-binary-");
     writeFileSync(join(cwd, "notes.txt"), "hello world");
-    const { subsystem, emitted, binary } = makeSubsystem({ hasBinaryChannel: true });
+    const { subsystem, emitted, binary } = makeSubsystem({
+      hasBinaryChannel: true,
+    });
 
     await subsystem.handleFileExplorerRequest({
       type: "file_explorer_request",
@@ -375,7 +379,9 @@ describe("WorkspaceFilesSession", () => {
   test("rejects an over-budget file before opening a binary transfer", async () => {
     const cwd = makeDir("workspace-files-read-budget-");
     writeFileSync(join(cwd, "notes.txt"), "hello world");
-    const { subsystem, emitted, binary } = makeSubsystem({ hasBinaryChannel: true });
+    const { subsystem, emitted, binary } = makeSubsystem({
+      hasBinaryChannel: true,
+    });
 
     await subsystem.handleFileExplorerRequest({
       type: "file_explorer_request",
@@ -391,7 +397,9 @@ describe("WorkspaceFilesSession", () => {
     expect(emitted).toEqual([
       expect.objectContaining({
         type: "file_explorer_response",
-        payload: expect.objectContaining({ error: "File is too large to display" }),
+        payload: expect.objectContaining({
+          error: "File is too large to display",
+        }),
       }),
     ]);
   });
@@ -443,7 +451,10 @@ describe("WorkspaceFilesSession", () => {
     expect(emitted).toEqual([
       expect.objectContaining({
         type: "file_explorer_response",
-        payload: expect.objectContaining({ requestId: "req-unrelated-list", error: null }),
+        payload: expect.objectContaining({
+          requestId: "req-unrelated-list",
+          error: null,
+        }),
       }),
     ]);
 
@@ -584,7 +595,10 @@ describe("WorkspaceFilesSession", () => {
       }),
     );
     await subsystem.handleFileTransferFrame(
-      uploadFrame({ opcode: FileTransferOpcode.FileEnd, requestId: "req-upload" }),
+      uploadFrame({
+        opcode: FileTransferOpcode.FileEnd,
+        requestId: "req-upload",
+      }),
     );
 
     const message = emitted.find((entry) => entry.type === "file.upload.response");
@@ -593,6 +607,11 @@ describe("WorkspaceFilesSession", () => {
     }
     expect(message.payload.error).toBeNull();
     expect(message.payload.file?.fileName).toBe("notes.txt");
+    if (!message.payload.file) throw new Error("expected an uploaded file");
+    expect(subsystem.ownsUploadedFileAttachments([message.payload.file])).toBe(true);
+    expect(makeSubsystem().subsystem.ownsUploadedFileAttachments([message.payload.file])).toBe(
+      false,
+    );
     expect(readFileSync(join(paseoHome, "uploads", "upload_req-upload", "notes.txt"), "utf8")).toBe(
       "hello world",
     );

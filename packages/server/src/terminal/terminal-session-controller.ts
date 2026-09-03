@@ -83,6 +83,8 @@ export interface TerminalSessionControllerOptions {
   // Bytes queued on the client transport but not yet sent, or null when the
   // transport exposes no backpressure signal (e.g. the multiplexed relay socket).
   getClientBufferedAmount?: () => number | null;
+  canUseWorkspace?: (workspaceId: string) => Promise<boolean>;
+  canUseTerminal?: (terminalId: string) => boolean;
 }
 
 interface TerminalWorkspaceRef {
@@ -131,6 +133,8 @@ export class TerminalSessionController {
   private readonly listTerminalWorkspaceRoots: () => Promise<readonly string[]>;
   private readonly clientSupportsWrapReflow: () => boolean;
   private readonly getClientBufferedAmount: () => number | null;
+  private readonly canUseWorkspace: (workspaceId: string) => Promise<boolean>;
+  private readonly canUseTerminal: (terminalId: string) => boolean;
   private readonly terminalSizeOwner = {};
 
   // A subscription is scoped to a (cwd, workspaceId) pair, keyed by
@@ -160,6 +164,8 @@ export class TerminalSessionController {
       (async () => (await this.listTerminalWorkspaceRefs()).map((workspace) => workspace.cwd));
     this.clientSupportsWrapReflow = options.clientSupportsWrapReflow ?? (() => false);
     this.getClientBufferedAmount = options.getClientBufferedAmount ?? (() => 0);
+    this.canUseWorkspace = options.canUseWorkspace ?? (async () => true);
+    this.canUseTerminal = options.canUseTerminal ?? (() => true);
   }
 
   start(): void {
@@ -227,7 +233,7 @@ export class TerminalSessionController {
 
   handleBinaryFrame(frame: TerminalStreamFrame): void {
     const activeStream = this.activeStreams.get(frame.slot);
-    if (!activeStream || !this.terminalManager) {
+    if (!activeStream || !this.terminalManager || !this.canUseTerminal(activeStream.terminalId)) {
       return;
     }
     const terminal = this.terminalManager.getTerminal(activeStream.terminalId);
@@ -463,7 +469,7 @@ export class TerminalSessionController {
     const terminalsByDirectory = await Promise.all(
       directories.map((cwd) => manager.getTerminals(cwd)),
     );
-    return terminalsByDirectory.flat();
+    return this.filterAuthorizedTerminals(terminalsByDirectory.flat());
   }
 
   private async getTerminalsForWorkspaceRoot(
@@ -480,9 +486,18 @@ export class TerminalSessionController {
       return terminals;
     }
 
-    return terminals.filter((terminal) =>
-      this.terminalBelongsToRoot(cwd, terminal.cwd, workspaceRoots),
+    return this.filterAuthorizedTerminals(
+      terminals.filter((terminal) => this.terminalBelongsToRoot(cwd, terminal.cwd, workspaceRoots)),
     );
+  }
+
+  private async filterAuthorizedTerminals(
+    terminals: readonly TerminalSession[],
+  ): Promise<TerminalSession[]> {
+    const decisions = await Promise.all(
+      terminals.map((terminal) => this.canUseWorkspace(terminal.workspaceId)),
+    );
+    return terminals.filter((_, index) => decisions[index] === true);
   }
 
   private terminalBelongsToRoot(
@@ -859,6 +874,10 @@ export class TerminalSessionController {
           if (this.activeStreams.get(slot) !== activeStream) {
             return;
           }
+          if (!this.canUseTerminal(activeStream.terminalId)) {
+            this.detachStream(activeStream.terminalId, { emitExit: false });
+            return;
+          }
           activeStream.outputBytesSinceSnapshot += payload.byteLength;
           // Catch up via a snapshot only when the client is BOTH far behind in
           // produced output AND actually backed up on the wire. A client that
@@ -899,6 +918,10 @@ export class TerminalSessionController {
         if (this.activeStreams.get(slot) !== activeStream) {
           return;
         }
+        if (!this.canUseTerminal(activeStream.terminalId)) {
+          this.detachStream(activeStream.terminalId, { emitExit: false });
+          return;
+        }
         if (message.type === "snapshot" || message.type === "snapshotReady") {
           activeStream.readyRevision = message.revision;
           activeStream.outputCoalescer.flush();
@@ -930,7 +953,8 @@ export class TerminalSessionController {
     if (
       this.activeStreams.get(activeStream.slot) !== activeStream ||
       !activeStream.needsSnapshot ||
-      activeStream.snapshotInFlight
+      activeStream.snapshotInFlight ||
+      !this.canUseTerminal(activeStream.terminalId)
     ) {
       return;
     }
@@ -980,7 +1004,10 @@ export class TerminalSessionController {
     const snapshot = await terminalManager.getTerminalState(activeStream.terminalId, {
       includeWrapFlags: this.clientSupportsWrapReflow(),
     });
-    if (this.activeStreams.get(activeStream.slot) !== activeStream) {
+    if (
+      this.activeStreams.get(activeStream.slot) !== activeStream ||
+      !this.canUseTerminal(activeStream.terminalId)
+    ) {
       return { shouldContinue: false };
     }
     if (!snapshot) {
@@ -1014,7 +1041,10 @@ export class TerminalSessionController {
       ...snapshotOptions,
       includeWrapFlags: this.clientSupportsWrapReflow(),
     });
-    if (this.activeStreams.get(activeStream.slot) !== activeStream) {
+    if (
+      this.activeStreams.get(activeStream.slot) !== activeStream ||
+      !this.canUseTerminal(activeStream.terminalId)
+    ) {
       return { shouldContinue: false };
     }
     if (!snapshot) {

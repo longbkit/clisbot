@@ -22,6 +22,11 @@ export interface AccessTicketAdmission extends ResolvedDaemonAccess {
   leaseExpiresAt: Date;
 }
 
+export interface RevokedAccessLease {
+  id: string;
+  daemonId: string;
+}
+
 export class AccessTicketError extends Error {
   constructor(
     readonly code: "access_denied" | "invalid_ticket",
@@ -137,11 +142,63 @@ export class AccessTicketService {
     });
   }
 
+  /** Re-resolves live authority and extends an unexpired lease for its enrolled daemon. */
+  async refresh(input: {
+    daemonId: string;
+    leaseId: string;
+    now?: Date;
+  }): Promise<AccessTicketAdmission> {
+    const now = input.now ?? new Date();
+    const admission = await this.runtime.transaction(async (handle) => {
+      const database = handle.drizzle();
+      const [lease] = await database
+        .select()
+        .from(schema.daemonAccessLeases)
+        .where(
+          and(
+            eq(schema.daemonAccessLeases.id, input.leaseId),
+            eq(schema.daemonAccessLeases.daemonId, input.daemonId),
+            isNull(schema.daemonAccessLeases.revokedAt),
+            gt(schema.daemonAccessLeases.expiresAt, now),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (lease === undefined) throw invalidLease();
+      const authority = await this.access.resolveDaemonAccess(
+        {
+          organizationId: lease.organizationId,
+          daemonId: lease.daemonId,
+          userId: lease.userId,
+          membershipId: lease.membershipId,
+        },
+        database,
+      );
+      if (authority === undefined) {
+        await database
+          .update(schema.daemonAccessLeases)
+          .set({ revokedAt: now })
+          .where(eq(schema.daemonAccessLeases.id, lease.id));
+        return null;
+      }
+      const leaseExpiresAt = new Date(now.getTime() + this.leaseDurationMs);
+      await database
+        .update(schema.daemonAccessLeases)
+        .set({ expiresAt: leaseExpiresAt })
+        .where(eq(schema.daemonAccessLeases.id, lease.id));
+      return { ...authority, leaseId: lease.id, leaseExpiresAt };
+    });
+    if (admission === null) {
+      throw new AccessTicketError("access_denied", "daemon access is no longer granted");
+    }
+    return admission;
+  }
+
   async revokeMemberLeases(
     organizationId: string,
     membershipId: string,
     now = new Date(),
-  ): Promise<string[]> {
+  ): Promise<RevokedAccessLease[]> {
     const rows = await this.runtime
       .drizzle()
       .update(schema.daemonAccessLeases)
@@ -154,16 +211,44 @@ export class AccessTicketService {
           gt(schema.daemonAccessLeases.expiresAt, now),
         ),
       )
-      .returning({ id: schema.daemonAccessLeases.id });
-    return rows.map(({ id }) => id);
+      .returning({
+        id: schema.daemonAccessLeases.id,
+        daemonId: schema.daemonAccessLeases.daemonId,
+      });
+    return rows;
+  }
+
+  async revokeOrganizationLeases(
+    organizationId: string,
+    now = new Date(),
+  ): Promise<RevokedAccessLease[]> {
+    return this.runtime
+      .drizzle()
+      .update(schema.daemonAccessLeases)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(schema.daemonAccessLeases.organizationId, organizationId),
+          isNull(schema.daemonAccessLeases.revokedAt),
+          gt(schema.daemonAccessLeases.expiresAt, now),
+        ),
+      )
+      .returning({
+        id: schema.daemonAccessLeases.id,
+        daemonId: schema.daemonAccessLeases.daemonId,
+      });
   }
 }
 
 export function readAccessLeaseDuration(value: string | undefined): number {
   if (value === undefined || value.trim() === "") return DEFAULT_ACCESS_LEASE_DURATION_MS;
-  const minutes = Number(value);
-  if (!Number.isFinite(minutes)) throw new Error("managed access lease duration must be minutes");
-  return validateLeaseDuration(minutes * 60_000);
+  const match = /^([1-9]\d*)(m|h)$/u.exec(value.trim());
+  if (match === null) {
+    throw new Error("managed access lease duration must be between 1m and 1h");
+  }
+  const amount = Number(match[1]);
+  const milliseconds = amount * (match[2] === "h" ? 60 * 60_000 : 60_000);
+  return validateLeaseDuration(milliseconds);
 }
 
 function validateLeaseDuration(value: number): number {
@@ -172,7 +257,7 @@ function validateLeaseDuration(value: number): number {
     value < MIN_ACCESS_LEASE_DURATION_MS ||
     value > MAX_ACCESS_LEASE_DURATION_MS
   ) {
-    throw new Error("managed access lease duration must be between 1 and 60 minutes");
+    throw new Error("managed access lease duration must be between 1m and 1h");
   }
   return value;
 }
@@ -183,4 +268,8 @@ function verifier(value: string): string {
 
 function invalidTicket(): AccessTicketError {
   return new AccessTicketError("invalid_ticket", "access ticket is invalid or expired");
+}
+
+function invalidLease(): AccessTicketError {
+  return new AccessTicketError("invalid_ticket", "access lease is invalid, revoked, or expired");
 }

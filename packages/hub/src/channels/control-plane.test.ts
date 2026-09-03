@@ -24,8 +24,6 @@ import { DEFAULT_MESSAGE_TOOL_PROMPT } from "./outbound-template.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
-  decodeChannelReplyBindingRef,
-  encodeChannelReplyBindingRef,
   type ChannelReplyBindingRef,
 } from "./plane/types.js";
 import type { EffectiveDefaults } from "./config/compile.js";
@@ -49,6 +47,9 @@ environments:
     kind: daemon
     daemon: daemon-10000000
     cwd: /workspace/app
+    worktree:
+      mode: checkout-branch
+      branch: release/next
   mirror:
     kind: fly
     image: mirror
@@ -56,6 +57,8 @@ agents:
   codex-safe:
     provider: codex
     model: gpt-5.5
+    featureValues:
+      fast_mode: true
     options:
       sandbox_workspace_write:
         network_access: false
@@ -95,6 +98,7 @@ fallback:
 `;
 
 const ORG_ID = "org-1";
+const REPLY_CAPABILITY = { token: "opaque-reply-capability", canSendFiles: true };
 
 // The resolver's second argument: the route's effective defaults. The
 // tool-path tests below flip `outbound.path` to `tool`.
@@ -106,7 +110,11 @@ const RELAY_DEFAULTS: EffectiveDefaults = {
   outbound: { path: "relay", template: null },
   sync: {
     finalAnswers: true,
-    progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+    progress: {
+      progressMessage: false,
+      typingIndicator: false,
+      messageReaction: "off",
+    },
     toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
@@ -190,7 +198,12 @@ describe("loadChannelControlPlane", () => {
     // byte-identical to today — no mcpServers, no toolPolicy, no systemPrompt.
     assert.deepEqual(
       snapshot.resolveAgentSpec(
-        { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+        {
+          kind: "agent",
+          agent: "codex-safe",
+          environment: "work",
+          template: null,
+        },
         RELAY_DEFAULTS,
         BINDING_REF,
       ),
@@ -198,8 +211,13 @@ describe("loadChannelControlPlane", () => {
         provider: "codex",
         cwd: "/workspace/app",
         model: "gpt-5.5",
+        featureValues: { fast_mode: true },
         providerOptions: {
           sandbox_workspace_write: { network_access: false },
+        },
+        worktree: {
+          mode: "checkout-branch",
+          branch: "release/next",
         },
       },
     );
@@ -214,6 +232,10 @@ describe("loadChannelControlPlane", () => {
         cwd: "/workspace/app",
         modeId: "bypassPermissions",
         thinkingOptionId: "high",
+        worktree: {
+          mode: "checkout-branch",
+          branch: "release/next",
+        },
       },
     );
   });
@@ -235,7 +257,12 @@ describe("loadChannelControlPlane", () => {
     assert.throws(
       () =>
         snapshot.resolveAgentSpec(
-          { kind: "agent", agent: "ghost", environment: "work", template: null },
+          {
+            kind: "agent",
+            agent: "ghost",
+            environment: "work",
+            template: null,
+          },
           RELAY_DEFAULTS,
           BINDING_REF,
         ),
@@ -244,7 +271,12 @@ describe("loadChannelControlPlane", () => {
     assert.throws(
       () =>
         snapshot.resolveAgentSpec(
-          { kind: "agent", agent: "codex-safe", environment: "mirror", template: null },
+          {
+            kind: "agent",
+            agent: "codex-safe",
+            environment: "mirror",
+            template: null,
+          },
           RELAY_DEFAULTS,
           BINDING_REF,
         ),
@@ -295,15 +327,186 @@ describe("loadChannelControlPlane", () => {
     assert.equal(snapshot.revision, null);
     assert.deepEqual(snapshot.controlPlane.accounts, []);
   });
+
+  it("rejects Fast mode on a direct Agent exposed to external participants", async () => {
+    const database = memoryDatabase();
+    await database.saveChannelConfiguration({
+      organizationId: ORG_ID,
+      files: [
+        { path: ".paseo/hub.yml", content: HUB_YAML },
+        {
+          path: ".paseo/channels/slack/public.yml",
+          content: `
+channel: slack
+accountId: public
+connectionId: slack:public
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    agent: codex-safe
+    environment: work
+    sync:
+      finalAnswers: true
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: off }
+      toolCalls: false
+      threadLink: none
+      subagents: { finalAnswers: false, progress: false, toolCalls: false }
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+        },
+      ],
+      contentHash: "unsafe-public-agent",
+      createdByUserId: null,
+    });
+
+    await assert.rejects(loadChannelControlPlane(database), /Fast mode is unavailable/u);
+  });
+
+  it("rejects Fast mode in an Automation exposed to external participants", async () => {
+    const database = memoryDatabase();
+    await enrollTestDaemon(database, ORG_ID);
+    await new OrganizationTriggerStore(database, ORG_ID).save({
+      yaml: `
+name: public-handoff
+enabled: true
+on: { manual.run: {} }
+run:
+  target: { daemon: daemon-10000000, cwd: /workspace/app }
+  agent:
+    provider: codex
+    mode: default
+    featureValues: { fast_mode: true }
+  prompt: hand off
+`,
+      userId: null,
+    });
+    await database.saveChannelConfiguration({
+      organizationId: ORG_ID,
+      files: [
+        {
+          path: ".paseo/channels/slack/public.yml",
+          content: `
+channel: slack
+accountId: public
+connectionId: slack:public
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    workflow: public-handoff
+    sync:
+      finalAnswers: true
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: off }
+      toolCalls: false
+      threadLink: none
+      subagents: { finalAnswers: false, progress: false, toolCalls: false }
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+        },
+      ],
+      contentHash: "unsafe-public-automation",
+      createdByUserId: null,
+    });
+
+    await assert.rejects(loadChannelControlPlane(database), /Fast mode is unavailable/u);
+  });
+
+  it("rejects an unattended direct-Agent Mode exposed to external participants", async () => {
+    const database = memoryDatabase();
+    await database.saveChannelConfiguration({
+      organizationId: ORG_ID,
+      files: [
+        { path: ".paseo/hub.yml", content: HUB_YAML },
+        {
+          path: ".paseo/channels/slack/public.yml",
+          content: `
+channel: slack
+accountId: public
+connectionId: slack:public
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    agent: claude
+    environment: work
+    sync:
+      finalAnswers: true
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: off }
+      toolCalls: false
+      threadLink: none
+      subagents: { finalAnswers: false, progress: false, toolCalls: false }
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+        },
+      ],
+      contentHash: "unsafe-public-agent-mode",
+      createdByUserId: null,
+    });
+
+    await assert.rejects(loadChannelControlPlane(database), /unattended Mode "bypassPermissions"/u);
+  });
+
+  it("rejects an unattended Automation Mode exposed to external participants", async () => {
+    const database = memoryDatabase();
+    await enrollTestDaemon(database, ORG_ID);
+    await new OrganizationTriggerStore(database, ORG_ID).save({
+      yaml: `
+name: public-unattended
+enabled: true
+on: { manual.run: {} }
+run:
+  target: { daemon: daemon-10000000, cwd: /workspace/app }
+  agent: { provider: codex, mode: full-access }
+  prompt: hand off
+`,
+      userId: null,
+    });
+    await database.saveChannelConfiguration({
+      organizationId: ORG_ID,
+      files: [
+        {
+          path: ".paseo/channels/slack/public.yml",
+          content: `
+channel: slack
+accountId: public
+connectionId: slack:public
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    workflow: public-unattended
+    sync:
+      finalAnswers: true
+      progress: { progressMessage: false, typingIndicator: false, messageReaction: off }
+      toolCalls: false
+      threadLink: none
+      subagents: { finalAnswers: false, progress: false, toolCalls: false }
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+        },
+      ],
+      contentHash: "unsafe-public-automation-mode",
+      createdByUserId: null,
+    });
+
+    await assert.rejects(loadChannelControlPlane(database), /unattended Mode "full-access"/u);
+  });
 });
 
 describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
   it("attaches the channel-reply MCP server + grant + default injection on a tool route", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     const config = snapshot.resolveAgentSpec(
-      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+      },
       { ...RELAY_DEFAULTS, outbound: { path: "tool", template: null } },
       BINDING_REF,
+      REPLY_CAPABILITY,
     );
     const server = channelReplyServerEntry(config);
     assert.equal(server.type, "http");
@@ -311,7 +514,7 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
     // (the snapshot's, threaded through the resolver options).
     assert.equal(
       server.url,
-      `http://127.0.0.1:${snapshot.hubPort}/mcp/channel/${encodeChannelReplyBindingRef(BINDING_REF)}`,
+      `http://127.0.0.1:${snapshot.hubPort}/mcp/channel/${REPLY_CAPABILITY.token}`,
     );
     assert.deepEqual(config.toolPolicy, {
       preapproved: [
@@ -330,23 +533,29 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
     assert.equal(config.systemPrompt, DEFAULT_MESSAGE_TOOL_PROMPT);
   });
 
-  it("honors a route template override and round-trips the binding ref in the URL", async () => {
+  it("honors a route template override and keeps binding facts out of the URL", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     const config = snapshot.resolveAgentSpec(
-      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+      },
       {
         ...RELAY_DEFAULTS,
-        outbound: { path: "tool", template: "Reply only through the message tool." },
+        outbound: {
+          path: "tool",
+          template: "Reply only through the message tool.",
+        },
       },
       BINDING_REF,
+      REPLY_CAPABILITY,
     );
     assert.equal(config.systemPrompt, "Reply only through the message tool.");
     const url = channelReplyServerEntry(config).url;
-    assert.ok(url.includes("/mcp/channel/"));
-    const ref = decodeChannelReplyBindingRef(
-      url.slice(url.indexOf("/mcp/channel/") + "/mcp/channel/".length),
-    );
-    assert.deepEqual(ref, BINDING_REF);
+    assert.equal(url.endsWith(`/mcp/channel/${REPLY_CAPABILITY.token}`), true);
+    assert.equal(url.includes(BINDING_REF.externalConversationId), false);
   });
 
   it("stays byte-identical to the relay config when the path is relay", async () => {
@@ -362,11 +571,36 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
       target,
       { ...RELAY_DEFAULTS, outbound: { path: "tool", template: null } },
       BINDING_REF,
+      REPLY_CAPABILITY,
     );
     // Exactly the three tool-path additions — nothing else changes.
     const { mcpServers, toolPolicy, systemPrompt, ...base } = toolConfig;
     assert.deepEqual(base, relayConfig);
     assert.ok(mcpServers !== undefined && toolPolicy !== undefined && systemPrompt !== undefined);
+  });
+
+  it("fails closed without an issued capability and omits file authority without a Project root", async () => {
+    const snapshot = await withActiveConfiguration(memoryDatabase());
+    const target = {
+      kind: "agent" as const,
+      agent: "codex-safe",
+      environment: "work",
+      template: null,
+    };
+    const defaults = { ...RELAY_DEFAULTS, outbound: { path: "tool" as const, template: null } };
+    assert.throws(
+      () => snapshot.resolveAgentSpec(target, defaults, BINDING_REF),
+      /reply capability is unavailable/u,
+    );
+    const config = snapshot.resolveAgentSpec(target, defaults, BINDING_REF, {
+      token: REPLY_CAPABILITY.token,
+      canSendFiles: false,
+    });
+    assert.deepEqual(
+      config.toolPolicy?.preapproved.map(({ tool }) => tool),
+      ["message"],
+    );
+    assert.equal(config.systemPrompt?.includes("send_file"), false);
   });
 });
 
@@ -382,12 +616,23 @@ describe("hubListenPort", () => {
 describe("createChannelAgentSpecResolver", () => {
   it("is importable standalone for the supervisor's plane construction", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
-    const resolver = createChannelAgentSpecResolver(snapshot.bundle, { hubPort: snapshot.hubPort });
+    const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
+      hubPort: snapshot.hubPort,
+    });
     const config = resolver(
-      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      {
+        kind: "agent",
+        agent: "codex-safe",
+        environment: "work",
+        template: null,
+      },
       RELAY_DEFAULTS,
       BINDING_REF,
     );
     assert.equal(config.provider, "codex");
+    assert.deepEqual(config.worktree, {
+      mode: "checkout-branch",
+      branch: "release/next",
+    });
   });
 });

@@ -10,7 +10,7 @@
 // admit (mention / follow-up mode / idle TTL) -> binding lookup -> create or
 // steer. Workflow targets are out of scope: they own their own session
 // lifecycle (implementation doc §4.3.4).
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { ChannelThreadBindingConflictError, type ChannelStore } from "../../db/channels.js";
 import type {
   ChannelControlPlane,
@@ -19,14 +19,17 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import type { DaemonConnection } from "../daemon/client.js";
-import { mayTrigger, type InboundConversation } from "../policy.js";
+import { externalParticipantMayTrigger, mayTrigger, type InboundConversation } from "../policy.js";
 import type { ProcessingController } from "../plane/processing.js";
 import { processingSurfaceFor } from "../plane/processing.js";
+import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
 import {
   SLACK_THREAD_TS_PATTERN,
   type InboundConversationDetail,
   type InboundMessage,
   type InboundOutcome,
+  type ChannelAgentAccessTarget,
+  type ChannelUseAuthorizer,
   type P0ChannelName,
   type PlaneClock,
   type PlaneLogger,
@@ -80,11 +83,15 @@ export function executionMarker(pendingExecutionId: string): string {
 
 interface BindingEngineContext {
   organizationId: string;
+  /** Immutable Channel revision used to select every route in this plane. */
+  channelRevisionId?: string | null | undefined;
   controlPlane: ChannelControlPlane;
   logger: PlaneLogger;
   clock: PlaneClock;
   store: ChannelStore;
   daemon: DaemonConnection;
+  authorizeChannelUse?: ChannelUseAuthorizer | undefined;
+  replyCapabilities?: ChannelReplyCapabilityService | undefined;
   /** Resolve a route's agent target into a `create_agent_request` config.
    * The route's effective defaults select the outbound path (E4/E6); on a
    * `tool` path the `bindingRef` names the thread the attached MCP tool
@@ -93,7 +100,11 @@ interface BindingEngineContext {
     target: Extract<CompiledRoute["target"], { kind: "agent" }>,
     defaults: EffectiveDefaults,
     bindingRef: import("../plane/types.js").ChannelReplyBindingRef,
+    capability?: import("../plane/types.js").ChannelReplyAgentCapability | undefined,
   ) => import("../daemon/types.js").CreateAgentConfig;
+  resolveAgentAccessTarget?:
+    | ((target: Extract<CompiledRoute["target"], { kind: "agent" }>) => ChannelAgentAccessTarget)
+    | undefined;
   /** COMPAT(clisbot-control-plane): record a created agent's home (its
    * create-time `cwd`) for the relay's native-media path (G7–G11). The plane
    * owns the agentId→cwd Map; the relay resolves it through its `agentCwd`
@@ -156,7 +167,7 @@ export class BindingEngine {
     } else if (route.defaults.requireMention && !message.mentionedBot) {
       return { allowed: false, reason: "not mentioned; requireMention is on" };
     }
-    return mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)
+    return (await this.mayUse(message, account, route))
       ? { allowed: true }
       : { allowed: false, reason: "sender may not trigger this route" };
   }
@@ -264,7 +275,7 @@ export class BindingEngine {
     if (defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
-    if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
+    if (!(await this.mayUse(message, account, route))) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const executionId = randomUUID();
@@ -281,7 +292,15 @@ export class BindingEngine {
         externalThreadId: key.externalThreadId,
         pendingExecutionId: executionId,
         initiator: message.senderIdentity,
-        route: bindingSummary(route, message.conversation),
+        route: bindingSummary(
+          route,
+          message.conversation,
+          {
+            revisionId: this.context.channelRevisionId ?? null,
+            position: routePosition(account, route),
+          },
+          message.conversationLabel,
+        ),
       });
     } catch (error) {
       // A concurrent mention won the insert between our lookup and our insert:
@@ -303,13 +322,7 @@ export class BindingEngine {
     }
     let created;
     try {
-      created = await this.createAgent(
-        account.channel as P0ChannelName,
-        account.accountId,
-        route,
-        key,
-        executionId,
-      );
+      created = await this.createAgent(account, route, key, executionId);
     } catch (error) {
       // Leave the marker pending: the create may have timed out rather than
       // failed, so a later inbound (or restart) can rebind the surviving
@@ -393,7 +406,7 @@ export class BindingEngine {
     if (route.defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
-    if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
+    if (!(await this.mayUse(message, account, route))) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const executionId = pendingExecutionId ?? "";
@@ -447,7 +460,7 @@ export class BindingEngine {
         reason: admission.reason ?? "follow-up not admitted",
       };
     }
-    if (!mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) {
+    if (!(await this.mayUse(message, account, route))) {
       return { kind: "ignored", reason: "sender may not trigger this route" };
     }
     const leaseId = randomUUID();
@@ -487,6 +500,22 @@ export class BindingEngine {
     this.lastActivity.set(agentId, this.context.clock.now());
   }
 
+  private async mayUse(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<boolean> {
+    if (externalParticipantMayTrigger(message, route)) return true;
+    if (mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) return true;
+    return (
+      (await this.context.authorizeChannelUse?.({
+        organizationId: this.context.organizationId,
+        account,
+        message,
+      })) ?? false
+    );
+  }
+
   /**
    * Issue the trusted `create_agent_request` with the route's agent target. The
    * bot is created IDLE (implementation doc §2.1): the caller delivers the
@@ -494,8 +523,7 @@ export class BindingEngine {
    * so splitting create from send is what keeps the first turn observable.
    */
   private async createAgent(
-    channel: P0ChannelName,
-    accountId: string,
+    account: CompiledChannelAccount,
     route: CompiledRoute,
     key: ThreadKey,
     executionId: string,
@@ -504,22 +532,64 @@ export class BindingEngine {
     if (target.kind !== "agent") {
       throw new ChannelWorkflowTargetError(target.workflow);
     }
-    // The tool-path MCP endpoint's thread address: the account + the durable
-    // thread key being created (the ref embedded in the mcpServers URL is
-    // create-time-only — no daemon RPC attaches an MCP server to a session).
-    const config = this.context.resolveAgentSpec(target, route.defaults, {
-      channel,
-      accountId,
+    const ref = {
+      channel: account.channel as P0ChannelName,
+      accountId: account.accountId,
       externalConversationId: key.externalConversationId,
       externalThreadId: key.externalThreadId,
-    });
-    const created = await this.context.daemon.createAgent(config, {
-      title: executionMarker(executionId),
-    });
-    // COMPAT(clisbot-control-plane): the agent's home for the relay's
-    // native-media path — the `cwd` the daemon runs it in (G7–G11).
-    this.context.noteAgentCwd?.(created.agentId, config.cwd);
-    return { agentId: created.agentId };
+    };
+    let capabilityToken: string | undefined;
+    let canSendFiles = false;
+    if (route.defaults.outbound.path === "tool") {
+      const capabilities = this.context.replyCapabilities;
+      const accessTarget = this.context.resolveAgentAccessTarget?.(target);
+      if (capabilities === undefined || accessTarget === undefined) {
+        throw new Error("Channel reply capability is unavailable");
+      }
+      capabilityToken = capabilities.issue({
+        organizationId: this.context.organizationId,
+        channelRevisionId: this.context.channelRevisionId ?? null,
+        routePosition: routePosition(account, route),
+        routeFingerprint: routeFingerprint(route),
+        ref,
+        ...(accessTarget.projectRoot === undefined
+          ? {}
+          : { projectRoot: accessTarget.projectRoot }),
+      });
+      canSendFiles = accessTarget.projectRoot !== undefined;
+    }
+    try {
+      const config = this.context.resolveAgentSpec(
+        target,
+        route.defaults,
+        ref,
+        capabilityToken === undefined
+          ? undefined
+          : {
+              token: capabilityToken,
+              canSendFiles,
+            },
+      );
+      const created = await this.context.daemon.createAgent(config, {
+        title: executionMarker(executionId),
+      });
+      if (
+        capabilityToken !== undefined &&
+        this.context.replyCapabilities?.bind(capabilityToken, created.agentId) !== true
+      ) {
+        await this.context.daemon.cancelAgent(created.agentId).catch(() => undefined);
+        throw new Error("Channel reply capability could not bind to the created Agent");
+      }
+      // COMPAT(clisbot-control-plane): the agent's home for the relay's
+      // native-media path — the `cwd` the daemon runs it in (G7–G11).
+      this.context.noteAgentCwd?.(created.agentId, config.cwd);
+      return { agentId: created.agentId };
+    } catch (error) {
+      if (capabilityToken !== undefined) {
+        this.context.replyCapabilities?.revoke(capabilityToken);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -588,11 +658,11 @@ export function admitFollowUp(
 }
 
 /**
- * The compact route summary stored on the binding row (resume without
- * re-compile). It stores the original route-match descriptor so the facade can
- * re-derive the live route on re-attach — routes are live (a config edit is
- * picked up from the next message), so this is the match key, not a pinned rule
- * set. The other leaves are a human-readable reference, not a decision input.
+ * The compact route summary stored on the binding row. `selection` pins the
+ * immutable revision decision without promoting routes into durable resources:
+ * position addresses the route inside that revision and fingerprint proves a
+ * later revision retained equivalent target and policy before continuation.
+ * Older rows without `selection` remain readable through the legacy match key.
  */
 export interface StoredRouteSummary {
   /** The original route-match descriptor (`kind` + native id). */
@@ -600,25 +670,83 @@ export interface StoredRouteSummary {
   target: CompiledRoute["target"];
   bindingKey: EffectiveDefaults["bindingKey"];
   replyAnchor: EffectiveDefaults["replyAnchor"];
+  /** Human label observed at admission; display-only and never an access key. */
+  conversationLabel?: string;
+  selection?: {
+    revisionId: string | null;
+    position: number | "fallback";
+    fingerprint: string;
+  };
 }
 
 export function bindingSummary(
   route: CompiledRoute,
   conversation: InboundConversationDetail,
+  selection?: { revisionId: string | null; position: number | "fallback" },
+  conversationLabel?: string,
 ): StoredRouteSummary {
-  // Store the MATCHED-LEVEL descriptor: a thread/topic stores its own
-  // (re-attach re-matches at thread level, not root); a root-level message
-  // stores the root (its `id` equals `rootConversationId`). This mirrors the
-  // facade's two-pass match (execution.ts `resolveRoute`).
-  const match =
-    conversation.threadId !== null
-      ? { kind: conversation.kind, id: conversation.id }
-      : { kind: conversation.kind, id: conversation.rootConversationId };
+  // The route may have matched a thread message at its root-level descriptor;
+  // store the level the route declares, not necessarily the inbound's most
+  // specific level. Fallbacks use the root descriptor.
+  const atInboundLevel = route.match.kind === conversation.kind;
+  const match = atInboundLevel
+    ? { kind: conversation.kind, id: conversation.id }
+    : {
+        kind: rootKind(conversation.kind),
+        id: conversation.rootConversationId,
+      };
+  const safeConversationLabel = conversationLabel?.trim().slice(0, 200);
   return {
     match,
     target: route.target,
     bindingKey: route.defaults.bindingKey,
     replyAnchor: route.defaults.replyAnchor,
+    ...(safeConversationLabel ? { conversationLabel: safeConversationLabel } : {}),
+    ...(selection === undefined
+      ? {}
+      : {
+          selection: {
+            revisionId: selection.revisionId,
+            position: selection.position,
+            fingerprint: routeFingerprint(route),
+          },
+        }),
+  };
+}
+
+/** Internal position of a compiled route inside one immutable account revision. */
+export function routePosition(
+  account: CompiledChannelAccount,
+  route: CompiledRoute,
+): number | "fallback" {
+  const position = account.routes.indexOf(route);
+  return position < 0 ? "fallback" : position;
+}
+
+/** Stable comparison token for continuation across a Channel revision. */
+export function routeFingerprint(route: CompiledRoute): string {
+  return createHash("sha256").update(JSON.stringify(route)).digest("base64url");
+}
+
+/** Parsed captured selection; undefined for a legacy or malformed row. */
+export function parseStoredRouteSelection(
+  stored: unknown,
+): StoredRouteSummary["selection"] | undefined {
+  if (typeof stored !== "object" || stored === null) return undefined;
+  const selection = (stored as { selection?: unknown }).selection;
+  if (typeof selection !== "object" || selection === null) return undefined;
+  const revisionId = (selection as { revisionId?: unknown }).revisionId;
+  const position = (selection as { position?: unknown }).position;
+  const fingerprint = (selection as { fingerprint?: unknown }).fingerprint;
+  if (revisionId !== null && typeof revisionId !== "string") return undefined;
+  if (position !== "fallback" && (!Number.isInteger(position) || Number(position) < 0)) {
+    return undefined;
+  }
+  if (typeof fingerprint !== "string" || fingerprint.length === 0) return undefined;
+  return {
+    revisionId: revisionId as string | null,
+    position: position as number | "fallback",
+    fingerprint,
   };
 }
 
@@ -632,6 +760,12 @@ export function parseStoredRouteSummary(stored: unknown): InboundConversation | 
   const id = (match as { id?: unknown }).id;
   if (typeof kind !== "string" || typeof id !== "string") return undefined;
   return { kind: kind as InboundConversationDetail["kind"], id };
+}
+
+function rootKind(kind: InboundConversationDetail["kind"]): "dm" | "channel" | "group" {
+  if (kind === "thread") return "channel";
+  if (kind === "topic") return "group";
+  return kind;
 }
 
 /** Raised when a route targets a workflow (out of scope for the bindings plane). */

@@ -5,6 +5,7 @@ import {
   compileChannelControlPlane,
   type ChannelCompileInput,
 } from "./compile.js";
+import { OPEN_AUDIENCE_ROUTE_LIMITS } from "./schema.js";
 
 const AGENTS = ["worker-app", "worker-infra", "assistant-personal", "telegram-butler"];
 const ENVIRONMENTS = ["repo-app", "repo-infra", "personal-lab"];
@@ -55,7 +56,7 @@ defaults:
   approval:
     - { match: command.destructive, mode: require, initiatorOnly: true }
 routes:
-  - match: { kind: channel, ids: [C0APP] }
+  - match: { kind: channel, ids: [C0APP], contains: "#triage" }
     agent: worker-app
     environment: repo-app
     template: team
@@ -153,6 +154,7 @@ describe("compileChannelControlPlane", () => {
     assert.equal(account.approval.length, 3);
     assert.equal(account.approval[0]!.match, "command.destructive");
     assert.equal(account.routes.length, 4);
+    assert.equal(account.routes[0]!.match.contains, "#triage");
     assert.equal(account.fallback.deny, true);
   });
 
@@ -177,6 +179,118 @@ config:
       richMessages: true,
       timeoutSeconds: 90,
     });
+  });
+
+  it("requires explicit safe boundaries for an open-audience Route", () => {
+    const safe = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    agent: worker-app
+    environment: repo-app
+    sync:
+      finalAnswers: true
+      progress:
+        progressMessage: false
+        typingIndicator: false
+        messageReaction: off
+      toolCalls: false
+      threadLink: none
+      subagents: { finalAnswers: false, progress: false, toolCalls: false }
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+      }),
+    );
+    assert.deepEqual(safe.accounts[0]?.routes[0]?.audience, {
+      kind: "conversationParticipants",
+    });
+    assert.deepEqual(safe.accounts[0]?.routes[0]?.limits, OPEN_AUDIENCE_ROUTE_LIMITS);
+
+    expectCompileError(
+      {
+        [".paseo/channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: channel }
+    audience: { kind: conversationParticipants }
+    agent: worker-app
+    environment: repo-app
+    sync:
+      finalAnswers: true
+      progress:
+        progressMessage: false
+        typingIndicator: false
+        messageReaction: off
+      toolCalls: false
+      threadLink: none
+      subagents: { finalAnswers: false, progress: false, toolCalls: false }
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+      },
+      /must name at least one Conversation ID/u,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    agent: worker-app
+    environment: repo-app
+    interaction: { requireMention: false }
+`,
+      },
+      /must require a mention/u,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    agent: worker-app
+    environment: repo-app
+    approval:
+      - { match: file, mode: auto-allow }
+      - { match: "*", mode: auto-deny }
+`,
+      },
+      /cannot auto-allow tool approvals/u,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/slack/public.yml"]: `
+channel: slack
+accountId: public
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C_CUSTOMER] }
+    audience: { kind: conversationParticipants }
+    agent: worker-app
+    environment: repo-app
+    approval: [{ match: "*", mode: auto-deny }]
+`,
+      },
+      /final-answer-only synchronization/u,
+    );
   });
 
   it("defaults the account config block to empty when omitted", () => {

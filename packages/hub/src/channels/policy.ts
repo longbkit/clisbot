@@ -299,13 +299,23 @@ export interface RouteMatchResult {
   target: RouteTarget | null;
 }
 
-/** Does a route's `match` block match this conversation? */
-export function routeMatches(
+/** Does the structural part of a route match this conversation? */
+export function routeConversationMatches(
   match: CompiledRoute["match"],
   conversation: InboundConversation,
 ): boolean {
   if (match.kind !== conversation.kind) return false;
   return match.ids.length === 0 || match.ids.includes(conversation.id);
+}
+
+/** Does a route match this conversation and normalized inbound text? */
+export function routeMatches(
+  match: CompiledRoute["match"],
+  conversation: InboundConversation,
+  text?: string,
+): boolean {
+  if (!routeConversationMatches(match, conversation)) return false;
+  return match.contains === undefined || (text !== undefined && text.includes(match.contains));
 }
 
 /**
@@ -317,12 +327,17 @@ export function routeMatches(
 export function matchRoute(
   conversation: InboundConversation,
   account: CompiledChannelAccount,
+  text?: string,
 ): RouteMatchResult {
   const route =
-    account.routes.find((candidate) => routeMatches(candidate.match, conversation)) ?? null;
+    account.routes.find((candidate) => routeMatches(candidate.match, conversation, text)) ?? null;
   if (route !== null) return { route, fallback: account.fallback, target: route.target };
   const fallback = account.fallback;
-  return { route: null, fallback, target: fallback.deny ? null : (fallback.target ?? null) };
+  return {
+    route: null,
+    fallback,
+    target: fallback.deny ? null : (fallback.target ?? null),
+  };
 }
 
 // --- Role scopes per decision level ---------------------------------------------------
@@ -380,7 +395,29 @@ export function mayTrigger(
   account: CompiledChannelAccount,
   route: CompiledRoute,
 ): boolean {
+  if (!isConfiguredChannelIdentity(senderIdentity, route, controlPlane)) return false;
   return privilegeHolds(senderIdentity, [routeRoleScope(route)], controlPlane, "bot.interact");
+}
+
+/** Explicit open audience is bounded to named Conversations and requires a mention outside DMs. */
+export function externalParticipantMayTrigger(
+  message: Pick<import("./plane/types.js").InboundMessage, "mentionedBot" | "conversation">,
+  route: CompiledRoute,
+): boolean {
+  if (route.audience?.kind !== "conversationParticipants") return false;
+  if (route.match.ids.length === 0) return false;
+  if (message.conversation.kind === "dm") return true;
+  return message.mentionedBot;
+}
+
+/** Legacy Channel identities count as Members only when explicitly mapped or assigned. */
+export function isConfiguredChannelIdentity(
+  identity: string,
+  route: CompiledRoute,
+  controlPlane: ChannelControlPlane,
+): boolean {
+  if (controlPlane.identityOwners[identity] !== undefined) return true;
+  return route.assignments.some(({ identities }) => identities.includes(identity));
 }
 
 /** An approval decision for one `permission_requested` event. */

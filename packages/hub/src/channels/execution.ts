@@ -16,7 +16,13 @@ import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { InboundReplyParams } from "./loader/host.js";
-import { isEnabled, mayTrigger, matchRoute } from "./policy.js";
+import {
+  externalParticipantMayTrigger,
+  isEnabled,
+  mayTrigger,
+  matchRoute,
+  routeConversationMatches,
+} from "./policy.js";
 import {
   ApprovalEngine,
   assertChannelPosture,
@@ -34,11 +40,18 @@ import {
   admitFollowUp,
   BindingEngine,
   deriveBindingKey,
+  parseStoredRouteSelection,
   parseStoredRouteSummary,
+  routeFingerprint,
+  routePosition,
 } from "./bindings/index.js";
 import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "./relay/index.js";
 import { realClock } from "./plane/clock.js";
 import { createProcessingController, type ProcessingController } from "./plane/processing.js";
+import {
+  RouteExecutionLimiter,
+  type RouteExecutionLease,
+} from "./plane/route-execution-limiter.js";
 import {
   asPermissionRequest,
   asPermissionResolved,
@@ -129,8 +142,8 @@ export interface ChannelPlane {
     account: CompiledChannelAccount,
     trigger?: InboundTriggerRef,
   ): void;
-  /** Stop the plane: clear the subscription and stop the daemon connection. */
-  stop(): void;
+  /** Stop the plane; configuration replacement may also cancel Route-owned work. */
+  stop(options?: { cancelActive?: boolean }): Promise<void>;
 }
 
 /** The plane kind a thread/topic's ROOT conversation carries (the two-pass
@@ -140,6 +153,26 @@ function rootKindOf(kind: InboundMessage["conversation"]["kind"]): "dm" | "chann
   if (kind === "thread") return "channel";
   if (kind === "topic") return "group";
   return kind;
+}
+
+function identityLinkReplyText(
+  status: "linked" | "already_linked" | "identity_conflict" | "invalid",
+): string {
+  if (status === "linked") {
+    return "Identity linked. You can now use the Channel access assigned to your Hub account.";
+  }
+  if (status === "already_linked") {
+    return "This identity is already linked to your Hub account.";
+  }
+  if (status === "identity_conflict") {
+    return "This provider identity is already linked to another Hub account.";
+  }
+  return "That link code is invalid or expired. Create a new code in Paseo Settings.";
+}
+
+function workflowDeliveryId(message: InboundMessage, route: CompiledRoute): string | undefined {
+  if (route.target.kind !== "workflow") return undefined;
+  return `${message.channel}:${message.accountId}:${message.externalMessageId ?? randomUUID()}`;
 }
 
 /**
@@ -157,8 +190,12 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   let approvals: ApprovalEngine | undefined;
   /** The turn-lifecycle surfaces opened by accepted inbounds (plane/processing.ts). */
   let processing: ProcessingController | undefined;
+  let routeExecutionLimiter: RouteExecutionLimiter | undefined;
   const subscribed = new Set<string>();
-  const workflowExecutionAgents = new Map<string, { agentId: string; agentKey: string }>();
+  const workflowExecutionAgents = new Map<
+    string,
+    { agentId: string; agentKey: string; context: StreamContext }
+  >();
   const workflowAgentsByBinding = new Map<string, Set<string>>();
   const workflowBindingActivity = new Map<string, number>();
 
@@ -208,20 +245,61 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           reason: "channels disabled (kill switch)",
         });
       }
-      const route = resolveRoute(message, account);
-      if (route === undefined) {
-        return result(false, {
-          kind: "ignored",
-          reason: "no route matches this conversation",
+      const identityCode = parseChannelIdentityLinkCommand(message.text);
+      if (identityCode !== null && deps.consumeChannelIdentityChallenge !== undefined) {
+        const status = await deps.consumeChannelIdentityChallenge({
+          organizationId: deps.organizationId,
+          account,
+          senderIdentity: message.senderIdentity,
+          ...(message.senderName === undefined ? {} : { senderName: message.senderName }),
+          code: identityCode,
+        });
+        const response = await deps.post({
+          channel: channelName(account),
+          accountId: account.accountId,
+          to: message.conversation.rootConversationId,
+          ...(message.conversation.threadId === null
+            ? {}
+            : { threadId: message.conversation.threadId }),
+          text: identityLinkReplyText(status),
+        });
+        if (!response.ok) {
+          logger.warn("channel identity link reply failed", {
+            channel: account.channel,
+            accountId: account.accountId,
+            status,
+            error: response.error,
+          });
+        }
+        return result(status === "linked" || status === "already_linked", {
+          kind: "command",
+          handled: true,
+          detail: `identity link ${status}`,
         });
       }
       const command = parseApprovalCommand(message.text);
       if (command !== null) {
-        return await handleApprovalCommand(message, account, route, command);
+        return await handleApprovalCommand(message, account, command);
       }
+      const textCommand = parseChannelTextCommand(message.text);
+      const workflowCommandRoute =
+        textCommand === null ? undefined : activeWorkflowRouteFor(message);
+      if (textCommand !== null && workflowCommandRoute !== undefined) {
+        return await handleTextCommand(message, account, workflowCommandRoute, textCommand);
+      }
+      const resolved = await resolveInboundRoute(message, account);
+      if (resolved.kind !== "selected") {
+        return result(false, {
+          kind: "ignored",
+          reason:
+            resolved.kind === "invalid-binding"
+              ? "the bound session is not valid under the active Channel configuration"
+              : "no route matches this conversation",
+        });
+      }
+      const route = resolved.route;
       // The channel's other plain-text commands (/status, /stop, /new, /help —
       // shared, channel-agnostic; see commands.ts).
-      const textCommand = parseChannelTextCommand(message.text);
       if (textCommand !== null) {
         return await handleTextCommand(message, account, route, textCommand);
       }
@@ -258,49 +336,45 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           reason: "channels disabled (kill switch)",
         });
       }
-      const route = resolveRouteForCallback(params, account);
-      if (route === undefined) {
-        return result(false, {
-          kind: "ignored",
-          reason: "no route matches this conversation",
-        });
-      }
-      const binding =
-        route.target.kind === "agent"
-          ? await store?.findThreadBinding(
-              deps.organizationId,
-              account.accountId,
-              params.externalConversationId,
-              params.externalThreadId,
-            )
-          : undefined;
-      let agentId: string | undefined;
-      if (route.target.kind === "workflow") {
-        agentId = workflowAgentForCallback(params, card.cardId, route.target.workflow);
-      } else if (binding?.status === "bound" && binding.agentId !== null) {
-        agentId = binding.agentId;
-      }
-      if (agentId === undefined) {
+      const target = approvalPromptAt(
+        params.channel,
+        params.accountId,
+        params.externalConversationId,
+        params.externalThreadId,
+        card.cardId,
+      );
+      if (target === undefined) {
         return result(false, {
           kind: "command",
           handled: false,
           detail: "no bound session to answer this approval",
         });
       }
+      const { context, request } = target;
       // First authority check (inbound entry): the clicker may take part in
       // this conversation — a stolen-session card click fails closed here.
-      if (!mayTrigger(params.senderIdentity, deps.controlPlane, account, route)) {
+      if (
+        !(await mayVerifiedMemberUseChannel(
+          callbackMessage(params, account),
+          account,
+          context.route,
+        ))
+      ) {
         return result(false, {
           kind: "command",
           handled: false,
           detail: "sender may not take part in this conversation",
         });
       }
-      const check = await approvalsEngine().answerFromChannel(agentId, params.senderIdentity, {
-        decision: card.decision,
-        requestId: card.cardId,
-        ...(card.answer !== undefined ? { answer: card.answer } : {}),
-      });
+      const check = await approvalsEngine().answerFromChannel(
+        context.agentId,
+        params.senderIdentity,
+        {
+          decision: card.decision,
+          requestId: request.id,
+          ...(card.answer !== undefined ? { answer: card.answer } : {}),
+        },
+      );
       return result(check.answered, {
         kind: "command",
         handled: check.answered,
@@ -313,21 +387,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     },
 
     async onStreamEvent(agentId, event) {
-      // One shared consumer: permission events to the approval engine, everything
-      // else to the relay. Unattached agents are a no-op in both (the stream
-      // context is only registered via attachStreamFor / start).
-      const request = asPermissionRequest(event);
-      if (request !== undefined) {
-        await approvals?.handlePermissionRequest(agentId, request);
-        return;
+      await consumeAgentStream(agentId, event);
+      if (isTerminalStreamEvent(event)) {
+        routeExecutionLimiter?.completeAgent(agentId);
       }
-      const resolvedId = asPermissionResolved(event);
-      if (resolvedId !== undefined) {
-        approvals?.onPermissionResolved(agentId, resolvedId);
-        return;
-      }
-      const relayed = asRelayedEvent(event);
-      if (relayed !== undefined) await relay?.onStream(agentId, relayed);
     },
 
     async onWorkflowStreamEvent({ execution, agentId, event }) {
@@ -339,17 +402,27 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             candidate.channel === channel.name && candidate.accountId === channel.account_id,
         );
         if (account === undefined) return;
-        const route: CompiledRoute = {
-          match: { kind: channel.root_kind, ids: [] },
-          target: {
-            kind: "workflow",
-            workflow: execution.launchIntent?.triggerName ?? "workflow",
-          },
-          defaultRoles: channel.route.defaultRoles,
-          assignments: channel.route.assignments,
-          defaults: channel.route.defaults,
-          approval: channel.route.approval,
-        };
+        const route = workflowRouteForCurrentConfiguration(
+          account,
+          channel,
+          execution.launchIntent?.triggerName ?? "workflow",
+        );
+        if (route === undefined) {
+          await daemon?.cancelAgent(agentId).catch(() => undefined);
+          logger.warn("Workflow output rejected after its Route changed", {
+            account: account.accountId,
+            agentId,
+            executionId: execution.id,
+          });
+          return;
+        }
+        routeExecutionLimiter?.bindOrRestore({
+          leaseId: channelWorkflowDeliveryId(execution.triggerContext),
+          account,
+          route,
+          startedAt: execution.startedAt,
+          agentId,
+        });
         const context: StreamContext = {
           agentId,
           deliveryScopeId: execution.id,
@@ -365,6 +438,18 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           rootKind: channel.root_kind,
           route,
           account,
+          ...(execution.launchIntent?.environment === undefined
+            ? {}
+            : {
+                accessTarget: {
+                  daemonReference: execution.launchIntent.environment.daemonId,
+                  ...(execution.launchIntent.environment.projectId === undefined
+                    ? {}
+                    : {
+                        projectId: execution.launchIntent.environment.projectId,
+                      }),
+                },
+              }),
           outputDelivery: workflowOutputDelivery(deps, execution),
         };
         relayEngine().attach(context);
@@ -373,14 +458,18 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           channel.binding_key,
           execution.launchIntent?.triggerName ?? "workflow",
         );
-        workflowExecutionAgents.set(execution.id, { agentId, agentKey });
+        workflowExecutionAgents.set(execution.id, {
+          agentId,
+          agentKey,
+          context,
+        });
         const agents = workflowAgentsByBinding.get(agentKey) ?? new Set<string>();
         agents.add(agentId);
         workflowAgentsByBinding.set(agentKey, agents);
       }
-      await plane.onStreamEvent(agentId, event);
-      const terminal = asRelayedEvent(event);
-      if (terminal?.kind === "turn_completed" || terminal?.kind === "turn_closed") {
+      await consumeAgentStream(agentId, event);
+      if (isTerminalStreamEvent(event)) {
+        routeExecutionLimiter?.completeById(channelWorkflowDeliveryId(execution.triggerContext));
         cleanupWorkflowStream(execution.id, agentId);
       }
     },
@@ -405,14 +494,27 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ...(deps.typing !== undefined ? { drive: deps.typing } : {}),
         ...(deps.processingTtlMs !== undefined ? { ttlMs: deps.processingTtlMs } : {}),
       });
+      routeExecutionLimiter = new RouteExecutionLimiter({
+        logger,
+        now: () => clock.now(),
+        cancelAgent: (agentId) => daemonConnection.cancelAgent(agentId),
+      });
       bindings = new BindingEngine({
         organizationId: deps.organizationId,
+        channelRevisionId: deps.channelRevisionId ?? null,
         controlPlane: deps.controlPlane,
         logger,
         clock,
         store: channelStore,
         daemon: daemonConnection,
+        ...(deps.authorizeChannelUse === undefined
+          ? {}
+          : { authorizeChannelUse: deps.authorizeChannelUse }),
         resolveAgentSpec: deps.resolveAgentSpec,
+        ...(deps.replyCapabilities === undefined
+          ? {}
+          : { replyCapabilities: deps.replyCapabilities }),
+        resolveAgentAccessTarget: deps.resolveAgentAccessTarget,
         ...(processing !== undefined ? { processing } : {}),
       });
       relay = new RelayEngine({
@@ -438,6 +540,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         store: channelStore,
         daemon: daemonConnection,
         post: deps.post,
+        ...(deps.authorizeChannelApproval === undefined
+          ? {}
+          : { authorizeChannelApproval: deps.authorizeChannelApproval }),
         // The card's in-place update (absent = the card goes stale, the
         // resolution is unaffected).
         ...(deps.update !== undefined ? { update: deps.update } : {}),
@@ -482,9 +587,14 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       void resubscribe().catch(() => undefined);
     },
 
-    stop() {
+    async stop(options) {
       if (daemon !== undefined) {
-        void daemon.setTimelineSubscription([]).catch(() => undefined);
+        await daemon.setTimelineSubscription([]).catch(() => undefined);
+        if (options?.cancelActive === true) {
+          await routeExecutionLimiter?.cancelActive();
+        } else {
+          routeExecutionLimiter?.clear();
+        }
         daemon.stop();
       }
       daemon = undefined;
@@ -494,6 +604,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       approvals = undefined;
       processing?.stopAll();
       processing = undefined;
+      routeExecutionLimiter = undefined;
       subscribed.clear();
       workflowExecutionAgents.clear();
       workflowAgentsByBinding.clear();
@@ -512,26 +623,69 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ? await admitWorkflowMessage(message, account, route)
         : await bindingsEngine().admit(message, account, route);
     if (!admission.allowed) {
-      return result(false, {
-        kind: "ignored",
-        reason: admission.reason ?? "message not admitted",
+      return recordOpenAudienceActivity(message, account, route, {
+        result: result(false, {
+          kind: "ignored",
+          reason: admission.reason ?? "message not admitted",
+        }),
+        limitDecision: "not_evaluated",
       });
     }
+    const deliveryId = workflowDeliveryId(message, route);
+    const routeLimit = routeExecutionLimiter?.admit({
+      account,
+      route,
+      senderIdentity: message.senderIdentity,
+      text: message.text,
+      ...(deliveryId === undefined ? {} : { leaseId: deliveryId }),
+    }) ?? { allowed: true as const };
+    if (!routeLimit.allowed) {
+      return recordOpenAudienceActivity(message, account, route, {
+        result: result(false, {
+          kind: "ignored",
+          reason: routeLimit.reason,
+        }),
+        limitDecision: "denied",
+        limitReason: routeLimit.reason,
+      });
+    }
+    const executionLease = routeLimit.lease;
     if (route.target.kind === "workflow") {
-      const key = deriveBindingKey(message, route);
-      const deliveryId = `${message.channel}:${message.accountId}:${message.externalMessageId ?? randomUUID()}`;
-      const bindingKey = JSON.stringify([
-        message.channel,
-        message.accountId,
-        key.externalConversationId,
-        key.externalThreadId,
-      ]);
+      return dispatchWorkflowMessage(
+        message,
+        account,
+        route,
+        route.target.workflow,
+        deliveryId!,
+        executionLease,
+      );
+    }
+    return dispatchDirectAgentMessage(message, account, route, executionLease);
+  }
+
+  async function dispatchWorkflowMessage(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    workflow: string,
+    deliveryId: string,
+    executionLease: RouteExecutionLease | undefined,
+  ): Promise<PlaneInboundResult> {
+    const key = deriveBindingKey(message, route);
+    const conversationLabel = message.conversationLabel?.trim().slice(0, 200);
+    const bindingKey = JSON.stringify([
+      message.channel,
+      message.accountId,
+      key.externalConversationId,
+      key.externalThreadId,
+    ]);
+    try {
       await deps.dispatchWorkflow({
         organizationId: deps.organizationId,
         deliveryId,
         receivedAt: new Date(clock.now()),
         payload: {
-          workflow: route.target.workflow,
+          workflow,
           text: message.text,
           channel: {
             name: message.channel,
@@ -539,6 +693,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             binding_key: bindingKey,
             external_conversation_id: key.externalConversationId,
             external_thread_id: key.externalThreadId,
+            ...(conversationLabel ? { conversation_label: conversationLabel } : {}),
             sender_identity: message.senderIdentity,
             ...(message.senderName === undefined ? {} : { sender_name: message.senderName }),
             root_kind: rootKindOf(message.conversation.kind),
@@ -546,25 +701,46 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
             ...(message.externalMessageId === undefined
               ? {}
               : { trigger_message_id: message.externalMessageId }),
+            revision_id: deps.channelRevisionId ?? null,
+            route_position: routePosition(account, route),
+            route_fingerprint: routeFingerprint(route),
             route: {
+              ...(route.audience === undefined ? {} : { audience: route.audience }),
               defaultRoles: [...route.defaultRoles],
               assignments: [...route.assignments],
               defaults: route.defaults,
               approval: [...route.approval],
+              ...(route.limits === undefined ? {} : { limits: route.limits }),
             },
           },
         },
       });
-      workflowBindingActivity.set(
-        workflowActivityKey(bindingKey, route.target.workflow),
-        clock.now(),
-      );
-      return result(true, {
-        kind: "workflow",
-        workflow: route.target.workflow,
-        deliveryId,
+    } catch (error) {
+      routeExecutionLimiter?.complete(executionLease);
+      await recordOpenAudienceActivity(message, account, route, {
+        result: result(false, {
+          kind: "ignored",
+          reason: "workflow dispatch failed",
+        }),
+        outcome: "error",
+        outcomeDetail: "workflow dispatch failed",
+        limitDecision: "allowed",
       });
+      throw error;
     }
+    workflowBindingActivity.set(workflowActivityKey(bindingKey, workflow), clock.now());
+    return recordOpenAudienceActivity(message, account, route, {
+      result: result(true, { kind: "workflow", workflow, deliveryId }),
+      limitDecision: "allowed",
+    });
+  }
+
+  async function dispatchDirectAgentMessage(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    executionLease: RouteExecutionLease | undefined,
+  ): Promise<PlaneInboundResult> {
     // The stream is subscribed from inside the dispatch, after the agent is
     // known and BEFORE its prompt is delivered — attaching afterwards is what
     // made a new session's first turn invisible (its events, including
@@ -587,8 +763,87 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           : {}),
       });
     };
-    const outcome = await bindingsEngine().bindOrSteer(message, account, route, subscribe);
-    return result(outcome.kind === "bound" || outcome.kind === "steered", outcome);
+    let outcome: InboundOutcome;
+    try {
+      outcome = await bindingsEngine().bindOrSteer(message, account, route, subscribe);
+    } catch (error) {
+      routeExecutionLimiter?.complete(executionLease);
+      await recordOpenAudienceActivity(message, account, route, {
+        result: result(false, {
+          kind: "ignored",
+          reason: "agent dispatch failed",
+        }),
+        outcome: "error",
+        outcomeDetail: "agent dispatch failed",
+        limitDecision: "allowed",
+      });
+      throw error;
+    }
+    if (outcome.kind === "bound" || outcome.kind === "steered") {
+      routeExecutionLimiter?.bind(executionLease, outcome.agentId);
+    } else {
+      routeExecutionLimiter?.complete(executionLease);
+    }
+    return recordOpenAudienceActivity(message, account, route, {
+      result: result(outcome.kind === "bound" || outcome.kind === "steered", outcome),
+      limitDecision: "allowed",
+    });
+  }
+
+  async function recordOpenAudienceActivity(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    decision: {
+      result: PlaneInboundResult;
+      outcome?: "bound" | "steered" | "workflow" | "ignored" | "error";
+      outcomeDetail?: string | undefined;
+      limitDecision: "not_evaluated" | "allowed" | "denied";
+      limitReason?: string | undefined;
+    },
+  ): Promise<PlaneInboundResult> {
+    if (
+      route.audience?.kind !== "conversationParticipants" ||
+      deps.recordChannelInboundActivity === undefined
+    ) {
+      return decision.result;
+    }
+    try {
+      const outcome = decision.result.outcome;
+      const recordedOutcome = decision.outcome ?? activityOutcome(outcome);
+      const outcomeDetail =
+        decision.outcomeDetail ?? (outcome?.kind === "ignored" ? outcome.reason : undefined);
+      await deps.recordChannelInboundActivity({
+        organizationId: deps.organizationId,
+        channel: message.channel,
+        accountId: account.accountId,
+        routePosition: routePosition(account, route),
+        routeFingerprint: routeFingerprint(route),
+        externalConversationId: message.conversation.rootConversationId,
+        externalThreadId: message.conversation.threadId,
+        senderIdentity: message.senderIdentity,
+        outcome: recordedOutcome,
+        ...(outcomeDetail === undefined ? {} : { outcomeDetail }),
+        limitDecision: decision.limitDecision,
+        ...(decision.limitReason === undefined ? {} : { limitReason: decision.limitReason }),
+      });
+    } catch (error) {
+      logger.warn("channel activity record failed", {
+        channel: message.channel,
+        accountId: account.accountId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return decision.result;
+  }
+
+  function activityOutcome(
+    outcome: InboundOutcome | undefined,
+  ): "bound" | "steered" | "workflow" | "ignored" {
+    if (outcome?.kind === "bound") return "bound";
+    if (outcome?.kind === "steered") return "steered";
+    if (outcome?.kind === "workflow") return "workflow";
+    return "ignored";
   }
 
   async function admitWorkflowMessage(
@@ -597,7 +852,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
   ): Promise<ReturnType<typeof admitFollowUp>> {
     if (route.target.kind !== "workflow") throw new Error("workflow route is required");
-    if (!mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) {
+    if (!(await mayUseChannel(message, account, route))) {
       return { allowed: false, reason: "sender may not trigger this route" };
     }
     const key = deriveBindingKey(message, route);
@@ -630,52 +885,43 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   async function handleApprovalCommand(
     message: InboundMessage,
     account: CompiledChannelAccount,
-    route: CompiledRoute,
     command: ApprovalCommand,
   ): Promise<PlaneInboundResult> {
-    const agentId =
-      route.target.kind === "workflow"
-        ? workflowAgentForBinding(workflowAgentMapKey(message, route), command.requestId)
-        : await directAgentFor(message, account, route);
-    if (agentId === undefined) {
+    const target = approvalPromptAt(
+      message.channel,
+      message.accountId,
+      message.conversation.rootConversationId,
+      message.conversation.threadId,
+      command.requestId,
+    );
+    if (target === undefined) {
       return result(false, {
         kind: "command",
         handled: false,
-        detail: "no bound session to answer this approval",
+        detail:
+          command.requestId === undefined
+            ? "no open approval to answer"
+            : `no open approval with id ${command.requestId}`,
       });
     }
+    const { context, request } = target;
     // First authority check (inbound entry): the responder may take part in this
     // conversation. The second (mayApprove: class privilege + initiatorOnly)
     // runs in the approval engine, at dispatch, against the current rule set.
-    if (!mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) {
+    if (!(await mayVerifiedMemberUseChannel(message, account, context.route))) {
       return result(false, {
         kind: "command",
         handled: false,
         detail: "sender may not take part in this conversation",
       });
     }
-    // Resolve the target against the engine's open prompts: an explicit id
-    // must name an open (unresolved) prompt of this agent; a bare command
-    // (no id) targets the newest open prompt ("latest").
     const engine = approvalsEngine();
-    const target = engine.resolveOpenPrompt(agentId, command.requestId);
-    if (target === undefined) {
-      const detail =
-        command.requestId !== undefined
-          ? `no open approval with id ${command.requestId}`
-          : "no open approval to answer";
-      return result(false, {
-        kind: "command",
-        handled: false,
-        detail,
-      });
-    }
     const check = await engine.answerFromChannel(
-      agentId,
+      context.agentId,
       message.senderIdentity,
       {
         decision: command.decision,
-        requestId: target.id,
+        requestId: request.id,
         ...(command.answer !== undefined ? { answer: command.answer } : {}),
       },
       message.senderName,
@@ -739,7 +985,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       return result(true, { kind: "command", handled: true, detail: "help" });
     }
 
-    if (!mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) {
+    if (!(await mayUseChannel(message, account, route))) {
       return result(false, {
         kind: "command",
         handled: false,
@@ -835,6 +1081,58 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     }
   }
 
+  async function mayUseChannel(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<boolean> {
+    if (externalParticipantMayTrigger(message, route)) return true;
+    if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) return true;
+    return (
+      (await deps.authorizeChannelUse?.({
+        organizationId: deps.organizationId,
+        account,
+        message,
+      })) ?? false
+    );
+  }
+
+  function mayVerifiedMemberUseChannel(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<boolean> {
+    if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) {
+      return Promise.resolve(true);
+    }
+    return (
+      deps.authorizeChannelUse?.({
+        organizationId: deps.organizationId,
+        account,
+        message,
+      }) ?? Promise.resolve(false)
+    );
+  }
+
+  function callbackMessage(
+    params: ApprovalCallbackParams,
+    account: CompiledChannelAccount,
+  ): InboundMessage {
+    return {
+      channel: account.channel === "slack" ? "slack" : "telegram",
+      accountId: account.accountId,
+      senderIdentity: params.senderIdentity,
+      text: "",
+      mentionedBot: true,
+      conversation: {
+        kind: params.externalThreadId === null ? params.rootKind : "thread",
+        id: params.externalThreadId ?? params.externalConversationId,
+        rootConversationId: params.externalConversationId,
+        threadId: params.externalThreadId,
+      },
+    };
+  }
+
   /** One engine's open prompts for an agent (the /status "pending" fact). */
   function engineOpenPrompts(agentId: string): AgentPermissionRequest[] {
     return approvals?.openPromptRequests(agentId) ?? [];
@@ -859,9 +1157,49 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     return workflowActivityKey(workflowBindingKey(message, route), route.target.workflow);
   }
 
-  function workflowAgentForBinding(bindingKey: string, requestId?: string): string | undefined {
-    const agents = [...(workflowAgentsByBinding.get(bindingKey) ?? [])].toReversed();
-    return agents.find((agentId) => approvals?.resolveOpenPrompt(agentId, requestId) !== undefined);
+  /** The captured Workflow route used only for session-control commands. A
+   * normal message still performs a fresh Route selection and creates a new
+   * Automation run, independently of Agent reuse. */
+  function activeWorkflowRouteFor(message: InboundMessage): CompiledRoute | undefined {
+    let exact: CompiledRoute | undefined;
+    let collapsed: CompiledRoute | undefined;
+    for (const { context } of workflowExecutionAgents.values()) {
+      if (
+        context.channel !== message.channel ||
+        context.accountId !== message.accountId ||
+        context.externalConversationId !== message.conversation.rootConversationId
+      ) {
+        continue;
+      }
+      if (context.externalThreadId === message.conversation.threadId) exact = context.route;
+      else if (context.externalThreadId === null) collapsed = context.route;
+    }
+    return exact ?? collapsed;
+  }
+
+  /** Resolve a prompt from its captured Channel location. Prefer the native
+   * thread/topic, then a deliberately conversation-collapsed binding. */
+  function approvalPromptAt(
+    channel: string,
+    accountId: string,
+    externalConversationId: string,
+    externalThreadId: string | null,
+    requestId?: string,
+  ) {
+    const matchesLocation = (context: StreamContext, threadId: string | null) =>
+      context.channel === channel &&
+      context.accountId === accountId &&
+      context.externalConversationId === externalConversationId &&
+      context.externalThreadId === threadId;
+    const exact = approvalsEngine().resolveOpenPromptWhere(
+      (context) => matchesLocation(context, externalThreadId),
+      requestId,
+    );
+    if (exact !== undefined || externalThreadId === null) return exact;
+    return approvalsEngine().resolveOpenPromptWhere(
+      (context) => matchesLocation(context, null),
+      requestId,
+    );
   }
 
   async function directAgentFor(
@@ -898,37 +1236,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     return execution?.daemonAgentId ?? undefined;
   }
 
-  function workflowAgentForCallback(
-    params: ApprovalCallbackParams,
-    requestId: string,
-    workflow: string,
-  ): string | undefined {
-    for (const [agentKey, agents] of workflowAgentsByBinding) {
-      let address: unknown;
-      try {
-        const parsed: unknown = JSON.parse(agentKey);
-        if (!Array.isArray(parsed) || parsed[1] !== workflow) continue;
-        address = typeof parsed[0] === "string" ? JSON.parse(parsed[0]) : undefined;
-      } catch {
-        continue;
-      }
-      if (
-        !Array.isArray(address) ||
-        address[0] !== params.channel ||
-        address[1] !== params.accountId ||
-        address[2] !== params.externalConversationId ||
-        (address[3] !== null && address[3] !== params.externalThreadId)
-      ) {
-        continue;
-      }
-      const agentId = [...agents]
-        .toReversed()
-        .find((candidate) => approvals?.resolveOpenPrompt(candidate, requestId) !== undefined);
-      if (agentId !== undefined) return agentId;
-    }
-    return undefined;
-  }
-
   function cleanupWorkflowStream(executionId: string, agentId: string): void {
     const attached = workflowExecutionAgents.get(executionId);
     if (attached?.agentId !== agentId) return;
@@ -955,37 +1262,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     if (check.answered) return answeredDetail;
     if (check.stale === true) return staleDetail;
     return `refused (${check.reason})`;
-  }
-
-  /**
-   * The route a card click's conversation resolves under: the card was posted
-   * into a bound thread/topic, so match the THREAD descriptor first (the
-   * click's thread id, when the card sat in one), then the ROOT descriptor —
-   * the same two-pass order as `resolveRoute` for an inbound message.
-   */
-  function resolveRouteForCallback(
-    params: ApprovalCallbackParams,
-    account: CompiledChannelAccount,
-  ): CompiledRoute | undefined {
-    const threadKind = params.externalThreadId !== null ? threadKindFor(params.channel) : null;
-    const descriptors = [
-      ...(threadKind !== null && params.externalThreadId !== null
-        ? [{ kind: threadKind, id: params.externalThreadId }]
-        : []),
-      { kind: params.rootKind, id: params.externalConversationId },
-    ];
-    for (const descriptor of descriptors) {
-      const match = matchRoute(descriptor, account);
-      if (match.route !== null) return match.route;
-    }
-    const fallback = account.fallback;
-    if (fallback.deny) return undefined;
-    return catchAllRoute(fallback);
-  }
-
-  /** The thread-level route-match kind of a channel's native threads. */
-  function threadKindFor(channel: string): "thread" | "topic" {
-    return channel === "telegram" ? "topic" : "thread";
   }
 
   // --- Start re-attach -------------------------------------------------------
@@ -1015,6 +1291,62 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
 
   // --- Routing ---------------------------------------------------------------
 
+  type InboundRouteResolution =
+    | { kind: "selected"; route: CompiledRoute }
+    | { kind: "invalid-binding" }
+    | { kind: "unmatched" };
+
+  /**
+   * A durable direct-Agent binding owns the inbound before text routing. This
+   * is what keeps a later `contains` marker from moving an active conversation
+   * into a Workflow. Without a binding, select a new target from message text.
+   */
+  async function resolveInboundRoute(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+  ): Promise<InboundRouteResolution> {
+    const binding = await bindingForInbound(message, account);
+    if (binding !== undefined) {
+      const route = routeForBinding(binding);
+      return route?.target.kind === "agent"
+        ? { kind: "selected", route }
+        : { kind: "invalid-binding" };
+    }
+    const route = resolveNewRoute(message, account);
+    return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
+  }
+
+  /** Find the most-specific binding key that can own this inbound. */
+  async function bindingForInbound(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+  ): Promise<ThreadBindingRecord | undefined> {
+    if (store === undefined) return undefined;
+    const conversation = message.conversation;
+    const candidates: (string | null)[] = [];
+    if (conversation.threadId !== null) candidates.push(conversation.threadId);
+    // A redelivery of the root marker that minted a Slack reply thread must
+    // find the same pending/bound row before attempting route selection again.
+    if (
+      conversation.threadId === null &&
+      message.channel === "slack" &&
+      message.externalMessageId !== undefined
+    ) {
+      candidates.push(message.externalMessageId);
+    }
+    candidates.push(null);
+    for (const externalThreadId of new Set(candidates)) {
+      const binding = await store.findThreadBinding(
+        deps.organizationId,
+        account.accountId,
+        conversation.rootConversationId,
+        externalThreadId,
+      );
+      if (binding !== undefined) return binding;
+    }
+    return undefined;
+  }
+
   /**
    * Two-pass route match (pinned-vertical-contracts/inbound.md): a
    * thread/topic-level message matches the THREAD-LEVEL descriptor first
@@ -1023,7 +1355,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
    * declaration order wins. `matchRoute` stays a pure single-level matcher.
    * A root-level message carries no thread id — one pass at the root.
    */
-  function resolveRoute(
+  function resolveNewRoute(
     message: InboundMessage,
     account: CompiledChannelAccount,
   ): CompiledRoute | undefined {
@@ -1037,7 +1369,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           ]
         : [{ kind: rootKind, id: conversation.rootConversationId }];
     for (const descriptor of descriptors) {
-      const match = matchRoute(descriptor, account);
+      const match = matchRoute(descriptor, account, message.text);
       if (match.route !== null) return match.route;
     }
     const fallback = account.fallback;
@@ -1069,6 +1401,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       initiator: binding.initiator,
       account,
       route,
+      ...(route.target.kind === "agent"
+        ? { accessTarget: deps.resolveAgentAccessTarget(route.target) }
+        : {}),
       // The approval card's `inlineButtons` dm/group gate decides on the
       // binding's stored route summary's kind (thread → channel, topic →
       // group; already mapped at store time — the root-level kind).
@@ -1101,13 +1436,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     );
   }
 
-  /**
-   * Re-derive the route a stored binding resolved under: re-match the original
-   * conversation descriptor (stored on the binding row) against the account,
-   * falling back to the catch-all route. Routes are live, so a config edit is
-   * picked up from this re-attach — the binding's stored summary is only the
-   * match key, not a pinned rule set.
-   */
+  /** Resolve a stored direct binding without re-running its original text match. */
   function routeForBinding(binding: ThreadBindingRecord): CompiledRoute | undefined {
     const account = findAccountForBinding(binding);
     if (account === undefined) return undefined;
@@ -1115,10 +1444,109 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       kind: "channel" as const,
       id: binding.externalConversationId,
     };
-    const match = matchRoute(descriptor, account);
-    if (match.route !== null) return match.route;
-    if (match.fallback.deny) return undefined;
-    return catchAllRoute(match.fallback);
+    const selection = parseStoredRouteSelection(binding.route);
+    if (selection === undefined) {
+      // Compatibility for bindings written before captured route selection.
+      // A content-specific route cannot match without its original text.
+      const legacy = matchRoute(descriptor, account);
+      if (legacy.route !== null) return legacy.route;
+      return legacy.fallback.deny ? undefined : catchAllRoute(legacy.fallback);
+    }
+    const fallback = account.fallback.deny ? undefined : catchAllRoute(account.fallback);
+    const atCapturedPosition =
+      selection.position === "fallback" ? fallback : account.routes[selection.position];
+    if (
+      selection.revisionId === (deps.channelRevisionId ?? null) &&
+      continuationMatches(atCapturedPosition, descriptor, selection.fingerprint)
+    ) {
+      return atCapturedPosition;
+    }
+    // A revision may reorder an otherwise identical route. Continue only when
+    // target and every effective policy leaf are byte-equivalent after compile.
+    return [...account.routes, ...(fallback === undefined ? [] : [fallback])].find((candidate) =>
+      continuationMatches(candidate, descriptor, selection.fingerprint),
+    );
+  }
+
+  function continuationMatches(
+    route: CompiledRoute | undefined,
+    descriptor: {
+      kind: "dm" | "channel" | "thread" | "group" | "topic";
+      id: string;
+    },
+    fingerprint: string,
+  ): route is CompiledRoute {
+    if (route === undefined || routeFingerprint(route) !== fingerprint) return false;
+    // The synthesized fallback has no authored scope; its fingerprint is the
+    // authority. Authored routes must still own the stored Conversation.
+    if (route.match.kind === "channel" && route.match.ids.length === 0 && !accountHasRoute(route)) {
+      return true;
+    }
+    return routeConversationMatches(route.match, descriptor);
+  }
+
+  function accountHasRoute(route: CompiledRoute): boolean {
+    return deps.controlPlane.accounts.some((account) => account.routes.includes(route));
+  }
+
+  /** The one shared stream consumer; callers own their execution lease shape. */
+  async function consumeAgentStream(agentId: string, event: unknown): Promise<void> {
+    const request = asPermissionRequest(event);
+    if (request !== undefined) {
+      await approvals?.handlePermissionRequest(agentId, request);
+      return;
+    }
+    const resolvedId = asPermissionResolved(event);
+    if (resolvedId !== undefined) {
+      approvals?.onPermissionResolved(agentId, resolvedId);
+      return;
+    }
+    const relayed = asRelayedEvent(event);
+    if (relayed !== undefined) await relay?.onStream(agentId, relayed);
+  }
+
+  /**
+   * A Workflow stream may outlive the Channel revision that started it. New
+   * events attach only when the captured Route still exists with the same
+   * fingerprint; old Member-only rows retain their pre-fingerprint behavior.
+   */
+  function workflowRouteForCurrentConfiguration(
+    account: CompiledChannelAccount,
+    channel: NonNullable<ReturnType<typeof channelWorkflowOutput>>,
+    workflow: string,
+  ): CompiledRoute | undefined {
+    if (channel.route_fingerprint !== undefined) {
+      const fallback =
+        account.fallback.deny || account.fallback.target === undefined
+          ? undefined
+          : catchAllRoute(account.fallback);
+      let atCapturedPosition: CompiledRoute | undefined;
+      if (channel.route_position === "fallback") {
+        atCapturedPosition = fallback;
+      } else if (typeof channel.route_position === "number") {
+        atCapturedPosition = account.routes[channel.route_position];
+      }
+      const candidates = [atCapturedPosition, ...account.routes, fallback];
+      return candidates.find(
+        (candidate) =>
+          candidate?.target.kind === "workflow" &&
+          candidate.target.workflow === workflow &&
+          routeFingerprint(candidate) === channel.route_fingerprint,
+      );
+    }
+    if (channel.route.audience?.kind === "conversationParticipants") {
+      return undefined;
+    }
+    return {
+      match: { kind: channel.root_kind, ids: [] },
+      ...(channel.route.audience === undefined ? {} : { audience: channel.route.audience }),
+      target: { kind: "workflow", workflow },
+      defaultRoles: channel.route.defaultRoles,
+      assignments: channel.route.assignments,
+      defaults: channel.route.defaults,
+      approval: channel.route.approval,
+      ...(channel.route.limits === undefined ? {} : { limits: channel.route.limits }),
+    };
   }
 
   function result(dispatched: boolean, outcome: InboundOutcome): PlaneInboundResult {
@@ -1128,6 +1556,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   return plane;
+}
+
+function parseChannelIdentityLinkCommand(text: string): string | null {
+  const match = /^(?:<@[^>]+>\s*)?\/link(?:@[A-Za-z0-9_]+)?\s+([A-Za-z0-9_-]+)\s*$/u.exec(
+    text.trim(),
+  );
+  return match?.[1] ?? null;
 }
 
 function workflowOutputDelivery(
@@ -1193,7 +1628,13 @@ function channelWorkflowOutput(value: unknown):
       root_kind: "dm" | "channel" | "group";
       trigger_thread_id: string | null;
       trigger_message_id?: string;
-      route: Pick<CompiledRoute, "defaultRoles" | "assignments" | "defaults" | "approval">;
+      revision_id?: string | null;
+      route_position?: number | "fallback";
+      route_fingerprint?: string;
+      route: Pick<
+        CompiledRoute,
+        "audience" | "defaultRoles" | "assignments" | "defaults" | "approval" | "limits"
+      >;
     }
   | undefined {
   if (!isRecord(value) || value["provider"] !== "channel") return undefined;
@@ -1212,8 +1653,24 @@ function channelWorkflowOutput(value: unknown):
     ...(channel.trigger_message_id === undefined
       ? {}
       : { trigger_message_id: channel.trigger_message_id }),
+    ...(channel.revision_id === undefined ? {} : { revision_id: channel.revision_id }),
+    ...(channel.route_position === undefined ? {} : { route_position: channel.route_position }),
+    ...(channel.route_fingerprint === undefined
+      ? {}
+      : { route_fingerprint: channel.route_fingerprint }),
     route: channel.route,
   };
+}
+
+function channelWorkflowDeliveryId(value: unknown): string | undefined {
+  if (!isRecord(value) || value["provider"] !== "channel") return undefined;
+  const deliveryId = value["deliveryId"];
+  return typeof deliveryId === "string" && deliveryId.length > 0 ? deliveryId : undefined;
+}
+
+function isTerminalStreamEvent(event: unknown): boolean {
+  const terminal = asRelayedEvent(event);
+  return terminal?.kind === "turn_completed" || terminal?.kind === "turn_closed";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

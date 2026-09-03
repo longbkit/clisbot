@@ -49,6 +49,22 @@ describe("provider applications", () => {
     assert.equal(fixture.store.reads, 0);
   });
 
+  it("lets an organization manager start a Connection from an existing Application", async () => {
+    const fixture = createFixture({ operator: false });
+    await fixture.store.save({
+      provider: "github",
+      configuration: githubConfiguration,
+      identity: { provider: "github", id: "42", name: "Paseo", ownerLogin: "acme" },
+      expectedVersion: undefined,
+      updatedByUserId: "operator",
+    });
+
+    assert.deepEqual(
+      await fixture.applications.beginConnection(request("POST"), "github", "42", "org"),
+      { url: "https://slack.test/install" },
+    );
+  });
+
   it("rejects cross-origin mutations before reading or changing provider state", async () => {
     const fixture = createFixture({ rejectMutation: true });
 
@@ -311,6 +327,10 @@ describe("provider applications", () => {
 
   it("persists and activates Slack only after the verified OAuth installation", async () => {
     const fixture = createFixture();
+    const changes: Array<{ provider: string; providerApplicationId: string }> = [];
+    fixture.applications.onConfigurationChanged?.(async (change) => {
+      changes.push(change);
+    });
 
     const result = await fixture.applications.verifyAndSave(
       request("POST"),
@@ -344,6 +364,7 @@ describe("provider applications", () => {
 
     assert.equal(fixture.store.values.get("slack")?.version, 1);
     assert.notEqual(fixture.runtime.active("slack"), undefined);
+    assert.deepEqual(changes, [{ provider: "slack", providerApplicationId: "A1" }]);
   });
 
   it("persists and activates Linear only after the verified OAuth installation", async () => {
@@ -538,9 +559,10 @@ describe("provider applications", () => {
 
     await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "appSetup");
     await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "apps");
+    await fixture.applications.beginConnection(request("POST"), "github", "42", "org", "paseo");
     await fixture.applications.beginConnection(request("POST"), "github", "42", "org");
 
-    assert.deepEqual(fixture.returnRoutes, ["/", "/apps", "/apps"]);
+    assert.deepEqual(fixture.returnRoutes, ["/", "/apps", "/settings/hub/configuration", "/apps"]);
   });
 
   it("carries the surface through a Slack installation", async () => {
@@ -561,6 +583,7 @@ describe("provider applications", () => {
     assert.equal(providerApplicationReturnRoute(undefined), "/apps");
     assert.equal(providerApplicationReturnRoute("appSetup"), "/");
     assert.equal(providerApplicationReturnRoute("apps"), "/apps");
+    assert.equal(providerApplicationReturnRoute("paseo"), "/settings/hub/configuration");
   });
 });
 

@@ -1,7 +1,7 @@
 # Unified client Hub configuration UI
 
-Date: 2026-09-01. Updated: 2026-09-02. Status: implementation-ready product and interaction
-contract, except for the explicitly open management-API decision gate in section 12. Scope: make
+Date: 2026-09-01. Updated: 2026-09-03. Status: implemented MVP product and interaction contract;
+the intentionally deferred items are listed in section 18. Scope: make
 the existing Paseo app the only end-user UI for Hub account, Channel, Automation, Team, access, and
 configuration management, without introducing a second app shell or a separate product-level Bot
 entity.
@@ -71,7 +71,7 @@ Hub
 
 After sign-in, the app shows only the Hub destinations the member may view. The main app sidebar
 adds the signed-in member's avatar without replacing the existing Settings button. The avatar opens
-Account and Sign out. There is no organization switcher in the first version.
+Account, where Sign out remains available. There is no organization switcher in the first version.
 
 ### Baseline product tests
 
@@ -194,41 +194,32 @@ and client state are behavior references only. Every end-user Hub management scr
 as new Paseo client code under `packages/app/src/clisbot/hub/**`, using Paseo navigation and design
 patterns while calling the retained Hub backend.
 
-The following are not implemented yet:
+The implemented baseline includes Team and invitation management, verified Channel-identity
+self-linking, Team/direct Access, Provider Application and Connection setup, guarded disconnect with
+consumer projection, structured Channel and Automation editors, Advanced YAML, immutable revision
+history, Channel test/retry, Automation Manual Run and Activity, managed Host discovery, and
+owner-first setup. These surfaces use one management API and the existing Hub domain stores; they do
+not introduce another configuration source.
 
-- BetterAuth Teams are currently disabled.
-- BetterAuth Members are not connected to channel-control-plane users.
-- Channel identity, Team membership, and managed resource access have no unified data model.
-- The Paseo app has no structured Channel, Team, or Access management screens.
-- Route matching has Conversation kind and IDs but no message-text condition. It therefore cannot
-  yet express “messages containing `#triage` run the Automation; other messages continue the direct
-  Agent” within one Conversation.
-- Candidate compilation now validates Agent, Environment, and enabled Workflow references against
-  candidate `hub.yml`, but it does not yet prove that every Channel `connectionId` exists, belongs
-  to the organization/provider, and is usable before activation.
-- The Channel supervisor does not restart an already-running account when its active revision
-  changes, so Route, policy, Agent, or Environment edits may leave the old in-memory snapshot active
-  until a process/account restart.
-- Slack still has separate physical transport consumers for Channel runtime and direct Automation
-  event sources. Sharing one Slack Connection between those independent consumers requires the
-  existing planned Application-scoped event multiplexer. A Channel Route that invokes a Workflow
-  already uses one Channel transport and is not blocked by this gap.
-- Direct Channel Agents and Automation Agents do not yet author `featureValues`; Fast mode is
-  already supported by the daemon and execution wire but is missing from the Hub Agent and Trigger
-  authoring schemas and their launch mappings.
-- Stable Paseo Project identity is still required by Managed Access enforcement. It is an additive
-  authorization link beside today's daemon Environment/cwd representation, not evidence that the
-  existing `hub.yml` Agent definition is incomplete.
-- The current Hub website owns configuration presentation. The Paseo app does not yet have the
-  reviewed session-authenticated management contract and structured screens needed to replace it.
-  The API shape is deliberately not decided in this document; see section 12.
+Route matching supports Conversation kind, exact IDs, and an optional literal text condition.
+Candidate activation validates Agent, Environment, Project, enabled Automation, Connection, and
+open-audience invariants before writing a revision. Reconciliation then restarts enabled Channel
+accounts from that exact snapshot and exposes per-account failure/retry state.
+
+The remaining items are deliberate follow-ups, not hidden MVP dependencies: provider-wide inbound
+transport multiplexing when one streaming Connection independently feeds Channel runtime and event
+Automations; fanout of one message to several targets with per-target idempotency; stable authored
+Automation-ID references; regex/expression routing; custom roles; multi-Team invitation; and
+runtime metadata for safely classifying daemon-local custom Modes. A Channel Route that invokes an
+Automation already shares its Channel-account transport and is unaffected by the multiplexer item.
 
 ## 4. Organization roles and resource access
 
 Organization roles control Hub administration. They do not automatically grant access to Channels,
 Daemons, Projects, or Automations.
 
-The canonical CURRENT/MODIFY/NEW permission inventory is in section 4 of
+The canonical permission inventory, including whether each name was retained, added, or extended,
+is in section 4 of
 [Unified Paseo client and Managed Access Lite](2026-08-31-unified-client-managed-access-lite.md).
 This document uses those actions through UI access levels; it does not define a second catalog.
 
@@ -259,7 +250,7 @@ type AccessSubject = { kind: "team"; teamId: string } | { kind: "member"; member
 
 type ResourceScope =
   | {
-      kind: "channel";
+      kind: "channel_account";
       channelAccountId: string;
       conversation: ConversationAccess;
     }
@@ -446,9 +437,10 @@ Access
 
 ### Invitations
 
-The existing invitation flow adds an optional Team selection after organization role. Nothing is
-selected by default. The review step lists the Teams and resulting access before the invitation is
-sent.
+The invitation flow adds one optional Team selection after organization role, reusing BetterAuth's
+existing invitation `teamId`. Nothing is selected by default. The review shows that Team and its
+current assignment count before the invitation is sent. Add a Member to further Teams after they
+accept; the MVP does not add a second invitation-to-Teams relation.
 
 ## 8. Access UI
 
@@ -581,7 +573,10 @@ Diagnostics
 ```
 
 Provider secrets are never shown after save. Replace and revoke are explicit actions. Revoke uses a
-destructive confirmation.
+destructive confirmation. Replacing either a Connection credential or its Provider Application
+credential keeps stable resource identity and immediately restarts every active Channel account in
+the active organization that consumes it, so runtime cannot continue using the old credential while
+the UI shows the new one.
 
 `Remove Channel account` disables and removes the conversational configuration, Routes, and
 running Channel handle; it is not the same operation as disconnecting the provider installation.
@@ -737,10 +732,10 @@ new isolated worktree, check out an existing branch, or check out a pull request
 folder` is the one-owner default. The UI writes the existing Environment `worktree` shape rather
 than inventing a second Workspace model.
 
-The only missing direct-Agent control in this representation is the additive `featureValues` field.
-Add it to both Hub Agent schemas and pass it through `createChannelAgentSpecResolver()`; Fast mode
-then uses `featureValues.fast_mode` and the `agent.fast.use` check. Provider, Model, Mode, Thinking,
-provider options, daemon, cwd, and worktree already exist and must not be redesigned.
+The direct-Agent representation includes additive `featureValues` in both Hub Agent schemas and
+passes it through `createChannelAgentSpecResolver()`. Fast mode uses
+`featureValues.fast_mode` and the `agent.fast.use` check. Provider, Model, Mode, Thinking, provider
+options, daemon, cwd, and worktree retain their existing shapes.
 
 The Route editor reuses the current interaction, binding, reply, outbound, synchronization, and
 approval settings. It shows the effective compiled value beside any inherited value so the user
@@ -829,21 +824,15 @@ uses `Anyone in selected conversations`.
 `Members with access` is the default Audience. It uses the owner, Team, and direct assignments
 described above.
 
-For an open Audience, `Specific conversations` is the safe default. `Direct messages`,
-`Public conversations`, and `All conversations` remain available to an authorized owner or
-administrator because deployments legitimately differ. Broader choices show their effective reach,
-whether future public Conversations are included, and a security/cost confirmation. The UI may
-offer `Select all current public conversations` as a safer snapshot of stable IDs without making it
-the only valid model.
-
-These are presets and explicit configuration choices, not hidden schema restrictions. Provider
-visibility that cannot be proved still fails closed for `Public conversations`; choosing `All
-conversations` is the administrator's explicit broader policy, not an inference from unknown
-visibility.
+Team/Member access assignments may use all four scopes. An open Audience is stricter: it must name
+at least one exact Conversation ID, including for DMs, and group/shared/public conversations must
+also require a mention. This prevents a public entry point from silently expanding to future or
+unknown Conversations. The observed-Conversation picker supplies known IDs and the form always
+retains manual ID entry for a Conversation the Hub has not observed yet.
 
 Channel accounts have one built-in user access level:
 
-- `Use` grants `channel.use` and `agent.interact` for the fixed Route in the assigned Conversations.
+- `Use` grants `channel.use` for the fixed Route in the assigned Conversations.
   It does not grant direct access to the target Project or Automation.
 
 ## 11. Channel authorization
@@ -884,8 +873,9 @@ Selecting an open Audience starts from a conservative preset:
 - Final-answer-only synchronization and text replies only.
 - Fast mode off, conservative rate/concurrency/input/runtime limits, and no external approvals.
 
-An authorized owner or administrator may deliberately broaden Conversation scope, synchronization,
-file output, feature values, and limits. The review must show the effective result and estimated cost.
+An authorized owner or administrator may deliberately broaden synchronization, file output,
+feature values, and limits within the hard boundaries below. Open Audience itself remains limited
+to exact Conversation IDs. The review must show the effective result and estimated cost.
 Configuration flexibility never weakens these hard invariants:
 
 - Enabling or changing open Audience requires both Hub configuration and access-management
@@ -899,6 +889,9 @@ Configuration flexibility never weakens these hard invariants:
 - External participants cannot approve a tool request. The Route may auto-run only actions in its
   server-side, Conversation-bound capability. File sending remains confined to declared Project
   output roots even when an administrator enables it.
+- Tool-path replies use an opaque, expiring Hub capability bound to the organization, Channel
+  account, Conversation, selected Route revision, and created Agent. Replacing the Route or
+  stopping its account revokes the capability. Its URL contains no routable Channel identifiers.
 - Fast mode requires `agent.fast.use`, an explicit cost warning, and a Route budget. An External
   participant never receives that privilege; the fixed Route either has it at activation or cannot
   enable Fast mode.
@@ -916,6 +909,11 @@ Configuration flexibility never weakens these hard invariants:
 
 These controls are the public automation boundary. Prompt intent, classifier output, and model
 instructions never broaden the fixed target or tool policy.
+
+Hub checks the daemon-published runtime Mode catalog during activation. An open-audience direct
+Agent or Automation must resolve to a known attended Mode; an omitted Mode resolves through the
+published default. Custom or unknown Modes without safety metadata and every unattended Mode fail
+closed.
 
 ## 12. Automations and Configuration
 
@@ -1060,8 +1058,8 @@ fail. Fast mode is off by default and additionally requires an explicit Route bu
 
 ### Management API
 
-The inventory found reusable Hub application services but no single API suitable for every Paseo
-client:
+The inventory found reusable Hub application services but no pre-existing single API suitable for
+every Paseo client:
 
 - the public API authenticates API keys or CLI credentials and already owns Project bundle and
   Automation operations;
@@ -1071,12 +1069,12 @@ client:
 - the Channel CLI endpoints authenticate an instance secret or loopback caller and expose only the
   early add/list/status and YAML-user commands.
 
-Keep those domain services and persistence paths. Add one Clisbot-owned HTTP adapter under
-`packages/hub/src/management-api/**`; it is a transport boundary, not a second configuration
-backend. The adapter authenticates a BetterAuth browser session or a first-party app credential,
-checks the organization named in the request, then calls the existing service that owns the
-operation. Hub page server functions may remain as compatibility callers, but Paseo and the CLI use
-the same operation layer beneath both HTTP surfaces.
+`packages/hub/src/management-api/**` is now the Clisbot-owned HTTP adapter over those domain
+services and persistence paths; it is a transport boundary, not a second configuration backend.
+It authenticates a BetterAuth browser session or first-party app credential, checks the
+organization named in the request, then calls the existing owner. Hub page server functions and
+older CLI commands remain compatibility callers. New CLI operations can use the same resource
+contract without introducing a CLI-specific backend.
 
 The resource families are `projects`, `automations`, `provider-applications`, `connections`,
 `channel-configuration`, `teams`, `channel-identities`, `access-assignments`, and `daemons`. They are
@@ -1104,25 +1102,39 @@ problem/error vocabulary, redact credentials, and enforce authorization on the H
 is never the access boundary. The existing `/api/v1/**` public API stays compatible; management
 authentication is not added to it implicitly.
 
-The backend work independent of that API decision is fixed:
+The implemented adapter currently exposes:
 
-1. Add optional `projectId` to daemon Environment/Trigger targets while continuing to read the
-   current daemon-plus-absolute-cwd form. Carry it through Hub-created Agent work so the Daemon can
-   resolve the target Workspace and enforce the Project boundary.
-2. Add optional `featureValues` to `TriggerAgentSchema`, the Hub Agent schemas used by `hub.yml`,
-   their compiled forms, and both launch mappings. Keep `mode` and `options` as compatibility names
-   and normalize only at the execution boundary.
-3. Expose `reuse: binding` in the one-run Trigger authoring schema and mapping; the Workflow engine
-   already owns compatibility checks, serialized same-binding runs, restore, and reuse execution.
-4. Add Channel Route `contains`, binding-first follow-up behavior, captured asynchronous Route
-   context, activation-time Connection validation, and restart-based supervisor reconciliation
-   described in section 9.
-5. After Paseo reaches feature parity, remove old Hub configuration pages from the end-user build.
-   Keep authentication/OAuth callbacks, application services, compilers, revisions, and runtime.
+- `provider-applications`: list the existing redacted `ProviderApplications.overview()` and verify
+  or replace GitHub, Slack Webhook, Discord, or Linear Application credentials through
+  `ProviderApplications.verifyAndSave()`;
+- `connections`: list organization Connections, create token-native Telegram or Slack Socket
+  Connections, or begin a provider OAuth/installation Connection from a verified Application;
+- `channel-configuration`: read, validate, or atomically replace the active Channel candidate;
+  list revisions; project observed Conversations; and expose account test/retry operations;
+- `automations`: list, validate, create, or replace organization Trigger documents under the
+  Automation product name; list revisions and Activity; project runnable Automations; and dispatch
+  a least-data Manual Run; and
+- `teams`, `channel-identities`, `access-assignments`, and `daemons`: the management and Managed
+  Access resources described in this document.
 
-Implementation seams below exclude the unresolved HTTP/function API façade:
+Provider secrets remain write-only. A Connection projection carries its owning
+`providerApplicationId` but never credential material. Application configuration remains
+instance-operator-only; an organization owner or administrator may create a Connection from an
+already verified Application. Connection projections include every Channel, Automation, and
+Project consumer; disconnect fails while any consumer remains. Provider setup guidance and Slack
+delivery retry are also exposed by the adapter. Daemon managed-access mode remains a Host-owned
+setting through the existing daemon configuration RPC; the Hub management API does not duplicate
+that write.
 
-| Relative file path                                  | Existing symbol                                                          | Required change                                                                                                                            |
+The additive `projectId`, `featureValues`, `reuse: binding`, Route `contains`, binding-first
+follow-up, captured asynchronous Route context, Connection validation, and restart-based
+reconciliation are implemented. The remaining presentation cleanup is to remove the old Hub
+configuration pages from an end-user build once deployment has switched to Paseo, while retaining
+authentication/OAuth callbacks, application services, compilers, revisions, and runtime.
+
+Implementation seams below use that management façade and retain the same domain owners:
+
+| Relative file path                                  | Existing symbol                                                          | Implemented responsibility                                                                                                                 |
 | --------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `packages/hub/src/config/compiler.ts`               | `AgentSchema`, `EnvironmentSchema`, `CompiledAgent`                      | Add Agent `featureValues` and daemon-Environment `projectId`; keep current fields and named-reference behavior.                            |
 | `packages/hub/src/config/bundle.ts`                 | `JsonAgentSchema`, `compileHubBundle()`                                  | Parse/compile the same additive field for DB-backed Channel revisions.                                                                     |
@@ -1131,13 +1143,19 @@ Implementation seams below exclude the unresolved HTTP/function API façade:
 | `packages/hub/src/channels/config/compile.ts`       | `CompiledRoute`, `compileRoute()`                                        | Carry the normalized text condition without changing declaration-order precedence.                                                         |
 | `packages/hub/src/channels/policy.ts`               | `routeMatches()`, `matchRoute()`                                         | Match Conversation facts plus message text; first match still wins.                                                                        |
 | `packages/hub/src/channels/execution.ts`            | `resolveRoute()`, `handleAgentMessage()`, `admitWorkflowMessage()`       | Prefer an existing direct binding, pass text for new Route selection, capture revision plus Route position, and retain shared admission.   |
+| `packages/hub/src/db/channels.ts`                   | `ChannelStore.recordChannelInboundActivity()`                            | Persist a bounded open-audience audit fact without message text, credentials, or display payload.                                          |
 | `packages/hub/src/channels/bindings/index.ts`       | `BindingEngine.admit()`, `.bindOrSteer()`                                | Continue the bound Agent without text reselection; persist the immutable selection in binding context and invalidate affected bindings.    |
 | `packages/hub/src/channels/supervisor/index.ts`     | `ChannelSupervisorImpl.reconcile()`                                      | On a new active revision, stop removed/disabled handles and restart every enabled handle from the new snapshot; return per-account status. |
 | `packages/hub/src/triggers/channel/provider.ts`     | `ChannelWorkflowRequestPayloadSchema`, `createChannelWorkflowProvider()` | Carry selected Channel revision/Route context into durable Workflow output and approvals; never rematch a callback without original text.  |
 | `packages/hub/src/triggers/configuration/schema.ts` | `TriggerAgentSchema`, `TriggerTargetSchema`, `TriggerRunSchema`          | Add optional `featureValues`, target `projectId`, and `reuse: binding`.                                                                    |
 | `packages/hub/src/triggers/configuration/index.ts`  | `compileTriggerDocument()`                                               | Map the additive fields into the existing compiled step and launch path.                                                                   |
+| `packages/hub/src/management-api/index.ts`          | `ManagementApi.restartChannelAccountsUsingConnection()`                  | Restart active Channel consumers immediately after a token-native credential is replaced, without waiting for a configuration revision.    |
+| `packages/hub/src/provider-applications/index.ts`   | `ProviderApplications.onConfigurationChanged()`                          | Publish a redacted post-commit event after direct save or OAuth/install completion; never expose credential material to the subscriber.    |
+| `packages/hub/src/application-runtime.ts`           | `restartProviderApplicationChannelConsumers()`                           | Resolve every affected Connection and restart its enabled Channel accounts within the active organization.                                 |
 | `packages/app/src/screens/settings-screen.tsx`      | `SettingsSidebar`, `SettingsScreen`                                      | Add only the Hub navigation/account mount points to shared Paseo code.                                                                     |
 | `packages/app/src/clisbot/hub/**`                   | new Clisbot-owned screens and state                                      | Own Account, Channels, Automations, Team, Access, Configuration, forms, drafts, validation, activation status, and tests.                  |
+| `packages/app/src/clisbot/hub/sidebar-account.tsx`  | `HubSidebarAccountButton`                                                | Render the signed-in avatar and open the existing Account route; feature-off and signed-out states render nothing.                         |
+| `packages/app/src/components/left-sidebar.tsx`      | `SidebarFooter`                                                          | Add one optional Clisbot-owned avatar mount without replacing the existing Settings action.                                                |
 
 Required focused tests live beside those seams: schema/compiler tests for the new optional fields;
 Route-order, text-match, active-binding and direct/Workflow admission tests; candidate-revision and
@@ -1148,13 +1166,14 @@ deletion tests; and Paseo form state/navigation tests for owner and public/team 
 
 `Hub → Configuration` is also entirely inside Paseo and contains lower-frequency administration:
 
-- General organization configuration.
 - Provider Applications and Connections for GitHub, Slack, Discord, Telegram, or other sources.
   One Connection may serve Automation events and Channel conversation behavior; the consumer list
   makes that reuse visible.
 - API keys.
-- Active configuration and revision history.
-- Instance Apps and Operator settings, visible only to the instance operator.
+- Instance-operator Provider Application setup where the underlying Hub capability requires it.
+
+Channel and Automation revision history remains with its owning detail screen. Host configuration,
+including managed-access mode, remains in the existing Host section.
 
 Usage and Billing remain outside the first unified-client MVP. Host Usage remains unchanged. Hub
 Usage can return only when the product has an organization-level metric or billing workflow that
@@ -1162,11 +1181,11 @@ cannot be represented by Host Usage.
 
 ## 13. Project, Agent configuration, and Daemon access
 
-An enrolled Daemon publishes the minimum catalog required by the Hub access editor, Route resolver,
-and Automation editor: stable Project IDs and names, plus the Provider, Model, Thinking, Mode,
-feature, and optional Agent-profile choices available on that Daemon. It updates the snapshot when
-the catalog changes. Filesystem paths and inaccessible resource details are not part of the
-member-facing catalog.
+An enrolled Daemon publishes the minimum catalog required by the Hub access and delegation checks:
+stable Project IDs and names plus ready Provider, Model, Thinking, and Mode safety metadata. It
+updates the snapshot when the catalog changes. Route and Automation editors use the same live Paseo
+Provider snapshot and optional Agent profiles already exposed by the selected Host. Filesystem
+paths and inaccessible resource details are not part of the member-facing Hub catalog.
 
 A Route or assignment whose Project was removed becomes unavailable and cannot start new work. The
 Channel account remains connected, and its detail page names the missing target to an access
@@ -1251,7 +1270,10 @@ Agent session does not pretend to retain a profile association after launch.
 
 For a Channel Route or Automation, Hub validates the fixed configuration during activation and the
 Daemon validates it again when work starts. The Channel sender or Automation caller cannot override
-the compiled Project or Agent controls.
+the compiled Project or Agent controls. Immediately before a Hub-owned Agent is created, the Daemon
+resolves the configured `cwd` or worktree source through its active Workspace/Project registry and
+requires it to belong to the asserted `projectId`. Hub never guesses path prefixes, and an owner or
+Daemon Administrator cannot use a correct Project ID to relabel an unrelated filesystem path.
 
 ## 14. Paseo client authorization
 
@@ -1346,7 +1368,7 @@ Existing channel `users` and `assignments` configuration has a one-time importer
 read-only compatibility adapter. It must not remain a second independently writable policy system.
 Organization and account `defaultRoles` remain empty so an unmapped sender or newly invited Member
 gains nothing. An open-audience Route compiles its explicit Audience into one built-in Route
-default role containing only `channel.use` and `agent.interact`. It never receives approval,
+default role containing only `channel.use`. It never receives approval,
 Project, Agent-configuration, Fast-mode, Daemon, or Hub privileges.
 
 ## 17. Design-system use
@@ -1397,6 +1419,9 @@ The first version deliberately excludes:
 - Stable Automation-ID references in authored Channel Routes. The current name is resolved and the
   accepted event pins ID plus revision; revisit only when rename behavior earns it.
 - Any end-user Hub configuration page outside Paseo.
+- Concurrent Channel runtime for multiple organizations in one Hub process. The current Supervisor
+  requires one active organization and fails closed on ambiguity; the management and access model
+  remains organization-scoped.
 
 These are omitted because the requested workflows do not need them. They can be added without
 changing the core model if a demonstrated use case appears.
@@ -1418,30 +1443,22 @@ The compatibility contract remains:
   `connectionId` remain compatible configuration contracts; the Paseo form edits them rather than
   replacing them with a second model.
 
-Deliver in this order:
+The implementation keeps these shipped boundaries:
 
-1. Complete and approve the management-API inventory/decision gate in section 12. Do not create
-   UI-specific mutation paths before that decision.
-2. Add Channel Route text matching, additive Agent/Trigger `featureValues`, Trigger
-   `reuse: binding`, stable Project propagation, captured asynchronous Route context, Connection
-   validation, and restart-based Channel reconciliation behind existing backend services.
-3. Mount Hub sign-in and Account in the shared app, preserving the feature-off path, then implement
-   the approved session-authenticated management adapter under `packages/app/src/clisbot/hub/**`.
-4. Enable BetterAuth Teams as a directory and add verified Channel identities plus access
-   assignments.
-5. Add Team and Access screens with owner wildcard, zero-access Member defaults, Project
-   Agent-configuration grants, and explicit Fast-mode access.
-6. Add the structured Automation editor and make `Run an Automation` the first Add Channel target;
-   include optional Apply Agent profile, Advanced YAML, validation, activation, revisions, and
-   Activity inside Paseo.
-7. Add structured Channels overview, the full Add Channel flow, ordered Route editing, text match,
-   Connection consumer/removal handling, validation, activation status, retry, and test message.
-8. Add explicit open Route Audience, safe presets, configurable policy within hard security
-   invariants, cost budgets, and audit.
-9. Complete Daemon Project, Agent-configuration, Fast-mode, File, Terminal, approval,
-   subscription, and outbound enforcement before enabling managed access `external` in production.
-10. Import legacy channel users and assignments, remove the second writable policy path, and remove
-    the old Hub configuration UI from the end-user build after Paseo reaches parity.
+1. one generic management HTTP adapter over existing Hub owners, never screen-specific write APIs;
+2. structured Channel/Automation forms and Advanced YAML compile into the same revisioned domain
+   documents;
+3. all shared UI/auth/data hooks live under `packages/app/src/clisbot/hub/**`, with small Settings,
+   Host-runtime, and Electron mount points;
+4. owner wildcard and zero-access Member defaults are resolved by Hub, not duplicated in clients;
+5. Channel execution, Automation delegation, managed daemon admission, and direct Paseo sessions
+   enforce their own resource boundary before side effects; and
+6. mode `off` and a build without Hub configuration retain ordinary upstream-compatible behavior.
+
+Deploy with daemons in `off`, verify the owner flow and local recovery path, then enable `external`
+per Host. Removing the old Hub presentation from an end-user deployment and importing legacy
+channel-user rows are deployment/migration tasks; they do not create a second writable policy path
+or require users to leave Paseo.
 
 ## 20. Acceptance flows
 

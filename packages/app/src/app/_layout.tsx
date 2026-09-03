@@ -134,6 +134,8 @@ import {
 import { buildNotificationRoute, resolveNotificationTarget } from "@/utils/notification-routing";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { PluginCatalogSync } from "@/plugins";
+import { HubAccountProvider } from "@/clisbot/hub/account-provider";
+import { HubHostSynchronization } from "@/clisbot/hub/host-synchronization";
 import {
   ensureOsNotificationPermission,
   WEB_NOTIFICATION_CLICK_EVENT,
@@ -888,6 +890,7 @@ function RootStack() {
         <Stack.Screen name="welcome" />
         <Stack.Screen name="settings/index" />
         <Stack.Screen name="settings/[section]" />
+        <Stack.Screen name="settings/hub/[hubSection]" />
         <Stack.Screen name="new" />
         <Stack.Screen name="open-project" />
         <Stack.Screen name="sessions" />
@@ -965,15 +968,18 @@ function RootProviders({ children }: { children: ReactNode }) {
 
 function RootAppTree() {
   return (
-    <GestureHandlerRootView style={flexStyle}>
-      <View style={layoutStyles.surfaceFill}>
-        <RootProviders>
-          <RuntimeProviders>
-            <AppShell />
-          </RuntimeProviders>
-        </RootProviders>
-      </View>
-    </GestureHandlerRootView>
+    <HubAccountProvider>
+      <HubHostSynchronization />
+      <GestureHandlerRootView style={flexStyle}>
+        <View style={layoutStyles.surfaceFill}>
+          <RootProviders>
+            <RuntimeProviders>
+              <AppShell />
+            </RuntimeProviders>
+          </RootProviders>
+        </View>
+      </GestureHandlerRootView>
+    </HubAccountProvider>
   );
 }
 

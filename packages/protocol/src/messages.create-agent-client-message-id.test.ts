@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SessionInboundMessageSchema } from "./messages";
 import { MAX_EXPLICIT_AGENT_TITLE_CHARS } from "@getpaseo/protocol/agent-title-limits";
 
-describe("create_agent_request clientMessageId", () => {
+describe("create_agent_request additive placement and message fields", () => {
   it("accepts clientMessageId for stable initial prompt transfer", () => {
     const parsed = SessionInboundMessageSchema.parse({
       type: "create_agent_request",
@@ -38,6 +38,24 @@ describe("create_agent_request clientMessageId", () => {
       throw new Error("Expected create_agent_request");
     }
     expect(parsed.config.title).toHaveLength(MAX_EXPLICIT_AGENT_TITLE_CHARS);
+  });
+
+  it("accepts a stable Project assertion without changing legacy requests", () => {
+    const parsed = SessionInboundMessageSchema.parse({
+      type: "create_agent_request",
+      requestId: "req-project",
+      projectId: "project-company",
+      config: {
+        provider: "claude",
+        cwd: "/tmp/project",
+      },
+    });
+
+    expect(parsed.type).toBe("create_agent_request");
+    if (parsed.type !== "create_agent_request") {
+      throw new Error("Expected create_agent_request");
+    }
+    expect(parsed.projectId).toBe("project-company");
   });
 
   it("rejects explicit titles longer than the create-agent limit", () => {

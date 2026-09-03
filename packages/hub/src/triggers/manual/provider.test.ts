@@ -5,6 +5,61 @@ import { createActiveWorkflowConfiguration } from "../../test-utils/project-conf
 import { createManualRunProvider } from "./provider.js";
 
 describe("manual invocation provider", () => {
+  it("accepts a structured prompt and validates only declared input values", async () => {
+    const database = createMemoryDatabase();
+    const { workflow, revision, configurationForWorkflow } =
+      await createActiveWorkflowConfiguration(
+        database,
+        {
+          environments: [{ name: "runner", kind: "daemon", daemon: "runner", cwd: "/repo" }],
+          triggers: [
+            {
+              name: "manual-request",
+              on: "manual.run",
+              max_runtime: "1h",
+              filters: { from_users: ["*"] },
+              inputs: { repo: { type: "string", required: true, choices: ["paseo", "hub"] } },
+              steps: [
+                {
+                  id: "work",
+                  environment: "runner",
+                  max_runtime: "10m",
+                  idle_timeout: "1m",
+                  agent: { provider: "codex" },
+                  prompt: [{ text: "Request: ${{ paseo.prompt }}" }],
+                },
+              ],
+            },
+          ],
+        },
+        { organizationId: "org-1" },
+      );
+    const provider = createManualRunProvider(configurationForWorkflow);
+    const match = (
+      await provider.match({
+        providerEventReceiptId: "11111111-1111-4111-8111-111111111121",
+        organizationId: "org-1",
+        workflowId: workflow.id,
+        configurationRevisionId: revision.id,
+        source: "manual.run",
+        deliveryId: "manual-structured-1",
+        receivedAt: new Date(),
+        payload: {
+          trigger: "manual-request",
+          actor: "operator",
+          input: { prompt: "Investigate the sync", inputs: { repo: "hub" } },
+        },
+      })
+    )[0];
+
+    assert.ok(match && typeof match !== "string");
+    assert.deepEqual(match.invocation, {
+      status: "accepted",
+      prompt: "Investigate the sync",
+      inputs: { repo: "hub" },
+    });
+  });
+
   it("uses the same typed invocation evidence as message providers", async () => {
     const database = createMemoryDatabase();
     const { workflow, revision, configurationForWorkflow } =

@@ -38,6 +38,16 @@ describe("file uploads", () => {
     await expect(uploads.receiveFrame(uploadChunk("req-upload", " world"))).resolves.toBeNull();
 
     const path = join(paseoHome, "uploads", "upload_req-upload", "notes.txt");
+    expect(
+      uploads.ownsUploadedFile({
+        type: "uploaded_file",
+        id: "upload_req-upload",
+        fileName: "notes.txt",
+        mimeType: "text/plain",
+        size: 11,
+        path,
+      }),
+    ).toBe(false);
     await expect(uploads.receiveFrame(uploadEnds("req-upload"))).resolves.toEqual({
       type: "file.upload.response",
       payload: {
@@ -53,6 +63,26 @@ describe("file uploads", () => {
         error: null,
       },
     });
+    expect(
+      uploads.ownsUploadedFile({
+        type: "uploaded_file",
+        id: "upload_req-upload",
+        fileName: "notes.txt",
+        mimeType: "text/plain",
+        size: 11,
+        path,
+      }),
+    ).toBe(true);
+    expect(
+      uploads.ownsUploadedFile({
+        type: "uploaded_file",
+        id: "upload_req-upload",
+        fileName: "notes.txt",
+        mimeType: "text/plain",
+        size: 11,
+        path: join(paseoHome, "uploads", "another-session", "notes.txt"),
+      }),
+    ).toBe(false);
     expect(readFileSync(path, "utf8")).toBe("hello world");
   });
 
@@ -115,7 +145,10 @@ describe("file uploads", () => {
     vi.useFakeTimers();
 
     const paseoHome = makePaseoHome();
-    const uploads = new FileUploadStore({ paseoHome, staleUploadTimeoutMs: 50 });
+    const uploads = new FileUploadStore({
+      paseoHome,
+      staleUploadTimeoutMs: 50,
+    });
 
     uploads.beginUpload({
       type: "file.upload.request",
@@ -164,7 +197,10 @@ describe("file uploads", () => {
     vi.useFakeTimers();
 
     const paseoHome = makePaseoHome();
-    const uploads = new FileUploadStore({ paseoHome, staleUploadTimeoutMs: 50 });
+    const uploads = new FileUploadStore({
+      paseoHome,
+      staleUploadTimeoutMs: 50,
+    });
 
     uploads.beginUpload({
       type: "file.upload.request",

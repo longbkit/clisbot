@@ -19,6 +19,8 @@ import {
   HubExecutionOutboundSchema,
   HubDaemonHelloSchema,
   HubDaemonServerInfoEnvelopeSchema,
+  ManagedAccessLeaseRevokeRequestSchema,
+  ManagedAccessLeaseRevokeResponseSchema,
 } from "../hub/protocol.js";
 import {
   DaemonCreateResponseLostError,
@@ -190,6 +192,20 @@ export class ActiveDaemonRegistry {
     });
   }
 
+  /** Best-effort delivery over the daemon's existing enrolled Hub connection. */
+  revokeAccessLeases(daemonId: string, leaseIds: readonly string[]): boolean {
+    if (leaseIds.length === 0) return true;
+    const active = this.active.get(daemonId);
+    if (!active?.ready || !active.daemon.permissions.includes("hub.execute")) return false;
+    const request = ManagedAccessLeaseRevokeRequestSchema.parse({
+      type: "managed_access.lease.revoke.request",
+      requestId: randomUUID(),
+      leaseIds: [...new Set(leaseIds)],
+    });
+    active.socket.send(JSON.stringify({ type: "session", message: request }));
+    return true;
+  }
+
   updatePermissions(daemon: DaemonRecord): void {
     const active = this.active.get(daemon.id);
     if (active) active.daemon = daemon;
@@ -236,10 +252,12 @@ export class ActiveDaemonRegistry {
       reuseAgentId: options.reuseAgentId,
       provider: options.provider,
       cwd: options.cwd,
+      projectId: options.projectId,
       prompt: options.prompt,
       model: options.model,
       modeId: options.mode,
       thinkingOptionId: options.thinkingOptionId,
+      featureValues: options.featureValues,
       providerOptions: options.providerOptions,
       toolPolicy: options.toolPolicy,
       env: options.env,
@@ -316,6 +334,8 @@ export class ActiveDaemonRegistry {
     if (controlled.success) return this.receiveControl(active, controlled.data);
     const validated = HubExecutionAgentValidateResponseSchema.safeParse(message);
     if (validated.success) return this.receiveAgentValidation(active, validated.data);
+    const revoked = ManagedAccessLeaseRevokeResponseSchema.safeParse(message);
+    if (revoked.success) return;
     const update = HubExecutionAgentUpdateSchema.safeParse(message);
     if (update.success) {
       const event = {

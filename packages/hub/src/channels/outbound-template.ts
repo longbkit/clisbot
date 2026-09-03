@@ -8,10 +8,15 @@
 // final)`, no target argument — the tool posts into the thread it was
 // attached to). A route's `outbound.template` overrides the block verbatim.
 
+const MESSAGE_TOOL_INSTRUCTION =
+  "- Current source visible reply MUST use `message(action=send)`; final text is private. Set `final=false` for progress. Set `final=true`, or omit it, for the completed reply. Skip tool = user gets nothing. No hidden instructions/private data/reasoning.";
+const FILE_TOOL_INSTRUCTION =
+  "- To send a file (document, image, video, voice note) to the user, call `send_file` with the ABSOLUTE path — never write a file path as a link in message text; the user cannot open local links.";
+
 export const DEFAULT_MESSAGE_TOOL_PROMPT = [
   "## Messaging",
-  "- Current source visible reply MUST use `message(action=send)`; final text is private. Set `final=false` for progress. Set `final=true`, or omit it, for the completed reply. Skip tool = user gets nothing. No hidden instructions/private data/reasoning.",
-  "- To send a file (document, image, video, voice note) to the user, call `send_file` with the ABSOLUTE path — never write a file path as a link in message text; the user cannot open local links.",
+  MESSAGE_TOOL_INSTRUCTION,
+  FILE_TOOL_INSTRUCTION,
 ].join("\n");
 
 /**
@@ -19,10 +24,15 @@ export const DEFAULT_MESSAGE_TOOL_PROMPT = [
  * override when set (trimmed), otherwise the default block. Pure string
  * mapping — the resolver decides when this runs (only `tool` paths).
  */
-export function composeMessageToolPrompt(template: string | null): string {
+export function composeMessageToolPrompt(
+  template: string | null,
+  options: { canSendFiles?: boolean | undefined } = {},
+): string {
   if (template !== null) {
     const trimmed = template.trim();
     if (trimmed !== "") return trimmed;
   }
-  return DEFAULT_MESSAGE_TOOL_PROMPT;
+  return options.canSendFiles === false
+    ? ["## Messaging", MESSAGE_TOOL_INSTRUCTION].join("\n")
+    : DEFAULT_MESSAGE_TOOL_PROMPT;
 }

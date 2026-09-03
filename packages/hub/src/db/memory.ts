@@ -1667,6 +1667,8 @@ class MemoryDatabase implements Database {
       machineId: machine.id,
       serverId: input.serverId,
       daemonPublicKey: input.daemonPublicKey,
+      connectionOffer: null,
+      managedAccessMode: "off",
       credentialVerifier: input.credentialVerifier,
       permissions: input.permissions,
       registeredByApiKeyId: token.issuedByApiKeyId ?? null,
@@ -1732,6 +1734,17 @@ class MemoryDatabase implements Database {
     const value = this.daemons.get(id);
     if (!value) return undefined;
     const updated = { ...value, permissions: [...permissions] };
+    this.daemons.set(id, updated);
+    return updated;
+  }
+  async setDaemonConnectionOffer(
+    id: string,
+    connectionOffer: import("@getpaseo/protocol/connection-offer").ConnectionOffer | null,
+    managedAccessMode: import("@getpaseo/protocol/managed-access").ManagedAccessMode,
+  ) {
+    const value = this.daemons.get(id);
+    if (!value || value.status !== "active") return undefined;
+    const updated = { ...value, connectionOffer, managedAccessMode };
     this.daemons.set(id, updated);
     return updated;
   }
@@ -2455,6 +2468,21 @@ class MemoryDatabase implements Database {
       : this.channelConfigurationRevisions.get(revisionId);
   }
 
+  async listChannelConfigurationRevisions(
+    organizationId: string,
+    limit: number,
+  ): Promise<ChannelConfigurationRevisionRecord[]> {
+    return [...this.channelConfigurationRevisions.values()]
+      .filter((revision) => revision.organizationId === organizationId)
+      .sort((left, right) => right.version - left.version)
+      .slice(0, limit)
+      .map((revision) =>
+        Object.assign({}, revision, {
+          files: revision.files.map((file) => Object.assign({}, file)),
+        }),
+      );
+  }
+
   async saveChannelConfiguration(
     input: SaveChannelConfigurationInput,
   ): Promise<ChannelConfigurationRevisionRecord> {
@@ -2492,6 +2520,20 @@ class MemoryDatabase implements Database {
     return Array.from(this.organizationTriggers.values()).filter(
       (trigger) => trigger.organizationId === organizationId,
     );
+  }
+
+  async listOrganizationTriggerRevisions(
+    organizationId: string,
+    triggerId: string,
+    limit: number,
+  ): Promise<OrganizationTriggerRevisionRecord[]> {
+    return [...this.organizationTriggerRevisions.values()]
+      .filter(
+        (revision) =>
+          revision.organizationId === organizationId && revision.triggerId === triggerId,
+      )
+      .sort((left, right) => right.version - left.version)
+      .slice(0, limit);
   }
 
   async findOrganizationTriggerRevision(

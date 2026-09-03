@@ -15,6 +15,7 @@ import {
   classifyToolClass,
   effectivePrivileges,
   effectiveRoles,
+  externalParticipantMayTrigger,
   fallbackRoleScope,
   isEnabled,
   mayApprove,
@@ -42,7 +43,11 @@ const DEFAULTS: EffectiveDefaults = {
   outbound: { path: "relay", template: null },
   sync: {
     finalAnswers: true,
-    progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
+    progress: {
+      progressMessage: false,
+      typingIndicator: false,
+      messageReaction: "off",
+    },
     toolCalls: false,
     threadLink: "final-only",
     subagents: { finalAnswers: false, progress: false, toolCalls: false },
@@ -52,7 +57,12 @@ const DEFAULTS: EffectiveDefaults = {
 /** The doc's four roles (§4.3.2), with precomputed `extends` closures. */
 function makeRoles(): ChannelControlPlane["roles"] {
   return {
-    user: { grants: ["bot.interact"], deny: [], extends: [], closure: ["user"] },
+    user: {
+      grants: ["bot.interact"],
+      deny: [],
+      extends: [],
+      closure: ["user"],
+    },
     approver: {
       grants: ["approval.*"],
       deny: [],
@@ -83,7 +93,10 @@ function makePlane(overrides: PlaneOverrides = {}): ChannelControlPlane {
     channelEnabled: {},
     roles: makeRoles(),
     users: overrides.users ?? {
-      "long.luong": { name: "Long Luong", identities: ["slack:U0ALICE", "telegram:123456789"] },
+      "long.luong": {
+        name: "Long Luong",
+        identities: ["slack:U0ALICE", "telegram:123456789"],
+      },
     },
     identityOwners: overrides.identityOwners ?? {
       "slack:U0ALICE": "long.luong",
@@ -306,7 +319,10 @@ describe("role algebra (extends + deny)", () => {
       assignments: [{ identities: ["user:long.luong"], roles: ["ghost"] }],
     });
     const account = makeAccount({ defaultRoles: [], assignments: [] });
-    const route = routeFor(plane, account, { defaultRoles: ["nope"], routeAssignments: [] });
+    const route = routeFor(plane, account, {
+      defaultRoles: ["nope"],
+      routeAssignments: [],
+    });
     assert.deepEqual(effectiveRoles("long.luong", [routeRoleScope(route)], plane), []);
     assert.deepEqual(effectivePrivileges("long.luong", [routeRoleScope(route)], plane), []);
   });
@@ -316,7 +332,10 @@ describe("role algebra (extends + deny)", () => {
       assignments: [{ identities: ["slack:U0CAROL"], roles: ["approver"] }],
     });
     const account = makeAccount({ defaultRoles: [] });
-    const route = routeFor(plane, account, { defaultRoles: [], routeAssignments: [] });
+    const route = routeFor(plane, account, {
+      defaultRoles: [],
+      routeAssignments: [],
+    });
     assert.deepEqual(effectiveRoles("slack:U0CAROL", [routeRoleScope(route)], plane), ["approver"]);
     // With defaultRoles in play, the anonymous principal inherits them too —
     // unions are additive, no exception for unmapped identities.
@@ -407,7 +426,9 @@ describe("route matching (first match wins)", () => {
     const account = makeAccount({
       routes: [
         routeFor(plane, accountStub(), { match: { kind: "channel", ids: [] } }), // kind-level
-        routeFor(plane, accountStub(), { match: { kind: "channel", ids: ["C0APP"] } }),
+        routeFor(plane, accountStub(), {
+          match: { kind: "channel", ids: ["C0APP"] },
+        }),
       ],
     });
     const result = matchRoute({ kind: "channel", id: "C0APP" }, account);
@@ -417,10 +438,38 @@ describe("route matching (first match wins)", () => {
   it("matches a specific channel id", () => {
     const plane = makePlane();
     const account = makeAccount({
-      routes: [routeFor(plane, accountStub(), { match: { kind: "channel", ids: ["C0APP"] } })],
+      routes: [
+        routeFor(plane, accountStub(), {
+          match: { kind: "channel", ids: ["C0APP"] },
+        }),
+      ],
     });
     assert.ok(matchRoute({ kind: "channel", id: "C0APP" }, account).route !== null);
     assert.ok(matchRoute({ kind: "channel", id: "C0OTHER" }, account).route === null);
+  });
+
+  it("uses a case-sensitive literal text condition before a catch-all route", () => {
+    const plane = makePlane();
+    const account = makeAccount({
+      routes: [
+        routeFor(plane, accountStub(), {
+          match: { kind: "channel", ids: ["C0APP"], contains: "#triage" },
+          target: { kind: "workflow", workflow: "triage" },
+        }),
+        routeFor(plane, accountStub(), {
+          match: { kind: "channel", ids: ["C0APP"] },
+        }),
+      ],
+    });
+    assert.equal(
+      matchRoute({ kind: "channel", id: "C0APP" }, account, "please #triage this").route,
+      account.routes[0],
+    );
+    assert.equal(
+      matchRoute({ kind: "channel", id: "C0APP" }, account, "please #TRIAGE this").route,
+      account.routes[1],
+    );
+    assert.equal(matchRoute({ kind: "channel", id: "C0APP" }, account).route, account.routes[1]);
   });
 
   it("matches kind-level routes with empty ids (incl. DMs)", () => {
@@ -435,7 +484,11 @@ describe("route matching (first match wins)", () => {
   it("falls back to the deny fallback when no route matches", () => {
     const plane = makePlane();
     const account = makeAccount({
-      routes: [routeFor(plane, accountStub(), { match: { kind: "channel", ids: ["C0APP"] } })],
+      routes: [
+        routeFor(plane, accountStub(), {
+          match: { kind: "channel", ids: ["C0APP"] },
+        }),
+      ],
       fallback: { deny: true },
     });
     const result = matchRoute({ kind: "group", id: "G1" }, account);
@@ -496,7 +549,9 @@ describe("approval rules (first match, all modes)", () => {
 
   it("auto-allows when the first matching rule is auto-allow", () => {
     const route = base();
-    assert.deepEqual(approvalDecisionFor("file", route), { mode: "auto-allow" });
+    assert.deepEqual(approvalDecisionFor("file", route), {
+      mode: "auto-allow",
+    });
     assert.deepEqual(approvalDecisionFor("command", route), {
       mode: "prompt",
       initiatorOnly: false,
@@ -510,7 +565,9 @@ describe("approval rules (first match, all modes)", () => {
         { match: "*", mode: "require" },
       ],
     });
-    assert.deepEqual(approvalDecisionFor("command.destructive", route), { mode: "auto-deny" });
+    assert.deepEqual(approvalDecisionFor("command.destructive", route), {
+      mode: "auto-deny",
+    });
     assert.deepEqual(approvalDecisionFor("command", route), {
       mode: "prompt",
       initiatorOnly: false,
@@ -621,7 +678,9 @@ describe("approval re-authorization (mayApprove)", () => {
   it("auto-denies the class when the merged rule auto-denies it", () => {
     const plane = makePlane();
     const account = makeAccount();
-    const route = routeFor(plane, account, { approval: [{ match: "command", mode: "auto-deny" }] });
+    const route = routeFor(plane, account, {
+      approval: [{ match: "command", mode: "auto-deny" }],
+    });
     const check = mayApprove("slack:U0ALICE", "command", "slack:U0ALICE", plane, account, route);
     assert.deepEqual(check, { allowed: false, reason: "auto-denied" });
   });
@@ -649,6 +708,55 @@ describe("mayTrigger", () => {
     const account = makeAccount({ defaultRoles: [] });
     const route = routeFor(plane, account, { defaultRoles: [] });
     assert.equal(mayTrigger("slack:U0CAROL", plane, account, route), false);
+  });
+
+  it("does not turn a default role into implicit public access", () => {
+    const plane = makePlane({ assignments: [], identityOwners: {}, users: {} });
+    const account = makeAccount({ defaultRoles: ["user"] });
+    const route = routeFor(plane, account, {
+      defaultRoles: ["user"],
+      routeAssignments: [],
+    });
+    assert.equal(mayTrigger("slack:U0UNKNOWN", plane, account, route), false);
+  });
+
+  it("admits an external participant only on an explicit selected-conversation audience", () => {
+    const plane = makePlane({ assignments: [], identityOwners: {}, users: {} });
+    const account = makeAccount({ defaultRoles: [] });
+    const route = {
+      ...routeFor(plane, account, { defaultRoles: [], routeAssignments: [] }),
+      audience: { kind: "conversationParticipants" as const },
+    };
+    assert.equal(
+      externalParticipantMayTrigger(
+        {
+          mentionedBot: true,
+          conversation: {
+            kind: "channel",
+            id: "C0APP",
+            rootConversationId: "C0APP",
+            threadId: null,
+          },
+        },
+        route,
+      ),
+      true,
+    );
+    assert.equal(
+      externalParticipantMayTrigger(
+        {
+          mentionedBot: false,
+          conversation: {
+            kind: "channel",
+            id: "C0APP",
+            rootConversationId: "C0APP",
+            threadId: null,
+          },
+        },
+        route,
+      ),
+      false,
+    );
   });
 });
 
@@ -696,7 +804,9 @@ describe("approval-required posture (plan S10)", () => {
   });
 
   it("is lifted (and asserted) when every tool class is auto-allowed", () => {
-    const route = routeFor(plane, account, { approval: [{ match: "*", mode: "auto-allow" }] });
+    const route = routeFor(plane, account, {
+      approval: [{ match: "*", mode: "auto-allow" }],
+    });
     assert.equal(postureIsApprovalRequired(route), false);
     assert.throws(() => assertApprovalRequiredPosture(route), /approval-required posture/u);
   });

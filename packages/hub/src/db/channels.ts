@@ -24,6 +24,22 @@ import type {
 type HubDatabase = DrizzleHandle;
 type HubTransaction = HubDatabase;
 
+/** Bounded, message-content-free evidence for one open-audience Route decision. */
+export interface RecordChannelInboundActivityInput {
+  organizationId: string;
+  channel: "slack" | "telegram";
+  accountId: string;
+  routePosition: number | "fallback";
+  routeFingerprint: string;
+  externalConversationId: string;
+  externalThreadId: string | null;
+  senderIdentity: string;
+  outcome: "bound" | "steered" | "workflow" | "ignored" | "error";
+  outcomeDetail?: string | undefined;
+  limitDecision: "not_evaluated" | "allowed" | "denied";
+  limitReason?: string | undefined;
+}
+
 /** Thrown when a binding transition targets a thread key with no stored binding. */
 export class ChannelThreadBindingNotFoundError extends Error {
   constructor() {
@@ -53,6 +69,34 @@ export class ChannelStore {
 
   constructor(private readonly runtime: DatabaseRuntime) {
     this.database = runtime.drizzle();
+  }
+
+  /**
+   * Persist the security-relevant decision without storing message text,
+   * credentials, display names, or provider payloads.
+   */
+  async recordChannelInboundActivity(input: RecordChannelInboundActivityInput): Promise<void> {
+    await this.database.insert(schema.auditEvents).values({
+      organizationId: input.organizationId,
+      actorKind: "system",
+      actorIdentity: "channel",
+      action: "channel.inbound.processed",
+      subjectType: "channel_account",
+      subjectId: `${input.channel}/${input.accountId}`,
+      evidence: {
+        channel: input.channel,
+        accountId: input.accountId,
+        routePosition: input.routePosition,
+        routeFingerprint: input.routeFingerprint,
+        conversationId: input.externalConversationId,
+        threadId: input.externalThreadId,
+        providerSenderId: input.senderIdentity,
+        outcome: input.outcome,
+        ...(input.outcomeDetail === undefined ? {} : { outcomeDetail: input.outcomeDetail }),
+        limitDecision: input.limitDecision,
+        ...(input.limitReason === undefined ? {} : { limitReason: input.limitReason }),
+      },
+    });
   }
 
   /**

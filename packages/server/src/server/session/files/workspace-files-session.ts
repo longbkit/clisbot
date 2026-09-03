@@ -6,6 +6,7 @@ import {
   type FileTransferFrame,
 } from "@getpaseo/protocol/binary-frames/index";
 import type {
+  AgentAttachment,
   FileDownloadTokenRequest,
   FileEntryCreateRequest,
   FileEntryDeleteRequest,
@@ -121,7 +122,10 @@ export class WorkspaceFilesSession {
     this.fileSubscriptions.delete(request.subscriptionId);
     this.host.emit({
       type: "fs.file.unsubscribe.response",
-      payload: { subscriptionId: request.subscriptionId, requestId: request.requestId },
+      payload: {
+        subscriptionId: request.subscriptionId,
+        requestId: request.requestId,
+      },
     });
   }
 
@@ -264,7 +268,10 @@ export class WorkspaceFilesSession {
         );
       } else {
         if (request.maxBytes) {
-          const file = await getDownloadableFileInfo({ root: cwd, relativePath: requestedPath });
+          const file = await getDownloadableFileInfo({
+            root: cwd,
+            relativePath: requestedPath,
+          });
           if (file.size > request.maxBytes) {
             throw new Error("File is too large to display");
           }
@@ -351,6 +358,13 @@ export class WorkspaceFilesSession {
 
   handleFileUploadRequest(request: FileUploadRequest): void {
     this.fileUploads.beginUpload(request);
+  }
+
+  ownsUploadedFileAttachments(attachments: readonly AgentAttachment[]): boolean {
+    return attachments.every(
+      (attachment) =>
+        attachment.type !== "uploaded_file" || this.fileUploads.ownsUploadedFile(attachment),
+    );
   }
 
   async handleFileTransferFrame(frame: FileTransferFrame): Promise<void> {

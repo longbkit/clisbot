@@ -37,6 +37,7 @@ export interface TriggerAgentConfig {
   mode?: string | undefined;
   model?: string | undefined;
   thinkingOptionId?: string | undefined;
+  featureValues?: Readonly<Record<string, JsonValue>> | undefined;
   options?: Readonly<Record<string, JsonValue>> | undefined;
 }
 
@@ -46,6 +47,9 @@ export function cleanTriggerAgent(agent: TriggerAgentConfig): TriggerAgentConfig
     ...(agent.mode === undefined ? {} : { mode: agent.mode }),
     ...(agent.model === undefined ? {} : { model: agent.model }),
     ...(agent.thinkingOptionId === undefined ? {} : { thinkingOptionId: agent.thinkingOptionId }),
+    ...(agent.featureValues === undefined
+      ? {}
+      : { featureValues: structuredClone(agent.featureValues) }),
     ...(agent.options === undefined ? {} : { options: structuredClone(agent.options) }),
   };
 }

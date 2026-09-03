@@ -50,6 +50,33 @@ describe("orderHostsLocalFirst", () => {
 });
 
 describe("normalizeStoredHostProfile", () => {
+  it("preserves Hub ownership metadata for managed Hosts", () => {
+    const profile = normalizeStoredHostProfile({
+      serverId: "srv_managed",
+      management: {
+        kind: "hub",
+        hubOrigin: "https://hub.example.test",
+        organizationId: "org-one",
+        daemonId: "daemon-one",
+      },
+      connections: [
+        {
+          type: "relay",
+          relayEndpoint: "relay.example.test:443",
+          useTls: true,
+          daemonPublicKeyB64: "public-key",
+        },
+      ],
+    });
+
+    expect(profile?.management).toEqual({
+      kind: "hub",
+      hubOrigin: "https://hub.example.test",
+      organizationId: "org-one",
+      daemonId: "daemon-one",
+    });
+  });
+
   it("loads direct TCP connections stored before TLS and password fields existed", () => {
     const profile = normalizeStoredHostProfile({
       serverId: "srv_old",

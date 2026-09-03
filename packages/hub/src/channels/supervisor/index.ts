@@ -61,11 +61,13 @@ import type {
   PlaneInboundResult,
   PlaneLogger,
   PostFn,
+  P0ChannelName,
   UpdateFn,
   TypingFn,
 } from "../plane/types.js";
 import { resolveHome } from "../daemon/discovery.js";
 import { createHostKeyedStoreRoot } from "../state/keyed-store.js";
+import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
 import type {
   ChannelAccountStartResult,
   ChannelAccountStatusEntry,
@@ -451,6 +453,7 @@ async function accountAndCfg(
 interface AccountHandle {
   channel: string;
   accountId: string;
+  organizationId?: string;
   revisionId: string | null;
   abortController: AbortController;
   plane?: ChannelPlane;
@@ -498,6 +501,7 @@ function confirmedString(value: unknown): string | null {
 }
 
 class ChannelSupervisorImpl implements ChannelSupervisor {
+  readonly channelReplyCapabilities = new ChannelReplyCapabilityRegistry();
   private readonly options: ChannelSupervisorOptions;
   private readonly env: NodeJS.ProcessEnv;
   private readonly logger: PlaneLogger;
@@ -554,6 +558,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     try {
       // Resolve on demand: re-read the active revision, no caching.
       const snapshot = await loadChannelControlPlane(this.options.database);
+      handle.organizationId = snapshot.organizationId;
       const compiled = snapshot.controlPlane.accounts.find(
         (candidate) => candidate.channel === channel && candidate.accountId === accountId,
       );
@@ -603,7 +608,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         account: accountId,
         detail,
       });
-      await this.stopHandle(handle);
+      await this.stopHandle(handle, { cancelActive: true });
       handle.transport = "failed";
       if (error instanceof InstallError || error instanceof ProvisionError)
         handle.integrity = "failed";
@@ -641,7 +646,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     for (const [key, handle] of this.handles) {
       if (desired.has(key)) continue;
       this.handles.delete(key);
-      await this.stopHandle(handle);
+      await this.stopHandle(handle, { cancelActive: true });
       stopped.push({ channel: handle.channel, account: handle.accountId });
     }
     const accounts: ChannelAccountStartResult[] = [];
@@ -689,8 +694,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   }
 
   /**
-   * The tool-path MCP endpoint's post seam (E4): resolve the decoded binding
-   * ref to a started account's outbound (`postFor`), and post through it.
+   * The tool-path MCP endpoint's post seam (E4): use the capability's
+   * server-owned binding ref to address a started account's outbound (`postFor`).
    * Fail-closed: an unstarted, unknown, or ref-less account returns
    * `{ok: false, error}` — the endpoint maps that to a clean tool error and
    * records a failed delivery. This is the SAME `sendText` seam the relay's
@@ -732,6 +737,29 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       to: ref.externalConversationId,
       ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
       filePath,
+    });
+  }
+
+  async postTestMessage(input: {
+    channel: P0ChannelName;
+    accountId: string;
+    conversationId: string;
+    threadId?: string | undefined;
+  }): Promise<OutboundPostResult> {
+    const handle = this.handles.get(handleKey(input.channel, input.accountId));
+    const post = handle?.post;
+    if (handle === undefined || post === undefined || handle.transport !== "started") {
+      return {
+        ok: false,
+        error: `the ${input.channel} account ${input.accountId} is not started`,
+      };
+    }
+    return post({
+      channel: input.channel,
+      accountId: input.accountId,
+      to: input.conversationId,
+      ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
+      text: "Paseo Channel test — the Connection can send messages.",
     });
   }
 
@@ -899,6 +927,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const planeTyping = typingFor(handle, cfg, loaded.hostRuntime);
     const plane = createChannelPlane({
       organizationId: snapshot.organizationId,
+      channelRevisionId: snapshot.revision?.id ?? null,
       accountScope: {
         channel: compiled.channel === "slack" ? "slack" : "telegram",
         accountId: compiled.accountId,
@@ -906,6 +935,18 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       normalizeInbound: flatInboundNormalizer,
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
+      ...(this.options.authorizeChannelUse === undefined
+        ? {}
+        : { authorizeChannelUse: this.options.authorizeChannelUse }),
+      ...(this.options.authorizeChannelApproval === undefined
+        ? {}
+        : { authorizeChannelApproval: this.options.authorizeChannelApproval }),
+      ...(this.options.consumeChannelIdentityChallenge === undefined
+        ? {}
+        : {
+            consumeChannelIdentityChallenge: this.options.consumeChannelIdentityChallenge,
+          }),
+      recordChannelInboundActivity: (input) => this.store.recordChannelInboundActivity(input),
       logger: this.logger,
       post: planePost,
       mediaPost: planeMediaPost,
@@ -915,6 +956,8 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       update: updateFor(handle, cfg, loaded.hostRuntime, this.logger),
       ...(planeTyping !== undefined ? { typing: planeTyping } : {}),
       resolveAgentSpec: snapshot.resolveAgentSpec,
+      replyCapabilities: this.channelReplyCapabilities,
+      resolveAgentAccessTarget: snapshot.resolveAgentAccessTarget,
       dispatchWorkflow:
         this.options.dispatchWorkflow ??
         (() => Promise.reject(new Error("channel workflow dispatcher is unavailable"))),
@@ -1228,14 +1271,20 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     };
   }
 
-  /**
-   * Stop one account's machinery: abort the monitor, stop the plane (which
-   * stops the daemon connection + clears the timeline subscription), and
-   * dispose the vertical. Synchronous — the socket close is immediate.
-   */
-  private async stopHandle(handle: AccountHandle): Promise<void> {
+  /** Stop one account; a policy replacement also revokes Route-owned work. */
+  private async stopHandle(
+    handle: AccountHandle,
+    options: { cancelActive?: boolean } = {},
+  ): Promise<void> {
+    if (handle.organizationId !== undefined) {
+      this.channelReplyCapabilities.revokeAccount(
+        handle.organizationId,
+        handle.channel,
+        handle.accountId,
+      );
+    }
     handle.abortController.abort();
-    if (handle.plane !== undefined) handle.plane.stop();
+    if (handle.plane !== undefined) await handle.plane.stop(options);
     else if (handle.daemon !== undefined) handle.daemon.stop();
     await handle.monitor;
     handle.vertical?.dispose();
@@ -1249,7 +1298,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   private async teardown(handle: AccountHandle | undefined): Promise<void> {
     if (handle === undefined) return;
     this.handles.delete(handleKey(handle.channel, handle.accountId));
-    await this.stopHandle(handle);
+    await this.stopHandle(handle, { cancelActive: true });
   }
 
   private stateDir(accountId: string): string {

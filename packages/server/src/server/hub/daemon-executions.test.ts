@@ -27,6 +27,48 @@ test("sequential replay after reconstruction keeps one durable owned agent", asy
   expect(reconstructed.durableAgentCount).toBe(1);
 });
 
+test("Hub execution Project placement is stable and unknown Projects fail closed", async () => {
+  const hub = await launchRelationship();
+  hub.beginOwnedCreate("project-seed", "project-seed-execution");
+  const seed = await hub.ownedCreateResult("project-seed");
+  expect(seed).toMatchObject({
+    type: "hub.execution.agent.create.response",
+    payload: { success: true },
+  });
+  if (seed.type !== "hub.execution.agent.create.response" || !seed.payload.agentId) {
+    throw new Error("Expected seeded Hub agent");
+  }
+  const projectId = await hub.agentProjectId(seed.payload.agentId);
+  expect(projectId).toEqual(expect.any(String));
+
+  hub.beginOwnedCreate("project-match", "project-match-execution", {
+    projectId: projectId!,
+  });
+  const matching = await hub.ownedCreateResult("project-match");
+  expect(matching).toMatchObject({
+    type: "hub.execution.agent.create.response",
+    payload: { success: true },
+  });
+  if (matching.type !== "hub.execution.agent.create.response" || !matching.payload.agentId) {
+    throw new Error("Expected Project-bound Hub agent");
+  }
+  await expect(hub.agentProjectId(matching.payload.agentId)).resolves.toBe(projectId);
+
+  const providerCreations = hub.executionProviderCreations();
+  hub.beginOwnedCreate("project-missing", "project-missing-execution", {
+    projectId: "missing-project",
+  });
+  const missing = await hub.ownedCreateResult("project-missing");
+  expect(missing).toMatchObject({
+    type: "hub.execution.agent.create.response",
+    payload: {
+      success: false,
+      error: { code: "create_failed", message: expect.stringContaining("Unknown project") },
+    },
+  });
+  expect(hub.executionProviderCreations()).toBe(providerCreations);
+});
+
 test("Hub MCP configuration reaches the provider alongside Paseo MCP without entering snapshots", async () => {
   const hub = await HubRelationshipHarness.startWithAgentMcp();
   await hub.beginConnect().result;

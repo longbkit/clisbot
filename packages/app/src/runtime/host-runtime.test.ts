@@ -8,7 +8,7 @@ import type {
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import type { SessionOutboundMessage } from "@getpaseo/protocol/messages";
 import type { AgentPermissionRequest } from "@getpaseo/protocol/agent-types";
-import type { HostConnection, HostProfile } from "@/types/host-connection";
+import type { HostConnection, HostProfile, HubHostManagement } from "@/types/host-connection";
 import { defaultHostAppearance } from "@/hosts/appearance";
 import { useSessionStore, type Agent } from "@/stores/session-store";
 import { normalizeAgentSnapshot } from "@/utils/agent-snapshots";
@@ -22,6 +22,7 @@ import {
   type HostRuntimeStorage,
 } from "./host-runtime";
 import type { ReplicaRow, ReplicaRowStore } from "./replica-cache/row-store";
+import { registerHostAccessTicketResolver } from "./host-session-access";
 
 class FakeDaemonClient {
   private state: ConnectionState = { status: "idle" };
@@ -78,7 +79,10 @@ class FakeDaemonClient {
   }
 
   async close(): Promise<void> {
-    this.setConnectionState({ status: "disconnected", reason: "client_closed" });
+    this.setConnectionState({
+      status: "disconnected",
+      reason: "client_closed",
+    });
   }
 
   async sendAgentMessage(
@@ -330,7 +334,10 @@ function makeFetchAgentsEntry(input: {
 }
 
 function replicaAgent(snapshot: FetchAgentsEntry["agent"], serverId: string): Agent {
-  return { ...normalizeAgentSnapshot(snapshot, serverId), projectPlacement: null };
+  return {
+    ...normalizeAgentSnapshot(snapshot, serverId),
+    projectPlacement: null,
+  };
 }
 
 function agentPermission(id: string): AgentPermissionRequest {
@@ -355,6 +362,7 @@ function makeHost(input?: Partial<HostProfile>): HostProfile {
     label: input?.label ?? "test host",
     appearance: input?.appearance ?? defaultHostAppearance(),
     lifecycle: input?.lifecycle ?? {},
+    ...(input?.management ? { management: input.management } : {}),
     connections: input?.connections ?? [direct, relay],
     preferredConnectionId: input?.preferredConnectionId ?? direct.id,
     createdAt: input?.createdAt ?? new Date(0).toISOString(),
@@ -478,7 +486,10 @@ function createMemoryReplicaRowStore(): ReplicaRowStore {
         hostRows.push(row);
         hosts.set(row.serverId, hostRows);
       }
-      return [...hosts].map(([serverId, hostRows]) => ({ serverId, rows: hostRows }));
+      return [...hosts].map(([serverId, hostRows]) => ({
+        serverId,
+        rows: hostRows,
+      }));
     },
     apply: async (changes) => {
       for (const key of changes.deletes) rows.delete(keyOf(key));
@@ -534,7 +545,10 @@ class BrowserClientLifecycle {
   public active: Array<{ serverId: string; connectionId: string }> = [];
 
   mount(input: { host: HostProfile; connection: HostConnection }): () => void {
-    const entry = { serverId: input.host.serverId, connectionId: input.connection.id };
+    const entry = {
+      serverId: input.host.serverId,
+      connectionId: input.connection.id,
+    };
     this.active.push(entry);
     return () => {
       this.active = this.active.filter((current) => current !== entry);
@@ -555,7 +569,10 @@ describe("HostRuntimeController", () => {
       ...oldRelay,
       daemonPublicKeyB64: "pk_new",
     };
-    const createdClients: Array<{ client: FakeDaemonClient; connection: HostConnection }> = [];
+    const createdClients: Array<{
+      client: FakeDaemonClient;
+      connection: HostConnection;
+    }> = [];
     const controller = new HostRuntimeController({
       host: makeHost({
         connections: [oldRelay],
@@ -1306,7 +1323,9 @@ describe("HostRuntimeController", () => {
       }
     };
 
-    const switchDirect = controller.activateConnection({ connectionId: "direct:lan:6767" });
+    const switchDirect = controller.activateConnection({
+      connectionId: "direct:lan:6767",
+    });
     await waitUntil(() => {
       const snapshot = controller.getSnapshot();
       return (
@@ -1435,6 +1454,129 @@ describe("HostRuntimeController", () => {
 });
 
 describe("HostRuntimeStore", () => {
+  const management: HubHostManagement = {
+    kind: "hub",
+    hubOrigin: "https://hub.example.test",
+    organizationId: "org-one",
+    daemonId: "daemon-one",
+  };
+
+  it("tags a Host created from a managed Hub offer", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+
+    const profile = await store.upsertManagedConnectionFromOffer({
+      offer: makeOffer(),
+      management,
+      label: "Managed Host",
+    });
+
+    expect(profile?.management).toEqual(management);
+    expect(store.getHosts()).toHaveLength(1);
+    store.syncHosts([]);
+  });
+
+  it("reuses a manually added Host with the same daemon identity without adopting it", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    await store.upsertRelayConnection({
+      serverId: "srv_offer",
+      relayEndpoint: "manual-relay.example.test:443",
+      useTls: true,
+      daemonPublicKeyB64: "manual-public-key",
+      label: "Manual Host",
+    });
+
+    const profile = await store.upsertManagedConnectionFromOffer({
+      offer: makeOffer(),
+      management,
+    });
+    expect(profile?.serverId).toBe("srv_offer");
+    expect(store.getHosts()[0]).not.toHaveProperty("management");
+    expect(store.getHosts()[0]?.label).toBe("Manual Host");
+    expect(store.getHosts()[0]?.connections).toHaveLength(1);
+    store.syncHosts([]);
+  });
+
+  it("does not merge a managed offer into a manual Host using the same relay connection", async () => {
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage(),
+      deps: makeDeps({}, []),
+    });
+    const offer = makeOffer();
+    await store.upsertRelayConnection({
+      serverId: "srv_manual",
+      relayEndpoint: offer.relay.endpoint,
+      useTls: offer.relay.useTls,
+      daemonPublicKeyB64: offer.daemonPublicKeyB64,
+      label: "Manual Host",
+    });
+
+    await expect(store.upsertManagedConnectionFromOffer({ offer, management })).resolves.toBeNull();
+    expect(store.getHosts().map((host) => host.serverId)).toEqual(["srv_manual"]);
+    expect(store.getHosts()[0]).not.toHaveProperty("management");
+    store.syncHosts([]);
+  });
+
+  it("removes only the Host owned by the exact Hub organization and daemon", async () => {
+    const managed = makeHost({ serverId: "srv_managed", management });
+    const manual = makeHost({ serverId: "srv_manual" });
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage({
+        "@paseo:daemon-registry": JSON.stringify([managed, manual]),
+        "@paseo:e2e": "1",
+      }),
+      deps: makeDeps({}, []),
+    });
+    await store.boot();
+
+    await expect(
+      store.removeManagedHost({ ...management, organizationId: "another-org" }),
+    ).resolves.toBe(false);
+    await expect(store.removeManagedHost(management)).resolves.toBe(true);
+    expect(store.getHosts().map((host) => host.serverId)).toEqual(["srv_manual"]);
+    store.syncHosts([]);
+  });
+
+  it("opens the real admitted session without temporary availability probes", async () => {
+    const host = makeHost({
+      serverId: "srv_admitted",
+      connections: [makeHost().connections[1]!],
+      preferredConnectionId: makeHost().connections[1]!.id,
+    });
+    let temporaryProbeCalls = 0;
+    let realClientCalls = 0;
+    const unregister = registerHostAccessTicketResolver(host.serverId, async () => "ticket");
+    const store = new HostRuntimeStore({
+      storage: createMemoryHostRuntimeStorage({ "@paseo:e2e": "1" }),
+      deps: {
+        createClient: () => {
+          realClientCalls += 1;
+          return new FakeDaemonClient() as unknown as DaemonClient;
+        },
+        connectToDaemon: async () => {
+          temporaryProbeCalls += 1;
+          throw new Error("an admitted Host must not open a temporary probe session");
+        },
+        getClientId: async () => "cid_admitted",
+      },
+    });
+
+    try {
+      await store.boot();
+      await store.upsertConnectionFromOffer(makeOffer({ serverId: host.serverId }), host.label);
+      await vi.waitFor(() => expect(realClientCalls).toBe(1));
+      expect(temporaryProbeCalls).toBe(0);
+    } finally {
+      unregister();
+      store.syncHosts([]);
+    }
+  });
+
   it("revokes push notifications before removing a host", async () => {
     const host = makeHost({ connections: [makeHost().connections[0]!] });
     const revocation = createDeferred<void>();
@@ -1580,7 +1722,11 @@ describe("HostRuntimeStore", () => {
           serverId: "srv_legacy",
           label: "Legacy",
           connections: [
-            { id: "socket:/tmp/legacy.sock", type: "directSocket", path: "/tmp/legacy.sock" },
+            {
+              id: "socket:/tmp/legacy.sock",
+              type: "directSocket",
+              path: "/tmp/legacy.sock",
+            },
           ],
           preferredConnectionId: "socket:/tmp/legacy.sock",
         },
@@ -1593,13 +1739,19 @@ describe("HostRuntimeStore", () => {
     store.boot();
     await registryLoaded;
 
-    expect(store.getHosts()[0]?.appearance).toEqual({ color: "none", badgeDisplay: null });
+    expect(store.getHosts()[0]?.appearance).toEqual({
+      color: "none",
+      badgeDisplay: null,
+    });
 
     store.syncHosts([]);
   });
 
   it("records a chosen host color and writes it through to storage", async () => {
-    const host = makeHost({ serverId: "srv_appearance", updatedAt: new Date(0).toISOString() });
+    const host = makeHost({
+      serverId: "srv_appearance",
+      updatedAt: new Date(0).toISOString(),
+    });
     const storage = createMemoryHostRuntimeStorage();
     await storage.setItem("@paseo:daemon-registry", JSON.stringify([host]));
     await storage.setItem("@paseo:e2e", "1");
@@ -1650,7 +1802,10 @@ describe("HostRuntimeStore", () => {
     await store.setHostBadgeDisplay("srv_appearance", "icon");
     await hostListChanged;
 
-    expect(store.getHosts()[0]?.appearance).toEqual({ color: "amber", badgeDisplay: "icon" });
+    expect(store.getHosts()[0]?.appearance).toEqual({
+      color: "amber",
+      badgeDisplay: "icon",
+    });
 
     const persisted = await storage.getItem("@paseo:daemon-registry");
     expect(JSON.parse(persisted ?? "[]")[0].appearance).toEqual({
@@ -1710,9 +1865,15 @@ describe("HostRuntimeStore", () => {
     firstWrite.resolve();
     await Promise.all([color, display]);
 
-    expect(store.getHosts()[0]?.appearance).toEqual({ color: "teal", badgeDisplay: "icon" });
+    expect(store.getHosts()[0]?.appearance).toEqual({
+      color: "teal",
+      badgeDisplay: "icon",
+    });
     const persistedHosts = JSON.parse((await storage.getItem("@paseo:daemon-registry")) ?? "[]");
-    expect(persistedHosts[0]?.appearance).toEqual({ color: "teal", badgeDisplay: "icon" });
+    expect(persistedHosts[0]?.appearance).toEqual({
+      color: "teal",
+      badgeDisplay: "icon",
+    });
     store.syncHosts([]);
   });
 
@@ -1746,7 +1907,10 @@ describe("HostRuntimeStore", () => {
     await vi.advanceTimersByTimeAsync(1_500);
 
     const outageStartedAt = Date.now();
-    fakeClient.setConnectionState({ status: "disconnected", reason: "transport closed" });
+    fakeClient.setConnectionState({
+      status: "disconnected",
+      reason: "transport closed",
+    });
     expect(store.getConnectionStatusSince(host.serverId)).toBe(outageStartedAt);
 
     await vi.advanceTimersByTimeAsync(500);
@@ -1812,7 +1976,10 @@ describe("HostRuntimeStore", () => {
     expect(snapshot?.agentDirectoryStatus).toBe("ready");
     expect(snapshot?.hasEverLoadedAgentDirectory).toBe(true);
 
-    fakeClient.setConnectionState({ status: "disconnected", reason: "transport closed" });
+    fakeClient.setConnectionState({
+      status: "disconnected",
+      reason: "transport closed",
+    });
     fakeClient.setConnectionState({ status: "connected" });
     await fakeClient.waitForFetches(2);
     expect(fakeClient.fetchAgentsCalls[1]).toMatchObject({ subscribe: {} });
@@ -1975,8 +2142,14 @@ describe("HostRuntimeStore", () => {
     fakeClient.fetchAgentsResponses.push(
       makeFetchAgentsPayload({
         entries: [
-          { ...snapshotAgent, agent: { ...snapshotAgent.agent, status: "idle" } },
-          { ...bufferedAgent, agent: { ...bufferedAgent.agent, status: "running" } },
+          {
+            ...snapshotAgent,
+            agent: { ...snapshotAgent.agent, status: "idle" },
+          },
+          {
+            ...bufferedAgent,
+            agent: { ...bufferedAgent.agent, status: "running" },
+          },
         ],
         hasMore: true,
         nextCursor: "legacy-page-two",
@@ -2006,19 +2179,43 @@ describe("HostRuntimeStore", () => {
       new Map([
         [
           "legacy-snapshot",
-          { ...replicaAgent(snapshotAgent.agent, host.serverId), status: "running" },
+          {
+            ...replicaAgent(snapshotAgent.agent, host.serverId),
+            status: "running",
+          },
         ],
         [
           "legacy-buffered",
-          { ...replicaAgent(bufferedAgent.agent, host.serverId), status: "running" },
+          {
+            ...replicaAgent(bufferedAgent.agent, host.serverId),
+            status: "running",
+          },
         ],
       ]),
     );
     sessionStore.setQueuedMessages(
       host.serverId,
       new Map([
-        ["legacy-snapshot", [{ id: "legacy-snapshot-message", text: "snapshot", attachments: [] }]],
-        ["legacy-buffered", [{ id: "legacy-buffered-message", text: "buffered", attachments: [] }]],
+        [
+          "legacy-snapshot",
+          [
+            {
+              id: "legacy-snapshot-message",
+              text: "snapshot",
+              attachments: [],
+            },
+          ],
+        ],
+        [
+          "legacy-buffered",
+          [
+            {
+              id: "legacy-buffered-message",
+              text: "buffered",
+              attachments: [],
+            },
+          ],
+        ],
       ]),
     );
     store.syncHosts([host]);
@@ -2254,7 +2451,11 @@ describe("HostRuntimeStore", () => {
       updatedAt: "2026-07-12T11:00:00.000Z",
       title: "immediate",
     });
-    fakeClient.agentUpdate({ kind: "upsert", agent: agentB.agent, project: agentB.project });
+    fakeClient.agentUpdate({
+      kind: "upsert",
+      agent: agentB.agent,
+      project: agentB.project,
+    });
     expect(useSessionStore.getState().sessions[host.serverId]?.agents.get("agent-b")?.title).toBe(
       "immediate",
     );
@@ -2346,7 +2547,9 @@ describe("HostRuntimeStore", () => {
     await store.refreshAgentDirectory({ serverId: host.serverId });
     const olderPage = new Deferred<Awaited<ReturnType<DaemonClient["fetchAgents"]>>>();
     fakeClient.fetchAgentsResponses.push(olderPage.promise);
-    const olderRefresh = store.refreshAgentDirectory({ serverId: host.serverId });
+    const olderRefresh = store.refreshAgentDirectory({
+      serverId: host.serverId,
+    });
     await fakeClient.waitForFetches(2);
     const newerEntry = makeFetchAgentsEntry({
       id: "newer",
@@ -2355,7 +2558,9 @@ describe("HostRuntimeStore", () => {
     });
     fakeClient.fetchAgentsResponses.push(makeFetchAgentsPayload({ entries: [newerEntry] }));
 
-    const newerRefresh = store.refreshAgentDirectory({ serverId: host.serverId });
+    const newerRefresh = store.refreshAgentDirectory({
+      serverId: host.serverId,
+    });
     await fakeClient.waitForFetches(3);
     await newerRefresh;
     olderPage.resolve(
@@ -2415,7 +2620,9 @@ describe("HostRuntimeStore", () => {
 
     const olderPage = new Deferred<Awaited<ReturnType<DaemonClient["fetchAgents"]>>>();
     fakeClient.fetchAgentsResponses.push(olderPage.promise);
-    const olderRefresh = store.refreshAgentDirectory({ serverId: host.serverId });
+    const olderRefresh = store.refreshAgentDirectory({
+      serverId: host.serverId,
+    });
     await fakeClient.waitForFetches(2);
     const liveEntry = makeFetchAgentsEntry({
       id: "live-delta",
@@ -2423,11 +2630,17 @@ describe("HostRuntimeStore", () => {
       updatedAt: "2026-07-17T10:00:00.000Z",
       title: "preserved",
     });
-    fakeClient.agentUpdate({ kind: "upsert", agent: liveEntry.agent, project: liveEntry.project });
+    fakeClient.agentUpdate({
+      kind: "upsert",
+      agent: liveEntry.agent,
+      project: liveEntry.project,
+    });
 
     const newerPage = new Deferred<Awaited<ReturnType<DaemonClient["fetchAgents"]>>>();
     fakeClient.fetchAgentsResponses.push(newerPage.promise);
-    const newerRefresh = store.refreshAgentDirectory({ serverId: host.serverId });
+    const newerRefresh = store.refreshAgentDirectory({
+      serverId: host.serverId,
+    });
     await fakeClient.waitForFetches(3);
     newerPage.reject(new Error("newer refresh failed"));
     await expect(newerRefresh).rejects.toThrow("newer refresh failed");
@@ -2519,8 +2732,14 @@ describe("HostRuntimeStore", () => {
     fakeClient.fetchAgentsResponses.push(
       makeFetchAgentsPayload({
         entries: [
-          { ...snapshotAgent, agent: { ...snapshotAgent.agent, status: "idle" } },
-          { ...bufferedAgent, agent: { ...bufferedAgent.agent, status: "running" } },
+          {
+            ...snapshotAgent,
+            agent: { ...snapshotAgent.agent, status: "idle" },
+          },
+          {
+            ...bufferedAgent,
+            agent: { ...bufferedAgent.agent, status: "running" },
+          },
         ],
         hasMore: true,
         nextCursor: "page-two",
@@ -2545,11 +2764,17 @@ describe("HostRuntimeStore", () => {
       new Map([
         [
           "snapshot-transition",
-          { ...replicaAgent(snapshotAgent.agent, host.serverId), status: "running" },
+          {
+            ...replicaAgent(snapshotAgent.agent, host.serverId),
+            status: "running",
+          },
         ],
         [
           "buffered-transition",
-          { ...replicaAgent(bufferedAgent.agent, host.serverId), status: "running" },
+          {
+            ...replicaAgent(bufferedAgent.agent, host.serverId),
+            status: "running",
+          },
         ],
       ]),
     );
@@ -2558,11 +2783,23 @@ describe("HostRuntimeStore", () => {
       new Map([
         [
           "snapshot-transition",
-          [{ id: "message-snapshot", text: "snapshot queued", attachments: [] }],
+          [
+            {
+              id: "message-snapshot",
+              text: "snapshot queued",
+              attachments: [],
+            },
+          ],
         ],
         [
           "buffered-transition",
-          [{ id: "message-buffered", text: "buffered queued", attachments: [] }],
+          [
+            {
+              id: "message-buffered",
+              text: "buffered queued",
+              attachments: [],
+            },
+          ],
         ],
       ]),
     );
@@ -3462,7 +3699,10 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
         createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
         connectToDaemon: async ({ connection }) => {
           if (connection.type === "directTcp") {
-            seenProbes.push({ endpoint: connection.endpoint, useTls: connection.useTls });
+            seenProbes.push({
+              endpoint: connection.endpoint,
+              useTls: connection.useTls,
+            });
           }
           return {
             client: makeConnectedProbeClient(5) as unknown as DaemonClient,
@@ -3483,12 +3723,18 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
     store.boot();
     await hostAdded;
 
-    expect(seenProbes).toContainEqual({ endpoint: "daemon-origin:6767", useTls: true });
+    expect(seenProbes).toContainEqual({
+      endpoint: "daemon-origin:6767",
+      useTls: true,
+    });
     const host = store.getHosts()[0];
     expect(host?.serverId).toBe("srv_hint");
     expect(host?.connections).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ endpoint: "daemon-origin:6767", useTls: true }),
+        expect.objectContaining({
+          endpoint: "daemon-origin:6767",
+          useTls: true,
+        }),
       ]),
     );
 
@@ -3503,7 +3749,10 @@ describe("HostRuntimeStore initial connection hint bootstrap", () => {
         createClient: () => new FakeDaemonClient() as unknown as DaemonClient,
         connectToDaemon: async ({ connection }) => {
           if (connection.type === "directTcp") {
-            seenProbes.push({ endpoint: connection.endpoint, useTls: connection.useTls });
+            seenProbes.push({
+              endpoint: connection.endpoint,
+              useTls: connection.useTls,
+            });
           }
           firstProbe.resolve();
           throw new Error("probe unavailable");

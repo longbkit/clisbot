@@ -77,6 +77,7 @@ import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
 import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarWorkspaceList } from "./sidebar-workspace-list";
 import { PluginSidebarItems } from "@/plugins";
+import { HubSidebarAccountButton } from "@/clisbot/hub/sidebar-account";
 
 type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
 
@@ -590,6 +591,7 @@ function SidebarFooter({
           theme={theme}
         />
         <SidebarHelpMenu />
+        <HubSidebarAccountButton />
         <FooterIconButton
           onPress={handleSettings}
           testID="sidebar-settings"

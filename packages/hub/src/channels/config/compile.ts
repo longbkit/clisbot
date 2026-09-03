@@ -24,6 +24,7 @@ import {
 } from "../../config/bundle-contract.js";
 import {
   AccountFileSchema,
+  OPEN_AUDIENCE_ROUTE_LIMITS,
   ORG_DEFAULTS,
   OrgPolicySchema,
   type ApprovalRule,
@@ -33,8 +34,10 @@ import {
   type SyncProgressGroup,
   type RoleAssignment,
   type Route,
+  type RouteLimits,
 } from "./schema.js";
 import type { CompiledRole } from "./privileges.js";
+import { privilegeCovers } from "./privileges.js";
 import {
   compileRoles,
   compileTransport,
@@ -102,13 +105,19 @@ export interface CompiledRoute {
   match: {
     kind: "dm" | "channel" | "thread" | "group" | "topic";
     ids: string[];
+    /** Case-sensitive literal substring; absent leaves text out of matching. */
+    contains?: string;
   };
+  /** Omitted only on in-memory legacy fixtures; compiled revisions always set it. */
+  audience?: { kind: "members" | "conversationParticipants" };
   target: RouteTarget;
   defaultRoles: string[];
   assignments: readonly RoleAssignment[];
   defaults: EffectiveDefaults;
   /** Merged, most-specific-first (route → account → org). */
   approval: readonly ApprovalRule[];
+  /** Route-local execution limits; open-audience Routes always have every leaf. */
+  limits?: RouteLimits;
 }
 
 export interface CompiledFallback {
@@ -119,6 +128,7 @@ export interface CompiledFallback {
   assignments?: readonly RoleAssignment[];
   defaults?: EffectiveDefaults;
   approval?: readonly ApprovalRule[];
+  limits?: RouteLimits;
 }
 
 export interface CompiledChannelAccount {
@@ -351,14 +361,84 @@ function compileRoute(
     "match",
     "kind",
   ]);
+  const audience = route.audience ?? { kind: "members" as const };
+  if (audience.kind === "conversationParticipants") {
+    if ((route.match.ids?.length ?? 0) === 0) {
+      issue(
+        [context.file.path, "routes", context.index, "match", "ids"],
+        "an open-audience route must name at least one Conversation ID",
+      );
+    }
+    if (route.match.kind !== "dm" && !context.defaults.requireMention) {
+      issue(
+        [context.file.path, "routes", context.index, "interaction", "requireMention"],
+        "an open-audience non-DM route must require a mention",
+      );
+    }
+    if (openAudienceAutoAllows(context.approval)) {
+      issue(
+        [context.file.path, "routes", context.index, "approval"],
+        "an open-audience route cannot auto-allow tool approvals",
+      );
+    }
+    if (!openAudienceUsesBoundedOutput(context.defaults)) {
+      issue(
+        [context.file.path, "routes", context.index, "sync"],
+        "an open-audience route must use relay text with final-answer-only synchronization",
+      );
+    }
+  }
   return {
-    match: { kind: route.match.kind, ids: (route.match.ids ?? []).map(String) },
+    match: {
+      kind: route.match.kind,
+      ids: (route.match.ids ?? []).map(String),
+      ...(route.match.contains === undefined ? {} : { contains: route.match.contains }),
+    },
+    audience,
     target: compileRouteTarget(route, context),
     defaultRoles: context.defaultRoles,
     assignments: context.assignments,
     defaults: context.defaults,
     approval: context.approval,
+    ...compileRouteLimits(route.limits, audience.kind),
   };
+}
+
+function compileRouteLimits(
+  authored: RouteLimits | undefined,
+  audience: "members" | "conversationParticipants",
+): { limits?: RouteLimits } {
+  if (audience === "conversationParticipants") {
+    return {
+      limits: { ...OPEN_AUDIENCE_ROUTE_LIMITS, ...authored },
+    };
+  }
+  return authored === undefined ? {} : { limits: authored };
+}
+
+function openAudienceUsesBoundedOutput(defaults: EffectiveDefaults): boolean {
+  return (
+    defaults.outbound.path === "relay" &&
+    defaults.sync.finalAnswers &&
+    !defaults.sync.progress.progressMessage &&
+    !defaults.sync.progress.typingIndicator &&
+    defaults.sync.progress.messageReaction === "off" &&
+    !defaults.sync.toolCalls &&
+    defaults.sync.threadLink === "none" &&
+    !defaults.sync.subagents.finalAnswers &&
+    !defaults.sync.subagents.progress &&
+    !defaults.sync.subagents.toolCalls
+  );
+}
+
+function openAudienceAutoAllows(rules: readonly ApprovalRule[]): boolean {
+  return ["file", "config", "command", "command.destructive", "channel"].some((toolClass) => {
+    const wanted = `approval.${toolClass}`;
+    const rule = rules.find(({ match }) =>
+      privilegeCovers(match.startsWith("approval.") ? match : `approval.${match}`, wanted),
+    );
+    return rule?.mode === "auto-allow";
+  });
 }
 
 function validateRouteKind(
@@ -461,6 +541,7 @@ function compileFallback(
     assignments,
     defaults: foldDefaults([...context.accountLayers, fallback]),
     approval,
+    ...(fallback.limits === undefined ? {} : { limits: fallback.limits }),
   };
 }
 

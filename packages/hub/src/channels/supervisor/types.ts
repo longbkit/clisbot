@@ -18,8 +18,10 @@ import type {
   MediaPostResult,
   OutboundPostResult,
   PlaneLogger,
+  P0ChannelName,
 } from "../plane/types.js";
 import type { ChannelDaemonClientOptions } from "../daemon/client.js";
+import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
 
 /** The per-account transport state the ops layer reports (`channels status`). */
 export type ChannelTransportState =
@@ -79,6 +81,9 @@ export interface ChannelSupervisorOptions {
   /** The process environment the channel gate + policy read; default `process.env`. */
   env?: NodeJS.ProcessEnv;
   dispatchWorkflow?: import("../plane/types.js").ChannelPlaneDeps["dispatchWorkflow"];
+  authorizeChannelUse?: import("../plane/types.js").ChannelPlaneDeps["authorizeChannelUse"];
+  authorizeChannelApproval?: import("../plane/types.js").ChannelPlaneDeps["authorizeChannelApproval"];
+  consumeChannelIdentityChallenge?: import("../plane/types.js").ChannelPlaneDeps["consumeChannelIdentityChallenge"];
   /** Transfer one Slack app's Socket Mode consumer to this Channel account. */
   claimSlackInbound?: (
     providerApplicationId: string,
@@ -93,6 +98,8 @@ export interface ChannelSupervisorOptions {
  * per-account failures land in `detail` / the transport state.
  */
 export interface ChannelSupervisor {
+  /** Shared process-lifetime owner for direct and Automation reply capabilities. */
+  readonly channelReplyCapabilities?: ChannelReplyCapabilityService;
   /** Mount-time recovery: install + start every enabled account (P13: isolated). */
   startAll(): Promise<void>;
   /** Teardown: stop every account's transport, plane, and daemon connection. */
@@ -105,13 +112,20 @@ export interface ChannelSupervisor {
   status(): readonly ChannelAccountStatusEntry[];
   /**
    * The tool-path post seam (E4): the account's outbound (the vertical's
-   * `sendText` through `postFor`) addressed by the decoded binding ref. The
+   * `sendText` through `postFor`) addressed by the server-owned binding ref. The
    * channel-reply MCP endpoint writes its ledger row, then calls this.
    * Fail-closed for an unstarted/unknown account (`{ok: false}`) — the
    * endpoint maps that to a clean tool error.
    */
   channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult>;
   channelReplyMediaPost(ref: ChannelReplyBindingRef, filePath: string): Promise<MediaPostResult>;
+  /** Sends the fixed management test message through one already-started account. */
+  postTestMessage(input: {
+    channel: P0ChannelName;
+    accountId: string;
+    conversationId: string;
+    threadId?: string | undefined;
+  }): Promise<OutboundPostResult>;
   workflowStreamEvent?(input: {
     execution: AgentExecutionRecord;
     agentId: string;

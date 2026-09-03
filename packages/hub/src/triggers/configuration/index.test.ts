@@ -18,6 +18,7 @@ function reportsMissingEvent(error: unknown): boolean {
 
 const trigger = `
 name: engineering-requests
+description: Handles requests from engineering systems.
 enabled: true
 on:
   slack.mention:
@@ -38,6 +39,7 @@ inputs:
 run:
   target:
     daemon: devbox
+    projectId: project-company
     cwd: /workspace/company
   agent:
     select: \${{ paseo.inputs.model }}
@@ -62,6 +64,7 @@ run:
   outputs:
     slack.reply:
       max: 5
+  reuse: binding
 `;
 
 describe("self-contained trigger documents", () => {
@@ -69,7 +72,12 @@ describe("self-contained trigger documents", () => {
     const compiled = compileTriggerDocument(trigger);
 
     assert.equal(compiled.authored.name, "engineering-requests");
+    assert.equal(compiled.authored.description, "Handles requests from engineering systems.");
     assert.equal(compiled.environment.kind, "daemon");
+    assert.equal(
+      compiled.environment.kind === "daemon" ? compiled.environment.projectId : undefined,
+      "project-company",
+    );
     assert.equal(compiled.events.length, 2);
     assert.deepEqual(
       compiled.events.map(({ on }) => on),
@@ -85,6 +93,7 @@ describe("self-contained trigger documents", () => {
     assert.deepEqual(compiled.events[0]?.steps[0]?.allowOutputs, [
       { type: "slack.reply", max: 5, required: false },
     ]);
+    assert.equal(compiled.events[0]?.steps[0]?.reuse, "binding");
     assert.deepEqual(compiled.events[1]?.steps[0]?.allowOutputs, [
       { type: "slack.reply", max: 5, required: false },
       { type: "github.reply", required: false },

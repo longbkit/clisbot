@@ -10,6 +10,15 @@ export interface PublicAuthorization {
   scopes: readonly ApiKeyScope[];
 }
 
+/** Authenticated principal accepted by the shared durable manual-run operation. */
+export type DispatchManualRunAuthorization =
+  | PublicAuthorization
+  | {
+      kind: "member";
+      membershipId: string;
+      organizationId: string;
+    };
+
 export interface InstallConfigurationInput {
   projectSlug?: string | undefined;
   files: readonly HubBundleFile[];
@@ -186,7 +195,7 @@ export interface PublicOperations {
     input: InstallConfigurationInput,
   ): Promise<InstallConfigurationResult>;
   dispatchManualRun(
-    authorization: PublicAuthorization,
+    authorization: DispatchManualRunAuthorization,
     input: DispatchManualRunInput,
   ): Promise<DispatchManualRunResult>;
   issueEnrollmentToken(authorization: PublicAuthorization): Promise<IssueEnrollmentTokenResult>;

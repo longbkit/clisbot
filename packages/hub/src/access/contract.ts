@@ -27,6 +27,15 @@ export const ACCESS_PRIVILEGES = [
 export const AccessPrivilegeSchema = z.enum(ACCESS_PRIVILEGES);
 export type AccessPrivilege = z.infer<typeof AccessPrivilegeSchema>;
 
+/** Complete authority required when an Agent configuration can suppress approval prompts. */
+export const APPROVAL_PRIVILEGES = [
+  "approval.file",
+  "approval.config",
+  "approval.command",
+  "approval.command.destructive",
+  "approval.channel",
+] as const satisfies readonly AccessPrivilege[];
+
 export const ACCESS_SUBJECT_KINDS = ["member", "team"] as const;
 export const AccessSubjectKindSchema = z.enum(ACCESS_SUBJECT_KINDS);
 export type AccessSubjectKind = z.infer<typeof AccessSubjectKindSchema>;
@@ -36,7 +45,7 @@ export const ACCESS_RESOURCE_KINDS = [
   "organization",
   "daemon",
   "project",
-  "channel",
+  "channel_account",
   "automation",
 ] as const;
 export const AccessResourceKindSchema = z.enum(ACCESS_RESOURCE_KINDS);
@@ -66,6 +75,45 @@ export const AgentConfigurationGrantSchema = z
   .strict();
 export type AgentConfigurationGrant = z.infer<typeof AgentConfigurationGrantSchema>;
 
+/** Redacted daemon choices used by management clients to author Agent grants safely. */
+export const AgentConfigurationCatalogSchema = z
+  .object({
+    providers: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          label: z.string().min(1),
+          defaultModeId: z.string().min(1).nullable().optional(),
+          modes: z
+            .array(
+              z
+                .object({
+                  id: z.string().min(1),
+                  label: z.string().min(1),
+                  /** Absent means the daemon could not classify this Mode safely. */
+                  isUnattended: z.boolean().optional(),
+                })
+                .strict(),
+            )
+            .optional(),
+          models: z.array(
+            z
+              .object({
+                id: z.string().min(1),
+                label: z.string().min(1),
+                thinkingOptions: z.array(
+                  z.object({ id: z.string().min(1), label: z.string().min(1) }).strict(),
+                ),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+export type AgentConfigurationCatalog = z.infer<typeof AgentConfigurationCatalogSchema>;
+
 export const AccessConstraintsSchema = z
   .object({
     conversation: ConversationAccessSchema.optional(),
@@ -80,32 +128,58 @@ export const AccessAssignmentInputSchema = z
     subjectId: z.string().min(1),
     resourceKind: AccessResourceKindSchema,
     resourceId: z.string().min(1),
-    privileges: z.array(AccessPrivilegeSchema),
+    privileges: z.array(AccessPrivilegeSchema).min(1),
     constraints: AccessConstraintsSchema.default({}),
   })
   .strict();
 export type AccessAssignmentInput = z.infer<typeof AccessAssignmentInputSchema>;
 
-export const PROJECT_ACCESS_LEVELS = {
-  office_worker: ["project.use", "agent.interact", "approval.file", "approval.config"],
-  developer: [
-    "project.use",
-    "agent.interact",
-    "agent.create",
-    "terminal.use",
-    "approval.file",
-    "approval.config",
-    "approval.command",
-  ],
-  full_access: [
-    "project.use",
-    "agent.interact",
-    "agent.create",
-    "terminal.use",
-    "approval.file",
-    "approval.config",
-    "approval.command",
-    "approval.command.destructive",
-    "approval.channel",
-  ],
-} as const satisfies Record<string, readonly AccessPrivilege[]>;
+/** Generic atomic write used when one user action grants related resources. */
+export const AccessAssignmentBatchInputSchema = z
+  .object({ assignments: z.array(AccessAssignmentInputSchema).min(1) })
+  .strict();
+export type AccessAssignmentBatchInput = z.infer<typeof AccessAssignmentBatchInputSchema>;
+
+/** Built-in resource access levels. Clients render these instead of inventing local role bundles. */
+export const RESOURCE_ACCESS_LEVELS = {
+  daemon: {
+    connect: ["daemon.connect"],
+    administrator: ["daemon.connect", "daemon.manage"],
+  },
+  project: {
+    office_worker: ["project.use", "agent.interact", "agent.create", "approval.file"],
+    developer: [
+      "project.use",
+      "agent.interact",
+      "agent.create",
+      "terminal.use",
+      "approval.file",
+      "approval.config",
+      "approval.command",
+    ],
+    full_access: [
+      "project.use",
+      "agent.interact",
+      "agent.create",
+      "terminal.use",
+      "approval.file",
+      "approval.config",
+      "approval.command",
+      "approval.command.destructive",
+      "approval.channel",
+    ],
+  },
+  channel_account: {
+    use: ["channel.use"],
+  },
+  automation: {
+    run: ["automation.run"],
+  },
+} as const satisfies Partial<
+  Record<AccessResourceKind, Record<string, readonly AccessPrivilege[]>>
+>;
+
+/** Opaque, stable Access resource id for the existing `(channel, accountId)` identity. */
+export function formatChannelAccountResourceId(channel: string, accountId: string): string {
+  return `${encodeURIComponent(channel)}/${encodeURIComponent(accountId)}`;
+}

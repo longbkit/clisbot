@@ -9,10 +9,12 @@ import {
   type HostSectionSlug,
   type SettingsSectionSlug,
 } from "@/utils/host-routes";
+import type { HubSectionSlug } from "@/clisbot/hub/navigation";
 
 export type SettingsView =
   | { kind: "root" }
   | { kind: "section"; section: SettingsSectionSlug }
+  | { kind: "hub"; section: HubSectionSlug }
   | { kind: "host"; serverId: string; section: HostSectionSlug }
   | { kind: "project"; serverId: string; projectId: string };
 

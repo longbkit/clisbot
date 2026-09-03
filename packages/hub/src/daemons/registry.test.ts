@@ -42,6 +42,8 @@ describe("daemon socket protocol negotiation", () => {
         machineId: randomUUID(),
         serverId: randomUUID(),
         daemonPublicKey: "public-key",
+        connectionOffer: null,
+        managedAccessMode: "off",
         credentialVerifier: createHash("sha256").update(secret).digest("base64url"),
         permissions: ["hub.execute"],
         registeredByApiKeyId: null,
@@ -155,9 +157,10 @@ describe("daemon socket generations", () => {
     });
   });
 
-  it("forwards only structured MCP grants with opaque provider options", async () => {
+  it("forwards structured MCP grants, Agent features, and opaque Provider options", async () => {
     const pending = await daemon.pendingCreate("contract-create");
 
+    assert.deepEqual(pending.request["featureValues"], { fast_mode: true });
     assert.deepEqual(pending.request["providerOptions"], {
       permission: { edit: "ask", bash: "deny" },
     });
@@ -185,6 +188,14 @@ describe("daemon socket generations", () => {
         },
       ],
     });
+  });
+
+  it("sends access lease revocation over the existing enrolled daemon session", async () => {
+    const leaseId = randomUUID();
+    const pending = await daemon.pendingAccessLeaseRevocation([leaseId, leaseId]);
+
+    assert.equal(pending.sent, true);
+    assert.deepEqual(pending.request["leaseIds"], [leaseId]);
   });
 
   it("waits for offline presence before shutdown completes", async () => {

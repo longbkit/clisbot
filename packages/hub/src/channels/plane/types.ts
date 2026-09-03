@@ -15,6 +15,8 @@ import type {
 } from "../config/compile.js";
 import type { CreateAgentConfig } from "../daemon/types.js";
 import type { InboundReplyParams, InboundReplyResult } from "../loader/host.js";
+import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
+import type { RecordChannelInboundActivityInput } from "../../db/channels.js";
 
 /** A channel native to P0 (the two verticals the control plane drives). */
 export type P0ChannelName = "slack" | "telegram";
@@ -290,49 +292,14 @@ export type ChannelReplyFilePostFn = (
   filePath: string,
 ) => Promise<MediaPostResult>;
 
-/** Encode the binding ref into the URL segment of the tool-path mcpServers URL
- * (`/mcp/channel/<ref>`). */
-export function encodeChannelReplyBindingRef(ref: ChannelReplyBindingRef): string {
-  return Buffer.from(JSON.stringify(ref), "utf8").toString("base64url");
-}
-
-/** Decode a binding ref; undefined when the token is not a well-formed ref
- * (the endpoint maps that to a clean tool error, never a crash). */
-export function decodeChannelReplyBindingRef(token: string): ChannelReplyBindingRef | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
-  } catch {
-    return undefined;
-  }
-  if (!isUnknownRecord(parsed)) return undefined;
-  const candidate = parsed;
-  const channel = candidate["channel"];
-  const threadId = candidate["externalThreadId"];
-  if (
-    (channel !== "slack" && channel !== "telegram") ||
-    typeof candidate["accountId"] !== "string" ||
-    candidate["accountId"] === "" ||
-    typeof candidate["externalConversationId"] !== "string" ||
-    candidate["externalConversationId"] === "" ||
-    (threadId !== null && typeof threadId !== "string")
-  ) {
-    return undefined;
-  }
-  return {
-    channel,
-    accountId: candidate["accountId"],
-    externalConversationId: candidate["externalConversationId"],
-    externalThreadId: threadId,
-  };
-}
-
-function isUnknownRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+/** Opaque server-issued capability attached to one Agent at create time. */
+export interface ChannelReplyAgentCapability {
+  token: string;
+  canSendFiles: boolean;
 }
 
 /** The tool-path post seam: the account's outbound (the vertical's `sendText`
- * through the supervisor's `postFor`), addressed by the decoded binding ref. */
+ * through the supervisor's `postFor`), addressed by the server-owned binding ref. */
 export type ChannelReplyPostFn = (
   ref: ChannelReplyBindingRef,
   text: string,
@@ -345,6 +312,7 @@ export type AgentSpecResolver = (
   target: Extract<RouteTarget, { kind: "agent" }>,
   defaults: EffectiveDefaults,
   bindingRef: ChannelReplyBindingRef,
+  capability?: ChannelReplyAgentCapability | undefined,
 ) => CreateAgentConfig;
 
 /** Render the back-link to a live session (threadLink); absent = no link rendered. */
@@ -359,9 +327,48 @@ export type SessionLinkRenderer = (agentId: string) => string;
  */
 export type InboundNormalizer = (params: InboundReplyParams) => InboundMessage | null;
 
+/** Optional Hub Member/Team authority layered beside the existing Channel policy. */
+export type ChannelUseAuthorizer = (input: {
+  organizationId: string;
+  account: CompiledChannelAccount;
+  message: InboundMessage;
+}) => Promise<boolean>;
+
+export interface ChannelAgentAccessTarget {
+  daemonReference: string;
+  projectId?: string;
+  /** Absolute root which bounds files an Agent may send back to its Channel. */
+  projectRoot?: string;
+}
+
+/** Verifies that a mapped Member may answer one Project-scoped approval. */
+export type ChannelApprovalAuthorizer = (input: {
+  organizationId: string;
+  account: CompiledChannelAccount;
+  responderIdentity: string;
+  target: ChannelAgentAccessTarget;
+  privilege:
+    | "approval.file"
+    | "approval.config"
+    | "approval.command"
+    | "approval.command.destructive"
+    | "approval.channel";
+}) => Promise<boolean>;
+
+/** Consumes a signed-in Member's one-use code from the provider identity that sent it. */
+export type ChannelIdentityChallengeConsumer = (input: {
+  organizationId: string;
+  account: CompiledChannelAccount;
+  senderIdentity: string;
+  senderName?: string | undefined;
+  code: string;
+}) => Promise<"linked" | "already_linked" | "identity_conflict" | "invalid">;
+
 /** Everything the execution plane is built with (the facade's deps). */
 export interface ChannelPlaneDeps {
   organizationId: string;
+  /** Immutable Channel configuration revision backing this plane. */
+  channelRevisionId?: string | null | undefined;
   /** This plane's transport owner; recovery and inbound never cross it. */
   accountScope: { channel: P0ChannelName; accountId: string };
   /** Normalize the channel's raw inbound event into the plane's flat shape. */
@@ -370,6 +377,13 @@ export interface ChannelPlaneDeps {
    * config levels compose it via `policy.isEnabled`. */
   envFlag: boolean;
   controlPlane: ChannelControlPlane;
+  authorizeChannelUse?: ChannelUseAuthorizer | undefined;
+  authorizeChannelApproval?: ChannelApprovalAuthorizer | undefined;
+  consumeChannelIdentityChallenge?: ChannelIdentityChallengeConsumer | undefined;
+  /** Durable, bounded audit sink for open-audience inbound decisions. */
+  recordChannelInboundActivity?:
+    | ((input: RecordChannelInboundActivityInput) => Promise<void>)
+    | undefined;
   logger: PlaneLogger;
   post: PostFn;
   /** COMPAT(clisbot-control-plane): the account's native-media post (the
@@ -394,6 +408,11 @@ export interface ChannelPlaneDeps {
   clock?: PlaneClock | undefined;
   /** Resolve a route's agent target into a `create_agent_request` config. */
   resolveAgentSpec: AgentSpecResolver;
+  /** Process-lifetime bearer capability owner for tool-path Channel replies. */
+  replyCapabilities?: ChannelReplyCapabilityService | undefined;
+  resolveAgentAccessTarget: (
+    target: Extract<RouteTarget, { kind: "agent" }>,
+  ) => ChannelAgentAccessTarget;
   dispatchWorkflow: (input: {
     organizationId: string;
     deliveryId: string;
@@ -459,6 +478,8 @@ export interface StreamContext {
   account: CompiledChannelAccount;
   /** The effective route (matched route, or the synthesized catch-all fallback). */
   route: CompiledRoute;
+  /** Fixed daemon/Project ceiling used to authorize Channel approval responders. */
+  accessTarget?: ChannelAgentAccessTarget;
   /** COMPAT(clisbot-control-plane): the conversation kind the binding's route
    * matched (the stored route summary's `kind`; "channel" when unparseable) —
    * the approval card's `inlineButtons` dm/group gate decides on it. */

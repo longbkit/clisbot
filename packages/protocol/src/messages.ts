@@ -1428,6 +1428,13 @@ export const HubManagementDaemonPermissionsUpdateRequestSchema = z.object({
   revoke: z.array(DaemonPermissionSchema).default([]),
 });
 
+/** Hub authority asks an enrolled daemon to terminate active managed-access leases. */
+export const ManagedAccessLeaseRevokeRequestSchema = z.object({
+  type: z.literal("managed_access.lease.revoke.request"),
+  requestId: z.string(),
+  leaseIds: z.array(z.string().uuid()).min(1),
+});
+
 export const DiagnosticsRequestSchema = z.object({
   type: z.literal("diagnostics.request"),
   requestId: z.string(),
@@ -1647,6 +1654,8 @@ export const CreateAgentRequestMessageSchema = z.object({
   config: AgentSessionConfigSchema,
   env: z.record(z.string(), z.string()).optional(),
   workspaceId: z.string().optional(),
+  // COMPAT(managedProjectPlacement): stable Project assertion beside cwd.
+  projectId: z.string().optional(),
   // Optional caller context lets managed CLI invocations use the same daemon-owned
   // workspace and parentage policy as agent-scoped MCP creation.
   callerAgentId: z.string().optional(),
@@ -2932,6 +2941,8 @@ export const HubExecutionAgentCreateRequestSchema = z.object({
   provider: z.string(),
   cwd: z.string(),
   prompt: z.string(),
+  // COMPAT(hubExecutionProjectPlacement): stable Project assertion beside cwd.
+  projectId: z.string().optional(),
   // COMPAT(hubExecutionWorkspaceSelection): semantics retired in v0.3.1; remove after 2027-08-08 once the Hub floor no longer sends it.
   workspaceId: z.string().optional(),
   model: z.string().optional(),
@@ -3038,6 +3049,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   HubManagementDaemonGetStatusRequestSchema,
   HubManagementDaemonDisconnectRequestSchema,
   HubManagementDaemonPermissionsUpdateRequestSchema,
+  ManagedAccessLeaseRevokeRequestSchema,
   DiagnosticsRequestSchema,
   PluginCatalogGetRequestSchema,
   PluginListRequestSchema,
@@ -4654,6 +4666,13 @@ export const HubManagementDaemonDisconnectResponseSchema = z.object({
 export const HubManagementDaemonPermissionsUpdateResponseSchema = z.object({
   type: z.literal("hub.management.daemon.permissions.update.response"),
   payload: z.object({ requestId: z.string(), status: HubRelationshipStatusSchema }),
+});
+export const ManagedAccessLeaseRevokeResponseSchema = z.object({
+  type: z.literal("managed_access.lease.revoke.response"),
+  payload: z.object({
+    requestId: z.string(),
+    revokedCount: z.number().int().nonnegative(),
+  }),
 });
 
 export const DaemonGetPairingOfferResponseSchema = z.object({
@@ -6399,6 +6418,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   HubManagementDaemonGetStatusResponseSchema,
   HubManagementDaemonDisconnectResponseSchema,
   HubManagementDaemonPermissionsUpdateResponseSchema,
+  ManagedAccessLeaseRevokeResponseSchema,
   DiagnosticsResponseSchema,
   GetDaemonConfigResponseMessageSchema,
   SetDaemonConfigResponseMessageSchema,

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { ConnectionOfferSchema } from "@getpaseo/protocol/connection-offer";
+import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import { and, eq, sql } from "drizzle-orm";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { JsonValue } from "../config/compiler.js";
@@ -1865,6 +1867,19 @@ class PgDatabase implements Database {
     return rows.rows[0] === undefined ? undefined : toDaemon(rows.rows[0]);
   }
 
+  async setDaemonConnectionOffer(
+    id: string,
+    connectionOffer: import("@getpaseo/protocol/connection-offer").ConnectionOffer | null,
+    managedAccessMode: ManagedAccessMode,
+  ): Promise<DaemonRecord | undefined> {
+    const rows = await query<DaemonRow>(
+      this.pool,
+      `update daemons set connection_offer = $2, managed_access_mode = $3 where id = $1 and status = 'active' returning *`,
+      [id, connectionOffer === null ? null : JSON.stringify(connectionOffer), managedAccessMode],
+    );
+    return rows.rows[0] === undefined ? undefined : toDaemon(rows.rows[0]);
+  }
+
   async revokeDaemon(id: string): Promise<boolean> {
     const rows = await query(
       this.pool,
@@ -2952,6 +2967,22 @@ class PgDatabase implements Database {
     return rows.rows.map(toOrganizationTriggerRecord);
   }
 
+  async listOrganizationTriggerRevisions(
+    organizationId: string,
+    triggerId: string,
+    limit: number,
+  ): Promise<OrganizationTriggerRevisionRecord[]> {
+    const rows = await query<OrganizationTriggerRevisionRow>(
+      this.pool,
+      `select * from organization_trigger_revisions
+       where organization_id = $1 and trigger_id = $2
+       order by version desc, id desc
+       limit $3`,
+      [organizationId, triggerId, limit],
+    );
+    return rows.rows.map(toOrganizationTriggerRevisionRecord);
+  }
+
   async findActiveChannelConfiguration(
     organizationId: string,
   ): Promise<ChannelConfigurationRevisionRecord | undefined> {
@@ -2965,6 +2996,21 @@ class PgDatabase implements Database {
     return rows.rows[0] === undefined
       ? undefined
       : toChannelConfigurationRevisionRecord(rows.rows[0]);
+  }
+
+  async listChannelConfigurationRevisions(
+    organizationId: string,
+    limit: number,
+  ): Promise<ChannelConfigurationRevisionRecord[]> {
+    const rows = await query<ChannelConfigurationRevisionRow>(
+      this.pool,
+      `select * from channel_configuration_revisions
+       where organization_id = $1
+       order by version desc, id desc
+       limit $2`,
+      [organizationId, limit],
+    );
+    return rows.rows.map(toChannelConfigurationRevisionRecord);
   }
 
   async saveChannelConfiguration(
@@ -4669,6 +4715,8 @@ interface DaemonRow extends QueryRow {
   machine_id: string;
   server_id: string;
   daemon_public_key: string;
+  connection_offer: unknown | null;
+  managed_access_mode: ManagedAccessMode;
   credential_verifier: string;
   scopes: string[];
   registered_by_api_key_id: string | null;
@@ -4703,6 +4751,9 @@ function toDaemon(row: DaemonRow): DaemonRecord {
     machineId: row.machine_id,
     serverId: row.server_id,
     daemonPublicKey: row.daemon_public_key,
+    connectionOffer:
+      row.connection_offer === null ? null : ConnectionOfferSchema.parse(row.connection_offer),
+    managedAccessMode: row.managed_access_mode,
     credentialVerifier: row.credential_verifier,
     permissions: semanticDaemonPermissions(row.scopes),
     registeredByApiKeyId: row.registered_by_api_key_id,

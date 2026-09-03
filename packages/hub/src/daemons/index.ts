@@ -18,6 +18,7 @@ import type {
 } from "./protocol.js";
 import type { Logger } from "pino";
 import type { OutputExecutorRegistry } from "../execution-capabilities/outputs.js";
+import type { ChannelReplyCapabilityService } from "../channels/channel-reply-capabilities.js";
 
 export type {
   DaemonAgentStreamEvent,
@@ -27,7 +28,12 @@ export type {
 export { DaemonDispatchFailure, DaemonSpawnAckTimeoutError };
 export { AgentExecutionCompletionFailure };
 export { ActiveDaemonRegistry, createDaemonUpgradeHandler, type DaemonClock } from "./registry.js";
-export { enrollDaemon, revokeDaemon, updateDaemonPermissions } from "./registration.js";
+export {
+  enrollDaemon,
+  replaceDaemonConnectionOffer,
+  revokeDaemon,
+  updateDaemonPermissions,
+} from "./registration.js";
 
 interface DaemonModuleTestOptions {
   logger?: Logger;
@@ -44,6 +50,7 @@ export interface DaemonModuleOptions {
   publicBaseUrl?: string;
   completionTokenSecret?: string;
   onWorkflowChannelStream?: DaemonDispatchLifecycleOptions["onWorkflowChannelStream"];
+  channelReplyCapabilities?: ChannelReplyCapabilityService;
   test?: DaemonModuleTestOptions;
 }
 
@@ -72,6 +79,9 @@ export function createDaemonModule(options: DaemonModuleOptions): DaemonModule {
       ...(options.onWorkflowChannelStream === undefined
         ? {}
         : { onWorkflowChannelStream: options.onWorkflowChannelStream }),
+      ...(options.channelReplyCapabilities === undefined
+        ? {}
+        : { channelReplyCapabilities: options.channelReplyCapabilities }),
       ...(options.test === undefined ? {} : { test: options.test }),
     }),
   };

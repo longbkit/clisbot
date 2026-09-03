@@ -49,8 +49,10 @@ import type {
 } from "../relationship-controller.js";
 import type {
   HubEnrollment,
+  HubConnectionOfferReplacement,
   HubEnrollmentResult,
   HubRelationshipRemote,
+  HubProjectReplacement,
   HubRevocation,
   HubSocketConnection,
   HubSocketCredentials,
@@ -288,6 +290,8 @@ class InMemoryHubRelationships implements HubRelationshipRemote {
   enrollments: HubEnrollment[] = [];
   revocations: HubRevocation[] = [];
   sockets: SocketAttempt[] = [];
+  projectReplacements: HubProjectReplacement[] = [];
+  connectionOfferReplacements: HubConnectionOfferReplacement[] = [];
   private readonly enrollmentGates: Array<Deferred<HubEnrollmentResult>> = [];
   private readonly heldEnrollments: Array<{
     input: HubEnrollment;
@@ -398,6 +402,21 @@ class InMemoryHubRelationships implements HubRelationshipRemote {
 
   async consumeAccessTicket(): Promise<never> {
     throw new Error("managed access is not configured in this relationship harness");
+  }
+
+  async refreshAccessLease(): Promise<never> {
+    throw new Error("managed access is not configured in this relationship harness");
+  }
+
+  async replaceProjects(input: HubProjectReplacement): Promise<void> {
+    this.projectReplacements.push({
+      ...input,
+      projects: input.projects.map((project) => ({ ...project })),
+    });
+  }
+
+  async replaceConnectionOffer(input: HubConnectionOfferReplacement): Promise<void> {
+    this.connectionOfferReplacements.push({ ...input });
   }
 
   openSocket(input: HubSocketCredentials, events: HubSocketEvents): HubSocketConnection {
@@ -748,6 +767,7 @@ export class HubRelationshipHarness {
     options: {
       provider?: AgentProvider;
       model?: string;
+      projectId?: string;
       workspaceId?: string;
       worktree?: CreateAgentWorktreeTarget;
       prompt?: string;
@@ -947,6 +967,18 @@ export class HubRelationshipHarness {
 
   latestCreatedCwd(): string | null {
     return this.codex.createdConfigs.at(-1)?.cwd ?? null;
+  }
+
+  async agentProjectId(agentId: string): Promise<string | null> {
+    const record = await this.daemon?.agentStorage.get(agentId);
+    if (!record?.workspaceId) return null;
+    const workspaces = JSON.parse(
+      readFileSync(path.join(this.paseoHome, "projects", "workspaces.json"), "utf8"),
+    ) as Array<{ workspaceId: string; projectId: string }>;
+    return (
+      workspaces.find((workspace) => workspace.workspaceId === record.workspaceId)?.projectId ??
+      null
+    );
   }
 
   repoRoot(): string {

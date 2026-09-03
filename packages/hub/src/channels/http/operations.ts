@@ -28,6 +28,7 @@ import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../../http/client-address.js";
 import {
   channelAgentNames,
   channelEnvironmentNames,
+  assertOpenAudienceTargetSafety,
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
   ChannelControlPlaneError,
@@ -61,7 +62,7 @@ export interface ChannelControlPlaneOpsOptions {
   /** The per-account lifecycle driver; null degrades the transport step. */
   supervisor: ChannelSupervisor | null;
   /** The tool-path channel-reply MCP endpoint (E4); null degrades the
-   * `/mcp/channel/<ref>` route to the shared 503. */
+   * `/mcp/channel/<opaque-capability>` route to the shared 503. */
   channelReplyServer: ChannelReplyServer | null;
 }
 
@@ -141,7 +142,8 @@ function gateChannelReplyMcp(
   if (options.channelReplyServer === null) {
     return Promise.resolve(Response.json({ error: "database_unavailable" }, { status: 503 }));
   }
-  if (!authorized(request, options.completionTokenSecret)) {
+  const server = options.channelReplyServer;
+  if (!authorized(request, options.completionTokenSecret) && server.accepts?.(token) !== true) {
     return Promise.resolve(
       problem(
         request,
@@ -152,7 +154,6 @@ function gateChannelReplyMcp(
       ),
     );
   }
-  const server = options.channelReplyServer;
   return server
     .handle(request, token)
     .catch((error: unknown) => Promise.resolve(errorResponse(request, error)));
@@ -540,8 +541,46 @@ export async function deployRevision(
   database: Database,
   snapshot: ChannelControlPlaneSnapshot,
   files: readonly HubBundleFile[],
-  options: { createdByUserId?: string | null; expectedRevisionId?: string | null } = {},
+  options: {
+    createdByUserId?: string | null;
+    expectedRevisionId?: string | null;
+    authorize?: (candidate: ChannelConfigurationCandidate) => Promise<void>;
+  } = {},
 ): Promise<void> {
+  const candidate = await prepareChannelConfigurationCandidate(database, snapshot, files);
+  await options.authorize?.(candidate);
+  const canonical = [...files].sort((left, right) => left.path.localeCompare(right.path));
+  await database.saveChannelConfiguration({
+    organizationId: snapshot.organizationId,
+    files: canonical,
+    contentHash: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
+    createdByUserId: options.createdByUserId ?? null,
+    ...(options.expectedRevisionId === undefined
+      ? {}
+      : { expectedRevisionId: options.expectedRevisionId }),
+  });
+}
+
+/** Compile a complete candidate with the same rules as deployment, without writing a revision. */
+export async function validateChannelConfigurationCandidate(
+  database: Database,
+  snapshot: ChannelControlPlaneSnapshot,
+  files: readonly HubBundleFile[],
+): Promise<ChannelControlPlane> {
+  return (await prepareChannelConfigurationCandidate(database, snapshot, files)).controlPlane;
+}
+
+export interface ChannelConfigurationCandidate {
+  bundle: ReturnType<typeof compileHubBundle>;
+  controlPlane: ChannelControlPlane;
+}
+
+/** Compiles the authored bundle and effective Channel policy used by activation authorization. */
+export async function prepareChannelConfigurationCandidate(
+  database: Database,
+  snapshot: ChannelControlPlaneSnapshot,
+  files: readonly HubBundleFile[],
+): Promise<ChannelConfigurationCandidate> {
   try {
     const candidateResourceFiles = [...files];
     if (!candidateResourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {
@@ -556,28 +595,25 @@ export async function deployRevision(
     const workflowNames = (await database.listOrganizationTriggers(snapshot.organizationId))
       .filter(({ enabled }) => enabled)
       .map(({ name }) => name);
-    compileChannelControlPlane({
+    const controlPlane = compileChannelControlPlane({
       files,
       agentNames: channelAgentNames(candidateBundle),
       environmentNames: channelEnvironmentNames(candidateBundle),
       workflowNames,
     });
+    await assertOpenAudienceTargetSafety(
+      database,
+      snapshot.organizationId,
+      candidateBundle,
+      controlPlane,
+    );
+    return { bundle: candidateBundle, controlPlane };
   } catch (error) {
     if (error instanceof ChannelCompilationError || error instanceof HubBundleError) {
       throw invalidConfiguration(error.message);
     }
     throw error;
   }
-  const canonical = [...files].sort((left, right) => left.path.localeCompare(right.path));
-  await database.saveChannelConfiguration({
-    organizationId: snapshot.organizationId,
-    files: canonical,
-    contentHash: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
-    createdByUserId: options.createdByUserId ?? null,
-    ...(options.expectedRevisionId === undefined
-      ? {}
-      : { expectedRevisionId: options.expectedRevisionId }),
-  });
 }
 
 /** The supervisor's start step, degraded when the supervisor is unavailable. */

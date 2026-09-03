@@ -12,7 +12,7 @@ import {
 import { providerApplicationSaveFailure, providerHost, providerName } from "./save-failure.js";
 
 const providerSchema = z.enum(["github", "slack", "discord", "linear"]);
-const surfaceSchema = z.enum(["appSetup", "apps"]).optional();
+const surfaceSchema = z.enum(["appSetup", "apps", "paseo"]).optional();
 const expectedVersionSchema = z.number().int().positive().optional();
 const configurationSchema = z.discriminatedUnion("provider", [
   z.object({

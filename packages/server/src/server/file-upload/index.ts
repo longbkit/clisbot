@@ -3,7 +3,9 @@ import { basename, join } from "node:path";
 
 import { FileTransferOpcode, type FileTransferFrame } from "@getpaseo/protocol/binary-frames/index";
 import { getErrorMessage } from "@getpaseo/protocol/error-utils";
-import type { FileUploadRequest, FileUploadResponse } from "../messages.js";
+import type { AgentAttachment, FileUploadRequest, FileUploadResponse } from "../messages.js";
+
+type UploadedFileAttachment = Extract<AgentAttachment, { type: "uploaded_file" }>;
 
 interface FileUploadStoreOptions {
   paseoHome: string;
@@ -30,6 +32,7 @@ export class FileUploadStore {
   private readonly paseoHome: string;
   private readonly staleUploadTimeoutMs: number;
   private readonly pending = new Map<string, PendingUpload>();
+  private readonly completed = new Map<string, UploadedFileAttachment>();
 
   constructor(options: FileUploadStoreOptions) {
     this.paseoHome = options.paseoHome;
@@ -79,6 +82,17 @@ export class FileUploadStore {
     return operation;
   }
 
+  ownsUploadedFile(attachment: UploadedFileAttachment): boolean {
+    const completed = this.completed.get(attachment.id);
+    return (
+      completed !== undefined &&
+      completed.fileName === attachment.fileName &&
+      completed.mimeType === attachment.mimeType &&
+      completed.size === attachment.size &&
+      completed.path === attachment.path
+    );
+  }
+
   private async applyFrame(
     upload: PendingUpload,
     frame: FileTransferFrame,
@@ -104,7 +118,9 @@ export class FileUploadStore {
   }
 
   private async startWriting(upload: PendingUpload): Promise<void> {
-    await mkdir(join(this.paseoHome, "uploads", upload.id), { recursive: true });
+    await mkdir(join(this.paseoHome, "uploads", upload.id), {
+      recursive: true,
+    });
     await writeFile(upload.path, new Uint8Array());
     upload.started = true;
   }
@@ -132,7 +148,9 @@ export class FileUploadStore {
         `Upload size mismatch: expected ${upload.size}, received ${upload.receivedBytes}.`,
       );
     }
-    return buildUploadResponse(upload, null);
+    const response = buildUploadResponse(upload, null);
+    if (response.payload.file) this.completed.set(upload.id, response.payload.file);
+    return response;
   }
 
   private createStaleUploadTimeout(requestId: string): ReturnType<typeof setTimeout> {
@@ -177,9 +195,10 @@ export class FileUploadStore {
   }
 
   private async removeUploadDirectory(upload: PendingUpload): Promise<void> {
-    await rm(join(this.paseoHome, "uploads", upload.id), { recursive: true, force: true }).catch(
-      () => undefined,
-    );
+    await rm(join(this.paseoHome, "uploads", upload.id), {
+      recursive: true,
+      force: true,
+    }).catch(() => undefined);
   }
 }
 

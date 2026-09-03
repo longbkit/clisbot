@@ -21,6 +21,7 @@ export type InvocationRejection =
       choices: readonly JsonPrimitive[];
     }
   | { code: "invalid_type"; inputName: string; expectedType: InvocationInputType }
+  | { code: "unknown_input"; inputName: string }
   | { code: "duplicate_input"; inputName: string }
   | { code: "missing_required"; inputName: string }
   | { code: "invalid_default_type"; inputName: string; expectedType: InvocationInputType }
@@ -37,6 +38,7 @@ export const InvocationRejectionSchema = z.discriminatedUnion("code", [
       choices: z.array(JsonPrimitiveSchema),
     })
     .strict(),
+  z.object({ code: z.literal("unknown_input"), inputName: z.string() }).strict(),
   z
     .object({
       code: z.literal("invalid_type"),
@@ -71,6 +73,8 @@ export function formatInvocationRejection(rejection: InvocationRejection): strin
       return `input ${rejection.inputName} must be one of the declared choices`;
     case "invalid_type":
       return `input ${rejection.inputName} must be a ${rejection.expectedType}`;
+    case "unknown_input":
+      return `input ${rejection.inputName} is not declared by this Automation`;
     case "duplicate_input":
       return `duplicate input ${rejection.inputName}`;
     case "missing_required":
@@ -129,6 +133,56 @@ export function parseInvocation(
     prompt,
     inputs: freezeInputs(inputs),
   };
+}
+
+/** Validates the structured prompt and declared input values used by direct Automation runs. */
+export function parseStructuredInvocation(
+  prompt: string,
+  definitions: InvocationInputDefinitions,
+  submittedInputs: InvocationInputs,
+): InvocationParseResult {
+  const inputs: Record<string, JsonPrimitive> = {};
+  for (const [name, value] of Object.entries(submittedInputs)) {
+    const definition = definitions[name];
+    if (definition === undefined) {
+      return rejected(prompt, inputs, `input ${name} is not declared by this Automation`, {
+        code: "unknown_input",
+        inputName: name,
+      });
+    }
+    if (!isValueForType(value, definition.type)) {
+      return rejected(prompt, inputs, `input ${name} must be a ${definition.type}`, {
+        code: "invalid_type",
+        inputName: name,
+        expectedType: definition.type,
+      });
+    }
+    if (
+      definition.choices !== undefined &&
+      !definition.choices.some((choice) => choice === value)
+    ) {
+      return rejected(prompt, inputs, `input ${name} must be one of the declared choices`, {
+        code: "invalid_choice",
+        inputName: name,
+        value,
+        choices: definition.choices,
+      });
+    }
+    inputs[name] = value;
+  }
+
+  const defaults = applyDefaults(definitions, inputs);
+  if (defaults !== undefined) {
+    return rejected(prompt, inputs, defaults.message, defaults.rejection);
+  }
+  const required = findMissingRequiredInput(definitions, inputs);
+  if (required !== undefined) {
+    return rejected(prompt, inputs, `required input ${required} is missing`, {
+      code: "missing_required",
+      inputName: required,
+    });
+  }
+  return { status: "accepted", prompt, inputs: freezeInputs(inputs) };
 }
 
 export function matchesInputFilters(

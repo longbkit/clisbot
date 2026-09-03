@@ -49,6 +49,11 @@ export interface ProviderCatalogSessionHost {
   supportsCompactProviderSnapshots(): boolean;
   listProviderAvailability(): Promise<ProviderAvailability[]>;
   listDraftFeatures(config: AgentSessionConfig): Promise<AgentFeature[]>;
+  /** Apply session resource grants after client-version visibility filtering. */
+  filterProviderEntries(
+    entries: ProviderSnapshotEntry[],
+    cwd: string | undefined,
+  ): ProviderSnapshotEntry[];
 }
 
 export interface ProviderCatalogSessionOptions {
@@ -99,7 +104,9 @@ export class ProviderCatalogSession {
         this.host.isProviderVisibleToClient(entry.provider),
       );
       const snapshotCwd = isGlobalProviderSnapshotKey(cwd) ? undefined : cwd;
-      const clientEntries = this.downgradeEntryModesForClient(visibleEntries);
+      const clientEntries = this.downgradeEntryModesForClient(
+        this.host.filterProviderEntries(visibleEntries, snapshotCwd),
+      );
       if (this.host.supportsCompactProviderSnapshots()) {
         const encoded = encodeProviderSnapshot(clientEntries);
         this.host.emit({
@@ -179,7 +186,12 @@ export class ProviderCatalogSession {
     const cwd = resolveCatalogRequestCwd(msg.cwd);
     const fetchedAt = new Date().toISOString();
 
-    const entry = await this.getProviderSnapshotEntryForRead(cwd, msg.provider);
+    const entry = this.host.filterProviderEntries(
+      [await this.getProviderSnapshotEntryForRead(cwd, msg.provider)].filter(
+        (candidate): candidate is ProviderSnapshotEntry => candidate !== undefined,
+      ),
+      cwd,
+    )[0];
 
     if (!entry) {
       this.host.emit({
@@ -234,7 +246,12 @@ export class ProviderCatalogSession {
   ): Promise<void> {
     const fetchedAt = new Date().toISOString();
     const cwd = resolveCatalogRequestCwd(msg.cwd);
-    const entry = await this.getProviderSnapshotEntryForRead(cwd, msg.provider);
+    const entry = this.host.filterProviderEntries(
+      [await this.getProviderSnapshotEntryForRead(cwd, msg.provider)].filter(
+        (candidate): candidate is ProviderSnapshotEntry => candidate !== undefined,
+      ),
+      cwd,
+    )[0];
 
     if (!entry) {
       this.host.emit({
@@ -342,7 +359,11 @@ export class ProviderCatalogSession {
       });
     } catch (error) {
       this.logger.error(
-        { err: error, provider: msg.draftConfig.provider, draftConfig: msg.draftConfig },
+        {
+          err: error,
+          provider: msg.draftConfig.provider,
+          draftConfig: msg.draftConfig,
+        },
         `Failed to list features for ${msg.draftConfig.provider}`,
       );
       this.host.emit({
@@ -365,10 +386,22 @@ export class ProviderCatalogSession {
       const providers = (await this.host.listProviderAvailability()).filter((provider) =>
         this.host.isProviderVisibleToClient(provider.provider),
       );
+      const allowedProviders = new Set(
+        this.host
+          .filterProviderEntries(
+            providers.map(({ provider }) => ({
+              provider,
+              status: "unavailable" as const,
+              enabled: true,
+            })),
+            undefined,
+          )
+          .map(({ provider }) => provider),
+      );
       this.host.emit({
         type: "list_available_providers_response",
         payload: {
-          providers,
+          providers: providers.filter(({ provider }) => allowedProviders.has(provider)),
           error: null,
           fetchedAt,
           requestId: msg.requestId,
@@ -393,10 +426,12 @@ export class ProviderCatalogSession {
   ): Promise<void> {
     // COMPAT(providersSnapshot): keep legacy provider-list RPCs alongside snapshot flow.
     const snapshotCwd = msg.cwd?.trim() ? resolveSnapshotCwd(expandTilde(msg.cwd)) : undefined;
-    const entries = this.providerSnapshotManager
+    const visibleEntries = this.providerSnapshotManager
       .getSnapshot(snapshotCwd)
       .filter((entry) => this.host.isProviderVisibleToClient(entry.provider));
-    const clientEntries = this.downgradeEntryModesForClient(entries);
+    const clientEntries = this.downgradeEntryModesForClient(
+      this.host.filterProviderEntries(visibleEntries, snapshotCwd),
+    );
 
     if (this.host.supportsCompactProviderSnapshots()) {
       const encoded = encodeProviderSnapshot(clientEntries);

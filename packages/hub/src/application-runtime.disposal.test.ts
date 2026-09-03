@@ -32,8 +32,18 @@ vi.mock("./channels/supervisor/index.js", () => ({
       }),
       reconcile: async () => ({ accounts: [], stopped: [] }),
       status: () => [],
-      channelReplyPost: async () => ({ ok: false, error: "no transport in the stub" }),
-      channelReplyMediaPost: async () => ({ ok: false, error: "no transport in the stub" }),
+      channelReplyPost: async () => ({
+        ok: false,
+        error: "no transport in the stub",
+      }),
+      channelReplyMediaPost: async () => ({
+        ok: false,
+        error: "no transport in the stub",
+      }),
+      postTestMessage: async () => ({
+        ok: false,
+        error: "no transport in the stub",
+      }),
     };
     return fake;
   },
@@ -56,7 +66,9 @@ describe("channel plane disposal chain", () => {
         databaseRuntime: fakeDatabaseRuntime(),
         hubDataDir: "channel-plane-disposal-test",
         auth: new RuntimeAuth(),
-        entitlements: new EntitlementsService(database, { seats: () => Promise.resolve(0) }),
+        entitlements: new EntitlementsService(database, {
+          seats: () => Promise.resolve(0),
+        }),
         billing: null,
         registrations: [],
         close: () => Promise.resolve(),
@@ -78,7 +90,9 @@ describe("channel plane disposal chain", () => {
         databaseRuntime: fakeDatabaseRuntime(),
         hubDataDir: "channel-plane-off-test",
         auth: new RuntimeAuth(),
-        entitlements: new EntitlementsService(database, { seats: () => Promise.resolve(0) }),
+        entitlements: new EntitlementsService(database, {
+          seats: () => Promise.resolve(0),
+        }),
         billing: null,
         registrations: [],
         close: () => Promise.resolve(),

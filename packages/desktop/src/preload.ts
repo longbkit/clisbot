@@ -94,6 +94,18 @@ contextBridge.exposeInMainWorld("paseoDesktop", {
   opener: {
     openUrl: (url: string) => ipcRenderer.invoke("paseo:opener:openUrl", url),
   },
+  hub: {
+    signIn: (input: { origin: string; invitationId?: string }) =>
+      ipcRenderer.invoke("paseo:hub:sign-in", input),
+    signOut: (input: { origin: string }) => ipcRenderer.invoke("paseo:hub:sign-out", input),
+    request: (input: {
+      origin: string;
+      path: string;
+      method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+      headers?: Record<string, string>;
+      body?: string;
+    }) => ipcRenderer.invoke("paseo:hub:request", input),
+  },
   editor: {
     listTargets: () => ipcRenderer.invoke("paseo:editor:listTargets"),
     openTarget: (input: {

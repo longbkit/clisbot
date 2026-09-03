@@ -17,6 +17,7 @@ import { BrowserToolsBroker } from "./browser-tools/broker.js";
 import type { CheckoutDiffManager } from "./checkout-diff-manager.js";
 import type { DaemonConfigStore } from "./daemon-config-store.js";
 import type { DownloadTokenStore } from "./file-download/token-store.js";
+import type { ManagedAccessAdmissionResolver } from "./managed-access/types.js";
 import type { ScheduleService } from "./schedule/service.js";
 import { createStub } from "./test-utils/class-mocks.js";
 import { DaemonClient } from "./test-utils/daemon-client.js";
@@ -35,6 +36,7 @@ interface BrowserToolsDaemonHarness {
 interface ConnectBrowserHostClientOptions {
   clientId?: string;
   capabilities?: Record<string, unknown>;
+  resolveAccessTicket?: () => Promise<string>;
 }
 
 interface BrowserHostClientHandle {
@@ -194,12 +196,43 @@ describe("WebSocketServer browser tools wiring", () => {
     expect(harness.broker.getRegisteredClientCount()).toBe(1);
     expect(harness.broker.getPendingRequestCount()).toBe(0);
   });
+
+  it("does not register a Project-scoped managed client as a daemon browser host", async () => {
+    const resolver: ManagedAccessAdmissionResolver = {
+      resolve: async () => ({
+        principalId: "member-a",
+        permissions: ["daemon.read", "workspace.read", "workspace.write"],
+        resourceMode: "projects",
+        projects: new Map(),
+        leaseId: "11111111-1111-4111-8111-111111111111",
+        leaseExpiresAt: Date.now() + 60_000,
+      }),
+    };
+    const harness = await startBrowserToolsDaemonHarness(resolver);
+    await harness.connectBrowserHostClient({
+      resolveAccessTicket: async () => "paseo_dat_browser_host",
+    });
+
+    expect(harness.broker.getRegisteredClientCount()).toBe(0);
+    await expect(
+      harness.broker.execute({ command: { command: "list_tabs", args: {} } }),
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "browser_no_host" },
+    });
+  });
 });
 
-async function startBrowserToolsDaemonHarness(): Promise<BrowserToolsDaemonHarness> {
+async function startBrowserToolsDaemonHarness(
+  managedAccessResolver?: ManagedAccessAdmissionResolver,
+): Promise<BrowserToolsDaemonHarness> {
   const httpServer = createServer();
   const broker = createBroker();
-  const wsServer = createVoiceAssistantWebSocketServer({ httpServer, broker });
+  const wsServer = createVoiceAssistantWebSocketServer({
+    httpServer,
+    broker,
+    managedAccessResolver,
+  });
   const clients = new Set<DaemonClient>();
 
   await listen(httpServer);
@@ -216,6 +249,9 @@ async function startBrowserToolsDaemonHarness(): Promise<BrowserToolsDaemonHarne
         connectTimeoutMs: 500,
         reconnect: { enabled: false },
         capabilities: options.capabilities ?? browserHostCapabilities(),
+        ...(options.resolveAccessTicket
+          ? { resolveAccessTicket: options.resolveAccessTicket }
+          : {}),
       });
       clients.add(client);
 
@@ -269,8 +305,9 @@ function createRequestIdSequence(): () => string {
 function createVoiceAssistantWebSocketServer(params: {
   httpServer: HTTPServer;
   broker: BrowserToolsBroker;
+  managedAccessResolver?: ManagedAccessAdmissionResolver;
 }): VoiceAssistantWebSocketServer {
-  const { httpServer, broker } = params;
+  const { httpServer, broker, managedAccessResolver } = params;
   const agentManager = {
     setAgentAttentionCallback() {},
     subscribe: () => () => {},
@@ -284,6 +321,7 @@ function createVoiceAssistantWebSocketServer(params: {
   const daemonConfigStore = {
     onApply: () => () => {},
     onChange: () => () => {},
+    onFieldChange: () => () => {},
   };
 
   return new VoiceAssistantWebSocketServer(
@@ -291,12 +329,22 @@ function createVoiceAssistantWebSocketServer(params: {
     createStub<pino.Logger>(createLogger()),
     "srv-test",
     createStub<AgentManager>(agentManager),
-    createStub<AgentStorage>({}),
+    createStub<AgentStorage>({ list: async () => [] }),
     createStub<DownloadTokenStore>({}),
     "/tmp/paseo-browser-tools-websocket-test",
     createStub<DaemonConfigStore>(daemonConfigStore),
     null,
-    { allowedOrigins: new Set(["*"]) },
+    {
+      allowedOrigins: new Set(["*"]),
+      ...(managedAccessResolver
+        ? {
+            managedAccess: {
+              mode: "external" as const,
+              resolver: managedAccessResolver,
+            },
+          }
+        : {}),
+    },
     createWorkspaceAutoNameStub(),
     undefined,
     undefined,

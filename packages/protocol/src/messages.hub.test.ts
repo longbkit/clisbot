@@ -101,6 +101,7 @@ describe("Hub session protocol", () => {
       executionId: "execution-1",
       provider: "codex",
       cwd: "/workspace",
+      projectId: "project-company",
       prompt: "Implement the requested change",
       modeId: "code",
     };

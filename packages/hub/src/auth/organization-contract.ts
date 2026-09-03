@@ -22,6 +22,7 @@ const invitationSchema = z.object({
   role: invitationRoleSchema,
   expiresAt: z.string(),
   email: z.string().email().optional(),
+  team: z.object({ id: z.string(), name: z.string() }).optional(),
 });
 const teamMemberSchema = z.object({
   id: z.string(),
@@ -36,6 +37,7 @@ const managerInvitationSchema = z.object({
   role: invitationRoleSchema,
   expiresAt: z.string(),
   link: z.string().url(),
+  team: z.object({ id: z.string(), name: z.string() }).optional(),
 });
 
 export const organizationCapabilitiesSchema = z.object({

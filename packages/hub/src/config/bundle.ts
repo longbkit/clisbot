@@ -73,6 +73,7 @@ const JsonAgentSchema = z
     model: z.string().min(1).optional(),
     mode: z.string().min(1).optional(),
     thinkingOptionId: z.string().min(1).optional(),
+    featureValues: z.record(z.string(), z.custom<JsonValue>(isJsonValue)).optional(),
     options: z.record(z.string(), z.custom<JsonValue>(isJsonValue)).optional(),
   })
   .strict();
@@ -196,7 +197,10 @@ function normalizeBundleFiles(input: readonly HubBundleFile[]): Map<string, HubB
     if (files.has(candidate.path)) {
       throw issue([candidate.path], "duplicate/conflicting bundle entry");
     }
-    files.set(candidate.path, { path: candidate.path, content: candidate.content });
+    files.set(candidate.path, {
+      path: candidate.path,
+      content: candidate.content,
+    });
   }
   return files;
 }

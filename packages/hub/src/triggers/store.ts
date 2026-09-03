@@ -15,6 +15,18 @@ export interface SaveTriggerInput {
   expectedActiveRevisionId?: string | null;
 }
 
+export interface SaveTriggerOptions {
+  authorize?: (candidate: PreparedOrganizationTrigger) => Promise<void>;
+}
+
+export interface PreparedOrganizationTrigger {
+  compiled: ReturnType<typeof compileTriggerDocument>;
+  resolved: Extract<
+    Awaited<ReturnType<typeof resolveTriggerConfigurationForOrganization>>,
+    { success: true }
+  >;
+}
+
 export class OrganizationTriggerStore {
   constructor(
     private readonly database: Database,
@@ -39,9 +51,13 @@ export class OrganizationTriggerStore {
     return revision;
   }
 
-  async save(input: SaveTriggerInput): Promise<OrganizationTriggerRecord> {
+  async save(
+    input: SaveTriggerInput,
+    options: SaveTriggerOptions = {},
+  ): Promise<OrganizationTriggerRecord> {
     const unchangedLegacyAuthoring = await this.isUnchangedExistingYaml(input);
     const prepared = await this.validate(input.yaml, !unchangedLegacyAuthoring);
+    await options.authorize?.(prepared);
     return this.database.saveOrganizationTrigger({
       organizationId: this.organizationId,
       ...(input.triggerId === undefined ? {} : { triggerId: input.triggerId }),
@@ -64,7 +80,10 @@ export class OrganizationTriggerStore {
     });
   }
 
-  async validate(yaml: string, enforceAuthoringContract = true) {
+  async validate(
+    yaml: string,
+    enforceAuthoringContract = true,
+  ): Promise<PreparedOrganizationTrigger> {
     const compiled = compileTriggerDocument(yaml);
     if (enforceAuthoringContract) validateAuthoringContract(compiled.authored);
     const resolved = await resolveTriggerConfigurationForOrganization(

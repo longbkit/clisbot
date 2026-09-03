@@ -50,4 +50,5 @@ export interface ManagedAccessAdmissionRequest {
 
 export interface ManagedAccessAdmissionResolver {
   resolve(request: ManagedAccessAdmissionRequest): Promise<ManagedAccessAdmission>;
+  refresh?(leaseId: string): Promise<ManagedAccessAdmission>;
 }

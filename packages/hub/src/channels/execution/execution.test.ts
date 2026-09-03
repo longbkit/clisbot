@@ -10,7 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { ChannelStore } from "../../db/channels.js";
+import { ChannelStore, type RecordChannelInboundActivityInput } from "../../db/channels.js";
 import type { AgentExecutionRecord } from "../../db/types.js";
 import { embeddedDatabaseRuntime } from "../../db/runtime/index.js";
 import type { DatabaseRuntimeBundle } from "../../db/runtime/index.js";
@@ -27,6 +27,7 @@ import type {
   CompiledRoute,
   EffectiveDefaults,
 } from "../config/compile.js";
+import { OPEN_AUDIENCE_ROUTE_LIMITS } from "../config/schema.js";
 import type {
   ChannelPlaneDeps,
   InboundMessage,
@@ -34,7 +35,7 @@ import type {
   TypingParams,
 } from "../plane/types.js";
 import { ManualClock } from "../plane/clock.js";
-import { executionMarker } from "../bindings/index.js";
+import { executionMarker, parseStoredRouteSelection, routeFingerprint } from "../bindings/index.js";
 import { ApprovalPostureError } from "../policy.js";
 import { createChannelPlane } from "../execution.js";
 
@@ -122,8 +123,13 @@ function makeControlPlane(account: CompiledChannelAccount): ChannelControlPlane 
         closure: ["commandApprover"],
       },
     },
-    users: {},
-    identityOwners: {},
+    users: {
+      "default-user": {
+        name: null,
+        identities: [INITIATOR],
+      },
+    },
+    identityOwners: { [INITIATOR]: "default-user" },
     assignments: [],
     defaults: DEFAULTS,
     approval: [],
@@ -237,6 +243,7 @@ interface FacadeHarness {
   order: string[];
   clock: ManualClock;
   workflowDispatches: Parameters<ChannelPlaneDeps["dispatchWorkflow"]>[0][];
+  activity: RecordChannelInboundActivityInput[];
 }
 
 function makeHarness(
@@ -250,6 +257,10 @@ function makeHarness(
     daemonOptions?: Parameters<typeof makeFakeDaemon>[1];
     daemonAgents?: AgentSnapshot[];
     processingTtlMs?: number;
+    authorizeChannelUse?: ChannelPlaneDeps["authorizeChannelUse"];
+    authorizeChannelApproval?: ChannelPlaneDeps["authorizeChannelApproval"];
+    consumeChannelIdentityChallenge?: ChannelPlaneDeps["consumeChannelIdentityChallenge"];
+    channelRevisionId?: string;
   } = {},
 ): FacadeHarness {
   const progress: EffectiveDefaults["sync"]["progress"] = {
@@ -276,12 +287,17 @@ function makeHarness(
   const postedThreads: (string | undefined)[] = [];
   const mediaPosted: string[] = [];
   const workflowDispatches: Parameters<ChannelPlaneDeps["dispatchWorkflow"]>[0][] = [];
+  const activity: RecordChannelInboundActivityInput[] = [];
   const next: { message: InboundMessage | null } = { message: null };
   const plane = createChannelPlane({
     organizationId: ORGANIZATION_ID,
+    ...(opts.channelRevisionId === undefined ? {} : { channelRevisionId: opts.channelRevisionId }),
     accountScope: { channel: "slack", accountId: ACCOUNT_ID },
     dispatchWorkflow: async (input) => {
       workflowDispatches.push(input);
+    },
+    recordChannelInboundActivity: async (input) => {
+      activity.push(input);
     },
     workflowOutputStore: {
       beginAgentExecutionOutput: async () => undefined,
@@ -292,6 +308,17 @@ function makeHarness(
     normalizeInbound: () => next.message,
     envFlag: opts.envFlag ?? true,
     controlPlane,
+    ...(opts.authorizeChannelUse === undefined
+      ? {}
+      : { authorizeChannelUse: opts.authorizeChannelUse }),
+    ...(opts.authorizeChannelApproval === undefined
+      ? {}
+      : { authorizeChannelApproval: opts.authorizeChannelApproval }),
+    ...(opts.consumeChannelIdentityChallenge === undefined
+      ? {}
+      : {
+          consumeChannelIdentityChallenge: opts.consumeChannelIdentityChallenge,
+        }),
     clock,
     logger: SILENT,
     ...(opts.processingTtlMs !== undefined ? { processingTtlMs: opts.processingTtlMs } : {}),
@@ -322,6 +349,10 @@ function makeHarness(
       provider: "codex",
       cwd: opts.media?.agentCwd ?? "/tmp/repo",
     }),
+    resolveAgentAccessTarget: () => ({
+      daemonReference: "daemon-1",
+      projectId: "project-1",
+    }),
   });
   return {
     plane,
@@ -334,6 +365,7 @@ function makeHarness(
     order,
     clock,
     workflowDispatches,
+    activity,
   };
 }
 
@@ -362,6 +394,79 @@ afterAll(async () => {
 // --- Tests -----------------------------------------------------------------
 
 describe("workflow route", () => {
+  it("uses text only for new selection and keeps an existing direct Agent binding", async () => {
+    const direct = makeRoute();
+    const workflow: CompiledRoute = {
+      ...makeRoute(),
+      match: { kind: "channel", ids: [], contains: "#triage" },
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+    };
+    const account: CompiledChannelAccount = {
+      ...makeAccount(direct),
+      routes: [workflow, direct],
+    };
+    const harness = makeHarness({
+      account,
+      channelRevisionId: "81ec5ff9-bb74-4277-b5d0-62c480a3f150",
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0TEXTROUTE",
+      rootConversationId: "C0TEXTROUTE",
+      threadId: null,
+    };
+
+    harness.next.message = message({
+      text: "please #triage this",
+      conversation,
+    });
+    const automated = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(automated.outcome?.kind, "workflow");
+    assert.equal(harness.workflowDispatches.length, 1);
+    assert.equal(harness.fake.created.length, 0);
+
+    harness.next.message = message({
+      text: "start a direct session",
+      conversation,
+    });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(bound.outcome?.kind, "bound");
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    const stored = await store.findThreadBinding(
+      ORGANIZATION_ID,
+      ACCOUNT_ID,
+      conversation.rootConversationId,
+      null,
+    );
+    assert.deepEqual(parseStoredRouteSelection(stored?.route), {
+      revisionId: "81ec5ff9-bb74-4277-b5d0-62c480a3f150",
+      position: 1,
+      fingerprint: parseStoredRouteSelection(stored?.route)?.fingerprint,
+    });
+
+    harness.next.message = message({
+      text: "now #triage appears",
+      conversation,
+    });
+    const continued = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(continued.outcome?.kind, "steered");
+    assert.equal(continued.outcome?.kind === "steered" ? continued.outcome.agentId : "", agentId);
+    assert.equal(harness.workflowDispatches.length, 1, "the active Agent binding wins");
+  });
+
   it("dispatches a durable workflow event without creating a direct agent binding", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
@@ -390,6 +495,11 @@ describe("workflow route", () => {
     assert.equal(harness.fake.created.length, 0);
     assert.equal(harness.workflowDispatches.length, 1);
     assert.equal(harness.workflowDispatches[0]!.payload.workflow, "engineering-assistant");
+    assert.equal(harness.workflowDispatches[0]!.payload.channel.route_position, 0);
+    assert.equal(
+      harness.workflowDispatches[0]!.payload.channel.route_fingerprint,
+      routeFingerprint(route),
+    );
     assert.equal(
       harness.workflowDispatches[0]!.payload.channel.route.defaults.outbound.path,
       "relay",
@@ -438,6 +548,77 @@ describe("workflow route", () => {
     assert.equal(unmentioned.outcome?.kind, "ignored");
     assert.equal(unauthorized.outcome?.kind, "ignored");
     assert.equal(harness.workflowDispatches.length, 0);
+  });
+
+  it("admits a Hub-authorized Member when legacy Channel roles do not", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+      defaultRoles: [],
+    };
+    const account = makeAccount(route);
+    const requests: Parameters<NonNullable<ChannelPlaneDeps["authorizeChannelUse"]>>[0][] = [];
+    const harness = makeHarness({
+      account,
+      controlPlane: makeControlPlane(account),
+      authorizeChannelUse: async (input) => {
+        requests.push(input);
+        return true;
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({ senderIdentity: "slack:U0MEMBER" });
+
+    const admitted = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(admitted.outcome?.kind, "workflow");
+    assert.equal(harness.workflowDispatches.length, 1);
+    assert.equal(requests[0]?.account.connectionId, account.connectionId);
+    assert.equal(requests[0]?.message.senderIdentity, "slack:U0MEMBER");
+  });
+
+  it("consumes an identity-link command before route admission", async () => {
+    const requests: Parameters<
+      NonNullable<ChannelPlaneDeps["consumeChannelIdentityChallenge"]>
+    >[0][] = [];
+    const account = makeAccount(makeRoute());
+    const harness = makeHarness({
+      account,
+      consumeChannelIdentityChallenge: async (input) => {
+        requests.push(input);
+        return "linked";
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      senderIdentity: "slack:U0NEW",
+      senderName: "New Member",
+      text: "<@B0BOT> /link ABCDE-23456",
+    });
+
+    const linked = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.deepEqual(requests, [
+      {
+        organizationId: ORGANIZATION_ID,
+        account,
+        senderIdentity: "slack:U0NEW",
+        senderName: "New Member",
+        code: "ABCDE-23456",
+      },
+    ]);
+    assert.equal(linked.outcome?.kind, "command");
+    assert.equal(linked.dispatched, true);
+    assert.match(harness.posted[0] ?? "", /Identity linked/u);
+    assert.equal(harness.fake.created.length, 0);
   });
 
   it("applies follow-up mode and idle TTL to an existing workflow binding", async () => {
@@ -509,6 +690,191 @@ describe("workflow route", () => {
 
     assert.equal(result.outcome?.kind, "ignored");
     assert.equal(harness.workflowDispatches.length, 1);
+  });
+});
+
+describe("selected-conversation audience", () => {
+  function openRoute(conversationId: string): CompiledRoute {
+    return {
+      ...makeRoute(),
+      match: { kind: "channel", ids: [conversationId] },
+      audience: { kind: "conversationParticipants" },
+      defaultRoles: [],
+      assignments: [],
+      approval: [{ match: "*", mode: "auto-deny" }],
+      limits: OPEN_AUDIENCE_ROUTE_LIMITS,
+    };
+  }
+
+  it("admits an unknown participant only when mentioned in the selected conversation", async () => {
+    const conversationId = "C0PUBLIC-ADMISSION";
+    const route = openRoute(conversationId);
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: conversationId,
+      rootConversationId: conversationId,
+      threadId: null,
+    };
+
+    harness.next.message = message({
+      senderIdentity: "slack:U0EXTERNAL",
+      mentionedBot: false,
+      conversation,
+    });
+    const unmentioned = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    harness.next.message = message({
+      senderIdentity: "slack:U0EXTERNAL",
+      mentionedBot: true,
+      conversation,
+    });
+    const mentioned = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(unmentioned.outcome?.kind, "ignored");
+    assert.equal(mentioned.outcome?.kind, "bound");
+    assert.equal(harness.fake.created.length, 1);
+  });
+
+  it("records bounded open-audience outcomes and limit decisions without message text", async () => {
+    const conversationId = "C0PUBLIC-AUDIT";
+    const route = openRoute(conversationId);
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: conversationId,
+      rootConversationId: conversationId,
+      threadId: null,
+    };
+
+    harness.next.message = message({
+      senderIdentity: "slack:U0EXTERNAL-AUDIT",
+      mentionedBot: false,
+      conversation,
+      text: "private message content",
+    });
+    await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    harness.next.message = message({
+      senderIdentity: "slack:U0EXTERNAL-AUDIT",
+      mentionedBot: true,
+      conversation,
+      text: "x".repeat(8_001),
+    });
+    await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(harness.activity.length, 2);
+    assert.deepEqual(harness.activity[0], {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      routePosition: 0,
+      routeFingerprint: routeFingerprint(route),
+      externalConversationId: conversationId,
+      externalThreadId: null,
+      senderIdentity: "slack:U0EXTERNAL-AUDIT",
+      outcome: "ignored",
+      outcomeDetail: "not mentioned; requireMention is on",
+      limitDecision: "not_evaluated",
+    });
+    assert.equal(harness.activity[1]?.limitDecision, "denied");
+    assert.match(harness.activity[1]?.limitReason ?? "", /size limit/u);
+    assert.equal(JSON.stringify(harness.activity).includes("private message content"), false);
+  });
+
+  it("bounds public input size and accepted messages per sender", async () => {
+    const conversationId = "C0PUBLIC-LIMITS";
+    const route = openRoute(conversationId);
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: conversationId,
+      rootConversationId: conversationId,
+      threadId: null,
+    };
+    const external = {
+      senderIdentity: "slack:U0RATE-LIMITED",
+      mentionedBot: true,
+      conversation,
+    };
+
+    harness.next.message = message({ ...external, text: "x".repeat(8_001) });
+    const oversized = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(oversized.outcome?.kind, "ignored");
+    assert.match(
+      oversized.outcome?.kind === "ignored" ? oversized.outcome.reason : "",
+      /size limit/u,
+    );
+
+    for (let index = 0; index < 10; index += 1) {
+      harness.next.message = message({ ...external, text: `request ${index}` });
+      const accepted = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {},
+      });
+      assert.notEqual(accepted.outcome?.kind, "ignored");
+      await harness.plane.onStreamEvent("agent-0", {
+        type: "turn_completed",
+        provider: "codex",
+        turnId: `public-${index}`,
+      });
+    }
+    harness.next.message = message({ ...external, text: "one too many" });
+    const limited = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(limited.outcome?.kind, "ignored");
+    assert.match(limited.outcome?.kind === "ignored" ? limited.outcome.reason : "", /rate limit/u);
+  });
+
+  it("cancels active public Route work when its configuration is replaced", async () => {
+    const conversationId = "C0PUBLIC-REVOKE";
+    const route = openRoute(conversationId);
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      senderIdentity: "slack:U0EXTERNAL",
+      conversation: {
+        kind: "channel",
+        id: conversationId,
+        rootConversationId: conversationId,
+        threadId: null,
+      },
+    });
+    const admitted = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(admitted.outcome?.kind, "bound");
+
+    await harness.plane.stop({ cancelActive: true });
+
+    assert.deepEqual(harness.fake.cancelled, ["agent-0"]);
   });
 });
 
@@ -1005,6 +1371,61 @@ describe("approval-command short-circuit", () => {
     assert.equal(response?.requestId, "req-cmd");
     assert.equal(response?.response.behavior, "allow");
   });
+  it("accepts a current Project approval privilege when legacy Channel roles do not", async () => {
+    const route: CompiledRoute = { ...makeRoute(), assignments: [] };
+    const requests: Parameters<NonNullable<ChannelPlaneDeps["authorizeChannelApproval"]>>[0][] = [];
+    const harness = makeHarness({
+      account: makeAccount(route),
+      authorizeChannelApproval: async (input) => {
+        requests.push(input);
+        return true;
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0MANAGED-APPROVAL",
+      rootConversationId: "C0MANAGED-APPROVAL",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+    await harness.plane.onStreamEvent(agentId, {
+      type: "permission_requested",
+      provider: "codex",
+      request: {
+        id: "req-managed",
+        provider: "codex",
+        name: "Bash",
+        kind: "tool",
+        input: { command: "ls" },
+      },
+    });
+
+    harness.next.message = message({
+      text: "approve req-managed",
+      conversation,
+    });
+    const answered = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(answered.outcome?.kind, "command");
+    assert.equal(answered.outcome?.kind === "command" && answered.outcome.handled, true);
+    assert.deepEqual(requests[0]?.target, {
+      daemonReference: "daemon-1",
+      projectId: "project-1",
+    });
+    assert.equal(requests[0]?.privilege, "approval.command");
+    assert.equal(harness.fake.responses.at(-1)?.requestId, "req-managed");
+  });
 });
 
 describe("channel session commands", () => {
@@ -1076,9 +1497,10 @@ describe("channel session commands", () => {
     assert.equal(stopped.outcome?.kind === "command" ? stopped.outcome.handled : true, false);
   });
 
-  it("resolves /stop to the Workflow Agent for the current route", async () => {
+  it("uses captured Workflow context for approval callbacks and /stop", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
+      match: { kind: "channel", ids: [], contains: "#triage" },
       target: { kind: "workflow", workflow: "engineering-assistant" },
     };
     const harness = makeHarness({ account: makeAccount(route) });
@@ -1148,6 +1570,34 @@ describe("channel session commands", () => {
         turnId: "workflow-turn",
       },
     });
+    await harness.plane.onWorkflowStreamEvent({
+      execution,
+      agentId: "workflow-agent",
+      event: {
+        type: "permission_requested",
+        provider: "codex",
+        request: {
+          id: "workflow-request",
+          provider: "codex",
+          name: "Bash",
+          kind: "tool",
+          input: { command: "ls" },
+        },
+      },
+    });
+    const answered = await harness.plane.onApprovalCallback({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      senderIdentity: INITIATOR,
+      cardValue: "allow:workflow-request",
+      externalConversationId: "C0WFSTOP",
+      externalThreadId: null,
+      rootKind: "channel",
+    });
+    assert.equal(answered.outcome?.kind, "command");
+    assert.equal(answered.outcome?.kind === "command" ? answered.outcome.handled : false, true);
+    assert.equal(harness.fake.responses.at(-1)?.agentId, "workflow-agent");
+
     harness.next.message = message({
       text: "/stop",
       conversation: {
@@ -1195,6 +1645,33 @@ describe("channel session commands", () => {
       postsBeforeUndeclaredOutput,
       "outputContext alone does not grant reply authority",
     );
+
+    const staleExecution = {
+      ...execution,
+      id: "5d809c9d-502c-4848-9972-e3860e8dfc20",
+      outputContext: {
+        provider: "channel",
+        channel: {
+          ...(
+            execution.outputContext as {
+              channel: Record<string, unknown>;
+            }
+          ).channel,
+          route_position: 0,
+          route_fingerprint: "stale-route-fingerprint",
+        },
+      },
+    };
+    await harness.plane.onWorkflowStreamEvent({
+      execution: staleExecution,
+      agentId: "stale-workflow-agent",
+      event: {
+        type: "turn_started",
+        provider: "codex",
+        turnId: "stale-turn",
+      },
+    });
+    assert.deepEqual(harness.fake.cancelled, ["workflow-agent", "stale-workflow-agent"]);
   });
 });
 
@@ -1594,7 +2071,7 @@ describe("processing lease (accepted inbound opens it)", () => {
       ctxPayload: {},
     });
     await settle();
-    harness.plane.stop();
+    await harness.plane.stop();
     await settle();
     assert.deepEqual(
       harness.driven.map((d) => d.action),

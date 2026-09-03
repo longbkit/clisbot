@@ -42,6 +42,7 @@ import type {
   PostFn,
   StreamContext,
   UpdateFn,
+  ChannelApprovalAuthorizer,
 } from "../plane/types.js";
 import {
   buildSlackCardBlocks,
@@ -100,6 +101,7 @@ interface ApprovalEngineContext {
   store: ChannelStore;
   daemon: DaemonConnection;
   post: PostFn;
+  authorizeChannelApproval?: ChannelApprovalAuthorizer;
   /** The in-place update adapter (the card's decided state); absent = no
    * in-place update (the card goes stale, the resolution is unaffected). */
   update?: UpdateFn;
@@ -225,7 +227,7 @@ export class ApprovalEngine {
       return { allowed: false, answered: false, reason: "ok", stale: true };
     }
     const { context, request } = prompt;
-    const check = mayApprove(
+    let check = mayApprove(
       responderIdentity,
       classifyToolClass(request),
       context.initiator,
@@ -233,6 +235,26 @@ export class ApprovalEngine {
       context.account,
       context.route,
     );
+    if (
+      !check.allowed &&
+      check.reason === "class-not-approved" &&
+      context.accessTarget?.projectId !== undefined &&
+      this.context.authorizeChannelApproval !== undefined
+    ) {
+      const privilege = approvalPrivilege(classifyToolClass(request));
+      if (
+        privilege !== null &&
+        (await this.context.authorizeChannelApproval({
+          organizationId: this.context.organizationId,
+          account: context.account,
+          responderIdentity,
+          target: context.accessTarget,
+          privilege,
+        }))
+      ) {
+        check = { allowed: true, reason: "ok" };
+      }
+    }
     if (!check.allowed) {
       this.context.logger.info?.("approval answer refused; request stays open", {
         agentId,
@@ -530,6 +552,34 @@ export class ApprovalEngine {
     return newest?.request;
   }
 
+  /** Resolve an open prompt by its captured stream context. This is used by
+   * Channel callbacks and typed approval commands, which intentionally do not
+   * re-run the original Route text match. Undefined also covers an ambiguous
+   * short/prefix id so one command can never answer two Agents. */
+  resolveOpenPromptWhere(
+    matchesContext: (context: StreamContext) => boolean,
+    requestId?: string,
+  ): Pick<OpenPrompt, "context" | "request"> | undefined {
+    let selected: OpenPrompt | undefined;
+    for (const candidate of this.openPrompts.values()) {
+      if (candidate.resolved || !matchesContext(candidate.context)) continue;
+      if (requestId === undefined) {
+        selected = candidate;
+        continue;
+      }
+      const matches =
+        candidate.request.id === requestId ||
+        shortIdOf(candidate.request.id).toLowerCase() === requestId.toLowerCase() ||
+        candidate.request.id.startsWith(requestId);
+      if (!matches) continue;
+      if (selected !== undefined && selected.request.id !== candidate.request.id) return undefined;
+      selected = candidate;
+    }
+    return selected === undefined
+      ? undefined
+      : { context: selected.context, request: selected.request };
+  }
+
   /** The open prompts of one agent (newest last — the "latest" target's
    * candidate set). Used by the facade when a typed command's id is absent. */
   openPromptRequests(agentId: string): AgentPermissionRequest[] {
@@ -540,6 +590,12 @@ export class ApprovalEngine {
     }
     return out;
   }
+}
+
+function approvalPrivilege(
+  toolClass: ReturnType<typeof classifyToolClass>,
+): Parameters<ChannelApprovalAuthorizer>[0]["privilege"] | null {
+  return toolClass === "other" ? null : `approval.${toolClass}`;
 }
 
 // --- Card-id passthrough -------------------------------------------------------
@@ -583,6 +639,7 @@ export function catchAllRoute(fallback: CompiledFallback): CompiledRoute {
     assignments: fallback.assignments ?? [],
     defaults: fallback.defaults ?? accountlessDefaults(),
     approval: fallback.approval ?? [],
+    ...(fallback.limits === undefined ? {} : { limits: fallback.limits }),
   };
 }
 

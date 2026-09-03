@@ -10,7 +10,12 @@ import {
   type CompiledTrigger,
 } from "./compiler.js";
 
-const environment = { name: "runner", kind: "daemon" as const, daemon: "runner", cwd: "/repo" };
+const environment = {
+  name: "runner",
+  kind: "daemon" as const,
+  daemon: "runner",
+  cwd: "/repo",
+};
 
 function configuration(overrides: Record<string, unknown> = {}) {
   return {
@@ -66,7 +71,12 @@ describe("workflow compiler", () => {
           ...base,
           steps: [
             { ...work, id: "prepare", reuse: "binding", auto_archive: true },
-            { ...work, id: "deliver", reuse: "steps.prepare", auto_archive: false },
+            {
+              ...work,
+              id: "deliver",
+              reuse: "steps.prepare",
+              auto_archive: false,
+            },
           ],
         },
       ],
@@ -156,7 +166,11 @@ describe("workflow compiler", () => {
     );
   });
 
-  it("preserves opaque provider options and leaves an omitted mode omitted", () => {
+  it("preserves opaque Agent features and Provider options while leaving an omitted mode omitted", () => {
+    const sourceFeatures = {
+      fast_mode: true,
+      provider_feature: { level: 2 },
+    };
     const sourceOptions = {
       sandbox_workspace_write: {
         writable_roots: ["/var/cache/npm"],
@@ -169,6 +183,7 @@ describe("workflow compiler", () => {
     setAgent(raw, {
       provider: "codex",
       model: "gpt-5.5",
+      featureValues: sourceFeatures,
       options: sourceOptions,
     });
 
@@ -177,11 +192,14 @@ describe("workflow compiler", () => {
     assert.ok(agent !== undefined && !("selector" in agent));
     if (agent === undefined || "selector" in agent) return;
     const options = agent.options;
+    const featureValues = agent.featureValues;
 
     assert.deepEqual(options, sourceOptions);
+    assert.deepEqual(featureValues, sourceFeatures);
     assert.equal(agent.mode, undefined);
     assert.deepEqual(parseCompiledHubConfig(compiled), compiled);
     assert.notEqual(options, sourceOptions);
+    assert.notEqual(featureValues, sourceFeatures);
   });
 
   it.each([null, [], "native", true, 1])("rejects non-object provider options %#", (options) => {
@@ -214,14 +232,19 @@ describe("workflow compiler", () => {
         {
           ...configuration().triggers[0],
           inputs: { repo: { type: "string", choices: ["paseo", "hub"] } },
-          values: { selected: "${{ paseo.inputs.repo ?? steps.classify.outputs.repo }}" },
+          values: {
+            selected: "${{ paseo.inputs.repo ?? steps.classify.outputs.repo }}",
+          },
           steps: [
             {
               ...configuration().triggers[0]!.steps[0],
               id: "classify",
               if: "${{ paseo.inputs.repo == null }}",
               output: {
-                schema: { type: "object", properties: { repo: { enum: ["paseo", "hub"] } } },
+                schema: {
+                  type: "object",
+                  properties: { repo: { enum: ["paseo", "hub"] } },
+                },
               },
             },
             {
@@ -275,7 +298,10 @@ describe("workflow compiler", () => {
             {
               ...trigger,
               steps: [
-                { ...step, allow_outputs: [{ type: "discord.reply", max: 0, required: true }] },
+                {
+                  ...step,
+                  allow_outputs: [{ type: "discord.reply", max: 0, required: true }],
+                },
               ],
             },
           ],
@@ -358,7 +384,11 @@ describe("workflow compiler", () => {
         compileHubConfig({
           ...raw,
           triggers: [
-            { ...trigger, on: "linear.comment_created", filters: { project: "linear-project-id" } },
+            {
+              ...trigger,
+              on: "linear.comment_created",
+              filters: { project: "linear-project-id" },
+            },
           ],
         }),
       /filters\.from_users/iu,
@@ -417,7 +447,12 @@ describe("workflow compiler", () => {
         () =>
           compileHubConfig({
             ...base,
-            triggers: [{ ...base.triggers[0], steps: [{ ...step, github: candidate.github }] }],
+            triggers: [
+              {
+                ...base.triggers[0],
+                steps: [{ ...step, github: candidate.github }],
+              },
+            ],
           }),
         candidate.expected,
       );
@@ -441,7 +476,9 @@ describe("workflow compiler", () => {
     });
 
     const compiled = compileHubConfig(raw);
-    assert.deepEqual(compiled.triggers[0]?.steps[0]?.github?.permissions, { [name]: level });
+    assert.deepEqual(compiled.triggers[0]?.steps[0]?.github?.permissions, {
+      [name]: level,
+    });
   });
 
   it.each(["actions_variables", "repository_advisories"])(
@@ -506,7 +543,12 @@ describe("workflow compiler", () => {
       () =>
         compileHubConfig({
           ...configuration(),
-          triggers: [{ ...trigger, values: { selected: "${{ steps.missing.outputs.repo }}" } }],
+          triggers: [
+            {
+              ...trigger,
+              values: { selected: "${{ steps.missing.outputs.repo }}" },
+            },
+          ],
         }),
       /unknown step/iu,
     );
@@ -518,8 +560,15 @@ describe("workflow compiler", () => {
             {
               ...trigger,
               steps: [
-                { ...trigger.steps[0]!, if: "${{ steps.later.outputs.repo == 'hub' }}" },
-                { ...trigger.steps[0]!, id: "later", output: { schema: { type: "object" } } },
+                {
+                  ...trigger.steps[0]!,
+                  if: "${{ steps.later.outputs.repo == 'hub' }}",
+                },
+                {
+                  ...trigger.steps[0]!,
+                  id: "later",
+                  output: { schema: { type: "object" } },
+                },
               ],
             },
           ],
@@ -533,7 +582,10 @@ describe("workflow compiler", () => {
           triggers: [
             {
               ...trigger,
-              values: { first: "${{ values.second }}", second: "${{ values.first }}" },
+              values: {
+                first: "${{ values.second }}",
+                second: "${{ values.first }}",
+              },
             },
           ],
         }),
@@ -570,7 +622,12 @@ describe("workflow compiler", () => {
           triggers: [
             {
               ...trigger,
-              steps: [{ ...trigger.steps[0]!, output: { schema: { type: "not-a-schema" } } }],
+              steps: [
+                {
+                  ...trigger.steps[0]!,
+                  output: { schema: { type: "not-a-schema" } },
+                },
+              ],
             },
           ],
         }),
@@ -587,7 +644,12 @@ describe("workflow compiler", () => {
           triggers: [
             {
               ...trigger,
-              steps: [{ ...trigger.steps[0]!, agent: { provider: "${{ paseo.prompt }}" } }],
+              steps: [
+                {
+                  ...trigger.steps[0]!,
+                  agent: { provider: "${{ paseo.prompt }}" },
+                },
+              ],
             },
           ],
         }),
@@ -602,7 +664,10 @@ describe("workflow compiler", () => {
               ...trigger,
               inputs: { provider: { type: "string" } },
               steps: [
-                { ...trigger.steps[0]!, agent: { provider: "${{ paseo.inputs.provider }}" } },
+                {
+                  ...trigger.steps[0]!,
+                  agent: { provider: "${{ paseo.inputs.provider }}" },
+                },
               ],
             },
           ],
@@ -619,7 +684,12 @@ describe("workflow compiler", () => {
         triggers: [
           {
             ...trigger,
-            steps: [{ ...trigger.steps[0]!, prompt: [{ text: "${{ paseo.context }}" }] }],
+            steps: [
+              {
+                ...trigger.steps[0]!,
+                prompt: [{ text: "${{ paseo.context }}" }],
+              },
+            ],
           },
         ],
       }),
@@ -691,7 +761,11 @@ describe("workflow compiler", () => {
             {
               ...trigger,
               steps: [
-                { ...trigger.steps[0]!, id: "classify", output: { schema: outputSchema } },
+                {
+                  ...trigger.steps[0]!,
+                  id: "classify",
+                  output: { schema: outputSchema },
+                },
                 {
                   ...trigger.steps[0]!,
                   id: "work",
@@ -720,7 +794,9 @@ describe("workflow compiler", () => {
                       schema: {
                         type: "object",
                         properties: {
-                          provider: { oneOf: [{ enum: ["codex"] }, { const: "opus" }] },
+                          provider: {
+                            oneOf: [{ enum: ["codex"] }, { const: "opus" }],
+                          },
                         },
                       },
                     },
@@ -734,7 +810,12 @@ describe("workflow compiler", () => {
               },
             ],
           },
-          { namedAgents: { codex: { provider: "codex" }, opus: { provider: "claude" } } },
+          {
+            namedAgents: {
+              codex: { provider: "codex" },
+              opus: { provider: "claude" },
+            },
+          },
         ),
       /provable finite choices/iu,
     );
@@ -846,7 +927,9 @@ describe("workflow compiler", () => {
           triggers: [
             {
               ...trigger,
-              inputs: { runner: { type: "string", choices: ["runner", "docker"] } },
+              inputs: {
+                runner: { type: "string", choices: ["runner", "docker"] },
+              },
               steps: [
                 {
                   ...trigger.steps[0]!,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { parseInvocation } from "./invocation.js";
+import { parseInvocation, parseStructuredInvocation } from "./invocation.js";
 
 const inputs = {
   repo: { type: "string" as const, choices: ["paseo", "hub"] },
@@ -14,6 +14,25 @@ const requiredInputs = {
 };
 
 describe("provider-neutral message invocation parser", () => {
+  it("validates direct-run values without encoding them into message text", () => {
+    assert.deepEqual(
+      parseStructuredInvocation("Investigate the customer report", requiredInputs, {
+        repo: "hub",
+        dry: false,
+      }),
+      {
+        status: "accepted",
+        prompt: "Investigate the customer report",
+        inputs: { repo: "hub", dry: false, agent: "codex" },
+      },
+    );
+    const unknown = parseStructuredInvocation("Investigate", inputs, { target: "production" });
+    assert.equal(unknown.status, "rejected");
+    if (unknown.status === "rejected") {
+      assert.deepEqual(unknown.rejection, { code: "unknown_input", inputName: "target" });
+    }
+  });
+
   it.each([
     {
       name: "parses after the mention without changing the prompt",

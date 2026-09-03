@@ -1,4 +1,6 @@
 import { sql } from "drizzle-orm";
+import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import {
   type AnyPgColumn,
   boolean,
@@ -573,6 +575,11 @@ export const daemons = pgTable(
     organizationId: text("organization_id").notNull(),
     serverId: text("server_id").notNull(),
     daemonPublicKey: text("daemon_public_key").notNull(),
+    connectionOffer: jsonb("connection_offer").$type<ConnectionOffer>(),
+    managedAccessMode: text("managed_access_mode")
+      .$type<ManagedAccessMode>()
+      .default("off")
+      .notNull(),
     credentialVerifier: text("credential_verifier").notNull(),
     permissions: jsonb("scopes").$type<string[]>().notNull(),
     registeredByApiKeyId: uuid("registered_by_api_key_id"),
@@ -671,6 +678,33 @@ export const channelIdentities = pgTable(
   ],
 );
 
+/** Short-lived proof that the sender of one Channel message owns a Hub membership. */
+export const channelIdentityChallenges = pgTable(
+  "channel_identity_challenges",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    tokenVerifier: text("token_verifier").notNull().unique(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    memberId: text("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("channel_identity_challenges_member_connection_idx").on(
+      table.organizationId,
+      table.memberId,
+      table.connectionId,
+    ),
+    index("channel_identity_challenges_expiry_idx").on(table.expiresAt),
+  ],
+);
+
 /** Additive grants for Member/Team subjects. Organization owners bypass this table. */
 export const accessAssignments = pgTable(
   "access_assignments",
@@ -682,7 +716,7 @@ export const accessAssignments = pgTable(
     subjectKind: text("subject_kind").$type<"member" | "team">().notNull(),
     subjectId: text("subject_id").notNull(),
     resourceKind: text("resource_kind")
-      .$type<"organization" | "daemon" | "project" | "channel" | "automation">()
+      .$type<"organization" | "daemon" | "project" | "channel_account" | "automation">()
       .notNull(),
     resourceId: text("resource_id").notNull(),
     privileges: jsonb().$type<string[]>().notNull(),
@@ -709,7 +743,7 @@ export const accessAssignments = pgTable(
     check("access_assignments_subject_kind_check", sql`${table.subjectKind} in ('member', 'team')`),
     check(
       "access_assignments_resource_kind_check",
-      sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'channel', 'automation')`,
+      sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'channel_account', 'automation')`,
     ),
   ],
 );
@@ -985,6 +1019,131 @@ export const verifications = pgTable("verification", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+/** OAuth 2.1 clients authorized to call Hub APIs on behalf of an account. */
+export const oauthClients = pgTable(
+  "oauth_client",
+  {
+    id: text().primaryKey(),
+    clientId: text("client_id").notNull().unique(),
+    clientSecret: text("client_secret"),
+    disabled: boolean().default(false),
+    skipConsent: boolean("skip_consent"),
+    enableEndSession: boolean("enable_end_session"),
+    subjectType: text("subject_type"),
+    scopes: text().array(),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    name: text(),
+    uri: text(),
+    icon: text(),
+    contacts: text().array(),
+    tos: text(),
+    policy: text(),
+    softwareId: text("software_id"),
+    softwareVersion: text("software_version"),
+    softwareStatement: text("software_statement"),
+    redirectUris: text("redirect_uris").array().notNull(),
+    postLogoutRedirectUris: text("post_logout_redirect_uris").array(),
+    tokenEndpointAuthMethod: text("token_endpoint_auth_method"),
+    grantTypes: text("grant_types").array(),
+    responseTypes: text("response_types").array(),
+    public: boolean(),
+    type: text(),
+    requirePKCE: boolean("require_pkce"),
+    referenceId: text("reference_id"),
+    metadata: jsonb(),
+  },
+  (table) => [index("oauth_clients_user_id_idx").on(table.userId)],
+);
+
+/** Rotating offline credentials issued by the Hub authorization server. */
+export const oauthRefreshTokens = pgTable(
+  "oauth_refresh_token",
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.clientId, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    revoked: timestamp({ withTimezone: true }),
+    authTime: timestamp("auth_time", { withTimezone: true }),
+    scopes: text().array().notNull(),
+  },
+  (table) => [
+    index("oauth_refresh_tokens_client_id_idx").on(table.clientId),
+    index("oauth_refresh_tokens_session_id_idx").on(table.sessionId),
+    index("oauth_refresh_tokens_user_id_idx").on(table.userId),
+  ],
+);
+
+/** Opaque OAuth access tokens; resource-bound Hub tokens use JWTs instead. */
+export const oauthAccessTokens = pgTable(
+  "oauth_access_token",
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.clientId, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => sessions.id, {
+      onDelete: "set null",
+    }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    refreshId: text("refresh_id").references(() => oauthRefreshTokens.id, {
+      onDelete: "cascade",
+    }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    scopes: text().array().notNull(),
+  },
+  (table) => [
+    index("oauth_access_tokens_client_id_idx").on(table.clientId),
+    index("oauth_access_tokens_session_id_idx").on(table.sessionId),
+    index("oauth_access_tokens_user_id_idx").on(table.userId),
+    index("oauth_access_tokens_refresh_id_idx").on(table.refreshId),
+  ],
+);
+
+/** Durable consent records for OAuth clients that do not use trusted first-party consent. */
+export const oauthConsents = pgTable(
+  "oauth_consent",
+  {
+    id: text().primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.clientId, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    referenceId: text("reference_id"),
+    scopes: text().array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("oauth_consents_client_id_idx").on(table.clientId),
+    index("oauth_consents_user_id_idx").on(table.userId),
+  ],
+);
+
+/** Signing keys owned by BetterAuth's JWT plugin. */
+export const authSigningKeys = pgTable("jwks", {
+  id: text().primaryKey(),
+  publicKey: text("public_key").notNull(),
+  privateKey: text("private_key").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
 });
 
 export const organizations = pgTable("organization", {
@@ -1376,7 +1535,9 @@ export const invitations = pgTable(
     inviterId: text("inviter_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    teamId: text("team_id").references(() => teams.id, { onDelete: "set null" }),
+    teamId: text("team_id").references(() => teams.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

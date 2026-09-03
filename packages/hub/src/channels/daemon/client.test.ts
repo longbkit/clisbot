@@ -301,7 +301,16 @@ describe("channel trusted-client daemon connection", () => {
 
   it("creates an agent via the trusted create_agent_request", async () => {
     const result = await client.createAgent(
-      { provider: "codex", cwd: "/tmp/work" },
+      {
+        provider: "codex",
+        cwd: "/tmp/work",
+        projectId: "project-channel",
+        worktree: {
+          mode: "branch-off",
+          newBranch: "channel/customer-request",
+          base: "main",
+        },
+      },
       { title: "channel-worker" },
     );
     assert.equal(result.agentId, "agent-1");
@@ -312,6 +321,14 @@ describe("channel trusted-client daemon connection", () => {
     assert.equal(config["provider"], "codex");
     assert.equal(config["cwd"], "/tmp/work");
     assert.equal(config["title"], "channel-worker");
+    assert.equal(config["projectId"], undefined);
+    assert.equal(config["worktree"], undefined);
+    assert.equal(frame["projectId"], "project-channel");
+    assert.deepEqual(frame["worktree"], {
+      mode: "branch-off",
+      newBranch: "channel/customer-request",
+      base: "main",
+    });
   });
 
   it("steers the bound session by default", async () => {

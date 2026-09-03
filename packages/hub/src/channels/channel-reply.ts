@@ -1,18 +1,16 @@
 // The hub-side channel-reply MCP tool (E4/E6): the `message` tool a tool-path
 // agent session gets through the control-plane agent-spec resolver. The Hub
 // serves it on its own loopback HTTP server at
-// `POST /mcp/channel/<opaque-binding-ref>` — the same trusted-client
-// loopback trust boundary as the channel ops (a Bearer token must equal the
-// instance auth secret; without one, the caller address must be loopback).
+// `POST /mcp/channel/<opaque-capability>`. A local Agent reaches it over
+// loopback; a remote managed Agent presents the unguessable URL capability.
 //
 // The tool posts through the SAME outbound seam the relay uses (the
 // vertical's `sendText` via the supervisor's `postFor`) and records a
 // delivery-ledger row before posting (record-before-post, like the relay).
-// The binding ref names the account + thread the session was created from:
-// it is embedded in the mcpServers URL at create time, so the endpoint is
-// create-time-only — no daemon RPC attaches an MCP server to an existing
-// session, and pre-existing agents outside the channel plane never get the
-// tool. Unknown or malformed refs return a clean tool error, never a 500.
+// Routing facts stay in the supervisor-owned capability registry and never
+// enter the URL. The capability is embedded at create time and bound to the
+// created Agent; unknown, expired, and revoked tokens return a clean tool
+// error, never a 500.
 //
 // Stateless MCP (SDK `WebStandardStreamableHTTPServerTransport` without a
 // sessionIdGenerator), one per-request Server + transport, closed on the
@@ -35,14 +33,14 @@ import { reportFailure } from "../failures/index.js";
 import {
   CHANNEL_REPLY_TOOL_NAME,
   CHANNEL_REPLY_FILE_TOOL_NAME,
-  decodeChannelReplyBindingRef,
   type ChannelReplyBindingRef,
   type ChannelReplyFilePostFn,
   type OutboundPostResult,
 } from "./plane/types.js";
+import type { ChannelReplyCapability } from "./channel-reply-capabilities.js";
 
 /** The seam the supervisor threads: the account's outbound post, addressed by
- * the decoded binding ref (the vertical's `sendText` through `postFor`). */
+ * the capability's server-owned binding ref (the vertical's `sendText` through `postFor`). */
 export type ChannelReplyPost = (
   ref: ChannelReplyBindingRef,
   text: string,
@@ -54,33 +52,45 @@ export interface ChannelReplyMcp {
   store: ChannelStore;
   post: ChannelReplyPost;
   mediaPost?: ChannelReplyFilePostFn;
-  homeRoot?: string;
+  resolveCapability(token: string): ChannelReplyCapability | undefined;
 }
 
 export interface ChannelReplyServer {
-  /** One MCP request against the channel-reply endpoint; `token` is the URL
-   * binding-ref segment (`/mcp/channel/<token>`). */
+  /** True only for a currently bound, unexpired server-side capability. */
+  accepts?(token: string): boolean;
+  /** One MCP request against `/mcp/channel/<opaque-capability>`. */
   handle(request: Request, token: string): Promise<Response>;
 }
 
 export function createChannelReplyServer(mcp: ChannelReplyMcp): ChannelReplyServer {
   return {
+    accepts: (token) => mcp.resolveCapability(token) !== undefined,
     async handle(request, token) {
       const server = new Server(
         { name: "paseo-hub-channel-reply", version: "1.0.0" },
         { capabilities: { tools: {} } },
       );
-      server.setRequestHandler(ListToolsRequestSchema, () => ({
-        tools: [messageTool(), fileTool()],
-      }));
+      server.setRequestHandler(ListToolsRequestSchema, () => {
+        const capability = mcp.resolveCapability(token);
+        return {
+          tools:
+            capability === undefined
+              ? []
+              : [messageTool(), ...(capability.projectRoot === undefined ? [] : [fileTool()])],
+        };
+      });
       server.setRequestHandler(CallToolRequestSchema, async (call) => {
+        const capability = mcp.resolveCapability(token);
+        if (capability === undefined) {
+          return toolFailure("unknown, expired, or revoked channel reply capability");
+        }
         if (call.params.name === CHANNEL_REPLY_FILE_TOOL_NAME) {
-          return fileCall(mcp, token, call.params.arguments ?? {});
+          return fileCall(mcp, capability, call.params.arguments ?? {});
         }
         if (call.params.name !== CHANNEL_REPLY_TOOL_NAME) {
           return toolFailure(`Tool ${call.params.name} not found`);
         }
-        return messageCall(mcp, token, call.params.arguments ?? {});
+        return messageCall(mcp, capability, call.params.arguments ?? {});
       });
       const transport = new WebStandardStreamableHTTPServerTransport({
         // Omitting sessionIdGenerator is the SDK's stateless-mode setting.
@@ -135,11 +145,10 @@ function messageTool() {
 
 async function messageCall(
   mcp: ChannelReplyMcp,
-  token: string,
+  capability: ChannelReplyCapability,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
-  const ref = decodeChannelReplyBindingRef(token);
-  if (ref === undefined) return toolFailure("unknown or malformed channel binding ref");
+  const ref = capability.ref;
   const action = "action" in args ? args["action"] : "send";
   if (action !== "send") return toolFailure(`unsupported action ${String(action)}`);
   const text = args["text"];
@@ -199,7 +208,7 @@ function fileTool() {
           type: "string",
           minLength: 1,
           description:
-            "Absolute path of the local file to send (document, image, video, or voice). Must live under your home directory.",
+            "Absolute path of the local file to send (document, image, video, or voice). Must live under this session's Project root.",
         },
         caption: { type: "string", description: "Optional short text posted after the file." },
       },
@@ -212,32 +221,31 @@ function fileTool() {
 // eslint-disable-next-line complexity -- one transaction owns validation, delivery, and rollback.
 async function fileCall(
   mcp: ChannelReplyMcp,
-  token: string,
+  capability: ChannelReplyCapability,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
-  const ref = decodeChannelReplyBindingRef(token);
-  if (ref === undefined) return toolFailure("unknown or malformed channel binding ref");
+  const ref = capability.ref;
   const filePath = args["path"];
   if (typeof filePath !== "string" || filePath.trim() === "")
     return toolFailure("`path` must be a non-empty string");
   if (!path.isAbsolute(filePath))
     return toolFailure("path must be an absolute path (e.g. /home/.../report.md)");
-  // Fail closed when no home root is configured: absence of a root is never
-  // "unrestricted access".
-  if (mcp.homeRoot === undefined) {
+  // The capability carries the fixed target Project root. Absence never means
+  // unrestricted file access, and a token cannot supply or alter this value.
+  if (capability.projectRoot === undefined) {
     return toolFailure(
-      "file sending is unavailable for this session: no home directory is configured",
+      "file sending is unavailable for this session: no Project root is configured",
     );
   }
   // Containment is checked AFTER symlink resolution on both sides: a lexical
   // check would let a link inside the home escape to a target outside it
   // (statSync follows symlinks). The canonical path is what gets uploaded.
-  let homeRoot: string;
+  let projectRoot: string;
   try {
-    homeRoot = realpathSync(mcp.homeRoot);
+    projectRoot = realpathSync(capability.projectRoot);
   } catch {
     return toolFailure(
-      "file sending is unavailable for this session: the home directory does not exist",
+      "file sending is unavailable for this session: the Project root does not exist",
     );
   }
   let target: string;
@@ -246,8 +254,8 @@ async function fileCall(
   } catch {
     return toolFailure(`file not found: ${filePath}`);
   }
-  if (target !== homeRoot && !target.startsWith(`${homeRoot}${path.sep}`)) {
-    return toolFailure("path is outside the allowed home directory");
+  if (target !== projectRoot && !target.startsWith(`${projectRoot}${path.sep}`)) {
+    return toolFailure("path is outside the allowed Project root");
   }
   let sizeBytes: number;
   try {

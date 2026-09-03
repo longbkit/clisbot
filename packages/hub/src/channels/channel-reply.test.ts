@@ -17,8 +17,8 @@ import { z } from "zod";
 import type { ChannelStore } from "../db/channels.js";
 import { createFetchServer } from "../http/node-server.js";
 import { createChannelReplyServer, type ChannelReplyPost } from "./channel-reply.js";
+import { ChannelReplyCapabilityRegistry } from "./channel-reply-capabilities.js";
 import {
-  encodeChannelReplyBindingRef,
   type ChannelReplyBindingRef,
   type OutboundPostParams,
   type OutboundPostResult,
@@ -38,7 +38,51 @@ const REF: ChannelReplyBindingRef = {
   externalConversationId: "C0WORK",
   externalThreadId: "1710000000.000001",
 };
-const TOKEN = encodeChannelReplyBindingRef(REF);
+const TOKEN = "opaque-channel-reply-capability";
+
+describe("ChannelReplyCapabilityRegistry", () => {
+  it("rejects token forgery, cross-Agent rebinding, and cross-organization use", () => {
+    const registry = new ChannelReplyCapabilityRegistry({ token: () => TOKEN });
+    const token = registry.issue(capabilityInput());
+    assert.equal(registry.bind(token, "agent-a"), true);
+    assert.equal(registry.bind(token, "agent-b"), false);
+    assert.equal(registry.resolve(`${token}-forged`, "org-1"), undefined);
+    assert.equal(
+      registry.resolve(
+        Buffer.from(
+          JSON.stringify({ ...REF, externalConversationId: "C_OTHER_ROUTE" }),
+          "utf8",
+        ).toString("base64url"),
+        "org-1",
+      ),
+      undefined,
+    );
+    assert.equal(registry.resolve(token, "org-2"), undefined);
+    const resolved = registry.resolve(token, "org-1");
+    assert.equal(resolved?.agentId, "agent-a");
+    if (resolved !== undefined) resolved.ref.externalConversationId = "C_OTHER_ROUTE";
+    assert.equal(registry.resolve(token, "org-1")?.ref.externalConversationId, "C0WORK");
+  });
+
+  it("expires and revokes capabilities when their account is invalidated", () => {
+    let now = 1_000;
+    let sequence = 0;
+    const registry = new ChannelReplyCapabilityRegistry({
+      now: () => now,
+      ttlMs: 100,
+      token: () => `token-${++sequence}`,
+    });
+    const expired = registry.issue(capabilityInput());
+    assert.equal(registry.bind(expired, "agent-expired"), true);
+    now = 1_100;
+    assert.equal(registry.resolve(expired, "org-1"), undefined);
+
+    const revoked = registry.issue(capabilityInput());
+    assert.equal(registry.bind(revoked, "agent-revoked"), true);
+    registry.revokeAccount("org-1", "slack", "work");
+    assert.equal(registry.resolve(revoked, "org-1"), undefined);
+  });
+});
 
 describe("channel-reply MCP endpoint", () => {
   it("lists both reply tools", async () => {
@@ -89,7 +133,7 @@ describe("channel-reply MCP endpoint", () => {
     const filePath = join(directory, "report.md");
     await writeFile(filePath, "report");
     const fixture = makeFixture({
-      homeRoot: directory,
+      projectRoot: directory,
       mediaPost: async (ref, path) => {
         assert.equal(ref.accountId, "work");
         assert.equal(path, filePath);
@@ -110,16 +154,16 @@ describe("channel-reply MCP endpoint", () => {
     ]);
   });
 
-  it("rejects a symlink inside the home that points outside it (containment after realpath)", async () => {
-    const home = await mkdtemp(join(tmpdir(), "channel-reply-home-"));
+  it("rejects a symlink inside the Project that points outside it (containment after realpath)", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "channel-reply-project-"));
     const outside = await mkdtemp(join(tmpdir(), "channel-reply-outside-"));
     const outsideFile = join(outside, "secret.md");
     await writeFile(outsideFile, "secret");
-    const linkPath = join(home, "link.md");
+    const linkPath = join(projectRoot, "link.md");
     symlinkSync(outsideFile, linkPath);
     let mediaCalls = 0;
     const fixture = makeFixture({
-      homeRoot: home,
+      projectRoot,
       mediaPost: async () => {
         mediaCalls += 1;
         return { ok: true, externalMessageId: "x", mediaPosted: true };
@@ -133,20 +177,29 @@ describe("channel-reply MCP endpoint", () => {
     assert.equal(result.isError, true);
     assert.match(
       String((body.result as { content: [{ text: string }] }).content[0]?.text),
-      /outside the allowed home directory/,
+      /outside the allowed Project root/,
     );
     assert.equal(mediaCalls, 0, "the vertical seam is never driven for an escaped path");
     assert.equal(fixture.records.length, 0, "no ledger row is recorded for a rejected path");
   });
 
-  it("fails closed with a clean tool error when no home root is configured", async () => {
+  it("omits and rejects file sending when no Project root is configured", async () => {
     let mediaCalls = 0;
     const fixture = makeFixture({
+      projectRoot: null,
       mediaPost: async () => {
         mediaCalls += 1;
         return { ok: true, externalMessageId: "x", mediaPosted: true };
       },
     });
+    const listed = await fixture.call("tools/list");
+    const tools = z
+      .array(z.object({ name: z.string() }))
+      .parse((listed.result as { tools: unknown[] }).tools);
+    assert.deepEqual(
+      tools.map(({ name }) => name),
+      ["message"],
+    );
     const body = await fixture.call("tools/call", {
       name: "send_file",
       arguments: { path: "/etc/hostname" },
@@ -155,7 +208,7 @@ describe("channel-reply MCP endpoint", () => {
     assert.equal(result.isError, true);
     assert.match(
       String((body.result as { content: [{ text: string }] }).content[0]?.text),
-      /no home directory is configured/,
+      /no Project root is configured/,
     );
     assert.equal(mediaCalls, 0, "absence of a home root is never unrestricted access");
     assert.equal(fixture.records.length, 0);
@@ -163,7 +216,7 @@ describe("channel-reply MCP endpoint", () => {
 
   it("omits threadId when the ref is a conversation-root session", async () => {
     const rootRef: ChannelReplyBindingRef = { ...REF, externalThreadId: null };
-    const fixture = makeFixture({ token: encodeChannelReplyBindingRef(rootRef) });
+    const fixture = makeFixture({ ref: rootRef });
     const body = await fixture.call("tools/call", {
       name: "message",
       arguments: { text: "hello" },
@@ -174,7 +227,7 @@ describe("channel-reply MCP endpoint", () => {
   });
 
   it("returns a clean tool error for an unknown or malformed binding ref", async () => {
-    const fixture = makeFixture({ token: "not-a-binding-ref" });
+    const fixture = makeFixture({ requestToken: "forged-token" });
     const body = await fixture.call("tools/call", {
       name: "message",
       arguments: { text: "lost" },
@@ -255,7 +308,6 @@ interface Fixture {
 
 function makeFixture(
   options: {
-    token?: string;
     post?: ChannelReplyPost;
     mediaPost?: (
       ref: ChannelReplyBindingRef,
@@ -266,10 +318,21 @@ function makeFixture(
       mediaPosted?: boolean;
       error?: string;
     }>;
-    homeRoot?: string;
+    projectRoot?: string | null;
+    ref?: ChannelReplyBindingRef;
+    requestToken?: string;
   } = {},
 ): Fixture {
-  const token = options.token ?? TOKEN;
+  const token = TOKEN;
+  const registry = new ChannelReplyCapabilityRegistry({ token: () => token });
+  const capabilityToken = registry.issue(
+    capabilityInput({
+      ref: options.ref ?? REF,
+      projectRoot: options.projectRoot === undefined ? process.cwd() : options.projectRoot,
+    }),
+  );
+  assert.equal(registry.bind(capabilityToken, "agent-1"), true);
+  const requestToken = options.requestToken ?? capabilityToken;
   const posts: OutboundPostParams[] = [];
   const post: ChannelReplyPost =
     options.post ??
@@ -312,9 +375,9 @@ function makeFixture(
   const server = createChannelReplyServer({
     organizationId: "org-1",
     store,
+    resolveCapability: (candidate) => registry.resolve(candidate, "org-1"),
     post,
     ...(options.mediaPost === undefined ? {} : { mediaPost: options.mediaPost }),
-    ...(options.homeRoot === undefined ? {} : { homeRoot: options.homeRoot }),
   });
   let id = 0;
   return {
@@ -326,7 +389,7 @@ function makeFixture(
     async call(method, params = undefined) {
       id += 1;
       const response = await server.handle(
-        new Request(`https://hub.test/mcp/channel/${token}`, {
+        new Request(`https://hub.test/mcp/channel/${requestToken}`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -334,13 +397,31 @@ function makeFixture(
           },
           body: JSON.stringify({ jsonrpc: "2.0", id, method, ...(params ? { params } : {}) }),
         }),
-        token,
+        requestToken,
       );
       return RpcResponseSchema.parse(await response.json()) as {
         result: unknown;
         error?: { code: number };
       };
     },
+  };
+}
+
+function capabilityInput(
+  options: {
+    ref?: ChannelReplyBindingRef;
+    projectRoot?: string | null;
+  } = {},
+) {
+  return {
+    organizationId: "org-1",
+    channelRevisionId: "revision-1",
+    routePosition: 0,
+    routeFingerprint: "route-a",
+    ref: options.ref ?? REF,
+    ...(options.projectRoot === null || options.projectRoot === undefined
+      ? {}
+      : { projectRoot: options.projectRoot }),
   };
 }
 

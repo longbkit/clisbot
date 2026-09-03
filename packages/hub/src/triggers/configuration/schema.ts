@@ -11,7 +11,10 @@ const WorktreeTargetSchema = z.discriminatedUnion("mode", [
     base: z.string().min(1).optional(),
   }),
   z.object({ mode: z.literal("checkout-branch"), branch: z.string().min(1) }),
-  z.object({ mode: z.literal("checkout-pr"), prNumber: z.number().int().positive() }),
+  z.object({
+    mode: z.literal("checkout-pr"),
+    prNumber: z.number().int().positive(),
+  }),
 ]);
 
 const IDENTIFIER = /^[a-z][a-z0-9_-]*$/u;
@@ -60,6 +63,7 @@ export const TriggerAgentSchema = z
     model: z.string().min(1).optional(),
     mode: z.string().min(1).optional(),
     thinkingOptionId: z.string().min(1).optional(),
+    featureValues: z.record(z.string(), z.custom<JsonValue>()).optional(),
     options: z.record(z.string(), z.custom<JsonValue>()).optional(),
   })
   .strict();
@@ -77,6 +81,7 @@ export const TriggerAgentSelectionSchema = z.union([
 export const TriggerTargetSchema = z
   .object({
     daemon: z.string().min(1),
+    projectId: z.string().min(1).optional(),
     cwd: z.string().min(1),
     worktree: WorktreeTargetSchema.optional(),
   })
@@ -104,12 +109,14 @@ export const TriggerRunSchema = z
       .optional(),
     outputs: z.record(z.string().regex(EVENT_NAME), TriggerOutputSchema).optional(),
     auto_archive: z.boolean().default(true),
+    reuse: z.literal("binding").optional(),
   })
   .strict();
 
 export const TriggerDocumentSchema = z
   .object({
     name: z.string().regex(IDENTIFIER),
+    description: z.string().trim().min(1).optional(),
     enabled: z.boolean().default(true),
     on: z.record(z.string().regex(EVENT_NAME), TriggerEventSchema),
     inputs: z.record(z.string().regex(IDENTIFIER), TriggerInputSchema).optional(),

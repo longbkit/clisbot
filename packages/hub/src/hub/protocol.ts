@@ -135,6 +135,7 @@ export const HubExecutionAgentCreateRequestSchema = z.object({
   provider: z.string(),
   cwd: z.string(),
   prompt: z.string(),
+  projectId: z.string().optional(),
   workspaceId: z.string().optional(),
   model: z.string().optional(),
   modeId: z.string().optional(),
@@ -246,6 +247,20 @@ export const HubExecutionControlResponseSchema = z.object({
   }),
 });
 
+export const ManagedAccessLeaseRevokeRequestSchema = z.object({
+  type: z.literal("managed_access.lease.revoke.request"),
+  requestId: z.string(),
+  leaseIds: z.array(z.string().uuid()).min(1),
+});
+
+export const ManagedAccessLeaseRevokeResponseSchema = z.object({
+  type: z.literal("managed_access.lease.revoke.response"),
+  payload: z.object({
+    requestId: z.string(),
+    revokedCount: z.number().int().nonnegative(),
+  }),
+});
+
 const RpcErrorSchema = z.object({
   type: z.literal("rpc_error"),
   payload: z.object({
@@ -264,6 +279,7 @@ export const HubExecutionOutboundSchema = z.object({
     HubExecutionAgentStreamSchema,
     HubExecutionControlResponseSchema,
     HubExecutionAgentValidateResponseSchema,
+    ManagedAccessLeaseRevokeResponseSchema,
     RpcErrorSchema,
   ]),
 });

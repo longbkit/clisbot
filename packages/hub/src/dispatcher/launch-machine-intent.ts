@@ -8,6 +8,7 @@ export interface DaemonEnvironmentTarget {
   kind: "daemon";
   daemonId: string;
   authoredSlug: string;
+  projectId?: string;
   cwd: string;
   env?: Record<string, string>;
   worktree?: WorktreeTarget;

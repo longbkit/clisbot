@@ -57,11 +57,19 @@ export type HostConnection =
 
 export type HostLifecycle = Record<string, never>;
 
+export interface HubHostManagement {
+  kind: "hub";
+  hubOrigin: string;
+  organizationId: string;
+  daemonId: string;
+}
+
 export interface HostProfile {
   serverId: string;
   label: string;
   appearance: HostAppearance;
   lifecycle: HostLifecycle;
+  management?: HubHostManagement;
   connections: HostConnection[];
   preferredConnectionId: string | null;
   createdAt: string;
@@ -186,11 +194,54 @@ function upsertHostConnectionById(
   return next;
 }
 
+function matchingHostProfileIndexes(
+  profiles: readonly HostProfile[],
+  serverId: string,
+  connection: HostConnection,
+): number[] {
+  return profiles.reduce<number[]>((matches, profile, index) => {
+    if (
+      profile.serverId === serverId ||
+      profile.connections.some((candidate) => hostConnectionEquals(candidate, connection))
+    ) {
+      matches.push(index);
+    }
+    return matches;
+  }, []);
+}
+
+function hostProfileNeedsUpdate(input: {
+  matchingCount: number;
+  previous: HostProfile;
+  serverId: string;
+  label: string;
+  management?: HubHostManagement;
+  connections: readonly HostConnection[];
+  preferredConnectionId: string;
+  createdAt: string;
+}): boolean {
+  const previous = input.previous;
+  return (
+    input.matchingCount > 1 ||
+    previous.serverId !== input.serverId ||
+    input.createdAt !== previous.createdAt ||
+    input.label !== previous.label ||
+    input.preferredConnectionId !== previous.preferredConnectionId ||
+    JSON.stringify(previous.management) !== JSON.stringify(input.management) ||
+    input.connections.length !== previous.connections.length ||
+    input.connections.some((connection, index) => {
+      const previousConnection = previous.connections[index];
+      return !previousConnection || !hostConnectionEquals(connection, previousConnection);
+    })
+  );
+}
+
 export function upsertHostConnectionInProfiles(input: {
   profiles: HostProfile[];
   serverId: string;
   label?: string;
   connection: HostConnection;
+  management?: HubHostManagement;
   now?: string;
 }): HostProfile[] {
   const serverId = input.serverId.trim();
@@ -202,15 +253,7 @@ export function upsertHostConnectionInProfiles(input: {
   const labelTrimmed = input.label?.trim() ?? "";
   const derivedLabel = labelTrimmed || serverId;
   const existing = input.profiles;
-  const matchingIndexes = existing.reduce<number[]>((matches, daemon, index) => {
-    if (
-      daemon.serverId === serverId ||
-      daemon.connections.some((connection) => hostConnectionEquals(connection, input.connection))
-    ) {
-      matches.push(index);
-    }
-    return matches;
-  }, []);
+  const matchingIndexes = matchingHostProfileIndexes(existing, serverId, input.connection);
 
   if (matchingIndexes.length === 0) {
     const profile: HostProfile = {
@@ -218,6 +261,7 @@ export function upsertHostConnectionInProfiles(input: {
       label: derivedLabel,
       appearance: defaultHostAppearance(),
       lifecycle: defaultLifecycle(),
+      ...(input.management ? { management: input.management } : {}),
       connections: [input.connection],
       preferredConnectionId: input.connection.id,
       createdAt: now,
@@ -233,6 +277,7 @@ export function upsertHostConnectionInProfiles(input: {
     input.connection,
   );
   const nextLifecycle = prev.lifecycle;
+  const nextManagement = input.management ?? prev.management;
   const nextLabel = prev.label === prev.serverId ? derivedLabel : prev.label;
   const nextPreferredConnectionId =
     prev.preferredConnectionId &&
@@ -244,16 +289,16 @@ export function upsertHostConnectionInProfiles(input: {
     prev.createdAt,
   );
   const changed =
-    matchingIndexes.length > 1 ||
-    prev.serverId !== serverId ||
-    nextCreatedAt !== prev.createdAt ||
-    nextLabel !== prev.label ||
-    nextPreferredConnectionId !== prev.preferredConnectionId ||
     !hostLifecycleEquals(prev.lifecycle, nextLifecycle) ||
-    nextConnections.length !== prev.connections.length ||
-    nextConnections.some((connection, index) => {
-      const previousConnection = prev.connections[index];
-      return !previousConnection || !hostConnectionEquals(connection, previousConnection);
+    hostProfileNeedsUpdate({
+      matchingCount: matchingIndexes.length,
+      previous: prev,
+      serverId,
+      label: nextLabel,
+      ...(nextManagement === undefined ? {} : { management: nextManagement }),
+      connections: nextConnections,
+      preferredConnectionId: nextPreferredConnectionId,
+      createdAt: nextCreatedAt,
     });
 
   if (!changed) {
@@ -265,6 +310,7 @@ export function upsertHostConnectionInProfiles(input: {
     serverId,
     label: nextLabel,
     lifecycle: nextLifecycle,
+    ...(nextManagement ? { management: nextManagement } : {}),
     connections: nextConnections,
     preferredConnectionId: nextPreferredConnectionId,
     createdAt: nextCreatedAt,
@@ -389,6 +435,14 @@ const StoredHostProfileSchema = z.strictObject({
   label: z.string().optional(),
   appearance: HostAppearanceSchema.optional(),
   lifecycle: z.strictObject({}).optional(),
+  management: z
+    .strictObject({
+      kind: z.literal("hub"),
+      hubOrigin: z.string().url(),
+      organizationId: z.string().min(1),
+      daemonId: z.string().min(1),
+    })
+    .optional(),
   connections: z.array(StoredHostConnectionSchema).min(1),
   preferredConnectionId: z.string().nullable().optional(),
   createdAt: z.string().datetime({ offset: true }).optional(),
@@ -481,6 +535,7 @@ export function normalizeStoredHostProfile(entry: unknown): HostProfile | null {
     label,
     appearance: record.appearance ?? defaultHostAppearance(),
     lifecycle: defaultLifecycle(),
+    ...(record.management ? { management: record.management } : {}),
     connections,
     preferredConnectionId,
     createdAt: record.createdAt ?? now,

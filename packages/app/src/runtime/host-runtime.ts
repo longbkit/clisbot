@@ -12,8 +12,10 @@ import {
   createRemoteSshHostConnection,
   normalizeStoredHostProfile,
   upsertHostConnectionInProfiles,
+  hostHasConnection,
   registryHasConnection,
   StoredHostRegistrySchema,
+  type HubHostManagement,
   type HostConnection,
   type HostProfile,
 } from "@/types/host-connection";
@@ -49,6 +51,10 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceSetupStore } from "@/stores/workspace-setup-store";
 import { invalidateCheckoutGitQueriesForServer } from "@/git/query-keys";
 import { queryClient } from "@/data/query-client";
+import {
+  hostRequiresSessionAdmission,
+  resolveHostAccessTicket,
+} from "@/runtime/host-session-access";
 import {
   invalidateServerDataQueriesAfterReconnect,
   mountServerDataPushRouter,
@@ -136,6 +142,15 @@ export function isHostRuntimeDirectoryLoading(snapshot: HostRuntimeSnapshot | nu
   return (
     !snapshot.hasEverLoadedAgentDirectory &&
     (snapshot.connectionStatus === "connecting" || snapshot.connectionStatus === "online")
+  );
+}
+
+function sameHubManagement(left: HubHostManagement | undefined, right: HubHostManagement): boolean {
+  return (
+    left?.kind === "hub" &&
+    left.hubOrigin === right.hubOrigin &&
+    left.organizationId === right.organizationId &&
+    left.daemonId === right.daemonId
   );
 }
 
@@ -260,7 +275,11 @@ type HostRuntimeConnectionMachineState =
     };
 
 type HostRuntimeConnectionMachineEvent =
-  | { type: "select_connection"; connectionId: string; connection: ActiveConnection }
+  | {
+      type: "select_connection";
+      connectionId: string;
+      connection: ActiveConnection;
+    }
   | { type: "client_state"; state: ConnectionState; lastError: string | null }
   | { type: "connect_failed"; message: string }
   | { type: "no_connections" }
@@ -512,6 +531,15 @@ function createDefaultDeps(): HostRuntimeControllerDeps {
         runtimeGeneration,
         capabilities: appCapabilities,
         trace: nativePerformanceTrace,
+        ...(hostRequiresSessionAdmission(host.serverId)
+          ? {
+              resolveAccessTicket: async () => {
+                const ticket = await resolveHostAccessTicket(host.serverId, clientId);
+                if (ticket === undefined) throw new Error("Host session admission is unavailable");
+                return ticket;
+              },
+            }
+          : {}),
       } satisfies Omit<DaemonClientConfig, "url">;
       if (connection.type === "directSocket" || connection.type === "directPipe") {
         return new DaemonClient({
@@ -797,6 +825,11 @@ export class HostRuntimeController {
       return;
     }
 
+    if (hostRequiresSessionAdmission(this.host.serverId)) {
+      await this.runSessionAdmissionConnectionCycle(requestVersion);
+      return;
+    }
+
     const now = performance.now();
     const isOnline = this.snapshot.connectionStatus === "online";
     const activeConnectionId = this.snapshot.activeConnectionId;
@@ -844,7 +877,9 @@ export class HostRuntimeController {
       if (!this.isCurrentProbeRequest(requestVersion)) {
         return;
       }
-      this.updateSnapshot({ probeByConnectionId: new Map(probeByConnectionId) });
+      this.updateSnapshot({
+        probeByConnectionId: new Map(probeByConnectionId),
+      });
     };
 
     const maybeActivateFirstAvailable = async (
@@ -1018,7 +1053,9 @@ export class HostRuntimeController {
               return;
             }
 
-            const rttMs = await connectedClient.measureLatency({ timeoutMs: 5000 });
+            const rttMs = await connectedClient.measureLatency({
+              timeoutMs: 5000,
+            });
             if (!this.isCurrentProbeRequest(requestVersion)) {
               return;
             }
@@ -1044,6 +1081,30 @@ export class HostRuntimeController {
           }
         })();
       }
+    });
+  }
+
+  private async runSessionAdmissionConnectionCycle(requestVersion: number): Promise<void> {
+    if (!this.isCurrentProbeRequest(requestVersion)) return;
+    const activeConnectionId = this.snapshot.activeConnectionId;
+    const activeConnection = findConnectionById(this.host, activeConnectionId);
+    if (activeConnection !== null && this.snapshot.client !== null) {
+      const rttMs = this.snapshot.client.getLastLivenessRttMs();
+      if (rttMs !== null) {
+        this.updateSnapshot({
+          probeByConnectionId: new Map([
+            [activeConnection.id, { status: "available", latencyMs: rttMs }],
+          ]),
+        });
+      }
+      return;
+    }
+    const preferred = findConnectionById(this.host, this.host.preferredConnectionId);
+    const connection = preferred ?? this.host.connections[0];
+    if (connection === undefined) return;
+    await this.switchToConnection({
+      connectionId: connection.id,
+      expectedProbeVersion: requestVersion,
     });
   }
 
@@ -1182,7 +1243,10 @@ export class HostRuntimeController {
     if (this.snapshot.hasEverLoadedAgentDirectory) return {};
     const tag = this.connectionMachineState.tag;
     if (tag === "connecting" || tag === "online") {
-      return { agentDirectoryStatus: "initial_loading", agentDirectoryError: null };
+      return {
+        agentDirectoryStatus: "initial_loading",
+        agentDirectoryError: null,
+      };
     }
     if (tag === "error") {
       return {
@@ -1210,7 +1274,10 @@ export class HostRuntimeController {
     }
     const requestVersion = ++this.switchRequestVersion;
 
-    const clientId = await this.resolveClientIdForSwitch({ existingClient, requestVersion });
+    const clientId = await this.resolveClientIdForSwitch({
+      existingClient,
+      requestVersion,
+    });
     if (clientId === null) return;
 
     if (!this.isSwitchStillValid(requestVersion, expectedProbeVersion)) {
@@ -1245,7 +1312,11 @@ export class HostRuntimeController {
 
     this.activeClient = client;
     this.unsubscribeClientHandlers =
-      this.deps.mountClientHandlers?.({ client, host: this.host, connection }) ?? null;
+      this.deps.mountClientHandlers?.({
+        client,
+        host: this.host,
+        connection,
+      }) ?? null;
     this.applyConnectionEvent({
       type: "select_connection",
       connectionId: connection.id,
@@ -1692,7 +1763,11 @@ export class HostRuntimeStore {
 
     this.hosts = this.hosts.map((host) =>
       host.serverId === oldServerId
-        ? { ...host, serverId: newServerId, updatedAt: new Date().toISOString() }
+        ? {
+            ...host,
+            serverId: newServerId,
+            updatedAt: new Date().toISOString(),
+          }
         : host,
     );
     this.emitHostList();
@@ -1730,7 +1805,11 @@ export class HostRuntimeStore {
     connection: HostConnection;
     label?: string;
     timeoutMs?: number;
-  }): Promise<{ profile: HostProfile; serverId: string; hostname: string | null }> {
+  }): Promise<{
+    profile: HostProfile;
+    serverId: string;
+    hostname: string | null;
+  }> {
     if (input.connection.type === "relay") {
       throw new Error("Cannot probe a relay connection without a server id.");
     }
@@ -1763,7 +1842,11 @@ export class HostRuntimeStore {
     useTls?: boolean;
     password?: string;
     label?: string;
-  }): Promise<{ profile: HostProfile; serverId: string; hostname: string | null }> {
+  }): Promise<{
+    profile: HostProfile;
+    serverId: string;
+    hostname: string | null;
+  }> {
     const endpoint = normalizeHostPort(input.endpoint);
     const password = input.password?.trim();
     return this.probeAndUpsertConnection({
@@ -1783,7 +1866,11 @@ export class HostRuntimeStore {
     sshPort?: number;
     daemonPort?: number;
     label?: string;
-  }): Promise<{ profile: HostProfile; serverId: string; hostname: string | null }> {
+  }): Promise<{
+    profile: HostProfile;
+    serverId: string;
+    hostname: string | null;
+  }> {
     return this.probeAndUpsertConnection({
       label: input.label,
       connection: createRemoteSshHostConnection(input),
@@ -1826,6 +1913,45 @@ export class HostRuntimeStore {
       useTls,
       daemonPublicKeyB64: offer.daemonPublicKeyB64,
       label,
+    });
+  }
+
+  async upsertManagedConnectionFromOffer(input: {
+    offer: ConnectionOffer;
+    management: HubHostManagement;
+    label?: string;
+  }): Promise<HostProfile | null> {
+    const useTls =
+      input.offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(input.offer.relay.endpoint);
+    const relayEndpoint = normalizeHostPort(input.offer.relay.endpoint);
+    const connection: HostConnection = {
+      id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
+      type: "relay",
+      relayEndpoint,
+      useTls,
+      daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
+    };
+    const existingManualHost = this.hosts.find(
+      (host) => host.serverId === input.offer.serverId && host.management === undefined,
+    );
+    if (existingManualHost !== undefined) {
+      // Keep user-owned TCP/SSH/relay choices and lifecycle intact. The Hub
+      // binding independently installs admission ticket resolution for this
+      // serverId while the account is signed in.
+      return existingManualHost;
+    }
+    const conflictingHost = this.hosts.find(
+      (host) =>
+        (host.serverId === input.offer.serverId || hostHasConnection(host, connection)) &&
+        !sameHubManagement(host.management, input.management),
+    );
+    if (conflictingHost) return null;
+
+    return this.upsertHostConnection({
+      serverId: input.offer.serverId,
+      label: input.label,
+      management: input.management,
+      connection,
     });
   }
 
@@ -1922,10 +2048,23 @@ export class HostRuntimeStore {
   }
 
   async removeHost(serverId: string): Promise<void> {
-    await this.revokePushNotifications({ client: this.getClient(serverId), serverId });
+    await this.revokePushNotifications({
+      client: this.getClient(serverId),
+      serverId,
+    });
     const remaining = this.hosts.filter((daemon) => daemon.serverId !== serverId);
     this.setHostsAndSync(remaining);
     await this.persistHosts();
+  }
+
+  async removeManagedHost(management: HubHostManagement): Promise<boolean> {
+    const host = this.hosts.find(
+      (candidate) =>
+        candidate.management?.kind === "hub" && sameHubManagement(candidate.management, management),
+    );
+    if (!host) return false;
+    await this.removeHost(host.serverId);
+    return true;
   }
 
   async removeConnection(serverId: string, connectionId: string): Promise<void> {
@@ -1962,6 +2101,7 @@ export class HostRuntimeStore {
     serverId: string;
     label?: string;
     connection: HostConnection;
+    management?: HubHostManagement;
     existingClient?: DaemonClient;
   }): Promise<HostProfile> {
     const now = new Date().toISOString();
@@ -1970,6 +2110,7 @@ export class HostRuntimeStore {
       serverId: input.serverId,
       label: input.label,
       connection: input.connection,
+      ...(input.management ? { management: input.management } : {}),
       now,
     });
     this.setHostsAndSync(next, {
@@ -2274,6 +2415,13 @@ export class HostRuntimeStore {
     }
   }
 
+  async restartHostConnection(serverId: string): Promise<void> {
+    const controller = this.controllers.get(serverId);
+    if (controller === undefined) return;
+    await controller.stop();
+    await controller.start();
+  }
+
   runProbeCycleNow(serverId?: string): Promise<void> {
     if (serverId) {
       return this.controllers.get(serverId)?.runProbeCycleNow() ?? Promise.resolve();
@@ -2523,13 +2671,21 @@ export interface HostMutations {
     useTls?: boolean;
     password?: string;
     label?: string;
-  }) => Promise<{ profile: HostProfile; serverId: string; hostname: string | null }>;
+  }) => Promise<{
+    profile: HostProfile;
+    serverId: string;
+    hostname: string | null;
+  }>;
   probeAndUpsertRemoteSshConnection: (input: {
     host: string;
     sshPort?: number;
     daemonPort?: number;
     label?: string;
-  }) => Promise<{ profile: HostProfile; serverId: string; hostname: string | null }>;
+  }) => Promise<{
+    profile: HostProfile;
+    serverId: string;
+    hostname: string | null;
+  }>;
   upsertRelayConnection: (input: {
     serverId: string;
     relayEndpoint: string;

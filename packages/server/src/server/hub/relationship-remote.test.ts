@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import type { AddressInfo, Socket } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -86,6 +86,184 @@ test("permission updates use the daemon credential and preserve semantic permiss
     authorization: "Bearer daemon-secret",
     body: { permissions: ["hub.execute"] },
   });
+});
+
+test("Project replacement uses the enrolled daemon credential and one complete snapshot", async () => {
+  let observed: { method?: string; url?: string; authorization?: string; body?: unknown } = {};
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    observed = {
+      method: request.method,
+      url: request.url,
+      authorization: request.headers.authorization,
+      body: JSON.parse(body),
+    };
+    response.writeHead(200, { "content-type": "application/json" }).end("{}");
+  });
+  openServers.push(server);
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+
+  await new DirectHubRelationshipRemote().replaceProjects({
+    daemonId: "daemon-1",
+    hubOrigin: `http://127.0.0.1:${address.port}`,
+    credential: "daemon-secret",
+    projects: [
+      {
+        projectId: "project-1",
+        name: "Paseo",
+        agentConfigurationCatalog: {
+          providers: [
+            {
+              id: "codex",
+              label: "Codex",
+              models: [
+                {
+                  id: "gpt-5.6",
+                  label: "GPT-5.6",
+                  thinkingOptions: [{ id: "high", label: "High" }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],
+  });
+
+  expect(observed).toEqual({
+    method: "PUT",
+    url: "/api/daemons/daemon-1/projects",
+    authorization: "Bearer daemon-secret",
+    body: {
+      projects: [
+        {
+          projectId: "project-1",
+          name: "Paseo",
+          agentConfigurationCatalog: {
+            providers: [
+              {
+                id: "codex",
+                label: "Codex",
+                models: [
+                  {
+                    id: "gpt-5.6",
+                    label: "GPT-5.6",
+                    thinkingOptions: [{ id: "high", label: "High" }],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  });
+});
+
+test("Connection Offer replacement publishes the canonical connection contract", async () => {
+  let observed: { method?: string; url?: string; authorization?: string; body?: unknown } = {};
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    observed = {
+      method: request.method,
+      url: request.url,
+      authorization: request.headers.authorization,
+      body: JSON.parse(body),
+    };
+    response.writeHead(200, { "content-type": "application/json" }).end("{}");
+  });
+  openServers.push(server);
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  const connectionOffer = {
+    v: 2 as const,
+    serverId: "server-1",
+    daemonPublicKeyB64: "public-key",
+    relay: { endpoint: "relay.example.test:443", useTls: true },
+  };
+
+  await new DirectHubRelationshipRemote().replaceConnectionOffer({
+    daemonId: "daemon-1",
+    hubOrigin: `http://127.0.0.1:${address.port}`,
+    credential: "daemon-secret",
+    connectionOffer,
+    managedAccessMode: "external",
+  });
+
+  expect(observed).toEqual({
+    method: "PUT",
+    url: "/api/daemons/daemon-1/connection-offer",
+    authorization: "Bearer daemon-secret",
+    body: { connectionOffer, managedAccessMode: "external" },
+  });
+});
+
+test("Connection Offer publication reads the current managed access mode", async () => {
+  const bodies: unknown[] = [];
+  const server = createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    bodies.push(JSON.parse(body));
+    response.writeHead(200).end();
+  });
+  openServers.push(server);
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  const hubOrigin = `http://127.0.0.1:${address.port}`;
+  const paseoHome = await mkdtemp(path.join(tmpdir(), "paseo-hub-offer-"));
+  openPaseoHomes.push(paseoHome);
+  await writeFile(
+    path.join(paseoHome, "hub-relationship.json"),
+    JSON.stringify({
+      version: 2,
+      state: "active",
+      relationship: {
+        daemonId: "daemon-1",
+        idempotencyKey: "relationship-1",
+        hubOrigin,
+        createdAt: "2026-09-03T00:00:00.000Z",
+        permissions: [],
+      },
+      credential: { secret: "daemon-secret" },
+      transport: { kind: "direct_websocket", webSocketUrl: hubOrigin.replace("http:", "ws:") },
+    }),
+    { mode: 0o600 },
+  );
+  let managedAccessMode: "off" | "external" = "off";
+  const controller = new HubRelationshipController({
+    paseoHome,
+    hostname: "test-daemon.local",
+    serverId: "server-1",
+    daemonPublicKey: "daemon-public-key",
+    logger: pino({ level: "silent" }),
+    remote: new DirectHubRelationshipRemote(),
+    attachSocket: async () => undefined,
+    updateAttachedPermissions: () => undefined,
+    createExecutionAgents: () => unusedExecutionAgents,
+    getConnectionOffer: async () => null,
+    getManagedAccessMode: () => managedAccessMode,
+  });
+
+  await controller.publishConnectionOffer();
+  managedAccessMode = "external";
+  await controller.publishConnectionOffer();
+
+  expect(bodies).toEqual([
+    { connectionOffer: null, managedAccessMode: "off" },
+    { connectionOffer: null, managedAccessMode: "external" },
+  ]);
 });
 
 test.each([

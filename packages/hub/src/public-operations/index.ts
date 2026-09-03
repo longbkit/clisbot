@@ -10,6 +10,7 @@ import { formatInvocationRejection } from "../triggers/invocation.js";
 import { ManualRunRejected } from "../triggers/manual/provider.js";
 import type {
   DispatchManualRunInput,
+  DispatchManualRunAuthorization,
   DispatchManualRunResult,
   PublicOperationCapabilities,
   PublicOperationRepository,
@@ -239,11 +240,7 @@ function triggerCapability(capabilities: PublicOperationCapabilities, organizati
 async function dispatchManualRun(
   repository: PublicOperationRepository,
   capabilities: PublicOperationCapabilities,
-  authorization: {
-    organizationId: string;
-    kind: "apiKey" | "cliCredential";
-    credentialId: string;
-  },
+  authorization: DispatchManualRunAuthorization,
   workflow: { id: string; revisionId: string },
   input: DispatchManualRunInput,
   deliveryId: string,
@@ -263,10 +260,7 @@ async function dispatchManualRun(
       actor: input.actor,
       input: input.input,
       publicDeliveryKey: input.deliveryKey,
-      authenticatedBy: {
-        kind: authorization.kind === "apiKey" ? "api-key" : "cli-credential",
-        credentialId: authorization.credentialId,
-      },
+      authenticatedBy: manualRunAuthenticationEvidence(authorization),
     },
   });
   const providerEventReceiptId = outcome?.providerEventReceiptId;
@@ -290,6 +284,18 @@ async function dispatchManualRun(
     configuredTriggerName: run.configuredTriggerName,
     workflowStatus: run.status,
   };
+}
+
+function manualRunAuthenticationEvidence(authorization: DispatchManualRunAuthorization) {
+  switch (authorization.kind) {
+    case "apiKey":
+      return { kind: "api-key" as const, credentialId: authorization.credentialId };
+    case "cliCredential":
+      return { kind: "cli-credential" as const, credentialId: authorization.credentialId };
+    case "member":
+      return { kind: "member" as const, membershipId: authorization.membershipId };
+  }
+  throw new Error("unsupported manual-run authorization");
 }
 
 async function resolveConfigurationDeployment(

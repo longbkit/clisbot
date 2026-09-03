@@ -50,6 +50,7 @@ const AgentSchema = z
     model: z.string().min(1).optional(),
     mode: z.string().min(1).optional(),
     thinkingOptionId: z.string().min(1).optional(),
+    featureValues: z.record(z.string(), z.custom<JsonValue>(isJsonValue)).optional(),
     options: z.record(z.string(), z.custom<JsonValue>(isJsonValue)).optional(),
   })
   .strict();
@@ -127,7 +128,10 @@ export const WorktreeTargetSchema = z.discriminatedUnion("mode", [
     base: z.string().min(1).optional(),
   }),
   z.object({ mode: z.literal("checkout-branch"), branch: z.string().min(1) }),
-  z.object({ mode: z.literal("checkout-pr"), prNumber: z.number().int().positive() }),
+  z.object({
+    mode: z.literal("checkout-pr"),
+    prNumber: z.number().int().positive(),
+  }),
 ]);
 
 const EnvironmentSchema = z.discriminatedUnion("kind", [
@@ -136,6 +140,7 @@ const EnvironmentSchema = z.discriminatedUnion("kind", [
       name: z.string().min(1),
       kind: z.literal("daemon"),
       daemon: z.string().min(1),
+      projectId: z.string().min(1).optional(),
       cwd: z.string().min(1),
       worktree: WorktreeTargetSchema.optional(),
     })
@@ -221,6 +226,7 @@ export interface CompiledAgent {
   model?: string | undefined;
   mode?: string | undefined;
   thinkingOptionId?: string | undefined;
+  featureValues?: Readonly<Record<string, JsonValue>> | undefined;
   options?: Readonly<Record<string, JsonValue>> | undefined;
 }
 
@@ -249,7 +255,11 @@ export interface CompiledStep {
   github?: CompiledGitHubAuthority | undefined;
   condition?: Expression | undefined;
   output?: { schema: JsonValue } | undefined;
-  allowOutputs: readonly { type: string; max?: number | undefined; required: boolean }[];
+  allowOutputs: readonly {
+    type: string;
+    max?: number | undefined;
+    required: boolean;
+  }[];
   reuse?: `binding` | `steps.${string}` | undefined;
   autoArchive: boolean;
 }
@@ -274,7 +284,9 @@ export type CompiledTriggerFilter = Readonly<
 >;
 
 export type CompiledEnvironment =
-  | (Extract<AuthoredEnvironment, { kind: "daemon" }> & { daemonId?: string | undefined })
+  | (Extract<AuthoredEnvironment, { kind: "daemon" }> & {
+      daemonId?: string | undefined;
+    })
   | Exclude<AuthoredEnvironment, { kind: "daemon" }>;
 
 export interface CompiledTrigger {
@@ -329,6 +341,7 @@ const CompiledAgentSchema: z.ZodType<CompiledAgent> = z
     model: z.string().min(1).optional(),
     mode: z.string().min(1).optional(),
     thinkingOptionId: z.string().min(1).optional(),
+    featureValues: z.record(z.string(), z.custom<JsonValue>(isJsonValue)).optional(),
     options: z.record(z.string(), z.custom<JsonValue>(isJsonValue)).optional(),
   })
   .strict();
@@ -359,6 +372,7 @@ const CompiledEnvironmentSchema = z.discriminatedUnion("kind", [
       kind: z.literal("daemon"),
       daemon: z.string().min(1),
       daemonId: z.string().min(1).optional(),
+      projectId: z.string().min(1).optional(),
       cwd: z.string().min(1),
       worktree: WorktreeTargetSchema.optional(),
     })
@@ -455,7 +469,10 @@ export function compileHubConfig(
       options.sourceFiles?.[trigger.name],
     ),
   );
-  const compiled = { environments: authored.environments, triggers } satisfies CompiledHubConfig;
+  const compiled = {
+    environments: authored.environments,
+    triggers,
+  } satisfies CompiledHubConfig;
   validateCompiledContract(compiled);
   return deepFreeze(compiled);
 }
@@ -672,6 +689,9 @@ function compileAgentSelection(
 function cloneAgent(agent: CompiledAgent): CompiledAgent {
   return {
     ...agent,
+    ...(agent.featureValues === undefined
+      ? {}
+      : { featureValues: cloneJsonObject(agent.featureValues) }),
     ...(agent.options === undefined ? {} : { options: cloneJsonObject(agent.options) }),
   };
 }

@@ -1,4 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
+import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import { existsSync, readFileSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 import type pino from "pino";
@@ -15,6 +17,7 @@ import type { HubExecutionAgents } from "./daemon-executions.js";
 import type { ManagedAccessAdmission } from "../managed-access/types.js";
 import type {
   HubRelationshipRemote,
+  HubProject,
   HubSocketConnection,
   HubSocketEvents,
 } from "./relationship-remote.js";
@@ -145,6 +148,7 @@ export interface HubRelationshipManagement {
     accessTicket: string;
     clientId: string;
   }): Promise<ManagedAccessAdmission>;
+  refreshAccessLease(leaseId: string): Promise<ManagedAccessAdmission>;
   disconnect(input: {
     force: boolean;
   }): Promise<{ status: HubRelationshipStatus; warning?: string }>;
@@ -188,6 +192,9 @@ export interface HubRelationshipControllerOptions {
     permissions: readonly DaemonPermission[],
   ) => void;
   createExecutionAgents: (daemonId: string) => HubExecutionAgents;
+  listProjects?: () => Promise<readonly HubProject[]>;
+  getConnectionOffer?: () => Promise<ConnectionOffer | null>;
+  getManagedAccessMode?: () => ManagedAccessMode;
 }
 
 const systemClock: HubRelationshipClock = {
@@ -229,6 +236,8 @@ export class HubRelationshipController implements HubRelationshipManagement {
   private retryAttempt = 0;
   private readonly inFlightEnrollments = new Set<Promise<void>>();
   private executionAgents: { daemonId: string; value: HubExecutionAgents } | null = null;
+  private projectReplacement: Promise<void> = Promise.resolve();
+  private connectionOfferReplacement: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: HubRelationshipControllerOptions) {
     this.filePath = path.join(options.paseoHome, FILE_NAME);
@@ -271,7 +280,11 @@ export class HubRelationshipController implements HubRelationshipManagement {
     this.cancelLifecycle();
     this.socket?.close();
     this.socket = null;
-    await pendingExecutionCleanup;
+    await Promise.all([
+      pendingExecutionCleanup,
+      this.projectReplacement,
+      this.connectionOfferReplacement,
+    ]);
   }
 
   status(): HubRelationshipStatus {
@@ -373,6 +386,57 @@ export class HubRelationshipController implements HubRelationshipManagement {
       accessTicket: input.accessTicket,
       clientId: input.clientId,
     });
+  }
+
+  async refreshAccessLease(leaseId: string): Promise<ManagedAccessAdmission> {
+    if (!this.record || this.record.state !== "active") {
+      throw new Error("This daemon is not connected to a Hub");
+    }
+    return this.options.remote.refreshAccessLease({
+      daemonId: this.record.relationship.daemonId,
+      hubOrigin: this.record.relationship.hubOrigin,
+      credential: this.record.credential.secret,
+      leaseId,
+    });
+  }
+
+  publishProjects(): Promise<void> {
+    if (this.options.listProjects === undefined) return Promise.resolve();
+    const replacement = this.projectReplacement.then(async () => {
+      if (!this.record || this.record.state !== "active") return undefined;
+      const projects = await this.options.listProjects!();
+      const record = this.record;
+      if (record.state !== "active") return undefined;
+      await this.options.remote.replaceProjects({
+        daemonId: record.relationship.daemonId,
+        hubOrigin: record.relationship.hubOrigin,
+        credential: record.credential.secret,
+        projects,
+      });
+      return undefined;
+    });
+    this.projectReplacement = replacement.catch(() => {});
+    return replacement;
+  }
+
+  publishConnectionOffer(): Promise<void> {
+    if (this.options.getConnectionOffer === undefined) return Promise.resolve();
+    const replacement = this.connectionOfferReplacement.then(async () => {
+      if (!this.record || this.record.state !== "active") return undefined;
+      const connectionOffer = await this.options.getConnectionOffer!();
+      const record = this.record;
+      if (record.state !== "active") return undefined;
+      await this.options.remote.replaceConnectionOffer({
+        daemonId: record.relationship.daemonId,
+        hubOrigin: record.relationship.hubOrigin,
+        credential: record.credential.secret,
+        connectionOffer,
+        managedAccessMode: this.options.getManagedAccessMode?.() ?? "off",
+      });
+      return undefined;
+    });
+    this.connectionOfferReplacement = replacement.catch(() => {});
+    return replacement;
   }
 
   async disconnect(input: {
@@ -516,6 +580,18 @@ export class HubRelationshipController implements HubRelationshipManagement {
       permissions: record.relationship.permissions,
       agents: this.executionAgentsFor(record.relationship.daemonId),
       sessionProtocol,
+    });
+    void this.publishProjects().catch((error: unknown) => {
+      this.options.logger.warn(
+        { err: error, daemonId: record.relationship.daemonId },
+        "Failed to replace Hub Project catalog",
+      );
+    });
+    void this.publishConnectionOffer().catch((error: unknown) => {
+      this.options.logger.warn(
+        { err: error, daemonId: record.relationship.daemonId },
+        "Failed to replace Hub Connection Offer",
+      );
     });
   }
 

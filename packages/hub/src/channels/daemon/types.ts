@@ -96,6 +96,12 @@ export type AgentPermissionResponse =
 export interface CreateAgentConfig {
   provider: string;
   cwd: string;
+  /** Stable daemon Project placement; sent beside, not inside, session config. */
+  projectId?: string;
+  worktree?:
+    | { mode: "branch-off"; newBranch: string; base?: string }
+    | { mode: "checkout-branch"; branch: string }
+    | { mode: "checkout-pr"; prNumber: number };
   modeId?: string;
   model?: string;
   thinkingOptionId?: string;

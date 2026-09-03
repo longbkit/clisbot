@@ -45,6 +45,56 @@ afterAll(async () => {
   await rm(dataDirectory, { recursive: true, force: true });
 });
 
+describe("channel activity", () => {
+  it("persists bounded open-audience evidence in the shared audit trail", async () => {
+    await store.recordChannelInboundActivity({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: SLACK_ACCOUNT,
+      routePosition: 1,
+      routeFingerprint: "route-fingerprint",
+      externalConversationId: SLACK_CONVERSATION,
+      externalThreadId: SLACK_THREAD,
+      senderIdentity: "slack:U0EXTERNAL",
+      outcome: "ignored",
+      outcomeDetail: "Route rate limit exceeded",
+      limitDecision: "denied",
+      limitReason: "Route rate limit exceeded",
+    });
+
+    const rows = await bundle.runtime.query<{
+      action: string;
+      subject_type: string;
+      subject_id: string;
+      evidence: Record<string, unknown>;
+    }>(
+      `select action, subject_type, subject_id, evidence
+       from audit_events
+       where organization_id = $1 and action = 'channel.inbound.processed'
+       order by created_at desc limit 1`,
+      [ORGANIZATION_ID],
+    );
+    assert.deepEqual(rows.rows[0], {
+      action: "channel.inbound.processed",
+      subject_type: "channel_account",
+      subject_id: "slack/work",
+      evidence: {
+        channel: "slack",
+        accountId: SLACK_ACCOUNT,
+        routePosition: 1,
+        routeFingerprint: "route-fingerprint",
+        conversationId: SLACK_CONVERSATION,
+        threadId: SLACK_THREAD,
+        providerSenderId: "slack:U0EXTERNAL",
+        outcome: "ignored",
+        outcomeDetail: "Route rate limit exceeded",
+        limitDecision: "denied",
+        limitReason: "Route rate limit exceeded",
+      },
+    });
+  });
+});
+
 describe("thread_bindings", () => {
   it("records a pending marker, resolves it, and round-trips the binding", async () => {
     const pending = await store.recordPendingThreadBinding({

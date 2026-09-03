@@ -59,6 +59,11 @@ export class SessionAuthorization {
     return this.resources?.resourceMode === "projects";
   }
 
+  authorizedProjectIds(): readonly string[] | null {
+    if (this.resources === null || this.resources.resourceMode === "daemon") return null;
+    return [...this.resources.projects.keys()];
+  }
+
   project(projectId: string): ProjectAuthorization | undefined {
     if (this.resources === null || this.resources.resourceMode === "daemon") {
       return undefined;
@@ -79,6 +84,18 @@ export class SessionAuthorization {
 
   leaseId(): string | null {
     return this.resources?.leaseId ?? null;
+  }
+
+  extendLease(leaseId: string, leaseExpiresAt: number): boolean {
+    if (this.resources?.leaseId !== leaseId || leaseExpiresAt <= this.resources.leaseExpiresAt) {
+      return false;
+    }
+    this.resources.leaseExpiresAt = leaseExpiresAt;
+    return true;
+  }
+
+  isLeaseActive(): boolean {
+    return this.hasActiveLease();
   }
 
   private allows(permission: DaemonPermission | null): boolean {

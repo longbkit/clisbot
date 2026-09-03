@@ -132,6 +132,10 @@ function stubSupervisor(
       ok: false,
       error: "no transport started in the stub",
     }),
+    postTestMessage: async () => ({
+      ok: false,
+      error: "no transport started in the stub",
+    }),
   };
   return { supervisor, started };
 }
@@ -465,6 +469,24 @@ describe("channel control-plane ops", () => {
       assert.equal(response.headers.get("www-authenticate"), "Bearer");
       const body = await response.json();
       assert.equal(body.code, "invalid_credentials");
+    }
+    // A valid opaque reply capability is its own narrow bearer authority for
+    // an Agent on a non-loopback daemon; it does not grant any other Hub API.
+    {
+      const application = buildApp(memoryDatabase(), {
+        channelReplyServer: {
+          accepts: (token) => token === "valid-capability",
+          handle: () => Promise.resolve(new Response("mcp-ok", { status: 200 })),
+        },
+      });
+      const response = await application.operations.handleChannelReplyMcp(
+        new Request("http://hub.test/mcp/channel/valid-capability", {
+          method: "POST",
+          headers: { "x-paseo-client-address": "10.1.2.3" },
+        }),
+        "valid-capability",
+      );
+      assert.equal(response.status, 200);
     }
   });
 

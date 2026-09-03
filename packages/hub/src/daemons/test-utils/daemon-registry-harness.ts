@@ -60,6 +60,7 @@ export class DaemonRegistryHarness {
       cwd: "/workspace",
       prompt: "Do the work",
       env: {},
+      featureValues: { fast_mode: true },
       providerOptions: { permission: { edit: "ask", bash: "deny" } },
       toolPolicy: {
         preapproved: [{ kind: "mcp", server: "hub", tool: "finish_execution" }],
@@ -98,6 +99,14 @@ export class DaemonRegistryHarness {
     };
   }
 
+  async pendingAccessLeaseRevocation(leaseIds: readonly string[]) {
+    const sent = this.registry.revokeAccessLeases(this.daemon.id, leaseIds);
+    return {
+      sent,
+      request: await this.currentSocket().next("managed_access.lease.revoke.request"),
+    };
+  }
+
   respondAgentValidation(
     pending: Awaited<ReturnType<DaemonRegistryHarness["pendingAgentValidation"]>>,
   ): void {
@@ -108,7 +117,10 @@ export class DaemonRegistryHarness {
         valid: false,
         issues: [
           { path: ["provider"], message: "provider is unavailable" },
-          { path: ["options", "nonsense"], message: "unrecognized provider option" },
+          {
+            path: ["options", "nonsense"],
+            message: "unrecognized provider option",
+          },
         ],
         error: null,
       },
@@ -457,6 +469,8 @@ function daemonRecord(): DaemonRecord {
     machineId: randomUUID(),
     serverId: randomUUID(),
     daemonPublicKey: "public-key",
+    connectionOffer: null,
+    managedAccessMode: "off",
     credentialVerifier: "verifier",
     permissions: ["hub.execute"],
     registeredByApiKeyId: null,

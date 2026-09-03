@@ -20,6 +20,7 @@ import { areEquivalentPaths, createRealpathAwarePathMatcher } from "../../../uti
 export interface ResolveOrCreateWorkspaceIdInput {
   createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
   requestedWorkspaceId?: string;
+  projectId?: string;
   cwd: string;
   initialTitle: string | null;
 }
@@ -317,7 +318,7 @@ export function createWorkspaceProvisioningService(deps: {
     if (input.createdWorktree) return input.createdWorktree.workspace.workspaceId;
     if (input.requestedWorkspaceId) return input.requestedWorkspaceId;
     return (
-      await createWorkspaceForDirectory(input.cwd, input.initialTitle, undefined, {
+      await createWorkspaceForDirectory(input.cwd, input.initialTitle, input.projectId, {
         expectsInitialAgent: true,
       })
     ).workspaceId;

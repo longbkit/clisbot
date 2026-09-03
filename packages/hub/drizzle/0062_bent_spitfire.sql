@@ -1,0 +1,1 @@
+ALTER TABLE "daemons" ADD COLUMN "managed_access_mode" text DEFAULT 'off' NOT NULL;

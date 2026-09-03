@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type TriggerProvider, type TriggerProviderMatch } from "../index.js";
-import { matchesInputFilters, parseInvocation } from "../invocation.js";
+import { matchesInputFilters, parseInvocation, parseStructuredInvocation } from "../invocation.js";
 import type { WorkflowConfigurationResolver } from "../configuration.js";
 
 export const ManualRunPayloadSchema = z.object({
@@ -10,6 +10,18 @@ export const ManualRunPayloadSchema = z.object({
   input: z.unknown(),
   publicDeliveryKey: z.string().min(1).optional(),
 });
+
+const ManualInvocationValueSchema = z.union([z.string(), z.number().finite(), z.boolean()]);
+
+/** Member-facing direct-run input. Target, Agent controls, and authority stay revision-owned. */
+export const ManualInvocationInputSchema = z
+  .object({
+    prompt: z.string().max(100_000),
+    inputs: z
+      .record(z.string().regex(/^[a-z][a-z0-9_-]*$/u), ManualInvocationValueSchema)
+      .default({}),
+  })
+  .strict();
 
 export type ManualRunPayload = z.infer<typeof ManualRunPayloadSchema>;
 export interface ManualMergeData {
@@ -88,10 +100,14 @@ export function createManualRunProvider(
         event,
       };
       const outputContext: ManualRunOutputContext = { provider: "manual", actor: payload.actor };
-      const invocation = parseInvocation(
-        typeof payload.input === "string" ? payload.input : "",
-        trigger.inputs,
-      );
+      const structuredInput = ManualInvocationInputSchema.safeParse(payload.input);
+      const invocation = structuredInput.success
+        ? parseStructuredInvocation(
+            structuredInput.data.prompt,
+            trigger.inputs,
+            structuredInput.data.inputs,
+          )
+        : parseInvocation(typeof payload.input === "string" ? payload.input : "", trigger.inputs);
       if (invocation.status === "rejected") {
         return [
           {

@@ -23,6 +23,7 @@ import {
 } from "@getpaseo/protocol/terminal-profiles";
 import { AgentProfilesSection } from "@/agent-profiles";
 import { AgentSkillsSection } from "@/agent-skills";
+import { ManagedAccessHostSection } from "@/clisbot/hub/settings";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { Alert as InlineAlert } from "@/components/ui/alert";
@@ -371,6 +372,8 @@ export function HostSettingsPage({
       <HostStatusBadges serverId={serverId} />
 
       <HostAppearanceSection host={host} />
+
+      <ManagedAccessHostSection host={host} />
 
       {isLocalDaemon ? <LocalDaemonSection /> : null}
 

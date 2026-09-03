@@ -1,6 +1,6 @@
 import { WebSocket, WebSocketServer } from "ws";
 import type { IncomingMessage, Server as HTTPServer } from "http";
-import { join } from "path";
+import { isAbsolute, join, relative, resolve as resolvePath } from "path";
 import { hostname as getHostname } from "node:os";
 import { randomUUID } from "node:crypto";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -441,6 +441,32 @@ function bufferFromWsData(data: Buffer | ArrayBuffer | Buffer[] | string): Buffe
   return Buffer.from(data);
 }
 
+function managedAuthoritySignature(
+  admission: Pick<SessionAdmission, "permissions" | "projects" | "resourceMode">,
+): string {
+  const projects = [...(admission.projects?.entries() ?? [])]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([projectId, authorization]) => ({
+      projectId,
+      privileges: [...authorization.privileges].sort(),
+      agentConfigurations: authorization.agentConfigurations
+        .map((configuration) => ({
+          providerId: configuration.providerId,
+          modelIds: configuration.modelIds === "*" ? "*" : [...configuration.modelIds].sort(),
+          thinkingOptionIds:
+            configuration.thinkingOptionIds === "*"
+              ? "*"
+              : [...configuration.thinkingOptionIds].sort(),
+        }))
+        .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
+    }));
+  return JSON.stringify({
+    permissions: [...admission.permissions].sort(),
+    resourceMode: admission.resourceMode ?? "daemon",
+    projects,
+  });
+}
+
 function getBrowserHostCapability(
   capabilities: Record<string, unknown> | null,
 ): BrowserAutomationHostCapability | null {
@@ -472,6 +498,11 @@ interface SessionConnectionBase {
   clientCapabilities: Record<string, unknown> | null;
   connectionLogger: pino.Logger;
   sockets: Set<WebSocketLike>;
+  managedLeaseId: string | null;
+  managedAuthoritySignature: string | null;
+  managedLeaseExpiryTimeout: ReturnType<typeof setTimeout> | null;
+  managedLeaseRefreshTimeout: ReturnType<typeof setTimeout> | null;
+  requiresManagedAccessInExternalMode: boolean;
 }
 
 interface ReconnectableSessionConnection extends SessionConnectionBase {
@@ -521,6 +552,7 @@ const WS_CLOSE_HELLO_TIMEOUT = 4001;
 const WS_CLOSE_INVALID_HELLO = 4002;
 const WS_CLOSE_INCOMPATIBLE_PROTOCOL = 4003;
 const WS_CLOSE_SERVER_SHUTDOWN = 1001;
+const WS_CLOSE_MANAGED_ACCESS_REVOKED = 4403;
 const WS_PROTOCOL_VERSION = 1;
 const WS_RUNTIME_METRICS_FLUSH_MS = 30_000;
 const OWNER_SESSION_ADMISSION: SessionAdmission = {
@@ -742,12 +774,7 @@ export class VoiceAssistantWebSocketServer {
     const unsubscribeManagedAccess = this.daemonConfigStore.onFieldChange(
       "managedAccess.mode",
       (value) => {
-        if (value === "off" || value === "external") {
-          if (value === "external" && this.managedAccess.resolver === undefined) {
-            throw new Error("Managed access external mode requires an admission resolver");
-          }
-          this.managedAccess = { ...this.managedAccess, mode: value };
-        }
+        if (value === "off" || value === "external") this.applyManagedAccessMode(value);
       },
     );
     const unsubscribeChange = this.daemonConfigStore.onChange((config) => {
@@ -885,7 +912,11 @@ export class VoiceAssistantWebSocketServer {
 
   // Main-loop stall visibility: terminal frames and agent traffic share one event
   // loop, so delay percentiles here are the ground truth for "the daemon is busy".
-  private snapshotEventLoopDelay(): { p50Ms: number; p99Ms: number; maxMs: number } | null {
+  private snapshotEventLoopDelay(): {
+    p50Ms: number;
+    p99Ms: number;
+    maxMs: number;
+  } | null {
     const monitor = this.eventLoopDelayMonitor;
     if (!monitor) {
       return null;
@@ -1347,9 +1378,18 @@ export class VoiceAssistantWebSocketServer {
     connectionLogger: pino.Logger;
     lifecycle: { kind: "reconnectable" } | { kind: "ephemeral-plugin"; pluginId: string };
     admission: SessionAdmission;
+    requiresManagedAccessInExternalMode: boolean;
   }): SessionConnection {
-    const { ws, clientId, appVersion, clientCapabilities, connectionLogger, lifecycle, admission } =
-      params;
+    const {
+      ws,
+      clientId,
+      appVersion,
+      clientCapabilities,
+      connectionLogger,
+      lifecycle,
+      admission,
+      requiresManagedAccessInExternalMode,
+    } = params;
     let connection: SessionConnection | null = null;
 
     const session = this.createSocketSession({
@@ -1427,11 +1467,28 @@ export class VoiceAssistantWebSocketServer {
       clientCapabilities,
       connectionLogger,
       sockets: new Set([ws]),
+      managedLeaseId: admission.leaseId ?? null,
+      managedAuthoritySignature:
+        admission.leaseId === undefined ? null : managedAuthoritySignature(admission),
+      managedLeaseExpiryTimeout: null,
+      managedLeaseRefreshTimeout: null,
+      requiresManagedAccessInExternalMode,
     };
     connection =
       lifecycle.kind === "ephemeral-plugin"
-        ? { ...base, lifecycle: "ephemeral-plugin", pluginId: lifecycle.pluginId }
-        : { ...base, lifecycle: "reconnectable", externalDisconnectCleanupTimeout: null };
+        ? {
+            ...base,
+            lifecycle: "ephemeral-plugin",
+            pluginId: lifecycle.pluginId,
+          }
+        : {
+            ...base,
+            lifecycle: "reconnectable",
+            externalDisconnectCleanupTimeout: null,
+          };
+    if (admission.leaseId !== undefined && admission.leaseExpiresAt !== undefined) {
+      this.scheduleManagedLease(connection, admission.leaseExpiresAt);
+    }
     session.updateClientCapabilities(clientCapabilities, ws);
     return connection;
   }
@@ -1594,7 +1651,13 @@ export class VoiceAssistantWebSocketServer {
       pending.helloInFlight = true;
       void this.admitManagedAccess({ ws, message, pending, clientId }).then((admitted) => {
         if (!admitted) return;
-        return this.completeHello({ ws, message, pending, clientId, pluginId });
+        return this.completeHello({
+          ws,
+          message,
+          pending,
+          clientId,
+          pluginId,
+        });
       });
       return;
     }
@@ -1618,8 +1681,11 @@ export class VoiceAssistantWebSocketServer {
     const sessionKey = sessionConnectionKey(pending.admission.principalId, clientId);
     const existing = pluginId ? undefined : this.externalSessionsByKey.get(sessionKey);
     if (existing) {
-      this.resumeSession({ ws, message, pending, existing });
-      return;
+      if (pending.admission.leaseId === undefined) {
+        this.resumeSession({ ws, message, pending, existing });
+        return;
+      }
+      void this.closeManagedConnection(existing, "Managed access lease renewed");
     }
 
     const connectionLogger = pending.connectionLogger.child({ clientId });
@@ -1632,6 +1698,7 @@ export class VoiceAssistantWebSocketServer {
       connectionLogger,
       lifecycle: pluginId ? { kind: "ephemeral-plugin", pluginId } : { kind: "reconnectable" },
       admission: pending.admission,
+      requiresManagedAccessInExternalMode: this.isManagedAccessSubject(pending.identity, pluginId),
     });
     this.sessions.set(ws, connection);
     if (connection.lifecycle === "reconnectable") {
@@ -1655,11 +1722,31 @@ export class VoiceAssistantWebSocketServer {
     pluginId: string | undefined,
   ): boolean {
     return (
-      this.managedAccess.mode === "external" &&
-      pluginId === undefined &&
-      identity.transport !== "hub" &&
-      identity.peer !== "local_ipc"
+      this.managedAccess.mode === "external" && this.isManagedAccessSubject(identity, pluginId)
     );
+  }
+
+  private applyManagedAccessMode(mode: ManagedAccessMode): void {
+    if (mode === "external" && this.managedAccess.resolver === undefined) {
+      throw new Error("Managed access external mode requires an admission resolver");
+    }
+    const previous = this.managedAccess.mode;
+    this.managedAccess = { ...this.managedAccess, mode };
+    this.broadcastCapabilitiesUpdate();
+    if (previous === "external" || mode !== "external") return;
+
+    for (const connection of new Set(this.externalSessionsByKey.values())) {
+      if (connection.requiresManagedAccessInExternalMode && connection.managedLeaseId === null) {
+        void this.closeManagedConnection(connection, "Managed access is now required");
+      }
+    }
+  }
+
+  private isManagedAccessSubject(
+    identity: WebSocketConnectionIdentity,
+    pluginId: string | undefined,
+  ): boolean {
+    return pluginId === undefined && identity.transport !== "hub" && identity.peer !== "local_ipc";
   }
 
   private async admitManagedAccess(params: {
@@ -2079,6 +2166,14 @@ export class VoiceAssistantWebSocketServer {
       clearTimeout(connection.externalDisconnectCleanupTimeout);
       connection.externalDisconnectCleanupTimeout = null;
     }
+    if (connection.managedLeaseExpiryTimeout) {
+      clearTimeout(connection.managedLeaseExpiryTimeout);
+      connection.managedLeaseExpiryTimeout = null;
+    }
+    if (connection.managedLeaseRefreshTimeout) {
+      clearTimeout(connection.managedLeaseRefreshTimeout);
+      connection.managedLeaseRefreshTimeout = null;
+    }
 
     for (const socket of connection.sockets) {
       this.sessions.delete(socket);
@@ -2100,12 +2195,115 @@ export class VoiceAssistantWebSocketServer {
     await connection.session.cleanup();
   }
 
+  public revokeManagedLeases(leaseIds: readonly string[]): number {
+    const requested = new Set(leaseIds);
+    const connections = new Set<SessionConnection>([
+      ...this.sessions.values(),
+      ...this.externalSessionsByKey.values(),
+    ]);
+    let revoked = 0;
+    for (const connection of connections) {
+      if (connection.managedLeaseId === null || !requested.has(connection.managedLeaseId)) continue;
+      revoked += 1;
+      void this.closeManagedConnection(connection, "Managed access lease revoked");
+    }
+    return revoked;
+  }
+
+  private scheduleManagedLease(connection: SessionConnection, leaseExpiresAt: number): void {
+    if (connection.managedLeaseExpiryTimeout) {
+      clearTimeout(connection.managedLeaseExpiryTimeout);
+    }
+    if (connection.managedLeaseRefreshTimeout) {
+      clearTimeout(connection.managedLeaseRefreshTimeout);
+      connection.managedLeaseRefreshTimeout = null;
+    }
+    const remainingMs = Math.max(0, leaseExpiresAt - Date.now());
+    const expiryTimeout = setTimeout(() => {
+      if (connection.managedLeaseExpiryTimeout !== expiryTimeout) return;
+      connection.managedLeaseExpiryTimeout = null;
+      void this.closeManagedConnection(connection, "Managed access lease expired");
+    }, remainingMs);
+    expiryTimeout.unref?.();
+    connection.managedLeaseExpiryTimeout = expiryTimeout;
+
+    if (!this.managedAccess.resolver?.refresh || connection.managedLeaseId === null) return;
+    const refreshDelayMs = Math.max(1_000, Math.floor(remainingMs * (2 / 3)));
+    const refreshTimeout = setTimeout(() => {
+      if (connection.managedLeaseRefreshTimeout !== refreshTimeout) return;
+      connection.managedLeaseRefreshTimeout = null;
+      void this.refreshManagedLease(connection, leaseExpiresAt);
+    }, refreshDelayMs);
+    refreshTimeout.unref?.();
+    connection.managedLeaseRefreshTimeout = refreshTimeout;
+  }
+
+  private async refreshManagedLease(
+    connection: SessionConnection,
+    currentLeaseExpiresAt: number,
+  ): Promise<void> {
+    const leaseId = connection.managedLeaseId;
+    const refresh = this.managedAccess.resolver?.refresh;
+    if (leaseId === null || refresh === undefined) return;
+    try {
+      const admission = await refresh(leaseId);
+      if (connection.managedLeaseExpiryTimeout === null) return;
+      if (
+        admission.leaseId !== leaseId ||
+        admission.principalId !== connection.principalId ||
+        managedAuthoritySignature(admission) !== connection.managedAuthoritySignature ||
+        admission.leaseExpiresAt <= currentLeaseExpiresAt ||
+        !connection.session.extendManagedLease(leaseId, admission.leaseExpiresAt)
+      ) {
+        await this.closeManagedConnection(connection, "Managed access authority changed");
+        return;
+      }
+      this.scheduleManagedLease(connection, admission.leaseExpiresAt);
+    } catch (error) {
+      const remainingMs = currentLeaseExpiresAt - Date.now();
+      connection.connectionLogger.warn({ err: error, leaseId }, "Managed access refresh failed");
+      if (remainingMs <= 1_000 || connection.managedLeaseExpiryTimeout === null) return;
+      const retryDelayMs = Math.max(1_000, Math.min(30_000, Math.floor(remainingMs / 4)));
+      const retryTimeout = setTimeout(() => {
+        if (connection.managedLeaseRefreshTimeout !== retryTimeout) return;
+        connection.managedLeaseRefreshTimeout = null;
+        void this.refreshManagedLease(connection, currentLeaseExpiresAt);
+      }, retryDelayMs);
+      retryTimeout.unref?.();
+      connection.managedLeaseRefreshTimeout = retryTimeout;
+    }
+  }
+
+  private async closeManagedConnection(
+    connection: SessionConnection,
+    reason: string,
+  ): Promise<void> {
+    if (connection.managedLeaseId !== null) {
+      try {
+        this.pushNotifications.revokeLease(connection.managedLeaseId);
+      } catch (error) {
+        this.logger.warn(
+          { err: error, leaseId: connection.managedLeaseId },
+          "Failed to revoke managed push subscription",
+        );
+      }
+    }
+    for (const socket of connection.sockets) {
+      try {
+        socket.close(WS_CLOSE_MANAGED_ACCESS_REVOKED, reason);
+      } catch {
+        // Cleanup below remains authoritative even if the transport close fails.
+      }
+    }
+    await this.cleanupConnection(connection, reason);
+  }
+
   private syncBrowserToolsClientRegistration(connection: SessionConnection): void {
     if (!this.browserToolsBroker) {
       return;
     }
     const registrationKey = connection.sessionKey;
-    if (!connection.session.allowsPermission("workspace.write")) {
+    if (!connection.session.canHostBrowserAutomation()) {
       this.unregisterBrowserToolsClient(registrationKey);
       return;
     }
@@ -2375,7 +2573,12 @@ export class VoiceAssistantWebSocketServer {
 
       if (message.type === "session") {
         void this.dispatchSessionMessage(ws, activeConnection, message).catch((error: unknown) => {
-          this.handleRawMessageError({ ws, data, error, log: activeConnection.connectionLogger });
+          this.handleRawMessageError({
+            ws,
+            data,
+            error,
+            log: activeConnection.connectionLogger,
+          });
         });
       }
     } catch (error) {
@@ -2389,6 +2592,36 @@ export class VoiceAssistantWebSocketServer {
     message: Extract<WSInboundMessage, { type: "session" }>,
   ): Promise<void> {
     this.recordInboundSessionRequestType(message.message.type);
+    if (message.message.type === "managed_access.lease.revoke.request") {
+      const identity = this.socketIdentities.get(ws);
+      if (
+        identity?.transport !== "hub" ||
+        !activeConnection.session.allowsInbound(message.message)
+      ) {
+        this.sendToClient(
+          ws,
+          wrapSessionMessage({
+            type: "rpc_error",
+            payload: {
+              requestId: message.message.requestId,
+              requestType: message.message.type,
+              error: "Managed access lease revocation requires Hub authority",
+              code: "access_denied",
+            },
+          }),
+        );
+        return;
+      }
+      const revokedCount = this.revokeManagedLeases(message.message.leaseIds);
+      this.sendToClient(
+        ws,
+        wrapSessionMessage({
+          type: "managed_access.lease.revoke.response",
+          payload: { requestId: message.message.requestId, revokedCount },
+        }),
+      );
+      return;
+    }
     const controlRpc = getControlRpcLogInfo(message.message);
     if (controlRpc) {
       const identity = this.socketIdentities.get(ws);
@@ -2407,7 +2640,7 @@ export class VoiceAssistantWebSocketServer {
       );
     }
     if (message.message.type === "browser.automation.execute.response") {
-      if (!activeConnection.session.allowsInbound(message.message)) {
+      if (!activeConnection.session.canRespondToBrowserAutomation(message.message)) {
         await activeConnection.session.handleMessage(message.message, ws);
         return;
       }
@@ -2678,9 +2911,12 @@ export class VoiceAssistantWebSocketServer {
     });
 
     if (plan.shouldPush) {
-      void this.pushNotificationSender.send(notification).catch((err) => {
-        this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
-      });
+      const projectId = await this.projectIdForWorkspace(agent.workspaceId);
+      void this.pushNotificationSender
+        .send(notification, projectId === null ? {} : { projectId })
+        .catch((err) => {
+          this.logger.warn({ err, agentId: params.agentId }, "Failed to send push notification");
+        });
     }
 
     for (const [clientIndex, { ws }] of clientEntries.entries()) {
@@ -2763,17 +2999,21 @@ export class VoiceAssistantWebSocketServer {
     const body = params.terminalName;
 
     if (plan.shouldPush) {
+      const projectId = await this.projectIdForWorkspace(workspaceId, params.cwd);
       void this.pushNotificationSender
-        .send({
-          title,
-          body,
-          data: {
-            serverId: this.serverId,
-            terminalId: params.terminalId,
-            cwd: params.cwd,
-            ...(workspaceId ? { workspaceId } : {}),
+        .send(
+          {
+            title,
+            body,
+            data: {
+              serverId: this.serverId,
+              terminalId: params.terminalId,
+              cwd: params.cwd,
+              ...(workspaceId ? { workspaceId } : {}),
+            },
           },
-        })
+          projectId === null ? {} : { projectId },
+        )
         .catch((err) => {
           this.logger.warn(
             { err, terminalId: params.terminalId },
@@ -2799,6 +3039,22 @@ export class VoiceAssistantWebSocketServer {
       });
       this.sendToClient(ws, message);
     }
+  }
+
+  private async projectIdForWorkspace(
+    workspaceId: string | undefined,
+    cwd?: string,
+  ): Promise<string | null> {
+    let workspace: Awaited<ReturnType<WorkspaceRegistry["get"]>> | undefined = null;
+    if (workspaceId) {
+      workspace = await this.workspaceRegistry.get(workspaceId);
+    } else if (cwd) {
+      workspace = (await this.workspaceRegistry.list())
+        .filter((candidate) => candidate.archivedAt === null)
+        .sort((left, right) => right.cwd.length - left.cwd.length)
+        .find((candidate) => isSameOrDescendantDirectory(candidate.cwd, cwd));
+    }
+    return workspace?.archivedAt === null ? workspace.projectId : null;
   }
 }
 
@@ -2854,14 +3110,55 @@ function resolveConnectionPeer(
 ): WebSocketConnectionIdentity["peer"] {
   if (metadata !== undefined) return "external";
   if (!requestMetadata.remoteAddress) return "local_ipc";
-  return isLoopbackAddress(requestMetadata.remoteAddress) ? "loopback" : "external";
+  if (!isLoopbackAddress(requestMetadata.remoteAddress)) return "external";
+  return requestTargetsLoopback(requestMetadata) ? "loopback" : "external";
 }
 
 function isLoopbackAddress(address: string): boolean {
-  const normalized = address.toLowerCase();
+  const normalized = address.toLowerCase().replace(/^\[|\]$/gu, "");
   if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
   const ipv4 = normalized.startsWith("::ffff:") ? normalized.slice("::ffff:".length) : normalized;
   return ipv4.startsWith("127.");
+}
+
+function requestTargetsLoopback(metadata: SocketRequestMetadata): boolean {
+  const host = metadata.host?.trim();
+  if (host && !authorityTargetsLoopback(host)) return false;
+  const origin = metadata.origin?.trim();
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      if (
+        (url.protocol === "http:" ||
+          url.protocol === "https:" ||
+          url.protocol === "ws:" ||
+          url.protocol === "wss:") &&
+        !hostnameTargetsLoopback(url.hostname)
+      ) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function authorityTargetsLoopback(authority: string): boolean {
+  try {
+    return hostnameTargetsLoopback(new URL(`http://${authority}`).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function hostnameTargetsLoopback(hostname: string): boolean {
+  return hostname === "localhost" || hostname.endsWith(".localhost") || isLoopbackAddress(hostname);
+}
+
+function isSameOrDescendantDirectory(root: string, candidate: string): boolean {
+  const relativePath = relative(resolvePath(root), resolvePath(candidate));
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
 }
 
 function extractSocketRequestMetadata(request: unknown): SocketRequestMetadata {

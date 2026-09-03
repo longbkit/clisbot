@@ -22,7 +22,9 @@ describe("cleanTriggerAgent", () => {
       provider: "codex",
       mode: "full-access",
     });
-    assert.deepEqual(cleanTriggerAgent({ provider: "codex" }), { provider: "codex" });
+    assert.deepEqual(cleanTriggerAgent({ provider: "codex" }), {
+      provider: "codex",
+    });
   });
 
   it("copies opaque provider options without interpreting their keys", () => {
@@ -30,5 +32,12 @@ describe("cleanTriggerAgent", () => {
     const cleaned = cleanTriggerAgent({ provider: "opencode", options });
     assert.deepEqual(cleaned, { provider: "opencode", options });
     assert.notEqual(cleaned.options, options);
+  });
+
+  it("copies opaque Agent feature values without interpreting their keys", () => {
+    const featureValues = { fast_mode: true, provider_feature: { level: 2 } };
+    const cleaned = cleanTriggerAgent({ provider: "codex", featureValues });
+    assert.deepEqual(cleaned, { provider: "codex", featureValues });
+    assert.notEqual(cleaned.featureValues, featureValues);
   });
 });

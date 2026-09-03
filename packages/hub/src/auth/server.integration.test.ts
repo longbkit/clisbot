@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { createPostgresQueryRuntime } from "../db/test-utils/runtime.js";
@@ -20,6 +20,7 @@ import {
 import { createAuthServer, type AuthServer } from "./server.js";
 import { composeEntitlements, type ComposedEntitlements } from "./entitlements.js";
 import type { InvitationEmail, InvitationMailer } from "../invitations/index.js";
+import { HUB_ACCESS_SCOPE, PASEO_CLIENT_ID } from "./client-authorization.js";
 
 type ActiveState = ActiveAccountState;
 
@@ -60,6 +61,23 @@ describe("account and organization boundary", () => {
       { name: "Default", slug: "default", createdByEmail: "alice@example.com" },
     ]);
     assert.equal(await alice.createOrganizationWithMetadata(), 400);
+  });
+
+  it("authorizes the Paseo client with PKCE and rechecks live organization membership", async () => {
+    const hub = await startAccounts(postgres);
+    const alice = await hub.signUp("Alice", "alice@example.com");
+    const organizationId = await alice.createOrganization("Acme");
+
+    const credential = await alice.authorizeHub();
+    assert.equal((await alice.bearerState(credential.accessToken)).status, "active");
+
+    const rotated = await alice.refreshHubCredential(credential.refreshToken);
+    assert.ok(rotated.refreshToken.length > 0);
+    assert.notEqual(rotated.refreshToken, credential.refreshToken);
+    assert.equal(await alice.refreshHubCredentialStatus(credential.refreshToken), 400);
+
+    await hub.removeMembership(alice.email, organizationId);
+    assert.equal((await alice.bearerState(rotated.accessToken)).status, "signedOut");
   });
 
   it("requires an explicit valid active membership and fails closed when it goes stale", async () => {
@@ -399,24 +417,21 @@ class PaseoAccounts {
     const url = isolatedDatabaseUrl(postgres);
     const database = await createDatabase(url);
     const entitlements = composeEntitlements(database, testDatabaseRuntime(database));
-    return new PaseoAccounts(
-      url,
-      database,
-      entitlements,
-      createAuthServer({
-        database: testDatabaseRuntime(database),
-        locks: testDatabaseLocks(database),
-        entitlements: entitlements.service,
-        secret: "phase-one-auth-secret-at-least-32-characters",
-        baseURL: "http://localhost:3000",
-        policy: {
-          registrationMode: "open",
-          organizationCreation: "open",
-          bootstrap: undefined,
-        },
-        ...(invitationMailer === undefined ? {} : { invitationMailer }),
-      }),
-    );
+    const auth = createAuthServer({
+      database: testDatabaseRuntime(database),
+      locks: testDatabaseLocks(database),
+      entitlements: entitlements.service,
+      secret: "phase-one-auth-secret-at-least-32-characters",
+      baseURL: "http://localhost:3000",
+      policy: {
+        registrationMode: "open",
+        organizationCreation: "open",
+        bootstrap: undefined,
+      },
+      ...(invitationMailer === undefined ? {} : { invitationMailer }),
+    });
+    await auth.initialize?.();
+    return new PaseoAccounts(url, database, entitlements, auth);
   }
 
   async signUp(name: string, email: string): Promise<AccountBrowser> {
@@ -749,6 +764,72 @@ class AccountBrowser {
     ).status;
   }
 
+  async authorizeHub(): Promise<{ accessToken: string; refreshToken: string }> {
+    const verifier = randomBytes(48).toString("base64url");
+    const challenge = createHash("sha256").update(verifier).digest("base64url");
+    const redirectUri = "http://127.0.0.1:49152/hub-auth/callback";
+    const authorize = new URL("http://localhost:3000/api/auth/oauth2/authorize");
+    authorize.searchParams.set("response_type", "code");
+    authorize.searchParams.set("client_id", PASEO_CLIENT_ID);
+    authorize.searchParams.set("redirect_uri", redirectUri);
+    authorize.searchParams.set("scope", `${HUB_ACCESS_SCOPE} offline_access`);
+    authorize.searchParams.set("state", "oauth-test-state");
+    authorize.searchParams.set("code_challenge", challenge);
+    authorize.searchParams.set("code_challenge_method", "S256");
+
+    const authorizationResponse = await this.auth.handle(
+      new Request(authorize, { headers: { cookie: this.cookie } }),
+    );
+    assert.equal(authorizationResponse.status, 302);
+    const callback = new URL(authorizationResponse.headers.get("location")!);
+    assert.equal(callback.origin, "http://127.0.0.1:49152");
+    assert.equal(callback.searchParams.get("state"), "oauth-test-state");
+    const code = callback.searchParams.get("code");
+    assert.ok(code !== null);
+
+    return this.exchangeHubCredential({
+      grant_type: "authorization_code",
+      client_id: PASEO_CLIENT_ID,
+      redirect_uri: redirectUri,
+      code,
+      code_verifier: verifier,
+      resource: "http://localhost:3000",
+    });
+  }
+
+  async refreshHubCredential(refreshToken: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    return this.exchangeHubCredential({
+      grant_type: "refresh_token",
+      client_id: PASEO_CLIENT_ID,
+      refresh_token: refreshToken,
+      resource: "http://localhost:3000",
+    });
+  }
+
+  async refreshHubCredentialStatus(refreshToken: string): Promise<number> {
+    return (
+      await this.tokenRequest({
+        grant_type: "refresh_token",
+        client_id: PASEO_CLIENT_ID,
+        refresh_token: refreshToken,
+        resource: "http://localhost:3000",
+      })
+    ).status;
+  }
+
+  async bearerState(accessToken: string): Promise<AccountState> {
+    const response = await this.auth.handle(
+      new Request("http://localhost:3000/api/auth/paseo/state", {
+        headers: { authorization: `Bearer ${accessToken}` },
+      }),
+    );
+    assert.equal(response.status, 200);
+    return accountStateSchema.parse(await response.json());
+  }
+
   async session(): Promise<{ email: string; activeOrganizationId: string }> {
     const response = await this.get("/api/auth/get-session");
     const session = z
@@ -946,6 +1027,27 @@ class AccountBrowser {
       return this.auth.browserAccount(request);
     }
     return this.auth.handle(request);
+  }
+
+  private async exchangeHubCredential(
+    body: Record<string, string>,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const response = await this.tokenRequest(body);
+    assert.equal(response.status, 200, await response.clone().text());
+    const credential = z
+      .object({ access_token: z.string().min(1), refresh_token: z.string().min(1) })
+      .parse(await response.json());
+    return { accessToken: credential.access_token, refreshToken: credential.refresh_token };
+  }
+
+  private tokenRequest(body: Record<string, string>): Promise<Response> {
+    return this.auth.handle(
+      new Request("http://localhost:3000/api/auth/oauth2/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(body),
+      }),
+    );
   }
 
   private post(path: string, body: unknown): Promise<Response> {
