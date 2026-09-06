@@ -28,13 +28,21 @@ From the T3Claw Fusion work, we carry forward design and experience rather than 
 
 ## Product Ambition
 
-The central idea is to explore a product that combines:
+The long-term ambition is to become the best all-purpose personal assistant for everyone, grounded in each person's second brain, and a shared place where people and AI work together. The central idea is to explore a product that combines:
 
 - OpenClaw's strongest capabilities in channel integration, native channel features, and plugin architecture;
 - Paseo's multi-provider agent support, cross-device clients, and its ability to support real work from web, desktop, and mobile against a local daemon; and
-- Clisbot's goal of bringing durable agent workflows into the communication surfaces where teams already work.
+- Clisbot's goal of bringing durable agent workflows into everyday life and the communication surfaces where teams already work.
 
-The result should be a tool that works well inside a team's day-to-day work chats while also being able to grow into a more professional workspace for coding and broader office or knowledge-work collaboration.
+The product should connect personal knowledge, two-way voice conversations, specialized agents, and group collaboration. Coding and professional work provide the initial foundation; the ambition extends to personal life, knowledge management, and everyday communication.
+
+### From Personal Utility to a Shared Platform
+
+The growth thesis starts with individual usefulness. A second brain gives the assistant durable access to a person's knowledge, goals, preferences, and ongoing work. With that context, the assistant should become more useful over time and require less repeated explanation, supporting the ambition to serve everyone with an assistant that understands their own life.
+
+The second brain should grow from personal Markdown notes and structured data into a broader knowledge and collaboration workspace, converging on the scope of Notion. Personal web access and publishing selected content as websites extend that knowledge into shared use.
+
+A strong user base built around the personal assistant can then support a Telegram-like communication application with AI and bots as native participants. People should be able to bring their assistants into conversations with other people and agents. As those shared conversations grow, the platform can support more business use cases, including team coordination, customer support, shared knowledge, and automated operations. These are long-term product directions for later delivery stages.
 
 ## Problems This Direction Must Address
 
@@ -99,14 +107,15 @@ The bridge should preserve useful thread context and channel-native behavior rat
 
 ### 2. A Work-Chat Model for Humans and Agents
 
-Over time, the product should evolve toward a Slack-like collaboration concept built specifically for work with agents.
+Over time, the product should evolve toward shared group chat for people and AI, supporting both everyday communication and a Slack-like collaboration experience for professional work.
 
 The product should support both a Lite edition and a more professional Premium edition:
 
 - Lite should remain simple enough for one-person teams and small teams.
 - Even Lite should expose a Slack-like API when another system or agent needs to interact with the workspace.
 - A channel should be able to contain multiple agents, mirroring Paseo's model of multiple agent sessions in one workspace.
-- Many humans and many agents should be able to interact together in the same channel and its threads — humans to humans, humans to agents, agents to agents — not just one person driving one agent.
+- A group chat, channel, or thread should support multiple humans and multiple AI agents working together, including human-to-human, human-to-agent, and agent-to-agent interaction.
+- AI agents and bots should be native participants with clear identities and roles, so people can understand who is speaking or acting and direct work to the appropriate participant.
 - Premium should extend this foundation for more demanding professional team and workspace needs.
 
 ### 3. Portable Queue, Loop, and Goal Workflows
@@ -162,6 +171,30 @@ Task management may be provided natively in the application or connected to exte
 
 Support both ends of the deployment spectrum without a rewrite. A one-person setup starts the daemon and immediately has a working agent, with no separate Hub to run or enroll. A team adds a separately deployed, professionally managed Hub for centralized control, approval boundaries, and multi-user access. The daemon-to-Hub relationship is the only difference between the two; the agent, workspace, and channel model stay the same.
 
+### 11. An All-Purpose Personal Assistant with Two-Way Voice
+
+Support a personal assistant across daily life and work: capturing ideas, recalling knowledge, planning, following up, and carrying out tasks through connected tools and agents. Two-way voice should be a first-class interaction: users can speak to the assistant and hear spoken responses, continuing a conversation naturally across voice and text.
+
+The assistant should use the second brain as durable personal context, connecting conversations and actions to the user's notes, structured records, goals, and preferences. Access should follow the user's permissions, including when the assistant participates in a shared conversation.
+
+### 12. Orchestration of Agents with Different Specialties and Personalities
+
+Let users work with multiple agents that have distinct areas of expertise, roles, and personalities. An agent's personality should shape its communication style, while its specialty and available tools determine the work it can take on.
+
+The assistant should be able to coordinate these agents toward a shared outcome: choose suitable specialists, delegate tasks, arrange parallel or sequential work, pass relevant context between agents, and combine their results. Users should be able to address an individual agent or let the assistant coordinate the group, with responsibilities and progress visible in the shared conversation and workspace.
+
+### 13. A Second Brain for Notes, Structured Data, and Web Publishing
+
+Provide a personal knowledge workspace that combines:
+
+- manual Markdown note-taking and editing in the spirit of Obsidian;
+- structured data with reusable templates for organizing knowledge and recurring personal or work records;
+- connections between freeform notes, structured records, and the tasks and conversations that use them;
+- web access for personal use; and
+- publishing selected pages or collections as shareable websites.
+
+Users should be able to maintain their knowledge directly, with the assistant helping to capture, organize, retrieve, and use it. Over time, this foundation should expand into a Notion-like workspace for documents, structured knowledge, and collaboration. Private knowledge, agent access, and published content must have clear sharing boundaries so users control what becomes visible to others.
+
 ## Initial Delivery Posture
 
 The first stage is not a wholesale rewrite of every Paseo surface. It is a careful exploration of the fusion architecture while maintaining an operable Paseo-compatible base.
@@ -177,4 +210,4 @@ Initial changes should prioritize:
 5. proving configurable two-way synchronization between a work-channel thread and a Paseo agent session; and
 6. making progress, tool activity, workspace changes, and approvals transparent enough for professional use.
 
-This foundation should allow Clisbot PaseoClaw Fusion to mature gradually from an agent-enabled work-chat tool into a professional collaborative workspace for software development and wider office work.
+This foundation should allow Clisbot PaseoClaw Fusion to mature gradually into the personal assistant, second brain, and shared communication platform described above, while supporting professional collaboration as the product grows. The broader ambition guides later delivery stages; the initial priorities remain focused on proving the foundation.
