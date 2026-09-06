@@ -39,7 +39,7 @@ external-supply policy is not evidence that the Paseo foundation should ignore
 
 Promote when:
 
-- an upstream release tag is cut (current: `v0.7.0-beta.2`),
+- an upstream release tag is cut,
 - a Clisbot release is about to be cut,
 - a specific upstream fix is needed (wait for the next tag, or cherry-pick
   just that fix).
@@ -51,12 +51,13 @@ not silently move the product baseline.
 ### Promotion procedure
 
 ```bash
-git worktree add <clean-sync-worktree> clisbot-paseoclaw-fusion
+git worktree add --detach <clean-sync-worktree> clisbot-paseoclaw-fusion
 cd <clean-sync-worktree>
 test -z "$(git status --porcelain)"           # required clean boundary
 git tag clisbot/fork-tip-$(date +%Y-%m-%d)   # mark the product tip
-git fetch upstream --tags
-git merge vX.Y.Z -m "Sync upstream vX.Y.Z"
+git fetch --no-tags upstream refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
+git rev-parse refs/upstream-releases/vX.Y.Z^{} # verify against the Paseo release commit
+git merge --no-commit --no-ff refs/upstream-releases/vX.Y.Z
 # resolve the shared files below
 npm install --package-lock-only --ignore-scripts
 npm ci                                      # trusted checkout; native tools need lifecycle setup
@@ -64,15 +65,26 @@ npm ls --workspaces --depth=0
 # Add exact `npm ls <package> --depth=0` checks for pins changed by the release.
 npm run typecheck
 # channel-plane E2E per docs/lessons/2026-08-26-integration-seams-before-live-e2e.md
+git commit -m "Sync upstream vX.Y.Z"
+# Fast-forward the product branch to the checked merge commit. Preserve and
+# reapply any existing worktree changes, then validate overlapping paths.
 # only after every required gate passes:
 git tag clisbot/sync-verified-$(date +%Y-%m-%d)-vX.Y.Z
 ```
 
+Paseo and Hub share this repository's local tag namespace. In the 2026-09-06
+checkout, local `v0.7.0` and `v0.8.0` point to Hub releases. Fetch Paseo tags
+into `refs/upstream-releases/` and verify the peeled commit before merging;
+neither a bare tag name nor the root package version proves the merged baseline.
+Keep a dirty product checkout intact while preparing the merge in the detached
+worktree. The final branch update must preserve its tracked and untracked work.
+
 ### Shared-file overlap surface
 
-Since the fork point, only these files changed on both sides:
+Measure this surface again for every sync. The 2026-08-30 merge overlapped
+four metadata/doc files; the 2026-09-06 comparison from `74a377ff6` to Paseo
+`v0.7.2` overlaps 12 files with committed Fusion changes:
 
-- `CLAUDE.md` — doc table; keep both sides' rows.
 - `package.json` — upstream adds scripts and version/license; Clisbot adds
   the `hub`/`channels` workspaces. Keep both.
 - `package-lock.json` — use the upstream release lock as the base and resolve
@@ -81,14 +93,22 @@ Since the fork point, only these files changed on both sides:
   require clean `npm ci` plus the
   scoped `npm ls` checks below. Do not use `--ignore-scripts` for the test
   install: native tools such as `tsgo` need their package setup intact.
-- `packages/cli/package.json` — merge dependencies.
+- `packages/cli/package.json` — update Paseo dependencies together while keeping
+  the independently versioned Hub dependency.
+- `packages/app/package.json`, `packages/app/src/app/_layout.tsx`, and
+  `packages/app/src/components/left-sidebar.tsx` — preserve Fusion navigation
+  while adopting upstream mobile animation changes.
+- `packages/client/src/daemon-client.ts` and its test,
+  `packages/protocol/src/messages.ts`, and `packages/server/src/server/session.ts`
+  — preserve managed access and channel integration contracts.
+- `packages/server/src/server/agent/providers/codex-app-server-agent.ts` and its
+  test — retain Fusion behavior alongside the upstream paginated rewind fix.
 
-These are files changed on both sides, not proof that all four will conflict.
+These are files changed on both sides, not proof that all will conflict.
 Record separately: overlap files, actual textual conflicts reported by Git,
-and semantic conflicts found by validation. Everything else normally
-auto-merges because Clisbot's work is additive in
-`packages/hub`, `packages/channels/*`, and new CLI command directories. Keep
-it that way.
+and semantic conflicts found by validation. The `v0.7.2` merge has textual
+conflicts in `package-lock.json` and `packages/cli/package.json`; the remaining
+overlap auto-merges and still needs focused validation.
 
 ## Why merge, not rebase, for sync
 
@@ -152,7 +172,7 @@ survives", not sync frequency. Maintain it by:
 
 - keeping Clisbot changes additive in its own namespaces
   (`packages/hub`, `packages/channels/*`, new CLI commands);
-- minimizing edits to shared files (currently 4, all metadata/docs);
+- minimizing edits to shared files and measuring the overlap at every sync;
 - tracking the seam surface: which upstream symbols the channel plane
   consumes. As of 2026-08-30 that is one import of `@getpaseo/server` in
   `packages/hub/src/e2e/harness/source-paseo.ts` (dev-only E2E harness).
@@ -174,6 +194,32 @@ preemptively.
 - Dev state lives in `.dev/paseo-home` inside the checkout; the packaged
   app's `~/.paseo` (port 6767) is never touched. Dev daemon: 6768; Expo: 8081. Use `npm run cli -- ...` for the dev daemon, not the global binary.
   See `docs/development.md`.
+
+## Paseo v0.7.2 merge (2026-09-06)
+
+The incoming release is `9400a49af670fdb5db4af58e73f8df98588dbea9`, with
+19 upstream commits after the previously merged `74a377ff6` (which already
+includes `v0.7.0-beta.3`). Hub stays at `0.8.0`; the channel packages stay at
+`0.1.0`. The overlap and conflict resolutions are recorded above.
+
+The lock reconciliation starts from the release lock and retains Fusion pins
+where upstream did not change the dependency version. It also removes stale
+Hub-local React/React DOM `19.2.7` entries and their scheduler: the Hub manifest
+already requires `19.1.0`, which resolves from the root. Keeping those stale
+entries made a clean install report invalid direct dependencies.
+
+The clean merge passed `npm ci` with lifecycle scripts, `npm ls --workspaces
+--depth=0`, server/CLI and channel/Hub-node builds, workspace typecheck,
+formatting, lint on all 137 changed code files, and 480 focused tests
+across server (271), protocol (18), client (117), app (43), and channel
+control-plane/daemon-client (31). Repository-wide lint still reports 84 errors
+outside the merge paths, including historical probe and revision scripts.
+
+This is not a `sync-verified-*` release point. Live Slack/Telegram round-trips
+have not been verified: the fixed `.clisbot-dev` fixture lacks the old
+`secrets/slack--work` and `secrets/telegram--work` files and has no daemon on 6867. A separate Hub is already running on 6868 from `.clisbot-dev-01`; do not
+reuse or restart it as if it were the fixed test fixture. Native/mobile platform
+QA also remains outside this Linux merge validation.
 
 ## Reference snapshot (2026-08-30)
 
