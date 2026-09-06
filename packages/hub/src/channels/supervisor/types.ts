@@ -1,3 +1,4 @@
+import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
 // The channel supervisor's public surface (plan §4-S1 / implementation doc §4.3.9):
 // the per-account lifecycle the control plane drives — install → load → start →
 // drive, plus teardown. This file is the shared contract the control-plane ops
@@ -67,6 +68,8 @@ export interface ChannelReconcileResult {
 export interface ChannelSupervisorOptions {
   /** The `Database` facade: the active-configuration read path (control-plane.ts). */
   database: Database;
+  /** Canonical Hub URL reachable by local and remote daemon Agents. */
+  publicBaseUrl?: string;
   /** The runtime handle: `ChannelStore` (org-scoped channel runtime state). */
   databaseRuntime: DatabaseRuntime;
   /** Test seam; production resolves encrypted credentials through `database`. */
@@ -119,12 +122,22 @@ export interface ChannelSupervisor {
    */
   channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult>;
   channelReplyMediaPost(ref: ChannelReplyBindingRef, filePath: string): Promise<MediaPostResult>;
+  /** Optional read-only lookup through the currently configured Connection. */
+  resolveConversation?(input: {
+    organizationId: string;
+    channel: P0ChannelName;
+    accountId: string;
+    connectionId: string;
+    conversationId: string;
+    budget?: { remaining: number };
+  }): Promise<ChannelConversationMetadata | null>;
   /** Sends the fixed management test message through one already-started account. */
   postTestMessage(input: {
     channel: P0ChannelName;
     accountId: string;
     conversationId: string;
     threadId?: string | undefined;
+    expectedRevisionId?: string | null | undefined;
   }): Promise<OutboundPostResult>;
   workflowStreamEvent?(input: {
     execution: AgentExecutionRecord;

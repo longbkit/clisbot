@@ -1,3 +1,4 @@
+import type { ChannelPrivilegeDecision } from "../access/store.js";
 // The channel execution plane facade (plan §4-S2): the thin object the loader
 // drives. It composes the three engines — bindings (thread + continuous
 // execution), relay (outbound + delivery ledger), approvals (prompt +
@@ -491,6 +492,12 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       processing = createProcessingController({
         logger,
         now: () => clock.now(),
+        readRunningAgentIds: async () =>
+          new Set(
+            (await daemonConnection.listAgents())
+              .filter((agent) => agent.status === "running")
+              .map((agent) => agent.id),
+          ),
         ...(deps.typing !== undefined ? { drive: deps.typing } : {}),
         ...(deps.processingTtlMs !== undefined ? { ttlMs: deps.processingTtlMs } : {}),
       });
@@ -623,7 +630,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         ? await admitWorkflowMessage(message, account, route)
         : await bindingsEngine().admit(message, account, route);
     if (!admission.allowed) {
-      return recordOpenAudienceActivity(message, account, route, {
+      return recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
           reason: admission.reason ?? "message not admitted",
@@ -640,7 +647,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       ...(deliveryId === undefined ? {} : { leaseId: deliveryId }),
     }) ?? { allowed: true as const };
     if (!routeLimit.allowed) {
-      return recordOpenAudienceActivity(message, account, route, {
+      return recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
           reason: routeLimit.reason,
@@ -717,7 +724,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       });
     } catch (error) {
       routeExecutionLimiter?.complete(executionLease);
-      await recordOpenAudienceActivity(message, account, route, {
+      await recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
           reason: "workflow dispatch failed",
@@ -729,7 +736,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       throw error;
     }
     workflowBindingActivity.set(workflowActivityKey(bindingKey, workflow), clock.now());
-    return recordOpenAudienceActivity(message, account, route, {
+    return recordChannelActivity(message, account, route, {
       result: result(true, { kind: "workflow", workflow, deliveryId }),
       limitDecision: "allowed",
     });
@@ -768,7 +775,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       outcome = await bindingsEngine().bindOrSteer(message, account, route, subscribe);
     } catch (error) {
       routeExecutionLimiter?.complete(executionLease);
-      await recordOpenAudienceActivity(message, account, route, {
+      await recordChannelActivity(message, account, route, {
         result: result(false, {
           kind: "ignored",
           reason: "agent dispatch failed",
@@ -784,13 +791,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     } else {
       routeExecutionLimiter?.complete(executionLease);
     }
-    return recordOpenAudienceActivity(message, account, route, {
+    return recordChannelActivity(message, account, route, {
       result: result(outcome.kind === "bound" || outcome.kind === "steered", outcome),
       limitDecision: "allowed",
     });
   }
 
-  async function recordOpenAudienceActivity(
+  async function recordChannelActivity(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
@@ -802,10 +809,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       limitReason?: string | undefined;
     },
   ): Promise<PlaneInboundResult> {
-    if (
-      route.audience?.kind !== "conversationParticipants" ||
-      deps.recordChannelInboundActivity === undefined
-    ) {
+    if (deps.recordChannelInboundActivity === undefined) {
       return decision.result;
     }
     try {
@@ -852,9 +856,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
   ): Promise<ReturnType<typeof admitFollowUp>> {
     if (route.target.kind !== "workflow") throw new Error("workflow route is required");
-    if (!(await mayUseChannel(message, account, route))) {
-      return { allowed: false, reason: "sender may not trigger this route" };
-    }
+    const authorization = await mayUseChannel(message, account, route);
+    if (!authorization.allowed) return authorization;
     const key = deriveBindingKey(message, route);
     const bindingKey = JSON.stringify([
       message.channel,
@@ -985,7 +988,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       return result(true, { kind: "command", handled: true, detail: "help" });
     }
 
-    if (!(await mayUseChannel(message, account, route))) {
+    if (!(await mayUseChannel(message, account, route)).allowed) {
       return result(false, {
         kind: "command",
         handled: false,
@@ -1085,19 +1088,20 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-  ): Promise<boolean> {
-    if (externalParticipantMayTrigger(message, route)) return true;
-    if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route)) return true;
+  ): Promise<ChannelPrivilegeDecision> {
+    if (externalParticipantMayTrigger(message, route)) return { allowed: true };
+    if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route))
+      return { allowed: true };
     return (
       (await deps.authorizeChannelUse?.({
         organizationId: deps.organizationId,
         account,
         message,
-      })) ?? false
+      })) ?? { allowed: false, reason: "sender may not trigger this route" }
     );
   }
 
-  function mayVerifiedMemberUseChannel(
+  async function mayVerifiedMemberUseChannel(
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
@@ -1106,11 +1110,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       return Promise.resolve(true);
     }
     return (
-      deps.authorizeChannelUse?.({
-        organizationId: deps.organizationId,
-        account,
-        message,
-      }) ?? Promise.resolve(false)
+      (
+        await deps.authorizeChannelUse?.({
+          organizationId: deps.organizationId,
+          account,
+          message,
+        })
+      )?.allowed ?? false
     );
   }
 

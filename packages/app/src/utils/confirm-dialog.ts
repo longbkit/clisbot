@@ -92,15 +92,21 @@ async function showDesktopConfirmDialog(input: ConfirmDialogInput): Promise<bool
   return null;
 }
 
-function showWebConfirmDialog(input: ConfirmDialogInput): boolean {
-  const browserConfirm = (globalThis as { confirm?: (message?: string) => boolean }).confirm;
-  if (typeof browserConfirm !== "function") {
-    throw new Error("[ConfirmDialog] No web confirmation backend is available.");
-  }
+type WebConfirmation = (input: ConfirmDialogInput) => Promise<boolean>;
+let webConfirmation: WebConfirmation | null = null;
 
-  blurActiveWebElement();
-  const promptMessage = `${input.title}\n\n${input.message}`;
-  return browserConfirm(promptMessage);
+export function registerWebConfirmation(backend: WebConfirmation): () => void {
+  webConfirmation = backend;
+  return () => {
+    if (webConfirmation === backend) webConfirmation = null;
+  };
+}
+
+function showWebConfirmDialog(input: ConfirmDialogInput): Promise<boolean> {
+  if (webConfirmation === null) {
+    throw new Error("[ConfirmDialog] App confirmation provider is not mounted.");
+  }
+  return webConfirmation(input);
 }
 
 export async function confirmDialog(input: ConfirmDialogInput): Promise<boolean> {

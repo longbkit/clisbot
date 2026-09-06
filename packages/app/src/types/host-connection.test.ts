@@ -223,6 +223,46 @@ describe("upsertHostConnectionInProfiles", () => {
     path: "/tmp/paseo.sock",
   };
 
+  it("follows shared Hub renames while preserving a local Appearance label", () => {
+    const management = {
+      kind: "hub" as const,
+      hubOrigin: "https://hub.example.test",
+      organizationId: "org",
+      daemonId: "daemon",
+      daemonSlug: "sandbox",
+    };
+    const existing = {
+      ...makeHost("srv_known"),
+      label: "sandbox",
+      management,
+      connections: [connection],
+    };
+    const renamed = upsertHostConnectionInProfiles({
+      profiles: [existing],
+      serverId: existing.serverId,
+      connection,
+      label: "build-studio",
+      management: { ...management, daemonSlug: "build-studio" },
+    })[0];
+    expect(renamed.label).toBe("build-studio");
+    const aliased = upsertHostConnectionInProfiles({
+      profiles: [{ ...existing, label: "My laptop" }],
+      serverId: existing.serverId,
+      connection,
+      label: "build-studio",
+      management: { ...management, daemonSlug: "build-studio" },
+    })[0];
+    expect(aliased.label).toBe("My laptop");
+    expect(aliased.management?.daemonSlug).toBe("build-studio");
+    expect(
+      upsertHostConnectionInProfiles({
+        profiles: [existing],
+        serverId: existing.serverId,
+        connection,
+      })[0].label,
+    ).toBe("sandbox");
+  });
+
   it("gives a newly discovered host the default appearance", () => {
     const [profile] = upsertHostConnectionInProfiles({
       profiles: [],

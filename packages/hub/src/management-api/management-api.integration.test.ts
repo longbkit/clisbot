@@ -1,3 +1,7 @@
+import { dump } from "js-yaml";
+import { compileTriggerDocument } from "../triggers/configuration/index.js";
+import { editableAutomationYaml } from "../triggers/configuration/workflow-document.js";
+import { CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -21,6 +25,7 @@ import type {
 } from "../provider-applications/index.js";
 import { enrollTestDaemon, TEST_DAEMON_ID } from "../test-utils/project-configuration.js";
 import { ManagementApi } from "./index.js";
+import { createHubApplication } from "../app.js";
 import { OrganizationTriggerStore } from "../triggers/store.js";
 import type {
   DispatchManualRunAuthorization,
@@ -44,6 +49,282 @@ afterEach(async () => {
   await bundle.runtime.close();
   await rm(root, { recursive: true, force: true });
 }, 30_000);
+
+it("keeps organization-wide Channel activity behind management authority and validates page requests", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  const access = new AccessStore(bundle.runtime);
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: null,
+  };
+  const owner = new ManagementApi({ ...common, auth: ownerAccess() });
+  const member = new ManagementApi({ ...common, auth: memberAccess() });
+  assert.equal((await member.handle(request("/channel-activity", "GET"))).status, 403);
+  const result = await owner.handle(request("/channel-activity?limit=25", "GET"));
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { activity: [], nextCursor: null });
+  assert.equal((await owner.handle(request("/channel-activity?limit=1000", "GET"))).status, 400);
+  assert.equal((await owner.handle(request("/channel-activity?cursor=bad", "GET"))).status, 400);
+  const otherOrganization = new Request(
+    "https://hub.example.test/api/management/v1/organizations/other/channel-activity",
+  );
+  assert.equal((await owner.handle(otherOrganization)).status, 404);
+});
+
+it("renames shared Hosts through canonical Hub authority, normalization, and conflict handling", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.organizations)
+    .values({ id: ORGANIZATION_ID, name: "Org", slug: "org" });
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.users)
+    .values([
+      { id: USER_ID, name: "Owner", email: "owner@example.test", emailVerified: true },
+      { id: "member-user", name: "Member", email: "member@example.test", emailVerified: true },
+    ]);
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.members)
+    .values([
+      { id: MEMBERSHIP_ID, organizationId: ORGANIZATION_ID, userId: USER_ID, role: "owner" },
+      {
+        id: "member-membership",
+        organizationId: ORGANIZATION_ID,
+        userId: "member-user",
+        role: "member",
+      },
+    ]);
+  await enrollTestDaemon(database, ORGANIZATION_ID);
+  const access = new AccessStore(bundle.runtime);
+  const tickets = new AccessTicketService(bundle.runtime, access);
+  const application = createHubApplication({
+    database,
+    databaseRuntime: bundle.runtime,
+    accessStore: access,
+    accessTickets: tickets,
+    entitlements: null,
+    publicApi: { status: "unavailable" },
+    browserOrganizationAccess: ownerAccess(),
+  });
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets,
+    channelSupervisor: null,
+    renameDaemon: application.operations.handleOrganizationDaemonRename,
+  };
+  const api = new ManagementApi({ ...common, auth: ownerAccess() });
+  const member = new ManagementApi({ ...common, auth: memberAccess() });
+  const grant = await api.handle(
+    request("/access-assignments/batch", "POST", {
+      assignments: [
+        {
+          subjectKind: "member",
+          subjectId: "member-membership",
+          resourceKind: "daemon",
+          resourceId: TEST_DAEMON_ID,
+          privileges: ["daemon.connect", "daemon.manage"],
+          constraints: {},
+        },
+      ],
+    }),
+  );
+  assert.equal(grant.status, 201);
+  assert.equal(
+    (await member.handle(request(`/daemons/${TEST_DAEMON_ID}`, "PUT", { slug: "member-name" })))
+      .status,
+    403,
+  );
+  const csrf = new ManagementApi({
+    ...common,
+    auth: { ...ownerAccess(), rejectCookieMutation: () => new Response(null, { status: 403 }) },
+  });
+  assert.equal(
+    (await csrf.handle(request(`/daemons/${TEST_DAEMON_ID}`, "PUT", { slug: "blocked" }))).status,
+    403,
+  );
+  for (const slug of ["", " ", "a".repeat(101)]) {
+    assert.equal(
+      (await api.handle(request(`/daemons/${TEST_DAEMON_ID}`, "PUT", { slug }))).status,
+      400,
+    );
+  }
+  assert.equal(
+    (await api.handle(request("/daemons/not-a-uuid", "PUT", { slug: "unknown" }))).status,
+    404,
+  );
+  assert.equal(
+    (
+      await api.handle(
+        request("/daemons/20000000-0000-4000-8000-000000000001", "PUT", { slug: "unknown" }),
+      )
+    ).status,
+    404,
+  );
+  const original = await database.findDaemonById(TEST_DAEMON_ID);
+  const renamed = await api.handle(
+    request(`/daemons/${TEST_DAEMON_ID}`, "PUT", { slug: "  Công Việc Studio  " }),
+  );
+  assert.equal(renamed.status, 200);
+  assert.equal((await renamed.json()).slug, "cong-viec-studio");
+  const stored = await database.findDaemonById(TEST_DAEMON_ID);
+  assert.equal(stored?.slug, "cong-viec-studio");
+  assert.equal(stored?.id, original?.id);
+  assert.deepEqual(stored?.permissions, original?.permissions);
+  assert.equal(stored?.serverId, original?.serverId);
+  await database.issueEnrollmentToken({
+    id: "30000000-0000-4000-8000-000000000003",
+    verifier: "second-verifier",
+    organizationId: ORGANIZATION_ID,
+    expiresAt: new Date("2026-08-06T12:00:00Z"),
+    consumedAt: null,
+  });
+  const secondId = "20000000-0000-4000-8000-000000000002";
+  await database.enrollDaemon({
+    tokenVerifier: "second-verifier",
+    daemonId: secondId,
+    idempotencyKey: "second",
+    serverId: "server-2",
+    daemonPublicKey: "public-2",
+    credentialVerifier: "credential-2",
+    permissions: ["hub.execute"],
+    now: new Date("2026-08-06T11:00:00Z"),
+  });
+  const conflict = await api.handle(
+    request(`/daemons/${secondId}`, "PUT", { slug: "Công Việc Studio" }),
+  );
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).error, "daemon_slug_conflict");
+  assert.notEqual((await database.findDaemonById(secondId))?.slug, "cong-viec-studio");
+  const listing = await api.handle(request("/daemons", "GET"));
+  assert.equal(
+    (await listing.json()).daemons.find((row: { id: string }) => row.id === TEST_DAEMON_ID).slug,
+    "cong-viec-studio",
+  );
+  await application.hub.stop();
+});
+
+it("disconnects a managed Host through canonical authorization before revoking its leases", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.organizations)
+    .values({ id: ORGANIZATION_ID, name: "Org", slug: "org" });
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.users)
+    .values({ id: USER_ID, name: "Owner", email: "owner@example.test", emailVerified: true });
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.members)
+    .values({ id: MEMBERSHIP_ID, organizationId: ORGANIZATION_ID, userId: USER_ID, role: "owner" });
+  await enrollTestDaemon(database, ORGANIZATION_ID);
+  const access = new AccessStore(bundle.runtime);
+  const calls: string[] = [];
+  class ObservedAccessTickets extends AccessTicketService {
+    override async revokeDaemonLeases(organizationId: string, daemonId: string, now?: Date) {
+      assert.equal((await database.findDaemonById(daemonId))?.status, "revoked");
+      calls.push("revoked daemon lease sweep");
+      return super.revokeDaemonLeases(organizationId, daemonId, now);
+    }
+  }
+  const tickets = new ObservedAccessTickets(bundle.runtime, access);
+  const issued = await tickets.issue({
+    organizationId: ORGANIZATION_ID,
+    daemonId: TEST_DAEMON_ID,
+    userId: USER_ID,
+    membershipId: MEMBERSHIP_ID,
+    clientId: "client-a",
+  });
+  const admission = await tickets.consume({
+    daemonId: TEST_DAEMON_ID,
+    accessTicket: issued.accessTicket,
+    clientId: "client-a",
+  });
+  const outstanding = await tickets.issue({
+    organizationId: ORGANIZATION_ID,
+    daemonId: TEST_DAEMON_ID,
+    userId: USER_ID,
+    membershipId: MEMBERSHIP_ID,
+    clientId: "not-consumed",
+  });
+  const application = createHubApplication({
+    database,
+    databaseRuntime: bundle.runtime,
+    accessStore: access,
+    accessTickets: tickets,
+    entitlements: null,
+    publicApi: { status: "unavailable" },
+    browserOrganizationAccess: ownerAccess(),
+  });
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets,
+    channelSupervisor: null,
+    revokeDaemon: application.operations.handleOrganizationDaemonRevocation,
+  };
+  const ownerApi = new ManagementApi({ ...common, auth: ownerAccess() });
+  const memberApi = new ManagementApi({ ...common, auth: memberAccess() });
+  assert.equal(
+    (await memberApi.handle(request(`/daemons/${TEST_DAEMON_ID}`, "DELETE"))).status,
+    403,
+  );
+  assert.equal(
+    (await ownerApi.handle(request("/daemons/other-organization-host", "DELETE"))).status,
+    404,
+  );
+  const csrfApi = new ManagementApi({
+    ...common,
+    auth: { ...ownerAccess(), rejectCookieMutation: () => new Response(null, { status: 403 }) },
+  });
+  assert.equal((await csrfApi.handle(request(`/daemons/${TEST_DAEMON_ID}`, "DELETE"))).status, 403);
+  assert.deepEqual(calls, []);
+  assert.equal(
+    (await ownerApi.handle(request(`/daemons/${TEST_DAEMON_ID}`, "DELETE"))).status,
+    204,
+  );
+  assert.deepEqual(calls, ["revoked daemon lease sweep"]);
+  const stored = await bundle.runtime.query<{ revoked_at: Date | null }>(
+    "select revoked_at from daemon_access_leases where id = $1",
+    [admission.leaseId],
+  );
+  assert.notEqual(stored.rows[0]?.revoked_at, null);
+  await assert.rejects(
+    tickets.consume({
+      daemonId: TEST_DAEMON_ID,
+      accessTicket: outstanding.accessTicket,
+      clientId: "not-consumed",
+    }),
+    /daemon access is no longer granted/,
+  );
+  await assert.rejects(
+    tickets.refresh({ daemonId: TEST_DAEMON_ID, leaseId: admission.leaseId }),
+    /lease/,
+  );
+  await assert.rejects(
+    tickets.issue({
+      organizationId: ORGANIZATION_ID,
+      daemonId: TEST_DAEMON_ID,
+      userId: USER_ID,
+      membershipId: MEMBERSHIP_ID,
+      clientId: "new",
+    }),
+    /daemon access is not granted/,
+  );
+  assert.equal((await database.findDaemonById(TEST_DAEMON_ID))?.status, "revoked");
+  assert.deepEqual(await (await ownerApi.handle(request("/daemons", "GET"))).json(), {
+    daemons: [],
+  });
+  await application.hub.stop();
+});
 
 it("runs an Automation through the shared dispatcher with current Member access", async () => {
   const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
@@ -309,13 +590,49 @@ routes:
   );
   assert.equal(reconciliations, 0);
 
+  const compiled = compileTriggerDocument(safeYaml);
+  const firstStep = compiled.events[0]!.steps[0]!;
+  const workflowYaml = (mode: string) =>
+    editableAutomationYaml(
+      dump({
+        legacy_multistep: {
+          environments: [compiled.environment],
+          trigger: {
+            ...compiled.events[0],
+            steps: [firstStep, { ...firstStep, id: "respond", agent: { provider: "codex", mode } }],
+          },
+        },
+      }),
+      true,
+    );
+  const unsafeWorkflow = await api.handle(
+    request(path, "PUT", {
+      expectedRevisionId: automation.activeRevisionId,
+      yaml: workflowYaml("full-access"),
+    }),
+  );
+  assert.equal(unsafeWorkflow.status, 422, JSON.stringify(await unsafeWorkflow.clone().json()));
+  assert.equal((await store.activeRevision(automation)).version, 1);
+
   const updated = await api.handle(
     request(path, "PUT", {
       expectedRevisionId: automation.activeRevisionId,
-      yaml: automationYaml("auto"),
+      yaml: workflowYaml("auto"),
     }),
   );
   assert.equal(updated.status, 200, JSON.stringify(await updated.clone().json()));
+  const savedWorkflow = await updated.json();
+  assert.equal(savedWorkflow.format, "workflow");
+  assert.equal(savedWorkflow.definition.steps.length, 2);
+  const reloaded = await api.handle(request(path, "GET"));
+  assert.equal((await reloaded.json()).yaml, savedWorkflow.yaml);
+  const staleWorkflow = await api.handle(
+    request(path, "PUT", {
+      expectedRevisionId: automation.activeRevisionId,
+      yaml: workflowYaml("auto"),
+    }),
+  );
+  assert.equal(staleWorkflow.status, 409);
   assert.equal(reconciliations, 1);
 });
 
@@ -355,7 +672,9 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     channel: string;
     accountId: string;
     conversationId: string;
+    expectedRevisionId?: string | null | undefined;
   }> = [];
+  const metadataReads: string[] = [];
   const retryStarts: Array<{ channel: string; account: string }> = [];
   const channelSupervisor: ChannelSupervisor = {
     startAll: async () => undefined,
@@ -389,6 +708,10 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     ],
     channelReplyPost: async () => ({ ok: false }),
     channelReplyMediaPost: async () => ({ ok: false }),
+    resolveConversation: async (input) => {
+      metadataReads.push(input.conversationId);
+      return { label: "Customer support", kind: "group", visibility: "unknown" };
+    },
     postTestMessage: async (input) => {
       testPosts.push(input);
       return { ok: true, externalMessageId: "test-message-1" };
@@ -470,6 +793,7 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
             match: { kind: "group", ids: ["-100123"] },
             workflow: "handoff",
           },
+          { match: { kind: "topic", ids: ["42"] }, workflow: "handoff" },
         ],
         fallback: { deny: true },
       },
@@ -608,6 +932,84 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
       conversationId: "-100123",
     },
   ]);
+  const previewResponse = await api.handle(
+    request("/channel-accounts/telegram/support/test-preview?conversationId=-100123", "GET"),
+  );
+  assert.equal(previewResponse.status, 200);
+  const preview = await previewResponse.json();
+  assert.equal(preview.text, CHANNEL_TEST_MESSAGE);
+  assert.equal(preview.conversationId, "-100123");
+  assert.equal(preview.threadId, null);
+  assert.deepEqual(preview.attachments, []);
+  assert.equal(testPosts.length, 1, "preview never sends a provider message");
+  const readsBeforeUnknownParent = metadataReads.length;
+  const unknownParent = await api.handle(
+    request(
+      "/channel-accounts/telegram/support/test-preview?conversationId=-999&threadId=42",
+      "GET",
+    ),
+  );
+  assert.equal(unknownParent.status, 200);
+  assert.equal((await unknownParent.json()).label, null);
+  assert.equal(
+    metadataReads.length,
+    readsBeforeUnknownParent,
+    "configured topic ID cannot authorize an unknown parent metadata read",
+  );
+  const knownParent = await api.handle(
+    request(
+      "/channel-accounts/telegram/support/test-preview?conversationId=-100123&threadId=42",
+      "GET",
+    ),
+  );
+  assert.equal((await knownParent.json()).label, "Customer support");
+  const general = await api.handle(
+    request(
+      "/channel-accounts/telegram/support/test-preview?conversationId=-100123&threadId=1",
+      "GET",
+    ),
+  );
+  assert.equal((await general.json()).threadId, null);
+  assert.equal(
+    (
+      await api.handle(
+        request("/channel-accounts/telegram/support/test-preview?conversationId=-999", "GET"),
+      )
+    ).status,
+    422,
+  );
+  for (const overrides of [
+    { expectedText: "a different message" },
+    { expectedRevisionId: initial.id },
+    { threadId: "42" },
+    { expectedPreviewId: "other-preview" },
+  ]) {
+    const rejected = await api.handle(
+      request("/channel-accounts/telegram/support/test", "POST", {
+        conversationId: preview.conversationId,
+        expectedText: preview.text,
+        expectedRevisionId: preview.revisionId,
+        expectedPreviewId: preview.previewId,
+        ...overrides,
+      }),
+    );
+    assert.equal(rejected.status, 409);
+  }
+  assert.equal(testPosts.length, 1, "stale or changed previews never send");
+  const confirmed = await api.handle(
+    request("/channel-accounts/telegram/support/test", "POST", {
+      conversationId: preview.conversationId,
+      expectedText: preview.text,
+      expectedPreviewId: preview.previewId,
+    }),
+  );
+  assert.equal(confirmed.status, 200);
+  assert.equal(testPosts.length, 2);
+  assert.equal(
+    testPosts[1]?.expectedRevisionId,
+    preview.revisionId,
+    "preview fingerprint also enforces applied runtime revision when the client omits the redundant revision field",
+  );
   const unconfiguredTest = await api.handle(
     request("/channel-accounts/telegram/support/test", "POST", {
       conversationId: "-100999",

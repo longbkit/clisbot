@@ -1,3 +1,4 @@
+import { apiFirstOnboardingEnabled } from "../organizations/onboarding.js";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import {
@@ -429,7 +430,7 @@ async function adoptExistingOrganization(
      values ($1, $2, $3, 'owner')`,
     [randomUUID(), organization.id, ownerUserId],
   );
-  if (organization.project_count !== 0) return;
+  if (apiFirstOnboardingEnabled() || organization.project_count !== 0) return;
   const projectId = randomUUID();
   await client.query(
     `insert into projects (id, organization_id, name, slug, created_by_user_id)

@@ -256,18 +256,20 @@ export function ManagedAgentConfigurationFields({
         title="Thinking"
         disabled={disabled || serverId === null || thinkingOptions.length <= 1}
       />
-      <SelectField
-        label="Mode"
-        value={value.mode}
-        selectedDisplay={modeDisplay}
-        options={modeOptions}
-        onChange={setMode}
-        placeholder="Default"
-        emptyText="No Modes are available."
-        searchable={modeOptions.length > 6}
-        title="Mode"
-        disabled={disabled || serverId === null || modeOptions.length <= 1}
-      />
+      {(modeOptions.length > 1 || value.mode.length > 0) && (
+        <SelectField
+          label="Mode"
+          value={value.mode}
+          selectedDisplay={modeDisplay}
+          options={modeOptions}
+          onChange={setMode}
+          placeholder="Default"
+          emptyText="No Modes are available."
+          searchable={modeOptions.length > 6}
+          title="Mode"
+          disabled={disabled || serverId === null || modeOptions.length <= 1}
+        />
+      )}
       <View style={settingsStyles.row}>
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>Use Fast mode</Text>

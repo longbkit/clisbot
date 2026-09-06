@@ -35,7 +35,7 @@ export type AgentExecutionStatus = (typeof AGENT_EXECUTION_STATUSES)[number];
 
 export const PROJECT_STATUSES = ["active", "archived"] as const;
 export const CONFIGURATION_SOURCE_KINDS = ["github", "manual"] as const;
-export const TRIGGER_FORMATS = ["single_run", "legacy_multistep"] as const;
+export const TRIGGER_FORMATS = ["single_run", "workflow", "legacy_multistep"] as const;
 export const CONNECTION_PROVIDERS = ["github", "slack", "discord", "linear"] as const;
 
 export type MachineSource =
@@ -294,7 +294,7 @@ export const organizationTriggers = pgTable(
     ),
     check(
       "organization_triggers_format_check",
-      sql`${table.format} in ('single_run', 'legacy_multistep')`,
+      sql`${table.format} in ('single_run', 'workflow', 'legacy_multistep')`,
     ),
   ],
 );
@@ -1472,6 +1472,26 @@ export const auditEvents = pgTable(
   (table) => [
     index("audit_events_organization_created_idx").on(table.organizationId, table.createdAt.desc()),
     index("audit_events_project_created_idx").on(table.projectId, table.createdAt.desc()),
+    index("audit_events_channel_created_idx")
+      .on(table.organizationId, table.createdAt.desc(), table.id.desc())
+      .where(
+        sql`${table.action} = 'channel.inbound.processed' AND ${table.subjectType} = 'channel_account'`,
+      ),
+    index("audit_events_channel_account_created_idx")
+      .on(table.organizationId, table.subjectId, table.createdAt.desc(), table.id.desc())
+      .where(
+        sql`${table.action} = 'channel.inbound.processed' AND ${table.subjectType} = 'channel_account'`,
+      ),
+    index("audit_events_channel_outcome_created_idx")
+      .on(
+        table.organizationId,
+        sql`(${table.evidence}->>'outcome')`,
+        table.createdAt.desc(),
+        table.id.desc(),
+      )
+      .where(
+        sql`${table.action} = 'channel.inbound.processed' AND ${table.subjectType} = 'channel_account'`,
+      ),
     check("audit_events_actor_kind_check", sql`${table.actorKind} in ('user', 'github', 'system')`),
     foreignKey({
       columns: [table.projectId, table.organizationId],

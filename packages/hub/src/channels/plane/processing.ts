@@ -1,8 +1,8 @@
 // The processing lease — "an accepted channel turn is in flight". The Hub owns
 // its LIFECYCLE (open at accepted inbound, close at the turn's terminal event,
 // expire a stalled turn, release on plane stop) and nothing else. The
-// provider's expiry behaviour belongs to the VERTICAL: Slack's status is set
-// once and cleared once, Telegram's `sendChatAction` re-sends on its own timer.
+// provider's expiry behaviour belongs to the VERTICAL: Slack restores its
+// status after posts and expiry; Telegram re-sends `sendChatAction` on its timer.
 //
 // Why the lease opens at the inbound and not at `turn_started`: the plane sends
 // the agent its prompt before the daemon can report anything, and a fresh
@@ -48,6 +48,8 @@ export interface ProcessingControllerDeps {
   /** Schedule the TTL sweep; returns the cancel. Injectable for tests. */
   schedule?: ((tick: () => void, intervalMs: number) => () => void) | undefined;
   ttlMs?: number | undefined;
+  /** Fresh authoritative daemon status for quiet tools; failure still expires the lease. */
+  readRunningAgentIds?: (() => Promise<ReadonlySet<string>>) | undefined;
 }
 
 export interface ProcessingController {
@@ -215,20 +217,44 @@ export function createProcessingController(deps: ProcessingControllerDeps): Proc
     }
   };
 
+  let checking = false;
   const tick = (): void => {
-    const now = deps.now();
-    for (const [id, lease] of Array.from(leases.entries())) {
-      if (now < lease.deadline) continue;
-      // The turn never reported its close (a dropped socket, a dead daemon).
-      deps.logger.warn("channel processing surface timed out", {
-        channel: lease.surface.channel,
-        account: lease.surface.accountId,
-        to: lease.surface.to,
-        lease: id,
-        agentId: lease.agentId ?? null,
-      });
-      release(id);
+    if (checking) return;
+    const expired = [...leases.values()].filter((lease) => deps.now() >= lease.deadline);
+    if (expired.length === 0) return;
+    const deadlines = new Map(expired.map((lease) => [lease.id, lease.deadline]));
+    const finish = (running: ReadonlySet<string>): void => {
+      for (const lease of expired) {
+        // A terminal event, a new lease or fresh stream activity wins over a late RPC result.
+        if (leases.get(lease.id) !== lease || lease.deadline !== deadlines.get(lease.id)) continue;
+        if (lease.agentId !== undefined && running.has(lease.agentId)) {
+          lease.deadline = deps.now() + ttlMs;
+          continue;
+        }
+        deps.logger.warn("channel processing surface timed out", {
+          channel: lease.surface.channel,
+          account: lease.surface.accountId,
+          to: lease.surface.to,
+          lease: lease.id,
+          agentId: lease.agentId ?? null,
+        });
+        release(lease.id);
+      }
+    };
+    if (
+      deps.readRunningAgentIds === undefined ||
+      expired.every((lease) => lease.agentId === undefined)
+    ) {
+      finish(new Set());
+      return;
     }
+    checking = true;
+    void deps
+      .readRunningAgentIds()
+      .then(finish, () => finish(new Set()))
+      .finally(() => {
+        checking = false;
+      });
   };
 
   return {

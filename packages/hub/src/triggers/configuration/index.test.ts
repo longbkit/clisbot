@@ -68,6 +68,30 @@ run:
 `;
 
 describe("self-contained trigger documents", () => {
+  it("compiles Channel-only work without enabling manual runs or implicit reply authority", () => {
+    const compiled = compileTriggerDocument(`
+name: conversation-assistant
+on:
+  channel.message:
+    filters: { from_users: ["*"] }
+run:
+  target: { daemon: devbox, cwd: /workspace }
+  agent: { provider: codex }
+  prompt: Answer the conversation
+  reuse: binding
+  outputs:
+    telegram.reply: { max: 1 }
+`);
+    assert.deepEqual(
+      compiled.events.map((event) => event.on),
+      ["channel.message"],
+    );
+    assert.equal(compiled.events[0]?.steps[0]?.reuse, "binding");
+    assert.deepEqual(compiled.events[0]?.steps[0]?.allowOutputs, [
+      { type: "telegram.reply", max: 1, required: false },
+    ]);
+  });
+
   it("compiles every input event to one launch against the inline target and agent choices", () => {
     const compiled = compileTriggerDocument(trigger);
 

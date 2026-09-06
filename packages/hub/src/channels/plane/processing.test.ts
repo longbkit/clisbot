@@ -258,3 +258,55 @@ describe("createProcessingController", () => {
     expect(h.calls).toEqual([]);
   });
 });
+
+it("keeps quiet tools visible only while a fresh daemon query confirms their Agent is running", async () => {
+  let running = new Set(["agent"]);
+  const h = harness({ ttlMs: 1000, readRunningAgentIds: async () => running });
+  h.controller.open("lease", SURFACE);
+  h.controller.bind("lease", "agent");
+  for (let i = 0; i < 3; i += 1) {
+    h.now.value += 1001;
+    h.ticks[0]!();
+    await settle();
+    expect(h.calls.map((call) => call.action)).toEqual(["start"]);
+  }
+  running = new Set();
+  h.now.value += 1001;
+  h.ticks[0]!();
+  await settle();
+  expect(h.calls.map((call) => call.action)).toEqual(["start", "stop"]);
+});
+
+it("expires quiet turns when daemon authority cannot be read", async () => {
+  const h = harness({
+    ttlMs: 1000,
+    readRunningAgentIds: async () => {
+      throw new Error("disconnected");
+    },
+  });
+  h.controller.open("lease", SURFACE);
+  h.controller.bind("lease", "agent");
+  h.now.value += 1001;
+  h.ticks[0]!();
+  await settle();
+  expect(h.calls.map((call) => call.action)).toEqual(["start", "stop"]);
+});
+
+it("does not resurrect a terminal lease when its pending daemon query resolves", async () => {
+  let resolve!: (running: Set<string>) => void;
+  const running = new Promise<Set<string>>((yes) => {
+    resolve = yes;
+  });
+  const h = harness({ ttlMs: 1000, readRunningAgentIds: () => running });
+  h.controller.open("lease", SURFACE);
+  h.controller.bind("lease", "agent");
+  h.now.value += 1001;
+  h.ticks[0]!();
+  h.controller.closeAgent("agent");
+  resolve(new Set(["agent"]));
+  await settle();
+  h.now.value += 1001;
+  h.ticks[0]!();
+  await settle();
+  expect(h.calls.map((call) => call.action)).toEqual(["start", "stop"]);
+});

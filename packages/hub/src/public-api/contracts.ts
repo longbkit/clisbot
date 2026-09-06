@@ -223,7 +223,7 @@ export const TriggerExportSchema = z
     id: z.string().uuid(),
     name: z.string(),
     enabled: z.boolean(),
-    format: z.enum(["single_run", "legacy_multistep"]),
+    format: z.enum(["single_run", "workflow", "legacy_multistep"]),
     yaml: z.string(),
   })
   .strict()

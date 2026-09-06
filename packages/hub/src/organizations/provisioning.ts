@@ -1,3 +1,4 @@
+import { apiFirstOnboardingEnabled } from "./onboarding.js";
 import { randomUUID } from "node:crypto";
 import type { QueryHandle } from "../db/runtime/index.js";
 import {
@@ -9,7 +10,7 @@ import {
 export interface ProvisionedOrganization {
   id: string;
   slug: string;
-  projectId: string;
+  projectId?: string;
 }
 
 /**
@@ -40,7 +41,7 @@ export async function provisionOrganization(
   entitlement: ProvisioningEntitlement,
 ): Promise<ProvisionedOrganization> {
   const slug = organizationSlug(input.name, input.organizationId);
-  const projectId = randomUUID();
+  const projectId = apiFirstOnboardingEnabled() ? undefined : randomUUID();
   await client.query(`insert into organization (id, name, slug) values ($1, $2, $3)`, [
     input.organizationId,
     input.name,
@@ -51,19 +52,21 @@ export async function provisionOrganization(
      values ($1, $2, $3, 'owner')`,
     [randomUUID(), input.organizationId, input.ownerUserId],
   );
-  await client.query(
-    `insert into projects (id, organization_id, name, slug, created_by_user_id)
+  if (projectId !== undefined) {
+    await client.query(
+      `insert into projects (id, organization_id, name, slug, created_by_user_id)
      values ($1, $2, 'Default', 'default', $3)`,
-    [projectId, input.organizationId, input.ownerUserId],
-  );
-  await client.query(
-    `insert into project_configuration_sources
+      [projectId, input.organizationId, input.ownerUserId],
+    );
+    await client.query(
+      `insert into project_configuration_sources
        (project_id, organization_id, kind, automatic_deployment_enabled, selected_by_user_id)
      values ($1, $2, 'manual', false, $3)`,
-    [projectId, input.organizationId, input.ownerUserId],
-  );
+      [projectId, input.organizationId, input.ownerUserId],
+    );
+  }
   await stampProvisioningEntitlements(client, input.organizationId, input.ownerUserId, entitlement);
-  return { id: input.organizationId, slug, projectId };
+  return { id: input.organizationId, slug, ...(projectId ? { projectId } : {}) };
 }
 
 /**

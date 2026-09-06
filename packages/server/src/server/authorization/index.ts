@@ -36,11 +36,29 @@ export class SessionAuthorization {
   }
 
   allowsInbound(message: SessionInboundMessage): boolean {
-    return this.hasActiveLease() && this.allows(requiredPermissionForInbound(message.type));
+    return (
+      this.hasActiveLease() &&
+      (this.allows(requiredPermissionForInbound(message.type)) ||
+        (message.type === "workspace.create.request" && this.allowsManagedWorkspaceCreation()))
+    );
   }
 
   allowsOutbound(message: SessionOutboundMessage): boolean {
-    return this.hasActiveLease() && this.allows(requiredPermissionForOutbound(message.type));
+    return (
+      this.hasActiveLease() &&
+      (this.allows(requiredPermissionForOutbound(message.type)) ||
+        (message.type === "workspace.create.response" && this.allowsManagedWorkspaceCreation()))
+    );
+  }
+
+  // Managed Access owns this narrow exception; ordinary Paseo retains workspace.manage.
+  // Exact project/source checks remain with ManagedResourceAuthorizer before dispatch.
+  private allowsManagedWorkspaceCreation(): boolean {
+    return (
+      this.resources?.resourceMode === "projects" &&
+      this.permissions.has("workspace.write") &&
+      [...this.resources.projects.keys()].some((id) => this.allowsProject(id, "workspace.create"))
+    );
   }
 
   replacePermissions(permissions: readonly DaemonPermission[]): void {

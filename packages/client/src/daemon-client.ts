@@ -879,10 +879,12 @@ class DaemonRpcError extends Error {
   readonly code?: string;
 
   constructor(params: { requestId: string; error: string; requestType?: string; code?: string }) {
-    const parts = [params.error];
-    if (params.requestType) parts.push(`requestType=${params.requestType}`);
-    if (params.code) parts.push(`code=${params.code}`);
-    super(parts.join(" "));
+    // Keep diagnostic metadata structured rather than leaking wire identifiers into UI copy.
+    super(
+      params.code === "access_denied"
+        ? "You do not have permission to perform this action. Ask your administrator for access."
+        : params.error,
+    );
     this.name = "DaemonRpcError";
     this.requestId = params.requestId;
     this.requestType = params.requestType;

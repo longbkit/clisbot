@@ -78,7 +78,9 @@ describe("Hub canonical bundle deployment contract", () => {
   });
 
   it("exposes only convention-based deployment options", () => {
-    const deploy = createHubCommand().commands.find((command) => command.name() === "deploy");
+    const deploy = createHubCommand({ env: { CLISBOT_ONBOARDING_ENABLED: "0" } }).commands.find(
+      (command) => command.name() === "deploy",
+    );
     const help = deploy?.helpInformation() ?? "";
 
     expect(help).not.toContain("[file]");

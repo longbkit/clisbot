@@ -66,6 +66,7 @@ import { replaceDaemonProjects } from "./access/daemon-projects.js";
 import { AccessStore } from "./access/store.js";
 import { consumeDaemonAccessTicket, refreshDaemonAccessLease } from "./managed-access/http.js";
 import { AccessTicketService } from "./managed-access/tickets.js";
+import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 
 export interface HubRuntimeOptions {
   database: Database | null;
@@ -88,6 +89,7 @@ export interface HubRuntimeOptions {
   accessTickets?: AccessTicketService;
   /** Shared Access repository used by management and daemon-owned catalog operations. */
   accessStore?: AccessStore;
+  providerApplications?: import("./provider-applications/index.js").ProviderApplications;
   /** COMPAT(clisbot-control-plane): the Hub data directory operator secrets mirror into. */
   hubDataDir?: string;
   /** COMPAT(clisbot-control-plane): the channel supervisor, or null to degrade the transport step. */
@@ -232,7 +234,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
 
   // COMPAT(clisbot-control-plane): one ops holder, built synchronously; the
   // kill-switch and database precedence are applied per request inside it.
-  const channelControlPlane = createChannelControlPlaneOpsFor(options);
+  const channelControlPlane = createChannelControlPlaneOpsFor(options, accessStore);
   const manualSource =
     options.database === null ? undefined : createManualTriggerSource(options.database);
   const durableDispatchHandler =
@@ -281,7 +283,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
       ? {}
       : { dispatchLaunchMachineIntent: durableDispatchHandler }),
   });
-  connectDaemonLifecycle(daemons, daemonModule);
+  connectDaemonLifecycle(daemons, daemonModule, accessTickets, options.database);
   let activeSources: readonly TriggerSource[] = [];
 
   const hub: HubRuntime = {
@@ -544,9 +546,21 @@ function channelWorkflowProviderFor(options: HubRuntimeOptions): TriggerProvider
 // inside the ops.
 function createChannelControlPlaneOpsFor(
   options: HubRuntimeOptions,
+  accessStore: AccessStore | null,
 ): ReturnType<typeof createChannelControlPlaneOps> {
   return createChannelControlPlaneOps({
     database: options.database,
+    ...(options.databaseRuntime
+      ? {
+          onboarding: {
+            runtime: options.databaseRuntime,
+            ...(options.providerApplications
+              ? { providerApplications: options.providerApplications }
+              : {}),
+            access: accessStore ?? new AccessStore(options.databaseRuntime),
+          },
+        }
+      : {}),
     completionTokenSecret: options.completionTokenSecret,
     supervisor: options.channelSupervisor ?? null,
     channelReplyServer: options.channelReplyServer ?? null,
@@ -556,14 +570,29 @@ function createChannelControlPlaneOpsFor(
 function connectDaemonLifecycle(
   daemons: ActiveDaemonRegistry | null,
   daemonModule: DaemonModule | null,
+  accessTickets: AccessTicketService | null,
+  database: Database | null,
 ): void {
+  const revocation =
+    daemons !== null && accessTickets !== null
+      ? new AccessLeaseRevocation(accessTickets, (daemonId, leaseIds) => {
+          daemons.revokeAccessLeases(daemonId, leaseIds);
+        })
+      : null;
   daemons?.onConnected((daemon) => daemonModule?.lifecycle.recoverDaemon(daemon));
-  daemons?.onRevoked((daemon) =>
-    daemonModule?.lifecycle.failPendingExecutionsForDisconnectedMachine(
+  daemons?.onRevoked(async (daemon) => {
+    // Canonical revocation already marked the Daemon inactive. Complete lease
+    // notifications before execution cleanup can reject and close the socket.
+    if (revocation !== null && database !== null) {
+      const machine = await database.findMachineById(daemon.machineId);
+      if (machine === undefined) throw new Error("Revoked Daemon has no owning machine");
+      await revocation.revokeDaemon(machine.orgId, daemon.id);
+    }
+    await daemonModule?.lifecycle.failPendingExecutionsForDisconnectedMachine(
       daemon.machineId,
       "daemon_revoked",
-    ),
-  );
+    );
+  });
 }
 
 function createAppDaemonModule(

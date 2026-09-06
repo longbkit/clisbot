@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -46,6 +47,7 @@ import { getNextActiveIndex } from "./combobox-keyboard";
 import {
   buildVisibleComboboxOptions,
   getComboboxFallbackIndex,
+  groupAndLimitComboboxOptions,
   orderVisibleComboboxOptions,
   shouldShowCustomComboboxOption,
 } from "./combobox-options";
@@ -90,6 +92,8 @@ export interface ComboboxProps {
   }) => ReactElement;
   onSearchQueryChange?: (query: string) => void;
   searchable?: boolean;
+  /** Limit each section after searching; the selected matching option stays visible. */
+  maxOptionsPerGroup?: number;
   placeholder?: string;
   searchPlaceholder?: string;
   emptyText?: string;
@@ -380,14 +384,20 @@ function OptionsList({
   return (
     <>
       {options.map((opt, index) => (
-        <OptionRow
-          key={opt.id}
-          option={opt}
-          selected={opt.id === value}
-          active={index === activeIndex}
-          onSelect={onSelect}
-          renderOption={renderOption}
-        />
+        <Fragment key={opt.id}>
+          {opt.group && (index === 0 || options[index - 1]?.group !== opt.group) ? (
+            <Text accessibilityRole="header" style={styles.groupHeading}>
+              {opt.group}
+            </Text>
+          ) : null}
+          <OptionRow
+            option={opt}
+            selected={opt.id === value}
+            active={index === activeIndex}
+            onSelect={onSelect}
+            renderOption={renderOption}
+          />
+        </Fragment>
       ))}
     </>
   );
@@ -1278,6 +1288,7 @@ export function Combobox({
   renderOption,
   onSearchQueryChange,
   searchable = true,
+  maxOptionsPerGroup,
   placeholder,
   searchPlaceholder,
   emptyText,
@@ -1308,7 +1319,6 @@ export function Combobox({
   const { t } = useTranslation();
   const { theme } = useUnistyles();
   const resolvedPlaceholder = placeholder ?? t("common.placeholders.search");
-  const resolvedEmptyText = emptyText ?? t("common.empty.noOptionsMatchSearch");
   const resolvedTitle = title ?? t("common.actions.select");
   const isMobile = useIsCompactFormFactor();
   const floatingLayer = useOverlayLayer("floating");
@@ -1326,6 +1336,10 @@ export function Combobox({
   const [referenceTop, setReferenceTop] = useState<number | null>(null);
   const [referenceAtOrigin, setReferenceAtOrigin] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const resolvedEmptyText =
+    searchable && searchQuery.trim().length > 0 && options.length > 0
+      ? t("common.empty.noOptionsMatchSearch")
+      : (emptyText ?? t("common.empty.noOptionsMatchSearch"));
   const [searchResetKey, bumpSearchResetKey] = useReducer((key: number) => key + 1, 0);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const desktopOptionsScrollRef = useRef<ScrollView>(null);
@@ -1461,9 +1475,26 @@ export function Combobox({
   );
 
   const orderedVisibleOptions = useMemo(
-    () => orderVisibleComboboxOptions(visibleOptions, effectiveOptionsPosition),
-    [effectiveOptionsPosition, visibleOptions],
+    () =>
+      orderVisibleComboboxOptions(
+        groupAndLimitComboboxOptions(visibleOptions, maxOptionsPerGroup, value),
+        effectiveOptionsPosition,
+      ),
+    [effectiveOptionsPosition, visibleOptions, maxOptionsPerGroup, value],
   );
+
+  const resultsFooter =
+    orderedVisibleOptions.length < visibleOptions.length ? (
+      <View>
+        <Text style={styles.groupHeading}>
+          Showing {orderedVisibleOptions.length} of {visibleOptions.length} results. Type to narrow
+          your search.
+        </Text>
+        {footer}
+      </View>
+    ) : (
+      footer
+    );
 
   const handleDesktopContentLayout = useCallback(
     (event: LayoutChangeEvent) =>
@@ -1584,7 +1615,7 @@ export function Combobox({
         header={header}
         onClose={handleClose}
         stickyHeader={stickyHeader}
-        footer={footer}
+        footer={resultsFooter}
         searchable={searchable}
         hasChildren={hasChildren}
         mobileChildrenScrollEnabled={mobileChildrenScrollEnabled}
@@ -1622,7 +1653,7 @@ export function Combobox({
       handleDesktopContentLayout={handleDesktopContentLayout}
       header={header}
       stickyHeader={stickyHeader}
-      footer={footer}
+      footer={resultsFooter}
       searchable={searchable}
       searchPlaceholder={effectiveSearchPlaceholder}
       searchQuery={searchQuery}
@@ -1647,6 +1678,13 @@ export function Combobox({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  groupHeading: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+  },
   mobileSheetFrame: {
     flex: 1,
     minHeight: 0,

@@ -7,6 +7,9 @@ import {
   type PressableStateCallbackType,
   type TargetedEvent,
 } from "react-native";
+import { X } from "lucide-react-native";
+import { StyleSheet } from "react-native-unistyles";
+import { Button } from "@/components/ui/button";
 import type { EditingTextInputHandle } from "@/components/ui/text-input";
 import { Combobox, ComboboxItem, type ComboboxProps } from "@/components/ui/combobox";
 import { Field, FormTextInput } from "@/components/ui/form-field";
@@ -14,9 +17,11 @@ import { SelectFieldTrigger } from "@/components/ui/select-field";
 import { useFetchQuery } from "@/data/query";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { hubResourceQueryKey } from "../query-keys";
 import { HubObservedChannelConversationsSchema } from "../contracts";
 import {
   observedConversationOptions,
+  splitConversationIds,
   type ConversationKind,
   type ConversationOption,
 } from "../conversation-picker";
@@ -44,11 +49,10 @@ export function ConversationSelectionFields({
   const organizationId = hub.signedIn?.organization.id ?? "";
   const observations = useFetchQuery({
     queryKey: [
-      "clisbot",
-      "hub",
-      hub.origin,
-      organizationId,
-      "channel-conversations",
+      ...hubResourceQueryKey(
+        { origin: hub.origin, organizationId, accountId: hub.signedIn?.account.id ?? null },
+        "channel-conversations",
+      ),
       channel,
       accountId,
     ],
@@ -61,9 +65,11 @@ export function ConversationSelectionFields({
         ),
     enabled: organizationId.length > 0 && channel !== null && accountId !== null,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
+  const [manualEntry, setManualEntry] = useState(false);
+  const toggleManualEntry = useCallback(() => setManualEntry((current) => !current), []);
   const inputRef = useRef<EditingTextInputHandle>(null);
   const displayedValue = useRef(value);
   useEffect(() => {
@@ -73,8 +79,13 @@ export function ConversationSelectionFields({
   }, [value]);
   const selectedIds = useMemo(() => splitConversationIds(value), [value]);
   const options = useMemo(
-    () => observedConversationOptions(observations.data?.conversations ?? [], kind),
-    [kind, observations.data?.conversations],
+    () =>
+      observedConversationOptions(
+        observations.data?.conversations ?? [],
+        kind,
+        observations.data?.destinations,
+      ),
+    [kind, observations.data?.conversations, observations.data?.destinations],
   );
   const setSelectedIds = useCallback(
     (ids: readonly string[]) => {
@@ -94,32 +105,100 @@ export function ConversationSelectionFields({
   );
 
   return (
-    <>
-      {options.length > 0 ? (
-        <ObservedConversationPicker
-          options={options}
-          selectedIds={selectedIds}
-          onChange={setSelectedIds}
-          disabled={disabled}
-        />
-      ) : null}
-      <Field label="Conversation IDs" hint={hint}>
-        <FormTextInput
-          ref={inputRef}
-          initialValue={value}
-          onChangeText={changeText}
-          placeholder={placeholder}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!disabled}
-        />
-      </Field>
-      {observations.error ? (
-        <Text style={settingsStyles.rowHint}>
-          Observed Conversations are unavailable. Enter an exact provider ID instead.
+    <Field label="Selected conversations" hint={hint}>
+      <View style={styles.selection}>
+        {selectedIds.length === 0 ? (
+          <Text style={settingsStyles.rowHint}>No conversations selected.</Text>
+        ) : (
+          selectedIds.map((id) => (
+            <SelectedConversation
+              key={id}
+              id={id}
+              option={options.find((option) => option.conversationId === id)}
+              selectedIds={selectedIds}
+              onChange={setSelectedIds}
+              disabled={disabled}
+            />
+          ))
+        )}
+        {options.length > 0 ? (
+          <ObservedConversationPicker
+            key={`${hub.origin}:${hub.signedIn?.account.id}:${organizationId}:${channel}:${accountId}:${kind}`}
+            options={options}
+            selectedIds={selectedIds}
+            onChange={setSelectedIds}
+            disabled={disabled}
+          />
+        ) : null}
+        <Button size="xs" variant="outline" onPress={toggleManualEntry} disabled={disabled}>
+          {manualEntry ? "Hide ID entry" : "Enter IDs"}
+        </Button>
+        {manualEntry ? (
+          <Field
+            label="Conversation IDs"
+            hint="Enter multiple IDs separated by commas or new lines. These update the selected conversations above."
+          >
+            <FormTextInput
+              ref={inputRef}
+              initialValue={value}
+              onChangeText={changeText}
+              placeholder={placeholder}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!disabled}
+              multiline
+            />
+          </Field>
+        ) : null}
+        {observations.error ? (
+          <Text style={settingsStyles.rowHint}>
+            Conversation names are unavailable. Your selected IDs are unchanged; you can enter IDs
+            manually.
+          </Text>
+        ) : null}
+      </View>
+    </Field>
+  );
+}
+
+function SelectedConversation({
+  id,
+  option,
+  selectedIds,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  option: ConversationOption | undefined;
+  selectedIds: readonly string[];
+  onChange(ids: readonly string[]): void;
+  disabled: boolean;
+}) {
+  const remove = useCallback(
+    () => onChange(selectedIds.filter((selected) => selected !== id)),
+    [id, onChange, selectedIds],
+  );
+  return (
+    <View style={styles.selectedRow}>
+      <View style={styles.selectedText}>
+        <Text selectable style={settingsStyles.rowTitle}>
+          {option?.label ?? id}
         </Text>
-      ) : null}
-    </>
+        {option ? (
+          <Text selectable style={settingsStyles.rowHint}>
+            {option.description}
+          </Text>
+        ) : null}
+      </View>
+      <Button
+        size="sm"
+        variant="ghost"
+        leftIcon={X}
+        accessibilityLabel={`Remove ${option?.label ?? id}`}
+        disabled={disabled}
+        onPress={remove}
+      />
+    </View>
   );
 }
 
@@ -136,11 +215,19 @@ function ObservedConversationPicker({
 }) {
   const anchorRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const pickerActions = useMemo(
+    () => (
+      <View style={styles.pickerActions}>
+        <Button size="sm" variant="secondary" onPress={close}>
+          Done
+        </Button>
+      </View>
+    ),
+    [close],
+  );
   const [focused, setFocused] = useState(false);
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const selectedObservedCount = options.filter((option) =>
-    selected.has(option.conversationId),
-  ).length;
   const toggle = useCallback(
     (optionId: string) => {
       const option = options.find(({ id }) => id === optionId);
@@ -179,10 +266,8 @@ function ObservedConversationPicker({
   );
 
   return (
-    <Field
-      label="Observed conversations"
-      hint="Select known Conversations, or enter an exact provider ID below."
-    >
+    <View style={styles.selection}>
+      <Text style={settingsStyles.rowHint}>Choose one or more known conversations.</Text>
       <View ref={anchorRef} collapsable={false}>
         <Pressable
           disabled={disabled}
@@ -190,17 +275,13 @@ function ObservedConversationPicker({
           onFocus={onFocus}
           onBlur={onBlur}
           accessibilityRole="button"
-          accessibilityLabel={`Observed conversations (${String(selectedObservedCount)} selected)`}
+          accessibilityLabel="Choose conversations"
         >
           {({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => (
             <SelectFieldTrigger
-              label={
-                selectedObservedCount === 0
-                  ? "Choose observed Conversations"
-                  : `${String(selectedObservedCount)} selected`
-              }
-              isPlaceholder={selectedObservedCount === 0}
-              placeholder="Choose observed Conversations"
+              label="Choose conversations"
+              isPlaceholder={false}
+              placeholder="Choose conversations"
               hovered={Boolean(hovered)}
               focused={focused}
               active={pressed || open}
@@ -215,25 +296,26 @@ function ObservedConversationPicker({
         onSelect={toggle}
         searchable
         searchPlaceholder="Search by name or provider ID"
-        emptyText="No observed Conversation matches this search."
-        title="Observed conversations"
+        emptyText="No conversation matches this search."
+        title="Choose conversations"
+        stickyHeader={pickerActions}
         open={open}
         onOpenChange={setOpen}
         keepOpenOnSelect
         anchorRef={anchorRef}
         renderOption={renderOption}
       />
-    </Field>
+    </View>
   );
 }
 
-function splitConversationIds(value: string): string[] {
-  return [
-    ...new Set(
-      value
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean),
-    ),
-  ];
-}
+const styles = StyleSheet.create((theme) => ({
+  selection: { gap: theme.spacing[2] },
+  pickerActions: {
+    alignItems: "flex-end",
+    paddingHorizontal: theme.spacing[6],
+    paddingBottom: theme.spacing[2],
+  },
+  selectedRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
+  selectedText: { flex: 1, minWidth: 0 },
+}));

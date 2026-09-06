@@ -749,3 +749,26 @@ describe("removeWorkspace", () => {
     expect(after.workspaces).toBe(before.workspaces);
   });
 });
+
+it("retains session permissions and updates permission-only server info changes", () => {
+  initializeTestSession();
+  const store = useSessionStore.getState();
+  const info = {
+    status: "server_info" as const,
+    serverId: "test-server",
+    hostname: null,
+    version: null,
+  };
+  store.updateSessionServerInfo("test-server", { ...info, permissions: ["workspace.read"] });
+  expect(useSessionStore.getState().sessions["test-server"]?.serverInfo?.permissions).toEqual([
+    "workspace.read",
+  ]);
+  store.updateSessionServerInfo("test-server", { ...info, permissions: ["workspace.manage"] });
+  expect(useSessionStore.getState().sessions["test-server"]?.serverInfo?.permissions).toEqual([
+    "workspace.manage",
+  ]);
+  store.updateSessionServerInfo("test-server", info);
+  expect(
+    useSessionStore.getState().sessions["test-server"]?.serverInfo?.permissions,
+  ).toBeUndefined();
+});

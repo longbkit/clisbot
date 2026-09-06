@@ -1,0 +1,626 @@
+{
+  "method": "Parse each SYNC row keyed by its quoted local src path; compare against current production TS files. Resolve quoted .ts references in source column relative to upstream channel/src, except explicit packages/ or extensions/ roots. Unresolved items need review, not proof they never existed historically.",
+  "channels": {
+    "slack": {
+      "productionFiles": 17,
+      "mappedProductionFiles": 13,
+      "unmappedProductionFiles": [
+        "src/conversation-metadata.ts",
+        "src/transport/approval-card.ts",
+        "src/transport/socket-pool.ts",
+        "src/typing.ts"
+      ],
+      "mappingRows": 13,
+      "rowsWithMultipleQuotedSourceTsFiles": 8,
+      "duplicateDeviationIds": ["D-006"],
+      "rows": [
+        {
+          "line": 19,
+          "local": "src/client/web-api.ts",
+          "localExists": true,
+          "source": "`client.ts` / `client-options.ts` (client options, write-client LRU cache, `SLACK_TEXT_LIMIT`, retry policies) + `probe.ts` (auth.test probe, user-token warning) + `token.ts` (`formatSlackBotTokenIdentityWarning`) + `errors.ts` (error shaping) + `limits.ts` (`SLACK_TEXT_LIMIT`)",
+          "quotedTsReferences": [
+            {
+              "reference": "client.ts",
+              "resolvedPath": "extensions/slack/src/client.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "client-options.ts",
+              "resolvedPath": "extensions/slack/src/client-options.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "probe.ts",
+              "resolvedPath": "extensions/slack/src/probe.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "token.ts",
+              "resolvedPath": "extensions/slack/src/token.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "errors.ts",
+              "resolvedPath": "extensions/slack/src/errors.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "limits.ts",
+              "resolvedPath": "extensions/slack/src/limits.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 20,
+          "local": "src/transport/socket-mode.ts",
+          "localExists": true,
+          "source": "`monitor/provider.ts` (socket branch: handler wiring, ack-first dispatch, im/mpim app_mention dedup) + `monitor/provider-support.ts` (SocketModeClient wrapper: autoReconnect, ping timeout, socket logger)",
+          "quotedTsReferences": [
+            {
+              "reference": "monitor/provider.ts",
+              "resolvedPath": "extensions/slack/src/monitor/provider.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "monitor/provider-support.ts",
+              "resolvedPath": "extensions/slack/src/monitor/provider-support.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 21,
+          "local": "src/transport/media.ts",
+          "localExists": true,
+          "source": "`monitor/media.ts` (the `files[].url_private_download` → `url_private` download URL, the Bearer-token `createSlackAuthHeaders`, the `assertSlackFileUrl` Slack-host allowlist) + `types.ts` (`SlackFile` fields) + shared `downloadMediaFile` / `buildAttachedFilesManifest` / `foldAttachedFilesIntoBody` (DRY with the Telegram vertical)",
+          "quotedTsReferences": [
+            {
+              "reference": "monitor/media.ts",
+              "resolvedPath": "extensions/slack/src/monitor/media.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "types.ts",
+              "resolvedPath": "extensions/slack/src/types.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 22,
+          "local": "src/transport/socket-reconnect.ts",
+          "localExists": true,
+          "source": "`monitor/reconnect-policy.ts` (backoff policy, auth-error classifier, disconnect waiter) + `monitor/provider.ts` (the reconnect loop)",
+          "quotedTsReferences": [
+            {
+              "reference": "monitor/reconnect-policy.ts",
+              "resolvedPath": "extensions/slack/src/monitor/reconnect-policy.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "monitor/provider.ts",
+              "resolvedPath": "extensions/slack/src/monitor/provider.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 23,
+          "local": "src/transport/socket-event-filter.ts",
+          "localExists": true,
+          "source": "`monitor/channel-type.ts` (`inferSlackChannelType` / `normalizeSlackChannelType` / `resolveSlackChatType`) + `monitor/events/messages.ts` (ts→ms, mention fact, own-message, payload → inbound event, the `to` fact = `channel:${channelId}`)",
+          "quotedTsReferences": [
+            {
+              "reference": "monitor/channel-type.ts",
+              "resolvedPath": "extensions/slack/src/monitor/channel-type.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "monitor/events/messages.ts",
+              "resolvedPath": "extensions/slack/src/monitor/events/messages.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 24,
+          "local": "src/lifecycle/start-account.ts",
+          "localExists": true,
+          "source": "`channel.ts` (`startAccount`, flat account read) + `probe.ts` (auth.test) + `accounts.ts` / `accounts.runtime.ts` (token source, duplicate-token guard) + `token.ts`",
+          "quotedTsReferences": [
+            {
+              "reference": "channel.ts",
+              "resolvedPath": "extensions/slack/src/channel.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "probe.ts",
+              "resolvedPath": "extensions/slack/src/probe.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "accounts.ts",
+              "resolvedPath": "extensions/slack/src/accounts.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "accounts.runtime.ts",
+              "resolvedPath": "extensions/slack/src/accounts.runtime.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "token.ts",
+              "resolvedPath": "extensions/slack/src/token.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 25,
+          "local": "src/mrkdwn.ts",
+          "localExists": true,
+          "source": "`monitor/mrkdwn.ts` (`escapeSlackMrkdwn`)",
+          "quotedTsReferences": [
+            {
+              "reference": "monitor/mrkdwn.ts",
+              "resolvedPath": "extensions/slack/src/monitor/mrkdwn.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 26,
+          "local": "src/outbound.ts",
+          "localExists": true,
+          "source": "`outbound-adapter.ts` (`sendText` subset: post text + thread, `NO_REPLY` silent token) + `send.ts` (write client) + `sent-thread-cache.ts` (`recordSlackSentMessage` → keyed-store seam, D-001)",
+          "quotedTsReferences": [
+            {
+              "reference": "outbound-adapter.ts",
+              "resolvedPath": "extensions/slack/src/outbound-adapter.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "send.ts",
+              "resolvedPath": "extensions/slack/src/send.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "sent-thread-cache.ts",
+              "resolvedPath": "extensions/slack/src/sent-thread-cache.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 27,
+          "local": "src/outbound-media.ts",
+          "localExists": true,
+          "source": "`client-delivery.ts` (`uploadSlackFile` — the 3-step external upload: `files.getUploadURLExternal` → `POST` bytes to `upload_url` → `files.completeUploadExternal`) + `errors.ts` (DNS-request retry wrapper shape)",
+          "quotedTsReferences": [
+            {
+              "reference": "client-delivery.ts",
+              "resolvedPath": "extensions/slack/src/client-delivery.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "errors.ts",
+              "resolvedPath": "extensions/slack/src/errors.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 28,
+          "local": "src/plugin.ts",
+          "localExists": true,
+          "source": "`channel.ts` (`startAccount` + `outbound.sendText` + `outbound.sendMedia` drive surface) — pinned export name `slackPlugin`",
+          "quotedTsReferences": [
+            {
+              "reference": "channel.ts",
+              "resolvedPath": "extensions/slack/src/channel.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 29,
+          "local": "src/entry.ts",
+          "localExists": true,
+          "source": "the `defineBundledChannelEntry`-shaped entry (id `slack`, name `Slack`)",
+          "quotedTsReferences": []
+        },
+        {
+          "line": 30,
+          "local": "src/runtime.ts",
+          "localExists": true,
+          "source": "the `setSlackChannelRuntime` runtime sidecar (HostRuntime store)",
+          "quotedTsReferences": []
+        },
+        {
+          "line": 31,
+          "local": "src/index.ts",
+          "localExists": true,
+          "source": "package entry (default = entry, named `slackPlugin`)",
+          "quotedTsReferences": []
+        }
+      ]
+    },
+    "telegram": {
+      "productionFiles": 22,
+      "mappedProductionFiles": 18,
+      "unmappedProductionFiles": [
+        "src/conversation-metadata.ts",
+        "src/index.ts",
+        "src/transport/media.ts",
+        "src/typing.ts"
+      ],
+      "mappingRows": 18,
+      "rowsWithMultipleQuotedSourceTsFiles": 6,
+      "duplicateDeviationIds": ["D-016"],
+      "rows": [
+        {
+          "line": 7,
+          "local": "src/client/bot-api.ts",
+          "localExists": true,
+          "source": "`send-message.ts` (text path only), `outbound-adapter.ts` (`baseOpts` + `TELEGRAM_TEXT_CHUNK_LIMIT = 4000`), `send-context.ts` surface",
+          "quotedTsReferences": [
+            {
+              "reference": "send-message.ts",
+              "resolvedPath": "extensions/telegram/src/send-message.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "outbound-adapter.ts",
+              "resolvedPath": "extensions/telegram/src/outbound-adapter.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "send-context.ts",
+              "resolvedPath": "extensions/telegram/src/send-context.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 8,
+          "local": "src/client/sent-messages.ts",
+          "localExists": true,
+          "source": "`sent-message-cache.ts` (`recordSentMessage` store half)",
+          "quotedTsReferences": [
+            {
+              "reference": "sent-message-cache.ts",
+              "resolvedPath": "extensions/telegram/src/sent-message-cache.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 9,
+          "local": "src/leaves/telegram-policy.ts",
+          "localExists": true,
+          "source": "`send-error-predicates.ts`, `network-errors.ts` (429/5xx classification), `retry-after.ts` boundary, `fetch.ts` (`TelegramTransport`), `accounts.ts` (apiRoot)",
+          "quotedTsReferences": [
+            {
+              "reference": "send-error-predicates.ts",
+              "resolvedPath": "extensions/telegram/src/send-error-predicates.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "network-errors.ts",
+              "resolvedPath": "extensions/telegram/src/network-errors.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "retry-after.ts",
+              "resolvedPath": "extensions/telegram/src/retry-after.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "fetch.ts",
+              "resolvedPath": "extensions/telegram/src/fetch.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "accounts.ts",
+              "resolvedPath": "extensions/telegram/src/accounts.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 10,
+          "local": "src/leaves/coerce.ts",
+          "localExists": true,
+          "source": "`targets.ts` (`parseTelegramTarget` / chat-id normalization), `error-runtime` (`formatErrorMessage`), chat-not-found wrap from `prepareTelegramOutbound`'s error path",
+          "quotedTsReferences": [
+            {
+              "reference": "targets.ts",
+              "resolvedPath": "extensions/telegram/src/targets.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 11,
+          "local": "src/leaves/rich-message.ts",
+          "localExists": true,
+          "source": "`format.ts` (plain-text chunking); `send-message-text.ts` (per-chunk thread/silent + single-use reply-to)",
+          "quotedTsReferences": [
+            {
+              "reference": "format.ts",
+              "resolvedPath": "extensions/telegram/src/format.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "send-message-text.ts",
+              "resolvedPath": "extensions/telegram/src/send-message-text.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 12,
+          "local": "src/format.ts",
+          "localExists": true,
+          "source": "`format.ts` (`markdownToTelegramIR` → `renderTelegramHtml` → `renderSupportedTelegramHtml`; markdown-it token walk)",
+          "quotedTsReferences": [
+            {
+              "reference": "format.ts",
+              "resolvedPath": "extensions/telegram/src/format.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 13,
+          "local": "src/format-sanitize.ts",
+          "localExists": true,
+          "source": "`format.ts` (`renderSupportedTelegramHtml` + tag-support tables + `telegramHtmlToPlainTextFallback` + `countTelegramHtmlVisibleCharacters`)",
+          "quotedTsReferences": [
+            {
+              "reference": "format.ts",
+              "resolvedPath": "extensions/telegram/src/format.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 14,
+          "local": "src/format-html.ts",
+          "localExists": true,
+          "source": "`format-html.ts` (entity decode + entity-end finder) + `escapeTelegramHtml`",
+          "quotedTsReferences": [
+            {
+              "reference": "format-html.ts",
+              "resolvedPath": "extensions/telegram/src/format-html.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 15,
+          "local": "src/telegram-html-chunk.ts",
+          "localExists": true,
+          "source": "`format.ts` (`splitTelegramHtmlChunks` + `splitTelegramHtmlChunksRaw` + split-index helpers)",
+          "quotedTsReferences": [
+            {
+              "reference": "format.ts",
+              "resolvedPath": "extensions/telegram/src/format.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 16,
+          "local": "src/html-tags.ts",
+          "localExists": true,
+          "source": "`packages/markdown-core/src/html-tags.ts` (`tokenizeHtmlTags`)",
+          "quotedTsReferences": [
+            {
+              "reference": "packages/markdown-core/src/html-tags.ts",
+              "resolvedPath": "packages/markdown-core/src/html-tags.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 17,
+          "local": "src/transport/poll.ts",
+          "localExists": true,
+          "source": "`monitor-polling.runtime.ts` (module surface), `polling-session.ts` (poll loop shape: read offset → getUpdates long-poll → persist max offset → back off on recoverable fault), `update-offset-store.ts` (offset state + rotation drop), `allowed-updates.ts` (`resolveTelegramAllowedUpdates`), `token-fingerprint.ts` (fingerprint + bot-id-from-token)",
+          "quotedTsReferences": [
+            {
+              "reference": "monitor-polling.runtime.ts",
+              "resolvedPath": "extensions/telegram/src/monitor-polling.runtime.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "polling-session.ts",
+              "resolvedPath": "extensions/telegram/src/polling-session.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "update-offset-store.ts",
+              "resolvedPath": "extensions/telegram/src/update-offset-store.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "allowed-updates.ts",
+              "resolvedPath": "extensions/telegram/src/allowed-updates.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "token-fingerprint.ts",
+              "resolvedPath": "extensions/telegram/src/token-fingerprint.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 18,
+          "local": "src/transport/approval-callback.ts",
+          "localExists": true,
+          "source": "— (in-repo seam, COMPAT(clisbot-control-plane); mirrors `extensions/slack/src/transport/approval-card.ts` of the in-repo Slack vertical, which in turn mirrors the pinned Slack `block_actions` envelope)",
+          "quotedTsReferences": [
+            {
+              "reference": "extensions/slack/src/transport/approval-card.ts",
+              "resolvedPath": "extensions/slack/src/transport/approval-card.ts",
+              "exists": false,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 19,
+          "local": "src/lifecycle/start-account.ts",
+          "localExists": true,
+          "source": "`bot-info.ts` (getMe shape), `bot-info-cache.ts` (fingerprint-keyed cache, 24 h TTL), `startup-probe-limiter.ts` (2-slot probe limiter)",
+          "quotedTsReferences": [
+            {
+              "reference": "bot-info.ts",
+              "resolvedPath": "extensions/telegram/src/bot-info.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "bot-info-cache.ts",
+              "resolvedPath": "extensions/telegram/src/bot-info-cache.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "startup-probe-limiter.ts",
+              "resolvedPath": "extensions/telegram/src/startup-probe-limiter.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 20,
+          "local": "src/outbound.ts",
+          "localExists": true,
+          "source": "`outbound-adapter.ts` (`resolveTelegramSendContext`'s `baseOpts` shape: cfg/accountId/threadId→messageThreadId/replyTo→replyToMessageId)",
+          "quotedTsReferences": [
+            {
+              "reference": "outbound-adapter.ts",
+              "resolvedPath": "extensions/telegram/src/outbound-adapter.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            }
+          ]
+        },
+        {
+          "line": 21,
+          "local": "src/outbound-media.ts",
+          "localExists": true,
+          "source": "`outbound-media.ts` (`resolveTelegramOutboundMediaSenders` mime→method routing), `packages/media-core/src/constants.ts` (`mediaKindFromMime` mime-kind mapping) + `mime.ts` (`EXT_BY_MIME` ext→mime)",
+          "quotedTsReferences": [
+            {
+              "reference": "outbound-media.ts",
+              "resolvedPath": "extensions/telegram/src/outbound-media.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "packages/media-core/src/constants.ts",
+              "resolvedPath": "packages/media-core/src/constants.ts",
+              "exists": true,
+              "sameBasenameCandidates": []
+            },
+            {
+              "reference": "mime.ts",
+              "resolvedPath": "extensions/telegram/src/mime.ts",
+              "exists": false,
+              "sameBasenameCandidates": ["packages/media-core/src/mime.ts"]
+            }
+          ]
+        },
+        {
+          "line": 22,
+          "local": "src/runtime-store.ts",
+          "localExists": true,
+          "source": "— (in-repo seam)",
+          "quotedTsReferences": []
+        },
+        {
+          "line": 23,
+          "local": "src/plugin.ts",
+          "localExists": true,
+          "source": "pinned entry shape (`telegramPlugin` export name, B3)",
+          "quotedTsReferences": []
+        },
+        {
+          "line": 24,
+          "local": "src/entry.ts",
+          "localExists": true,
+          "source": "pinned entry shape",
+          "quotedTsReferences": []
+        }
+      ]
+    }
+  },
+  "fusionHead": "8a675bfe4c4b80f6733ff50e6c9a152c5984d2f6",
+  "upstreamHead": "04453837d3ed72bbb0325ac5039390373795d5a2",
+  "mappingHashes": {
+    "packages/channels/slack/SYNC.md": "5e4a9528386098f3abf5895eeb757b67641df1c724f3bdf8cdb94bab92a0f2a0",
+    "packages/channels/slack/DEVIATIONS.md": "eb3d41eb5d076eb7df7d7cb546f66de15eb6ea8625389bb6f41ce13da08edff1",
+    "packages/channels/telegram/SYNC.md": "9bebbc899c02b185d0bfcd50edcb6557b847508ba82e2ac938f1c43f3aea2098",
+    "packages/channels/telegram/DEVIATIONS.md": "b84d2dafc87940d22844868db3c72b419b23c1a5eecb8e8eb6d269f4bd04106f"
+  },
+  "scopeNotes": [
+    "Counts include current working-tree production files; file row existence is not source fidelity.",
+    "Multiple source references are counted from quoted .ts paths only, not semantic or complete dependency closure.",
+    "Approval callback is explicitly local glue in prose; its in-repo cross-reference path is wrong. mime.ts has ambiguous root. These are reference-resolution findings, not proof about historical source availability."
+  ]
+}

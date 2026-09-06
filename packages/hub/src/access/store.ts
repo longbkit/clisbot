@@ -49,6 +49,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
   ]),
   project: new Set([
     "project.use",
+    "workspace.create",
     "agent.interact",
     "agent.create",
     "agent.fast.use",
@@ -65,6 +66,7 @@ const PRIVILEGES_BY_RESOURCE: Record<AccessResourceKind, ReadonlySet<AccessPrivi
 
 const PROJECT_PRIVILEGES = new Set<AccessPrivilege>([
   "project.use",
+  "workspace.create",
   "agent.interact",
   "agent.create",
   "agent.fast.use",
@@ -177,6 +179,8 @@ export interface ConsumedChannelIdentityChallenge {
 
 const CHANNEL_IDENTITY_CHALLENGE_LIFETIME_MS = 10 * 60_000;
 const CHANNEL_IDENTITY_CHALLENGE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export type ChannelPrivilegeDecision = { allowed: true } | { allowed: false; reason: string };
 
 export interface ChannelPrivilegeRequest {
   organizationId: string;
@@ -877,9 +881,20 @@ export class AccessStore {
 
   /** Resolves one provider sender to a Hub Member and evaluates an exact Channel-account grant. */
   async allowsChannelPrivilege(input: ChannelPrivilegeRequest): Promise<boolean> {
+    return (await this.authorizeChannelPrivilege(input)).allowed;
+  }
+
+  async authorizeChannelPrivilege(
+    input: ChannelPrivilegeRequest,
+  ): Promise<ChannelPrivilegeDecision> {
     const identity = await this.resolveChannelMember(input);
-    if (identity === undefined) return false;
-    if (identity.role === "owner") return true;
+    if (identity === undefined) {
+      return {
+        allowed: false,
+        reason: "sender identity is not linked to a Hub Member on this Connection",
+      };
+    }
+    if (identity.role === "owner") return { allowed: true };
 
     const teams = await this.database
       .select({ id: schema.teams.id })
@@ -922,13 +937,16 @@ export class AccessStore {
           subject,
         ),
       );
-    return rows
+    const allowed = rows
       .map(toAssignment)
       .some(
         ({ privileges, constraints }) =>
           privileges.includes(input.privilege) &&
           conversationCovers(constraints.conversation, input.conversation),
       );
+    return allowed
+      ? { allowed: true }
+      : { allowed: false, reason: "linked Hub Member does not have access to this conversation" };
   }
 
   /** Requires both a verified Channel identity and current Project approval authority. */

@@ -1,12 +1,82 @@
+import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
 import {
   automationRouteBacklinks,
+  automationChannelReplyGrant,
+  automationOutputs,
+  initialChannelReplyProviders,
   buildSingleAgentAutomationYaml,
   normalizeAutomationName,
   parseSingleAgentAutomationYaml,
 } from "./automation-configuration";
 
 describe("Automation configuration", () => {
+  it("reflects the first compiled step's reply defaults without borrowing later event grants", () => {
+    const value = { events: [{ name: "slack.mention" }], outputs: [] };
+    expect(automationChannelReplyGrant(value, "slack")).toEqual({ type: "slack.reply" });
+    expect(automationChannelReplyGrant(value, "telegram")).toBeUndefined();
+    expect(
+      automationChannelReplyGrant(
+        { ...value, events: [{ name: "channel.message" }, ...value.events] },
+        "slack",
+      ),
+    ).toBeUndefined();
+    expect(
+      automationChannelReplyGrant(
+        { ...value, outputs: [{ type: "slack.reply", max: 2 }] },
+        "slack",
+      ),
+    ).toEqual({ type: "slack.reply", max: 2 });
+  });
+  it("authors Channel-only work with explicit admission and without a manual entry point", () => {
+    const yaml = buildSingleAgentAutomationYaml({
+      name: "conversation-assistant",
+      events: [],
+      daemonId: "daemon",
+      cwd: "/workspace",
+      provider: "codex",
+      instruction: "Answer the request",
+      reuseBinding: true,
+      outputs: [{ type: "telegram.reply", max: 1 }],
+    });
+    expect(parseSingleAgentAutomationYaml(yaml)).toMatchObject({
+      events: [{ name: "channel.message", allowedUsers: ["*"] }],
+      reuseBinding: true,
+      outputs: [{ type: "telegram.reply", max: 1 }],
+    });
+    expect(yaml).toContain("name: conversation-assistant");
+    expect(yaml.trimStart().startsWith("{")).toBe(false);
+    expect(parse(yaml).on).toEqual({
+      "channel.message": { filters: { from_users: ["*"] } },
+    });
+  });
+
+  it("round-trips GitHub repository and comment filters", () => {
+    const events = [
+      {
+        name: "github.issue_comment",
+        connection: "github",
+        allowedUsers: ["alice"],
+        repository: "org/repo",
+        contains: "@bot review",
+      },
+    ];
+    const yaml = buildSingleAgentAutomationYaml({
+      name: "review",
+      instruction: "Review the change",
+      events,
+      daemonId: "host",
+      cwd: "/workspace",
+      provider: "pi",
+    });
+    expect(parse(yaml).on["github.issue_comment"].filters).toEqual({
+      from_users: ["alice"],
+      repo: "org/repo",
+      contains: "@bot review",
+    });
+    expect(parseSingleAgentAutomationYaml(yaml)?.events).toEqual(events);
+  });
+
   it("normalizes a durable resource name", () => {
     expect(normalizeAutomationName("  12 Customer Handoff! ")).toBe("customer-handoff");
   });
@@ -56,7 +126,7 @@ describe("Automation configuration", () => {
       },
       outputs: [{ type: "slack.reply", max: 2 }],
     });
-    const document = JSON.parse(yaml) as Record<string, unknown>;
+    const document = parse(yaml) as Record<string, unknown>;
 
     expect(document).toMatchObject({
       name: "customer-handoff",
@@ -202,5 +272,49 @@ describe("Automation configuration", () => {
       { channel: "slack", accountId: "support", routePosition: 0 },
       { channel: "slack", accountId: "support", routePosition: "fallback" },
     ]);
+  });
+});
+
+describe("Channel Automation reply authority", () => {
+  it("gives a new Channel Automation only its explicitly displayed provider reply action", () => {
+    const selected = initialChannelReplyProviders([], "telegram");
+    expect(selected).toEqual(["telegram"]);
+    expect(automationOutputs([], [{ name: "manual.run" }], {}, selected)).toEqual([
+      { type: "telegram.reply" },
+    ]);
+    expect(automationOutputs([], [{ name: "manual.run" }], {}, [])).toEqual([]);
+  });
+  it("preserves authored Channel and unrelated output authority on structured edit", () => {
+    const existing = [
+      { type: "slack.reply", max: 2, required: true },
+      { type: "telegram.reply", max: 3 },
+      { type: "github.reply", max: 1 },
+      { type: "custom.publish", required: true },
+    ];
+    const selected = initialChannelReplyProviders(existing);
+    const output = automationOutputs(
+      existing,
+      [{ name: "manual.run" }],
+      { "slack.reply": "2", "telegram.reply": "3" },
+      selected,
+    );
+    expect(output).toEqual(expect.arrayContaining(existing));
+    expect(output).toHaveLength(existing.length);
+  });
+  it("removes Channel reply authority when unchecked without removing the direct event or other provider outputs", () => {
+    const existing = [{ type: "slack.reply", max: 2 }, { type: "telegram.reply" }];
+    expect(automationOutputs(existing, [{ name: "manual.run" }], {}, ["telegram"])).toEqual([
+      { type: "telegram.reply" },
+    ]);
+    expect(
+      automationOutputs(
+        existing,
+        [{ name: "slack.mention", connection: "slack" }],
+        { "slack.reply": "2" },
+        ["telegram"],
+      ),
+    ).toEqual(
+      expect.arrayContaining([{ type: "slack.reply", max: 2 }, { type: "telegram.reply" }]),
+    );
   });
 });

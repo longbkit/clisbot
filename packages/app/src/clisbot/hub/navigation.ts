@@ -13,6 +13,6 @@ export function isHubSectionSlug(value: string): value is HubSectionSlug {
   return (HUB_SECTION_SLUGS as readonly string[]).includes(value);
 }
 
-export function buildHubSettingsRoute(section: HubSectionSlug) {
+export function buildHubSettingsRoute<const Section extends HubSectionSlug>(section: Section) {
   return `/settings/hub/${section}` as const;
 }

@@ -31,6 +31,7 @@ const accountStateSchema = z
     status: z.string(),
     account: z.object({ email: z.string() }).optional(),
     organization: z.object({ name: z.string(), slug: z.string() }).optional(),
+    membership: z.object({ id: z.string(), role: z.string() }).optional(),
     isInstanceOperator: z.boolean().optional(),
     registration: z.string().optional(),
   })
@@ -76,7 +77,12 @@ describe("first-run claim at the browser boundary", () => {
       // setup before the durable account state becomes active.
       const cookie = await signIn(instance.auth, operator.email, operator.password);
       const appSetup = await readAccountState(instance.auth, cookie);
-      assert.equal(appSetup.status, "appSetupRequired");
+      if (appSetup.status !== "appSetupRequired") {
+        assert.fail(`expected appSetupRequired, received ${appSetup.status}`);
+      }
+      assert.ok(appSetup.membership);
+      assert.equal(appSetup.membership.role, "owner");
+      assert.equal(appSetup.isInstanceOperator, true);
       // App setup already resolves the organization the daemon handoff has to address, and it is
       // the same one the dashboard opens on — the handoff never re-resolves it.
       assert.match(appSetup.organization?.slug ?? "", /^paseo-hub-[0-9a-f]{8}$/u);

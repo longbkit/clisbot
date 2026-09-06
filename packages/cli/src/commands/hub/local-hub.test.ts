@@ -127,6 +127,12 @@ afterEach(async () => {
 });
 
 describe("resolveLocalHubHome", () => {
+  test("expands a configured home independently of the checkout", () => {
+    expect(resolveLocalHubHome({}, { CLISBOT_HOME: "~/.clisbot-dev" })).toBe(
+      path.join(os.homedir(), ".clisbot-dev"),
+    );
+    expect(resolveLocalHubHome({ home: "relative-home" }, {})).toBe(path.resolve("relative-home"));
+  });
   test("flag beats CLISBOT_HOME, PASEO_HOME, and default", () => {
     const env = { CLISBOT_HOME: "/a", PASEO_HOME: "/b" } as NodeJS.ProcessEnv;
     expect(resolveLocalHubHome({ home: "/flag" }, env)).toBe("/flag");
@@ -233,6 +239,64 @@ describe("local Hub credential master key", () => {
 });
 
 describe("startLocalHubDetached", () => {
+  test("records the available port and launch identity used by the actual child", async () => {
+    const home = await createHome();
+    const runtime = new FakeHubRuntime();
+    const selectPort = vi.fn().mockResolvedValue(7123);
+    const result = await startLocalHubDetached({ home }, Object.assign(runtime, { selectPort }));
+    expect(selectPort).toHaveBeenCalledWith(6868, true);
+    expect(result.url).toBe("http://127.0.0.1:7123");
+    const recorded = readHubStateFile(home);
+    expect(recorded?.instanceId).toBeTruthy();
+    expect(runtime.lastDetached?.options.env?.CLISBOT_HUB_INSTANCE_ID).toBe(recorded?.instanceId);
+    expect(runtime.lastDetached?.options.env?.PASEO_HUB_APP_URL).toBe(result.url);
+  });
+
+  test("keeps the selected port across stop and restart without treating a stopped PID as live", async () => {
+    const home = await createHome();
+    writeFileSync(
+      path.join(home, "hub-local.json"),
+      JSON.stringify({
+        version: 1,
+        url: "http://127.0.0.1:7123",
+        port: 7123,
+        pid: process.pid,
+        instanceId: "previous-launch",
+        stoppedAt: new Date().toISOString(),
+      }),
+    );
+    expect(resolveLocalHubState({ home }).running).toBe(false);
+    expect((await stopLocalHub({ home })).action).toBe("not_running");
+    expect(readHubStateFile(home)?.port).toBe(7123);
+    const runtime = new FakeHubRuntime();
+    const selectPort = vi.fn().mockResolvedValue(7123);
+    await startLocalHubDetached({ home }, Object.assign(runtime, { selectPort }));
+    expect(selectPort).toHaveBeenCalledWith(7123, false);
+    expect(readHubStateFile(home)?.stoppedAt).toBeUndefined();
+  });
+
+  test("keeps inherited port behavior when onboarding is disabled", async () => {
+    const home = await createHome();
+    const runtime = new FakeHubRuntime();
+    const selectPort = vi.fn();
+    await startLocalHubDetached({ home }, Object.assign(runtime, { selectPort }), {
+      CLISBOT_ONBOARDING_ENABLED: "0",
+    });
+    expect(selectPort).not.toHaveBeenCalled();
+    expect(readHubStateFile(home)?.instanceId).toBeUndefined();
+  });
+
+  test("does not turn bare token input variables into a legacy environment Application", async () => {
+    const home = await createHome();
+    const runtime = new FakeHubRuntime();
+    const inherited = { SLACK_APP_TOKEN: "xapp-input", SLACK_BOT_TOKEN: "xoxb-input" };
+    await startLocalHubDetached({ home }, runtime, inherited);
+    const child = runtime.lastDetached?.options.env as NodeJS.ProcessEnv;
+    expect(child.SLACK_APP_TOKEN).toBeUndefined();
+    expect(child.SLACK_BOT_TOKEN).toBeUndefined();
+    expect(inherited.SLACK_APP_TOKEN).toBe("xapp-input");
+  });
+
   test("spawns the fork bin detached and records hub-local.json at loopback :6868", async () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
@@ -247,6 +311,7 @@ describe("startLocalHubDetached", () => {
     expect(launch?.args).toEqual([runtime.bin]);
     expect(launch?.options?.detached).toBe(true);
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6868");
+    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_APP_URL).toBe(result.url);
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_BIND).toBe("127.0.0.1");
     expect(
       Buffer.from(

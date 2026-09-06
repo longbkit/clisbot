@@ -442,6 +442,20 @@
       "when": 1788455947723,
       "tag": "0062_bent_spitfire",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788588683652,
+      "tag": "0063_round_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1788628357934,
+      "tag": "0064_tiny_lester",
+      "breakpoints": true
     }
   ]
 }

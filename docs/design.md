@@ -108,6 +108,12 @@ Five primitives. The pick is determined by option count, the need to search, and
 
 `confirmDialog` is for destructive yes/no and imperative confirmation. Promise-based: `await confirmDialog({ destructive: true, ... })`. Anything where a wrong click loses work.
 
+On web, confirmations render inside the app through `ConfirmationProvider` and
+`AdaptiveModalSheet`; never call the browser's blocking `confirm`. Native alerts
+and the Electron dialog backend retain their platform behavior. Scoped forms can
+use the same confirmation surface with owner lifecycle cancellation and structured
+detail, so leaving a form cannot authorize its pending mutation.
+
 Three themes is `DropdownMenu`. Thirty hosts is `Combobox`. A label and a value is `AdaptiveModalSheet`. "Are you sure?" is `confirmDialog`.
 
 ---

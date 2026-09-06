@@ -1,3 +1,8 @@
+import {
+  MasterPasswordReset,
+  MASTER_PASSWORD_RESET_PATH,
+  recoverySessionValid,
+} from "./master-password-reset.js";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { jwt } from "better-auth/plugins";
@@ -101,6 +106,8 @@ interface AuthServerOptions {
   onOrganizationAccessChanged?: (organizationId: string) => Promise<void>;
   /** Optional post-commit delivery for organization invitations. */
   invitationMailer?: InvitationMailer;
+  /** Optional instance-wide recovery secret; absent disables recovery. */
+  masterPassword?: string | undefined;
 }
 
 const sessionSchema = z.object({
@@ -159,6 +166,7 @@ const TEAM_AUTH_MUTATION_PATHS = new Set([
 
 export function createAuthServer(options: AuthServerOptions): AuthServer {
   const database = options.database.drizzle();
+  const passwordRecovery = new MasterPasswordReset(options.database, options.masterPassword);
   const policy = options.policy ?? defaultInstanceAuthPolicy();
   const provisioningEntitlements =
     options.provisioningEntitlements ?? (() => Promise.resolve(UNLIMITED_PROVISIONING));
@@ -290,6 +298,8 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
       if (token.length === 0) return undefined;
       try {
         const payload = await verifyAccessToken(token, {
+          // The resource client defaults to /jwks; Hub auth is mounted under /api/auth.
+          jwksUrl: new URL("/api/auth/jwks", options.baseURL).href,
           verifyOptions: {
             audience: options.baseURL,
             issuer: options.baseURL,
@@ -297,6 +307,8 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           scopes: [HUB_ACCESS_SCOPE],
         });
         if (payload["azp"] !== PASEO_CLIENT_ID || typeof payload.sub !== "string") return undefined;
+        if (!(await recoverySessionValid(options.database, payload.sub, payload["sid"])))
+          return undefined;
         const organizationId = payload[HUB_ORGANIZATION_CLAIM];
         if (typeof organizationId !== "string" || organizationId.length === 0) return undefined;
         const membership = await clientAuthorization.membership(payload.sub, organizationId);
@@ -348,6 +360,7 @@ export function createAuthServer(options: AuthServerOptions): AuthServer {
           requestBrowserOrigin(request, browserOrigin),
         );
         if (rejected !== undefined) return Promise.resolve(rejected);
+        if (path === MASTER_PASSWORD_RESET_PATH) return passwordRecovery.handle(request);
         if (path === "/api/auth/paseo/claim-instance") {
           return claimInstanceRequest(request);
         }

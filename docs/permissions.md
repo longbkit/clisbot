@@ -1,5 +1,7 @@
 # Daemon permissions
 
+For setup steps and user-facing access levels, see the [Paseo + Hub user guide](guides/user-guide/README.md) and [Daemon Administrator guide](guides/user-guide/access/daemon-administrator.md).
+
 The daemon authorizes principals with semantic permissions. RPC names and protocol namespaces are not authority.
 
 ## Model
@@ -37,7 +39,14 @@ Permissions are additive allows. Missing authority denies the operation. Do not 
 
 ## Resources
 
-Permissions are daemon-wide today. Future grants may select workspaces or agents, but operation classification remains inside the authorization module:
+The base semantic permissions are daemon-wide. Clisbot Managed Access additionally enforces
+Project grants on requests and outbound observations; see the
+[Managed Access contract](audits/2026-08-31-unified-client-managed-access-lite.md). Its explicit
+`workspace.create` Project privilege admits only creating a Workspace in an authorized Project,
+without granting daemon-wide `workspace.manage`. Project creation still requires
+`workspace.manage`. Existing stored grants do not gain new privileges when a UI preset changes.
+
+Future base grants may select workspaces or agents, but operation classification remains inside the authorization module:
 
 ```ts
 type Grant = {
@@ -48,7 +57,7 @@ type Grant = {
 
 A delegating principal can grant only authority it already possesses. A session may attenuate its principal's grants but cannot widen them.
 
-Workspace-scoped grants require every resource-bearing operation and outbound observation to enforce the same workspace boundary. File preview currently accepts any daemon-readable regular file, so it must gain resource enforcement before workspace-specific access ships.
+Workspace-scoped grants require every resource-bearing operation and outbound observation to enforce the same workspace boundary. Ordinary trusted sessions can preview any daemon-readable regular file; Managed Access applies its Project resource checks before file operations. These application checks are not an operating-system sandbox for code executed by an agent or terminal.
 
 ## Hub
 

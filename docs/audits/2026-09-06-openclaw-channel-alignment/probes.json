@@ -1,0 +1,23 @@
+{
+  "verification": "isolated execution of current TS functions; injected memory store, failing handoff, fake poll; no network or database calls",
+  "sharedLedger": {
+    "first": {
+      "dispatched": false,
+      "reason": "handoff fault"
+    },
+    "afterRestart": {
+      "dispatched": false,
+      "reason": "ledger replay"
+    },
+    "handoffs": 1
+  },
+  "telegramPoll": {
+    "handoffCalls": 1,
+    "offsetWritesAfterFailure": [10]
+  },
+  "telegramMention": {
+    "commandForOtherBot": true,
+    "usernamePrefix": true,
+    "textMentionOurBot": false
+  }
+}

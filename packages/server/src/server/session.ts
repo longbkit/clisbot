@@ -1931,15 +1931,19 @@ export class Session {
       if (!operationAllowed || !resourceAllowed) {
         const requestId = sessionRequestId(msg);
         if (requestId) {
+          const code = resourceAllowed
+            ? "access_denied"
+            : await this.resourceAuthorizer.denialCode(msg);
           this.emit({
             type: "rpc_error",
             payload: {
               requestId,
               requestType: msg.type,
-              error: resourceAllowed
-                ? `Session is not authorized for ${msg.type}`
-                : "Resource not found",
-              code: resourceAllowed ? "access_denied" : "resource_not_found",
+              error:
+                code === "access_denied"
+                  ? "You do not have permission to perform this action. Ask your administrator for access."
+                  : "Resource not found",
+              code,
             },
           });
         }
@@ -6317,6 +6321,15 @@ export class Session {
     }
 
     const sourceCwd = await resolveWorktreeSourceCwd(source, this.projectRegistry);
+    if (
+      !(await this.resourceAuthorizer.allowsWorktreeDestination(
+        sourceCwd,
+        this.paseoHome,
+        this.worktreesRoot,
+      ))
+    ) {
+      throw new Error("Worktree destination is outside the configured worktrees directory");
+    }
 
     const result = await this.createPaseoWorktreeWorkflow(
       {

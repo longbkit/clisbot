@@ -22,6 +22,12 @@ export class AccessLeaseRevocation {
     return revoked;
   }
 
+  async revokeDaemon(organizationId: string, daemonId: string): Promise<RevokedAccessLease[]> {
+    const revoked = await this.tickets.revokeDaemonLeases(organizationId, daemonId);
+    await this.notify(organizationId, revoked);
+    return revoked;
+  }
+
   async revokeMember(organizationId: string, membershipId: string): Promise<RevokedAccessLease[]> {
     const revoked = await this.tickets.revokeMemberLeases(organizationId, membershipId);
     await this.notify(organizationId, revoked);

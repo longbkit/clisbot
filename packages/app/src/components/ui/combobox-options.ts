@@ -11,6 +11,7 @@ export interface ComboboxOptionModel {
   label: string;
   description?: string;
   kind?: ComboboxOptionKind;
+  group?: string;
 }
 
 const DESCRIPTION_FALLBACK_TIER = 99;
@@ -122,4 +123,25 @@ export function getComboboxFallbackIndex(
     return -1;
   }
   return optionsPosition === "above-search" ? itemCount - 1 : 0;
+}
+
+/** Group after ranking so search relevance is preserved within each section. */
+export function groupAndLimitComboboxOptions(
+  options: ComboboxOptionModel[],
+  maxOptionsPerGroup?: number,
+  selectedId?: string,
+): ComboboxOptionModel[] {
+  const groups = new Map<string | undefined, ComboboxOptionModel[]>();
+  for (const option of options) {
+    const group = groups.get(option.group) ?? [];
+    group.push(option);
+    groups.set(option.group, group);
+  }
+  return [...groups.values()].flatMap((group) => {
+    if (maxOptionsPerGroup === undefined || group.length <= maxOptionsPerGroup) return group;
+    const limited = group.slice(0, Math.max(1, maxOptionsPerGroup));
+    const selected = group.find((option) => option.id === selectedId);
+    if (selected && !limited.includes(selected)) limited[limited.length - 1] = selected;
+    return limited;
+  });
 }

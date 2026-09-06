@@ -1,3 +1,21 @@
+import { TRUSTED_REQUEST_ORIGIN_HEADER } from "../../http/request-origin.js";
+import { deployRevision } from "./configuration.js";
+export {
+  deployRevision,
+  validateChannelConfigurationCandidate,
+  prepareChannelConfigurationCandidate,
+  type ChannelConfigurationCandidate,
+} from "./configuration.js";
+import {
+  controlPlaneAbsent,
+  errorResponse,
+  invalidRequest,
+  conflict,
+  parseJsonBody,
+  problem,
+  ControlPlaneHttpError,
+} from "./problems.js";
+export { ControlPlaneHttpError } from "./problems.js";
 // COMPAT(clisbot-control-plane): the channel control-plane's HTTP ops — the seven
 // thin operations the CLI's `channels` and `users` verbs target (implementation
 // doc §1.4, §3.2, §4-S4): channel add/list/status and user list/show/add/edit.
@@ -18,26 +36,29 @@
 // the activation semantics. Account files contain only connection ids; no token
 // appears in a revision or on disk.
 
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  configureOnboardingSlack,
+  validateOnboardingTarget,
+  ChannelOnboardingSchema,
+  prepareChannelOnboarding,
+  configureOnboardingRoute,
+  linkOnboardingOwner,
+  type OnboardingServices,
+} from "./onboarding.js";
+import { apiFirstOnboardingEnabled } from "../../organizations/onboarding.js";
+import { timingSafeEqual } from "node:crypto";
 import { dump, load } from "js-yaml";
 import { z } from "zod";
 import { CHANNEL_POLICY_PATH } from "../../config/bundle-contract.js";
-import { compileHubBundle, HubBundleError, type HubBundleFile } from "../../config/bundle.js";
+import { type HubBundleFile } from "../../config/bundle.js";
 import type { Database } from "../../db/types.js";
 import { INTERNAL_CLIENT_ADDRESS_HEADER } from "../../http/client-address.js";
 import {
-  channelAgentNames,
-  channelEnvironmentNames,
-  assertOpenAudienceTargetSafety,
+  ChannelControlPlaneError,
   loadChannelControlPlane,
   type ChannelControlPlaneSnapshot,
-  ChannelControlPlaneError,
 } from "../control-plane.js";
-import {
-  ChannelCompilationError,
-  compileChannelControlPlane,
-  type ChannelControlPlane,
-} from "../config/compile.js";
+import { type ChannelControlPlane } from "../config/compile.js";
 import { isChannelsEnabled } from "../loader/channel-gate.js";
 import type { ChannelReplyServer } from "../channel-reply.js";
 import { assignmentCoversPrincipal } from "../policy.js";
@@ -58,6 +79,7 @@ export interface ChannelControlPlaneOps {
 
 export interface ChannelControlPlaneOpsOptions {
   database: Database | null;
+  onboarding?: OnboardingServices;
   completionTokenSecret: string | undefined;
   /** The per-account lifecycle driver; null degrades the transport step. */
   supervisor: ChannelSupervisor | null;
@@ -77,14 +99,19 @@ const channelAddBodySchema = z.discriminatedUnion("channel", [
     .object({
       channel: z.literal("slack"),
       account: z.string().min(1).max(128),
-      connectionId: z.string().uuid(),
+      connectionId: z.string().uuid().optional(),
+      botToken: z.string().min(1).optional(),
+      appToken: z.string().min(1).optional(),
+      setup: ChannelOnboardingSchema.optional(),
     })
     .strict(),
   z
     .object({
       channel: z.literal("telegram"),
       account: z.string().min(1).max(128),
-      botToken: z.string().min(1),
+      botToken: z.string().min(1).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
     })
     .strict(),
 ]);
@@ -187,17 +214,6 @@ function gate(
   return handle(database).catch((error: unknown) => Promise.resolve(errorResponse(request, error)));
 }
 
-/** The exact 404 the public API gives unknown canonical routes — byte-equivalent. */
-function controlPlaneAbsent(request: Request): Response {
-  return problem(
-    request,
-    404,
-    "not_found",
-    "Not found",
-    "No canonical API route matches this path.",
-  );
-}
-
 /** A Bearer token must equal the instance auth secret (no loopback fallback);
  * without one, the caller's address must be loopback. */
 function authorized(request: Request, completionTokenSecret: string | undefined): boolean {
@@ -209,6 +225,9 @@ function authorized(request: Request, completionTokenSecret: string | undefined)
     const presented = Buffer.from(token, "utf8");
     return expected.length === presented.length && timingSafeEqual(expected, presented);
   }
+  const origin = request.headers.get("origin");
+  if (origin !== null && origin !== request.headers.get(TRUSTED_REQUEST_ORIGIN_HEADER))
+    return false;
   const address = request.headers.get(INTERNAL_CLIENT_ADDRESS_HEADER);
   return (
     address === "127.0.0.1" ||
@@ -218,85 +237,104 @@ function authorized(request: Request, completionTokenSecret: string | undefined)
   );
 }
 
-/** Map a handler failure to its status + problem body. */
-function errorResponse(request: Request, error: unknown): Response {
-  if (error instanceof ControlPlaneHttpError) {
-    return problem(request, error.status, error.code, error.title, error.detail);
-  }
-  return problem(
-    request,
-    500,
-    "internal_error",
-    "Internal error",
-    "an unexpected failure occurred",
-  );
-}
-
-/** A typed 4xx/5xx the handlers throw for their own failure classes. */
-export class ControlPlaneHttpError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string,
-    readonly title: string,
-    readonly detail: string,
-  ) {
-    super(detail);
-    this.name = "ControlPlaneHttpError";
-  }
-}
-
-function invalidRequest(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(400, "invalid_request", "Invalid request", detail);
-}
-
-function conflict(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(409, "control_plane_conflict", "Conflict", detail);
-}
-
-function invalidConfiguration(detail: string): ControlPlaneHttpError {
-  return new ControlPlaneHttpError(422, "invalid_configuration", "Invalid configuration", detail);
-}
-
 async function handleAddChannel(
   database: Database,
   request: Request,
   options: ChannelControlPlaneOpsOptions,
 ): Promise<Response> {
+  if (request.method === "PUT") return handlePrepareOnboarding(database, request, options);
   const body = await parseJsonBody(request, channelAddBodySchema);
+  if (body.setup && !apiFirstOnboardingEnabled()) return controlPlaneAbsent(request);
   if (body.account.includes("/") || body.account.includes("\0")) {
     throw invalidRequest("the account id must not contain '/'");
   }
   const snapshot = await loadSnapshot(database);
-  const connectionId =
-    body.channel === "telegram"
-      ? (
-          await database.configureTelegramConnection({
-            organizationId: snapshot.organizationId,
-            accountId: body.account,
-            botToken: body.botToken,
-          })
-        ).connectionId
-      : body.connectionId;
+  if (body.setup)
+    await validateOnboardingTarget(
+      database,
+      options.onboarding,
+      snapshot.organizationId,
+      body.setup,
+    );
+  const connectionId = await resolveOnboardingConnection(
+    database,
+    request,
+    options,
+    snapshot.organizationId,
+    body,
+  );
   const connection = await database.resolveChannelConnection({
     organizationId: snapshot.organizationId,
     channel: body.channel,
     connectionId,
   });
   if (connection === undefined) throw invalidRequest("the channel connection does not exist");
-  const files = upsertAccountFile(snapshot, body.channel, body.account, connectionId);
-  await deployRevision(database, snapshot, files);
-  const start = await startAccount(options.supervisor, body.channel, body.account);
+  let files = upsertAccountFile(snapshot, body.channel, body.account, connectionId);
+  if (body.setup) files = configureOnboardingRoute(files, body.channel, body.account, body.setup);
+  await deployRevision(database, snapshot, files, {
+    expectedRevisionId: snapshot.revision?.id ?? null,
+  });
+  const owner =
+    body.setup && options.onboarding
+      ? await linkOnboardingOwner(
+          options.onboarding,
+          snapshot.organizationId,
+          connectionId,
+          body.setup,
+        )
+      : undefined;
+  return channelInstallationResponse(options.supervisor, body, connectionId, owner);
+}
+
+async function channelInstallationResponse(
+  supervisor: ChannelSupervisor | null,
+  body: { channel: string; account: string },
+  connectionId: string,
+  owner: { ready: boolean; command?: string; expiresAt?: string } | undefined,
+): Promise<Response> {
+  const start = await startAccount(supervisor, body.channel, body.account);
   return Response.json(
     {
       channel: body.channel,
       account: body.account,
       installed: start.installed,
       revision: true,
+      ...(owner ? { owner, connectionId } : {}),
       transport: start.transport,
       ...(start.detail === undefined ? {} : { detail: start.detail }),
     },
     { status: 200 },
   );
+}
+
+async function resolveOnboardingConnection(
+  database: Database,
+  request: Request,
+  options: ChannelControlPlaneOpsOptions,
+  organizationId: string,
+  body: z.infer<typeof channelAddBodySchema>,
+): Promise<string> {
+  if (body.channel === "telegram") {
+    if (body.connectionId && !body.botToken) return body.connectionId;
+    if (!body.botToken || body.connectionId)
+      throw invalidRequest("Supply a Telegram token or Connection ID");
+    return (
+      await database.configureTelegramConnection({
+        organizationId,
+        accountId: body.account,
+        botToken: body.botToken,
+      })
+    ).connectionId;
+  }
+  if (body.connectionId && !body.botToken && !body.appToken) return body.connectionId;
+  if (!body.connectionId && body.botToken && body.appToken && options.onboarding) {
+    return configureOnboardingSlack(database, options.onboarding, request, organizationId, {
+      botToken: body.botToken,
+      appToken: body.appToken,
+      ...(body.setup?.ownerEmail ? { ownerEmail: body.setup.ownerEmail } : {}),
+    });
+  }
+  throw invalidRequest("Supply a Slack Connection ID or both app token and bot token");
 }
 
 async function handleListChannels(
@@ -459,27 +497,6 @@ async function loadSnapshot(database: Database): Promise<ChannelControlPlaneSnap
   }
 }
 
-async function parseJsonBody<Schema extends z.ZodType>(
-  request: Request,
-  schema: Schema,
-): Promise<z.infer<Schema>> {
-  let value: unknown;
-  try {
-    value = await request.json();
-  } catch {
-    throw invalidRequest("the request body is not valid JSON");
-  }
-  const result = schema.safeParse(value);
-  if (!result.success) {
-    const detail = result.error.issues
-      .slice(0, 5)
-      .map((entry) => `${entry.path.join(".")}: ${entry.message}`)
-      .join("; ");
-    throw invalidRequest(`invalid request body${detail.length > 0 ? `: ${detail}` : ""}`);
-  }
-  return result.data;
-}
-
 /** Write/replace the account file into a copy of the active revision's files. */
 function upsertAccountFile(
   snapshot: ChannelControlPlaneSnapshot,
@@ -488,14 +505,17 @@ function upsertAccountFile(
   connectionId: string,
 ): HubBundleFile[] {
   const path = `.paseo/channels/${channel}/${account}.yml`;
+  const previous = snapshot.files.find((file) => file.path === path);
+  const retained = previous ? (load(previous.content) as Record<string, unknown>) : {};
   const content = dump(
     {
+      ...retained,
       channel,
       accountId: account,
       enabled: true,
       connectionId,
-      transport: { mode: P0_TRANSPORT_MODE[channel] },
-      fallback: { deny: true },
+      transport: retained["transport"] ?? { mode: P0_TRANSPORT_MODE[channel] },
+      fallback: retained["fallback"] ?? { deny: true },
     },
     { lineWidth: -1 },
   );
@@ -529,91 +549,6 @@ function upsertPolicyUser(
     content: dump(policy, { lineWidth: -1 }),
   });
   return next;
-}
-
-/**
- * Pre-compile the channel control plane from the candidate files, then insert
- * + activate a new revision. The pre-compile is the guard: `activate`
- * validates the hub bundle + daemon agents, but the channel compile only runs
- * at load time — a broken channel revision would poison every later load.
- */
-export async function deployRevision(
-  database: Database,
-  snapshot: ChannelControlPlaneSnapshot,
-  files: readonly HubBundleFile[],
-  options: {
-    createdByUserId?: string | null;
-    expectedRevisionId?: string | null;
-    authorize?: (candidate: ChannelConfigurationCandidate) => Promise<void>;
-  } = {},
-): Promise<void> {
-  const candidate = await prepareChannelConfigurationCandidate(database, snapshot, files);
-  await options.authorize?.(candidate);
-  const canonical = [...files].sort((left, right) => left.path.localeCompare(right.path));
-  await database.saveChannelConfiguration({
-    organizationId: snapshot.organizationId,
-    files: canonical,
-    contentHash: createHash("sha256").update(JSON.stringify(canonical)).digest("hex"),
-    createdByUserId: options.createdByUserId ?? null,
-    ...(options.expectedRevisionId === undefined
-      ? {}
-      : { expectedRevisionId: options.expectedRevisionId }),
-  });
-}
-
-/** Compile a complete candidate with the same rules as deployment, without writing a revision. */
-export async function validateChannelConfigurationCandidate(
-  database: Database,
-  snapshot: ChannelControlPlaneSnapshot,
-  files: readonly HubBundleFile[],
-): Promise<ChannelControlPlane> {
-  return (await prepareChannelConfigurationCandidate(database, snapshot, files)).controlPlane;
-}
-
-export interface ChannelConfigurationCandidate {
-  bundle: ReturnType<typeof compileHubBundle>;
-  controlPlane: ChannelControlPlane;
-}
-
-/** Compiles the authored bundle and effective Channel policy used by activation authorization. */
-export async function prepareChannelConfigurationCandidate(
-  database: Database,
-  snapshot: ChannelControlPlaneSnapshot,
-  files: readonly HubBundleFile[],
-): Promise<ChannelConfigurationCandidate> {
-  try {
-    const candidateResourceFiles = [...files];
-    if (!candidateResourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {
-      candidateResourceFiles.push({
-        path: ".paseo/hub.yml",
-        content: "environments: {}\nagents: {}\n",
-      });
-    }
-    const candidateBundle = compileHubBundle(candidateResourceFiles, {
-      requireWorkflow: false,
-    });
-    const workflowNames = (await database.listOrganizationTriggers(snapshot.organizationId))
-      .filter(({ enabled }) => enabled)
-      .map(({ name }) => name);
-    const controlPlane = compileChannelControlPlane({
-      files,
-      agentNames: channelAgentNames(candidateBundle),
-      environmentNames: channelEnvironmentNames(candidateBundle),
-      workflowNames,
-    });
-    await assertOpenAudienceTargetSafety(
-      database,
-      snapshot.organizationId,
-      candidateBundle,
-      controlPlane,
-    );
-    return { bundle: candidateBundle, controlPlane };
-  } catch (error) {
-    if (error instanceof ChannelCompilationError || error instanceof HubBundleError) {
-      throw invalidConfiguration(error.message);
-    }
-    throw error;
-  }
 }
 
 /** The supervisor's start step, degraded when the supervisor is unavailable. */
@@ -688,31 +623,23 @@ function userRoles(username: string, controlPlane: ChannelControlPlane): string[
   return [...names].sort();
 }
 
-/** The RFC 7807 problem body — the public API's `problem()` shape, byte-for-byte. */
-function problem(
+async function handlePrepareOnboarding(
+  database: Database,
   request: Request,
-  status: number,
-  code: string,
-  title: string,
-  detail: string,
-): Response {
-  const requestId = request.headers.get("x-request-id")?.trim() || randomUUID();
-  return Response.json(
-    {
-      type: `https://paseo.sh/problems/${code.replaceAll("_", "-")}`,
-      title,
-      status,
-      detail,
-      code,
-      requestId,
-    },
-    {
-      status,
-      headers: {
-        "content-type": "application/problem+json",
-        "x-request-id": requestId,
-        ...(status === 401 ? { "www-authenticate": "Bearer" } : {}),
-      },
-    },
+  options: ChannelControlPlaneOpsOptions,
+): Promise<Response> {
+  if (!apiFirstOnboardingEnabled()) return controlPlaneAbsent(request);
+  const input = await parseJsonBody(
+    request,
+    z.object({ ownerEmail: z.string().email().optional() }).strict(),
   );
+  if (!options.onboarding) throw conflict("Local onboarding services are unavailable");
+  try {
+    return Response.json(
+      await prepareChannelOnboarding(database, options.onboarding, input.ownerEmail),
+      { headers: { "cache-control": "no-store" } },
+    );
+  } catch (error) {
+    throw conflict(error instanceof Error ? error.message : "Account setup is incomplete");
+  }
 }

@@ -1,4 +1,5 @@
 import "@/styles/unistyles";
+import { ConfirmationProvider } from "@/components/confirmation-provider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { PortalProvider } from "@gorhom/portal";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -135,6 +136,7 @@ import { buildNotificationRoute, resolveNotificationTarget } from "@/utils/notif
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { PluginCatalogSync } from "@/plugins";
 import { HubAccountProvider } from "@/clisbot/hub/account-provider";
+import { HubAccountEntryNavigation } from "@/clisbot/hub/account-entry-navigation";
 import { HubHostSynchronization } from "@/clisbot/hub/host-synchronization";
 import {
   ensureOsNotificationPermission,
@@ -865,6 +867,7 @@ function AppWithSidebar({ children }: { children: ReactNode }) {
       pathname === "/new" ||
       pathname === "/sessions" ||
       pathname === "/schedules" ||
+      pathname === "/automations" ||
       routeHasKnownHost);
 
   return <AppContainer chromeEnabled={shouldShowAppChrome}>{children}</AppContainer>;
@@ -885,6 +888,7 @@ function RootStack() {
   return (
     <ThemedStack screenOptions={ROOT_STACK_SCREEN_OPTIONS}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="cli-login" />
       <Stack.Protected guard={storeReady}>
         <Stack.Screen name="welcome" />
         <Stack.Screen name="settings/index" />
@@ -894,6 +898,7 @@ function RootStack() {
         <Stack.Screen name="open-project" />
         <Stack.Screen name="sessions" />
         <Stack.Screen name="schedules" />
+        <Stack.Screen name="automations" />
         <Stack.Screen name="pair-scan" />
       </Stack.Protected>
       <Stack.Screen name="h/[serverId]" />
@@ -916,9 +921,11 @@ function WorkspaceRouteNavigationBridge() {
 }
 
 function AppShell() {
+  const navigationReady = useStoreReady();
   return (
     <MobilePanelsProvider>
       <HorizontalScrollProvider>
+        <HubAccountEntryNavigation navigationReady={navigationReady} />
         <OpenProjectListener />
         <AgentNavigationListener />
         <AppWithSidebar>
@@ -948,10 +955,15 @@ function RuntimeProviders({ children }: { children: ReactNode }) {
 // BottomSheetModalProvider is the exception: Gorhom modals consume portal
 // context and need one shared provider for sibling sheets to stack.
 function OverlayProviders({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   return (
     <ToastProvider>
       <PortalProvider>
-        <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
+        <BottomSheetModalProvider>
+          <ConfirmationProvider webBackend scopeKey={pathname}>
+            {children}
+          </ConfirmationProvider>
+        </BottomSheetModalProvider>
       </PortalProvider>
     </ToastProvider>
   );

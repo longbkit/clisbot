@@ -1,3 +1,8 @@
+import {
+  compileAutomationDocument,
+  automationAgents,
+  editableAutomationYaml,
+} from "../triggers/configuration/workflow-document.js";
 // The channel control-plane source (plan S8 / implementation doc §4.3): the one
 // builder that turns the active organization Channel revision into the control
 // plane everything above it consumes — the control-plane ops, the supervisor,
@@ -31,7 +36,7 @@ import {
   type EffectiveDefaults,
   type RouteTarget,
 } from "./config/compile.js";
-import { compileTriggerDocument, TriggerDocumentError } from "../triggers/configuration/index.js";
+import { TriggerDocumentError } from "../triggers/configuration/index.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
@@ -81,10 +86,8 @@ export interface ChannelControlPlaneSnapshot {
   bundle: CompiledHubBundle;
   /** The compiled channel control-plane snapshot. */
   controlPlane: ChannelControlPlane;
-  /** The Hub's loopback listen port: the base of the tool-path mcpServers
-   * URL (`http://127.0.0.1:<hubPort>/mcp/channel/<opaque-capability>`) — the agent and the
-   * Hub run on one host, so the tool reaches this process's own loopback. */
-  hubPort: number;
+  /** The same reachable Hub URL used by Workflow reply tools. */
+  publicBaseUrl: string;
   /** Resolve a route's agent target into a daemon `create_agent` config. The
    * route's effective defaults select the outbound path (E4/E6); on a `tool`
    * path the `bindingRef` names the thread the attached MCP tool posts into. */
@@ -101,18 +104,23 @@ export interface ChannelControlPlaneSnapshot {
 
 /** The options the agent-spec resolver is built with. */
 export interface ChannelAgentSpecResolverOptions {
-  /** The Hub's loopback listen port (the tool-path mcpServers URL base). */
-  hubPort: number;
+  publicBaseUrl: string;
 }
 
 /** Load the organization-owned Channel control plane. An absent revision is a valid empty plane. */
 export async function loadChannelControlPlane(
   database: Database,
   organizationId?: string,
+  publicBaseUrl?: string,
 ): Promise<ChannelControlPlaneSnapshot> {
   const resolvedOrganizationId = organizationId ?? (await resolveDefaultOrganization(database)).id;
   const revision = await database.findActiveChannelConfiguration(resolvedOrganizationId);
-  return compileControlPlaneSnapshot(database, resolvedOrganizationId, revision ?? null);
+  return compileControlPlaneSnapshot(
+    database,
+    resolvedOrganizationId,
+    revision ?? null,
+    publicBaseUrl === undefined ? {} : { publicBaseUrl },
+  );
 }
 
 /** P0 is single-operator: exactly one provisioned organization. Zero or
@@ -135,7 +143,7 @@ async function compileControlPlaneSnapshot(
   database: Database,
   organizationId: string,
   revision: ChannelConfigurationRevisionRecord | null,
-  options: { skipOpenAudienceTargetSafety?: boolean } = {},
+  options: { skipOpenAudienceTargetSafety?: boolean; publicBaseUrl?: string } = {},
 ): Promise<ChannelControlPlaneSnapshot> {
   const files = revision?.files ?? [];
   if (files.some((file) => file.path.startsWith(".paseo/workflows/"))) {
@@ -154,10 +162,9 @@ async function compileControlPlaneSnapshot(
   const bundle = compileHubBundle(resourceFiles, { requireWorkflow: false });
   const triggers = await database.listOrganizationTriggers(organizationId);
   const workflowNames = triggers.filter(({ enabled }) => enabled).map(({ name }) => name);
-  // The tool-path mcpServers URL needs the Hub's loopback listen port —
-  // `process.env.PORT` is set by the Hub's process entry (index.ts
-  // `readPort`), so the resolver and the listening server agree on it.
-  const hubPort = hubListenPort(process.env);
+  // Runtime composition supplies its canonical public URL. Local consumers that only
+  // compile configuration retain the ordinary single-machine default.
+  const publicBaseUrl = options.publicBaseUrl ?? `http://127.0.0.1:${hubListenPort(process.env)}`;
   const controlPlane = compileChannelControlPlane({
     files,
     agentNames: channelAgentNames(bundle),
@@ -173,8 +180,8 @@ async function compileControlPlaneSnapshot(
     files,
     bundle,
     controlPlane,
-    hubPort,
-    resolveAgentSpec: createChannelAgentSpecResolver(bundle, { hubPort }),
+    publicBaseUrl,
+    resolveAgentSpec: createChannelAgentSpecResolver(bundle, { publicBaseUrl }),
     resolveAgentAccessTarget: createChannelAgentAccessTargetResolver(bundle),
   };
 }
@@ -212,13 +219,6 @@ export async function assertOpenAudienceTargetSafety(
       });
       continue;
     }
-    if (trigger.format !== "single_run") {
-      issues.push({
-        path,
-        message: "external participants require a bounded single-run Automation",
-      });
-      continue;
-    }
     const revision = await database.findOrganizationTriggerRevision(
       trigger.id,
       trigger.activeRevisionId,
@@ -230,8 +230,9 @@ export async function assertOpenAudienceTargetSafety(
       });
       continue;
     }
-    const agent = compileTriggerDocument(revision.yaml).authored.run.agent;
-    const choices = "choices" in agent ? Object.values(agent.choices) : [agent];
+    const choices = automationAgents(
+      compileAutomationDocument(editableAutomationYaml(revision.yaml, trigger.enabled)),
+    );
     appendOpenAudienceAgentIssues(choices, path, issues);
   }
   if (issues.length > 0) throw new ChannelCompilationError(issues);
@@ -242,7 +243,7 @@ export async function assertOpenAudienceAutomationUpdateSafety(input: {
   database: Database;
   organizationId: string;
   automationId: string;
-  candidate: ReturnType<typeof compileTriggerDocument>["authored"];
+  candidate: ReturnType<typeof compileAutomationDocument>;
 }): Promise<void> {
   const triggerRecords = await input.database.listOrganizationTriggers(input.organizationId);
   const current = triggerRecords.find(({ id }) => id === input.automationId);
@@ -263,18 +264,17 @@ export async function assertOpenAudienceAutomationUpdateSafety(input: {
     ),
   );
   if (!hasOpenAudienceBacklink) return;
-  if (!input.candidate.enabled || input.candidate.name !== current.name) {
+  if (!input.candidate.authored.enabled || input.candidate.authored.name !== current.name) {
     throw new TriggerDocumentError([
       {
-        path: [input.candidate.name !== current.name ? "name" : "enabled"],
+        path: [input.candidate.authored.name !== current.name ? "name" : "enabled"],
         message: "must remain active while an external-participant Channel Route uses it",
       },
     ]);
   }
-  const agent = input.candidate.run.agent;
-  const choices = "choices" in agent ? Object.values(agent.choices) : [agent];
+  const choices = automationAgents(input.candidate);
   const issues: Array<{ path: readonly (string | number)[]; message: string }> = [];
-  appendOpenAudienceAgentIssues(choices, ["run", "agent"], issues);
+  appendOpenAudienceAgentIssues(choices, ["steps", "agent"], issues);
   if (issues.length > 0) throw new TriggerDocumentError(issues);
 }
 
@@ -448,7 +448,7 @@ export function createChannelAgentSpecResolver(
       mcpServers: {
         [CHANNEL_REPLY_MCP_SERVER_NAME]: {
           type: "http",
-          url: `http://127.0.0.1:${options.hubPort}/mcp/channel/${capability.token}`,
+          url: `${options.publicBaseUrl.replace(/\/$/u, "")}/mcp/channel/${capability.token}`,
         },
       },
       toolPolicy: {

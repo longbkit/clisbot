@@ -1,7 +1,6 @@
 import type { UseQueryResult } from "@tanstack/react-query";
-import * as Linking from "expo-linking";
-import { useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
@@ -9,15 +8,18 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/screens/settings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { openHubAccountEntryForm, type HubAccountEntryMode } from "../account-entry-form";
 import {
   HubChannelIdentitiesSchema,
   HubAccessAssignmentsSchema,
   HubAccessCatalogSchema,
   HubConnectionContinuationSchema,
+  HubConnectionSchema,
   HubConnectionsSchema,
   HubDaemonsSchema,
   HubMembersSchema,
@@ -26,10 +28,11 @@ import {
   HubTeamsSchema,
   type HubAccountState,
 } from "../contracts";
-import { buildHubSettingsRoute, type HubSectionSlug } from "../navigation";
+import { type HubSectionSlug } from "../navigation";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
-import { ChannelSettings } from "./channel-settings";
+import { ChannelSettings, ChannelConnectionForm } from "./channel-settings";
+import { ManagedHostRow } from "./managed-host-row";
 import { AutomationSettings } from "./automation-settings";
 import { AccessSettings } from "./access-settings";
 import { ApiKeySettings } from "./api-key-settings";
@@ -38,10 +41,22 @@ import {
   ChannelIdentitySettings,
 } from "./channel-identity-settings";
 import { ProviderApplicationSettings } from "./provider-application-settings";
+import { HubHostOnboardingSection } from "../host-onboarding-section";
+import { hubResourceQueryKey } from "../query-keys";
+import { useHubSettingsDetailScroll } from "./detail-scroll";
+import { HubConnectionResultNotice } from "./connection-result";
+import { HubConnectionContinuationNotice } from "./connection-continuation";
+import { useHubConnectionContinuation } from "../use-connection-continuation";
 
 export function HubSettingsContent({ section }: { section: HubSectionSlug }) {
+  const hub = useHubAccount();
   if (section === "account") return <HubAccountSettings />;
-  return <SignedInHubSettings section={section} />;
+  return (
+    <SignedInHubSettings
+      key={JSON.stringify([hub.origin, hub.signedIn?.account.id, hub.signedIn?.organization.id])}
+      section={section}
+    />
+  );
 }
 
 function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "account"> }) {
@@ -64,7 +79,7 @@ function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "ac
     case "channels":
       return <ChannelSettings />;
     case "automations":
-      return <AutomationSettings />;
+      return <AutomationSettings ChannelInputs={ChannelSettings} />;
     case "team":
       return <TeamSettings />;
     case "access":
@@ -76,22 +91,37 @@ function SignedInHubSettings({ section }: { section: Exclude<HubSectionSlug, "ac
 
 function HubAccountSettings() {
   const hub = useHubAccount();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [entryMode, setEntryMode] = useState<"signIn" | "signUp">("signIn");
-  const [organizationName, setOrganizationName] = useState("");
+  if (!hub.enabled) return null;
+  if (hub.loading) return <StateMessage message="Loading Hub account..." />;
+  const state = hub.state;
+  const invitation = getAccountInvitation(state);
+  const accountId = state !== null && "account" in state ? state.account.id : null;
+  return (
+    <HubAccountSettingsForm
+      key={JSON.stringify([hub.origin, state?.status, accountId, invitation?.id])}
+      hub={hub}
+      invitation={invitation}
+    />
+  );
+}
+
+function HubAccountSettingsForm({
+  hub,
+  invitation,
+}: {
+  hub: HubAccount;
+  invitation: HubInvitation | undefined;
+}) {
+  const [form] = useState(() =>
+    openHubAccountEntryForm({
+      mode: accountEntryMode(hub.state, invitation),
+      invitedEmail: invitation?.email,
+    }),
+  );
+  const fields = useSyncExternalStore(form.subscribe, form.getState, form.getState);
+  useEffect(() => form.close, [form]);
+  const entryMode = fields.mode === "signUp" ? "signUp" : "signIn";
   const [pending, setPending] = useState(false);
-  const invitation =
-    hub.state !== null && "invitation" in hub.state ? hub.state.invitation : undefined;
-  useEffect(() => {
-    if (invitation !== undefined) {
-      setEntryMode("signUp");
-      if (invitation.email !== undefined) setEmail(invitation.email);
-    }
-  }, [invitation]);
   const run = useCallback(async (operation: () => Promise<void>) => {
     setPending(true);
     try {
@@ -103,9 +133,19 @@ function HubAccountSettings() {
     }
   }, []);
 
-  if (!hub.enabled) return null;
-  if (hub.loading) return <StateMessage message="Loading Hub account…" />;
+  const retryAccount = useCallback(() => void run(hub.refresh), [hub.refresh, run]);
   const state = hub.state;
+
+  if (hasUnavailableSignedInInvitation(state)) {
+    return (
+      <UnavailableAccountInvitation
+        hub={hub}
+        accountEmail={state.account.email}
+        pending={pending}
+        run={run}
+      />
+    );
+  }
 
   if (invitation !== undefined && isInvitationAcceptanceState(state)) {
     return (
@@ -126,10 +166,10 @@ function HubAccountSettings() {
   if (state?.status === "organizationRequired") {
     return (
       <OrganizationSelection
+        form={form}
+        fields={fields}
         hub={hub}
         state={state}
-        organizationName={organizationName}
-        setOrganizationName={setOrganizationName}
         pending={pending}
         run={run}
       />
@@ -142,32 +182,16 @@ function HubAccountSettings() {
   }
 
   if (state?.status === "instanceSetupRequired") {
-    return (
-      <InstanceSetup
-        hub={hub}
-        email={email}
-        password={password}
-        confirmPassword={confirmPassword}
-        setEmail={setEmail}
-        setPassword={setPassword}
-        setConfirmPassword={setConfirmPassword}
-        pending={pending}
-        run={run}
-      />
-    );
+    return <InstanceSetup form={form} fields={fields} hub={hub} pending={pending} run={run} />;
   }
 
   if (state?.status === "passwordChangeRequired") {
     return (
       <PasswordChange
+        form={form}
+        fields={fields}
         hub={hub}
         state={state}
-        currentPassword={currentPassword}
-        password={password}
-        confirmPassword={confirmPassword}
-        setCurrentPassword={setCurrentPassword}
-        setPassword={setPassword}
-        setConfirmPassword={setConfirmPassword}
         pending={pending}
         run={run}
       />
@@ -177,41 +201,123 @@ function HubAccountSettings() {
   if (state?.status !== "signedOut") {
     return (
       <SettingsSection title="Hub account">
-        <Alert variant="error" title="Hub account state is unavailable" />
+        <Alert
+          variant="error"
+          title="Hub account state is unavailable"
+          description={hub.error ?? "Check the Hub connection and try again."}
+        >
+          <Button size="sm" variant="outline" disabled={pending} onPress={retryAccount}>
+            Retry
+          </Button>
+        </Alert>
       </SettingsSection>
     );
   }
 
   return (
     <SignedOutHubAccount
+      key={entryMode}
+      form={form}
+      fields={fields}
       hub={hub}
       state={state}
       invitation={invitation}
-      name={name}
-      email={email}
-      password={password}
-      confirmPassword={confirmPassword}
-      entryMode={entryMode}
-      setName={setName}
-      setEmail={setEmail}
-      setPassword={setPassword}
-      setConfirmPassword={setConfirmPassword}
-      setEntryMode={setEntryMode}
       pending={pending}
       run={run}
     />
   );
 }
 
+function accountEntryMode(
+  state: HubAccountState | null,
+  invitation: HubInvitation | undefined,
+): HubAccountEntryMode {
+  if (state?.status === "signedOut") return invitation === undefined ? "signIn" : "signUp";
+  if (state?.status === "instanceSetupRequired") return "instanceSetup";
+  if (state?.status === "passwordChangeRequired") return "passwordChange";
+  if (state?.status === "organizationRequired") return "organization";
+  return "account";
+}
+
+function hasUnavailableSignedInInvitation(state: HubAccountState | null): state is Extract<
+  HubAccountState,
+  { status: "active" | "appSetupRequired" | "organizationRequired" }
+> & {
+  invitationUnavailable: true;
+} {
+  return (
+    (state?.status === "active" ||
+      state?.status === "appSetupRequired" ||
+      state?.status === "organizationRequired") &&
+    state.invitationUnavailable === true
+  );
+}
+
+function getAccountInvitation(state: HubAccountState | null) {
+  return state !== null && "invitation" in state ? state.invitation : undefined;
+}
+
 function isInvitationAcceptanceState(
   state: HubAccountState | null,
-): state is Extract<HubAccountState, { status: "organizationRequired" | "active" }> {
-  return state?.status === "organizationRequired" || state?.status === "active";
+): state is Extract<
+  HubAccountState,
+  { status: "organizationRequired" | "active" | "appSetupRequired" }
+> {
+  return (
+    state?.status === "organizationRequired" ||
+    state?.status === "active" ||
+    state?.status === "appSetupRequired"
+  );
 }
 
 type HubAccount = ReturnType<typeof useHubAccount>;
 type HubRun = (operation: () => Promise<void>) => Promise<void>;
 type HubInvitation = NonNullable<Extract<HubAccountState, { status: "signedOut" }>["invitation"]>;
+
+type AccountEntryFormModel = ReturnType<typeof openHubAccountEntryForm>;
+interface AccountEntryFormProps {
+  hub: HubAccount;
+  pending: boolean;
+  run: HubRun;
+  form: AccountEntryFormModel;
+  fields: ReturnType<AccountEntryFormModel["getState"]>;
+}
+
+function UnavailableAccountInvitation({
+  hub,
+  accountEmail,
+  pending,
+  run,
+}: {
+  hub: HubAccount;
+  accountEmail: string;
+  pending: boolean;
+  run: HubRun;
+}) {
+  const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
+  const retry = useCallback(() => void run(hub.refresh), [hub.refresh, run]);
+  return (
+    <SettingsSection title="Invitation">
+      <Alert
+        variant="warning"
+        title="This invitation is unavailable"
+        description="It may have expired, already been used, or belong to another account. Sign in with the invited account or ask an organization owner for a new invitation."
+      />
+      <View style={settingsStyles.card}>
+        <InfoRow title="Signed in as" hint={accountEmail} />
+      </View>
+      <View style={styles.actions}>
+        <Button variant="outline" disabled={pending} onPress={retry}>
+          Retry
+        </Button>
+        <Button variant="outline" disabled={pending} onPress={signOut}>
+          Sign out
+        </Button>
+      </View>
+      {hub.error ? <Alert variant="error" title={hub.error} /> : null}
+    </SettingsSection>
+  );
+}
 
 function InvitationAcceptance({
   hub,
@@ -274,17 +380,36 @@ function ActiveHubAccount({
   pending: boolean;
   run: HubRun;
 }) {
-  const role =
-    state.status === "active" ? channelLabel(state.membership.role) : "Instance operator";
+  const router = useRouter();
+  const [showIdentity, setShowIdentity] = useState(false);
+  const openIdentity = useCallback(() => setShowIdentity(true), []);
+  const params = useLocalSearchParams<{ channelConnectionId?: string }>();
+  const backToAccount = useCallback(() => {
+    setShowIdentity(false);
+    router.setParams({ channelConnectionId: undefined });
+  }, [router]);
+  const role = channelLabel(state.membership.role);
   const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
-  const finishSetup = useCallback(
-    () => void run(hub.completeAppSetup),
-    [hub.completeAppSetup, run],
-  );
+  const identityVisible =
+    showIdentity ||
+    (typeof params.channelConnectionId === "string" && params.channelConnectionId.length > 0);
+  const scrollToTop = useHubSettingsDetailScroll();
+  useEffect(() => {
+    scrollToTop?.();
+  }, [identityVisible, scrollToTop]);
+  if (identityVisible)
+    return (
+      <View>
+        <Button size="sm" variant="outline" onPress={backToAccount}>
+          Back to Account
+        </Button>
+        <ChannelIdentitySelfLinkSettings />
+      </View>
+    );
   return (
     <View>
       <SettingsSection title="Account">
-        {state.status === "active" && state.membership.role === "owner" ? (
+        {state.membership.role === "owner" ? (
           <Alert
             variant="success"
             title="Full organization access"
@@ -294,55 +419,51 @@ function ActiveHubAccount({
         <View style={settingsStyles.card}>
           <InfoRow title={state.account.name} hint={state.account.email} />
           <InfoRow title={state.organization.name} hint={`Organization role: ${role}`} bordered />
+          {state.isInstanceOperator ? (
+            <InfoRow title="Hub instance" hint="Instance role: Operator" bordered />
+          ) : null}
         </View>
+        <Button variant="outline" disabled={pending} onPress={openIdentity}>
+          Your Channel identities
+        </Button>
         <Button variant="outline" disabled={pending} onPress={signOut}>
           Sign out
         </Button>
         {hub.error ? <Alert variant="error" title={hub.error} /> : null}
       </SettingsSection>
-      {state.status === "appSetupRequired" ? (
-        <>
-          <ProviderApplicationSettings />
-          <SettingsSection title="Finish setup">
-            <Alert
-              variant="info"
-              title="Continue when you are ready"
-              description="Provider Applications are optional. You can add or replace them later under Hub Configuration."
-            />
-            <Button disabled={pending} loading={pending} onPress={finishSetup}>
-              Finish setup
-            </Button>
-            {hub.error ? <Alert variant="error" title={hub.error} /> : null}
-          </SettingsSection>
-        </>
-      ) : (
-        <ChannelIdentitySelfLinkSettings />
-      )}
+      <HubHostOnboardingSection />
     </View>
   );
 }
 
 function OrganizationSelection({
   hub,
-  state,
-  organizationName,
-  setOrganizationName,
   pending,
   run,
-}: {
-  hub: HubAccount;
+  form,
+  fields,
+  state,
+}: AccountEntryFormProps & {
   state: Extract<HubAccountState, { status: "organizationRequired" }>;
-  organizationName: string;
-  setOrganizationName(value: string): void;
-  pending: boolean;
-  run: HubRun;
 }) {
+  const { organizationName } = fields;
+  const { setOrganizationName } = form;
+  const compact = useIsCompactFormFactor();
+  const fieldSize = compact ? "md" : "sm";
   const createOrganization = useCallback(
     () => void run(() => hub.createOrganization(organizationName.trim())),
     [hub, organizationName, run],
   );
+  const signOut = useCallback(() => void run(hub.signOut), [hub.signOut, run]);
   return (
     <SettingsSection title="Choose an organization">
+      {state.memberships.length === 0 && !state.canCreateOrganization ? (
+        <Alert
+          variant="info"
+          title="No organization available"
+          description="Ask an organization owner or admin for an invitation, or sign in with another account."
+        />
+      ) : null}
       {state.memberships.map((membership) => (
         <OrganizationChoice
           key={membership.id}
@@ -357,20 +478,21 @@ function OrganizationSelection({
         <View style={[settingsStyles.card, styles.form]}>
           <Field label="Organization name">
             <FormTextInput
-              initialValue=""
+              size={fieldSize}
+              initialValue={organizationName}
               onChangeText={setOrganizationName}
               placeholder="Acme"
               editable={!pending}
             />
           </Field>
-          <Button
-            disabled={pending || organizationName.trim().length === 0}
-            onPress={createOrganization}
-          >
+          <Button disabled={pending || !fields.canSubmit} onPress={createOrganization}>
             Create organization
           </Button>
         </View>
       ) : null}
+      <Button variant="outline" disabled={pending} onPress={signOut}>
+        Sign out
+      </Button>
       {hub.error ? <Alert variant="error" title={hub.error} /> : null}
     </SettingsSection>
   );
@@ -433,28 +555,11 @@ function browserAuthenticationTitle(state: HubAccountState | null): string {
   return "Sign in to Hub";
 }
 
-function InstanceSetup({
-  hub,
-  email,
-  password,
-  confirmPassword,
-  setEmail,
-  setPassword,
-  setConfirmPassword,
-  pending,
-  run,
-}: {
-  hub: HubAccount;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  setEmail(value: string): void;
-  setPassword(value: string): void;
-  setConfirmPassword(value: string): void;
-  pending: boolean;
-  run: HubRun;
-}) {
-  const passwordsMatch = password === confirmPassword;
+function InstanceSetup({ hub, pending, run, form, fields }: AccountEntryFormProps) {
+  const { email, password, confirmPassword, passwordsMatch } = fields;
+  const { setEmail, setPassword, setConfirmPassword } = form;
+  const compact = useIsCompactFormFactor();
+  const fieldSize = compact ? "md" : "sm";
   const createOwner = useCallback(
     () => void run(() => hub.claimInstance({ email: email.trim().toLowerCase(), password })),
     [email, hub, password, run],
@@ -469,7 +574,8 @@ function InstanceSetup({
       <View style={[settingsStyles.card, styles.form]}>
         <Field label="Email">
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={email}
             onChangeText={setEmail}
             placeholder="owner@example.com"
             autoCapitalize="none"
@@ -479,7 +585,8 @@ function InstanceSetup({
         </Field>
         <Field label="Password" hint="Use at least 12 characters.">
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={password}
             onChangeText={setPassword}
             secureTextEntry
             editable={!pending}
@@ -487,17 +594,14 @@ function InstanceSetup({
         </Field>
         <Field label="Confirm password" error={passwordMismatch(confirmPassword, passwordsMatch)}>
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
             editable={!pending}
           />
         </Field>
-        <Button
-          disabled={pending || email.trim().length === 0 || password.length < 12 || !passwordsMatch}
-          loading={pending}
-          onPress={createOwner}
-        >
+        <Button disabled={pending || !fields.canSubmit} loading={pending} onPress={createOwner}>
           Create owner account
         </Button>
       </View>
@@ -508,28 +612,18 @@ function InstanceSetup({
 
 function PasswordChange({
   hub,
-  state,
-  currentPassword,
-  password,
-  confirmPassword,
-  setCurrentPassword,
-  setPassword,
-  setConfirmPassword,
   pending,
   run,
-}: {
-  hub: HubAccount;
+  form,
+  fields,
+  state,
+}: AccountEntryFormProps & {
   state: Extract<HubAccountState, { status: "passwordChangeRequired" }>;
-  currentPassword: string;
-  password: string;
-  confirmPassword: string;
-  setCurrentPassword(value: string): void;
-  setPassword(value: string): void;
-  setConfirmPassword(value: string): void;
-  pending: boolean;
-  run: HubRun;
 }) {
-  const passwordsMatch = password === confirmPassword;
+  const { currentPassword, password, confirmPassword, passwordsMatch } = fields;
+  const { setCurrentPassword, setPassword, setConfirmPassword } = form;
+  const compact = useIsCompactFormFactor();
+  const fieldSize = compact ? "md" : "sm";
   const savePassword = useCallback(
     () => void run(() => hub.changePassword({ currentPassword, newPassword: password })),
     [currentPassword, hub, password, run],
@@ -544,7 +638,8 @@ function PasswordChange({
       <View style={[settingsStyles.card, styles.form]}>
         <Field label="Current password">
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={currentPassword}
             onChangeText={setCurrentPassword}
             secureTextEntry
             editable={!pending}
@@ -552,7 +647,8 @@ function PasswordChange({
         </Field>
         <Field label="New password" hint="Use at least 12 characters.">
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={password}
             onChangeText={setPassword}
             secureTextEntry
             editable={!pending}
@@ -563,19 +659,14 @@ function PasswordChange({
           error={passwordMismatch(confirmPassword, passwordsMatch)}
         >
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
             editable={!pending}
           />
         </Field>
-        <Button
-          disabled={
-            pending || currentPassword.length === 0 || password.length < 12 || !passwordsMatch
-          }
-          loading={pending}
-          onPress={savePassword}
-        >
+        <Button disabled={pending || !fields.canSubmit} loading={pending} onPress={savePassword}>
           Save password
         </Button>
       </View>
@@ -590,41 +681,23 @@ function passwordMismatch(confirmPassword: string, passwordsMatch: boolean): str
 
 function SignedOutHubAccount({
   hub,
-  state,
-  invitation,
-  name,
-  email,
-  password,
-  confirmPassword,
-  entryMode,
-  setName,
-  setEmail,
-  setPassword,
-  setConfirmPassword,
-  setEntryMode,
   pending,
   run,
-}: {
-  hub: HubAccount;
+  form,
+  fields,
+  state,
+  invitation,
+}: AccountEntryFormProps & {
   state: Extract<HubAccountState, { status: "signedOut" }>;
   invitation: HubInvitation | undefined;
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  entryMode: "signIn" | "signUp";
-  setName(value: string): void;
-  setEmail(value: string): void;
-  setPassword(value: string): void;
-  setConfirmPassword(value: string): void;
-  setEntryMode(value: "signIn" | "signUp"): void;
-  pending: boolean;
-  run: HubRun;
 }) {
+  const { name, email, password, confirmPassword, passwordsMatch } = fields;
+  const { setName, setEmail, setPassword, setConfirmPassword, setEntryMode } = form;
+  const compact = useIsCompactFormFactor();
+  const fieldSize = compact ? "md" : "sm";
   const maySignUp = invitation !== undefined || state.registration === "open";
-  const signingUp = entryMode === "signUp" && maySignUp;
+  const signingUp = fields.mode === "signUp" && maySignUp;
   const invitedEmail = invitation?.email;
-  const passwordsMatch = password === confirmPassword;
   const submit = useCallback(() => {
     void run(async () => {
       if (signingUp) {
@@ -645,10 +718,7 @@ function SignedOutHubAccount({
   );
   const title = signedOutTitle(invitation, signingUp);
   const description = signedOutDescription(invitation);
-  const submitDisabled =
-    pending ||
-    email.trim().length === 0 ||
-    invalidAuthenticationInput(signingUp, name, password, passwordsMatch);
+  const submitDisabled = pending || !fields.canSubmit;
   return (
     <SettingsSection title="Hub account">
       <Alert variant="info" title={title} description={description} />
@@ -663,7 +733,8 @@ function SignedOutHubAccount({
         {signingUp ? (
           <Field label="Name">
             <FormTextInput
-              initialValue=""
+              size={fieldSize}
+              initialValue={name}
               onChangeText={setName}
               placeholder="Your name"
               editable={!pending}
@@ -672,8 +743,9 @@ function SignedOutHubAccount({
         ) : null}
         <Field label="Email">
           <FormTextInput
+            size={fieldSize}
             key={invitedEmail ?? "email"}
-            initialValue={invitedEmail ?? ""}
+            initialValue={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
             autoCapitalize="none"
@@ -683,7 +755,8 @@ function SignedOutHubAccount({
         </Field>
         <Field label="Password" hint={signingUp ? "Use at least 12 characters." : undefined}>
           <FormTextInput
-            initialValue=""
+            size={fieldSize}
+            initialValue={password}
             onChangeText={setPassword}
             secureTextEntry
             editable={!pending}
@@ -692,7 +765,8 @@ function SignedOutHubAccount({
         {signingUp ? (
           <Field label="Confirm password" error={passwordMismatch(confirmPassword, passwordsMatch)}>
             <FormTextInput
-              initialValue=""
+              size={fieldSize}
+              initialValue={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
               editable={!pending}
@@ -727,16 +801,6 @@ function signedOutDescription(invitation: HubInvitation | undefined): string {
   return `${invitation.inviterName} invited you as ${channelLabel(invitation.role)}${team}. The invitation is bound to the invited email.`;
 }
 
-function invalidAuthenticationInput(
-  signingUp: boolean,
-  name: string,
-  password: string,
-  passwordsMatch: boolean,
-): boolean {
-  if (!signingUp) return password.length === 0;
-  return name.trim().length === 0 || password.length < 12 || !passwordsMatch;
-}
-
 function registrationMessage(state: Extract<HubAccountState, { status: "signedOut" }>): string {
   return state.registration === "invite_only"
     ? "Accounts are created by invitation. Ask an organization owner to invite you."
@@ -761,8 +825,8 @@ function TeamSettings() {
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const activeAccount = hub.state?.status === "active" ? hub.state : null;
-  const canManageMembers = activeAccount?.capabilities.manageMembers === true;
+  const signedInAccount = hub.signedIn;
+  const canManageMembers = hub.signedIn?.capabilities.manageMembers === true;
   const canManageTeams = hub.signedIn?.capabilities.manageResources === true;
   const teamOptions = useMemo<SelectFieldOption<string>[]>(
     () => [
@@ -867,7 +931,13 @@ function TeamSettings() {
     [assignments, hub, identities, members, run, teams],
   );
   const clearSelection = useCallback(() => setSelection(undefined), []);
-  const manageAccess = useCallback(() => router.push(buildHubSettingsRoute("access")), [router]);
+  const manageAccess = useCallback(() => {
+    if (selection === undefined) return;
+    router.push({
+      pathname: "/settings/hub/[hubSection]",
+      params: { hubSection: "access", subjectKind: selection.kind, subjectId: selection.id },
+    });
+  }, [router, selection]);
 
   return (
     <TeamSettingsView
@@ -879,7 +949,7 @@ function TeamSettings() {
       connections={connections}
       assignments={assignments}
       catalog={catalog}
-      activeAccount={activeAccount}
+      signedInAccount={signedInAccount}
       canManageMembers={canManageMembers}
       canManageTeams={canManageTeams}
       teamName={teamName}
@@ -1065,7 +1135,7 @@ function TeamSettingsView({
   connections,
   assignments,
   catalog,
-  activeAccount,
+  signedInAccount,
   canManageMembers,
   canManageTeams,
   teamName,
@@ -1103,7 +1173,7 @@ function TeamSettingsView({
   connections: UseQueryResult<z.infer<typeof HubConnectionsSchema>, Error>;
   assignments: UseQueryResult<z.infer<typeof HubAccessAssignmentsSchema>, Error>;
   catalog: UseQueryResult<z.infer<typeof HubAccessCatalogSchema>, Error>;
-  activeAccount: Extract<HubAccountState, { status: "active" }> | null;
+  signedInAccount: HubAccount["signedIn"];
   canManageMembers: boolean;
   canManageTeams: boolean;
   teamName: string;
@@ -1190,8 +1260,9 @@ function TeamSettingsView({
         teams={teams}
         identities={identities}
         connections={connections}
-        assignments={assignments.data?.assignments ?? []}
-        invitations={activeAccount?.team.invitations ?? []}
+        assignments={assignments}
+        catalog={catalog}
+        invitations={signedInAccount?.team?.invitations ?? []}
         canManageMembers={canManageMembers}
         inviteEmail={inviteEmail}
         setInviteEmail={setInviteEmail}
@@ -1341,6 +1412,7 @@ function MemberOverviewSection({
   identities,
   connections,
   assignments,
+  catalog,
   invitations,
   canManageMembers,
   inviteEmail,
@@ -1366,7 +1438,8 @@ function MemberOverviewSection({
   teams: UseQueryResult<z.infer<typeof HubTeamsSchema>, Error>;
   identities: UseQueryResult<z.infer<typeof HubChannelIdentitiesSchema>, Error>;
   connections: UseQueryResult<z.infer<typeof HubConnectionsSchema>, Error>;
-  assignments: HubAssignment[];
+  assignments: UseQueryResult<z.infer<typeof HubAccessAssignmentsSchema>, Error>;
+  catalog: UseQueryResult<z.infer<typeof HubAccessCatalogSchema>, Error>;
   invitations: HubManagedInvitation[];
   canManageMembers: boolean;
   inviteEmail: string;
@@ -1402,6 +1475,7 @@ function MemberOverviewSection({
         <InviteMemberForm
           hub={hub}
           assignments={assignments}
+          catalog={catalog}
           inviteEmail={inviteEmail}
           setInviteEmail={setInviteEmail}
           inviteRole={inviteRole}
@@ -1508,6 +1582,7 @@ function MemberOverviewRow({
 function InviteMemberForm({
   hub,
   assignments,
+  catalog,
   inviteEmail,
   setInviteEmail,
   inviteRole,
@@ -1522,7 +1597,8 @@ function InviteMemberForm({
   run,
 }: {
   hub: HubAccount;
-  assignments: HubAssignment[];
+  assignments: UseQueryResult<z.infer<typeof HubAccessAssignmentsSchema>, Error>;
+  catalog: UseQueryResult<z.infer<typeof HubAccessCatalogSchema>, Error>;
   inviteEmail: string;
   setInviteEmail(value: string): void;
   inviteRole: "admin" | "member";
@@ -1536,12 +1612,25 @@ function InviteMemberForm({
   pending: boolean;
   run: HubRun;
 }) {
+  const compact = useIsCompactFormFactor();
+  const fieldSize = compact ? "md" : "sm";
+  const reviewReady =
+    inviteTeamId.length === 0 ||
+    (selectedInviteTeam !== undefined &&
+      assignments.data !== undefined &&
+      catalog.data !== undefined &&
+      !assignments.isError &&
+      !catalog.isError);
+  const retryPreview = useCallback(() => {
+    void Promise.all([assignments.refetch(), catalog.refetch()]);
+  }, [assignments, catalog]);
   const roleDisplay = useMemo(() => ({ label: channelLabel(inviteRole) }), [inviteRole]);
   const teamDisplay = useMemo(
     () => ({ label: selectedInviteTeam?.name ?? "No Team" }),
     [selectedInviteTeam?.name],
   );
   const sendInvitation = useCallback(() => {
+    if (!reviewReady) return;
     void run(async () => {
       await hub.inviteMember({
         email: inviteEmail.trim().toLowerCase(),
@@ -1558,24 +1647,24 @@ function InviteMemberForm({
     inviteEmail,
     inviteRole,
     run,
+    reviewReady,
     selectedInviteTeam,
     setInviteEmail,
     setInviteResetKey,
     setInviteRole,
     setInviteTeamId,
   ]);
-  const assignmentCount =
-    selectedInviteTeam === undefined ? 0 : teamAssignmentCount(assignments, selectedInviteTeam.id);
   const reviewTitle =
     selectedInviteTeam === undefined ? "No resource access" : `Join ${selectedInviteTeam.name}`;
   const reviewDescription =
     selectedInviteTeam === undefined
       ? "The account joins the organization only. Assign access later if needed."
-      : `After accepting, the Member receives the Team's ${String(assignmentCount)} current ${plural(assignmentCount, "assignment")}.`;
+      : "After accepting, the Member receives the Team access shown below.";
   return (
     <View style={[settingsStyles.card, styles.form]}>
       <Field label="Email">
         <FormTextInput
+          size={fieldSize}
           initialValue=""
           resetKey={inviteResetKey}
           onChangeText={setInviteEmail}
@@ -1586,6 +1675,7 @@ function InviteMemberForm({
         />
       </Field>
       <SelectField
+        size={fieldSize}
         label="Organization role"
         value={inviteRole}
         selectedDisplay={roleDisplay}
@@ -1597,6 +1687,7 @@ function InviteMemberForm({
         disabled={pending}
       />
       <SelectField
+        size={fieldSize}
         label="Team"
         value={inviteTeamId}
         selectedDisplay={teamDisplay}
@@ -1609,13 +1700,71 @@ function InviteMemberForm({
         disabled={pending}
       />
       <Alert variant="info" title={reviewTitle} description={reviewDescription} />
+      {inviteTeamId.length > 0 ? (
+        <InvitationTeamAccessPreview
+          team={selectedInviteTeam}
+          assignments={assignments}
+          catalog={catalog}
+          retry={retryPreview}
+        />
+      ) : null}
       <Button
-        disabled={pending || inviteEmail.trim().length === 0}
+        disabled={pending || inviteEmail.trim().length === 0 || !reviewReady}
         loading={pending}
         onPress={sendInvitation}
       >
         Send invitation
       </Button>
+    </View>
+  );
+}
+
+function InvitationTeamAccessPreview({
+  team,
+  assignments,
+  catalog,
+  retry,
+}: {
+  team: HubTeam | undefined;
+  assignments: UseQueryResult<z.infer<typeof HubAccessAssignmentsSchema>, Error>;
+  catalog: UseQueryResult<z.infer<typeof HubAccessCatalogSchema>, Error>;
+  retry(): void;
+}) {
+  if (assignments.isPending || catalog.isPending)
+    return <Text style={settingsStyles.rowHint}>Loading Team access...</Text>;
+  if (
+    team === undefined ||
+    assignments.isError ||
+    catalog.isError ||
+    assignments.data === undefined ||
+    catalog.data === undefined
+  ) {
+    return (
+      <Alert
+        variant="error"
+        title="Team access unavailable"
+        description="Refresh the access preview before sending the invitation."
+      >
+        <Button size="sm" variant="outline" onPress={retry}>
+          Retry
+        </Button>
+      </Alert>
+    );
+  }
+  const entries = assignments.data.assignments
+    .filter((assignment) => assignment.subjectKind === "team" && assignment.subjectId === team.id)
+    .map((assignment) => ({ assignment, source: `Via ${team.name}` }));
+  return (
+    <View>
+      <Text
+        style={settingsStyles.rowHint}
+      >{`${entries.length} current ${plural(entries.length, "assignment")}`}</Text>
+      <AccessSummary
+        entries={entries}
+        resources={catalog.data.resources}
+        accessLevels={catalog.data.accessLevels}
+        emptyMessage="This Team has no resource access"
+      />
     </View>
   );
 }
@@ -2179,6 +2328,11 @@ function AccessSummary({
                 <Text style={settingsStyles.rowHint}>
                   {`${hubResourceKindLabel(assignment.resourceKind)} · ${level} · ${source}`}
                 </Text>
+                <Text style={settingsStyles.rowHint}>
+                  {assignment.privileges
+                    .map((privilege) => privilege.replaceAll(".", " "))
+                    .join(", ") || "No privileges"}
+                </Text>
                 {accessConstraintSummary(assignment.constraints) === null ? null : (
                   <Text style={settingsStyles.rowHint}>
                     {accessConstraintSummary(assignment.constraints)}
@@ -2195,12 +2349,45 @@ function AccessSummary({
 
 function HubConfigurationSettings() {
   const hub = useHubAccount();
+  const continuation = useHubConnectionContinuation();
+  const openContinuation = continuation.open;
+  const clearContinuation = continuation.dismiss;
   const connections = useHubResource("connections", HubConnectionsSchema);
   const daemons = useHubResource("daemons", HubDaemonsSchema);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [connectingApplicationId, setConnectingApplicationId] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [addingTelegram, setAddingTelegram] = useState(false);
+  const openTelegram = useCallback(() => setAddingTelegram(true), []);
+  const closeTelegram = useCallback(() => setAddingTelegram(false), []);
+  const telegramSaved = useCallback(async () => {
+    setAddingTelegram(false);
+    await connections.refetch();
+  }, [connections]);
+  const refreshHosts = useCallback(() => void daemons.refetch(), [daemons]);
+  const refreshHostsAction = useMemo(
+    () => (
+      <Button size="sm" variant="ghost" loading={daemons.isFetching} onPress={refreshHosts}>
+        Refresh
+      </Button>
+    ),
+    [daemons.isFetching, refreshHosts],
+  );
   const canManage = hub.signedIn?.capabilities.manageResources === true;
+  const refreshConnections = useCallback(() => void connections.refetch(), [connections]);
+  const refreshConnectionsAction = useMemo(
+    () => (
+      <Button
+        size="sm"
+        variant="ghost"
+        loading={connections.isFetching}
+        onPress={refreshConnections}
+      >
+        Refresh
+      </Button>
+    ),
+    [connections.isFetching, refreshConnections],
+  );
   const disconnect = useCallback(
     async (connection: NonNullable<typeof connections.data>["connections"][number]) => {
       if (connection.consumers.length > 0) return;
@@ -2227,9 +2414,10 @@ function HubConfigurationSettings() {
   const connect = useCallback(
     async (application: NonNullable<typeof connections.data>["providerApplications"][number]) => {
       setConnectionError(null);
+      clearContinuation();
       setConnectingApplicationId(application.id);
       try {
-        const continuation = await hub.api().post(
+        const result = await hub.api().post(
           "connections",
           {
             provider: application.provider,
@@ -2237,37 +2425,46 @@ function HubConfigurationSettings() {
           },
           HubConnectionContinuationSchema,
         );
-        await Linking.openURL(continuation.url);
+        await openContinuation(result.url);
       } catch (error) {
         setConnectionError(error instanceof Error ? error.message : "Hub request failed.");
       } finally {
         setConnectingApplicationId(null);
       }
     },
-    [hub],
+    [clearContinuation, hub, openContinuation],
   );
   return (
     <View>
+      <HubConnectionResultNotice />
       <ProviderApplicationSettings />
-      <SettingsSection title="Connections">
+      <SettingsSection title="Connections" trailing={refreshConnectionsAction}>
+        <HubConnectionContinuationNotice continuation={continuation} />
         {connectionError ? <Alert variant="error" title={connectionError} /> : null}
         <ResourceFeedback query={connections} />
-        <View style={settingsStyles.card}>
-          {(connections.data?.connections.length ?? 0) === 0 ? (
-            <EmptyRow message="No provider Connections are configured." />
-          ) : (
-            connections.data?.connections.map((connection, index) => (
-              <ConnectionRow
-                key={connection.id}
-                connection={connection}
-                bordered={index > 0}
-                canManage={canManage}
-                disconnecting={disconnectingId === connection.id}
-                disconnect={disconnect}
-              />
-            ))
-          )}
-        </View>
+        {connections.data !== undefined ? (
+          <View style={settingsStyles.card}>
+            {connections.data.connections.length === 0 ? (
+              <EmptyRow message="No provider Connections are configured." />
+            ) : (
+              connections.data.connections.map((connection, index) => (
+                <ConnectionRow
+                  key={connection.id}
+                  connection={connection}
+                  bordered={index > 0}
+                  canManage={canManage}
+                  disconnecting={disconnectingId === connection.id}
+                  disconnect={disconnect}
+                />
+              ))
+            )}
+          </View>
+        ) : null}
+        {canManage ? (
+          <Button size="sm" variant="outline" disabled={addingTelegram} onPress={openTelegram}>
+            Add Telegram account
+          </Button>
+        ) : null}
         {canManage && (connections.data?.providerApplications.length ?? 0) > 0 ? (
           <View style={styles.connectionActions}>
             <Text style={settingsStyles.rowHint}>Connect another provider account</Text>
@@ -2276,7 +2473,7 @@ function HubConfigurationSettings() {
                 <ConnectProviderApplicationButton
                   key={`${application.provider}:${application.id}`}
                   application={application}
-                  disabled={connectingApplicationId !== null}
+                  disabled={connectingApplicationId !== null || continuation.pending}
                   loading={connectingApplicationId === application.id}
                   connect={connect}
                 />
@@ -2285,24 +2482,58 @@ function HubConfigurationSettings() {
           </View>
         ) : null}
       </SettingsSection>
+      {canManage && addingTelegram ? (
+        <TelegramConnectionSetup close={closeTelegram} saved={telegramSaved} />
+      ) : null}
       {canManage ? <ApiKeySettings /> : null}
-      <SettingsSection title="Managed Hosts">
+      <SettingsSection title="Managed Hosts" trailing={refreshHostsAction}>
         <ResourceFeedback query={daemons} />
-        <View style={settingsStyles.card}>
-          {(daemons.data?.daemons.length ?? 0) === 0 ? (
-            <EmptyRow message="No Daemons are enrolled in this organization." />
-          ) : (
-            daemons.data?.daemons.map((daemon, index) => (
-              <InfoRow
-                key={daemon.id}
-                title={daemon.slug}
-                hint={`${daemon.presence} · ${daemon.canManage ? "Administrator" : "Assigned access"}`}
-                bordered={index > 0}
-              />
-            ))
-          )}
-        </View>
+        {daemons.data !== undefined ? (
+          <View style={settingsStyles.card}>
+            {daemons.data.daemons.length === 0 ? (
+              <EmptyRow message="No Daemons are enrolled in this organization." />
+            ) : (
+              daemons.data.daemons.map((daemon, index) => (
+                <ManagedHostRow
+                  key={`${hub.signedIn?.account.id}:${daemon.id}`}
+                  daemon={daemon}
+                  bordered={index > 0}
+                />
+              ))
+            )}
+          </View>
+        ) : null}
       </SettingsSection>
+    </View>
+  );
+}
+
+function TelegramConnectionSetup({ close, saved }: { close(): void; saved(): Promise<void> }) {
+  const hub = useHubAccount();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const save = useCallback(
+    (body: unknown) => {
+      setPending(true);
+      setError(null);
+      void hub
+        .api()
+        .post("connections", body, HubConnectionSchema)
+        .then(saved)
+        .catch((cause: unknown) =>
+          setError(cause instanceof Error ? cause.message : "Unable to add Telegram account."),
+        )
+        .finally(() => setPending(false));
+    },
+    [hub, saved],
+  );
+  return (
+    <View>
+      {error ? <Alert variant="error" title={error} /> : null}
+      <ChannelConnectionForm pending={pending} allowSlackSocket={false} save={save} />
+      <Button variant="outline" disabled={pending} onPress={close}>
+        Cancel
+      </Button>
     </View>
   );
 }
@@ -2388,9 +2619,12 @@ function useHubResource<Schema extends z.ZodType>(
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? null;
   return useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, resource],
+    queryKey: hubResourceQueryKey(
+      { origin: hub.origin, organizationId, accountId: hub.signedIn?.account.id ?? null },
+      resource,
+    ),
     queryFn: () => hub.api().get(resource, schema),
-    dataShape: "list",
+    dataShape: "value",
     enabled: organizationId !== null,
     retry: false,
     staleTimeMs: 0,

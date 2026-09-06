@@ -18,7 +18,7 @@
 Paseo Hub is the self-hosted automation layer for [Paseo](https://paseo.sh). Connect the services where work arrives and run agents on the machines where your development environments already live.
 
 - **Your machines:** Hub dispatches to Paseo daemons on your laptop, devbox, or build server.
-- **Your configuration:** Keep triggers, environments, permissions, and prompts in version control.
+- **Your configuration:** Update resources through Hub APIs or the UI; export when you need a portable copy.
 - **Your services:** Start agents from GitHub, Linear, Slack, Discord, or manual runs.
 - **One audit trail:** See every event, configuration revision, execution, and result.
 
@@ -31,21 +31,27 @@ Paseo Hub is the self-hosted automation layer for [Paseo](https://paseo.sh). Con
 
 ## Quick start
 
-You need Node.js and [Paseo installed and running](https://paseo.sh/docs).
+You need Node.js, Paseo, and an available agent provider on the daemon.
 
 ```sh
-npx @getpaseo/hub
+paseo hub init --provider codex
 ```
 
-Open the local URL printed by Hub. Create the operator account, then follow the browser setup to connect GitHub, Slack, or Discord. Slack Socket Mode works without a public URL.
+This creates a seeded local assistant Workspace and its daemon Project, then starts
+the local Hub as needed. The default personal workspace is
+`<resolved Clisbot home>/workspaces/default`, independent of your current directory.
+Team assistants use `workspaces/team`. Existing files are preserved.
 
-From the repository where agents should work, run:
+Open the Hub URL printed by the command to finish Account setup. Supply Slack or
+Telegram credentials to `hub init` or `bot start` to configure the Connection,
+member routes, and owner identity through APIs. A previously linked owner can use
+the bot immediately; an unlinked owner gets a private one-time linking command.
+See the [assistant onboarding quickstart](../../public-docs/hub/quickstart.md) for
+credential flags, unattended owner setup, and restart behavior.
 
-```sh
-paseo hub init
-```
-
-Choose the local Hub URL when prompted. The guided setup connects your daemon, uses the default project created during onboarding, detects the selected app connection, writes a safe starter workflow, validates it, and offers to deploy it.
+Hub has no Project to create or select. Export/edit/deploy is not required by the
+normal configuration flow. The inherited CLI scaffold/project/deploy surface is
+available only when `CLISBOT_ONBOARDING_ENABLED=0` is explicitly selected.
 
 See the [Hub documentation](https://paseo.sh/docs/hub) for PostgreSQL, Docker, public URLs, environment-managed configuration, and production deployment.
 

@@ -163,7 +163,7 @@ export interface PublicTrigger {
   id: string;
   name: string;
   enabled: boolean;
-  format: "single_run" | "legacy_multistep";
+  format: "single_run" | "workflow" | "legacy_multistep";
   yaml: string;
 }
 

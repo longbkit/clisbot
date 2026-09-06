@@ -14,6 +14,19 @@ import type { HubReporter } from "./reporter.js";
 
 const quietReporter: HubReporter = { progress() {} };
 
+describe("onboarding rollout", () => {
+  it("keeps project/deploy commands only on the explicit legacy surface", () => {
+    const modern = createHubCommand({ env: {} }).commands.map((c) => c.name());
+    const legacy = createHubCommand({ env: { CLISBOT_ONBOARDING_ENABLED: "0" } }).commands.map(
+      (c) => c.name(),
+    );
+    assert.equal(modern.includes("projects"), false);
+    assert.equal(modern.includes("deploy"), false);
+    assert.equal(legacy.includes("projects"), true);
+    assert.equal(legacy.includes("deploy"), true);
+  });
+});
+
 describe("Hub commands", () => {
   it("exposes the hard-cut Hub command surface without connect --token", () => {
     const command = createHubCommand();
@@ -21,15 +34,16 @@ describe("Hub commands", () => {
     const connect = command.commands.find((child) => child.name() === "connect");
 
     assert.deepEqual(names, [
+      "start",
+      "stop",
+      "password",
       "login",
       "init",
       "connect",
       "status",
       "disconnect",
       "permissions",
-      "projects",
       "export",
-      "deploy",
       "logout",
     ]);
     assert.match(connect?.helpInformation() ?? "", /--api-key <secret>/u);

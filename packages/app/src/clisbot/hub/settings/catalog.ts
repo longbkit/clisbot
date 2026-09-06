@@ -17,6 +17,12 @@ export interface HubSettingsNavigationItem {
   icon: ComponentType<{ size: number; color: string }>;
 }
 
+const ACCOUNT_ITEM: HubSettingsNavigationItem = {
+  section: "account",
+  label: "Account",
+  icon: UserRound,
+};
+
 const SIGNED_IN_ITEMS: readonly HubSettingsNavigationItem[] = [
   { section: "channels", label: "Channels", icon: MessageSquare },
   { section: "automations", label: "Automations", icon: Workflow },
@@ -45,13 +51,12 @@ export function hubSettingsNavigationItems(input: {
       ...MEMBER_ITEMS,
     ];
   }
-  return destinations;
+  return [ACCOUNT_ITEM, ...destinations];
 }
 
 export function hubSettingsSection(section: HubSectionSlug): HubSettingsNavigationItem {
-  const item = [
-    { section: "account" as const, label: "Account", icon: UserRound },
-    ...SIGNED_IN_ITEMS,
-  ].find((candidate) => candidate.section === section);
+  const item = [ACCOUNT_ITEM, ...SIGNED_IN_ITEMS].find(
+    (candidate) => candidate.section === section,
+  );
   return item ?? { section: "configuration", label: "Configuration", icon: Cable };
 }

@@ -1,4 +1,4 @@
-import { parse } from "yaml";
+import { parse, stringify } from "yaml";
 import { parseWorktreeTarget, type WorktreeTarget } from "./workspace-configuration";
 
 export interface SingleAgentAutomationInput {
@@ -30,6 +30,8 @@ export interface AutomationEventValue {
   name: string;
   connection?: string;
   allowedUsers?: readonly string[];
+  repository?: string;
+  contains?: string;
 }
 
 export interface AutomationInputValue {
@@ -121,21 +123,35 @@ export function buildSingleAgentAutomationYaml(input: SingleAgentAutomationInput
       ...(input.reuseBinding === true ? { reuse: "binding" } : {}),
     },
   };
-  // JSON is valid YAML and preserves arbitrary user text without a second escaping implementation.
-  return `${JSON.stringify(document, null, 2)}\n`;
+  return stringify(document, { lineWidth: 0 });
 }
 
 function buildAutomationEvents(events: readonly AutomationEventValue[]): Record<string, unknown> {
+  // The Workflow compiler needs an event to compile its steps even for Route-only work.
+  const authoredEvents: readonly AutomationEventValue[] =
+    events.length === 0 ? [{ name: "channel.message" }] : events;
   return Object.fromEntries(
-    events.map((event) => [
-      event.name,
-      {
-        ...(event.connection?.trim() ? { connection: event.connection.trim() } : {}),
-        ...(event.allowedUsers && event.allowedUsers.length > 0
-          ? { filters: { from_users: [...event.allowedUsers] } }
-          : {}),
-      },
-    ]),
+    authoredEvents.map((event) => {
+      // Channel admission already checks the Route audience and linked identity.
+      // The compiled Workflow still needs an explicit external-event allowlist.
+      const defaultUsers = event.name === "channel.message" ? ["*"] : [];
+      const allowedUsers = event.allowedUsers ?? defaultUsers;
+      return [
+        event.name,
+        {
+          ...(event.connection?.trim() ? { connection: event.connection.trim() } : {}),
+          ...(allowedUsers.length > 0 || event.repository?.trim() || event.contains?.trim()
+            ? {
+                filters: {
+                  ...(allowedUsers.length ? { from_users: [...allowedUsers] } : {}),
+                  ...(event.repository?.trim() ? { repo: event.repository.trim() } : {}),
+                  ...(event.contains?.trim() ? { contains: event.contains.trim() } : {}),
+                },
+              }
+            : {}),
+        },
+      ];
+    }),
   );
 }
 
@@ -403,18 +419,33 @@ function parseEvents(on: Record<string, unknown>): AutomationEventValue[] | null
     if (connection === null) return null;
     const filters = definition["filters"];
     let allowedUsers: string[] | undefined;
+    let repository: string | undefined;
+    let contains: string | undefined;
     if (filters !== undefined) {
-      if (!isRecord(filters) || !hasOnlyKeys(filters, ["from_users"])) return null;
+      if (
+        !isRecord(filters) ||
+        !hasOnlyKeys(
+          filters,
+          name.startsWith("github.") ? ["from_users", "repo", "contains"] : ["from_users"],
+        )
+      )
+        return null;
       const users = filters["from_users"];
       if (!Array.isArray(users) || !users.every((user) => typeof user === "string")) {
         return null;
       }
       allowedUsers = users;
+      if (filters.repo !== undefined && typeof filters.repo !== "string") return null;
+      if (filters.contains !== undefined && typeof filters.contains !== "string") return null;
+      repository = filters.repo as string | undefined;
+      contains = filters.contains as string | undefined;
     }
     events.push({
       name,
       ...(connection ? { connection } : {}),
       ...(allowedUsers === undefined ? {} : { allowedUsers }),
+      ...(repository === undefined ? {} : { repository }),
+      ...(contains === undefined ? {} : { contains }),
     });
   }
   return events;
@@ -505,4 +536,100 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function hasOnlyKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
   const names = new Set(allowed);
   return Object.keys(value).every((key) => names.has(key));
+}
+
+export function initialChannelReplyProviders(
+  outputs: readonly AutomationOutputValue[],
+  provider?: "slack" | "telegram",
+): Array<"slack" | "telegram"> {
+  return (["slack", "telegram"] as const).filter(
+    (candidate) =>
+      candidate === provider || outputs.some(({ type }) => type === `${candidate}.reply`),
+  );
+}
+
+/** Channel dispatch runs the first compiled event's steps, including its native reply default. */
+export function automationChannelReplyGrant(
+  value: Pick<SingleAgentAutomationValue, "events" | "outputs">,
+  channel: string,
+): AutomationOutputValue | undefined {
+  const type = `${channel}.reply`;
+  const explicit = value.outputs.find((output) => output.type === type);
+  if (explicit !== undefined) return explicit;
+  const firstProvider = value.events[0]?.name.split(".", 1)[0];
+  if (firstProvider === channel && ["slack", "discord", "github", "linear"].includes(channel)) {
+    return { type };
+  }
+  return undefined;
+}
+
+/** Direct event output defaults and explicit Channel reply grants share the existing run.outputs owner. */
+export function automationOutputs(
+  existing: readonly AutomationOutputValue[],
+  events: readonly AutomationEventValue[],
+  replyLimits: Readonly<Record<string, string>>,
+  channelReplyProviders: readonly ("slack" | "telegram")[],
+): AutomationOutputValue[] {
+  const eventProviders = events
+    .map(({ name }) => name.split(".", 1)[0])
+    .filter((provider) => ["slack", "discord", "github", "linear"].includes(provider));
+  const providers = new Set([...eventProviders, ...channelReplyProviders]);
+  const managedTypes = new Set(
+    [...eventProviders, "slack", "telegram"].map((provider) => `${provider}.reply`),
+  );
+  const outputs = existing
+    .filter(({ type }) => !managedTypes.has(type))
+    .map((output) => Object.assign({}, output));
+  for (const provider of providers) {
+    const type = `${provider}.reply`;
+    const value = replyLimits[type]?.trim() ?? "";
+    const previous = existing.find((output) => output.type === type);
+    const explicitChannelReply = channelReplyProviders.some((candidate) => candidate === provider);
+    if (value.length === 0 && !explicitChannelReply && previous?.required !== true) continue;
+    outputs.push({
+      type,
+      ...(value.length === 0 ? {} : { max: Number(value) }),
+      ...(previous?.required === true ? { required: true } : {}),
+    });
+  }
+  return outputs;
+}
+
+/** Replies belong to individual Workflow steps. Shorthand retains its existing native defaults. */
+export function automationYamlChannelReplyGrant(
+  yaml: string,
+  channel: string,
+): AutomationOutputValue | undefined {
+  const single = parseSingleAgentAutomationYaml(yaml);
+  if (single) return automationChannelReplyGrant(single, channel);
+  let document: unknown;
+  try {
+    document = parse(yaml);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(document) || !Array.isArray(document.steps)) return undefined;
+  for (const step of document.steps) {
+    if (!isRecord(step) || !Array.isArray(step.allow_outputs)) continue;
+    for (const output of step.allow_outputs) {
+      if (isRecord(output) && output.type === `${channel}.reply`)
+        return {
+          type: `${channel}.reply`,
+          ...(typeof output.max === "number" ? { max: output.max } : {}),
+          ...(typeof output.required === "boolean" ? { required: output.required } : {}),
+        };
+    }
+  }
+  return undefined;
+}
+
+export function automationManualParameters(yaml: string): AutomationInputValue[] | null {
+  try {
+    const document: unknown = parse(yaml);
+    if (!isRecord(document) || !isRecord(document.on) || !("manual.run" in document.on))
+      return null;
+    return parseInputs(document.inputs);
+  } catch {
+    return null;
+  }
 }

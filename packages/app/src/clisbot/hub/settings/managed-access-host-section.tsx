@@ -29,8 +29,7 @@ export function ManagedAccessHostSection({ host }: { host: HostProfile }) {
   const isOwner =
     managedByCurrentHub &&
     hub.signedIn?.organization.id === management.organizationId &&
-    (hub.signedIn.status === "appSetupRequired" ||
-      (hub.signedIn.status === "active" && hub.signedIn.membership.role === "owner"));
+    hub.signedIn.membership.role === "owner";
   const external = config?.managedAccess.mode === "external";
 
   const changeMode = useCallback(

@@ -1,3 +1,4 @@
+import { resolveSlackConversation } from "./conversation-metadata.js";
 // The drive surface — the object the Hub control plane actually drives
 // (blueprint §6.5 hard rule 2, B3-immutable): `gateway.startAccount` +
 // `outbound.sendText` under the pinned export name `slackPlugin`.
@@ -14,6 +15,7 @@ import { slackTyping } from "./typing.js";
  * decides against it; absent from a pinned vertical, the card just goes
  * stale (the open record key keeps the pinned surface byte-compatible). */
 export const slackPlugin: ChannelPlugin = {
+  directory: { resolveConversation: resolveSlackConversation },
   gateway: {
     startAccount: async (ctx) => {
       await startSlackAccount(ctx);

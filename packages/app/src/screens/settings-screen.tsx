@@ -49,6 +49,7 @@ import { HostStatusDot } from "@/components/host-status-dot";
 import { ScreenTitle } from "@/components/headers/screen-title";
 import { HeaderIconBadge } from "@/components/headers/header-icon-badge";
 import { SettingsSection } from "@/screens/settings/settings-section";
+import { HubSettingsDetailScrollProvider } from "@/clisbot/hub/settings/detail-scroll";
 import { AppearanceSection } from "@/screens/settings/appearance/appearance-section";
 import { LayoutSection } from "@/screens/settings/layout/layout-section";
 import {
@@ -134,6 +135,7 @@ import { isNative, isWeb } from "@/constants/platform";
 import { useFetchQuery } from "@/data/query";
 import { useHubAccount } from "@/clisbot/hub/account-provider";
 import { HubEffectiveAccessSchema } from "@/clisbot/hub/contracts";
+import { hubResourceQueryKey } from "@/clisbot/hub/query-keys";
 import { buildHubSettingsRoute, type HubSectionSlug } from "@/clisbot/hub/navigation";
 import {
   HubSettingsContent,
@@ -1064,11 +1066,14 @@ function SettingsSidebar({
   const canManageHub = hub.signedIn?.capabilities.manageResources === true;
   const effectiveHubAccess = useFetchQuery({
     queryKey: [
-      "clisbot",
-      "hub",
-      hub.origin,
-      hub.signedIn?.organization.id ?? "",
-      "access-assignments",
+      ...hubResourceQueryKey(
+        {
+          origin: hub.origin,
+          organizationId: hub.signedIn?.organization.id ?? null,
+          accountId: hub.signedIn?.account.id ?? null,
+        },
+        "access-assignments",
+      ),
       "effective",
     ],
     queryFn: () => hub.api().get("access-assignments/effective", HubEffectiveAccessSchema),
@@ -1254,6 +1259,10 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
   const [isPlaybackTestRunning, setIsPlaybackTestRunning] = useState(false);
   const [playbackTestResult, setPlaybackTestResult] = useState<string | null>(null);
   const lastOpenedAddHostIntentRef = useRef<string | null>(null);
+  const detailScrollRef = useRef<ScrollView | null>(null);
+  const scrollDetailToTop = useCallback(() => {
+    detailScrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
   const isDesktopApp = isElectronRuntime();
   const appVersion = resolveAppVersion();
   const appVersionText = formatVersionWithPrefix(appVersion);
@@ -1680,8 +1689,16 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
           titleAccessory={detailHeader?.titleAccessory}
           onBack={handleBackFromDetail}
         />
-        <ScrollView style={styles.scrollView} contentContainerStyle={insetBottomStyle}>
-          <View style={styles.content}>{content}</View>
+        <ScrollView
+          ref={detailScrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={insetBottomStyle}
+        >
+          <View style={styles.content}>
+            <HubSettingsDetailScrollProvider onNavigate={scrollDetailToTop}>
+              {content}
+            </HubSettingsDetailScrollProvider>
+          </View>
         </ScrollView>
         {addHostModals}
       </View>
@@ -1714,8 +1731,16 @@ export default function SettingsScreen({ view, openAddHostIntent = null }: Setti
               left={desktopDetailHeaderLeft}
               leftStyle={desktopStyles.detailLeft}
             />
-            <ScrollView style={styles.scrollView} contentContainerStyle={insetBottomStyle}>
-              <View style={styles.content}>{content}</View>
+            <ScrollView
+              ref={detailScrollRef}
+              style={styles.scrollView}
+              contentContainerStyle={insetBottomStyle}
+            >
+              <View style={styles.content}>
+                <HubSettingsDetailScrollProvider onNavigate={scrollDetailToTop}>
+                  {content}
+                </HubSettingsDetailScrollProvider>
+              </View>
             </ScrollView>
           </View>
         </WindowChromeRegion>

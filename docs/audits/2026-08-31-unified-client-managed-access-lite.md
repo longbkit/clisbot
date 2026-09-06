@@ -1,6 +1,6 @@
 # Unified Paseo client and Managed Access Lite
 
-Date: 2026-08-31. Updated: 2026-09-03. Status: Managed Access Lite MVP implemented; explicit
+Date: 2026-08-31. Updated: 2026-09-05. Status: Managed Access Lite MVP implemented; explicit
 post-MVP items remain in sections 5.4 and 12. Scope: put Hub account
 and management surfaces in the shared Paseo app, let an authenticated user discover and open the
 daemon Projects they may use, and preserve ordinary Paseo client/daemon compatibility when managed
@@ -86,14 +86,17 @@ Client-side hiding is only UX and is never the security boundary.
 | App                | Daemon                | Managed mode | Expected result                                                                                                                           |
 | ------------------ | --------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Upstream Paseo app | Upstream Paseo daemon | n/a          | **CURRENT:** ordinary Paseo behavior.                                                                                                     |
-| Clisbot app        | Upstream Paseo daemon | n/a          | Must work as an ordinary Paseo app. Manual/upstream Hosts do not request a Hub ticket and use the existing protocol.                      |
+| Clisbot app        | Upstream Paseo daemon | n/a          | Must work as an ordinary Paseo app. Upstream daemons use the existing protocol and do not request a Hub ticket.                           |
 | Upstream Paseo app | Clisbot daemon        | `off`        | Must work as an ordinary Paseo app. Clisbot managed-access code is inactive.                                                              |
 | Clisbot app        | Clisbot daemon        | `off`        | Ordinary Paseo behavior; Hub account features may exist in the app but do not change this daemon session.                                 |
 | Upstream Paseo app | Clisbot daemon        | `external`   | Relay and TCP connections are rejected with an actionable upgrade/login error. Authenticated local socket/pipe recovery remains possible. |
 | Clisbot app        | Clisbot daemon        | `external`   | A Hub-managed external connection succeeds with a valid ticket and is restricted to its Projects/privileges.                              |
 
-**IMPLEMENTED:** a manual Host has no Hub ticket resolver and continues through the ordinary
-`@getpaseo/client`/`HostRuntimeStore` path. A daemon in `off` keeps owner admission and performs no
+**IMPLEMENTED:** a Host without a matching Hub `external` projection has no Hub ticket resolver and
+continues through the ordinary `@getpaseo/client`/`HostRuntimeStore` path. If the same `serverId` is
+already a manual Host and is enrolled with managed access `external`, the Hub binding supplies
+tickets while retaining the user's TCP/SSH/relay choices and manual Host lifecycle. Signing out
+removes that binding without deleting the manual Host. A daemon in `off` keeps owner admission and performs no
 ticket lookup, session narrowing, resource filtering, or Hub availability check. Focused client,
 Host-runtime, and WebSocket tests cover absent-ticket compatibility and the `off`/`external`
 boundary; wire fields remain optional for old clients and daemons.
@@ -131,8 +134,9 @@ connection offer:
 managedAccessMode: "off" | "external";
 ```
 
-A missing field from an older daemon resolves to `off`; a manual Host has no Hub binding and follows
-the upstream path. `HubHostBinding` registers a ticket resolver only for `external`. The post-hello
+A missing field from an older daemon resolves to `off`; a Host without a matching Hub projection
+follows the upstream path. `HubHostBinding` registers a ticket resolver only for `external`, including
+when it reuses an existing manual Host for that same daemon. The post-hello
 `server_info.features.managedAccessTickets` field remains useful for diagnostics and version-drift
 validation, not initial ticket discovery. A Hub must not advertise an upstream daemon as a managed
 Host when that daemon cannot consume tickets.
@@ -267,27 +271,28 @@ In the MVP, `hub.*` and `channel.manage` are role-derived HTTP actions, not assi
 grants. The Access API rejects them in Team/Member assignments. `channel.use`, `automation.run`, and
 Daemon/Project privileges are the assignable leaves.
 
-| Privilege                      | Meaning                                                                                                       | Enforcement owner | Origin     | Implemented handling                                                                                                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `hub.view`                     | View Hub account state and the resources already visible to the Member.                                       | Hub               | `ADDED`    | Thin action over current `view`; it never reveals unassigned resources.                                                                   |
-| `hub.configure`                | Manage organization configuration, event connections, API keys, and Automation definitions/revisions.         | Hub               | `ADDED`    | Split from coarse `manageResources`; does not grant resource use.                                                                         |
-| `hub.access.manage`            | Assign Team/direct access to Channels, Daemons, Projects, and Automations.                                    | Hub               | `ADDED`    | Split from `manageResources`; every mutation remains organization-scoped and audited.                                                     |
-| `hub.member.manage`            | Invite/remove Members and change non-owner membership.                                                        | Hub               | `ADDED`    | Map to current `manageMembers`; current owner rules remain authoritative.                                                                 |
-| `hub.instance.manage`          | Manage instance-wide Apps and operator settings.                                                              | Hub               | `ADDED`    | Derived only from instance-operator authority, never from ordinary Team assignment.                                                       |
-| `channel.manage`               | Connect, edit, test, enable/disable, and remove Channel accounts and Routes.                                  | Hub               | `ADDED`    | Replaces the unimplemented proposal `bot.manage`; there is no Bot product resource.                                                       |
-| `channel.use`                  | Invoke one fixed Route in the assigned Conversations.                                                         | Hub               | `ADDED`    | May use only that Route's bound outbound actions; grants no generic Channel tool or direct Project, File, Terminal, or Automation access. |
-| `automation.run`               | Invoke an Automation directly from Paseo or a Member API.                                                     | Hub               | `ADDED`    | A fixed Channel Route is authorized by `channel.use` instead.                                                                             |
-| `daemon.connect`               | Obtain managed admission to one Daemon.                                                                       | Hub + Daemon      | `ADDED`    | Checked at ticket issue/consume; grants no RPC operation by itself.                                                                       |
-| `project.use`                  | See and work with Agents, Workspaces, Files, and Project projections in one Project.                          | Hub + Daemon      | `ADDED`    | Compile to resource-scoped workspace read/write; do not include Project lifecycle management.                                             |
-| `agent.interact`               | Start or continue an Agent interaction on an authorized Project or fixed Channel Route.                       | Hub + Daemon      | `EXTENDED` | Canonical replacement for current `bot.interact`; accept the old name only as a bounded config alias.                                     |
-| `agent.create`                 | Create an Agent in an authorized Project using one allowed Agent configuration.                               | Daemon            | `ADDED`    | Enforce Project and resolved Provider/Model/Thinking constraints at creation.                                                             |
-| `agent.fast.use`               | Enable cost-bearing Fast mode for an Agent creation or fixed Route/Automation configuration.                  | Hub + Daemon      | `ADDED`    | Check `featureValues.fast_mode` during activation and Agent creation; off by default.                                                     |
-| `terminal.use`                 | List, create, subscribe, read, input, capture, rename, kill, and receive binary frames for Project terminals. | Daemon            | `ADDED`    | Apply to every terminal text/binary path; it is narrower than `workspace.write`.                                                          |
-| `approval.file`                | Approve a provider request classified as File work.                                                           | Hub + Daemon      | `EXTENDED` | Already enforced for Channel responders; reuse the classifier and enforce in Paseo.                                                       |
-| `approval.config`              | Approve a provider request classified as configuration work.                                                  | Hub + Daemon      | `EXTENDED` | Same cross-surface extension.                                                                                                             |
-| `approval.command`             | Approve command work; dot-subtree matching covers destructive commands unless explicitly denied.              | Hub + Daemon      | `EXTENDED` | Same cross-surface extension; compile denies before sending exact leaves to the Daemon.                                                   |
-| `approval.command.destructive` | Approve commands classified as destructive.                                                                   | Hub + Daemon      | `EXTENDED` | Already a Channel leaf; enforce as the narrower Paseo decision too.                                                                       |
-| `approval.channel`             | Answer a pending provider request classified as a Channel-native action.                                      | Hub + Daemon      | `EXTENDED` | Approval never supplies the underlying action or resource authority; the broker rechecks that ceiling.                                    |
+| Privilege                      | Meaning                                                                                                       | Enforcement owner | Origin     | Implemented handling                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | ----------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hub.view`                     | View Hub account state and the resources already visible to the Member.                                       | Hub               | `ADDED`    | Thin action over current `view`; it never reveals unassigned resources.                                                                           |
+| `hub.configure`                | Manage organization configuration, event connections, API keys, and Automation definitions/revisions.         | Hub               | `ADDED`    | Split from coarse `manageResources`; does not grant resource use.                                                                                 |
+| `hub.access.manage`            | Assign Team/direct access to Channels, Daemons, Projects, and Automations.                                    | Hub               | `ADDED`    | Split from `manageResources`; every mutation remains organization-scoped and audited.                                                             |
+| `hub.member.manage`            | Invite/remove Members and change non-owner membership.                                                        | Hub               | `ADDED`    | Map to current `manageMembers`; current owner rules remain authoritative.                                                                         |
+| `hub.instance.manage`          | Manage instance-wide Apps and operator settings.                                                              | Hub               | `ADDED`    | Derived only from instance-operator authority, never from ordinary Team assignment.                                                               |
+| `channel.manage`               | Connect, edit, test, enable/disable, and remove Channel accounts and Routes.                                  | Hub               | `ADDED`    | Replaces the unimplemented proposal `bot.manage`; there is no Bot product resource.                                                               |
+| `channel.use`                  | Invoke one fixed Route in the assigned Conversations.                                                         | Hub               | `ADDED`    | May use only that Route's bound outbound actions; grants no generic Channel tool or direct Project, File, Terminal, or Automation access.         |
+| `automation.run`               | Invoke an Automation directly from Paseo or a Member API.                                                     | Hub               | `ADDED`    | A fixed Channel Route is authorized by `channel.use` instead.                                                                                     |
+| `daemon.connect`               | Obtain managed admission to one Daemon.                                                                       | Hub + Daemon      | `ADDED`    | Checked at ticket issue/consume; grants no RPC operation by itself.                                                                               |
+| `project.use`                  | See and work with Agents, Workspaces, Files, and Project projections in one Project.                          | Hub + Daemon      | `ADDED`    | Compile to resource-scoped workspace read/write; do not include Project lifecycle management.                                                     |
+| `workspace.create`             | Create a Workspace or Git worktree within an explicitly granted existing Project.                             | Hub + Daemon      | `ADDED`    | Requires an active lease, exact Project/source authorization, and daemon-owned worktree destination; does not grant Project lifecycle management. |
+| `agent.interact`               | Start or continue an Agent interaction on an authorized Project or fixed Channel Route.                       | Hub + Daemon      | `EXTENDED` | Canonical replacement for current `bot.interact`; accept the old name only as a bounded config alias.                                             |
+| `agent.create`                 | Create an Agent in an authorized Project using one allowed Agent configuration.                               | Daemon            | `ADDED`    | Enforce Project and resolved Provider/Model/Thinking constraints at creation.                                                                     |
+| `agent.fast.use`               | Enable cost-bearing Fast mode for an Agent creation or fixed Route/Automation configuration.                  | Hub + Daemon      | `ADDED`    | Check `featureValues.fast_mode` during activation and Agent creation; off by default.                                                             |
+| `terminal.use`                 | List, create, subscribe, read, input, capture, rename, kill, and receive binary frames for Project terminals. | Daemon            | `ADDED`    | Apply to every terminal text/binary path; it is narrower than `workspace.write`.                                                                  |
+| `approval.file`                | Approve a provider request classified as File work.                                                           | Hub + Daemon      | `EXTENDED` | Already enforced for Channel responders; reuse the classifier and enforce in Paseo.                                                               |
+| `approval.config`              | Approve a provider request classified as configuration work.                                                  | Hub + Daemon      | `EXTENDED` | Same cross-surface extension.                                                                                                                     |
+| `approval.command`             | Approve command work; dot-subtree matching covers destructive commands unless explicitly denied.              | Hub + Daemon      | `EXTENDED` | Same cross-surface extension; compile denies before sending exact leaves to the Daemon.                                                           |
+| `approval.command.destructive` | Approve commands classified as destructive.                                                                   | Hub + Daemon      | `EXTENDED` | Already a Channel leaf; enforce as the narrower Paseo decision too.                                                                               |
+| `approval.channel`             | Answer a pending provider request classified as a Channel-native action.                                      | Hub + Daemon      | `EXTENDED` | Approval never supplies the underlying action or resource authority; the broker rechecks that ceiling.                                            |
 
 `approval.other` remains deliberately unavailable: an unclassified request fails closed.
 
@@ -462,7 +467,7 @@ The first Project access levels expand as follows:
 | Access level         | Product privileges                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Office worker        | `project.use`, `agent.interact`, `agent.create`, `approval.file`                                                                                                                      |
-| Developer            | Office worker plus `terminal.use`, `approval.config`, and `approval.command`, with `approval.command.destructive` denied                                                              |
+| Developer            | Office worker plus `workspace.create`, `terminal.use`, `approval.config`, and `approval.command`, with `approval.command.destructive` denied                                          |
 | Full access          | Developer plus `approval.command.destructive` and `approval.channel`                                                                                                                  |
 | Use Fast mode        | Adds `agent.fast.use`; separate and off by default for non-owners                                                                                                                     |
 | Daemon Connect       | Adds `daemon.connect`; no Project or operation authority by itself                                                                                                                    |
@@ -474,6 +479,14 @@ Provider, Model, and Thinking grants are data constraints attached to a Project 
 additional privilege names. A complete resolved configuration must match one grant; fields from
 different grants are never cross-combined. Fast mode is then checked separately with
 `agent.fast.use`.
+
+`workspace.create` permits a new Workspace (Local or New worktree) only within an explicitly
+authorized Project. It does not grant Project creation or Workspace rename, archive, removal, or
+other daemon-wide `workspace.manage` operations. New Developer and Full access selections include
+this leaf; persisted assignments remain literal permission lists and do not gain it automatically.
+To extend an existing assignment, explicitly select Developer or Full access again and save the
+reviewed grant. Update the daemon before granting this leaf: older managed-admission parsers reject
+unknown Project privileges rather than silently discard restrictions.
 
 Do not add a custom-role editor in the MVP. Reuse the existing dot-subtree, grant, deny, and extends
 algebra in Hub, but send only exact resolved privilege leaves to the Daemon.
@@ -598,6 +611,13 @@ Do not add in the first version:
 
 A signed grant may replace opaque consume later if offline Hub operation becomes a demonstrated
 requirement. The resource-privilege and lease contracts can remain unchanged.
+
+Disconnecting a managed Host uses Hub's canonical enrollment revocation. The Daemon is marked
+revoked before its active leases are swept and notifications sent; only then does the Hub connection
+close. Ticket consumption and lease refresh hold a shared lock on the active Daemon row until their
+lease transaction commits, so revocation cannot miss a lease admitted immediately before the change.
+The same lifecycle hook covers CLI and organization revocation. The shared client requires both Hub
+configuration authority and Daemon management authority for its Disconnect action.
 
 ## 6. Existing code: what it is for and how much should constrain the product
 
@@ -1163,8 +1183,11 @@ cannot be bypassed at Agent creation.
 **Existing semantic classification:** upstream classifies daemon-global operations explicitly. Configuration, update,
 restart, plugins, and skills use `daemon.manage`; pairing and grant changes use `access.manage`; Hub
 and relay relationship changes use `tunnel.manage`; diagnostics/status use `daemon.read`; Project
-and workspace lifecycle uses `workspace.manage`. A Session without the required semantic permission
-receives `access_denied` before the handler runs.
+and workspace lifecycle uses `workspace.manage`. Managed Access adds one narrow exception for
+`workspace.create.request` and its response when an active project-scoped Session has
+`workspace.create`; resource authorization still verifies its explicit Project and source root.
+Other operations without the required semantic permission receive `access_denied` before the
+handler runs.
 
 **IMPLEMENTED:** `Administrator` is a UI access level that compiles to the exact current daemon
 semantic permissions it is meant to receive. Do not add another product privilege named
@@ -1324,7 +1347,9 @@ future upstream merge sees small protocol/runtime hooks and Clisbot-owned policy
 | `packages/app/src/clisbot/hub/transport/create.web.ts`    | `BrowserHubTransport`, `ElectronHubTransport`                     | Browser uses same-origin HTTP-only cookie; Electron delegates authenticated requests to the main-process IPC adapter.                         |
 | `packages/app/src/clisbot/hub/api-client.ts`              | `HubApiClient`                                                    | Shared typed HTTP operations for account, management resources, bootstrap, and access-ticket issue.                                           |
 | `packages/app/src/clisbot/hub/account-provider.tsx`       | `HubAccountProvider`, `useHubAccount()`                           | One cross-platform signed-out/loading/setup/signed-in state owner.                                                                            |
-| `packages/app/src/clisbot/hub/host-synchronization.tsx`   | `HubHostSynchronization`, `HubHostBinding`                        | Reconciles Hub daemons into existing Host profiles and registers a ticket resolver only for published `external` mode.                        |
+| `packages/app/src/clisbot/hub/cli-login-screen.tsx`       | `HubCliLoginScreen`                                               | Approves CLI login, observes the resulting Host enrollment, and opens the shared Add Project flow with that Host preselected.                 |
+| `packages/app/src/clisbot/hub/host-synchronization.tsx`   | `HubHostSynchronization`, `HubHostBinding`                        | Reconciles Hub Daemons into existing Host profiles and registers a ticket resolver only for published `external` mode.                        |
+| `packages/app/src/clisbot/hub/managed-host-discovery.ts`  | `hubHostDiscoveryRefetchInterval()`                               | Bounds the faster Daemon-catalog refresh used only while an approved enrollment is expected to add a Host.                                    |
 | `packages/app/src/runtime/host-session-access.ts`         | `registerHostAccessTicketResolver()`, `resolveHostAccessTicket()` | Isolates the optional Clisbot admission hook from the upstream Host transport model.                                                          |
 | `packages/app/src/runtime/host-runtime.ts`                | `HostRuntimeController`                                           | Resolves a ticket only for real connection admission/reconnect; no ticket is created for ordinary background health probes.                   |
 | `packages/app/src/screens/settings-screen.tsx`            | `SettingsSidebar`, `SettingsScreen`                               | Reuses the existing App/Host Settings shell and mounts Clisbot-owned Account, Channels, Automations, Team, Access, and Configuration screens. |

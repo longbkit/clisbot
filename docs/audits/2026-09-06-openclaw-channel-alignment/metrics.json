@@ -1,0 +1,1113 @@
+{
+  "generatedAt": "2026-09-06T05:29:19.768Z",
+  "typescript": "5.9.3",
+  "repo": "/home/node/projects/clisbot-paseoclaw-fusion",
+  "upstream": "/home/node/projects/openclaw-private",
+  "method": "TypeScript printer removeComments, trim indentation, drop blank lines; shared blocks >=5 or >=10 lines, maximal matching blocks with at least 3 lines containing letters/digits; no identifier/import rewrites",
+  "channels": {
+    "slack": {
+      "localProduction": {
+        "files": 17,
+        "loc": 3346
+      },
+      "localTests": {
+        "files": 10,
+        "loc": 2229
+      },
+      "referenceProduction": {
+        "files": 185,
+        "loc": 38858
+      },
+      "referenceTests": {
+        "files": 140,
+        "loc": 66547
+      },
+      "helpers": [
+        "packages/markdown-core/src/assistant-transcript-headers.ts",
+        "packages/markdown-core/src/assistant-transcript.ts",
+        "packages/markdown-core/src/chunk-text.ts",
+        "packages/markdown-core/src/code-spans.ts",
+        "packages/markdown-core/src/construct-fallbacks.ts",
+        "packages/markdown-core/src/fences.ts",
+        "packages/markdown-core/src/format-capabilities.ts",
+        "packages/markdown-core/src/frontmatter.ts",
+        "packages/markdown-core/src/html-tags.ts",
+        "packages/markdown-core/src/index.ts",
+        "packages/markdown-core/src/ir-annotations.ts",
+        "packages/markdown-core/src/ir-source-spacing.ts",
+        "packages/markdown-core/src/ir-spans.ts",
+        "packages/markdown-core/src/ir.ts",
+        "packages/markdown-core/src/reasoning-tag-parser.ts",
+        "packages/markdown-core/src/reasoning-tags.ts",
+        "packages/markdown-core/src/render-attributed.ts",
+        "packages/markdown-core/src/render-aware-chunking.ts",
+        "packages/markdown-core/src/render.ts",
+        "packages/markdown-core/src/tables.ts",
+        "packages/markdown-core/src/types.ts",
+        "packages/media-core/src/attachment-classify.ts",
+        "packages/media-core/src/base64.ts",
+        "packages/media-core/src/constants.ts",
+        "packages/media-core/src/content-length.ts",
+        "packages/media-core/src/file-name.ts",
+        "packages/media-core/src/inbound-path-policy.ts",
+        "packages/media-core/src/index.ts",
+        "packages/media-core/src/inline-image-data-url.ts",
+        "packages/media-core/src/media-source-url.ts",
+        "packages/media-core/src/mime.ts",
+        "packages/media-core/src/read-byte-stream-with-limit.ts"
+      ],
+      "files": [
+        {
+          "path": "client/web-api.ts",
+          "loc": 492,
+          "normalizedLines": 357,
+          "hash": "ce9a282e115add6d9129d9ed1dc0480646900da4e479ece83a470d2af41615a6",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 5,
+              "percent": 1.4005602240896358,
+              "origins": [
+                {
+                  "path": "client-options.ts",
+                  "lines": 5
+                }
+              ]
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "conversation-metadata.ts",
+          "loc": 23,
+          "normalizedLines": 28,
+          "hash": "c4bde84bec0a6ab3bd82488589edfdd5fef88e33b49c8f19d6bf87f194ec2781",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "entry.ts",
+          "loc": 24,
+          "normalizedLines": 12,
+          "hash": "2b200f027071fcf4b458ce7a2d65196d98185a3a3409f496e060de9560ea65b1",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "index.ts",
+          "loc": 8,
+          "normalizedLines": 4,
+          "hash": "ad9c600f0cb6853d1f2f6fa3c862fef41716f97d9532c1b474a4479fc3f1607e",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "lifecycle/start-account.ts",
+          "loc": 301,
+          "normalizedLines": 181,
+          "hash": "37abce883be1b71258b78567dee208ef6bac296246e82bc33e3811f4e70b4a26",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "mrkdwn.ts",
+          "loc": 336,
+          "normalizedLines": 260,
+          "hash": "3607724a9da0349bd237c589c9fcbba4beb8f52968e707114f71743a9f5f7090",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "outbound-media.ts",
+          "loc": 116,
+          "normalizedLines": 83,
+          "hash": "da4ee75f99bf6e19d33e5851b7b6e09f0661718290d7feb0b4472032cc8d4f24",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "outbound.ts",
+          "loc": 282,
+          "normalizedLines": 193,
+          "hash": "2275bd87494d149e9a07c98e440a609972625914c33cebba5d2e1dd6e3dd001a",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "plugin.ts",
+          "loc": 46,
+          "normalizedLines": 26,
+          "hash": "37e640e6b22bb053c6d98a6d72cf9942e64ac7f4946b13ff973e959673729daa",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "runtime.ts",
+          "loc": 29,
+          "normalizedLines": 11,
+          "hash": "9475c60c1a6f0f8f05ece9da124d9fa300a2a9514eda034fdea1dad5dc8a9722",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/approval-card.ts",
+          "loc": 106,
+          "normalizedLines": 62,
+          "hash": "09e5bd470a70fab2e665ef251021ea40545aeae86a5b129508d3244127f48e94",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/media.ts",
+          "loc": 245,
+          "normalizedLines": 164,
+          "hash": "7edaa0b5d82ea605aa782aaa6794fc7ba0cb5f6baf83a2bf9b6660570bd246be",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/socket-event-filter.ts",
+          "loc": 295,
+          "normalizedLines": 185,
+          "hash": "592af060c4736b3970faf33d32c09d1cbefc8a13752f50518ac7385d701368b4",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 5,
+              "percent": 2.7027027027027026,
+              "origins": [
+                {
+                  "path": "monitor/channel-type.ts",
+                  "lines": 5
+                }
+              ]
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/socket-mode.ts",
+          "loc": 372,
+          "normalizedLines": 228,
+          "hash": "e8a2adeae00cd94d18bc1e66a90b9f05f8a00fe8c124004d1b839678ceeef738",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/socket-pool.ts",
+          "loc": 131,
+          "normalizedLines": 120,
+          "hash": "613294461713bf811221b9d330eeb895f696a9614a7228d42c72bd449bbbd625",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/socket-reconnect.ts",
+          "loc": 198,
+          "normalizedLines": 138,
+          "hash": "ae23980ddca953a6d2525e6589d005e5b7d179e401d4efec3196101089faa847",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 6,
+              "percent": 4.3478260869565215,
+              "origins": [
+                {
+                  "path": "monitor/reconnect-policy.ts",
+                  "lines": 6
+                }
+              ]
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "typing.ts",
+          "loc": 342,
+          "normalizedLines": 281,
+          "hash": "cfac2bf2e8b2bf60419de9cdee205e2d2812b7df3cff04822c536a344ab13d9e",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        }
+      ],
+      "normalizationParseErrors": [],
+      "pathDiff": {
+        "add": 3343,
+        "delete": 38855,
+        "files": 200
+      }
+    },
+    "telegram": {
+      "localProduction": {
+        "files": 22,
+        "loc": 4180
+      },
+      "localTests": {
+        "files": 12,
+        "loc": 2496
+      },
+      "referenceProduction": {
+        "files": 264,
+        "loc": 56310
+      },
+      "referenceTests": {
+        "files": 232,
+        "loc": 102902
+      },
+      "helpers": [
+        "packages/markdown-core/src/assistant-transcript-headers.ts",
+        "packages/markdown-core/src/assistant-transcript.ts",
+        "packages/markdown-core/src/chunk-text.ts",
+        "packages/markdown-core/src/code-spans.ts",
+        "packages/markdown-core/src/construct-fallbacks.ts",
+        "packages/markdown-core/src/fences.ts",
+        "packages/markdown-core/src/format-capabilities.ts",
+        "packages/markdown-core/src/frontmatter.ts",
+        "packages/markdown-core/src/html-tags.ts",
+        "packages/markdown-core/src/index.ts",
+        "packages/markdown-core/src/ir-annotations.ts",
+        "packages/markdown-core/src/ir-source-spacing.ts",
+        "packages/markdown-core/src/ir-spans.ts",
+        "packages/markdown-core/src/ir.ts",
+        "packages/markdown-core/src/reasoning-tag-parser.ts",
+        "packages/markdown-core/src/reasoning-tags.ts",
+        "packages/markdown-core/src/render-attributed.ts",
+        "packages/markdown-core/src/render-aware-chunking.ts",
+        "packages/markdown-core/src/render.ts",
+        "packages/markdown-core/src/tables.ts",
+        "packages/markdown-core/src/types.ts",
+        "packages/media-core/src/attachment-classify.ts",
+        "packages/media-core/src/base64.ts",
+        "packages/media-core/src/constants.ts",
+        "packages/media-core/src/content-length.ts",
+        "packages/media-core/src/file-name.ts",
+        "packages/media-core/src/inbound-path-policy.ts",
+        "packages/media-core/src/index.ts",
+        "packages/media-core/src/inline-image-data-url.ts",
+        "packages/media-core/src/media-source-url.ts",
+        "packages/media-core/src/mime.ts",
+        "packages/media-core/src/read-byte-stream-with-limit.ts"
+      ],
+      "files": [
+        {
+          "path": "client/bot-api.ts",
+          "loc": 629,
+          "normalizedLines": 418,
+          "hash": "b4354c17ef53655b42359ae2916ea05cdcad18c3482476a13307ff0d16748c85",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "client/sent-messages.ts",
+          "loc": 38,
+          "normalizedLines": 22,
+          "hash": "9f68328e59bcce96071b58ce75c80d6f3dbad1faeaaea26056fd89f55b1bf66d",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "conversation-metadata.ts",
+          "loc": 29,
+          "normalizedLines": 19,
+          "hash": "7c4f039f0d9abb75484781953458d472d720d51788ab956122122c9fdbd83a25",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "entry.ts",
+          "loc": 20,
+          "normalizedLines": 11,
+          "hash": "d8d0da0d66c34cf6ddc6d103e3e346cef838adda300846809450eb517b7852d6",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "format-html.ts",
+          "loc": 103,
+          "normalizedLines": 86,
+          "hash": "4d71190b62f8b82c90c80da549543b5a98e0bcc2553cff06e8f658a228ac292c",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 82,
+              "percent": 95.34883720930233,
+              "origins": [
+                {
+                  "path": "format-html.ts",
+                  "lines": 82
+                }
+              ]
+            },
+            "10": {
+              "lines": 82,
+              "percent": 95.34883720930233,
+              "origins": [
+                {
+                  "path": "format-html.ts",
+                  "lines": 82
+                }
+              ]
+            }
+          }
+        },
+        {
+          "path": "format-sanitize.ts",
+          "loc": 282,
+          "normalizedLines": 203,
+          "hash": "72e7774c5b25597a7b6e3333832e91c1335842e4356707c015da5fcf3f983073",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 175,
+              "percent": 86.20689655172414,
+              "origins": [
+                {
+                  "path": "format.ts",
+                  "lines": 175
+                }
+              ]
+            },
+            "10": {
+              "lines": 157,
+              "percent": 77.33990147783251,
+              "origins": [
+                {
+                  "path": "format.ts",
+                  "lines": 157
+                }
+              ]
+            }
+          }
+        },
+        {
+          "path": "format.ts",
+          "loc": 672,
+          "normalizedLines": 574,
+          "hash": "a4d8b74273461366e2c5d7abbee4b8ebc59826593883dc4068aa508e3d9cfecd",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 81,
+              "percent": 14.111498257839722,
+              "origins": [
+                {
+                  "path": "packages/markdown-core/src/ir.ts",
+                  "lines": 42
+                },
+                {
+                  "path": "packages/markdown-core/src/render.ts",
+                  "lines": 39
+                }
+              ]
+            },
+            "10": {
+              "lines": 24,
+              "percent": 4.181184668989547,
+              "origins": [
+                {
+                  "path": "packages/markdown-core/src/render.ts",
+                  "lines": 13
+                },
+                {
+                  "path": "packages/markdown-core/src/ir.ts",
+                  "lines": 11
+                }
+              ]
+            }
+          }
+        },
+        {
+          "path": "html-tags.ts",
+          "loc": 79,
+          "normalizedLines": 61,
+          "hash": "5361ba241f8e891da9c5ca982e0e703c88a9977244b00be143a2ec21db1e8c0d",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 49,
+              "percent": 80.32786885245902,
+              "origins": [
+                {
+                  "path": "packages/markdown-core/src/html-tags.ts",
+                  "lines": 49
+                }
+              ]
+            },
+            "10": {
+              "lines": 43,
+              "percent": 70.49180327868852,
+              "origins": [
+                {
+                  "path": "packages/markdown-core/src/html-tags.ts",
+                  "lines": 43
+                }
+              ]
+            }
+          }
+        },
+        {
+          "path": "index.ts",
+          "loc": 25,
+          "normalizedLines": 12,
+          "hash": "f96398794a34c22d85e63dd157179335fbe99919a2c705eee15484b6f8bb6c1c",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "leaves/coerce.ts",
+          "loc": 93,
+          "normalizedLines": 84,
+          "hash": "1a73777b9b36a6ad0bb04cc2ba4df5c7c44b385dcd93ba9a58a6f29f21453631",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "leaves/rich-message.ts",
+          "loc": 65,
+          "normalizedLines": 41,
+          "hash": "e89dbc112929b9aad81925b156182e5bfeec2f5224d82451e9d3b028574d4271",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "leaves/telegram-policy.ts",
+          "loc": 178,
+          "normalizedLines": 109,
+          "hash": "db87520d1f8bbec55d4e74cbdb10c8144b5c7f872a3fd7b04b4791ba85fbab30",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "lifecycle/start-account.ts",
+          "loc": 285,
+          "normalizedLines": 208,
+          "hash": "274625abdd1e93799790d82837a7a519da97dcbafe7c25b497bc5f63186ab22c",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "outbound-media.ts",
+          "loc": 134,
+          "normalizedLines": 87,
+          "hash": "ea375351cf20ca4427adb6e8cc4cee845149e02ecfe014d6d13a9d7bb0698606",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "outbound.ts",
+          "loc": 202,
+          "normalizedLines": 140,
+          "hash": "859d9d050708203e1d2971469f9406b6454e89e874c74486205d9835f733dde4",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "plugin.ts",
+          "loc": 39,
+          "normalizedLines": 22,
+          "hash": "91acccff0c095cbca4020dd49ecbc5c28a11cda59751c1944cfb2ae31d89e1fd",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "runtime-store.ts",
+          "loc": 79,
+          "normalizedLines": 53,
+          "hash": "5ba31ee49a16b6643089caf4116fe65169f99ad5209270bc9801574811175fee",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "telegram-html-chunk.ts",
+          "loc": 236,
+          "normalizedLines": 190,
+          "hash": "3d283eaf1556b507b5e9545fbfdb83d007bb6610960b9aee479ae588a4961ea2",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 169,
+              "percent": 88.94736842105263,
+              "origins": [
+                {
+                  "path": "format.ts",
+                  "lines": 169
+                }
+              ]
+            },
+            "10": {
+              "lines": 169,
+              "percent": 88.94736842105263,
+              "origins": [
+                {
+                  "path": "format.ts",
+                  "lines": 169
+                }
+              ]
+            }
+          }
+        },
+        {
+          "path": "transport/approval-callback.ts",
+          "loc": 104,
+          "normalizedLines": 53,
+          "hash": "682664e9f3953f6fdc334fe10b0c3b550c651c74f432d0766b7130334839261e",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/media.ts",
+          "loc": 226,
+          "normalizedLines": 178,
+          "hash": "d101a13724728ffec29651837d7c7788390415104ae354693aeb82246bd57dd5",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "transport/poll.ts",
+          "loc": 517,
+          "normalizedLines": 399,
+          "hash": "6df26d3a78d9dbec42417eded2991bd1a8759a0d7b5fd2ca323bd5646d4e9bf5",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "typing.ts",
+          "loc": 145,
+          "normalizedLines": 81,
+          "hash": "7889add2e110b8bf699a84bfe59b82b00069d9fb953e7b1e1b58d74cbf2417d0",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        }
+      ],
+      "normalizationParseErrors": [],
+      "pathDiff": {
+        "add": 3972,
+        "delete": 56102,
+        "files": 283
+      }
+    },
+    "shared": {
+      "localProduction": {
+        "files": 7,
+        "loc": 828
+      },
+      "localTests": {
+        "files": 3,
+        "loc": 519
+      },
+      "referenceProduction": {
+        "files": 0,
+        "loc": 0
+      },
+      "referenceTests": {
+        "files": 0,
+        "loc": 0
+      },
+      "helpers": [],
+      "files": [
+        {
+          "path": "entry.ts",
+          "loc": 83,
+          "normalizedLines": 40,
+          "hash": "6b8f4f319ebdddd14504b3559a89a09f94efcbd0e2db11271846e4c2e82b443c",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "host.ts",
+          "loc": 180,
+          "normalizedLines": 101,
+          "hash": "4125f690954403b60bcde13b84cee6b5921735e216cc44cd899c7b10ca691871",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "index.ts",
+          "loc": 48,
+          "normalizedLines": 10,
+          "hash": "c22e6ffa6f7aea68df8a2b226ff1f000c5f1e2d2422a331b5b9a8d034f297053",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "media-policy.ts",
+          "loc": 115,
+          "normalizedLines": 70,
+          "hash": "2f58014af1241ffb787b20d9bc076631712392ea926b49fd0fe4ef702616c2f0",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "media.ts",
+          "loc": 89,
+          "normalizedLines": 68,
+          "hash": "973886437674e444cae11b0108f28879b482952eaffe3033bc26c9eb17c8485d",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "monitor.ts",
+          "loc": 242,
+          "normalizedLines": 157,
+          "hash": "83231cb962ee809db21bfb8028a203c46d14bc00c81ec4aaeaf15f6ac480143c",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        },
+        {
+          "path": "plugin.ts",
+          "loc": 71,
+          "normalizedLines": 48,
+          "hash": "c2cc8fc0b4200637a0fa87d38b1874cebf70a6de4461236d26847703e3cf6676",
+          "exactFile": null,
+          "coverage": {
+            "5": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            },
+            "10": {
+              "lines": 0,
+              "percent": 0,
+              "origins": []
+            }
+          }
+        }
+      ],
+      "normalizationParseErrors": []
+    }
+  },
+  "provenance": {
+    "localHead": "557502e7eb25c8bb3a8c2b2ebf314bf878edef33",
+    "referenceHead": "04453837d3ed72bbb0325ac5039390373795d5a2",
+    "upstreamMainLocalRef": "c500ab7cc0d73c8327e61de9bc830e0327bf129c",
+    "referenceVersion": "2026.8.1",
+    "referenceTreeEqualsUpstreamMainForAuditedPaths": true,
+    "networkFetchPerformed": false,
+    "gitTreeHashes": {
+      "extensions/slack/src": "0053e6a14ea7b65ae2a5760d84fb96f5e8159e9d",
+      "extensions/telegram/src": "7a109f3b807ebec8c227fa7ef12c954a462e475a",
+      "packages/markdown-core/src": "553fb6c104e85275fcbca7c037390d28e7fc473e",
+      "packages/media-core/src": "fe05942bb69991cd8b8e1a7d2f8c1614a965b3ee"
+    },
+    "localFilesUnchangedSinceMeasurement": true
+  }
+}

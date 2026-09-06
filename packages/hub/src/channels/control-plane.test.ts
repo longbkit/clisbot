@@ -495,6 +495,26 @@ routes:
 });
 
 describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
+  it("uses the canonical Hub URL for a direct Agent on a remote Host", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const snapshot = await loadChannelControlPlane(
+      database,
+      undefined,
+      "https://hub.example.test/base/",
+    );
+    const config = snapshot.resolveAgentSpec(
+      { kind: "agent", agent: "codex-safe", environment: "work", template: null },
+      { ...RELAY_DEFAULTS, outbound: { path: "tool", template: null } },
+      BINDING_REF,
+      REPLY_CAPABILITY,
+    );
+    assert.deepEqual(channelReplyServerEntry(config), {
+      type: "http",
+      url: `https://hub.example.test/base/mcp/channel/${REPLY_CAPABILITY.token}`,
+    });
+  });
+
   it("attaches the channel-reply MCP server + grant + default injection on a tool route", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     const config = snapshot.resolveAgentSpec(
@@ -510,12 +530,7 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
     );
     const server = channelReplyServerEntry(config);
     assert.equal(server.type, "http");
-    // The hub listens on PORT; the URL the agent dials is loopback hubPort
-    // (the snapshot's, threaded through the resolver options).
-    assert.equal(
-      server.url,
-      `http://127.0.0.1:${snapshot.hubPort}/mcp/channel/${REPLY_CAPABILITY.token}`,
-    );
+    assert.equal(server.url, `${snapshot.publicBaseUrl}/mcp/channel/${REPLY_CAPABILITY.token}`);
     assert.deepEqual(config.toolPolicy, {
       preapproved: [
         {
@@ -617,7 +632,7 @@ describe("createChannelAgentSpecResolver", () => {
   it("is importable standalone for the supervisor's plane construction", async () => {
     const snapshot = await withActiveConfiguration(memoryDatabase());
     const resolver = createChannelAgentSpecResolver(snapshot.bundle, {
-      hubPort: snapshot.hubPort,
+      publicBaseUrl: snapshot.publicBaseUrl,
     });
     const config = resolver(
       {

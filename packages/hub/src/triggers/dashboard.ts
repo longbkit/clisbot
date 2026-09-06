@@ -1,3 +1,4 @@
+import { editableAutomationYaml } from "./configuration/workflow-document.js";
 import type { AuthServer } from "../auth/server.js";
 import { capabilitiesFor } from "../auth/organization-policy.js";
 import type { Database, OrganizationTriggerRecord } from "../db/types.js";
@@ -127,7 +128,7 @@ async function triggerView(
       name: trigger.name,
       enabled: trigger.enabled,
       format: trigger.format,
-      yaml: revision.yaml,
+      yaml: editableAutomationYaml(revision.yaml, trigger.enabled),
       updatedAt: trigger.updatedAt.toISOString(),
       blockers: stringArray(evidence?.["conversionBlockers"]),
       draft: null,
@@ -142,7 +143,7 @@ async function triggerView(
     name: trigger.name,
     enabled: trigger.enabled,
     format: trigger.format,
-    yaml: revision.yaml,
+    yaml: editableAutomationYaml(revision.yaml, trigger.enabled),
     updatedAt: trigger.updatedAt.toISOString(),
     blockers: [],
     draft: projection.status === "editable" ? projection.value : null,

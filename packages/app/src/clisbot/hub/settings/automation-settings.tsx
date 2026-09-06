@@ -1,19 +1,44 @@
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
-import { Text, View } from "react-native";
+import { AutomationWorkflowEditor } from "./automation-workflow-editor";
+import { openAutomationWorkflow } from "../automation-workflow-model";
+import { AutomationInputDraftContext, type AutomationChannelDraft } from "./automation-input-draft";
+import {
+  saveAutomationWithInputs,
+  type AutomationInputSaveProgress,
+} from "../automation-input-save";
+import { parse, stringify } from "yaml";
+import {
+  useCallback,
+  useRef,
+  useMemo,
+  useState,
+  type ComponentType,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { z } from "zod";
+import { ArrowLeft, ChevronRight } from "lucide-react-native";
+import { ScreenTitle } from "@/components/headers/screen-title";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
+import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { Switch } from "@/components/ui/switch";
+import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
 import { useFetchQuery } from "@/data/query";
 import { SettingsSection } from "@/screens/settings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
+import { hubResourceQueryKey } from "../query-keys";
 import { createAutomation } from "../automation-management";
 import {
   automationRouteBacklinks,
+  automationManualParameters,
+  automationOutputs,
+  initialChannelReplyProviders,
   buildSingleAgentAutomationYaml,
   normalizeAutomationInputName,
   normalizeAutomationName,
@@ -50,6 +75,7 @@ import {
   type ManagedAgentConfigurationValue,
 } from "./managed-agent-configuration-fields";
 import { ManagedWorkspaceFields } from "./managed-workspace-fields";
+import { AutomationActivity } from "./automation-run-details";
 
 export interface AutomationConnection {
   id: string;
@@ -116,44 +142,50 @@ const INPUT_TYPE_OPTIONS: SelectFieldOption<AutomationInputValue["type"]>[] = [
 const NOOP_ASYNC = async () => undefined;
 
 // eslint-disable-next-line complexity -- one settings coordinator owns the query/load/detail states.
-export function AutomationSettings() {
+export interface AutomationSettingsProps {
+  ChannelInputs?: ComponentType<{ automationName: string; embedded?: boolean }>;
+}
+
+export function AutomationSettings({ ChannelInputs }: AutomationSettingsProps = {}) {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
+  const accountId = hub.signedIn?.account.id ?? null;
+  const queryScope = { origin: hub.origin, organizationId, accountId };
   const canManage = hub.signedIn?.capabilities.manageResources === true;
   const automations = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "automations"],
+    queryKey: hubResourceQueryKey(queryScope, "automations"),
     queryFn: () => hub.api().get("automations", HubAutomationsSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
   const runnableAutomations = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "automations", "runnable"],
+    queryKey: [...hubResourceQueryKey(queryScope, "automations"), "runnable"],
     queryFn: () => hub.api().get("automations/runnable", HubRunnableAutomationsSchema),
     enabled: organizationId.length > 0 && !canManage,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
   const daemons = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "daemons"],
+    queryKey: hubResourceQueryKey(queryScope, "daemons"),
     queryFn: () => hub.api().get("daemons", HubDaemonsSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
   const connections = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "connections"],
+    queryKey: hubResourceQueryKey(queryScope, "connections"),
     queryFn: () => hub.api().get("connections", HubConnectionsSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
   const channelConfiguration = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "channel-configuration"],
+    queryKey: hubResourceQueryKey(queryScope, "channel-configuration"),
     queryFn: () => hub.api().get("channel-configuration", HubChannelConfigurationSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,
@@ -161,7 +193,7 @@ export function AutomationSettings() {
     staleTimeMs: 15_000,
   });
   const effectiveAccess = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "access-assignments", "effective"],
+    queryKey: [...hubResourceQueryKey(queryScope, "access-assignments"), "effective"],
     queryFn: () => hub.api().get("access-assignments/effective", HubEffectiveAccessSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,
@@ -170,15 +202,26 @@ export function AutomationSettings() {
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const creationProgress = useRef<AutomationInputSaveProgress>({});
+  const startCreate = useCallback(() => {
+    creationProgress.current = {};
+    setCreating(true);
+  }, []);
+  const cancelCreate = useCallback(() => setCreating(false), []);
   const [selectedAutomationId, setSelectedAutomationId] = useState<string | null>(null);
 
   const create = useCallback(
-    async (yaml: string) => {
+    async (yaml: string, draft?: AutomationChannelDraft | null) => {
       setPending(true);
       setError(null);
       try {
-        await createAutomation(hub.api(), yaml);
+        const created = draft
+          ? await saveAutomationWithInputs(hub.api(), yaml, draft, creationProgress.current)
+          : await createAutomation(hub.api(), yaml);
         await automations.refetch();
+        setCreating(false);
+        setSelectedAutomationId(created.id);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Hub request failed.");
       } finally {
@@ -197,8 +240,8 @@ export function AutomationSettings() {
     await Promise.all([automations.refetch(), channelConfiguration.refetch()]);
   }, [automations, channelConfiguration]);
   const createFromYaml = useCallback(
-    (yaml: string) => {
-      void create(yaml);
+    (yaml: string, draft?: AutomationChannelDraft | null) => {
+      void create(yaml, draft);
     },
     [create],
   );
@@ -229,33 +272,37 @@ export function AutomationSettings() {
 
   return (
     <View>
-      <SettingsSection title="Automations">
-        <Alert
-          variant="info"
-          title="Use an Automation for reusable work"
-          description="An Automation starts one configured Agent from an event, a direct run, or a Channel route. Its target, Agent controls, limits, and output actions are fixed by the active revision."
-        />
-        <QueryFeedback pending={automations.isPending} error={automations.error} />
-        {error ? <Alert variant="error" title={error} /> : null}
-        <View style={settingsStyles.card}>
-          {(automations.data?.automations.length ?? 0) === 0 ? (
-            <EmptyRow message="No Automations are configured." />
-          ) : (
-            automations.data?.automations.map((automation, index) => (
-              <ManagedAutomationRow
-                key={automation.id}
-                automation={automation}
-                bordered={index > 0}
-                open={openAutomation}
-              />
-            ))
-          )}
-        </View>
-      </SettingsSection>
+      {!selectedAutomationId && !creating ? (
+        <SettingsSection
+          title="Automations"
+          trailing={
+            <Button size="sm" variant="outline" onPress={startCreate}>
+              New Automation
+            </Button>
+          }
+        >
+          <QueryFeedback pending={automations.isPending} error={automations.error} />
+          {error ? <Alert variant="error" title={error} /> : null}
+          <View>
+            {automations.data?.automations.length === 0 ? (
+              <EmptyRow message="No Automations are configured." />
+            ) : (
+              automations.data?.automations.map((automation) => (
+                <ManagedAutomationRow
+                  key={automation.id}
+                  automation={automation}
+                  open={openAutomation}
+                />
+              ))
+            )}
+          </View>
+        </SettingsSection>
+      ) : null}
       {selectedAutomationId ? (
         <AutomationDetail
-          key={selectedAutomation?.activeRevisionId ?? selectedAutomationId}
+          key={selectedAutomationId}
           automation={selectedAutomation}
+          ChannelInputs={ChannelInputs}
           daemons={daemons.data?.daemons ?? []}
           connections={connections.data?.connections ?? []}
           backlinks={backlinks}
@@ -265,13 +312,103 @@ export function AutomationSettings() {
           saved={refreshAutomation}
         />
       ) : null}
-      {canManage ? (
-        <SingleAgentAutomationForm
-          daemons={daemons.data?.daemons ?? []}
-          connections={connections.data?.connections ?? []}
-          existingNames={automations.data?.automations.map(({ name }) => name) ?? []}
-          pending={pending}
-          save={createFromYaml}
+      {canManage && creating ? (
+        <View>
+          {error ? <Alert variant="error" title={error} /> : null}
+          <QueryFeedback
+            pending={daemons.isPending || connections.isPending}
+            error={daemons.error ?? connections.error}
+          />
+          <AutomationWorkflowEditor
+            creating
+            source={buildSingleAgentAutomationYaml({
+              name: "",
+              events: [],
+              daemonId: "",
+              cwd: "",
+              provider: "",
+              instruction: "",
+            })}
+            ChannelInputs={ChannelInputs}
+            daemons={daemons.data?.daemons ?? []}
+            connections={connections.data?.connections ?? []}
+            pending={pending || daemons.data === undefined || connections.data === undefined}
+            cancel={cancelCreate}
+            save={createFromYaml}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function AutomationListRow({
+  name,
+  description,
+  open,
+}: {
+  name: string;
+  description?: string;
+  open(): void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const enter = useCallback(() => setHovered(true), []);
+  const leave = useCallback(() => setHovered(false), []);
+  const rowStyle = useCallback(
+    ({ pressed }: { pressed: boolean }) => [
+      settingsStyles.row,
+      styles.listRow,
+      (hovered || pressed) && styles.highlight,
+    ],
+    [hovered],
+  );
+  return (
+    <View onPointerEnter={enter} onPointerLeave={leave}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${name}`}
+        onPress={open}
+        style={rowStyle}
+      >
+        <View style={settingsStyles.rowContent}>
+          <Text style={settingsStyles.rowTitle}>{name}</Text>
+          {description ? <Text style={settingsStyles.rowHint}>{description}</Text> : null}
+        </View>
+        <ChevronRight style={styles.chevron} />
+      </Pressable>
+    </View>
+  );
+}
+
+function AutomationDetailHeading({
+  name,
+  enabled,
+  close,
+  disabled = false,
+}: {
+  name: string;
+  enabled?: boolean;
+  close(): void;
+  disabled?: boolean;
+}) {
+  return (
+    <View style={styles.detailHeading}>
+      <Button
+        size="sm"
+        variant="ghost"
+        accessibilityLabel="Back to Automations"
+        disabled={disabled}
+        onPress={close}
+      >
+        <ArrowLeft style={styles.chevron} />
+      </Button>
+      <View style={styles.headingTitle}>
+        <ScreenTitle>{name}</ScreenTitle>
+      </View>
+      {enabled !== undefined ? (
+        <StatusBadge
+          label={enabled ? "Active" : "Disabled"}
+          variant={enabled ? "success" : "muted"}
         />
       ) : null}
     </View>
@@ -280,35 +417,21 @@ export function AutomationSettings() {
 
 function ManagedAutomationRow({
   automation,
-  bordered,
   open,
 }: {
   automation: ManagedAutomation;
-  bordered: boolean;
   open(automationId: string): void;
 }) {
-  const openAutomation = useCallback(() => {
-    open(automation.id);
-  }, [automation.id, open]);
+  const openAutomation = useCallback(() => open(automation.id), [automation.id, open]);
   const value = parseSingleAgentAutomationYaml(automation.yaml);
   return (
-    <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{automation.name}</Text>
-        <Text style={settingsStyles.rowHint}>
-          {[
-            automation.enabled ? "Active" : "Disabled",
-            automation.format === "legacy_multistep" ? "Legacy multi-step" : "Single Agent",
-            value?.description,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </Text>
-      </View>
-      <Button size="xs" variant="ghost" onPress={openAutomation}>
-        Open
-      </Button>
-    </View>
+    <AutomationListRow
+      name={automation.name}
+      description={[automation.enabled ? "Active" : "Disabled", value?.description]
+        .filter(Boolean)
+        .join(" · ")}
+      open={openAutomation}
+    />
   );
 }
 
@@ -349,7 +472,8 @@ function RunnableAutomationSettings({
   if (selected !== null) {
     return (
       <View>
-        <SettingsSection title={selected.name}>
+        <AutomationDetailHeading name={selected.name} close={closeAutomation} />
+        <SettingsSection title="Workflow">
           <View style={settingsStyles.card}>
             {selected.description ? (
               <SummaryRow title="Description" hint={selected.description} />
@@ -363,29 +487,20 @@ function RunnableAutomationSettings({
           inputs={runnableAutomationInputs(selected)}
           completed={NOOP_ASYNC}
         />
-        <Button size="sm" variant="ghost" onPress={closeAutomation}>
-          Back to Automations
-        </Button>
       </View>
     );
   }
   return (
     <SettingsSection title="Automations">
-      <Alert
-        variant="info"
-        title="Run assigned Automations"
-        description="Only the prompt and declared inputs are editable. Automation targets and authority remain fixed by their active revisions."
-      />
       <QueryFeedback pending={pending} error={error} />
-      <View style={settingsStyles.card}>
+      <View>
         {automations.length === 0 ? (
           <EmptyRow message="No Automations are assigned to you." />
         ) : (
-          automations.map((automation, index) => (
+          automations.map((automation) => (
             <RunnableAutomationRow
               key={automation.id}
               automation={automation}
-              bordered={index > 0}
               select={selectAutomation}
             />
           ))
@@ -397,28 +512,18 @@ function RunnableAutomationSettings({
 
 function RunnableAutomationRow({
   automation,
-  bordered,
   select,
 }: {
   automation: HubRunnableAutomation;
-  bordered: boolean;
   select(automationId: string): void;
 }) {
-  const open = useCallback(() => {
-    select(automation.id);
-  }, [automation.id, select]);
+  const open = useCallback(() => select(automation.id), [automation.id, select]);
   return (
-    <View style={[settingsStyles.row, bordered ? settingsStyles.rowBorder : null]}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{automation.name}</Text>
-        {automation.description ? (
-          <Text style={settingsStyles.rowHint}>{automation.description}</Text>
-        ) : null}
-      </View>
-      <Button size="xs" variant="ghost" onPress={open}>
-        Open
-      </Button>
-    </View>
+    <AutomationListRow
+      name={automation.name}
+      description={automation.description ?? undefined}
+      open={open}
+    />
   );
 }
 
@@ -435,8 +540,17 @@ function runnableAutomationInputs(automation: HubRunnableAutomation): Automation
   });
 }
 
+type AutomationDetailView = "overview" | "channels" | "configuration" | "runs" | "revisions";
+const AUTOMATION_DETAIL_VIEWS: SegmentedControlOption<AutomationDetailView>[] = [
+  { value: "overview", label: "Overview" },
+  { value: "configuration", label: "Configuration" },
+  { value: "runs", label: "Runs" },
+  { value: "revisions", label: "Revisions" },
+];
+
 // eslint-disable-next-line complexity -- one detail route owns its mutually exclusive view states.
 function AutomationDetail({
+  ChannelInputs,
   automation,
   daemons,
   connections,
@@ -446,6 +560,7 @@ function AutomationDetail({
   close,
   saved,
 }: {
+  ChannelInputs?: AutomationSettingsProps["ChannelInputs"];
   automation: {
     id: string;
     name: string;
@@ -468,17 +583,11 @@ function AutomationDetail({
 }) {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
+  const accountId = hub.signedIn?.account.id ?? null;
+  const queryScope = { origin: hub.origin, organizationId, accountId };
   const automationId = automation?.id ?? "";
   const history = useFetchQuery({
-    queryKey: [
-      "clisbot",
-      "hub",
-      hub.origin,
-      organizationId,
-      "automations",
-      automationId,
-      "revisions",
-    ],
+    queryKey: [...hubResourceQueryKey(queryScope, "automations"), automationId, "revisions"],
     queryFn: () =>
       hub
         .api()
@@ -488,19 +597,11 @@ function AutomationDetail({
         ),
     enabled: automationId.length > 0,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
   const activity = useFetchQuery({
-    queryKey: [
-      "clisbot",
-      "hub",
-      hub.origin,
-      organizationId,
-      "automations",
-      automationId,
-      "activity",
-    ],
+    queryKey: [...hubResourceQueryKey(queryScope, "automations"), automationId, "activity"],
     queryFn: () =>
       hub
         .api()
@@ -510,56 +611,53 @@ function AutomationDetail({
         ),
     enabled: automationId.length > 0,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
-  const [yaml, setYaml] = useState(automation?.yaml ?? "");
+  const [view, setView] = useState<AutomationDetailView>("overview");
+  const configurationVisited = useLatchedBoolean(view === "configuration");
+  const [yaml, setYaml] = useState(() => {
+    const source = automation?.yaml ?? "";
+    if (!source.trimStart().startsWith("{")) return source;
+    try {
+      return stringify(parse(source), { lineWidth: 0 });
+    } catch {
+      return source;
+    }
+  });
+  const inputSaveProgress = useRef<AutomationInputSaveProgress>({});
   const [pending, setPending] = useState<"validate" | "save" | null>(null);
   const [result, setResult] = useState<{
     tone: "success" | "error";
     message: string;
   } | null>(null);
   const structuredValue = useMemo(
-    () =>
-      automation === null || automation.format === "legacy_multistep"
-        ? null
-        : parseSingleAgentAutomationYaml(automation.yaml),
+    () => (automation === null ? null : parseSingleAgentAutomationYaml(automation.yaml)),
     [automation],
   );
 
-  const validate = useCallback(async () => {
-    setPending("validate");
-    setResult(null);
-    try {
-      const response = await hub
-        .api()
-        .post("automations/validate", { yaml }, HubAutomationValidationSchema);
-      setResult({ tone: "success", message: `${response.name} is valid. Nothing was activated.` });
-    } catch (cause) {
-      setResult({
-        tone: "error",
-        message: cause instanceof Error ? cause.message : "Validation failed.",
-      });
-    } finally {
-      setPending(null);
-    }
-  }, [hub, yaml]);
   const save = useCallback(
-    async (source = yaml) => {
+    async (source = yaml, draft?: AutomationChannelDraft | null) => {
       if (automation === null) return;
       setPending("save");
       setResult(null);
       try {
-        await hub
-          .api()
-          .post("automations/validate", { yaml: source }, HubAutomationValidationSchema);
-        await hub
-          .api()
-          .put(
-            `automations/${encodeURIComponent(automation.id)}`,
-            { expectedRevisionId: automation.activeRevisionId, yaml: source },
-            HubAutomationSchema,
-          );
+        if (draft) {
+          inputSaveProgress.current.automation ??= automation;
+          await saveAutomationWithInputs(hub.api(), source, draft, inputSaveProgress.current);
+        } else {
+          await hub
+            .api()
+            .post("automations/validate", { yaml: source }, HubAutomationValidationSchema);
+          await hub
+            .api()
+            .put(
+              `automations/${encodeURIComponent(automation.id)}`,
+              { expectedRevisionId: automation.activeRevisionId, yaml: source },
+              HubAutomationSchema,
+            );
+        }
+        setYaml(source);
         await saved();
         await Promise.all([history.refetch(), activity.refetch()]);
         setResult({ tone: "success", message: "Automation activated." });
@@ -576,17 +674,11 @@ function AutomationDetail({
   );
   const refreshActivity = useCallback(() => activity.refetch(), [activity]);
   const saveStructured = useCallback(
-    (source: string) => {
-      void save(source);
+    (source: string, draft?: AutomationChannelDraft | null) => {
+      void save(source, draft);
     },
     [save],
   );
-  const validateCurrent = useCallback(() => {
-    void validate();
-  }, [validate]);
-  const saveCurrent = useCallback(() => {
-    void save();
-  }, [save]);
 
   if (automation === null) {
     return (
@@ -599,162 +691,159 @@ function AutomationDetail({
     );
   }
 
-  const advancedReadOnly = structuredValue === null;
+  const manualParameters = automationManualParameters(automation.yaml);
+  const workflowSteps = (() => {
+    try {
+      const value = parse(automation.yaml);
+      return Array.isArray(value?.steps) ? value.steps.length : 1;
+    } catch {
+      return 0;
+    }
+  })();
   return (
     <View>
-      <SettingsSection title={automation.name}>
-        <View style={settingsStyles.card}>
-          <SummaryRow title="Status" hint={automation.enabled ? "Active" : "Disabled"} />
-          <SummaryRow
-            title="Type"
-            hint={automation.format === "legacy_multistep" ? "Legacy multi-step" : "Single Agent"}
-            border
-          />
-          {structuredValue?.description ? (
-            <SummaryRow title="Description" hint={structuredValue.description} border />
-          ) : null}
-          <SummaryRow title="Active revision" hint={automation.activeRevisionId} border />
-        </View>
-      </SettingsSection>
-      {structuredValue?.events.some(({ name }) => name === "manual.run") && canRun ? (
+      <AutomationDetailHeading
+        name={automation.name}
+        enabled={automation.enabled}
+        close={close}
+        disabled={pending !== null}
+      />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detailTabs}>
+        <SegmentedControl
+          options={AUTOMATION_DETAIL_VIEWS}
+          value={view}
+          onValueChange={setView}
+          size="sm"
+        />
+      </ScrollView>
+      {view === "configuration" && result ? (
+        <Alert variant={result.tone} title={result.message} />
+      ) : null}
+      {view === "overview" ? (
+        <SettingsSection title="Workflow">
+          <View style={settingsStyles.card}>
+            <SummaryRow
+              title="Type"
+              hint={`${workflowSteps} ${workflowSteps === 1 ? "step" : "steps"}`}
+            />
+            {structuredValue?.description ? (
+              <SummaryRow title="Description" hint={structuredValue.description} border />
+            ) : null}
+            {structuredValue ? (
+              <>
+                <SummaryRow
+                  title="Host"
+                  hint={
+                    daemons.find(
+                      ({ id, slug }) =>
+                        id === structuredValue.daemonId || slug === structuredValue.daemonId,
+                    )?.slug ?? "Unavailable Host"
+                  }
+                  border
+                />
+                <SummaryRow title="Working directory" hint={structuredValue.cwd} border />
+                <SummaryRow
+                  title="Agent"
+                  hint={`${structuredValue.provider}${structuredValue.model ? ` · ${structuredValue.model}` : ""}`}
+                  border
+                />
+                <SummaryRow
+                  title="Declared outputs"
+                  hint={
+                    structuredValue.outputs.length === 0
+                      ? "No explicit output grants; direct events retain their native reply defaults"
+                      : structuredValue.outputs
+                          .map((output) => `${output.type} · ${output.max ?? "Unlimited"}`)
+                          .join("; ")
+                  }
+                  border
+                />
+                <SummaryRow
+                  title="Conversation continuity"
+                  hint={
+                    structuredValue.reuseBinding
+                      ? "Continue a compatible Agent in the same conversation"
+                      : "Create a new Agent for each run"
+                  }
+                  border
+                />
+              </>
+            ) : null}
+          </View>
+        </SettingsSection>
+      ) : null}
+      {view === "overview" && manualParameters !== null && canRun ? (
         <AutomationRunForm
           automationId={automation.id}
-          inputs={structuredValue.inputs}
+          inputs={manualParameters}
           completed={refreshActivity}
         />
       ) : null}
-      {structuredValue !== null && canManage ? (
-        <SingleAgentAutomationForm
-          title={`Edit ${automation.name}`}
-          initialValue={structuredValue}
-          daemons={daemons}
-          connections={connections}
-          existingNames={[]}
-          pending={pending !== null}
-          save={saveStructured}
-        />
-      ) : null}
-      <SettingsSection title="Routes and triggers">
-        <View style={settingsStyles.card}>
-          {structuredValue?.events.map((event, index) => (
-            <SummaryRow
-              key={`${event.name}:${event.connection ?? ""}`}
-              title={eventLabel(event.name)}
-              hint={automationEventHint(event)}
-              border={index > 0}
-            />
-          ))}
-          {backlinks.map((backlink, index) => (
-            <SummaryRow
-              key={`${backlink.channel}:${backlink.accountId}:${String(backlink.routePosition)}`}
-              title={`${capitalize(backlink.channel)} · ${backlink.accountId}`}
-              hint={
-                backlink.routePosition === "fallback"
-                  ? "Fallback Route"
-                  : `Route ${String(backlink.routePosition + 1)}`
-              }
-              border={(structuredValue?.events.length ?? 0) + index > 0}
-            />
-          ))}
-          {(structuredValue?.events.length ?? 0) === 0 && backlinks.length === 0 ? (
-            <EmptyRow message="See Advanced YAML for this Automation's triggers." />
-          ) : null}
-        </View>
-      </SettingsSection>
-      <SettingsSection title="Advanced">
-        {advancedReadOnly ? (
-          <Alert
-            variant="info"
-            title="This definition is read-only in Paseo"
-            description={
-              automation.format === "legacy_multistep"
-                ? "Legacy multi-step Automations remain runnable, but Paseo does not activate edits until a deliberate multi-step editor exists."
-                : "This one-Agent definition contains fields the structured editor cannot round-trip without losing data."
-            }
-          />
-        ) : null}
-        <View style={[settingsStyles.card, styles.form]}>
-          <Field
-            label="Authored YAML"
-            hint={
-              advancedReadOnly
-                ? "View the exact active revision."
-                : "Validate uses the activation compiler and Host references without creating a revision."
-            }
-          >
-            <FormTextInput
-              initialValue={automation.yaml}
-              onChangeText={setYaml}
-              multiline
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={canManage && pending === null && !advancedReadOnly}
-            />
-          </Field>
-          {result ? <Alert variant={result.tone} title={result.message} /> : null}
-          <View style={styles.actions}>
-            {!advancedReadOnly ? (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pending !== null}
-                onPress={validateCurrent}
-              >
-                {pending === "validate" ? "Validating…" : "Validate"}
-              </Button>
+      {view === "overview" ? (
+        <SettingsSection title="Inputs">
+          <View style={settingsStyles.card}>
+            {structuredValue?.events.map((event, index) => (
+              <SummaryRow
+                key={`${event.name}:${event.connection ?? ""}`}
+                title={eventLabel(event.name)}
+                hint={automationEventHint(event)}
+                border={index > 0}
+              />
+            ))}
+            {backlinks.map((backlink, index) => (
+              <SummaryRow
+                key={`${backlink.channel}:${backlink.accountId}:${String(backlink.routePosition)}`}
+                title={`${capitalize(backlink.channel)} · ${backlink.accountId}`}
+                hint={
+                  backlink.routePosition === "fallback"
+                    ? "Fallback Route"
+                    : `Route ${String(backlink.routePosition + 1)}`
+                }
+                border={(structuredValue?.events.length ?? 0) + index > 0}
+              />
+            ))}
+            {(structuredValue?.events.length ?? 0) === 0 && backlinks.length === 0 ? (
+              <EmptyRow message="See Advanced YAML for this Automation's triggers." />
             ) : null}
-            {canManage && !advancedReadOnly ? (
-              <Button
-                size="sm"
-                disabled={pending !== null || yaml === automation.yaml}
-                onPress={saveCurrent}
-              >
-                {pending === "save" ? "Activating…" : "Activate changes"}
-              </Button>
-            ) : null}
-            <Button size="sm" variant="ghost" disabled={pending !== null} onPress={close}>
-              Close
-            </Button>
           </View>
+        </SettingsSection>
+      ) : null}
+      {configurationVisited && canManage ? (
+        <View style={view === "configuration" ? undefined : styles.hidden}>
+          <AutomationWorkflowEditor
+            source={yaml}
+            ChannelInputs={ChannelInputs}
+            daemons={daemons}
+            connections={connections}
+            pending={pending !== null}
+            save={saveStructured}
+          />
         </View>
-      </SettingsSection>
-      <SettingsSection title="Revision history">
-        <View style={settingsStyles.card}>
-          {history.data?.revisions.map((revision, index) => (
-            <View
-              key={revision.id}
-              style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
-            >
-              <View style={settingsStyles.rowContent}>
-                <Text style={settingsStyles.rowTitle}>
-                  {`Revision ${String(revision.version)}${revision.id === automation.activeRevisionId ? " · Active" : ""}`}
-                </Text>
-                <Text style={settingsStyles.rowHint}>
-                  {new Date(revision.createdAt).toLocaleString()}
-                </Text>
+      ) : null}
+      {view === "revisions" ? (
+        <SettingsSection title="Revision history">
+          <View style={settingsStyles.card}>
+            {history.data?.revisions.map((revision, index) => (
+              <View
+                key={revision.id}
+                style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
+              >
+                <View style={settingsStyles.rowContent}>
+                  <Text style={settingsStyles.rowTitle}>
+                    {`Revision ${String(revision.version)}${revision.id === automation.activeRevisionId ? " · Active" : ""}`}
+                  </Text>
+                  <Text style={settingsStyles.rowHint}>
+                    {new Date(revision.createdAt).toLocaleString()}
+                  </Text>
+                </View>
               </View>
-            </View>
-          )) ?? <EmptyRow message="Loading revisions…" />}
-        </View>
-      </SettingsSection>
-      <SettingsSection title="Activity">
-        <View style={settingsStyles.card}>
-          {activity.data?.activity.length === 0 ? <EmptyRow message="No runs yet." /> : null}
-          {activity.data?.activity.map((run, index) => (
-            <View
-              key={run.id}
-              style={[settingsStyles.row, index > 0 ? settingsStyles.rowBorder : null]}
-            >
-              <View style={settingsStyles.rowContent}>
-                <Text style={settingsStyles.rowTitle}>{`${run.status} · ${run.provider}`}</Text>
-                <Text style={settingsStyles.rowHint}>
-                  {`${new Date(run.createdAt).toLocaleString()}${run.error ? ` · ${run.error}` : ""}`}
-                </Text>
-              </View>
-            </View>
-          )) ?? <EmptyRow message="Loading activity…" />}
-        </View>
-      </SettingsSection>
+            )) ?? <EmptyRow message="Loading revisions…" />}
+          </View>
+        </SettingsSection>
+      ) : null}
+      {view === "runs" ? (
+        <AutomationActivity key={automationId} automationId={automationId} activity={activity} />
+      ) : null}
     </View>
   );
 }
@@ -954,6 +1043,10 @@ function automationRunResultMessage(
 export function SingleAgentAutomationForm({
   title = "Create Automation",
   initialValue = null,
+  channelReplyProvider,
+  prioritizeReplies = false,
+  initialChannelProviders = [],
+  ChannelInputs,
   daemons,
   connections,
   existingNames,
@@ -963,6 +1056,10 @@ export function SingleAgentAutomationForm({
 }: {
   title?: string;
   initialValue?: SingleAgentAutomationValue | null;
+  channelReplyProvider?: "slack" | "telegram";
+  prioritizeReplies?: boolean;
+  initialChannelProviders?: readonly string[];
+  ChannelInputs?: ComponentType<{ automationName: string; embedded?: boolean }>;
   daemons: {
     id: string;
     slug: string;
@@ -972,14 +1069,49 @@ export function SingleAgentAutomationForm({
   existingNames: string[];
   pending: boolean;
   cancel?: () => void;
-  save(yaml: string): void | Promise<void>;
+  save(yaml: string, draft?: AutomationChannelDraft | null): void | Promise<void>;
 }) {
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowSource, setWorkflowSource] = useState<string | null>(null);
+  const [editingChannelInput, setEditingChannelInput] = useState(false);
+  const [channelDraft, setChannelDraft] = useState<AutomationChannelDraft | null>(null);
+  const [channelProvider, setChannelProvider] = useState<"slack" | "telegram" | null>(null);
+  const [addingSource, setAddingSource] = useState(false);
+  const chooseSource = useCallback((source: string) => {
+    setAddingSource(false);
+    if (source === "slack" || source === "telegram") {
+      setChannelProvider(source);
+      return;
+    }
+    setEvents((current) =>
+      current.some((event) => event.name === source)
+        ? current
+        : [
+            ...current,
+            { name: source, ...(source === "manual.run" ? {} : { allowedUsers: ["*"] }) },
+          ],
+    );
+  }, []);
+  const openSources = useCallback(() => setAddingSource(true), []);
+  const inputDraftContext = useMemo(
+    () =>
+      channelProvider
+        ? {
+            provider: channelProvider,
+            draft: channelDraft,
+            stage: setChannelDraft,
+            setEditing: setEditingChannelInput,
+            pending,
+          }
+        : null,
+    [channelProvider, channelDraft, pending],
+  );
+  const editSlackInputs = useCallback(() => setChannelProvider("slack"), []);
+  const editTelegramInputs = useCallback(() => setChannelProvider("telegram"), []);
   const [name, setName] = useState(initialValue?.name ?? "");
   const [description, setDescription] = useState(initialValue?.description ?? "");
   const [enabled, setEnabled] = useState(initialValue?.enabled ?? true);
-  const [events, setEvents] = useState<AutomationEventValue[]>(
-    initialValue?.events ?? [{ name: "manual.run" }],
-  );
+  const [events, setEvents] = useState<AutomationEventValue[]>(initialValue?.events ?? []);
   const [inputs, setInputs] = useState<AutomationInputDraft[]>(() =>
     (initialValue?.inputs ?? []).map(automationInputDraft),
   );
@@ -1015,33 +1147,63 @@ export function SingleAgentAutomationForm({
   );
   const [replyLimits, setReplyLimits] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      (initialValue?.outputs ?? [])
+      (
+        initialValue?.outputs ??
+        (channelReplyProvider === undefined
+          ? []
+          : [{ type: `${channelReplyProvider}.reply`, max: 1 }])
+      )
         .filter(({ type }) => type.endsWith(".reply"))
         .map(({ type, max }) => [type, max === undefined ? "" : String(max)]),
     ),
   );
+  const [channelReplyProviders, setChannelReplyProviders] = useState(() =>
+    initialChannelReplyProviders(initialValue?.outputs ?? [], channelReplyProvider),
+  );
   const normalizedName = normalizeAutomationName(name);
+  const draftProviders =
+    channelDraft?.accounts
+      .filter(
+        (account) =>
+          Array.isArray(account.routes) &&
+          account.routes.some(
+            (route: unknown) =>
+              typeof route === "object" &&
+              route !== null &&
+              "workflow" in route &&
+              route.workflow === normalizedName,
+          ),
+      )
+      .map((account) => account.channel) ?? [];
+  const hasSlackInputs =
+    initialChannelProviders.includes("slack") || draftProviders.includes("slack");
+  const hasTelegramInputs =
+    initialChannelProviders.includes("telegram") || draftProviders.includes("telegram");
   const duplicate = initialValue === null && existingNames.includes(normalizedName);
   const options = parseOptionalObject(providerOptions);
   const parsedOutputSchema = parseOptionalObject(outputSchema);
-  const replyLimitsValid = Object.values(replyLimits).every(
-    (value) =>
-      value.trim().length === 0 ||
-      (/^[1-9][0-9]*$/u.test(value.trim()) && Number.isSafeInteger(Number(value))),
+  const configuredOutputs = automationOutputs(
+    initialValue?.outputs ?? [],
+    events,
+    replyLimits,
+    channelReplyProviders,
   );
-  const configuredOutputs = automationOutputs(initialValue?.outputs ?? [], events, replyLimits);
+  const replyLimitsValid = configuredOutputs.every(({ type }) => {
+    const value = replyLimits[type]?.trim() ?? "";
+    return (
+      value.length === 0 || (/^[1-9][0-9]*$/u.test(value) && Number.isSafeInteger(Number(value)))
+    );
+  });
   const normalizedInputNames = inputs.map(({ name: inputName }) =>
     normalizeAutomationInputName(inputName),
   );
   const inputsValid =
     normalizedInputNames.every((inputName) => inputName.length > 0) &&
     new Set(normalizedInputNames).size === normalizedInputNames.length;
-  const eventsValid =
-    events.length > 0 &&
-    events.every((event) => {
-      const definition = AUTOMATION_EVENTS.find(({ name: eventName }) => eventName === event.name);
-      return definition?.provider === undefined || Boolean(event.connection);
-    });
+  const eventsValid = events.every((event) => {
+    const definition = AUTOMATION_EVENTS.find(({ name: eventName }) => eventName === event.name);
+    return definition?.provider === undefined || Boolean(event.connection);
+  });
   const daemonOptions = useMemo<SelectFieldOption<string>[]>(
     () =>
       daemons.map((daemon) => ({
@@ -1057,6 +1219,8 @@ export function SingleAgentAutomationForm({
   const canSave =
     normalizedName.length > 0 &&
     !duplicate &&
+    !editingChannelInput &&
+    (channelDraft === null || enabled) &&
     eventsValid &&
     inputsValid &&
     daemonId !== null &&
@@ -1088,13 +1252,14 @@ export function SingleAgentAutomationForm({
   const changeDaemon = useCallback((value: string) => {
     setDaemonId(value);
     setProjectId(null);
+    setCwd("");
   }, []);
-  const activateAutomation = useCallback(() => {
-    if (daemonId === null || projectId === null || !options.valid || !parsedOutputSchema.valid)
-      return;
-    const worktree = worktreeTargetFromConfiguration(workspace);
-    void save(
-      buildSingleAgentAutomationYaml({
+  const submitAutomation = useCallback(
+    (addStep: boolean) => {
+      if (daemonId === null || projectId === null || !options.valid || !parsedOutputSchema.valid)
+        return;
+      const worktree = worktreeTargetFromConfiguration(workspace);
+      const source = buildSingleAgentAutomationYaml({
         name,
         description,
         enabled,
@@ -1121,32 +1286,94 @@ export function SingleAgentAutomationForm({
           ? {}
           : { outputSchema: parsedOutputSchema.value }),
         ...(configuredOutputs.length > 0 ? { outputs: configuredOutputs } : {}),
-      }),
-    );
-  }, [
-    agentConfiguration,
-    autoArchive,
-    configuredOutputs,
-    cwd,
-    daemonId,
-    description,
-    enabled,
-    events,
-    idleTimeout,
-    inputs,
-    instruction,
-    maxRuntime,
-    name,
-    options,
-    parsedOutputSchema,
-    projectId,
-    reuseBinding,
-    save,
-    workspace,
-  ]);
+      });
+      if (addStep) {
+        try {
+          const workflow = openAutomationWorkflow(source);
+          workflow.addStep();
+          setWorkflowSource(workflow.getState().yaml);
+        } catch (cause) {
+          setWorkflowError(cause instanceof Error ? cause.message : "Could not add step");
+        }
+      } else void save(source, channelDraft);
+    },
+    [
+      channelDraft,
+      agentConfiguration,
+      autoArchive,
+      configuredOutputs,
+      cwd,
+      daemonId,
+      description,
+      enabled,
+      events,
+      idleTimeout,
+      inputs,
+      instruction,
+      maxRuntime,
+      name,
+      options,
+      parsedOutputSchema,
+      projectId,
+      reuseBinding,
+      save,
+      workspace,
+    ],
+  );
 
+  const activateAutomation = useCallback(() => submitAutomation(false), [submitAutomation]);
+  const replyFields = (
+    <>
+      {channelProvider !== "slack" || prioritizeReplies ? (
+        <ChannelReplyOutputFields
+          provider="slack"
+          enabled={channelReplyProviders.includes("slack")}
+          limit={replyLimits["slack.reply"] ?? ""}
+          limitsValid={replyLimitsValid}
+          pending={pending}
+          setProviders={setChannelReplyProviders}
+          setLimits={setReplyLimits}
+        />
+      ) : null}
+      {channelProvider !== "telegram" || prioritizeReplies ? (
+        <ChannelReplyOutputFields
+          provider="telegram"
+          enabled={channelReplyProviders.includes("telegram")}
+          limit={replyLimits["telegram.reply"] ?? ""}
+          limitsValid={replyLimitsValid}
+          pending={pending}
+          setProviders={setChannelReplyProviders}
+          setLimits={setReplyLimits}
+        />
+      ) : null}
+    </>
+  );
+  if (workflowSource !== null)
+    return (
+      <AutomationWorkflowEditor
+        ChannelInputs={ChannelInputs}
+        connections={connections}
+        source={workflowSource}
+        initialDraft={channelDraft}
+        daemons={daemons}
+        pending={pending}
+        save={(source, draft) => {
+          void save(source, draft);
+        }}
+      />
+    );
   return (
     <SettingsSection title={title}>
+      {workflowError ? <Alert variant="error" title={workflowError} /> : null}
+      {prioritizeReplies ? (
+        <View style={[settingsStyles.card, styles.form]}>
+          <Text style={styles.sectionTitle}>Channel replies</Text>
+          {replyFields}
+          <Button size="sm" disabled={pending || !canSave} onPress={activateAutomation}>
+            Save reply settings
+          </Button>
+        </View>
+      ) : null}
       <View style={[settingsStyles.card, styles.form]}>
         <Field
           label="Name"
@@ -1163,7 +1390,9 @@ export function SingleAgentAutomationForm({
             placeholder="customer-handoff"
             autoCapitalize="none"
             autoCorrect={false}
-            editable={!pending && initialValue === null}
+            editable={
+              !pending && initialValue === null && channelDraft === null && !editingChannelInput
+            }
           />
         </Field>
         <Field label="Description" hint="Optional. Explain when this Automation should be used.">
@@ -1186,12 +1415,95 @@ export function SingleAgentAutomationForm({
       </View>
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-        <Text style={styles.sectionTitle}>Starts from</Text>
-        <Text style={settingsStyles.rowHint}>
-          Choose any direct events. A Channel Route may invoke this Automation separately and does
-          not need a channel.message event here.
-        </Text>
-        {AUTOMATION_EVENTS.map((definition) => (
+        <Text style={styles.sectionTitle}>Inputs</Text>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || editingChannelInput}
+          onPress={openSources}
+        >
+          Add input
+        </Button>
+        <View style={styles.actions}>
+          {ChannelInputs && hasSlackInputs ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={pending || editingChannelInput}
+              onPress={editSlackInputs}
+            >
+              Edit Slack inputs
+            </Button>
+          ) : null}
+          {ChannelInputs && hasTelegramInputs ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={pending || editingChannelInput}
+              onPress={editTelegramInputs}
+            >
+              Edit Telegram inputs
+            </Button>
+          ) : null}
+        </View>
+        {addingSource ? (
+          <SelectField
+            label="Input source"
+            selectedDisplay={null}
+            emptyText="No input sources available."
+            title="Add input"
+            value={null}
+            options={[
+              ...(ChannelInputs
+                ? [
+                    { id: "slack", value: "slack", label: "Slack" },
+                    { id: "telegram", value: "telegram", label: "Telegram" },
+                  ]
+                : []),
+              ...AUTOMATION_EVENTS.filter((event) => event.name !== "slack.mention").map(
+                (event) => ({
+                  id: event.name,
+                  value: event.name,
+                  label: event.provider ? capitalize(event.provider) : "Manual / API",
+                }),
+              ),
+            ]}
+            onChange={chooseSource}
+            placeholder="Choose an input source"
+            disabled={pending}
+          />
+        ) : null}
+        {channelDraft && !enabled ? (
+          <Alert
+            variant="error"
+            title="Enable Active to save Channel inputs. Routes require an active Automation."
+          />
+        ) : null}
+        {channelProvider && ChannelInputs ? (
+          <>
+            {normalizedName ? (
+              <AutomationInputDraftContext.Provider value={inputDraftContext}>
+                <ChannelInputs key={channelProvider} automationName={normalizedName} />
+              </AutomationInputDraftContext.Provider>
+            ) : (
+              <Alert variant="info" title="Enter an Automation name to configure Channel inputs." />
+            )}
+            {!prioritizeReplies ? (
+              <ChannelReplyOutputFields
+                provider={channelProvider}
+                enabled={channelReplyProviders.includes(channelProvider)}
+                limit={replyLimits[`${channelProvider}.reply`] ?? ""}
+                limitsValid={replyLimitsValid}
+                pending={pending}
+                setProviders={setChannelReplyProviders}
+                setLimits={setReplyLimits}
+              />
+            ) : null}
+          </>
+        ) : null}
+        {AUTOMATION_EVENTS.filter((definition) =>
+          events.some((event) => event.name === definition.name),
+        ).map((definition) => (
           <AutomationEventEditor
             key={definition.name}
             definition={definition}
@@ -1212,6 +1524,7 @@ export function SingleAgentAutomationForm({
         {events
           .filter(
             ({ name: eventName }) =>
+              eventName !== "channel.message" &&
               !AUTOMATION_EVENTS.some(({ name: definitionName }) => definitionName === eventName),
           )
           .map((event) => (
@@ -1223,18 +1536,15 @@ export function SingleAgentAutomationForm({
             />
           ))}
         {!eventsValid ? (
-          <Alert
-            variant="error"
-            title="Choose at least one event and a Connection for each provider event."
-          />
+          <Alert variant="error" title="Choose a Connection for each selected provider event." />
         ) : null}
       </View>
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
-        <Text style={styles.sectionTitle}>Inputs</Text>
+        <Text style={styles.sectionTitle}>Parameters</Text>
         <Text style={settingsStyles.rowHint}>
-          Callers may supply only these values. Inputs never replace the fixed Host, Project, Agent
-          controls, or output actions.
+          Callers may supply only these parameters. Parameters never replace the fixed Host,
+          Project, Agent controls, or output actions.
         </Text>
         {inputs.map((input, index) => (
           <AutomationInputEditor
@@ -1252,7 +1562,7 @@ export function SingleAgentAutomationForm({
           />
         ) : null}
         <Button size="xs" variant="outline" disabled={pending || !inputsValid} onPress={addInput}>
-          Add input
+          Add parameter
         </Button>
       </View>
 
@@ -1272,20 +1582,13 @@ export function SingleAgentAutomationForm({
         />
         <DaemonProjectField
           daemonId={daemonId}
+          serverId={selectedDaemonServerId}
           value={projectId}
+          cwd={cwd}
           onChange={setProjectId}
+          onCwdChange={setCwd}
           disabled={pending}
         />
-        <Field label="Working directory">
-          <FormTextInput
-            initialValue={initialValue?.cwd ?? ""}
-            onChangeText={setCwd}
-            placeholder="/workspace/project"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!pending}
-          />
-        </Field>
         <ManagedWorkspaceFields value={workspace} onChange={setWorkspace} disabled={pending} />
         <ManagedAgentConfigurationFields
           serverId={selectedDaemonServerId}
@@ -1336,6 +1639,12 @@ export function SingleAgentAutomationForm({
 
       <View style={[settingsStyles.card, styles.form, styles.sectionCard]}>
         <Text style={styles.sectionTitle}>Limits and outputs</Text>
+        <Text style={settingsStyles.rowHint}>
+          Channel replies apply when a Channel Route invokes this Automation. Direct event reply
+          settings remain above.
+        </Text>
+        {!prioritizeReplies ? replyFields : null}
+
         <Field
           label="Maximum runtime"
           hint="Examples: 30m, 2h. The Hub rejects values above its instance ceiling."
@@ -1388,6 +1697,15 @@ export function SingleAgentAutomationForm({
         </Field>
       </View>
 
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={pending || !canSave}
+        onPress={() => submitAutomation(true)}
+      >
+        Add step
+      </Button>
+
       <AutomationReview
         daemon={selectedDaemon?.label ?? null}
         projectId={projectId}
@@ -1409,6 +1727,68 @@ export function SingleAgentAutomationForm({
         ) : null}
       </View>
     </SettingsSection>
+  );
+}
+
+function ChannelReplyOutputFields({
+  provider,
+  enabled,
+  limit,
+  limitsValid,
+  pending,
+  setProviders,
+  setLimits,
+}: {
+  provider: "slack" | "telegram";
+  enabled: boolean;
+  limit: string;
+  limitsValid: boolean;
+  pending: boolean;
+  setProviders: Dispatch<SetStateAction<Array<"slack" | "telegram">>>;
+  setLimits: Dispatch<SetStateAction<Record<string, string>>>;
+}) {
+  const label = provider === "slack" ? "Slack" : "Telegram";
+  const toggle = useCallback(
+    (value: boolean) => {
+      setProviders((current) =>
+        value
+          ? [...current.filter((item) => item !== provider), provider]
+          : current.filter((item) => item !== provider),
+      );
+    },
+    [provider, setProviders],
+  );
+  const changeLimit = useCallback(
+    (value: string) => setLimits((current) => ({ ...current, [`${provider}.reply`]: value })),
+    [provider, setLimits],
+  );
+  return (
+    <>
+      <SwitchRow
+        title={`Allow ${label} Channel replies`}
+        hint={`The Agent may reply to the invoking ${label} conversation. A Route using Channel tools also allows Project files without a separate approval.`}
+        value={enabled}
+        onValueChange={toggle}
+        disabled={pending}
+        accessibilityLabel={`Allow ${label} Channel replies`}
+      />
+      {enabled ? (
+        <Field
+          label={`Maximum ${label} replies`}
+          hint="Leave empty for unlimited replies within the Route's existing policy."
+          error={limitsValid ? null : "Enter a positive whole number."}
+        >
+          <FormTextInput
+            initialValue={limit}
+            onChangeText={changeLimit}
+            placeholder="Unlimited"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!pending}
+          />
+        </Field>
+      ) : null}
+    </>
   );
 }
 
@@ -1460,20 +1840,17 @@ function AutomationEventEditor({
           },
     [selectedConnection],
   );
-  const toggleEvent = useCallback(
-    (selected: boolean) => {
-      if (!selected) {
-        setEvents((current) => current.filter(({ name }) => name !== definition.name));
-        return;
-      }
-      const next: AutomationEventValue = { name: definition.name };
-      if (definition.provider !== undefined) {
-        next.connection = connectionOptions[0]?.value;
-        next.allowedUsers = ["*"];
-      }
-      setEvents((current) => [...current, next]);
-    },
-    [connectionOptions, definition.name, definition.provider, setEvents],
+  const removeEvent = useCallback(
+    () => setEvents((current) => current.filter(({ name }) => name !== definition.name)),
+    [definition.name, setEvents],
+  );
+  const changeRepository = useCallback(
+    (repository: string) => updateEvent(definition.name, { repository }),
+    [definition.name, updateEvent],
+  );
+  const changeContains = useCallback(
+    (contains: string) => updateEvent(definition.name, { contains }),
+    [definition.name, updateEvent],
   );
   const changeConnection = useCallback(
     (connectionName: string) => {
@@ -1500,14 +1877,18 @@ function AutomationEventEditor({
 
   return (
     <View style={styles.choiceGroup}>
-      <SwitchRow
-        title={definition.label}
-        hint={definition.description}
-        value={event !== undefined}
-        onValueChange={toggleEvent}
-        disabled={pending}
-        accessibilityLabel={`Use ${definition.label}`}
-      />
+      <View style={styles.actions}>
+        <Text style={settingsStyles.rowTitle}>{definition.label}</Text>
+        <Button size="xs" variant="ghost" onPress={removeEvent} disabled={pending}>
+          Remove {definition.label}
+        </Button>
+      </View>
+      <Text style={settingsStyles.rowHint}>{definition.description}</Text>
+      {definition.name === "slack.mention" ? (
+        <Text style={settingsStyles.rowHint}>
+          Existing direct event. New Slack inputs use Channel Routes.
+        </Text>
+      ) : null}
       {event !== undefined && definition.provider !== undefined ? (
         <>
           <SelectField
@@ -1522,6 +1903,36 @@ function AutomationEventEditor({
             title={`${definition.label} Connection`}
             disabled={pending}
           />
+          {definition.provider === "github" ? (
+            <>
+              <Field
+                label="Repository"
+                hint="Optional owner/repository filter. Leave empty for repositories available to this Connection."
+              >
+                <FormTextInput
+                  initialValue={event.repository ?? ""}
+                  onChangeText={changeRepository}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!pending}
+                  placeholder="org/repo"
+                />
+              </Field>
+              <Field
+                label="Comment contains"
+                hint="Optional text required in the comment, for example @bot review."
+              >
+                <FormTextInput
+                  initialValue={event.contains ?? ""}
+                  onChangeText={changeContains}
+                  editable={!pending}
+                />
+              </Field>
+              <Text style={settingsStyles.rowHint}>
+                Replies are posted to the issue or pull request that supplied the comment.
+              </Text>
+            </>
+          ) : null}
           <Field
             label="Allowed provider users"
             hint='Comma-separated provider user IDs. Use "*" only when every sender on this Connection may start the Automation.'
@@ -1568,7 +1979,7 @@ function LegacyAutomationEvent({
     setEvents((current) => current.filter(({ name }) => name !== event.name));
   }, [event.name, setEvents]);
   return (
-    <View style={styles.legacyEvent}>
+    <View style={styles.eventFields}>
       <View style={settingsStyles.rowContent}>
         <Text style={settingsStyles.rowTitle}>{eventLabel(event.name)}</Text>
         <Text style={settingsStyles.rowHint}>
@@ -1739,9 +2150,10 @@ function AutomationReview({
         />
       ) : null}
       <Text style={settingsStyles.rowHint}>
-        Provider file, command, configuration, and Channel tool authority stays bounded by the
-        selected Mode and the Daemon approval policy. The Automation cannot broaden it from an input
-        or prompt.
+        Native file and command tools follow the selected Mode and Daemon approval policy. Channel
+        tool replies are separately preapproved for the invoking conversation, including files
+        within the selected Project when the Hub can access that folder. Callers cannot change these
+        fixed targets or grants through an input or prompt.
       </Text>
     </View>
   );
@@ -1824,36 +2236,6 @@ function parseOptionalObject(
   }
 }
 
-function automationOutputs(
-  existing: readonly AutomationOutputValue[],
-  events: readonly AutomationEventValue[],
-  replyLimits: Readonly<Record<string, string>>,
-): AutomationOutputValue[] {
-  const providers = new Set(
-    events
-      .map(({ name }) => name.split(".", 1)[0])
-      .filter((provider) => ["slack", "discord", "github", "linear"].includes(provider)),
-  );
-  const retained = existing
-    .filter(({ type }) => !type.endsWith(".reply"))
-    .map((output) => Object.assign({}, output));
-  for (const provider of providers) {
-    const type = `${provider}.reply`;
-    const value = replyLimits[type]?.trim() ?? "";
-    const previous = existing.find((output) => output.type === type);
-    if (value.length === 0) {
-      if (previous?.required === true) retained.push({ type, required: true });
-      continue;
-    }
-    retained.push({
-      type,
-      max: Number(value),
-      ...(previous?.required === true ? { required: true } : {}),
-    });
-  }
-  return retained;
-}
-
 function commaSeparated(value: string): string[] {
   return value
     .split(",")
@@ -1869,7 +2251,7 @@ function automationEventHint(event: AutomationEventValue): string {
 function eventLabel(eventName: string): string {
   return (
     AUTOMATION_EVENTS.find(({ name }) => name === eventName)?.label ??
-    (eventName === "channel.message" ? "Channel Route (legacy event)" : eventName)
+    (eventName === "channel.message" ? "Channel Routes" : eventName)
   );
 }
 
@@ -1882,6 +2264,22 @@ function humanize(value: string): string {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  hidden: { display: "none" },
+  listRow: { minHeight: theme.spacing[12], borderRadius: theme.borderRadius.lg },
+  highlight: { backgroundColor: theme.colors.interactionHighlight },
+  chevron: {
+    width: theme.iconSize.sm,
+    height: theme.iconSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
+  detailHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[2],
+    marginBottom: theme.spacing[4],
+  },
+  headingTitle: { flex: 1 },
+  detailTabs: { marginBottom: theme.spacing[6] },
   form: {
     padding: theme.spacing[4],
     gap: theme.spacing[4],
@@ -1906,7 +2304,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[3],
     paddingTop: theme.spacing[2],
   },
-  legacyEvent: {
+  eventFields: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[3],

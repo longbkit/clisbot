@@ -6104,3 +6104,38 @@ test("waitForFinish with timeout=0 omits timeoutMs and has no client deadline", 
     vi.useRealTimers();
   }
 });
+
+test("RPC denial messages remain user-facing while retaining structured diagnostics", async () => {
+  const mock = createMockTransport();
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger: createMockLogger(),
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+  const connecting = client.connect();
+  mock.triggerOpen();
+  await connecting;
+  const result = client.fetchAgents({ requestId: "denied-read", scope: "active" });
+  const assertion = expect(result).rejects.toMatchObject({
+    message:
+      "You do not have permission to perform this action. Ask your administrator for access.",
+    code: "access_denied",
+    requestType: "fetch_agents_request",
+    requestId: "denied-read",
+  });
+  mock.triggerMessage(
+    wrapSessionMessage({
+      type: "rpc_error",
+      payload: {
+        requestId: "denied-read",
+        requestType: "fetch_agents_request",
+        error: "Session is not authorized for fetch_agents_request",
+        code: "access_denied",
+      },
+    }),
+  );
+  await assertion;
+});

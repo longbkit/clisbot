@@ -24,7 +24,7 @@ import type {
 type HubDatabase = DrizzleHandle;
 type HubTransaction = HubDatabase;
 
-/** Bounded, message-content-free evidence for one open-audience Route decision. */
+/** Bounded, message-content-free evidence for one Channel Route decision. */
 export interface RecordChannelInboundActivityInput {
   organizationId: string;
   channel: "slack" | "telegram";

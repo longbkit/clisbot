@@ -1,3 +1,5 @@
+import { useToast } from "@/contexts/toast-api-context";
+import { canManageHostProjects, PROJECT_ACCESS_DENIED } from "@/add-project-flow/permissions";
 import { router } from "expo-router";
 import type { WorkspaceProjectDescriptorPayload } from "@getpaseo/protocol/messages";
 import {
@@ -368,6 +370,16 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
   const hostId = pageHostId(page);
   const host = hostId ? state.hosts.find((candidate) => candidate.serverId === hostId) : null;
   const client = useHostRuntimeClient(hostId ?? "");
+  const permissions = useSessionStore(
+    (store) => store.sessions[hostId ?? ""]?.serverInfo?.permissions,
+  );
+  const accessDenied = hostId !== null && !canManageHostProjects(permissions);
+  const toast = useToast();
+  useEffect(() => {
+    if (!accessDenied) return;
+    toast.error(PROJECT_ACCESS_DENIED);
+    onClose();
+  }, [accessDenied, onClose, toast]);
   const isLocalDaemon = useIsLocalDaemon(hostId ?? "");
   const recommendedPaths = useRecommendedProjectPaths(hostId);
   const openProject = useOpenProject(hostId);
@@ -420,7 +432,7 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
           [],
       };
     },
-    enabled: Boolean(client && searchesDirectories),
+    enabled: Boolean(client && !accessDenied && searchesDirectories),
     dataShape: "value",
     retry: false,
     staleTimeMs: 15_000,
@@ -432,7 +444,9 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
       const payload = await client.searchGithubRepositories({ query: debouncedQuery, limit: 30 });
       return { query: debouncedQuery, payload };
     },
-    enabled: Boolean(client && page.kind === "github-search" && host?.canSearchGithubRepositories),
+    enabled: Boolean(
+      client && !accessDenied && page.kind === "github-search" && host?.canSearchGithubRepositories,
+    ),
     dataShape: "value",
     retry: false,
     staleTimeMs: 15_000,
@@ -954,7 +968,9 @@ export function AddProjectFlow({ request, onClose }: AddProjectFlowProps) {
     </Modal>
   );
 
-  return createElement(OverlayLayerProvider, { layer: isWeb ? modalLayer : 0 }, modal);
+  return accessDenied
+    ? null
+    : createElement(OverlayLayerProvider, { layer: isWeb ? modalLayer : 0 }, modal);
 }
 
 const styles = StyleSheet.create((theme) => ({

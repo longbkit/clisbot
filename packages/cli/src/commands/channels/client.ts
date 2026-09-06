@@ -9,10 +9,18 @@ const channelAddResultSchema = z
   .object({
     channel: z.string(),
     account: z.string(),
+    connectionId: z.string().optional(),
     installed: z.boolean(),
     revision: z.boolean(),
     transport: z.enum(["started", "deferred"]),
     detail: z.string().optional(),
+    owner: z
+      .object({
+        ready: z.boolean(),
+        command: z.string().optional(),
+        expiresAt: z.string().datetime().optional(),
+      })
+      .optional(),
   })
   .strict();
 
@@ -30,6 +38,7 @@ const channelStatusAccountSchema = z
     integrity: z.enum(["ok", "failed", "not-checked"]),
     loadTrace: z.enum(["ok", "failed", "not-loaded"]),
     transport: z.string(),
+    detail: z.string().optional(),
   })
   .strict();
 
@@ -41,9 +50,24 @@ export type ChannelAddResult = z.infer<typeof channelAddResultSchema>;
 export type ChannelAccount = z.infer<typeof channelAccountSchema>;
 export type ChannelStatusAccount = z.infer<typeof channelStatusAccountSchema>;
 
-export type ChannelAddInput =
+export interface ChannelSetupInput {
+  update?: boolean;
+  name: string;
+  daemonId: string;
+  projectId: string;
+  cwd: string;
+  provider: string;
+  model?: string;
+  mode?: string;
+  ownerEmail?: string;
+  ownerIdentity?: string;
+}
+export type ChannelAddInput = { setup?: ChannelSetupInput } & (
   | { channel: "slack"; account: string; connectionId: string }
-  | { channel: "telegram"; account: string; botToken: string };
+  | { channel: "slack"; account: string; botToken: string; appToken: string }
+  | { channel: "telegram"; account: string; botToken: string }
+  | { channel: "telegram"; account: string; connectionId: string }
+);
 
 /** POST /api/v1/channels — install an account and start or defer its transport. */
 export function addChannel(

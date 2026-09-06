@@ -106,7 +106,7 @@ export function TriggersPanel() {
                   </Link>
                   <span className="block truncate text-xs text-muted-foreground">
                     {trigger.format === "legacy_multistep"
-                      ? "Legacy YAML"
+                      ? "Workflow"
                       : (trigger.draft?.agent ?? "Advanced YAML")}
                   </span>
                 </span>
@@ -248,12 +248,12 @@ function TriggerEditor({
   onCancel: () => void;
   onSave: (yaml: string) => void;
 }) {
-  const legacy = trigger?.format === "legacy_multistep";
-  const editor = useTriggerEditorState(trigger, snapshot, legacy, onSave);
+  const workflow = trigger !== null && trigger.draft === null;
+  const editor = useTriggerEditorState(trigger, snapshot, workflow, onSave);
   const title = trigger === null ? "New trigger" : trigger.name;
   const submitLabel = triggerSubmitLabel(saving, trigger === null);
   const footerSubmitLabel = editor.mode === "yaml" && !saving ? "Save YAML" : submitLabel;
-  const saveDisabled = saving || !snapshot.canManage || legacy;
+  const saveDisabled = saving || !snapshot.canManage;
   return (
     <>
       <SiteHeaderActions>
@@ -263,7 +263,7 @@ function TriggerEditor({
         >
           <ModeButton
             active={editor.mode === "form"}
-            disabled={legacy}
+            disabled={workflow}
             onClick={() => editor.switchMode("form")}
             icon="form"
           >
@@ -293,7 +293,7 @@ function TriggerEditor({
           label: editor.form.enabled ? "Enabled" : "Disabled",
           tone: editor.form.enabled ? "success" : "neutral",
         }}
-        description="One event launches one agent on your compute."
+        description="Inputs launch the configured Workflow on your compute."
       >
         <EnabledSwitch
           checked={editor.form.enabled}
@@ -301,7 +301,7 @@ function TriggerEditor({
         />
       </PageHeader>
       <TriggerCompatibilityAlert
-        legacy={legacy}
+        workflow={workflow}
         advanced={editor.mode === "yaml" && editor.yamlOnly}
       />
       {saveError === undefined && editor.error === undefined ? null : (
@@ -324,7 +324,7 @@ function TriggerEditor({
             <CodeEditor
               value={editor.yaml}
               language="yaml"
-              readOnly={!snapshot.canManage || legacy}
+              readOnly={!snapshot.canManage}
               label="Trigger YAML"
               onChange={editor.setYaml}
             />
@@ -358,14 +358,14 @@ function triggerSubmitLabel(saving: boolean, creating: boolean) {
 function useTriggerEditorState(
   trigger: BrowserTrigger | null,
   snapshot: TriggerSnapshot,
-  legacy: boolean,
+  workflow: boolean,
   onSave: (yaml: string) => void,
 ) {
   const initialForm = trigger?.draft ?? defaultForm(snapshot);
   const initialYaml = trigger?.yaml ?? createTriggerYaml(initialForm);
   const initialProjection = projectTriggerForm(initialYaml);
   const [mode, setMode] = useState<EditorMode>(
-    trigger === null || (initialProjection.status === "editable" && !legacy) ? "form" : "yaml",
+    trigger === null || (initialProjection.status === "editable" && !workflow) ? "form" : "yaml",
   );
   const [yaml, setYaml] = useState(initialYaml);
   const [form, setForm] = useState<TriggerFormValue>(
@@ -416,15 +416,21 @@ function useTriggerEditorState(
   };
 }
 
-function TriggerCompatibilityAlert({ legacy, advanced }: { legacy: boolean; advanced: boolean }) {
-  if (!legacy && !advanced) return null;
+function TriggerCompatibilityAlert({
+  workflow,
+  advanced,
+}: {
+  workflow: boolean;
+  advanced: boolean;
+}) {
+  if (!workflow && !advanced) return null;
   return (
     <Alert className="mb-5">
       <AlertTriangle className="size-4" />
-      <AlertTitle>{legacy ? "Legacy multi-step workflow" : "Advanced trigger"}</AlertTitle>
+      <AlertTitle>{workflow ? "Workflow" : "Advanced trigger"}</AlertTitle>
       <AlertDescription>
-        {legacy
-          ? "This workflow remains runnable. Copy this YAML and use the migration guide to replace it with one self-contained trigger per event. Form editing is disabled."
+        {workflow
+          ? "Edit the Workflow YAML here, or use the Steps editor in Paseo Automations."
           : "This YAML uses features the form cannot represent. Edit it directly; Hub will preserve every advanced field."}
       </AlertDescription>
     </Alert>

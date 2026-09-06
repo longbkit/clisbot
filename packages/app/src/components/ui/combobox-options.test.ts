@@ -4,6 +4,7 @@ import {
   buildVisibleComboboxOptions,
   filterAndRankComboboxOptions,
   getComboboxFallbackIndex,
+  groupAndLimitComboboxOptions,
   orderVisibleComboboxOptions,
 } from "./combobox-options";
 
@@ -158,5 +159,55 @@ describe("combobox above-search ordering", () => {
       "/Users/me/project-b",
     ]);
     expect(getComboboxFallbackIndex(ordered.length, "below-search")).toBe(0);
+  });
+});
+
+describe("grouped search results", () => {
+  const options = [
+    ...Array.from({ length: 120 }, (_, index) => ({
+      id: `team-${index}`,
+      label: `Team ${index}`,
+      group: "Teams",
+    })),
+    ...Array.from({ length: 120 }, (_, index) => ({
+      id: `member-${index}`,
+      label: `Member ${index}`,
+      group: "Members",
+      description: `person${index}@example.com`,
+    })),
+  ];
+
+  it("bounds every group fairly and retains a selected value outside the first page", () => {
+    const visible = groupAndLimitComboboxOptions(options, 50, "member-119");
+    expect(visible).toHaveLength(100);
+    expect(visible.filter((option) => option.group === "Teams")).toHaveLength(50);
+    expect(visible.filter((option) => option.group === "Members")).toHaveLength(50);
+    expect(visible.at(-1)?.id).toBe("member-119");
+  });
+
+  it("searches the complete list by email before limiting and removes empty groups", () => {
+    const matches = filterAndRankComboboxOptions(options, "person119@example.com");
+    const visible = groupAndLimitComboboxOptions(matches, 50);
+    expect(visible.map((option) => option.id)).toEqual(["member-119"]);
+    expect(visible.map((option) => option.group)).toEqual(["Members"]);
+  });
+
+  it("keeps each matching group contiguous without changing relevance within it", () => {
+    const ranked = [options[0]!, options[121]!, options[1]!, options[120]!];
+    expect(groupAndLimitComboboxOptions(ranked).map((option) => option.id)).toEqual([
+      "team-0",
+      "team-1",
+      "member-1",
+      "member-0",
+    ]);
+  });
+
+  it("preserves ungrouped consumers and empty results", () => {
+    const ungrouped = [
+      { id: "b", label: "B" },
+      { id: "a", label: "A" },
+    ];
+    expect(groupAndLimitComboboxOptions(ungrouped)).toEqual(ungrouped);
+    expect(groupAndLimitComboboxOptions([], 50)).toEqual([]);
   });
 });

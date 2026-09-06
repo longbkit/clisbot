@@ -298,20 +298,13 @@ export class OrganizationAccess {
       });
     }
 
-    if (resolvedSession.isInstanceOperator && !(await this.options.appOnboarding.isComplete())) {
-      return Response.json({
-        status: "appSetupRequired",
-        account,
-        memberships: membershipSummaries(memberships),
-        organization: access.organization,
-        capabilities: access.capabilities,
-        isInstanceOperator: true,
-      });
-    }
-
     const team = await this.team(access);
+    const status =
+      resolvedSession.isInstanceOperator && !(await this.options.appOnboarding.isComplete())
+        ? "appSetupRequired"
+        : "active";
     return Response.json({
-      status: "active",
+      status,
       account,
       memberships: membershipSummaries(memberships),
       organization: access.organization,

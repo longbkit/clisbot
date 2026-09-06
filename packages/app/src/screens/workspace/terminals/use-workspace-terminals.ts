@@ -1,3 +1,4 @@
+import { toErrorMessage } from "@/utils/error-messages";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
@@ -172,7 +173,7 @@ export function useWorkspaceTerminals(input: UseWorkspaceTerminalsInput) {
       }
     },
     onError: (error: unknown) => {
-      onTerminalCreateFailed(error instanceof Error ? error.message : String(error));
+      onTerminalCreateFailed(toErrorMessage(error));
     },
   });
   const killMutation = useMutation({

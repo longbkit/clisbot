@@ -16,6 +16,7 @@ export interface AdaptiveRenameModalProps {
   title: string;
   initialValue: string;
   placeholder?: string;
+  description?: string;
   submitLabel?: string;
   onClose: () => void;
   onSubmit: (value: string) => Promise<void> | void;
@@ -29,6 +30,7 @@ export function AdaptiveRenameModal({
   title,
   initialValue,
   placeholder,
+  description,
   submitLabel,
   onClose,
   onSubmit,
@@ -124,6 +126,7 @@ export function AdaptiveRenameModal({
       testID={testID}
     >
       <View style={styles.body}>
+        {description ? <Text style={styles.description}>{description}</Text> : null}
         <AdaptiveTextInput
           ref={inputRef}
           initialValue={initialValue}
@@ -182,6 +185,10 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    fontSize: theme.fontSize.base,
+  },
+  description: {
+    color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
   },
   errorText: {

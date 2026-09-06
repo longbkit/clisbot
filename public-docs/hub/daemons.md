@@ -32,9 +32,23 @@ paseo hub connect
 
 Hub derives the daemon's initial slug from its hostname. If that slug is already used in the organization, Hub adds a short daemon ID suffix. You can rename the daemon later in Hub.
 
-Each daemon has two identifiers: an immutable generated ID and a friendly slug. Hub normalizes slugs with lowercase words joined by hyphens, so `Build Studio` becomes `build-studio`. The slug is what the dashboard shows and what configuration references.
+Each daemon has two identifiers: an immutable generated ID and a friendly slug. Hub normalizes slugs with lowercase words joined by hyphens, so `Build Studio` becomes `build-studio`. The dashboard shows the slug. Configuration accepts either the slug or the immutable ID.
 
-You can rename the slug later without changing the daemon ID. Renaming after a configuration is active means updating that configuration.
+You can rename the slug later without changing the daemon ID. Configuration referencing the slug must be updated after a rename; references using the immutable ID remain valid.
+
+In Paseo, open **Account → Hosts → Rename** with an organization Owner or Admin account.
+The dialog changes the shared Hub name and reports name conflicts inline. Daemon Administrator
+access alone does not grant organization configuration authority. Hosts following the shared name
+update without reconnecting; a local name chosen in Host Appearance stays personal to that app.
+
+With Managed Access enabled, creating a new Project requires Daemon Administrator or Owner
+authority. To let a Member create Workspaces or Git worktrees in one existing Project, assign
+**Developer** or **Full access** on that Project, with the allowed Agent configuration. These
+presets include the explicit `workspace.create` privilege for new grants. Existing assignments
+must be reviewed and saved with the preset again to gain it. The Member then opens that Project,
+chooses **New workspace**, and selects **New worktree** for Git isolation. This does not permit
+creating new Projects or managing other Projects. Update the daemon before granting the new
+privilege; older daemons reject unknown Project privileges.
 
 For unattended setup, pass an organization API key without storing it:
 
@@ -75,7 +89,7 @@ environments:
     cwd: /Users/you/code/your-repo
 ```
 
-`daemon` is the friendly slug. It resolves to the immutable daemon ID when the configuration activates, so a daemon that no longer exists fails activation instead of failing at dispatch.
+`daemon` accepts the friendly slug or immutable ID within the same organization. It resolves to the immutable daemon ID when the configuration activates, so a daemon that no longer exists fails activation instead of failing at dispatch.
 
 `cwd` is a path on that machine. Hub does not clone anything for you; the directory must already exist.
 

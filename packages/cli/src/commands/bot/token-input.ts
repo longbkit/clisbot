@@ -44,10 +44,13 @@ function expandHome(raw: string): string {
 }
 
 /** Resolve a parsed credential to its secret string (literal or env var). */
-export function resolveTokenSecret(input: ParsedTokenInput): string {
+export function resolveTokenSecret(
+  input: ParsedTokenInput,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
   if (input.kind === "literal") return input.value;
   if (input.kind === "env") {
-    const value = process.env[input.name];
+    const value = env[input.name];
     if (value === undefined || value.trim().length === 0) {
       throw tokenInputError(`environment variable \${${input.name}} is not set`);
     }

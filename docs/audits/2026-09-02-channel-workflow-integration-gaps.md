@@ -89,11 +89,12 @@ union remains in this path.
 
 ## Remaining non-blocking gaps
 
-| Gap                        | Follow-up                                                                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Restart-specific assertion | Add a fault-injection E2E proving persisted output context reattaches relay/approval before a replayed event. |
-| Remote tool path           | Define authenticated Hub reachability for a daemon that is not on the Hub host; relay already works.          |
-| Accepted no-op settings    | Implement or reject `transport.errorPolicy`; define the companion allowlist before enabling `inlineButtons`.  |
+| Gap                         | Follow-up                                                                                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Restart-specific assertion  | Add a fault-injection E2E proving persisted output context reattaches relay/approval before a replayed event.                                                                                                                                                                        |
+| Remote tool path            | Define authenticated Hub reachability for a daemon that is not on the Hub host; relay already works.                                                                                                                                                                                 |
+| Accepted no-op settings     | Implement or reject `transport.errorPolicy`; define the companion allowlist before enabling `inlineButtons`.                                                                                                                                                                         |
+| Native processing indicator | The Workflow branch does not open/bind the direct Route processing lease. Connect typing/reaction lifecycle to authoritative Workflow step/Agent activity; retain the existing Workflow owner. The 2026-09-05 direct-Agent quiet-turn and Slack refresh fixes do not close this gap. |
 
 MCP mutation after Agent creation is intentionally not required now: reuse reloads/restores the
 Agent with the current execution MCP and tool policy before sending the next prompt.

@@ -3,7 +3,7 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { AccessStore, type ResolvedDaemonAccess } from "../access/store.js";
 import * as schema from "../db/schema.js";
-import type { DatabaseRuntime } from "../db/runtime/index.js";
+import type { DatabaseRuntime, DrizzleHandle } from "../db/runtime/index.js";
 
 export const ACCESS_TICKET_LIFETIME_MS = 60_000;
 export const DEFAULT_ACCESS_LEASE_DURATION_MS = 15 * 60_000;
@@ -108,6 +108,7 @@ export class AccessTicketService {
         .for("update")
         .limit(1);
       if (ticket === undefined) throw invalidTicket();
+      await lockActiveDaemon(database, ticket.daemonId);
       const authority = await this.access.resolveDaemonAccess(
         {
           organizationId: ticket.organizationId,
@@ -165,6 +166,7 @@ export class AccessTicketService {
         .for("update")
         .limit(1);
       if (lease === undefined) throw invalidLease();
+      await lockActiveDaemon(database, lease.daemonId);
       const authority = await this.access.resolveDaemonAccess(
         {
           organizationId: lease.organizationId,
@@ -216,6 +218,29 @@ export class AccessTicketService {
         daemonId: schema.daemonAccessLeases.daemonId,
       });
     return rows;
+  }
+
+  async revokeDaemonLeases(
+    organizationId: string,
+    daemonId: string,
+    now = new Date(),
+  ): Promise<RevokedAccessLease[]> {
+    return this.runtime
+      .drizzle()
+      .update(schema.daemonAccessLeases)
+      .set({ revokedAt: now })
+      .where(
+        and(
+          eq(schema.daemonAccessLeases.organizationId, organizationId),
+          eq(schema.daemonAccessLeases.daemonId, daemonId),
+          isNull(schema.daemonAccessLeases.revokedAt),
+          gt(schema.daemonAccessLeases.expiresAt, now),
+        ),
+      )
+      .returning({
+        id: schema.daemonAccessLeases.id,
+        daemonId: schema.daemonAccessLeases.daemonId,
+      });
   }
 
   async revokeOrganizationLeases(
@@ -272,4 +297,18 @@ function invalidTicket(): AccessTicketError {
 
 function invalidLease(): AccessTicketError {
   return new AccessTicketError("invalid_ticket", "access lease is invalid, revoked, or expired");
+}
+
+/** Hold through lease commit so revocation's Daemon UPDATE waits for all
+ * admitted leases before its post-update sweep and notification. */
+async function lockActiveDaemon(database: DrizzleHandle, daemonId: string): Promise<void> {
+  const [daemon] = await database
+    .select({ id: schema.daemons.id })
+    .from(schema.daemons)
+    .where(and(eq(schema.daemons.id, daemonId), eq(schema.daemons.status, "active")))
+    .for("share")
+    .limit(1);
+  if (daemon === undefined) {
+    throw new AccessTicketError("access_denied", "daemon access is no longer granted");
+  }
 }

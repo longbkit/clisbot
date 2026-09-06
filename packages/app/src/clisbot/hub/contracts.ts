@@ -67,18 +67,58 @@ export const HubAccountStateSchema = z.discriminatedUnion("status", [
       invitationUnavailable: z.literal(true).optional(),
     })
     .strict(),
-  z.object({
-    status: z.literal("appSetupRequired"),
-    account: AccountSchema,
-    memberships: z.array(MembershipSummarySchema),
-    organization: z.object({
-      id: z.string(),
-      name: z.string(),
-      slug: z.string(),
+  z
+    .object({
+      status: z.literal("appSetupRequired"),
+      account: AccountSchema,
+      memberships: z.array(MembershipSummarySchema),
+      organization: z.object({
+        id: z.string(),
+        name: z.string(),
+        slug: z.string(),
+      }),
+      // COMPAT(appSetupMembershipPublication): added in v0.8.0; remove this optional
+      // input and the normalization below after 2027-03-05 once the supported Hub
+      // floor always publishes appSetupRequired.membership.
+      membership: z.object({ id: z.string(), role: OrganizationRoleSchema }).optional(),
+      capabilities: OrganizationCapabilitiesSchema,
+      isInstanceOperator: z.literal(true),
+      // Older Hub setup responses omit these facts; absence is not an empty Team.
+      team: z
+        .object({
+          members: z.array(TeamMemberSummarySchema),
+          invitations: z.array(ManagedInvitationSummarySchema).optional(),
+        })
+        .optional(),
+      canCreateOrganization: z.boolean().optional(),
+      invitation: AccountInvitationSchema.optional(),
+      invitationUnavailable: z.literal(true).optional(),
+    })
+    .transform((state, context) => {
+      const selectedMemberships = state.memberships.filter(
+        (membership) => membership.id === state.organization.id,
+      );
+      const selected = selectedMemberships.length === 1 ? selectedMemberships[0] : undefined;
+      if (selected === undefined || selected.membershipId.length === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["membership"],
+          message: "App setup requires one membership for the selected organization.",
+        });
+        return z.NEVER;
+      }
+
+      const membership = state.membership ?? { id: selected.membershipId, role: selected.role };
+      if (membership.id !== selected.membershipId || membership.role !== selected.role) {
+        context.addIssue({
+          code: "custom",
+          path: ["membership"],
+          message: "App setup membership does not match the selected organization membership.",
+        });
+        return z.NEVER;
+      }
+      return { ...state, membership };
     }),
-    capabilities: OrganizationCapabilitiesSchema,
-    isInstanceOperator: z.literal(true),
-  }),
   z
     .object({
       status: z.literal("active"),
@@ -315,6 +355,8 @@ export const HubDaemonSchema = z.object({
   managedAccessMode: z.enum(["off", "external"]).optional().default("off"),
 });
 
+export const HubDaemonRenameResultSchema = HubDaemonSchema.pick({ id: true, slug: true });
+
 export const HubDaemonsSchema = z.object({ daemons: z.array(HubDaemonSchema) });
 
 export const HubDaemonProjectSchema = z.object({
@@ -426,6 +468,26 @@ export const HubAutomationActivitySchema = z.object({
       createdAt: z.string(),
       completedAt: z.string().nullable(),
       error: z.string().nullable(),
+    }),
+  ),
+});
+
+export const HubAutomationRunDetailsSchema = z.object({
+  id: z.string(),
+  status: z.enum(["running", "succeeded", "failed", "timed_out", "rejected"]),
+  revisionId: z.string(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+  error: z.string().nullable(),
+  steps: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      status: z.enum(["pending", "running", "succeeded", "skipped", "failed", "timed_out"]),
+      startedAt: z.string().nullable(),
+      completedAt: z.string().nullable(),
+      error: z.string().nullable(),
+      outputs: z.record(z.string(), z.number()),
     }),
   ),
 });
@@ -629,8 +691,50 @@ export const HubObservedChannelConversationSchema = z.object({
   observedAt: z.string(),
 });
 
+export const HubChannelDestinationSchema = HubObservedChannelConversationSchema.omit({
+  observedAt: true,
+}).extend({
+  source: z.enum(["provider", "unavailable"]),
+});
+
 export const HubObservedChannelConversationsSchema = z.object({
+  destinations: z.array(HubChannelDestinationSchema).optional(),
   conversations: z.array(HubObservedChannelConversationSchema),
 });
 
 export type HubObservedChannelConversation = z.infer<typeof HubObservedChannelConversationSchema>;
+
+export const HubChannelActivitySchema = z.object({
+  nextCursor: z.string().nullable().optional(),
+  activity: z.array(
+    z.object({
+      id: z.string(),
+      channel: z.enum(["slack", "telegram"]).optional(),
+      accountId: z.string().optional(),
+      createdAt: z.string(),
+      routePosition: z.union([z.number().int().nonnegative(), z.literal("fallback")]),
+      conversationId: z.string(),
+      threadId: z.string().nullable(),
+      providerSenderId: z.string(),
+      outcome: z.enum(["bound", "steered", "workflow", "ignored", "error"]),
+      outcomeDetail: z.string().optional(),
+      limitDecision: z.enum(["not_evaluated", "allowed", "denied"]),
+      limitReason: z.string().optional(),
+    }),
+  ),
+});
+
+export const HubChannelTestPreviewSchema = z.object({
+  previewId: z.string(),
+  channel: z.enum(["slack", "telegram"]),
+  accountId: z.string(),
+  conversationId: z.string(),
+  threadId: z.string().nullable(),
+  requestedThreadId: z.string().nullable(),
+  text: z.string(),
+  replyToMessageId: z.null(),
+  attachments: z.array(z.never()),
+  revisionId: z.string().nullable(),
+  label: z.string().nullable().optional(),
+  threadLabel: z.string().nullable().optional(),
+});

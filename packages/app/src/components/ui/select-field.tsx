@@ -30,6 +30,7 @@ export interface SelectFieldOption<TValue> {
   label: string;
   description?: string;
   kind?: ComboboxOption["kind"];
+  group?: string;
   testID?: string;
 }
 
@@ -53,6 +54,7 @@ export interface SelectFieldProps<TValue> {
   hint?: string;
   error?: string | null;
   searchable?: boolean;
+  maxOptionsPerGroup?: number;
   searchPlaceholder?: string;
   title?: string;
   size?: FieldControlSize;
@@ -183,6 +185,7 @@ export function SelectField<TValue>({
   hint,
   error,
   searchable = false,
+  maxOptionsPerGroup,
   searchPlaceholder,
   title,
   size = "md",
@@ -208,6 +211,7 @@ export function SelectField<TValue>({
         label: option.label,
         description: option.description,
         kind: option.kind,
+        group: option.group,
       })),
     [visibleOptions],
   );
@@ -319,6 +323,7 @@ export function SelectField<TValue>({
         value={selectedOptionId}
         onSelect={handleSelect}
         searchable={searchable}
+        maxOptionsPerGroup={maxOptionsPerGroup}
         searchPlaceholder={searchPlaceholder}
         emptyText={loading && visibleOptions.length === 0 ? "Loading..." : emptyText}
         title={title ?? label}

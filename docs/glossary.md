@@ -34,8 +34,11 @@ Authoritative terminology. UI label wins. Don't invent synonyms; use what's here
 - **Connection** — One Hub organization installation/account and the canonical encrypted credential owner, such as one Slack workspace installation or Telegram account. A Connection may be reused by Channel behavior and Automation event sources. Code: provider Connection records plus `telegramConnections` in `packages/hub/src/db/schema.ts`. Don't confuse with: a client-side **Host connection**.
 - **Channel account** — The conversational behavior attached to one Connection: transport settings, ordered Routes, access, reply synchronization, and fallback. Code: `AccountFileSchema` (`packages/hub/src/channels/config/schema.ts`). It never owns provider credentials. Forbidden: "Bot" as a separate product resource.
 - **Conversation** — One provider-native DM, channel, group, thread, or topic handled by a Channel account. Provider adapters normalize its stable ID, kind, and visibility before policy is evaluated.
-- **Route** — One ordered Channel-account rule that selects a fixed direct Agent configuration or Automation from Conversation facts and optional message text. First match wins. It is revision-owned configuration, not a durable resource with its own ID.
-- **Automation** — Paseo UI name for one organization-owned Hub Trigger/Workflow definition and its immutable revisions. Code keeps established Trigger/Workflow terms inside the Hub engine; UI and management resources use "Automation". Forbidden: "Job" or "Bot".
+- **Route** — One ordered Channel-account rule that selects a fixed direct Agent configuration or Automation from Conversation facts and optional message text. First match wins. It is revision-owned configuration, not a durable resource with its own ID. An Automation's Channel inputs edit these same Routes; they do not own a duplicate configuration.
+- **Automation** — Paseo UI name for one organization-owned Hub Trigger/Workflow definition and its immutable revisions. The app feature presents inputs, workflow, execution target, outputs and runs together; Channel conversations can supply inputs and receive replies. Direct Channel–Agent conversations remain a separate supported execution path. Code keeps established Trigger/Workflow terms inside the Hub engine; UI and management resources use "Automation". Forbidden: "Job" or "Bot".
+- **Workflow step** — One ordered Agent execution inside an Automation, with its own Agent configuration, prompt, optional condition, output schema and output grants. A one-step Workflow is the same concept as a multi-step Workflow; `legacy_multistep` is only a historical storage discriminator, never a product lifecycle label.
+- **Automation input** — An event source or Channel Route that can invoke an Automation. UI entry: **Add input**. Slack/Telegram inputs reuse canonical Channel Routes; GitHub and other direct events remain event definitions.
+- **Parameters** — The Automation form's typed values supplied by callers. Serialized as the existing `inputs` schema; this UI name distinguishes values from input sources. It does not rename the Hub wire contract.
 - **Team** — One organization-scoped named group of Hub Members used as an access-assignment subject. A Member may belong to several Teams. BetterAuth owns Team identity and membership; Hub Access owns resource assignments.
 - **Access assignment** — A Hub-owned grant from one Member or Team to one organization resource and semantic privilege set, with optional resource constraints. It does not replace organization roles or daemon Session namespace scopes.
 - **Model** — A specific LLM offered by a provider. UI: "Model" / "Select model". Code: `AgentModelDefinition` (`packages/protocol/src/messages.ts:187`).
@@ -64,3 +67,10 @@ Authoritative terminology. UI label wins. Don't invent synonyms; use what's here
 
 - CLI `--host <host>` description `"Daemon host target"` (`packages/cli/src/utils/command-options.ts:5`) blurs daemon/host; the app keeps them distinct.
 - `WorkspaceDescriptorPayloadSchema.workspaceKind` accepts legacy `"checkout"` on the wire (`packages/protocol/src/messages.ts:2187`) while `PersistedWorkspaceKind` does not (`packages/server/src/server/workspace-registry-model.ts:8`).
+
+### Hub master password (Clisbot recovery)
+
+`CLISBOT_MASTER_PASSWORD` is an optional, operator-configured, instance-wide secret
+that authorizes resetting an existing Hub account password without the old password.
+It is separate from account passwords and the channel credential encryption key
+`CLISBOT_HUB_CREDENTIAL_MASTER_KEY`. Its absence disables master-password recovery.

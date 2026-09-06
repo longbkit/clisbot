@@ -90,6 +90,13 @@ export interface HubProviderApplicationFormModel {
   setError(error: string | null): void;
 }
 
+export function providerApplicationCanConnectAccount(application: {
+  provider: HubProviderApplicationProvider;
+  identifiers: Readonly<Record<string, string>>;
+}): boolean {
+  return application.provider !== "slack" || application.identifiers.transport === "webhook";
+}
+
 const EMPTY_FIELDS: Readonly<Record<HubProviderApplicationField, string>> = {
   appId: "",
   appSlug: "",

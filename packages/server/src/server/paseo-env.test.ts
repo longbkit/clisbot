@@ -119,3 +119,13 @@ describe("paseo env contract", () => {
     expect(resolvePaseoNodeEnv({ NODE_ENV: "test", PASEO_NODE_ENV: "local" })).toBeUndefined();
   });
 });
+
+test("keeps the Hub master password internal and strips it after external overlays", () => {
+  const privateEnv = { CLISBOT_MASTER_PASSWORD: "private-master", PATH: "/bin" };
+  expect(createPaseoInternalEnv(privateEnv).CLISBOT_MASTER_PASSWORD).toBe("private-master");
+  expect(createExternalProcessEnv(privateEnv, privateEnv).CLISBOT_MASTER_PASSWORD).toBeUndefined();
+  expect(
+    createExternalCommandProcessEnv("codex", privateEnv, privateEnv).CLISBOT_MASTER_PASSWORD,
+  ).toBeUndefined();
+  expect(buildSelfNodeCommand([], privateEnv).env.CLISBOT_MASTER_PASSWORD).toBeUndefined();
+});

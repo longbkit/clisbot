@@ -1,3 +1,12 @@
+import { editableAutomationYaml } from "../triggers/configuration/workflow-document.js";
+import { configuredChannelDestinations } from "../channels/configured-destinations.js";
+import { channelTestPreview, CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
+import {
+  channelActivityPage,
+  channelActivityView,
+  parseChannelActivityQuery,
+} from "./channel-activity.js";
+import { automationRunView } from "./automation-run.js";
 import { randomUUID } from "node:crypto";
 import { and, asc, eq } from "drizzle-orm";
 import { dump, load } from "js-yaml";
@@ -83,12 +92,17 @@ const channelConfigurationCandidateSchema = z
 const channelConfigurationRequestSchema = channelConfigurationCandidateSchema.extend({
   expectedRevisionId: z.string().uuid().nullable(),
 });
-const channelAccountTestRequestSchema = z
+const channelAccountTestTargetSchema = z
   .object({
     conversationId: z.string().trim().min(1),
     threadId: z.string().trim().min(1).optional(),
   })
   .strict();
+const channelAccountTestRequestSchema = channelAccountTestTargetSchema.extend({
+  expectedText: z.string().optional(),
+  expectedPreviewId: z.string().optional(),
+  expectedRevisionId: z.string().uuid().nullable().optional(),
+});
 const automationCandidateSchema = z.object({ yaml: z.string().min(1) }).strict();
 const automationRequestSchema = automationCandidateSchema.extend({
   expectedRevisionId: z.string().uuid().nullable(),
@@ -250,6 +264,8 @@ export class ManagementApi {
       ) => Promise<Response>;
       accessLeaseRevocation?: AccessLeaseRevocation;
       manualRuns?: Pick<PublicOperations, "dispatchManualRun"> | null;
+      revokeDaemon?: (request: Request, daemonId: string) => Promise<Response>;
+      renameDaemon?: (request: Request, daemonId: string) => Promise<Response>;
     },
   ) {
     this.accessLeaseRevocation =
@@ -329,6 +345,9 @@ export class ManagementApi {
     }
     if (resource === "channel-configuration") {
       return this.handleChannelConfiguration(request, requestId, access, segments);
+    }
+    if (resource === "channel-activity") {
+      return this.handleChannelActivity(request, requestId, access, segments);
     }
     if (resource === "channel-accounts") {
       return this.handleChannelAccounts(request, requestId, access, segments);
@@ -994,6 +1013,25 @@ export class ManagementApi {
     });
   }
 
+  private async handleChannelActivity(
+    request: Request,
+    requestId: string,
+    access: OrganizationAccessValue,
+    segments: readonly string[],
+  ): Promise<Response> {
+    this.requireHubAction(access, "channel.manage");
+    if (request.method !== "GET" || segments.length !== 3) {
+      return problem(requestId, 404, "not_found", "No management resource matches this path.");
+    }
+    return Response.json(
+      await channelActivityPage(
+        this.options.runtime,
+        access.organization.id,
+        parseChannelActivityQuery(new URL(request.url).searchParams),
+      ),
+    );
+  }
+
   private async handleChannelAccounts(
     request: Request,
     requestId: string,
@@ -1008,7 +1046,7 @@ export class ManagementApi {
       return problem(requestId, 404, "not_found", "No management resource matches this path.");
     }
     this.requireHubAction(access, "channel.manage");
-    if (operation !== "conversations") this.requireMutation(request);
+    if (request.method !== "GET") this.requireMutation(request);
     const channel = z.enum(["slack", "telegram"]).safeParse(segments[3]);
     if (!channel.success) {
       return problem(
@@ -1023,7 +1061,7 @@ export class ManagementApi {
     const account = snapshot.controlPlane.accounts.find(
       (candidate) => candidate.channel === channel.data && candidate.accountId === accountId,
     );
-    if (account === undefined || (operation !== "conversations" && !account.enabled)) {
+    if (account === undefined || (request.method !== "GET" && !account.enabled)) {
       return problem(
         requestId,
         404,
@@ -1031,13 +1069,117 @@ export class ManagementApi {
         "Channel account is unavailable.",
       );
     }
+    if (operation === "activity") {
+      return Response.json(
+        await channelActivityView(
+          this.options.runtime,
+          access.organization.id,
+          channel.data,
+          accountId,
+        ),
+      );
+    }
     if (operation === "conversations") {
-      return this.listChannelAccountConversations(access, channel.data, accountId);
+      return this.listChannelAccountConversations(access, channel.data, accountId, account);
+    }
+    if (operation === "test-preview") {
+      return this.previewChannelAccountTest(
+        request,
+        access,
+        channel.data,
+        accountId,
+        account,
+        snapshot.revision?.id ?? null,
+      );
     }
     if (operation === "retry") {
       return this.retryChannelAccount(requestId, channel.data, accountId);
     }
-    return this.testChannelAccount(request, requestId, channel.data, accountId, account);
+    return this.testChannelAccount(
+      request,
+      requestId,
+      channel.data,
+      accountId,
+      account,
+      snapshot.revision?.id ?? null,
+    );
+  }
+
+  private async previewChannelAccountTest(
+    request: Request,
+    access: OrganizationAccessValue,
+    channel: "slack" | "telegram",
+    accountId: string,
+    account: CompiledChannelAccount,
+    revisionId: string | null,
+  ): Promise<Response> {
+    const parsed = channelAccountTestTargetSchema.safeParse(
+      Object.fromEntries(new URL(request.url).searchParams),
+    );
+    if (!parsed.success) throw new ProductRequestError(400, "invalid_request");
+    if (!configuredChannelTestTarget(account, parsed.data))
+      throw new ProductRequestError(422, "conversation_not_configured");
+    const metadataAllowed = await this.configuredMetadataRoot(
+      access.organization.id,
+      channel,
+      account,
+      parsed.data,
+    );
+    const metadata = metadataAllowed
+      ? await this.options.channelSupervisor?.resolveConversation?.({
+          organizationId: access.organization.id,
+          channel,
+          accountId,
+          connectionId: account.connectionId,
+          conversationId: parsed.data.conversationId,
+        })
+      : null;
+    return Response.json({
+      ...channelTestPreview({
+        channel,
+        accountId,
+        ...parsed.data,
+        revisionId,
+        connectionId: account.connectionId,
+      }),
+      label: metadata?.label ?? null,
+      threadLabel: null,
+    });
+  }
+
+  private async configuredMetadataRoot(
+    organizationId: string,
+    channel: "slack" | "telegram",
+    account: CompiledChannelAccount,
+    input: { conversationId: string; threadId?: string | undefined },
+  ): Promise<boolean> {
+    if (
+      account.routes.some(
+        ({ match }) =>
+          match.kind !== "thread" &&
+          match.kind !== "topic" &&
+          match.ids.includes(input.conversationId),
+      )
+    )
+      return true;
+    const nested = account.routes.filter(
+      ({ match }) =>
+        (match.kind === "thread" || match.kind === "topic") &&
+        input.threadId !== undefined &&
+        match.ids.includes(input.threadId),
+    );
+    if (nested.length === 0) return false;
+    const observed = await listObservedChannelConversations(this.options.runtime, {
+      organizationId,
+      channel,
+      accountId: account.accountId,
+    });
+    return observed.some(
+      (item) =>
+        item.rootConversationId === input.conversationId &&
+        item.threadId === input.threadId &&
+        nested.some(({ match }) => match.kind === item.kind),
+    );
   }
 
   private async channelAccountStatus(access: OrganizationAccessValue): Promise<Response> {
@@ -1059,13 +1201,28 @@ export class ManagementApi {
     access: OrganizationAccessValue,
     channel: "slack" | "telegram",
     accountId: string,
+    account: CompiledChannelAccount,
   ): Promise<Response> {
     const conversations = await listObservedChannelConversations(this.options.runtime, {
       organizationId: access.organization.id,
       channel,
       accountId,
     });
+    const destinations = await configuredChannelDestinations(
+      account,
+      conversations,
+      (conversationId, budget) =>
+        this.options.channelSupervisor?.resolveConversation?.({
+          organizationId: access.organization.id,
+          channel,
+          accountId,
+          connectionId: account.connectionId,
+          conversationId,
+          budget,
+        }) ?? Promise.resolve(null),
+    );
     return Response.json({
+      destinations,
       conversations: conversations.map((conversation) =>
         Object.assign({}, conversation, {
           observedAt: conversation.observedAt.toISOString(),
@@ -1100,14 +1257,26 @@ export class ManagementApi {
     channel: "slack" | "telegram",
     accountId: string,
     account: CompiledChannelAccount,
+    revisionId: string | null,
   ): Promise<Response> {
     const input = await parseBody(request, channelAccountTestRequestSchema);
-    const authorizedTarget = account.routes.some(({ match }) =>
-      match.ids.some(
-        (id) =>
-          id === input.conversationId || (input.threadId !== undefined && id === input.threadId),
-      ),
-    );
+    const preview = channelTestPreview({
+      channel,
+      accountId,
+      ...input,
+      revisionId,
+      connectionId: account.connectionId,
+    });
+    if (input.expectedPreviewId !== undefined && input.expectedPreviewId !== preview.previewId) {
+      throw new ProductRequestError(409, "channel_test_preview_changed");
+    }
+    if (
+      (input.expectedText !== undefined && input.expectedText !== CHANNEL_TEST_MESSAGE) ||
+      (input.expectedRevisionId !== undefined && input.expectedRevisionId !== revisionId)
+    ) {
+      throw new ProductRequestError(409, "channel_test_preview_changed");
+    }
+    const authorizedTarget = configuredChannelTestTarget(account, input);
     if (!authorizedTarget) {
       return problem(
         requestId,
@@ -1128,6 +1297,9 @@ export class ManagementApi {
       channel,
       accountId,
       conversationId: input.conversationId,
+      ...(input.expectedPreviewId !== undefined || input.expectedRevisionId !== undefined
+        ? { expectedRevisionId: revisionId }
+        : {}),
       ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
     });
     if (!result.ok) {
@@ -1283,6 +1455,21 @@ export class ManagementApi {
         revisions: revisions.map((revision) => automationRevisionView(revision)),
       });
     }
+    if (segments.length === 6 && segments[4] === "runs") {
+      const runId = segments[5];
+      if (runId === undefined || !z.string().uuid().safeParse(runId).success) {
+        return problem(requestId, 404, "run_unavailable", "Run is unavailable.");
+      }
+      const run = await automationRunView(
+        this.options.database,
+        access.organization.id,
+        automation.id,
+        runId,
+      );
+      return run === undefined
+        ? problem(requestId, 404, "run_unavailable", "Run is unavailable.")
+        : Response.json(run);
+    }
     if (segments.length === 5 && segments[4] === "activity") {
       const activity = await this.options.database.listWorkflowActivityRuns(automation.id, 100);
       return Response.json({
@@ -1329,7 +1516,7 @@ export class ManagementApi {
               database: this.options.database,
               organizationId: access.organization.id,
               automationId,
-              candidate: compiled.authored,
+              candidate: compiled,
             });
           }
         },
@@ -1455,6 +1642,66 @@ export class ManagementApi {
   ): Promise<Response> {
     if (request.method === "GET" && segments.length === 3) return this.listDaemons(access);
     const daemonId = segments[3];
+    if (request.method === "PUT" && daemonId !== undefined && segments.length === 4) {
+      this.requireMutation(request);
+      this.requireHubAction(access, "hub.configure");
+      if (!z.string().uuid().safeParse(daemonId).success) {
+        return problem(requestId, 404, "daemon_unavailable", "Daemon is unavailable.");
+      }
+      if (this.options.renameDaemon === undefined) {
+        return problem(requestId, 503, "daemon_unavailable", "Daemon management is unavailable.");
+      }
+      if (access.organization.slug === undefined) {
+        return problem(
+          requestId,
+          409,
+          "organization_unavailable",
+          "The organization needs a URL slug before this Host can be renamed.",
+        );
+      }
+      const canonicalUrl = new URL(request.url);
+      canonicalUrl.searchParams.set("organizationSlug", access.organization.slug);
+      return this.options.renameDaemon(new Request(canonicalUrl, request), daemonId);
+    }
+    if (request.method === "DELETE" && daemonId !== undefined && segments.length === 4) {
+      this.requireMutation(request);
+      this.requireHubAction(access, "hub.configure");
+      if (!z.string().uuid().safeParse(daemonId).success) {
+        return problem(requestId, 404, "daemon_unavailable", "Daemon is unavailable.");
+      }
+      const daemon = await this.options.database.findDaemonForOrganization(
+        access.organization.id,
+        daemonId,
+      );
+      if (daemon === undefined)
+        return problem(requestId, 404, "daemon_unavailable", "Daemon is unavailable.");
+      const authority = await this.options.access.resolveDaemonAccess({
+        organizationId: access.organization.id,
+        daemonId,
+        userId: access.account.id,
+        membershipId: access.membership.id,
+      });
+      if (
+        authority === undefined ||
+        (!authority.owner && !authority.permissions.includes("daemon.manage"))
+      ) {
+        return problem(requestId, 404, "daemon_unavailable", "Daemon is unavailable.");
+      }
+      if (this.options.revokeDaemon === undefined) {
+        return problem(requestId, 503, "daemon_unavailable", "Daemon management is unavailable.");
+      }
+      if (access.organization.slug === undefined) {
+        return problem(
+          requestId,
+          409,
+          "organization_unavailable",
+          "The organization needs a URL slug before this Host can be disconnected.",
+        );
+      }
+      const canonicalUrl = new URL(request.url);
+      canonicalUrl.searchParams.set("organizationSlug", access.organization.slug);
+      return this.options.revokeDaemon(new Request(canonicalUrl, request), daemonId);
+    }
     if (daemonId === undefined || segments.length !== 5) {
       return problem(requestId, 404, "not_found", "No management resource matches this path.");
     }
@@ -1784,8 +2031,8 @@ async function automationView(
     enabled: automation.enabled,
     format: automation.format,
     activeRevisionId: automation.activeRevisionId,
-    definition: load(revision.yaml),
-    yaml: revision.yaml,
+    definition: load(editableAutomationYaml(revision.yaml, automation.enabled)),
+    yaml: editableAutomationYaml(revision.yaml, automation.enabled),
     createdAt: automation.createdAt.toISOString(),
     updatedAt: automation.updatedAt.toISOString(),
   };
@@ -1859,9 +2106,11 @@ function problem(requestId: string, status: number, error: string, message: stri
 function channelAccountOperation(
   request: Request,
   segments: readonly string[],
-): "conversations" | "retry" | "test" | undefined {
+): "conversations" | "activity" | "retry" | "test" | "test-preview" | undefined {
   if (segments.length !== 6) return undefined;
   if (request.method === "GET" && segments[5] === "conversations") return "conversations";
+  if (request.method === "GET" && segments[5] === "activity") return "activity";
+  if (request.method === "GET" && segments[5] === "test-preview") return "test-preview";
   if (request.method === "POST" && segments[5] === "retry") return "retry";
   if (request.method === "POST" && segments[5] === "test") return "test";
   return undefined;
@@ -1919,4 +2168,16 @@ function providerApplicationErrorStatus(code: ProviderApplicationError["code"]):
     return 503;
   }
   return 422;
+}
+
+function configuredChannelTestTarget(
+  account: CompiledChannelAccount,
+  input: { conversationId: string; threadId?: string | undefined },
+): boolean {
+  return account.routes.some(({ match }) =>
+    match.ids.some(
+      (id) =>
+        id === input.conversationId || (input.threadId !== undefined && id === input.threadId),
+    ),
+  );
 }

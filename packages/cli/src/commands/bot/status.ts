@@ -23,6 +23,7 @@ import {
 import { channelStatus, findChannelStatus, type ChannelStatusAccount } from "../channels/client.js";
 import { credentialKindFor, readBotManifest, type BotManifest } from "./manifest.js";
 import { resolveBotHome } from "./home.js";
+import { botRestartCommand } from "./start-output.js";
 
 export interface BotStatusReport {
   name: string;
@@ -35,7 +36,7 @@ export interface BotStatusReport {
   agentTitle: string;
   workspaceId: string;
   workspacePath: string;
-  credential: "persisted";
+  credential: "persisted" | "pending";
   routeNote?: string;
   /** True when the account appears in the running Hub's channel status. */
   running: boolean;
@@ -43,6 +44,7 @@ export interface BotStatusReport {
   integrity?: "ok" | "failed" | "not-checked";
   loadTrace?: "ok" | "failed" | "not-loaded";
   pin?: string;
+  ownerLinkRenewCommand?: string;
 }
 
 export type BotStatusCommandResult = SingleResult<BotStatusReport>;
@@ -64,7 +66,14 @@ export async function runBotStatusCommand(
   const target = resolveControlPlaneTarget(extractControlPlaneOptions(options));
   const accounts = await channelStatus(target);
   const live = findChannelStatus(accounts, manifest.channel, manifest.account);
-  return { type: "single", data: buildStatusReport(manifest, live), schema: botStatusSchema };
+  return {
+    type: "single",
+    data: {
+      ...buildStatusReport(manifest, live),
+      ownerLinkRenewCommand: botRestartCommand(home, name),
+    },
+    schema: botStatusSchema,
+  };
 }
 
 /** Merge the recorded manifest with the live channel-account status, if any. */
@@ -116,6 +125,8 @@ function renderBotStatus(
     `  hub      ${hub}`,
   ];
   if (bot.routeNote !== undefined) lines.push(`  route    ${bot.routeNote}`);
+  if (bot.ownerLinkRenewCommand)
+    lines.push("", "Check owner / get a new linking code:", `  ${bot.ownerLinkRenewCommand}`);
   return lines.join("\n");
 }
 

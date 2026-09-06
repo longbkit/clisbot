@@ -340,7 +340,7 @@ export interface OrganizationTriggerRecord {
   organizationId: string;
   name: string;
   enabled: boolean;
-  format: "single_run" | "legacy_multistep";
+  format: "single_run" | "workflow" | "legacy_multistep";
   activeRevisionId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -1090,7 +1090,7 @@ export interface SaveOrganizationTriggerInput {
   triggerId?: string;
   name: string;
   enabled: boolean;
-  format: "single_run" | "legacy_multistep";
+  format: "single_run" | "workflow" | "legacy_multistep";
   yaml: string;
   normalizedConfiguration: unknown;
   contentHash: string;

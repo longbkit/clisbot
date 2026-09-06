@@ -16,6 +16,7 @@ interface AlertButton {
 
 async function loadModuleForPlatform(platform: MockPlatform): Promise<{
   confirmDialog: typeof import("./confirm-dialog").confirmDialog;
+  registerWebConfirmation: typeof import("./confirm-dialog").registerWebConfirmation;
   alertMock: ReturnType<typeof vi.fn>;
 }> {
   vi.resetModules();
@@ -32,7 +33,11 @@ async function loadModuleForPlatform(platform: MockPlatform): Promise<{
   }));
 
   const module = await import("./confirm-dialog");
-  return { confirmDialog: module.confirmDialog, alertMock };
+  return {
+    confirmDialog: module.confirmDialog,
+    registerWebConfirmation: module.registerWebConfirmation,
+    alertMock,
+  };
 }
 
 function clearDialogGlobals(): void {
@@ -78,34 +83,42 @@ describe("confirmDialog", () => {
     });
   });
 
-  it("falls back to browser confirm on web when desktop APIs are unavailable", async () => {
+  it("uses the mounted app confirmation on web and never invokes browser confirm", async () => {
     const browserConfirm = vi.fn(() => true);
-    const blurMock = vi.fn();
-    (globalThis as { document?: unknown }).document = {
-      activeElement: { blur: blurMock },
-    } as unknown as Document;
     (globalThis as { confirm?: unknown }).confirm = browserConfirm;
-
-    const { confirmDialog } = await loadModuleForPlatform("web");
-    const confirmed = await confirmDialog({
+    const { confirmDialog, registerWebConfirmation } = await loadModuleForPlatform("web");
+    const appConfirm = vi.fn(async () => false);
+    const unregister = registerWebConfirmation(appConfirm);
+    const input = {
       title: "Restart host",
       message: "This will restart the daemon.",
-    });
-
-    expect(confirmed).toBe(true);
-    expect(blurMock).toHaveBeenCalledTimes(1);
-    expect(browserConfirm).toHaveBeenCalledWith("Restart host\n\nThis will restart the daemon.");
+      confirmLabel: "Restart",
+      destructive: true,
+    };
+    expect(await confirmDialog(input)).toBe(false);
+    expect(appConfirm).toHaveBeenCalledWith(input);
+    expect(browserConfirm).not.toHaveBeenCalled();
+    unregister();
+    await expect(confirmDialog(input)).rejects.toThrow("App confirmation provider is not mounted");
   });
 
-  it("throws on web when no confirm backend exists", async () => {
-    const { confirmDialog } = await loadModuleForPlatform("web");
+  it("does not detach a replacement provider when the old provider cleans up", async () => {
+    const { confirmDialog, registerWebConfirmation } = await loadModuleForPlatform("web");
+    const unregisterOld = registerWebConfirmation(async () => false);
+    const unregisterNew = registerWebConfirmation(async () => true);
+    unregisterOld();
+    expect(await confirmDialog({ title: "Restart", message: "Restart daemon?" })).toBe(true);
+    unregisterNew();
+  });
 
+  it("throws on web when the app confirmation provider is absent", async () => {
+    const { confirmDialog } = await loadModuleForPlatform("web");
     await expect(
       confirmDialog({
         title: "Restart host",
         message: "This will restart the daemon.",
       }),
-    ).rejects.toThrow("[ConfirmDialog] No web confirmation backend is available.");
+    ).rejects.toThrow("[ConfirmDialog] App confirmation provider is not mounted.");
   });
 
   it("uses native Alert on iOS/Android", async () => {

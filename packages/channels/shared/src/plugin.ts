@@ -49,6 +49,7 @@ export type SendMediaFn = (args: {
  * own surface may carry more; the Hub reads only these (sendText today;
  * sendMedia is the native-media seam, G7–G11). */
 export interface ChannelPlugin {
+  directory?: { resolveConversation?: ResolveConversationFn | undefined };
   gateway?: { startAccount?: StartAccountFn | undefined } | undefined;
   outbound?: {
     sendText?: SendTextFn | undefined;
@@ -56,3 +57,15 @@ export interface ChannelPlugin {
   } & Record<string, unknown>;
   [key: string]: unknown;
 }
+
+/** Optional, read-only lookup of one known destination; never lists provider directories. */
+export interface ChannelConversationMetadata {
+  label: string | null;
+  kind: "dm" | "channel" | "group";
+  visibility: "public" | "private" | "unknown";
+}
+export type ResolveConversationFn = (args: {
+  cfg: Record<string, unknown>;
+  accountId: string;
+  to: string;
+}) => Promise<ChannelConversationMetadata | null>;

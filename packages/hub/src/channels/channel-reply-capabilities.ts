@@ -6,6 +6,12 @@ import type { ChannelReplyBindingRef } from "./plane/types.js";
  * placed in an Agent's MCP URL; every routing and authorization fact remains
  * in Hub memory.
  */
+export interface ChannelReplyOutputBudget {
+  executionId: string;
+  type: string;
+  max?: number | undefined;
+}
+
 export interface ChannelReplyCapability {
   organizationId: string;
   channelRevisionId: string | null;
@@ -13,6 +19,7 @@ export interface ChannelReplyCapability {
   routeFingerprint: string;
   ref: ChannelReplyBindingRef;
   projectRoot?: string | undefined;
+  outputBudget?: ChannelReplyOutputBudget | undefined;
   agentId: string;
   expiresAt: number;
 }
@@ -24,6 +31,7 @@ export interface ChannelReplyCapabilityInput {
   routeFingerprint: string;
   ref: ChannelReplyBindingRef;
   projectRoot?: string | undefined;
+  outputBudget?: ChannelReplyOutputBudget | undefined;
 }
 
 interface PendingChannelReplyCapability extends Omit<ChannelReplyCapability, "agentId"> {
@@ -73,6 +81,7 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
     this.capabilities.set(token, {
       ...input,
       ref: { ...input.ref },
+      ...(input.outputBudget === undefined ? {} : { outputBudget: { ...input.outputBudget } }),
       agentId: null,
       expiresAt: this.now() + this.ttlMs,
     });
@@ -100,6 +109,9 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
     return {
       ...capability,
       ref: { ...capability.ref },
+      ...(capability.outputBudget === undefined
+        ? {}
+        : { outputBudget: { ...capability.outputBudget } }),
       agentId: capability.agentId,
     };
   }

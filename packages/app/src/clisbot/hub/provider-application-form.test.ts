@@ -1,7 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { openHubProviderApplicationForm } from "./provider-application-form";
+import {
+  openHubProviderApplicationForm,
+  providerApplicationCanConnectAccount,
+} from "./provider-application-form";
 
 describe("Hub Provider Application form", () => {
+  it("offers account connection only when the Application has a separate install flow", () => {
+    expect(
+      providerApplicationCanConnectAccount({
+        provider: "slack",
+        identifiers: { appId: "A1", transport: "socket" },
+      }),
+    ).toBe(false);
+    expect(
+      providerApplicationCanConnectAccount({
+        provider: "slack",
+        identifiers: { appId: "A1", transport: "webhook" },
+      }),
+    ).toBe(true);
+    expect(
+      providerApplicationCanConnectAccount({
+        provider: "github",
+        identifiers: { appId: "42" },
+      }),
+    ).toBe(true);
+  });
+
   it("builds a GitHub Application without trimming secret material", () => {
     const form = openHubProviderApplicationForm();
     form.setField("appId", " 42 ");

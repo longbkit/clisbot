@@ -5,6 +5,7 @@ export type ManagedAccessMode = ProtocolManagedAccessMode;
 
 export const PROJECT_PRIVILEGES = [
   "project.use",
+  "workspace.create",
   "agent.interact",
   "agent.create",
   "agent.fast.use",

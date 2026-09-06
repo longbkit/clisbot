@@ -108,7 +108,9 @@ function convertSingleRun(
   );
   if (environment === undefined) blockers.push("target environment is selected dynamically");
   else if (environment.kind !== "daemon")
-    blockers.push(`target kind ${environment.kind} is legacy`);
+    blockers.push(
+      `target kind ${environment.kind} cannot be represented by the single-run shorthand`,
+    );
   if (hasDuplicateOutputs(step)) blockers.push("run contains duplicate output grants");
   if (blockers.length > 0 || environment === undefined || environment.kind !== "daemon") {
     return { success: false, blockers };

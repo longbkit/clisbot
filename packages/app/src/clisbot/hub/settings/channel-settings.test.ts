@@ -45,7 +45,7 @@ describe("buildChannelAccountCandidate", () => {
       connection: { id: "telegram-connection", provider: "telegram" },
       accountId: " Customer Support ",
       matchKind: "channel",
-      conversationIds: " C1, C2 ",
+      conversationIds: " C1, C2\nC1\r\n, C2 ",
       contains: " #triage ",
       target: {
         kind: "agent",

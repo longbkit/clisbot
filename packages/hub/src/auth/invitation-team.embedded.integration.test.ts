@@ -14,7 +14,7 @@ import { createAuthServer } from "./server.js";
 
 const ORIGIN = "http://embedded.test";
 
-it("adds an invited Member to the selected Team atomically on PGlite", async () => {
+it("preserves setup-pending Account context and adds an invited Member to its Team atomically", async () => {
   const root = await mkdtemp(join(tmpdir(), "hub-team-invitation-"));
   const { runtime, locks } = await embeddedDatabaseRuntime(join(root, "database"));
   await runtime.migrate();
@@ -36,10 +36,12 @@ it("adds an invited Member to the selected Team atomically on PGlite", async () 
   try {
     await auth.initialize?.();
     const ownerCookie = await claimOwner(auth);
-    await post(auth, "/api/auth/paseo/complete-app-setup", ownerCookie, {});
     const ownerState = await state(auth, ownerCookie);
-    assert.equal(ownerState.status, "active");
-    if (ownerState.status !== "active") throw new Error("owner account is not active");
+    assert.equal(ownerState.status, "appSetupRequired");
+    if (ownerState.status !== "appSetupRequired") throw new Error("owner setup state is missing");
+    assert.equal(ownerState.team?.members.length, 1);
+    assert.equal(ownerState.team?.members[0]?.role, "owner");
+    assert.equal(ownerState.canCreateOrganization, true);
 
     const teamId = randomUUID();
     await runtime.query(
@@ -77,6 +79,11 @@ it("adds an invited Member to the selected Team atomically on PGlite", async () 
       })
       .parse(await invitation.json());
     assert.deepEqual(invitationBody.team, { id: teamId, name: "Engineering" });
+    const pendingState = await state(auth, ownerCookie);
+    assert.equal(pendingState.status, "appSetupRequired");
+    if (pendingState.status !== "appSetupRequired")
+      throw new Error("setup was unexpectedly completed");
+    assert.equal(pendingState.team?.invitations?.[0]?.id, invitationBody.id);
 
     const memberCookie = await signUp(auth, {
       name: "Member",
@@ -96,6 +103,38 @@ it("adds an invited Member to the selected Team atomically on PGlite", async () 
       [teamId],
     );
     assert.deepEqual(membership.rows, [{ team_id: teamId, user_email: "member@example.test" }]);
+
+    // An incomplete optional setup must not hide an invitation to another organization.
+    const otherOrganization = await post(
+      auth,
+      "/api/auth/paseo/create-organization",
+      memberCookie,
+      {
+        name: "Another organization",
+      },
+    );
+    assert.equal(otherOrganization.status, 201);
+    const incomingInvitation = await post(auth, "/api/auth/paseo/create-invitation", memberCookie, {
+      email: "owner@example.test",
+      role: "member",
+    });
+    assert.equal(incomingInvitation.status, 201);
+    const incoming = z.object({ id: z.string() }).parse(await incomingInvitation.json());
+    const invitedOwner = await state(auth, ownerCookie, incoming.id);
+    assert.equal(invitedOwner.status, "appSetupRequired");
+    if (invitedOwner.status !== "appSetupRequired")
+      throw new Error("setup was unexpectedly completed");
+    assert.equal(invitedOwner.invitation?.id, incoming.id);
+    assert.equal(invitedOwner.invitation?.organization.name, "Another organization");
+    assert.equal(invitedOwner.membership.role, "owner");
+    const unavailable = await state(auth, ownerCookie, "missing-invitation");
+    assert.equal("invitationUnavailable" in unavailable && unavailable.invitationUnavailable, true);
+    assert.equal(
+      (await runtime.query(`select app_onboarding_completed_at from instance_bootstrap`)).rows[0]?.[
+        "app_onboarding_completed_at"
+      ],
+      null,
+    );
   } finally {
     await auth.close();
     await entitlements.close();
@@ -149,10 +188,14 @@ function post(
   );
 }
 
-async function state(auth: ReturnType<typeof createAuthServer>, cookie: string) {
-  const response = await auth.handle(
-    new Request(`${ORIGIN}/api/auth/paseo/state`, { headers: { cookie } }),
-  );
+async function state(
+  auth: ReturnType<typeof createAuthServer>,
+  cookie: string,
+  invitationId?: string,
+) {
+  const url = new URL("/api/auth/paseo/state", ORIGIN);
+  if (invitationId !== undefined) url.searchParams.set("invitation", invitationId);
+  const response = await auth.handle(new Request(url, { headers: { cookie } }));
   assert.equal(response.status, 200);
   return accountStateSchema.parse(await response.json());
 }

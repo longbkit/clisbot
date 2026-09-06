@@ -4,21 +4,25 @@ The "the bot is working" signal, distinct from the relayed text. Two surfaces, a
 
 Paths below the install roots: `slack/…` = `@openclaw/slack@2026.7.1`, `main/…` = `openclaw@2026.7.1-2`.
 
-## The two surfaces
+## The two surfaces in the in-repo verticals
 
-|                  | Native typing status                                                                           | Inbound-message reaction                                     |
-| ---------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Slack            | `assistant.threads.setStatus` — "is typing..." + rotating `loading_messages`                   | `reactions.add` / `reactions.remove` on the sender's message |
-| Telegram         | `sendChatAction(chat_id, "typing")`                                                            | none                                                         |
-| Scope            | Slack: a `thread_ts` only — and a root message's own `ts` is one                               | the message that triggered the turn                          |
-| Expiry           | Slack: "until cleared, 2-min cap"; Telegram: ~5s                                               | persists until removed                                       |
-| Who refreshes it | Slack: nobody (one set holds past a whole turn); Telegram: the VERTICAL, on its own 4.5s timer | Slack answers `already_reacted` to a re-add                  |
+|                  | Native typing status                                                                            | Inbound-message reaction                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Slack            | `assistant.threads.setStatus` — "is typing..." + rotating `loading_messages`                    | `reactions.add` / `reactions.remove` on the sender's message |
+| Telegram         | `sendChatAction(chat_id, "typing")`                                                             | none                                                         |
+| Scope            | Slack: a `thread_ts` only — and a root message's own `ts` is one                                | the message that triggered the turn                          |
+| Expiry           | Slack: "until cleared, 2-min cap"; Telegram: ~5s                                                | persists until removed                                       |
+| Who refreshes it | Slack: the vertical every 60s and after successful bot posts; Telegram: the vertical every 4.5s | Slack answers `already_reacted` to a re-add                  |
 
-Because the expiry differs per channel, the refresh cannot live in the config or in one Hub-side heartbeat: the Hub drives `start` once per surface and each vertical keeps its own wire alive. Slack's status needs nothing further after the set; Telegram's action lapses in ~5s, so `packages/channels/telegram/src/typing.ts` re-sends on `TELEGRAM_TYPING_REFRESH_MS` until `stop` cancels the timer. The pinned references split the same way: `createTypingCallbacks` beats every 3s for both channels (`main/dist/typing-DnYJejsM.js:10`), which is a wasted call on Slack and the wrong cadence on Telegram.
+Refresh belongs to each vertical: the Hub opens the processing surface, and the provider-specific drive keeps its wire signal alive until the surface closes. In-repo Slack refreshes on `SLACK_TYPING_REFRESH_MS` (60s), below its status expiry, and restores an active status after successful text or file posts because a bot post clears the visible status. An interim answer therefore does not mean the Agent has finished. Telegram re-sends on `TELEGRAM_TYPING_REFRESH_MS` (4.5s) until `stop` cancels the timer. The pinned host's separate `createTypingCallbacks` loop beats every 3s for both channels (`main/dist/typing-DnYJejsM.js:10`); that is the sync baseline, not the in-repo cadence.
 
 ## Pinned machinery
 
-`createTypingCallbacks` (`main/dist/typing-DnYJejsM.js:15-40`): keepalive `3e3` ms (`:10`), breaker `DEFAULT_MAX_CONSECUTIVE_TYPING_FAILURES = 2` (`:4,18`) whose trip stops the keepalive loop (`:26-28`), TTL `6e4` ms auto-stop (`:19`). The in-repo mirror of the lifecycle half is `packages/hub/src/channels/plane/processing.ts` (`PROCESSING_TTL_MS`, the per-surface refcount, the failure release); the refresh half belongs to each vertical.
+`createTypingCallbacks` (`main/dist/typing-DnYJejsM.js:15-40`): keepalive `3e3` ms (`:10`), breaker `DEFAULT_MAX_CONSECUTIVE_TYPING_FAILURES = 2` (`:4,18`) whose trip stops the keepalive loop (`:26-28`), TTL `6e4` ms auto-stop (`:19`). These are pinned-source facts. The in-repo lifecycle owner remains `packages/hub/src/channels/plane/processing.ts` (`PROCESSING_TTL_MS`, the per-surface refcount, the failure release); the refresh half belongs to each vertical.
+
+For a quiet Agent turn, the in-repo TTL sweep reads the existing daemon Agent inventory before expiring its bound lease. Only an Agent still reported as `running` extends that lease; a missing/idle Agent or a failed read allows cleanup. Stream activity still renews the deadline, and terminal events still release it. A late inventory response cannot restore a released or replaced lease or override newer stream activity. This uses the existing daemon status owner, not a second Agent lifecycle or a new protocol heartbeat.
+
+This processing lease currently covers direct Agent Routes. The Workflow dispatch branch does not open or bind one, so the native Workflow typing/reaction indicator remains a separate [tracked gap](../2026-09-02-channel-workflow-integration-gaps.md#remaining-non-blocking-gaps). Workflow progress text and tool output have their existing output lifecycle; the direct-route TTL fix does not claim to add Workflow liveness.
 
 The lifecycle the pinned host drives from its ingress pipeline, the Hub drives from the ACCEPTED INBOUND (`bindings/index.ts` opens the lease, `relay/index.ts` keeps it alive and releases it). It is NOT driven from `turn_started`: the plane delivers the prompt before the daemon can report anything, and a fresh session's stream is only subscribed after the create returns, so a surface waiting on that event opens late or never — the bug that made the indicator invisible on both channels.
 
@@ -35,6 +39,8 @@ The vendor SWALLOWS failures here (`logVerbose`, `provider-C1-DFSpw.js:293-295`)
 **Reaction config in the vendor** is a separate key from the status: `channels.slack.typingReaction` / per-account (`docs/channels/slack.md:1204-1215`), an emoji-name string, applied OUTSIDE threads because threads already show the status. In-repo the value is `sync.progress.messageReaction` (`off` | emoji name) and the two leaves are independent rather than mutually exclusive: the indicator answers every turn that has an anchor (thread or not), the reaction is the receipt on the sender's own message.
 
 **The anchor differs from the vendor.** The pinned path derives `threadTs` from the reply thread and returns early without it, so an unthreaded ask gets no status. In-repo falls back to the sender's own message `ts` (`typing.ts` `statusAnchor`), because that is a valid `thread_ts` and it is where Slack renders liveness for a root message — the "bot is working…" line under the ask. A marker id that is not a `ts` (a slash command's synthetic `slash:<ts>:<user>`) has no anchor and stays on the reaction surface.
+
+**In-repo lifecycle.** Status writes are serialized per account/conversation/anchor. Stop cancels the refresh timer and queues the clear after in-flight writes; a late write cannot reactivate a stopped surface. Reaction add/remove operations retain their own message-scoped ordering. Successful outbound delivery stays successful if its cosmetic status refresh fails: the refresh stops and logs the failure without causing the message to be resent. Only surfaces whose Agent turn is still active are restored after a post.
 
 ## Telegram
 

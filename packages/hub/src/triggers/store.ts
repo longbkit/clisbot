@@ -1,10 +1,11 @@
+import { compileAutomationDocument } from "./configuration/workflow-document.js";
 import type {
   Database,
   OrganizationTriggerRecord,
   OrganizationTriggerRevisionRecord,
 } from "../db/types.js";
 import { resolveTriggerConfigurationForOrganization } from "../configuration/store.js";
-import { compileTriggerDocument, TriggerDocumentError } from "./configuration/index.js";
+import { TriggerDocumentError } from "./configuration/index.js";
 
 export interface SaveTriggerInput {
   triggerId?: string;
@@ -20,7 +21,7 @@ export interface SaveTriggerOptions {
 }
 
 export interface PreparedOrganizationTrigger {
-  compiled: ReturnType<typeof compileTriggerDocument>;
+  compiled: ReturnType<typeof compileAutomationDocument>;
   resolved: Extract<
     Awaited<ReturnType<typeof resolveTriggerConfigurationForOrganization>>,
     { success: true }
@@ -55,15 +56,15 @@ export class OrganizationTriggerStore {
     input: SaveTriggerInput,
     options: SaveTriggerOptions = {},
   ): Promise<OrganizationTriggerRecord> {
-    const unchangedLegacyAuthoring = await this.isUnchangedExistingYaml(input);
-    const prepared = await this.validate(input.yaml, !unchangedLegacyAuthoring);
+    const unchangedAuthoring = await this.isUnchangedExistingYaml(input);
+    const prepared = await this.validate(input.yaml, !unchangedAuthoring);
     await options.authorize?.(prepared);
     return this.database.saveOrganizationTrigger({
       organizationId: this.organizationId,
       ...(input.triggerId === undefined ? {} : { triggerId: input.triggerId }),
       name: prepared.compiled.authored.name,
       enabled: prepared.compiled.authored.enabled,
-      format: "single_run",
+      format: prepared.compiled.format,
       yaml: input.yaml,
       normalizedConfiguration: prepared.resolved.configuration,
       contentHash: prepared.compiled.authoredHash,
@@ -84,13 +85,13 @@ export class OrganizationTriggerStore {
     yaml: string,
     enforceAuthoringContract = true,
   ): Promise<PreparedOrganizationTrigger> {
-    const compiled = compileTriggerDocument(yaml);
+    const compiled = compileAutomationDocument(yaml);
     if (enforceAuthoringContract) validateAuthoringContract(compiled.authored);
     const resolved = await resolveTriggerConfigurationForOrganization(
       this.database,
       this.organizationId,
       {
-        environments: [compiled.environment],
+        environments: compiled.environments,
         triggers: compiled.events,
       },
     );
@@ -109,26 +110,16 @@ export class OrganizationTriggerStore {
 }
 
 function validateAuthoringContract(
-  trigger: ReturnType<typeof compileTriggerDocument>["authored"],
+  trigger: ReturnType<typeof compileAutomationDocument>["authored"],
 ): void {
   const issues: Array<{ path: readonly (string | number)[]; message: string }> = [];
-  if (!trigger.run.target.cwd.startsWith("/")) {
-    issues.push({ path: ["run", "target", "cwd"], message: "must be an absolute path" });
-  }
-  if ("choices" in trigger.run.agent) {
-    for (const [name, agent] of Object.entries(trigger.run.agent.choices)) {
-      if (agent.mode === undefined) {
-        issues.push({
-          path: ["run", "agent", "choices", name, "mode"],
-          message: "is required for new triggers",
-        });
-      }
-    }
-  } else if (trigger.run.agent.mode === undefined) {
-    issues.push({
-      path: ["run", "agent", "mode"],
-      message: "is required for new triggers",
-    });
-  }
+  const targets =
+    "run" in trigger
+      ? [trigger.run.target]
+      : trigger.environments.filter((target) => target.kind === "daemon");
+  targets.forEach((target, index) => {
+    if (!target.cwd?.startsWith("/"))
+      issues.push({ path: ["environments", index, "cwd"], message: "must be an absolute path" });
+  });
   if (issues.length > 0) throw new TriggerDocumentError(issues);
 }

@@ -363,6 +363,12 @@ export interface ProviderApplications {
     request: Request,
     input: { appToken: string; botToken: string; expectedVersion?: number },
   ): Promise<ProviderApplicationResult>;
+  /** In-process operator boundary, called only after local control-plane authentication. */
+  configureLocalSlackSocket?(
+    request: Request,
+    actor: { userId: string; organizationId: string },
+    input: { appToken: string; botToken: string; expectedVersion?: number },
+  ): Promise<ProviderApplicationResult>;
   retrySlackSocket(request: Request, providerApplicationId: string): Promise<void>;
   /** Redacted post-commit signal; optional for older/injected implementations. */
   onConfigurationChanged?(
@@ -416,6 +422,94 @@ export function createProviderApplications(
       completeLinearInstallation(options, input, configurationListeners),
     ),
   );
+
+  async function configureSocket(
+    request: Request,
+    actor: { userId: string; organizationId: string },
+    input: { appToken: string; botToken: string; expectedVersion?: number },
+    localOrigin?: string,
+  ): Promise<ProviderApplicationResult> {
+    if (options.environment.slack !== undefined) {
+      throw new ProviderApplicationError("managedByEnvironment");
+    }
+    if (options.slackSocketVerifier === undefined) {
+      throw new ProviderApplicationError("internal");
+    }
+    return serialize(queues, "slack", async () => {
+      if (!input.appToken.startsWith("xapp-") || !input.botToken.startsWith("xoxb-")) {
+        throw new ProviderApplicationError("invalidInput");
+      }
+      const organizationId = actor.organizationId;
+      if (organizationId === null) throw new ProviderApplicationError("invalidInput");
+      let installation: Awaited<ReturnType<SlackSocketInstallationVerifier["verify"]>>;
+      try {
+        installation = await options.slackSocketVerifier!.verify(input.appToken, input.botToken);
+      } catch (error) {
+        if (error instanceof ProviderVerificationError) {
+          throw new ProviderApplicationError(error.reason, error.subject, {
+            cause: error,
+          });
+        }
+        throw new ProviderApplicationError("internal", undefined, {
+          cause: error,
+        });
+      }
+      const configuration = {
+        provider: "slack" as const,
+        transport: "socket" as const,
+        appId: installation.appId,
+        appToken: input.appToken,
+      };
+      const identity = {
+        provider: "slack" as const,
+        id: installation.appId,
+        name: installation.appId,
+      };
+      let candidate: ProviderRuntimeCandidate | undefined;
+      try {
+        candidate = await options.runtime.prepare(
+          "slack",
+          configuration,
+          localOrigin ?? (await safeCallbackOrigin(options, request)),
+          identity,
+          (input.expectedVersion ?? 0) + 1,
+        );
+        await candidate.start();
+        const saved = await options.store.completeSlackSocketApplication({
+          configuration,
+          identity,
+          expectedVersion: input.expectedVersion,
+          updatedByUserId: actor.userId,
+          organizationId,
+          installation,
+        });
+        candidate.publish();
+        candidate = undefined;
+        await notifyConfigurationChanged(configurationListeners, {
+          provider: "slack",
+          providerApplicationId: identity.id,
+        });
+        return {
+          status: "verified",
+          provider: "slack",
+          identity,
+          configurationVersion: saved.version,
+        };
+      } catch (error) {
+        await closeCandidate(candidate, "slack", "configure_socket");
+        if (isConfigurationConflict(error)) {
+          throw new ProviderApplicationError("configurationConflict");
+        }
+        if (isIdentityConflict(error)) {
+          throw new ProviderApplicationError("identityConflict");
+        }
+        if (error instanceof ProviderApplicationError) throw error;
+        throw new ProviderApplicationError("internal", undefined, {
+          cause: error,
+        });
+      }
+    });
+  }
 
   return {
     onConfigurationChanged(listener) {
@@ -609,6 +703,12 @@ export function createProviderApplications(
         if (configuration === undefined || options.beginCandidateConnection === undefined) {
           throw new ProviderApplicationError("invalidInput");
         }
+        if (!supportsManagedConnection(configuration)) {
+          throw new ProviderApplicationError(
+            "invalidInput",
+            "Slack Socket Mode creates its Connection when its tokens are verified.",
+          );
+        }
         const configurationVersion =
           options.environment[provider] === undefined ? stored!.version : 0;
         const identity =
@@ -646,86 +746,14 @@ export function createProviderApplications(
     async configureSlackSocket(request, input) {
       rejectMutation(options, request);
       const account = await requireOperator(options, request);
-      if (options.environment.slack !== undefined) {
-        throw new ProviderApplicationError("managedByEnvironment");
-      }
-      if (options.slackSocketVerifier === undefined) {
-        throw new ProviderApplicationError("internal");
-      }
-      return serialize(queues, "slack", async () => {
-        if (!input.appToken.startsWith("xapp-") || !input.botToken.startsWith("xoxb-")) {
-          throw new ProviderApplicationError("invalidInput");
-        }
-        const organizationId = account.session.activeOrganizationId;
-        if (organizationId === null) throw new ProviderApplicationError("invalidInput");
-        let installation: Awaited<ReturnType<SlackSocketInstallationVerifier["verify"]>>;
-        try {
-          installation = await options.slackSocketVerifier!.verify(input.appToken, input.botToken);
-        } catch (error) {
-          if (error instanceof ProviderVerificationError) {
-            throw new ProviderApplicationError(error.reason, error.subject, {
-              cause: error,
-            });
-          }
-          throw new ProviderApplicationError("internal", undefined, {
-            cause: error,
-          });
-        }
-        const configuration = {
-          provider: "slack" as const,
-          transport: "socket" as const,
-          appId: installation.appId,
-          appToken: input.appToken,
-        };
-        const identity = {
-          provider: "slack" as const,
-          id: installation.appId,
-          name: installation.appId,
-        };
-        let candidate: ProviderRuntimeCandidate | undefined;
-        try {
-          candidate = await options.runtime.prepare(
-            "slack",
-            configuration,
-            await safeCallbackOrigin(options, request),
-            identity,
-            (input.expectedVersion ?? 0) + 1,
-          );
-          await candidate.start();
-          const saved = await options.store.completeSlackSocketApplication({
-            configuration,
-            identity,
-            expectedVersion: input.expectedVersion,
-            updatedByUserId: account.account.id,
-            organizationId,
-            installation,
-          });
-          candidate.publish();
-          candidate = undefined;
-          await notifyConfigurationChanged(configurationListeners, {
-            provider: "slack",
-            providerApplicationId: identity.id,
-          });
-          return {
-            status: "verified",
-            provider: "slack",
-            identity,
-            configurationVersion: saved.version,
-          };
-        } catch (error) {
-          await closeCandidate(candidate, "slack", "configure_socket");
-          if (isConfigurationConflict(error)) {
-            throw new ProviderApplicationError("configurationConflict");
-          }
-          if (isIdentityConflict(error)) {
-            throw new ProviderApplicationError("identityConflict");
-          }
-          if (error instanceof ProviderApplicationError) throw error;
-          throw new ProviderApplicationError("internal", undefined, {
-            cause: error,
-          });
-        }
-      });
+      const organizationId = account.session.activeOrganizationId;
+      if (organizationId === null) throw new ProviderApplicationError("invalidInput");
+      return configureSocket(request, { userId: account.account.id, organizationId }, input);
+    },
+    configureLocalSlackSocket: (request, actor, input) => {
+      const origin = request.headers.get(TRUSTED_REQUEST_ORIGIN_HEADER);
+      if (origin === null) return Promise.reject(new ProviderApplicationError("invalidOrigin"));
+      return configureSocket(request, actor, input, parseHttpOrigin(origin));
     },
     async retrySlackSocket(request, providerApplicationId) {
       rejectMutation(options, request);

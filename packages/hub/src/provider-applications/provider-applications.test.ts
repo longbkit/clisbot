@@ -468,6 +468,45 @@ describe("provider applications", () => {
     assert.notEqual(fixture.runtime.active("slack"), undefined);
   });
 
+  it("does not start a separate account connection for Slack Socket Mode", async () => {
+    const fixture = createFixture();
+    await fixture.applications.configureSlackSocket(request("POST"), {
+      appToken: "xapp-secret",
+      botToken: "xoxb-secret",
+    });
+
+    await assert.rejects(
+      fixture.applications.beginConnection(request("POST"), "slack", "A1", "org"),
+      (error: unknown) =>
+        error instanceof ProviderApplicationError &&
+        error.code === "invalidInput" &&
+        error.safeContext ===
+          "Slack Socket Mode creates its Connection when its tokens are verified.",
+    );
+    assert.equal(fixture.runtime.prepareCount("slack"), 1);
+  });
+
+  it("uses the same verified Socket Mode activation for an authenticated local operator", async () => {
+    const fixture = createFixture({ operator: false });
+    const localRequest = request("POST");
+    localRequest.headers.set("x-paseo-trusted-request-origin", "https://hub.test");
+    await fixture.applications.configureLocalSlackSocket!(
+      localRequest,
+      { userId: "operator", organizationId: "org" },
+      { appToken: "xapp-secret", botToken: "xoxb-secret" },
+    );
+    assert.equal(fixture.store.values.get("slack")?.configuration.provider, "slack");
+    assert.equal(fixture.runtime.prepareCount("slack"), 1);
+    assert.notEqual(fixture.runtime.active("slack"), undefined);
+    await assert.rejects(
+      fixture.applications.configureSlackSocket(request("POST"), {
+        appToken: "xapp-secret",
+        botToken: "xoxb-secret",
+      }),
+      (error: unknown) => error instanceof ProviderApplicationError && error.code === "forbidden",
+    );
+  });
+
   it("keeps Slack unconfigured when post-OAuth activation fails", async () => {
     const fixture = createFixture();
     await fixture.applications.verifyAndSave(request("POST"), "slack", slackConfiguration);

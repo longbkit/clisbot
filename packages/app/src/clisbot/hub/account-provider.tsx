@@ -1,5 +1,15 @@
+import { useQueryClient } from "@tanstack/react-query";
 import * as Linking from "expo-linking";
-import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
+import { useRouter } from "expo-router";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useFetchQuery } from "@/data/query";
 import { HubApiClient } from "./api-client";
 import { getHubConfiguration, type HubConfiguration } from "./config";
@@ -82,8 +92,19 @@ function EnabledHubAccountProvider({
   children: ReactNode;
 }) {
   const transport = useMemo(() => createHubTransport(configuration), [configuration]);
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const currentUrl = Linking.useURL();
-  const invitationId = useMemo(() => invitationIdFromUrl(currentUrl), [currentUrl]);
+  const currentUrlRef = useRef(currentUrl);
+  currentUrlRef.current = currentUrl;
+  const [consumedInvitation, setConsumedInvitation] = useState<{
+    url: string | null;
+    id: string;
+  } | null>(null);
+  const invitationId = useMemo(() => {
+    const id = invitationIdFromUrl(currentUrl);
+    return consumedInvitation?.url === currentUrl && consumedInvitation.id === id ? null : id;
+  }, [consumedInvitation, currentUrl]);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const account = useFetchQuery({
     queryKey: ["clisbot", "hub", configuration.origin, "account", invitationId],
@@ -151,12 +172,23 @@ function EnabledHubAccountProvider({
   );
   const acceptInvitation = useCallback(
     (pendingInvitationId: string) =>
-      run(() =>
-        accountCommand(transport, "/api/auth/paseo/accept-invitation", {
+      run(async () => {
+        await accountCommand(transport, "/api/auth/paseo/accept-invitation", {
           invitationId: pendingInvitationId,
-        }),
-      ),
-    [run, transport],
+        });
+        if (currentUrlRef.current !== currentUrl) return;
+        // The no-invitation cache may describe the previous organization. Let the
+        // new query load authoritative post-acceptance state before OAuth resumes.
+        queryClient.removeQueries({
+          queryKey: ["clisbot", "hub", configuration.origin, "account", null],
+          exact: true,
+        });
+        setConsumedInvitation({ url: currentUrl, id: pendingInvitationId });
+        // Preserve the current route and OAuth/PKCE parameters; only the successful
+        // invitation is consumed. Failed acceptance keeps its recovery context.
+        router.setParams({ invitation: undefined });
+      }),
+    [configuration.origin, currentUrl, queryClient, router, run, transport],
   );
   const signOut = useCallback(() => run(() => transport.signOut()), [run, transport]);
   const selectOrganization = useCallback(

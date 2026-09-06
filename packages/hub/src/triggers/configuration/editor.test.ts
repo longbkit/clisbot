@@ -64,6 +64,22 @@ describe("trigger form YAML bridge", () => {
     }
   });
 
+  test("clears the previous mode when switching to Pi with its default behavior", () => {
+    const projection = projectTriggerForm(ADVANCED);
+    if (projection.status !== "editable") throw new Error(projection.reason);
+    const yaml = patchTriggerYaml(ADVANCED, {
+      ...projection.value,
+      agent: "pi/gateway/vendor/model-v1",
+      mode: "",
+    });
+    expect(parseDocument(yaml).toJS().run.agent).toEqual({
+      provider: "pi",
+      model: "gateway/vendor/model-v1",
+      thinkingOptionId: "xhigh",
+      options: { sandbox_mode: "workspace-write", approval_policy: "never" },
+    });
+  });
+
   test("patches owned nodes while preserving comments and advanced configuration", () => {
     const projection = projectTriggerForm(ADVANCED);
     if (projection.status !== "editable") throw new Error(projection.reason);
@@ -139,7 +155,7 @@ describe("trigger form YAML bridge", () => {
     ).toBe("yaml_only");
   });
 
-  test("creates a deliberately minimal new trigger", () => {
+  test.each(["full-access", ""])("creates a minimal trigger with mode %j", (mode) => {
     const yaml = createTriggerYaml({
       name: "answer",
       enabled: true,
@@ -149,7 +165,7 @@ describe("trigger form YAML bridge", () => {
       daemon: "office",
       cwd: "/workspace",
       agent: "codex/gpt-5.4",
-      mode: "full-access",
+      mode,
       thinkingOptionId: "",
       providerOptions: "",
       maxRuntime: "2h",
@@ -166,7 +182,7 @@ describe("trigger form YAML bridge", () => {
       on: { "manual.run": {} },
       run: {
         target: { daemon: "office", cwd: "/workspace" },
-        agent: { provider: "codex", model: "gpt-5.4", mode: "full-access" },
+        agent: { provider: "codex", model: "gpt-5.4", ...(mode ? { mode } : {}) },
         max_runtime: "2h",
         idle_timeout: "10m",
         prompt: "Handle it.",

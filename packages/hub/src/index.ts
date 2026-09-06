@@ -286,6 +286,7 @@ function createProductionAuthServer(
     secret: identity.authSecret,
     baseURL: identity.appUrl,
     policy: authPolicy,
+    masterPassword: process.env["CLISBOT_MASTER_PASSWORD"],
     ...(trustedClientIpHeader === undefined ? {} : { trustedClientIpHeader }),
     ...(invitationMailer === undefined ? {} : { invitationMailer }),
     onOrganizationAccessChanged,

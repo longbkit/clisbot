@@ -1,10 +1,15 @@
 # Unified client Hub configuration UI
 
-Date: 2026-09-01. Updated: 2026-09-03. Status: implemented MVP product and interaction contract;
+Date: 2026-09-01. Updated: 2026-09-05. Status: MVP implementation in progress against the acceptance flows below;
 the intentionally deferred items are listed in section 18. Scope: make
 the existing Paseo app the only end-user UI for Hub account, Channel, Automation, Team, access, and
 configuration management, without introducing a second app shell or a separate product-level Bot
 entity.
+
+The [September 5 Automation-first delivery](2026-09-05-automation-first-channel-configuration.md)
+adds a first-class Automation destination and in-context Channel input/reply configuration. It
+preserves direct Channel–Agent Routes and the existing Channel revision owner; it supersedes
+the placement of Automation operation solely inside Settings, not the underlying access model.
 
 This document is the UI companion to
 [Unified Paseo client and Managed Access Lite](2026-08-31-unified-client-managed-access-lite.md).
@@ -12,6 +17,113 @@ That document owns connection admission, access tickets, daemon leases, revocati
 This document owns what users see, how they configure access, and how the Hub turns those choices
 into the managed-access policy. Where the earlier audit describes a separate Bot resource or its
 Phase-C UI, this document supersedes that part of the proposal.
+
+### Delivery priorities recovered from recent sessions
+
+The September 3, 14:27 UTC progress review in session `01a056a9-5728-74c0-b46d-bdbbcb0fe9e3`
+contains the original P0/P1 list. The user authorized parallel completion at 15:36 UTC and
+reaffirmed the complete user flow on September 5. Later requests prioritize Slack setup recovery
+(September 4, session `01a06d31-0b32-7f20-8b1f-2ed9d9a76f83`) and enrollment automatically leading
+to a usable Host and Project (September 4, 17:59 UTC, the first session). These are the scope
+sources; an old progress claim is not verification of current code.
+
+P0 means an account, authorization, activation, or reply failure prevents safe everyday use.
+P1 completes the owner/member journey without manual repair or leaving Paseo. The rows below group
+the original items by user outcome; section 20 remains the acceptance contract. “Implemented”
+means code exists; release acceptance still requires the indicated integration evidence.
+
+| Priority | User outcome                                   | Implementation and acceptance                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P0       | Owner setup and Member invitations             | Implemented: setup completion, copyable invitations, fresh Account form lifetimes, invalid-invitation recovery, and PKCE continuation. Embedded HTTP and mounted UI tests pass; native/Electron round trips remain a runtime gate.                                                                                                                                 |
+| P0       | Safe Project access                            | Implemented: catalog controls, multiple Agent configurations, explicit paired Host grant, owner wildcard and zero-access Member defaults. Embedded tests cover additive Team/Member authority, delegation ceilings and revocation.                                                                                                                                 |
+| P0       | Channel activation reports actual state        | Implemented: review, access selection, reconciliation, runtime errors/Retry, Automation-first owner defaults and preserved inline Automation replies. A live inbound-to-reply journey remains an acceptance gate.                                                                                                                                                  |
+| P0       | Automation preserves output authority          | Implemented: native Mode and fixed Hub tool authority review, explicit reply outputs, Project-bounded files, cost review and legacy read-only definitions. Channel MCP, Hub outputs and relay share the existing durable output budget; public tool-path Routes remain rejected.                                                                                   |
+| P0       | Managed-access compatibility and revocation    | Implemented: `off` retains ordinary Paseo behavior; external TCP/relay require tickets. Canonical enrollment revocation disables the Daemon before sweeping/notifying leases and closing its Hub socket. Lease admission holds a Daemon row lock until commit. Session/resource tests and embedded revocation pass; full device/transport journey remains pending. |
+| P1       | Account and Host onboarding stays recoverable  | Implemented: Account is reachable without Hosts, caches/forms follow account identity, CLI approval has bounded discovery, sync errors expose Retry, and permitted online Hosts offer Add Project.                                                                                                                                                                 |
+| P1       | Team/Member access can be reviewed and changed | Implemented: Team resource/privilege preview before invitation, Member/Team context links, in-place assignment editing, inherited access, resource “Who has access,” and published Public Routes overview. Custom grants and unchanged constraints survive edits; detached confirmations cannot write.                                                             |
+| P1       | Channel setup leads to usable conversations    | Implemented: Conversation picker, profile application, draft-preserving inline Automation, identity link, Automation-first owner preset, seeded focused Route editor with Back/Cancel, remote direct-Agent reply URL, and inbound Activity. Mounted editor tests cover draft/constraint preservation and cancellation.                                             |
+| P1       | Automations can be authored and operated       | Implemented: description, declared inputs, installed provider events, profiles, timeout/run controls, Route backlinks, and run/step Activity details with retry and output counts.                                                                                                                                                                                 |
+| P1       | Hub configuration stays inside Paseo           | Implemented: Provider Applications (including operator-owned instance credentials), Connections, API keys, Telegram creation, CLI enrollment and managed Host disconnect. A separate undefined operator dashboard is superseded by this existing ownership.                                                                                                        |
+
+Do not reopen accepted Channel Workflow migration, encrypted credential storage, or legacy Hub
+Project removal merely because their historical audits listed gaps. Key rotation, a shared Slack
+transport across independent trigger/channel consumers, and unsupported advanced transport options
+remain the separately documented non-blocking work unless a required flow demonstrates a blocker.
+Do not introduce organization switching, custom roles, a second access graph, or a second app shell.
+
+Release acceptance is still open for the complete owner/member journey on iOS, Android and packaged
+Electron, and the live provider-inbound → selected target → reply journey together with direct/relay
+reconnect and revocation. Native simulator/device and packaged Electron runs were not exercised in
+this Linux workspace. Shared React tests, embedded DB tests, and socket-adapter tests are evidence for their
+layers; they are not substitutes for those platform runs. No P0 release gate is marked complete on
+that basis. PostgreSQL lock contention was not exercised on a separate PostgreSQL server; the embedded
+regression checks canonical request, status, and revocation order.
+
+Existing responsive Settings limitation (verified 2026-09-05): resizing across the compact breakpoint
+remounts the detail subtree because upstream `SettingsScreen` renders separate compact and desktop
+branches. An unsaved Route draft or Activity selection can therefore reset during that transition.
+The Activity/dialog pass verifies each viewport and preserves drafts when canceling confirmation;
+it does not fix this preexisting transition. A future shared Settings change should keep one stable
+detail subtree across layouts, rather than add a second Channel draft cache.
+
+### 2026-09-05 flow completion pass
+
+Account now includes the shared Hosts section. Owners and administrators without a Host receive
+the CLI enrollment command; Members without access are directed to their organization administrator.
+Online Hosts expose Add project only with daemon management authority; Project-scoped Members open
+the existing Host. Offline and failed connections retain their actual status and link to Paseo's
+Connections settings.
+The section has one Refresh Hosts action. A refresh error stays visible beside cached Hosts until
+retry succeeds; the initial loading/error state never presents an empty organization. Binding/upsert
+and restart failures also appear on the affected Host with Retry; leaving an account removes that
+account's ephemeral failure state.
+
+The September 5 sandbox follow-up exposed a dev runtime gap: Vite served Hub HTTP but did not forward
+daemon WebSocket upgrades. The daemon remained `reconnecting` with a handshake timeout, so enrollment
+did not complete the connection/publication flow. A dev-only adapter now loads the same TanStack SSR
+entry for `/api/daemons/socket`; readiness verifies the unauthenticated 401 boundary. Live checks
+confirmed sandbox reconnecting to Hub with no error and a relay client reaching the same server as
+the local client. This does not establish the user's separate browser state. Missing connection
+details now produce Offline or Waiting for connection with recovery guidance in both Account Hosts
+and Configuration; Registering is reserved for an available offer being added to the Host registry.
+
+CLI approval starts with a fresh daemon catalog, scopes each attempt to its account, organization,
+and verification code, and ignores stale responses after leaving the form. Host discovery stops
+after one minute with Retry and Open Hosts actions. Re-enrolling an existing daemon does not label
+an unrelated existing Host as newly enrolled.
+
+First-party OAuth and invitation links enter Settings Account after runtime bootstrap. Their
+authorization parameters survive that navigation and resume through the Hub authorization endpoint
+after account and invitation gates are satisfied. Invalid invitations block continuation; successful
+acceptance removes only the consumed invitation parameter, preserving PKCE. Hub remains responsible for validating client,
+redirect URI, scope, and PKCE. Both Provider Application setup and Configuration's Connect account
+entry use the same browser-continuation recovery. Retrying reopens the existing attempt without
+resubmitting credentials. Recognized callback results refresh authenticated Connection records;
+inventory refresh failures remain visible and can be retried without replaying the setup write.
+
+Hub resource caches include the account identity and do not show the previous account's data while
+the new account loads. The UI continues to use shared React Native components, Paseo settings
+primitives, and theme tokens. Hub UI lives under `clisbot/hub`; app layout and Settings retain small
+mount/cache/navigation seams. The existing Settings ScrollViews provide a scroll-to-top callback
+through a Clisbot-owned context so the focused Route editor opens visibly on compact and desktop
+layouts, using the same React Native API. Hub backend changes reuse enrollment, access leases, audit events and
+output accounting. They add no daemon RPC or wire contract.
+
+For older Hub setup responses that omit `appSetupRequired.membership`, the client derives it from
+the single matching organization entry in `memberships`. Missing, ambiguous, or contradictory
+membership data is rejected. This HTTP-only compatibility normalization has a tagged removal gate;
+it does not infer a role from the instance-operator flag. Normalization stays within the setup state;
+other account-state schemas remain unchanged.
+
+Validation includes the CLI form lifecycle, account-entry navigation readiness, account-scoped
+query transitions, Host state/authority projection, provider continuation and callback recovery,
+and the real embedded PGlite browser-claim HTTP integration. The dev browser rendered Account and
+an actionable failed sign-in at desktop and 390px widths. Native iOS/Android and packaged Electron
+were not exercised in this pass; shared code and typechecking do not replace that runtime proof.
+The dev browser also verified that leaving/reopening Account clears the visible credential draft.
+The Tailscale dev proxy now forwards `/mcp` and `/agent-executions` to Hub; a POST with an invalid
+Channel capability reaches Hub and is rejected with 401 rather than receiving Expo HTML. This proves
+routing and the rejection path, not a successful provider send.
 
 ## 1. Product shape
 
@@ -297,6 +409,18 @@ Every effective-access row states where it came from: `Via Engineering`, `Via Op
 broader effective privilege wins and both sources remain visible.
 
 ## 6. Account and Channel identities
+
+Account's Hosts list exposes **Rename** to organization Owners/Admins through the unified
+management API, delegating normalization, organization scoping, and duplicate-name checks to the
+existing Hub daemon rename owner. This changes the shared daemon slug, not the local Appearance
+alias. Host management metadata remembers the last shared slug so ordinary labels follow a rename
+without reconnecting, while user-chosen local labels are retained.
+
+Add project checks the selected Host's advertised `workspace.manage` permission before opening
+filesystem or clone steps. Missing permission is reported immediately; older daemons without the
+optional permission projection continue to rely on backend enforcement. A denied action on a
+visible Project/resource reports `access_denied`; foreign or unknown resources remain hidden as
+`resource_not_found`. User messages omit protocol request names and error codes.
 
 Account opens from the member avatar rather than taking another Settings navigation row.
 
@@ -598,6 +722,38 @@ must not infer usage from whichever list happens to be loaded.
 
 ### Add channel
 
+Channels opens with the configured accounts. Selecting an account opens its Routes and runtime
+actions. `Add Channel account` starts account setup; `Add Route` starts a new Route for the selected
+account, and editing an existing Route opens that Route alone. Creation and edit forms replace the
+overview while open. Their action labels describe the job being saved, and Cancel returns without
+writing. After activation succeeds, the editor closes and the configured account is selected;
+inventory refresh or Team-access follow-up errors are reported without presenting the completed
+create form for resubmission.
+
+New Routes use `Activate Route`; edits use `Save Route`. New replies default to a thread, while
+editing preserves the stored reply anchor, including the legacy provider default. Reply choices
+are labeled `Text forward` and `Use Channel tool`; these labels retain the existing relay/tool
+configuration values and output ownership.
+
+Account and Route secondary actions use Paseo's shared overflow menu. Route reorder arrows retain
+explicit accessible names. `Who can use this?` reveals existing access and neutral `Your Channel
+identities` navigation; provider Connection details describe the connected credential, not a Member
+grant or proof that the current user has linked an identity.
+
+Provider Connection creation is opened explicitly from account setup when needed. It reuses the
+existing Connection form and preserves the surrounding account draft. A second always-open
+`Add Connection` form is not part of the Channels overview. `Advanced YAML` starts collapsed and is
+available outside the focused editor; it still edits the same complete revisioned configuration.
+Opening it shows a multiline editor using Paseo's shared input and monospace token, with bounded
+internal scrolling. The normal scope hint replaces a warning panel; validation and activation errors
+remain beside the draft. The plain form model belongs to the signed-in Channels screen, so collapsing
+the editor or opening Activity or a Route form preserves unsaved YAML. Account changes clear that
+local lifetime. A newer active revision preserves a dirty draft but blocks activation until the user
+explicitly discards it and reloads; a clean draft follows the new revision. Editing invalidates prior
+validation, and delayed validation results cannot mark a newer draft valid. Validate writes nothing;
+Activate still submits all three roots (`resource`, `policy`, and `accounts`) through the existing
+backend validation and expected-revision replacement.
+
 Adding a Channel account is one full-page flow because it combines external verification and Route
 configuration:
 
@@ -613,12 +769,14 @@ configuration:
    direct Agent, choose the Project, Workspace behavior, Provider, Model, Thinking, Mode, optional
    feature values such as Fast mode, provider settings, and optional Agent profile shortcut.
 6. **Access and replies:** review `Who can use it`, Team assignments, reply synchronization,
-   Channel actions, tool approvals, output roots, and limits. A one-owner organization is prefilled
-   as `Only you`; otherwise the default is `Members with access` and no Team is selected.
+   Channel actions, tool approvals, output roots, and limits. A confirmed single-member organization
+   whose member is the signed-in owner displays `Only you`; otherwise the default is
+   `Members with access` and no Team is selected. This label does not create or change a grant.
 7. **Review and activate:** show the Connection, ordered Route, fixed target, Audience, cost and
    security safeguards, then validate, activate, reconcile runtime, and offer a real test message.
 
-For `Members with access`, no Team assignment means only organization owners can use the Route. For
+For a new Channel account with no existing direct or Team grants, `Members with access` initially
+allows only organization owners. Existing grants remain effective when editing an account. For
 `Anyone in selected conversations`, the explicit Route Audience admits participants under the
 open-audience safeguards below. The Channel account may be saved as disabled before a Route is
 complete.
@@ -626,6 +784,49 @@ complete.
 When the provider proves the installing user's identity, setup offers to link it to the signed-in
 owner automatically. Telegram setup presents the one-time link command before the final test. A
 one-owner organization therefore needs no separate Team or Access setup before testing the Route.
+
+`Running` reports that the provider transport has started. Route selection, sender identity and
+access, mention rules, and execution limits are separate admission checks. A matched Route with
+`sender may not trigger this route` has received the message but denied sender access; restarting
+a Running account is not evidence that access has been repaired. Review the verified provider
+identity in Account and the Channel account's existing access in Manage access. Linking an identity
+does not grant new privileges, and `Only you` does not bypass identity verification. Use inbound
+Activity to verify admission; a successful outbound test reply does not prove sender eligibility.
+
+Channels separates `Accounts` configuration from `Activity`. Activity shows up to 25 inbound events
+per page, with account, Route position, and outcome filters, explicit Older/Newer navigation, and
+Refresh. Opening one event reveals its Conversation, sender, admission result, and recovery actions;
+the list does not repeat full warning panels. Returning from details preserves the filters and page.
+The Hub uses an organization-scoped timestamp/ID cursor and indexed audit queries rather than loading
+the full event history. Failed page requests retain the last loaded page with an explicit retry state.
+Historical account IDs and Route positions remain audit facts when current configuration changes;
+they do not identify the current Route at the same position.
+
+New denied Activity entries distinguish an unlinked sender from a linked Member who lacks access
+to that conversation. When the account still has an eligible current Connection, `Link my identity`
+opens the existing Account identity form with that Connection selected. An event does not prove which
+Connection an account uses today; removed accounts must not fall back to another Connection. The user
+copies its one-use command and sends it through the provider to prove ownership; opening the form creates no identity
+or access grant. After verification, send a new message because ignored messages are not replayed.
+`Manage access` handles missing Member or Team grants. Older generic denial entries offer both
+checks without claiming which prerequisite failed. Explicit open-audience Routes retain their
+separate admission rules.
+
+Optional Provider Application setup does not block linking an existing Channel Connection.
+Account shows `Your Channel identities` for both authenticated `appSetupRequired` and `active`
+Members, and a Connection-prefilled identity link opens in either state. Both states have the normal
+Account and Hosts view; the app removes the redundant `Finish setup` action. Optional Provider
+Applications remain under Hub Configuration. Identity reads and one-use challenges still use the
+current membership and the Connection's server-reported linking permission. Opening Account does
+not post setup completion, install credentials, or grant access.
+
+The Hub retains its existing setup status, completion endpoint, and persisted flag for compatibility.
+Its setup response now includes the same authorized Team, organization-creation, and invitation
+facts as an active response, so an unfinished optional step cannot hide pending invitations.
+These additive HTTP fields remain optional for older Hub responses; unknown Team data is not an
+empty Team or proof of a sole owner. Password, organization-selection, and invitation gates remain
+enforced. Regression coverage includes a setup-pending owner with an existing Slack Connection,
+the real Account-to-identity form, pending invitations, and legacy responses without the new facts.
 
 ### Routes
 
@@ -741,21 +942,26 @@ The Route editor reuses the current interaction, binding, reply, outbound, synch
 approval settings. It shows the effective compiled value beside any inherited value so the user
 does not need to read several YAML files to understand the result.
 
-The outbound section also owns a small Route-bound Channel action ceiling. It does not expose
-`tool.*`, `channel.tool.*`, arbitrary MCP tool names, or OpenClaw's complete message-action catalog:
+The `Reply method` labels are `Text forward` and `Use Channel tool`. `Text forward` uses the existing
+`outbound.path: relay` behavior; `Use Channel tool` uses `outbound.path: tool`. The display names do
+not change stored configuration or the provider transport. New Routes default `Reply in a thread`
+to on. Editing preserves an existing explicit or omitted legacy reply anchor rather than silently
+changing its behavior.
 
-```text
-Channel replies
-  Send text replies                    On
-  Send files and artifacts             On
-  Allowed file roots                   Project outputs
-```
+The tool
+capability is generated from the fixed Route and target Project: it preapproves text replies and,
+when an absolute Project root is available, file sending to the invoking Conversation. Review shows
+this authority separately from native Provider Mode. No arbitrary MCP tool-policy or file-root
+editor exists; authored Agent `toolPolicy` remains rejected by the compiler.
 
-An owner-only Route preserves the current easy default: text and Project-output files are enabled.
-An open-audience Route starts with text only; enabling files requires an explicit Project-output
-root and a safeguard review. Provider-native actions such as reactions, polls, edits, or pins appear
-only after the Hub action broker and that in-repo vertical implement them. They are Route behavior,
-not Agent-profile fields and not automatically granted to a Member.
+Files must remain inside the Project root after resolving symlinks. The current upload runs in the
+Hub process, so the Hub must be able to access that Project folder; remote Daemon file transfer is
+not implemented. Open Audience requires automatic final-text replies; the compiler rejects a tool
+reply path. Workflow tool sends reserve the same durable output budget as Hub output tools and relay
+delivery; a file and its optional separately posted caption consume separate sends. Member direct
+Agent Routes retain their existing tool behavior without an Automation output budget. Provider-native actions such as
+reactions, polls, edits, or pins appear only after the Hub action broker and in-repo vertical support
+them. They are Route behavior and do not grant direct Project or Automation access.
 
 Changing a Route target shows the old and new Project, Agent controls, tool ceiling, and cost impact
 before activation. It does not silently create direct Project or Automation access for any Team. An
@@ -828,7 +1034,39 @@ Team/Member access assignments may use all four scopes. An open Audience is stri
 at least one exact Conversation ID, including for DMs, and group/shared/public conversations must
 also require a mention. This prevents a public entry point from silently expanding to future or
 unknown Conversations. The observed-Conversation picker supplies known IDs and the form always
-retains manual ID entry for a Conversation the Hub has not observed yet.
+retains manual ID entry for a Conversation the Hub has not observed yet. The shared Channels and
+Access selector shows each selected name alongside its canonical ID, supports multiple selections,
+and accepts comma-separated or newline-separated IDs through an explicit ID editor. Available
+configured-destination metadata enriches the same picker without changing its values. Route scope is
+explicit: `Any matching conversation` preserves existing wildcard configurations, while `Selected conversations`
+requires at least one ID. Removing the last selected ID leaves that scope specific and blocks saving;
+it never silently broadens a Route or Access assignment.
+
+Configured destinations can also show provider metadata from Slack `conversations.info` or Telegram
+`getChat`, using the current account's Connection. These optional read-only lookups enrich authored
+IDs rather than enumerate a provider directory. They use an already-started account; unavailable
+vertical support or a stopped runtime retains IDs without starting or reauthorizing the Connection.
+A rebuildable cache is scoped to the organization,
+Connection, and credential configuration, with 256 entries per provider namespace, a 15-minute
+positive lifetime, and a 60-second negative lifetime. One response includes at most 200 configured
+destinations and spends at most 20 uncached lookups, four at a time; cached results do not consume that
+budget. Permission, rate-limit, missing-name, or network failures retain the raw ID. Known thread or
+topic parents may show their Conversation name; unobserved parents and unavailable topic names are
+not guessed. A nested ID observed under multiple parents shows the raw ID and an ambiguity hint,
+without implying that one parent name uniquely identifies its scope. Names do not change matching,
+routing, or access authority.
+
+`Send test message` first obtains a read-only preview of the exact canonical text and destination,
+showing available names alongside raw IDs, reply/thread placement, and the absence of attachments.
+The confirmation separates `Send to` from `Message to send`. Only the exact preview text appears in
+the message block; destination details and explanatory notes stay outside it. The screen-scoped
+confirmation accepts this structured body while ordinary confirmations retain their text message.
+On compact screens, detailed confirmations open taller so the canonical short message is visible
+initially; long content scrolls independently of the action buttons.
+Confirmation submits the preview fingerprint, text, and revision. A changed destination, Connection,
+configuration revision, or unapplied runtime revision is rejected before sending. Older clients retain
+the existing test endpoint; the app requires a preview-capable Hub before offering this send action.
+This outbound test does not start an Agent or Automation and does not prove inbound sender access.
 
 Channel accounts have one built-in user access level:
 
@@ -881,7 +1119,7 @@ Configuration flexibility never weakens these hard invariants:
 - Enabling or changing open Audience requires both Hub configuration and access-management
   authority, unless the current Member is the organization owner.
 - The Route has a server-fixed Agent or Automation target. Message content cannot replace its
-  Daemon, Project, Provider, Model, Mode, feature values, tool ceiling, or output roots.
+  Daemon, Project, Provider, Model, Mode, feature values, generated action grants, or Project file root.
 - Context and bindings are keyed by Channel account, Conversation, and thread or topic. A customer
   Conversation cannot reuse another Conversation's Agent session or history.
 - External participants never receive Project metadata, filesystem paths, diagnostics, internal
@@ -1026,7 +1264,10 @@ The structured flow is:
 6. For a Channel-triggered Automation, optionally enable `Continue the same Agent`. This compiles
    to Workflow `reuse: binding`; otherwise every run creates a new Agent. Reuse is independent of
    auto-archive and must fail closed when target, Agent controls, or authority are incompatible.
-7. Configure the step's tool ceiling. A Route or caller may narrow it but cannot broaden it.
+7. Review native Provider Mode and the generated Hub action grants separately. Enable Slack or
+   Telegram Channel replies explicitly; editing preserves authored grants. A Channel tool Route
+   additionally grants Project-bounded file sending. These fixed grants are derived from existing
+   output and Project configuration, not an arbitrary tool-policy or file-root editor.
 8. Review target access, automatic tool authority, Fast-mode cost, runtime limits, and exposed
    outputs.
 9. Validate. Validation is read-only and does not create or activate a revision.
@@ -1143,7 +1384,7 @@ Implementation seams below use that management façade and retain the same domai
 | `packages/hub/src/channels/config/compile.ts`       | `CompiledRoute`, `compileRoute()`                                        | Carry the normalized text condition without changing declaration-order precedence.                                                         |
 | `packages/hub/src/channels/policy.ts`               | `routeMatches()`, `matchRoute()`                                         | Match Conversation facts plus message text; first match still wins.                                                                        |
 | `packages/hub/src/channels/execution.ts`            | `resolveRoute()`, `handleAgentMessage()`, `admitWorkflowMessage()`       | Prefer an existing direct binding, pass text for new Route selection, capture revision plus Route position, and retain shared admission.   |
-| `packages/hub/src/db/channels.ts`                   | `ChannelStore.recordChannelInboundActivity()`                            | Persist a bounded open-audience audit fact without message text, credentials, or display payload.                                          |
+| `packages/hub/src/db/channels.ts`                   | `ChannelStore.recordChannelInboundActivity()`                            | Persist a bounded inbound admission audit fact for Member and open-audience Routes without message text, credentials, or display payload.  |
 | `packages/hub/src/channels/bindings/index.ts`       | `BindingEngine.admit()`, `.bindOrSteer()`                                | Continue the bound Agent without text reselection; persist the immutable selection in binding context and invalidate affected bindings.    |
 | `packages/hub/src/channels/supervisor/index.ts`     | `ChannelSupervisorImpl.reconcile()`                                      | On a new active revision, stop removed/disabled handles and restart every enabled handle from the new snapshot; return per-account status. |
 | `packages/hub/src/triggers/channel/provider.ts`     | `ChannelWorkflowRequestPayloadSchema`, `createChannelWorkflowProvider()` | Carry selected Channel revision/Route context into durable Workflow output and approvals; never rematch a callback without original text.  |
@@ -1380,10 +1621,25 @@ The Hub area uses Paseo's existing Settings patterns:
 - `StatusBadge` for Connected, Disabled, Error, and Verified.
 - `Combobox` for searchable Members, Teams, Daemons, Projects, optional Agent profiles,
   Automations, and Conversations.
+- Access subject and resource pickers always expose autocomplete. Subjects are grouped into
+  Teams and Members, with Member email included in search. Resources are grouped into Hosts,
+  Projects, Channel accounts, and Automations; parent names distinguish resources with the same
+  name and are searchable. Each group initially renders at most 50 matches, retaining its selected
+  match. Search considers the full loaded catalog before limiting results, and a truncation hint
+  explains how to narrow the list. This bounds rendered options; it does not add server pagination.
 - `DropdownMenu` for small fixed action lists.
 - `AdaptiveModalSheet` for Link identity, Add Team member, and Add access.
-- A full detail route for Add channel because it is a multi-step external setup flow.
-- `confirmDialog` for revoke, unlink, remove, and disable operations.
+- A focused detail view within the existing Settings screen for Add Channel account and Add Route;
+  no additional router or app shell owns these forms.
+- Web confirmations, including Access grants and removals, use the shared app
+  `ConfirmationProvider` through `confirmDialog`, rendered with `AdaptiveModalSheet` and standard
+  buttons. Channel forms mount a scoped instance of that same provider and use `useConfirmation`,
+  including structured test-send previews and cancellation when the requesting form leaves.
+  No browser blocking confirmation is used. The action row fills the shared footer's available
+  width; the body scrolls independently while the footer stays within the current compact snap
+  point. Button geometry and modal sizing remain owned by the shared Paseo primitives. Compact
+  confirmations stack full-width actions so longer labels such as `Send test message` remain
+  readable. Native and Electron confirmation backends retain their existing ownership.
 - `Alert` for a recoverable account, validation, or activation error.
 
 Desktop keeps the current 320px Settings sidebar and centered detail column. Compact layouts keep
@@ -1467,14 +1723,25 @@ These are release-gating integration scenarios, not illustrative examples.
 ### One owner
 
 1. The owner signs in and sees every enrolled Host, Project, Provider, Model, Thinking option, and
-   optional Agent profile without creating an assignment.
+   optional Agent profile without creating an assignment. After approving CLI login, Paseo keeps a
+   bounded Daemon-catalog reconciliation active while the terminal enrolls the Daemon. Its published
+   Connection Offer is added through the existing Host registry (or reuses its matching manual
+   Host), then the same screen offers `Add a Project` with that Host preselected; these catalog
+   reads do not issue access tickets.
 2. The owner adds a Channel account and links their provider identity during setup.
 3. `Who can use it` is already set to `Only you`; the owner does not open the access picker.
 4. The owner sees `Run an Automation` first and can create or select the standard one-Agent
    Automation. They may instead choose direct Agent work, configure Project and Agent controls, or
    optionally apply an Agent profile.
 5. `Use Project folder` is preselected; worktree/branch/PR choices remain available without forcing
-   extra setup.
+   extra setup. Selecting a Project resolves its root from the existing Paseo Host directory,
+   matching both Host server ID and Project ID, and writes that absolute path into the existing
+   Environment `cwd`. The root is shown without asking the owner to re-enter it. The
+   `Use a custom working directory` switch reveals the optional path field; existing custom paths remain visible and
+   unchanged when editing. Changing Host or Project clears the previous path. Missing directory
+   data shows loading or connection/retry guidance instead of guessing a path from the Project
+   name. This shared field is used by direct Channel targets and Automation forms, including inline
+   creation. The daemon remains authoritative for validating that the path belongs to the Project.
 6. Activation validates the candidate, restarts the account from the new snapshot, and reports a
    successful real test message or a retryable runtime error.
 7. The flow never asks the owner to create a Team or grant themselves access.

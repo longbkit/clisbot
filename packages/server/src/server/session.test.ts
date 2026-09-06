@@ -782,7 +782,8 @@ describe("session authorization permissions", () => {
         payload: {
           requestId: "restricted-ping",
           requestType: "ping",
-          error: "Session is not authorized for ping",
+          error:
+            "You do not have permission to perform this action. Ask your administrator for access.",
           code: "access_denied",
         },
       },
@@ -807,7 +808,8 @@ describe("session authorization permissions", () => {
         payload: {
           requestId: "before-scope-change",
           requestType: "ping",
-          error: "Session is not authorized for ping",
+          error:
+            "You do not have permission to perform this action. Ask your administrator for access.",
           code: "access_denied",
         },
       },
@@ -5660,5 +5662,70 @@ describe("agent config setters", () => {
         error: "thinking boom",
       },
     });
+  });
+});
+
+test("managed terminal creation explains missing privilege only for visible workspaces", async () => {
+  const messages: SessionOutboundMessage[] = [];
+  const project = { ...createProjectRecord("/work/a"), projectId: "project-a" };
+  const workspace = {
+    workspaceId: "workspace-a",
+    projectId: "project-a",
+    cwd: "/work/a",
+    archivedAt: null,
+  };
+  const session = createSessionForTest({
+    messages,
+    permissions: ["workspace.read", "workspace.write"],
+    resourceAuthorization: {
+      resourceMode: "projects",
+      projects: new Map([
+        [
+          "project-a",
+          {
+            privileges: new Set(["project.use", "agent.interact"] as const),
+            agentConfigurations: [],
+          },
+        ],
+      ]),
+      leaseId: "permission-test",
+      leaseExpiresAt: Date.now() + 60_000,
+    },
+    projectRegistry: { list: vi.fn().mockResolvedValue([project]) },
+    workspaceRegistry: {
+      get: vi.fn(async (id: string) => (id === "workspace-a" ? workspace : null)),
+      list: vi.fn().mockResolvedValue([workspace]),
+    },
+  });
+  await session.handleMessage({
+    type: "create_terminal_request",
+    requestId: "visible-terminal",
+    cwd: "/work/a",
+    workspaceId: "workspace-a",
+  });
+  expect(messages).toContainEqual({
+    type: "rpc_error",
+    payload: {
+      requestId: "visible-terminal",
+      requestType: "create_terminal_request",
+      code: "access_denied",
+      error:
+        "You do not have permission to perform this action. Ask your administrator for access.",
+    },
+  });
+  await session.handleMessage({
+    type: "create_terminal_request",
+    requestId: "missing-terminal",
+    cwd: "/work/a",
+    workspaceId: "missing",
+  });
+  expect(messages).toContainEqual({
+    type: "rpc_error",
+    payload: {
+      requestId: "missing-terminal",
+      requestType: "create_terminal_request",
+      code: "resource_not_found",
+      error: "Resource not found",
+    },
   });
 });

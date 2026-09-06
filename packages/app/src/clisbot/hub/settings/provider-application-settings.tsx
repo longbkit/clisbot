@@ -18,6 +18,9 @@ import { SettingsSection } from "@/screens/settings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
+import { HubConnectionContinuationNotice } from "./connection-continuation";
+import { hubResourceQueryKey } from "../query-keys";
+import { useHubConnectionContinuation } from "../use-connection-continuation";
 import {
   HubConnectionContinuationSchema,
   HubConnectionSchema,
@@ -31,6 +34,7 @@ import {
   HUB_PROVIDER_APPLICATION_PROVIDERS,
   isHubProviderApplicationField,
   openHubProviderApplicationForm,
+  providerApplicationCanConnectAccount,
   type HubProviderApplicationFormState,
   type HubProviderApplicationFormSnapshot,
   type HubProviderApplicationProvider,
@@ -69,16 +73,22 @@ const NOOP = () => undefined;
 export function ProviderApplicationSettings() {
   const hub = useHubAccount();
   const queryClient = useQueryClient();
+  const continuation = useHubConnectionContinuation();
+  const openContinuation = continuation.open;
   const organizationId = hub.signedIn?.organization.id ?? "";
+  const accountId = hub.signedIn?.account.id ?? null;
   const operator =
     hub.state?.status === "appSetupRequired" ||
     (hub.state?.status === "active" && hub.state.isInstanceOperator);
   const applications = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "provider-applications"],
+    queryKey: hubResourceQueryKey(
+      { origin: hub.origin, organizationId, accountId },
+      "provider-applications",
+    ),
     queryFn: () => hub.api().get("provider-applications", HubProviderApplicationsSchema),
     enabled: operator && organizationId.length > 0,
     retry: false,
-    dataShape: "list",
+    dataShape: "value",
     staleTimeMs: 15_000,
   });
   const [draft, setDraft] = useState<ApplicationDraft | null>(null);
@@ -96,21 +106,21 @@ export function ProviderApplicationSettings() {
       setError(null);
       setPendingApplicationId(providerApplicationId);
       try {
-        const continuation = await hub
+        const result = await hub
           .api()
           .post(
             "connections",
             { provider: application.provider, providerApplicationId },
             HubConnectionContinuationSchema,
           );
-        await Linking.openURL(continuation.url);
+        await openContinuation(result.url);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Unable to connect provider account.");
       } finally {
         setPendingApplicationId(null);
       }
     },
-    [hub],
+    [hub, openContinuation],
   );
   const retryDelivery = useCallback(
     async (application: ProviderApplication) => {
@@ -144,9 +154,25 @@ export function ProviderApplicationSettings() {
   const addApplication = useCallback(() => {
     setDraft({ key: `create:${Date.now()}` });
   }, []);
-  const refresh = useCallback(() => {
-    void applications.refetch();
-  }, [applications]);
+  const refresh = useCallback(async () => {
+    setError(null);
+    try {
+      await Promise.all([
+        applications.refetch({ throwOnError: true }),
+        queryClient.invalidateQueries(
+          {
+            queryKey: hubResourceQueryKey(
+              { origin: hub.origin, organizationId, accountId },
+              "connections",
+            ),
+          },
+          { throwOnError: true },
+        ),
+      ]);
+    } catch {
+      setError("Provider details could not refresh. Use Refresh to try again.");
+    }
+  }, [accountId, applications, hub.origin, organizationId, queryClient]);
   const save = useCallback(
     async (input: HubProviderApplicationSubmission) => {
       if (input.provider === "slack" && input.transport === "socket") {
@@ -177,13 +203,10 @@ export function ProviderApplicationSettings() {
   const saved = useCallback(
     async (continuationUrl: string | null) => {
       setDraft(null);
-      await applications.refetch();
-      await queryClient.invalidateQueries({
-        queryKey: ["clisbot", "hub", hub.origin, organizationId, "connections"],
-      });
-      if (continuationUrl !== null) await Linking.openURL(continuationUrl);
+      if (continuationUrl !== null) await openContinuation(continuationUrl);
+      await refresh();
     },
-    [applications, hub.origin, organizationId, queryClient],
+    [openContinuation, refresh],
   );
   const closeDraft = useCallback(() => {
     setDraft(null);
@@ -200,27 +223,34 @@ export function ProviderApplicationSettings() {
       />
       <ProviderApplicationLoadState pending={applications.isPending} error={applications.error} />
       {error ? <Alert variant="error" title={error} /> : null}
-      <View style={settingsStyles.card}>
-        {visible.length === 0 ? (
-          <View style={settingsStyles.row}>
-            <Text style={settingsStyles.rowHint}>No Provider Applications configured</Text>
-          </View>
-        ) : (
-          visible.map((application, index) => (
-            <ProviderApplicationRow
-              key={`${application.provider}:${application.identity?.id ?? "environment"}`}
-              application={application}
-              bordered={index > 0}
-              pendingApplicationId={pendingApplicationId}
-              connect={connect}
-              retryDelivery={retryDelivery}
-              replaceCredentials={replaceCredentials}
-            />
-          ))
-        )}
-      </View>
+      <HubConnectionContinuationNotice continuation={continuation} />
+      {applications.data === undefined ? null : (
+        <View style={settingsStyles.card}>
+          {visible.length === 0 ? (
+            <View style={settingsStyles.row}>
+              <Text style={settingsStyles.rowHint}>No Provider Applications configured</Text>
+            </View>
+          ) : (
+            visible.map((application, index) => (
+              <ProviderApplicationRow
+                key={`${application.provider}:${application.identity?.id ?? "environment"}`}
+                application={application}
+                bordered={index > 0}
+                pendingApplicationId={pendingApplicationId}
+                connect={connect}
+                retryDelivery={retryDelivery}
+                replaceCredentials={replaceCredentials}
+              />
+            ))
+          )}
+        </View>
+      )}
       <View style={styles.sectionActions}>
-        <Button variant="outline" disabled={pendingApplicationId !== null} onPress={addApplication}>
+        <Button
+          variant="outline"
+          disabled={applications.data === undefined || pendingApplicationId !== null}
+          onPress={addApplication}
+        >
           Add provider application
         </Button>
         <Button variant="ghost" disabled={applications.isFetching} onPress={refresh}>
@@ -283,6 +313,7 @@ function ProviderApplicationRow({
     application.provider === "slack" &&
     application.identifiers.transport === "socket" &&
     application.deliveryStatus?.state === "actionNeeded";
+  const canConnectAccount = identity !== null && providerApplicationCanConnectAccount(application);
   const connectionCount = application.connections.length;
 
   return (
@@ -310,7 +341,7 @@ function ProviderApplicationRow({
         </Text>
       </View>
       <View style={styles.actions}>
-        {identity === null ? null : (
+        {!canConnectAccount ? null : (
           <Button
             size="xs"
             variant="outline"

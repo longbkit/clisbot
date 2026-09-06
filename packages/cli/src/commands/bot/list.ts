@@ -25,7 +25,7 @@ export interface BotListEntry {
   channel: "slack" | "telegram";
   account: string;
   agentId: string;
-  credential: "persisted";
+  credential: "persisted" | "pending";
   running: boolean;
   transport?: string;
 }

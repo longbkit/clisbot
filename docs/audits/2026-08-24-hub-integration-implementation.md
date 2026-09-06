@@ -1,5 +1,7 @@
 # Hub integration: build, publish, onboarding, and source changes
 
+> Onboarding status (2026-09-06): the Hub Project/scaffold/deploy and manual route proposal below is superseded by [API-first assistant onboarding](2026-09-06-api-first-onboarding.md). Project now means the daemon filesystem root; this document retains the historical proposal.
+
 > Credential-model update, 2026-09-01: Hub now persists encrypted canonical Connections; active
 > revisions no longer contain `secretRef` and `bot stop` never deletes Connection credentials. See
 > [the Hub credential, Application, and Connection gap decision](2026-09-01-hub-credential-application-connection-gaps.md).

@@ -1,3 +1,4 @@
+import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import {
   cancel,
   confirm,
@@ -236,7 +237,9 @@ export async function continueHubGuidedSetup(
   }
   reportMessage(
     environment,
-    `Configure triggers in Hub: ${new URL("/triggers", origin).toString()}\nOr scaffold triggers as code: ${hubLoginResumeCommand("init", origin)}`,
+    isOnboardingEnabled(environment.env)
+      ? `Configure resources directly in Hub: ${origin}. For a local assistant workspace and channel setup, run: paseo hub init`
+      : `Configure triggers in Hub: ${new URL("/triggers", origin).toString()}\nOr scaffold triggers as code: ${hubLoginResumeCommand("init", origin)}`,
   );
 }
 

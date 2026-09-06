@@ -1,3 +1,4 @@
+import type { ResolveConversationFn } from "@getpaseo/channels-shared";
 // Load a channel vertical in-process (plan §14.5 / implementation doc §4.1 + §4.8
 // D1). `loadChannelVertical` applies the loader hooks for one channel, imports its
 // entry module AND its plugin chunk (both through the Hub's own resolve/load hooks,
@@ -75,6 +76,7 @@ export interface LoadChannelVerticalOptions {
  * Vendor shape kept loose: the control plane drives `gateway.startAccount` and
  * reads `outbound` (§4.8 D1/D3); unknown keys stay open. */
 export interface ChannelPlugin {
+  directory?: { resolveConversation?: ResolveConversationFn | undefined };
   gateway?: { startAccount?: (ctx: unknown) => unknown };
   outbound?: Record<string, unknown>;
   [key: string]: unknown;

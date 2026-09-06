@@ -28,6 +28,7 @@ import { realpathSync, statSync } from "node:fs";
 import path from "node:path";
 import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
 import { ChannelStore } from "../db/channels.js";
+import type { Database } from "../db/types.js";
 import { registerResponseLifecycle } from "../http/response-lifecycle.js";
 import { reportFailure } from "../failures/index.js";
 import {
@@ -50,6 +51,10 @@ export type ChannelReplyPost = (
 export interface ChannelReplyMcp {
   organizationId: string;
   store: ChannelStore;
+  outputStore?: Pick<
+    Database,
+    "beginAgentExecutionOutput" | "completeAgentExecutionOutput" | "failAgentExecutionOutput"
+  >;
   post: ChannelReplyPost;
   mediaPost?: ChannelReplyFilePostFn;
   resolveCapability(token: string): ChannelReplyCapability | undefined;
@@ -155,6 +160,8 @@ async function messageCall(
   if (typeof text !== "string" || text.trim() === "") {
     return toolFailure("`text` must be a non-empty string");
   }
+  const attemptId = await beginOutput(mcp, capability);
+  if (attemptId === undefined) return toolFailure("Channel reply output limit reached");
   // Record-before-post: the ledger row lands before the channel post; a
   // fresh UUID per call so retries of the same logical reply are new posts
   // (the agent drives them), while a replayed row (never, in this shape)
@@ -169,7 +176,10 @@ async function messageCall(
     eventTurnId,
     sequence: 0,
   });
-  if (!recorded.created) return toolFailure("delivery already recorded; not re-posting");
+  if (!recorded.created) {
+    await failOutput(mcp, capability, attemptId);
+    return toolFailure("delivery already recorded; not re-posting");
+  }
   const result = await mcp.post(ref, text);
   if (!result.ok) {
     await mcp.store.failDelivery({
@@ -181,6 +191,7 @@ async function messageCall(
       sequence: 0,
       failureReason: result.error ?? "the channel post failed",
     });
+    await failOutput(mcp, capability, attemptId);
     return toolFailure(`message post failed: ${result.error ?? "the channel post failed"}`);
   }
   await mcp.store.confirmDelivery({
@@ -193,6 +204,7 @@ async function messageCall(
     externalMessageId: result.externalMessageId ?? "",
     postedAt: new Date(),
   });
+  await completeOutput(mcp, capability, attemptId);
   return toolSuccess("message posted");
 }
 
@@ -271,6 +283,8 @@ async function fileCall(
     fileName: mediaFileName(target),
   });
   if (!decision.ok) return toolFailure(decision.notice);
+  const attemptId = await beginOutput(mcp, capability);
+  if (attemptId === undefined) return toolFailure("Channel reply output limit reached");
   const eventTurnId = `channel-reply-file:${randomUUID()}`;
   const recorded = await mcp.store.recordDelivery({
     organizationId: mcp.organizationId,
@@ -281,7 +295,10 @@ async function fileCall(
     eventTurnId,
     sequence: 0,
   });
-  if (!recorded.created) return toolFailure("delivery already recorded; not re-posting");
+  if (!recorded.created) {
+    await failOutput(mcp, capability, attemptId);
+    return toolFailure("delivery already recorded; not re-posting");
+  }
   if (mcp.mediaPost === undefined) {
     await mcp.store.failDelivery({
       organizationId: mcp.organizationId,
@@ -292,6 +309,7 @@ async function fileCall(
       sequence: 0,
       failureReason: "this channel does not support file sending",
     });
+    await failOutput(mcp, capability, attemptId);
     return toolFailure("this channel does not support file sending");
   }
   const result = await mcp.mediaPost(ref, target);
@@ -305,6 +323,7 @@ async function fileCall(
       sequence: 0,
       failureReason: result.error ?? "the file post failed",
     });
+    await failOutput(mcp, capability, attemptId);
     return toolFailure(result.error ?? "the file post failed");
   }
   await mcp.store.confirmDelivery({
@@ -317,12 +336,17 @@ async function fileCall(
     externalMessageId: result.externalMessageId ?? "",
     postedAt: new Date(),
   });
+  await completeOutput(mcp, capability, attemptId);
   let success =
     result.mediaPosted === false
       ? "file was too large for the channel; posted an in-channel notice instead"
       : `file posted (${result.externalMessageId ?? ""})`;
   const caption = args["caption"];
   if (typeof caption === "string" && caption.trim() !== "") {
+    const captionAttemptId = await beginOutput(mcp, capability);
+    if (captionAttemptId === undefined) {
+      return toolSuccess(`${success} (caption not sent: Channel reply output limit reached)`);
+    }
     const captionTurnId = `channel-reply:${randomUUID()}`;
     const captionRecorded = await mcp.store.recordDelivery({
       organizationId: mcp.organizationId,
@@ -334,6 +358,7 @@ async function fileCall(
       sequence: 0,
     });
     if (!captionRecorded.created) {
+      await failOutput(mcp, capability, captionAttemptId);
       success += " (caption failed: delivery already recorded; not re-posting)";
     } else {
       const captionResult = await mcp.post(ref, caption);
@@ -347,6 +372,7 @@ async function fileCall(
           sequence: 0,
           failureReason: captionResult.error ?? "the caption post failed",
         });
+        await failOutput(mcp, capability, captionAttemptId);
         success += ` (caption failed: ${captionResult.error ?? "the caption post failed"})`;
       } else {
         await mcp.store.confirmDelivery({
@@ -359,6 +385,7 @@ async function fileCall(
           externalMessageId: captionResult.externalMessageId ?? "",
           postedAt: new Date(),
         });
+        await completeOutput(mcp, capability, captionAttemptId);
       }
     }
   }
@@ -371,4 +398,48 @@ function toolSuccess(text: string) {
 
 function toolFailure(text: string) {
   return { content: [{ type: "text" as const, text }], isError: true };
+}
+
+/** Reserve before any external send; pending attempts count against the same
+ * durable budget as Hub output tools and relay delivery. An ambiguous failure
+ * retains its pending delivery lease, matching the existing output admission. */
+async function beginOutput(
+  mcp: ChannelReplyMcp,
+  capability: ChannelReplyCapability,
+): Promise<string | null | undefined> {
+  const budget = capability.outputBudget;
+  if (budget === undefined) return null;
+  const attempt = await mcp.outputStore?.beginAgentExecutionOutput(
+    budget.executionId,
+    budget.type,
+    budget.max,
+    new Date(),
+  );
+  return attempt?.id;
+}
+
+async function completeOutput(
+  mcp: ChannelReplyMcp,
+  capability: ChannelReplyCapability,
+  attemptId: string | null,
+): Promise<void> {
+  if (attemptId === null || capability.outputBudget === undefined) return;
+  await mcp.outputStore?.completeAgentExecutionOutput(
+    capability.outputBudget.executionId,
+    attemptId,
+    new Date(),
+  );
+}
+
+async function failOutput(
+  mcp: ChannelReplyMcp,
+  capability: ChannelReplyCapability,
+  attemptId: string | null,
+): Promise<void> {
+  if (attemptId === null || capability.outputBudget === undefined) return;
+  await mcp.outputStore?.failAgentExecutionOutput(
+    capability.outputBudget.executionId,
+    attemptId,
+    new Date(),
+  );
 }

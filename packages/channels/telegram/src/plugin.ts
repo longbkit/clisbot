@@ -1,3 +1,4 @@
+import { resolveTelegramConversation } from "./conversation-metadata.js";
 // The drive surface (blueprint §6.5 hard rule 2, B3-immutable): the pinned
 // export name `telegramPlugin` carrying `gateway.startAccount` +
 // `outbound.sendText`. The Hub loader imports this chunk and drives it.
@@ -9,6 +10,7 @@ import { sendMedia, sendText, updateText } from "./outbound.js";
 import { telegramTyping } from "./typing.js";
 
 export const telegramPlugin: ChannelPlugin = {
+  directory: { resolveConversation: resolveTelegramConversation },
   gateway: {
     startAccount: (ctx) =>
       startTelegramAccount(

@@ -47,8 +47,8 @@ describe("instance bootstrap and first-login boundary", () => {
     assert.equal(first.organizationCount, 1);
     assert.equal(first.ownerCount, 1);
     assert.equal(first.accountCount, 1);
-    assert.equal(first.projectCount, 1);
-    assert.equal(first.sourceCount, 1);
+    assert.equal(first.projectCount, 0);
+    assert.equal(first.sourceCount, 0);
     assert.equal(first.mustChangePassword, true);
     assert.equal(first.completionOrganizationId, first.organizationId);
 
@@ -130,8 +130,8 @@ describe("instance bootstrap and first-login boundary", () => {
     assert.equal(result.organizationCount, 1);
     assert.equal(result.ownerCount, 1);
     assert.equal(result.accountCount, 1);
-    assert.equal(result.projectCount, 1);
-    assert.equal(result.sourceCount, 1);
+    assert.equal(result.projectCount, 0);
+    assert.equal(result.sourceCount, 0);
     assert.equal(result.bootstrapRows, 1);
   }, 120_000);
 

@@ -3373,6 +3373,8 @@ export const ServerInfoStatusPayloadSchema = z
     // COMPAT(providersSnapshot): added in v0.1.48, remove gating when all clients use snapshot
     features: z
       .object({
+        // COMPAT(projectWorkspaceCreation): absent daemons require workspace.manage.
+        projectWorkspaceCreation: z.boolean().optional(),
         providersSnapshot: z.boolean().optional(),
         // COMPAT(providersSnapshotCwd): added in v0.3.2, remove gate after 2027-02-10.
         providersSnapshotCwd: z.boolean().optional(),

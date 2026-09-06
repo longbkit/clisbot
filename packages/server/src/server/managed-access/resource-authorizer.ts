@@ -15,6 +15,7 @@ import type {
   ProjectRegistry,
   WorkspaceRegistry,
 } from "../workspace-registry.js";
+import { getPaseoWorktreesRoot, resolvePaseoWorktreesBaseRoot } from "../../utils/worktree.js";
 import { isSameOrDescendantPath } from "../path-utils.js";
 import type { SessionAuthorization } from "../authorization/index.js";
 import {
@@ -582,6 +583,35 @@ export class ManagedResourceAuthorizer {
     return await this.configurationMatchesProject(workspace.projectId, next, "agent.interact");
   }
 
+  /** Explain forbidden actions only after every supplied target is visible to this session. */
+  async denialCode(
+    message: SessionInboundMessage,
+  ): Promise<"access_denied" | "resource_not_found"> {
+    await this.ready();
+    const checks: Array<Promise<boolean> | boolean> = [];
+    for (const agentId of agentIdsOf(message)) checks.push(this.allowsAgent(agentId));
+    for (const workspaceId of stringValuesProperty(message, "workspaceId")) {
+      checks.push(this.allowsWorkspace(workspaceId));
+    }
+    for (const projectId of stringValuesProperty(message, "projectId")) {
+      checks.push(this.allowsProject(projectId));
+    }
+    for (const cwd of stringValuesProperty(message, "cwd")) checks.push(this.allowsCwd(cwd));
+    for (const terminalId of stringValuesProperty(message, "terminalId")) {
+      const terminal = this.terminalManager?.getTerminal(terminalId);
+      checks.push(terminal ? this.allowsWorkspace(terminal.workspaceId) : false);
+    }
+    if (message.type === "workspace.create.request") {
+      const source = message.source;
+      if (source.projectId !== undefined) checks.push(this.allowsProject(source.projectId));
+      const cwd = source.kind === "directory" ? source.path : source.cwd;
+      if (cwd !== undefined) checks.push(this.allowsCwd(cwd));
+    }
+    return checks.length > 0 && (await Promise.all(checks)).every(Boolean)
+      ? "access_denied"
+      : "resource_not_found";
+  }
+
   async allowsInbound(message: SessionInboundMessage): Promise<boolean> {
     if (!this.isRestricted()) return true;
     await this.ready();
@@ -852,15 +882,38 @@ export class ManagedResourceAuthorizer {
     message: Extract<SessionInboundMessage, { type: "workspace.create.request" }>,
   ): Promise<boolean> {
     const source = message.source;
+    // Missing projectId takes an upstream compatibility path that can add a Project.
+    // Managed creation must always attach to an existing, explicitly granted Project.
     const projectId = source.projectId;
-    const cwd = source.kind === "directory" ? source.path : source.cwd;
-    if (projectId !== undefined && !this.allowsProject(projectId, "project.use")) return false;
-    if (cwd === undefined) return projectId !== undefined;
-    const resolvedProjectId = await this.projectIdForCwd(cwd);
-    if (resolvedProjectId === null || !this.allowsProject(resolvedProjectId, "project.use")) {
-      return false;
+    if (projectId === undefined || !this.allowsProject(projectId, "workspace.create")) return false;
+    const project = this.projects.get(projectId);
+    if (!project) return false;
+    const cwd = source.kind === "directory" ? source.path : (source.cwd ?? project.rootPath);
+    const canonicalCwd = await canonicalPathForAuthorization(cwd);
+    if (canonicalCwd === null || (await this.projectIdForCwd(cwd)) !== projectId) return false;
+    const roots = [
+      project.rootPath,
+      ...[...this.workspaces.values()]
+        .filter((workspace) => workspace.projectId === projectId && workspace.archivedAt === null)
+        .map((workspace) => workspace.cwd),
+    ];
+    for (const root of roots) {
+      if ((await canonicalPathForAuthorization(root)) === canonicalCwd) return true;
     }
-    return projectId === undefined || projectId === resolvedProjectId;
+    return false;
+  }
+
+  async allowsWorktreeDestination(
+    sourceCwd: string,
+    paseoHome: string,
+    worktreesRoot?: string,
+  ): Promise<boolean> {
+    if (!this.isRestricted()) return true;
+    const baseRoot = resolvePaseoWorktreesBaseRoot({ paseoHome, worktreesRoot });
+    const projectRoot = await getPaseoWorktreesRoot(sourceCwd, paseoHome, worktreesRoot);
+    // The daemon generates a validated single-segment slug below this root.
+    // Reject a project-hash directory symlink that would redirect creation elsewhere.
+    return isSameOrDescendantExistingPath(baseRoot, projectRoot);
   }
 
   private async load(): Promise<void> {

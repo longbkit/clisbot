@@ -1,0 +1,139 @@
+{
+  "generatedAt": "2026-09-06T07:14:48.833Z",
+  "method": "Actual historical/current TypeScript transpiled in isolation. Injected 401 Response, fake account store and handoff. No external network, live services or product changes. New loop is aborted by the probe on second fetch to bound execution.",
+  "poll401": [
+    {
+      "ref": "c73fb4444",
+      "settled": "rejected",
+      "message": "telegram getUpdates failed (401): Unauthorized",
+      "calls": 1,
+      "warns": 0,
+      "abortedByProbe": false,
+      "elapsedMs": 53
+    },
+    {
+      "ref": "97433b457",
+      "settled": "rejected",
+      "message": "Telegram getUpdates failed: HTTP 401",
+      "calls": 2,
+      "warns": 1,
+      "abortedByProbe": true,
+      "elapsedMs": 1007
+    },
+    {
+      "ref": "WORKTREE",
+      "settled": "resolved",
+      "message": null,
+      "calls": 2,
+      "warns": 1,
+      "abortedByProbe": true,
+      "elapsedMs": 1014
+    }
+  ],
+  "replay": [
+    {
+      "ref": "97433b457",
+      "first": {
+        "dispatched": false,
+        "reason": "handoff fault"
+      },
+      "afterRestart": {
+        "dispatched": false,
+        "reason": "ledger replay"
+      },
+      "handoffs": 1
+    },
+    {
+      "ref": "WORKTREE",
+      "first": {
+        "dispatched": false,
+        "reason": "handoff fault"
+      },
+      "afterRestart": {
+        "dispatched": false,
+        "reason": "ledger replay"
+      },
+      "handoffs": 1
+    }
+  ],
+  "mentions": [
+    {
+      "ref": "97433b457",
+      "otherBotCommand": true,
+      "usernamePrefix": true,
+      "textMentionOurBot": false
+    },
+    {
+      "ref": "WORKTREE",
+      "otherBotCommand": true,
+      "usernamePrefix": true,
+      "textMentionOurBot": false
+    }
+  ],
+  "initialInventory": {
+    "shared": {
+      "production": {
+        "files": 5,
+        "physicalLOC": 554
+      },
+      "tests": {
+        "files": 1,
+        "physicalLOC": 273
+      }
+    },
+    "slack": {
+      "production": {
+        "files": 10,
+        "physicalLOC": 1370
+      },
+      "tests": {
+        "files": 2,
+        "physicalLOC": 314
+      }
+    },
+    "telegram": {
+      "production": {
+        "files": 12,
+        "physicalLOC": 1565
+      },
+      "tests": {
+        "files": 2,
+        "physicalLOC": 205
+      }
+    }
+  },
+  "unchangedSinceInitial": {
+    "packages/channels/shared/src/monitor.ts": true,
+    "packages/channels/telegram/src/leaves/coerce.ts": true
+  },
+  "fusionHead": "557502e7eb25c8bb3a8c2b2ebf314bf878edef33",
+  "upstreamHead": "04453837d3ed72bbb0325ac5039390373795d5a2",
+  "focusedTests": {
+    "files": [
+      "packages/channels/shared/src/monitor.test.ts",
+      "packages/channels/telegram/src/transport/poll.test.ts"
+    ],
+    "passed": 24,
+    "filesPassed": 2,
+    "vitest": "4.1.7"
+  },
+  "historicalRefs": {
+    "c73fb4444": "c73fb444417316406c2299a0ecf0accded8e1e3c",
+    "97433b457": "97433b45765d5693b7cabe9481996a15cb79d273",
+    "ed238aee9": "ed238aee9094f383946b117c06406859865e4cde",
+    "2de4b4bd0": "2de4b4bd0b536398d22898e51593486c955eed06"
+  },
+  "filesSha256": {
+    "packages/channels/shared/src/monitor.ts": "83231cb962ee809db21bfb8028a203c46d14bc00c81ec4aaeaf15f6ac480143c",
+    "packages/channels/telegram/src/transport/poll.ts": "6df26d3a78d9dbec42417eded2991bd1a8759a0d7b5fd2ca323bd5646d4e9bf5",
+    "packages/channels/telegram/src/leaves/telegram-policy.ts": "db87520d1f8bbec55d4e74cbdb10c8144b5c7f872a3fd7b04b4791ba85fbab30",
+    "packages/hub/src/channels/loader/hosts/telegram-monitor.ts": "14268ebdd5b2cdfa1343fcf7bacab99deaaa38efca2d94b0fcc32f1e923c028a"
+  },
+  "legacyFocusedTests": {
+    "files": ["packages/hub/src/channels/loader/hosts/telegram-monitor.test.ts"],
+    "passed": 10,
+    "filesPassed": 1,
+    "vitest": "4.1.7",
+    "productionCaller": "Supervisor import and monitor override removed at 97433b457; legacy test still exercises old implementation."
+  }
+}

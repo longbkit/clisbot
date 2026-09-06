@@ -16,6 +16,7 @@ const accountStateSchema = z
   .object({
     status: z.string(),
     account: z.object({ email: z.string() }).optional(),
+    membership: z.object({ id: z.string(), role: z.string() }).optional(),
     isInstanceOperator: z.boolean().optional(),
   })
   .passthrough();
@@ -57,8 +58,12 @@ it("claims and completes a pristine instance through the shared Paseo HTTP contr
     assert.ok(cookie !== undefined);
 
     const beforeCompletion = await readAccountState(auth, cookie);
-    assert.equal(beforeCompletion.status, "appSetupRequired");
+    if (beforeCompletion.status !== "appSetupRequired") {
+      assert.fail(`expected appSetupRequired, received ${beforeCompletion.status}`);
+    }
     assert.equal(beforeCompletion.account?.email, "browser.operator@example.test");
+    assert.ok(beforeCompletion.membership);
+    assert.equal(beforeCompletion.membership.role, "owner");
     assert.equal(beforeCompletion.isInstanceOperator, true);
 
     const completed = await auth.handle(

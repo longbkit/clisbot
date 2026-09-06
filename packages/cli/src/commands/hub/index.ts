@@ -1,3 +1,6 @@
+import { onboardingInitCommand } from "../bot/init.js";
+import { passwordCommand } from "./password.js";
+import { isOnboardingEnabled } from "../bot/onboarding-client.js";
 import { Command } from "commander";
 import { withOutput } from "../../output/index.js";
 import { addJsonAndDaemonHostOptions } from "../../utils/command-options.js";
@@ -59,6 +62,7 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
   // COMPAT(clisbot-hub-local): embedded-Hub lifecycle before the remote verbs.
   hub.addCommand(startLocalHubCommand());
   hub.addCommand(stopLocalHubCommand());
+  if (isOnboardingEnabled(environment.env)) hub.addCommand(passwordCommand());
 
   addHubLoginCommand(hub, {
     env: environment.env,
@@ -68,7 +72,8 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
     isInteractive: environment.isInteractive,
     continueGuidedSetup: (origin) => continueHubGuidedSetup(origin, environment),
   });
-  addHubInitCommand(hub, environment);
+  if (isOnboardingEnabled(environment.env)) hub.addCommand(onboardingInitCommand());
+  else addHubInitCommand(hub, environment);
   addHubConnectCommand(hub, {
     env: environment.env,
     credentials: environment.credentials,
@@ -92,12 +97,13 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
     daemon: environment.daemon,
     reporter: environment.reporter,
   });
-  addHubProjectsCommand(hub, {
-    env: environment.env,
-    credentials: environment.credentials,
-    hub: environment.hub,
-    reporter: environment.reporter,
-  });
+  if (!isOnboardingEnabled(environment.env))
+    addHubProjectsCommand(hub, {
+      env: environment.env,
+      credentials: environment.credentials,
+      hub: environment.hub,
+      reporter: environment.reporter,
+    });
   addHubExportCommand(hub, {
     env: environment.env,
     credentials: environment.credentials,
@@ -105,13 +111,14 @@ export function createHubCommand(overrides: Partial<HubCommandEnvironment> = {})
     reporter: environment.reporter,
     cwd: environment.cwd,
   });
-  addHubDeployCommand(hub, {
-    env: environment.env,
-    credentials: environment.credentials,
-    hub: environment.hub,
-    reporter: environment.reporter,
-    cwd: environment.cwd,
-  });
+  if (!isOnboardingEnabled(environment.env))
+    addHubDeployCommand(hub, {
+      env: environment.env,
+      credentials: environment.credentials,
+      hub: environment.hub,
+      reporter: environment.reporter,
+      cwd: environment.cwd,
+    });
   addHubLogoutCommand(hub, {
     credentials: environment.credentials,
     daemon: environment.daemon,

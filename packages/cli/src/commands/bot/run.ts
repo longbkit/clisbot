@@ -5,13 +5,26 @@
 // control-plane HTTP, disk) is a `BotStartDeps` function so the orchestration is
 // testable with fakes; `createBotStartDeps` wires the real implementations.
 
+import { ownerBootstrapEnvironment } from "./owner-bootstrap.js";
+import { botRestartCommand } from "./start-output.js";
+import {
+  assertLocalOnboardingAccess,
+  onboardingDaemonListen,
+  recordedDaemonHost,
+  verifyOnboardingDaemon,
+  waitForOnboardingHub,
+} from "./local-runtime.js";
+import {
+  provisionAssistant,
+  findAssistantWorkspace,
+  waitForAssistantProvider,
+  createAssistantWorkspace,
+  createAssistantAgent,
+} from "./assistant-workspace.js";
+import { seedWorkspaceTemplate, type WorkspaceTemplateResult } from "./workspace-template.js";
+import { connectOnboardingDaemon, isOnboardingEnabled } from "./onboarding-client.js";
 import { mkdir } from "node:fs/promises";
-import { BUILTIN_PROVIDER_IDS } from "@getpaseo/protocol/provider-manifest";
-import type {
-  AgentSnapshotPayload,
-  WorkspaceCreateRequest,
-  WorkspaceCreateResponse,
-} from "@getpaseo/protocol/messages";
+import type { WorkspaceCreateRequest } from "@getpaseo/protocol/messages";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { connectToDaemon } from "../../utils/client.js";
 import type { CommandError } from "../../output/index.js";
@@ -78,6 +91,11 @@ export interface BotStartReport {
   channelTransport?: string;
   nextStep: string;
   routeNote: string;
+  ownerReady?: boolean;
+  ownerLinkCommand?: string;
+  ownerLinkExpiresAt?: string;
+  ownerLinkRenewCommand?: string;
+  template?: WorkspaceTemplateResult;
 }
 
 /** Every external boundary the orchestrator touches, injectable for tests. */
@@ -100,12 +118,25 @@ export interface BotStartDeps {
   daemonPassword(home: string): string | undefined;
   openDaemon(host: string | undefined, password?: string): Promise<DaemonClient>;
   closeDaemon(client: DaemonClient): Promise<void>;
+  prepareOnboarding(
+    client: DaemonClient,
+    ownerEmail?: string,
+  ): Promise<{ daemonId: string; ownerEmail: string }>;
+  seedTemplate(
+    directory: string,
+    type: BotStartPlan["botType"],
+    overwrite?: boolean,
+  ): Promise<WorkspaceTemplateResult>;
+  findWorkspace(
+    client: DaemonClient,
+    id: string,
+  ): Promise<{ projectId: string; directory: string } | undefined>;
   providerKnown(client: DaemonClient, provider: string): Promise<boolean>;
   createWorkspace(
     client: DaemonClient,
     source: BotWorkspaceSource,
     title?: string,
-  ): Promise<{ id: string; directory?: string }>;
+  ): Promise<{ id: string; projectId: string; directory?: string }>;
   createIdleAgent(client: DaemonClient, options: BotAgentCreateOptions): Promise<{ id: string }>;
   /** Create the bot's workspace directory on disk (a `directory` source must exist). */
   ensureWorkspaceDir(path: string): Promise<void>;
@@ -126,6 +157,7 @@ export interface BotAgentCreateOptions {
   cwd: string;
   workspaceId: string;
   title: string;
+  assistantName?: string;
 }
 
 /** Run the full `bot start` flow. Pure of transport: all I/O is in `deps`. */
@@ -133,31 +165,193 @@ export async function runBotStart(
   input: BotStartInput,
   deps: BotStartDeps,
 ): Promise<BotStartReport> {
-  const plan = buildBotStartPlan(input.options, input.home);
+  const name = input.options.botName ?? `${input.options.botType ?? "personal"}-assistant`;
+  assertBotName(name);
+  const saved = await deps.readManifest(input.home, name);
+  const options = resumeBotOptions(input.options, saved);
+  const plan = buildBotStartPlan(options, input.home);
   assertBotName(plan.name);
 
-  const existing = await deps.readManifest(input.home, plan.name);
+  const existing = saved;
   const reused = existing !== null && planUnchanged(existing, plan);
 
+  input = { ...input, env: ownerBootstrapEnvironment(options, input.env) };
   const infrastructure = await ensureInfrastructure(input, deps);
-  let ids: { agentId: string; agentTitle: string; workspacePath: string; workspaceId: string };
-  if (reused && existing !== null) {
-    // Same flags as the recorded bot: keep the existing workspace + agent, but
-    // re-install the channel account so the transport is live after a Hub restart.
-    ids = {
-      agentId: existing.agentId,
-      agentTitle: existing.agentTitle,
-      workspacePath: existing.workspacePath,
-      workspaceId: existing.workspaceId,
-    };
-    await installChannelAccount(deps, plan);
-  } else {
-    ids = await createBotBundle(input, deps, plan);
+  const client = await deps.openDaemon(
+    deps.daemonHost(input.home, input.env),
+    deps.daemonPassword(input.home),
+  );
+  try {
+    const ids = await resolveAssistantResources(client, deps, plan, existing, reused, input.env);
+    const template = ids.template;
+    // Keep the local assistant available even if Account setup or Channel installation needs a retry.
+    await writeRecordedManifest(input.home, deps, plan, existing, ids);
+    const onboarding = isOnboardingEnabled(input.env)
+      ? await deps.prepareOnboarding(client, input.options.ownerEmail)
+      : undefined;
+    const installed = await installChannelAccount(
+      deps,
+      plan,
+      onboarding
+        ? channelSetup(
+            plan,
+            ids,
+            onboarding,
+            input.options.ownerIdentity,
+            shouldUpdateRuntime(input.options, reused),
+          )
+        : undefined,
+    );
+    await recordInstalledConnection(input.home, deps, plan, installed, Boolean(onboarding));
+    const channel = await verifyChannelInstalled(deps, plan);
+    return withOnboardingStatus(
+      {
+        ...buildReport(plan, ids, reused, infrastructure, channel),
+        ownerLinkRenewCommand: botRestartCommand(input.home, plan.name, onboarding?.ownerEmail),
+      },
+      installed,
+      template,
+    );
+  } finally {
+    await deps.closeDaemon(client);
   }
+}
 
-  await writeRecordedManifest(input.home, deps, plan, existing, ids);
-  const channel = await verifyChannelInstalled(deps, plan);
-  return buildReport(plan, ids, reused, infrastructure, channel);
+async function resolveAssistantResources(
+  client: DaemonClient,
+  deps: BotStartDeps,
+  plan: BotStartPlan,
+  existing: BotManifest | null,
+  reused: boolean,
+  env: NodeJS.ProcessEnv,
+) {
+  if (!reused || !existing) return provisionAssistant(client, deps, plan, env);
+  const workspace = await deps.findWorkspace(client, existing.workspaceId);
+  if (!workspace)
+    throw new Error(
+      "The bot workspace is missing or archived. Restore it before restarting the bot.",
+    );
+  const template = isOnboardingEnabled(env)
+    ? await deps.seedTemplate(workspace.directory, plan.botType, plan.overwriteTemplate)
+    : undefined;
+  return {
+    ...existing,
+    projectId: workspace.projectId,
+    workspacePath: workspace.directory,
+    template,
+  };
+}
+
+async function recordInstalledConnection(
+  home: string,
+  deps: BotStartDeps,
+  plan: BotStartPlan,
+  installed: ChannelAddResult,
+  onboarding: boolean,
+): Promise<void> {
+  const recorded = await deps.readManifest(home, plan.name);
+  if (!recorded)
+    throw new Error("The onboarding checkpoint disappeared; rerun setup before proceeding.");
+  await deps.writeManifest(home, {
+    ...recorded,
+    ...(installed.connectionId ? { connectionId: installed.connectionId } : {}),
+    credentials: { [`${plan.channel}:${plan.account}`]: { persisted: true } },
+    routeNote: onboarding
+      ? "Member routes are configured for the seeded workspace"
+      : recorded.routeNote,
+  });
+}
+
+function resumeBotOptions(options: BotStartOptions, existing: BotManifest | null): BotStartOptions {
+  if (!existing) return options;
+  const supplied = Object.fromEntries(
+    Object.entries(options).filter(([, value]) => value !== undefined),
+  );
+  const resumed: BotStartOptions = {
+    provider: existing.provider,
+    model: existing.model,
+    mode: existing.mode,
+    botType: existing.botType,
+    botName: existing.name,
+    agentName: existing.agentTitle,
+    workspace: options.workspace ?? options.cwd ?? existing.sourcePath ?? existing.workspacePath,
+    newWorkspace: existing.isolation ?? "local",
+    ...supplied,
+  };
+  if (
+    !options.slackConnectionId &&
+    !options.slackBotToken &&
+    !options.telegramBotToken &&
+    !options.telegramConnectionId &&
+    existing.connectionId
+  ) {
+    if (existing.channel === "slack") {
+      resumed.slackConnectionId = existing.connectionId;
+      resumed.slackAccount = existing.account;
+    } else {
+      resumed.telegramConnectionId = existing.connectionId;
+      resumed.telegramAccount = existing.account;
+    }
+  }
+  return resumed;
+}
+
+function shouldUpdateRuntime(options: BotStartOptions, reused: boolean): boolean {
+  return (
+    !reused ||
+    [
+      options.provider,
+      options.model,
+      options.mode,
+      options.workspace,
+      options.cwd,
+      options.newWorkspace,
+    ].some((value) => value !== undefined)
+  );
+}
+
+function channelSetup(
+  plan: BotStartPlan,
+  ids: { projectId: string; workspacePath: string },
+  onboarding: { daemonId: string; ownerEmail: string },
+  ownerIdentity?: string,
+  update = false,
+): import("../channels/client.js").ChannelSetupInput {
+  return {
+    name: plan.name,
+    update,
+    daemonId: onboarding.daemonId,
+    projectId: ids.projectId,
+    cwd: ids.workspacePath,
+    provider: plan.provider,
+    ...(plan.model ? { model: plan.model } : {}),
+    ...(plan.mode ? { mode: plan.mode } : {}),
+    ownerEmail: onboarding.ownerEmail,
+    ...(ownerIdentity ? { ownerIdentity } : {}),
+  };
+}
+
+function withOnboardingStatus(
+  report: BotStartReport,
+  installed: ChannelAddResult,
+  template?: WorkspaceTemplateResult,
+): BotStartReport {
+  if (!template) return report;
+  let nextStep = "Check bot status; the channel is not ready yet";
+  if (installed.owner?.command)
+    nextStep =
+      "Send the owner linking command to this bot from your channel account, then send your request";
+  if (installed.owner?.ready && report.channelTransport === "started")
+    nextStep = buildNextStep(report.channel);
+  return {
+    ...report,
+    template,
+    nextStep,
+    routeNote: "Member routes are configured for the seeded workspace",
+    ownerReady: installed.owner?.ready === true,
+    ...(installed.owner?.command ? { ownerLinkCommand: installed.owner.command } : {}),
+    ...(installed.owner?.expiresAt ? { ownerLinkExpiresAt: installed.owner.expiresAt } : {}),
+  };
 }
 
 /**
@@ -184,80 +378,62 @@ async function ensureInfrastructure(
   url: string;
   daemonHost: string;
 }> {
+  const daemon = await deps.ensureDaemonUp(input.home, input.env);
+  await deps.waitDaemonUp(input.home);
   const hub = await deps.ensureHubUp(input.home, input.env);
   await deps.waitHubReady(hub.url);
   const hubPid = String(resolveHubPid(input.home) ?? "-");
-  const daemon = await deps.ensureDaemonUp(input.home, input.env);
-  await deps.waitDaemonUp(input.home);
   return {
     hub: hub.hub,
     hubPid,
     daemon: daemon.daemon,
     url: hub.url,
-    daemonHost: daemonHostFor(input.home) ?? "unknown",
+    daemonHost: deps.daemonHost(input.home, input.env) ?? "unknown",
   };
 }
 
-async function createBotBundle(
-  input: BotStartInput,
+async function installChannelAccount(
   deps: BotStartDeps,
   plan: BotStartPlan,
-): Promise<{ agentId: string; agentTitle: string; workspacePath: string; workspaceId: string }> {
-  const host = deps.daemonHost(input.home, input.env);
-  const client = await deps.openDaemon(host, deps.daemonPassword(input.home));
-  try {
-    if (!(await deps.providerKnown(client, plan.provider))) {
-      throw unknownProviderError(plan.provider, input.home);
-    }
-    // A `directory` workspace source must exist on disk (the daemon rejects a
-    // missing path with `directory_not_found`), so create it before requesting.
-    if (plan.isolation !== "worktree") await deps.ensureWorkspaceDir(plan.workspacePath);
-    const workspace = await deps.createWorkspace(client, buildBotWorkspaceSource(plan), plan.name);
-    const agent = await deps.createIdleAgent(client, {
-      provider: plan.provider,
-      ...(plan.model === undefined ? {} : { model: plan.model }),
-      ...(plan.mode === undefined ? {} : { modeId: plan.mode }),
-      cwd: workspace.directory ?? plan.workspacePath,
-      workspaceId: workspace.id,
-      title: plan.agentTitle,
-    });
-    await installChannelAccount(deps, plan);
-    return {
-      agentId: agent.id,
-      agentTitle: plan.agentTitle,
-      workspacePath: plan.workspacePath,
-      workspaceId: workspace.id,
+  setup?: import("../channels/client.js").ChannelSetupInput,
+): Promise<ChannelAddResult> {
+  const credential = plan.credential;
+  if ("connectionId" in credential) {
+    const connection = {
+      account: plan.account,
+      connectionId: credential.connectionId,
+      ...(setup ? { setup } : {}),
     };
-  } finally {
-    await deps.closeDaemon(client);
+    return deps.addChannel(
+      credential.channel === "slack"
+        ? { ...connection, channel: "slack" }
+        : { ...connection, channel: "telegram" },
+    );
   }
+  return deps.addChannel({
+    ...(credential.channel === "slack"
+      ? slackChannelInput(credential, plan.account)
+      : {
+          channel: "telegram" as const,
+          account: plan.account,
+          botToken: resolveTokenSecret(credential.input),
+        }),
+    ...(setup ? { setup } : {}),
+  });
 }
 
-/** Add the channel account, translating the cold-instance 409 into a `hub init` pointer. */
-async function installChannelAccount(deps: BotStartDeps, plan: BotStartPlan): Promise<void> {
-  try {
-    const credential = plan.credential;
-    await deps.addChannel(
-      credential.channel === "slack"
-        ? { channel: "slack", account: plan.account, connectionId: credential.connectionId }
-        : {
-            channel: "telegram",
-            account: plan.account,
-            botToken: resolveTokenSecret(credential.input),
-          },
-    );
-  } catch (error) {
-    if (isNoActiveConfiguration(error)) {
-      const commandError: CommandError = {
-        code: "NO_ACTIVE_CONFIGURATION",
-        message:
-          "The Hub has no active configuration, so the channel account cannot be installed. " +
-          "Run `clisbot hub init` to create and deploy the starter configuration, then re-run this command.",
-      };
-      throw commandError;
-    }
-    throw error;
-  }
+function slackChannelInput(
+  credential: Extract<BotStartPlan["credential"], { channel: "slack" }>,
+  account: string,
+): ChannelAddInput {
+  if ("connectionId" in credential)
+    return { channel: "slack", account, connectionId: credential.connectionId };
+  return {
+    channel: "slack",
+    account,
+    botToken: resolveTokenSecret(credential.botToken),
+    appToken: resolveTokenSecret(credential.appToken),
+  };
 }
 
 async function writeRecordedManifest(
@@ -265,16 +441,29 @@ async function writeRecordedManifest(
   deps: BotStartDeps,
   plan: BotStartPlan,
   existing: BotManifest | null,
-  ids: { agentId: string; agentTitle: string; workspacePath: string; workspaceId: string },
+  ids: {
+    agentId: string;
+    agentTitle: string;
+    workspacePath: string;
+    workspaceId: string;
+    projectId: string;
+  },
 ): Promise<void> {
   const now = new Date();
-  const credentialKey = `${plan.channel}:${plan.account}`;
-  const manifest: BotManifest =
-    existing === null
-      ? buildBotManifest(plan, { workspaceId: ids.workspaceId, agentId: ids.agentId }, now)
-      : { ...existing, updatedAt: now.toISOString() };
+  const manifest: BotManifest = {
+    ...buildBotManifest(plan, { workspaceId: ids.workspaceId, agentId: ids.agentId }, now),
+    workspacePath: ids.workspacePath,
+    projectId: ids.projectId,
+    createdAt: existing?.createdAt ?? now.toISOString(),
+  };
   manifest.routeNote = plan.routeNote;
-  manifest.credentials[credentialKey] = { persisted: true };
+  manifest.credentials = existing?.credentials ?? {};
+  if (
+    existing?.connectionId &&
+    existing.channel === plan.channel &&
+    existing.account === plan.account
+  )
+    manifest.connectionId = existing.connectionId;
   await deps.writeManifest(home, manifest);
 }
 
@@ -314,109 +503,52 @@ function buildReport(
   };
 }
 
-function buildBotWorkspaceSource(plan: BotStartPlan): BotWorkspaceSource {
-  if (plan.isolation === "worktree") {
-    return { kind: "worktree", cwd: plan.workspacePath };
-  }
-  return { kind: "directory", path: plan.workspacePath };
-}
-
 function buildNextStep(channel: "slack" | "telegram"): string {
   return channel === "slack"
-    ? "mention the bot in your Slack channel"
-    : "message the bot in its Telegram group";
-}
-
-function unknownProviderError(provider: string, home: string): CommandError {
-  const builtins = BUILTIN_PROVIDER_IDS.join(", ");
-  return {
-    code: "UNKNOWN_PROVIDER",
-    message: `Provider "${provider}" is not registered on the daemon.`,
-    details:
-      `Built-in providers are: ${builtins}. To add a custom ACP provider, register it in ` +
-      `${home}/config.json under "agents.providers", for example:\n\n` +
-      `{\n  "agents": {\n    "providers": {\n` +
-      `      "${provider}": { "extends": "acp", "command": ["<binary>", "<acp-subcommand>"] }\n` +
-      `    }\n  }\n}\n\n` +
-      "See docs/custom-providers.md for the full shape.",
-  };
-}
-
-/**
- * True when a Hub error is the cold-instance 409 from `loadChannelControlPlane`
- * (no active configuration). It surfaces two ways: a conforming problem body
- * ("Control plane unavailable: the default project has no active configuration")
- * or a plain "… with HTTP 409."
- */
-export function isNoActiveConfiguration(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const candidate = error as { code?: unknown; message?: unknown };
-  if (candidate.code !== "HUB_REQUEST_FAILED") return false;
-  const message = typeof candidate.message === "string" ? candidate.message : "";
-  return (
-    /no active configuration/i.test(message) ||
-    /no_active_configuration/.test(message) ||
-    /HTTP 409/.test(message)
-  );
+    ? "DM the bot, or mention it in your Slack channel"
+    : "DM the bot, or mention it in your Telegram group";
 }
 
 /** The real boundary implementations, wired to the shared home + env. */
 export function createBotStartDeps(home: string, env: NodeJS.ProcessEnv): BotStartDeps {
   return {
-    ensureHubUp: async () => {
+    ensureHubUp: async (_home, childEnv) => {
       const state = resolveLocalHubState({ home }, env);
       if (state.running) {
         return { hub: "already-running", url: state.state?.url ?? "" };
       }
-      const started = await startLocalHubDetached({ home });
+      const started = await startLocalHubDetached({ home }, undefined, childEnv);
       return { hub: "started", url: started.url };
     },
-    waitHubReady: (url) => waitHubReady(url),
+    waitHubReady: (url) => waitForOnboardingHub(url, home),
     ensureDaemonUp: async () => {
+      if (isOnboardingEnabled(env)) assertLocalOnboardingAccess(home, env);
       const state = resolveLocalDaemonState({ home });
       if (state.running) return { daemon: "already-running" };
-      await startLocalDaemonDetached({ home });
+      const listen = isOnboardingEnabled(env) ? await onboardingDaemonListen(home, env) : undefined;
+      await startLocalDaemonDetached({ home, ...(listen ? { listen } : {}) });
       return { daemon: "started" };
     },
     waitDaemonUp: () => waitDaemonUp(home),
     daemonHost: () => daemonHostFor(home),
     daemonPassword: () => readDaemonPasswordFile(home),
-    openDaemon: (host, password) => openDaemonWithRetry(host, password),
+    openDaemon: (host, password) => openVerifiedDaemon(home, host, password),
     closeDaemon: (client) => client.close().catch(() => undefined),
-    providerKnown: async (client, provider) => {
-      const known = new Set<string>(BUILTIN_PROVIDER_IDS);
-      try {
-        const snapshot = await client.getProvidersSnapshot();
-        for (const entry of snapshot.entries) known.add(entry.provider);
-      } catch {
-        // Snapshot unavailable — fall back to the built-in set only.
-      }
-      return known.has(provider);
+    prepareOnboarding: (client, email) =>
+      connectOnboardingDaemon(localControlPlaneTarget(home, env), client, email),
+    seedTemplate: seedWorkspaceTemplate,
+    findWorkspace: async (client, id) => {
+      const workspace = await findAssistantWorkspace(client, (entry) => entry.id === id);
+      return workspace
+        ? {
+            projectId: workspace.projectId,
+            directory: workspace.workspaceDirectory ?? workspace.projectRootPath,
+          }
+        : undefined;
     },
-    createWorkspace: async (client, source, title) => {
-      const payload: WorkspaceCreateResponse["payload"] = await client.createWorkspace({
-        source: source as Parameters<DaemonClient["createWorkspace"]>[0]["source"],
-        ...(title === undefined ? {} : { title }),
-      });
-      if (!payload.workspace) {
-        throw {
-          code: "WORKSPACE_CREATE_FAILED",
-          message: payload.error ?? "Workspace creation failed",
-        } satisfies CommandError;
-      }
-      return { id: payload.workspace.id, directory: payload.workspace.workspaceDirectory };
-    },
-    createIdleAgent: async (client, options) => {
-      const agent: AgentSnapshotPayload = await client.createAgent({
-        provider: options.provider,
-        ...(options.model === undefined ? {} : { model: options.model }),
-        ...(options.modeId === undefined ? {} : { modeId: options.modeId }),
-        cwd: options.cwd,
-        workspaceId: options.workspaceId,
-        title: options.title,
-      });
-      return { id: agent.id };
-    },
+    providerKnown: waitForAssistantProvider,
+    createWorkspace: createAssistantWorkspace,
+    createIdleAgent: createAssistantAgent,
     ensureWorkspaceDir: async (workspacePath) => {
       await mkdir(workspacePath, { recursive: true });
     },
@@ -437,7 +569,7 @@ function resolveHubPid(home: string): number | null {
 }
 
 function daemonHostFor(home: string): string | undefined {
-  const listen = resolveLocalDaemonState({ home }).listen;
+  const listen = recordedDaemonHost(home);
   const tcp = resolveTcpHostFromListen(listen);
   if (tcp !== null) return tcp;
   if (listen.startsWith("/") || listen.startsWith("unix://")) return listen;
@@ -456,11 +588,12 @@ const DAEMON_READY_POLL_MS = 250;
 async function waitDaemonUp(home: string): Promise<void> {
   const deadline = Date.now() + DAEMON_READY_TIMEOUT_MS;
   while (true) {
-    if (resolveLocalDaemonState({ home }).running) return;
+    const state = resolveLocalDaemonState({ home });
+    if (state.running && state.pidInfo?.listen) return;
     if (Date.now() >= deadline) {
       throw {
         code: "DAEMON_NOT_READY",
-        message: "The daemon started but did not record its pid file in time.",
+        message: `The daemon did not record a ready listener. Check ${home}/daemon.log for startup or port conflicts.`,
       } satisfies CommandError;
     }
     await sleep(DAEMON_READY_POLL_MS);
@@ -474,6 +607,12 @@ async function waitDaemonUp(home: string): Promise<void> {
  * the first socket. `password` (the dev home's `.daemon-password`) authenticates
  * a password-protected local daemon at the WS upgrade.
  */
+async function openVerifiedDaemon(home: string, host: string | undefined, password?: string) {
+  const client = await openDaemonWithRetry(host, password);
+  await verifyOnboardingDaemon(client, home);
+  return client;
+}
+
 async function openDaemonWithRetry(
   host: string | undefined,
   password?: string,
@@ -503,34 +642,6 @@ function daemonHostWithPassword(host: string | undefined, password?: string): st
   if (host.startsWith("/") || host.startsWith("unix://") || host.startsWith("pipe://")) return host;
   const bare = host.startsWith("tcp://") ? host.slice("tcp://".length) : host;
   return `tcp://${bare}?password=${encodeURIComponent(password)}`;
-}
-
-const HUB_READY_TIMEOUT_MS = 20_000;
-const HUB_READY_POLL_MS = 250;
-
-/** Poll the embedded Hub's /health until it accepts requests (bounded). */
-async function waitHubReady(url: string): Promise<void> {
-  if (url.length === 0) return;
-  const deadline = Date.now() + HUB_READY_TIMEOUT_MS;
-  while (true) {
-    if (await hubHealthOk(url)) return;
-    if (Date.now() >= deadline) {
-      throw {
-        code: "HUB_NOT_READY",
-        message: "The Hub started but did not become ready in time.",
-      } satisfies CommandError;
-    }
-    await sleep(HUB_READY_POLL_MS);
-  }
-}
-
-async function hubHealthOk(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${url}/health`, { signal: AbortSignal.timeout(500) });
-    return response.ok;
-  } catch {
-    return false;
-  }
 }
 
 function sleep(ms: number): Promise<void> {

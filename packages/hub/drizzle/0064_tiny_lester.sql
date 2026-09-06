@@ -1,0 +1,2 @@
+ALTER TABLE "organization_triggers" DROP CONSTRAINT "organization_triggers_format_check";--> statement-breakpoint
+ALTER TABLE "organization_triggers" ADD CONSTRAINT "organization_triggers_format_check" CHECK ("organization_triggers"."format" in ('single_run', 'workflow', 'legacy_multistep'));

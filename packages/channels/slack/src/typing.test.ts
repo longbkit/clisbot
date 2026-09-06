@@ -3,7 +3,7 @@
 // set-once / clear-once dedupe and the idempotent reaction outcomes are
 // asserted on the actual wire args.
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { registerSlackWriteClientForTest, type WebClient } from "./client/web-api.js";
 import {
   clearSlackTypingScopeWarningsForTest,
@@ -12,8 +12,11 @@ import {
   slackTyping,
   SLACK_TYPING_LOADING_MESSAGES,
   SLACK_TYPING_STATUS,
+  SLACK_TYPING_REFRESH_MS,
   type SlackTypingArgs,
 } from "./typing.js";
+
+import { sendSlackText } from "./outbound.js";
 
 const CFG = {
   channels: { slack: { accounts: { work: { botToken: "xoxb-test-typing" } } } },
@@ -230,4 +233,147 @@ describe("slackErrorCode", () => {
     expect(slackErrorCode("nope")).toBe("");
     expect(slackErrorCode(null)).toBe("");
   });
+});
+
+afterEach(() => {
+  clearSlackTypingSurfacesForTest();
+  vi.useRealTimers();
+});
+
+function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+function postText(text: string) {
+  return sendSlackText({ cfg: CFG, accountId: "work", to: "C1", threadId: "1700.0001", text });
+}
+
+it("restores status after interim text, refreshes long turns, and leaves terminal posts clear", async () => {
+  vi.useFakeTimers();
+  const calls = install();
+  await slackTyping(typingArgs());
+  await postText("Still researching");
+  expect(calls.status.map((call) => call["status"])).toEqual([
+    SLACK_TYPING_STATUS,
+    SLACK_TYPING_STATUS,
+  ]);
+  await vi.advanceTimersByTimeAsync(SLACK_TYPING_REFRESH_MS * 3);
+  expect(calls.status).toHaveLength(5);
+  await slackTyping(typingArgs({ action: "stop" }));
+  await postText("Final answer");
+  await vi.advanceTimersByTimeAsync(SLACK_TYPING_REFRESH_MS * 3);
+  expect(calls.status.map((call) => call["status"])).toEqual([
+    ...Array(5).fill(SLACK_TYPING_STATUS),
+    "",
+  ]);
+});
+
+it("queues post-send restoration behind an in-flight periodic refresh", async () => {
+  vi.useFakeTimers();
+  const calls: Calls = { status: [], add: [], remove: [] };
+  const client = fakeClient(calls);
+  const pending = deferred();
+  client.assistant.threads.setStatus = async (args) => {
+    calls.status.push(args);
+    if (calls.status.length === 2) await pending.promise;
+    return { ok: true } as never;
+  };
+  registerSlackWriteClientForTest("xoxb-test-typing", client);
+  await slackTyping(typingArgs());
+  await vi.advanceTimersByTimeAsync(SLACK_TYPING_REFRESH_MS);
+  const post = postText("Interim reply clears Slack status");
+  pending.resolve();
+  await post;
+  expect(calls.status).toHaveLength(3);
+});
+
+it("clears a delayed start before opening a replacement turn, without adding a stale reaction", async () => {
+  const calls: Calls = { status: [], add: [], remove: [] };
+  const client = fakeClient(calls);
+  const pending = deferred();
+  client.assistant.threads.setStatus = async (args) => {
+    calls.status.push(args);
+    if (calls.status.length === 1) await pending.promise;
+    return { ok: true } as never;
+  };
+  registerSlackWriteClientForTest("xoxb-test-typing", client);
+  const args = typingArgs({ reactionEmoji: "eyes" });
+  const opening = slackTyping(args);
+  await vi.waitFor(() => expect(calls.status).toHaveLength(1));
+  const closing = slackTyping({ ...args, action: "stop" });
+  const replacement = slackTyping(args);
+  pending.resolve();
+  await Promise.all([opening, closing, replacement]);
+  expect(calls.status.map((call) => call["status"])).toEqual([
+    SLACK_TYPING_STATUS,
+    "",
+    SLACK_TYPING_STATUS,
+  ]);
+  expect(calls.add).toHaveLength(1);
+  await slackTyping({ ...args, action: "stop" });
+  expect(calls.remove).toHaveLength(1);
+});
+
+it("does not clear a replacement status when an older reaction fails late", async () => {
+  const calls: Calls = { status: [], add: [], remove: [] };
+  const client = fakeClient(calls);
+  const pending = deferred();
+  client.reactions.add = async (args) => {
+    calls.add.push(args);
+    if (calls.add.length === 1) await pending.promise;
+    return { ok: true } as never;
+  };
+  registerSlackWriteClientForTest("xoxb-test-typing", client);
+  const args = typingArgs({ reactionEmoji: "eyes" });
+  const opening = slackTyping(args);
+  const rejected = expect(opening).rejects.toThrow("old reaction failed");
+  await vi.waitFor(() => expect(calls.add).toHaveLength(1));
+  const closing = slackTyping({ ...args, action: "stop" });
+  const replacement = slackTyping(args);
+  pending.reject(new Error("old reaction failed"));
+  await Promise.all([rejected, closing, replacement]);
+  expect(calls.status.map((call) => call["status"])).toEqual([
+    SLACK_TYPING_STATUS,
+    "",
+    SLACK_TYPING_STATUS,
+  ]);
+  expect(calls.add).toHaveLength(2);
+});
+
+it("stops refreshes on provider rejection without failing an already delivered post", async () => {
+  vi.useFakeTimers();
+  const failures: { status?: unknown } = {};
+  const calls = install(failures);
+  await slackTyping(typingArgs());
+  failures.status = { data: { error: "ratelimited" } };
+  await expect(postText("Delivered text")).resolves.toBeDefined();
+  expect(calls.status).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(SLACK_TYPING_REFRESH_MS * 3);
+  expect(calls.status).toHaveLength(2);
+});
+
+it("removes a reaction whose add was still in flight when the turn stopped", async () => {
+  const calls: Calls = { status: [], add: [], remove: [] };
+  const client = fakeClient(calls);
+  const pending = deferred();
+  client.reactions.add = async (args) => {
+    calls.add.push(args);
+    await pending.promise;
+    return { ok: true } as never;
+  };
+  registerSlackWriteClientForTest("xoxb-test-typing", client);
+  const args = typingArgs({ indicator: false, reactionEmoji: "eyes" });
+  const opening = slackTyping(args);
+  await vi.waitFor(() => expect(calls.add).toHaveLength(1));
+  const closing = slackTyping({ ...args, action: "stop" });
+  expect(calls.remove).toHaveLength(0);
+  pending.resolve();
+  await Promise.all([opening, closing]);
+  expect(calls.remove).toHaveLength(1);
 });

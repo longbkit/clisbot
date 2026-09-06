@@ -13,6 +13,7 @@ export const ACCESS_PRIVILEGES = [
   "daemon.connect",
   "daemon.manage",
   "project.use",
+  "workspace.create",
   "agent.interact",
   "agent.create",
   "agent.fast.use",
@@ -150,6 +151,7 @@ export const RESOURCE_ACCESS_LEVELS = {
     office_worker: ["project.use", "agent.interact", "agent.create", "approval.file"],
     developer: [
       "project.use",
+      "workspace.create",
       "agent.interact",
       "agent.create",
       "terminal.use",
@@ -159,6 +161,7 @@ export const RESOURCE_ACCESS_LEVELS = {
     ],
     full_access: [
       "project.use",
+      "workspace.create",
       "agent.interact",
       "agent.create",
       "terminal.use",

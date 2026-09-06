@@ -1,10 +1,12 @@
+import { isOnboardingEnabled } from "../bot/onboarding-client.js";
+import { selectLocalPort } from "./local-port.js";
 // COMPAT(clisbot-hub-local): local lifecycle + discovery for the fork's embedded
 // Hub. `hub start` spawns the `@getpaseo/hub` bin detached (default loopback :6868,
 // the fork default distinct from upstream's :3000) and records url + pid in
 // `hub-local.json` under the shared Clisbot home ($CLISBOT_HOME, default ~/.clisbot);
 // the `channels`/`users` verbs read that file to reach the control plane without
 // `CLISBOT_HUB_URL`/`CLISBOT_HUB_API_KEY` to set. `hub stop` signals the recorded
-// owner pid and removes the state file. Mirrors the daemon's `local-daemon.ts`
+// owner pid and retains the selected port for restart. Mirrors the daemon's `local-daemon.ts`
 // pattern applied to the Hub's exported bin entry (implementation doc §2 step 3, §3.2).
 
 import { randomBytes } from "node:crypto";
@@ -64,6 +66,8 @@ export interface HubStateRecord {
   port: number;
   pid: number;
   startedAt?: string;
+  instanceId?: string;
+  stoppedAt?: string;
 }
 
 export interface LocalHubState {
@@ -107,6 +111,7 @@ export interface LocalHubStatus {
 export interface HubLocalProcess extends Pick<ChildProcess, "once" | "pid" | "unref"> {}
 
 export interface HubLaunchRuntime {
+  selectPort?(preferred: number, allowFallback: boolean): Promise<number>;
   resolveHubBin(): string;
   spawnDetached(
     command: string,
@@ -130,6 +135,7 @@ interface ProcessExitDetails {
 type DetachedStartupResult = { exitedEarly: false } | ({ exitedEarly: true } & ProcessExitDetails);
 
 const defaultHubLaunchRuntime: HubLaunchRuntime = {
+  selectPort: selectLocalPort,
   resolveHubBin: resolveHubBin,
   spawnDetached: spawnProcess,
   spawnForeground: (command, args, options) => spawnSync(command, args, options),
@@ -150,10 +156,14 @@ export function resolveLocalHubHome(
   options: { home?: string } = {},
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  if (isSet(options.home)) return options.home;
-  if (isSet(env.CLISBOT_HOME)) return env.CLISBOT_HOME;
-  if (isSet(env.PASEO_HOME)) return env.PASEO_HOME;
-  return path.join(os.homedir(), FORK_DEFAULT_HOME_DIRECTORY_NAME);
+  const selected =
+    options.home?.trim() ||
+    env.CLISBOT_HOME?.trim() ||
+    env.PASEO_HOME?.trim() ||
+    path.join(os.homedir(), FORK_DEFAULT_HOME_DIRECTORY_NAME);
+  const expanded =
+    selected === "~" ? os.homedir() : selected.replace(/^~[\\/]/, `${os.homedir()}${path.sep}`);
+  return path.resolve(expanded);
 }
 
 export function hubStatePath(home: string): string {
@@ -186,6 +196,8 @@ export function readHubStateFile(home: string): HubStateRecord | null {
       port,
       pid,
       startedAt,
+      ...(typeof parsed.instanceId === "string" ? { instanceId: parsed.instanceId } : {}),
+      ...(typeof parsed.stoppedAt === "string" ? { stoppedAt: parsed.stoppedAt } : {}),
     };
   } catch {
     return null;
@@ -305,14 +317,14 @@ export function resolveLocalHubState(
 ): LocalHubState {
   const home = resolveLocalHubHome(options, env);
   const state = readHubStateFile(home);
-  const running = state !== null && isProcessRunning(state.pid);
+  const running = state !== null && !state.stoppedAt && isProcessRunning(state.pid);
   return {
     home,
     statePath: hubStatePath(home),
     logPath: path.join(home, HUB_LOG_FILENAME),
     state,
     running,
-    staleStateFile: state !== null && !running,
+    staleStateFile: state !== null && !state.stoppedAt && !running,
   };
 }
 
@@ -388,13 +400,34 @@ export function readOrCreateLocalHubMasterKey(home: string, hubDataDirectory = h
   }
 }
 
-function buildChildEnv(home: string, port: number): NodeJS.ProcessEnv {
+function buildChildEnv(
+  home: string,
+  port: number,
+  inherited: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...inherited,
+    CLISBOT_HOME: home,
     PORT: String(port),
     PASEO_HUB_BIND: FORK_HUB_BIND,
+    PASEO_HUB_APP_URL: inherited.PASEO_HUB_APP_URL?.trim() || `http://${FORK_HUB_BIND}:${port}`,
     PASEO_HOME: home,
   };
+  // A token reference for CLI onboarding is not an environment-managed Application.
+  // Preserve explicit legacy Application configuration, but keep bare input tokens local to the CLI.
+  if (
+    isOnboardingEnabled(env) &&
+    ![
+      env.SLACK_TRANSPORT,
+      env.SLACK_APP_ID,
+      env.SLACK_CLIENT_ID,
+      env.SLACK_CLIENT_SECRET,
+      env.SLACK_SIGNING_SECRET,
+    ].some(isSet)
+  ) {
+    delete env.SLACK_APP_TOKEN;
+    delete env.SLACK_BOT_TOKEN;
+  }
   if (
     !isSet(env.PASEO_HUB_CREDENTIAL_MASTER_KEY) &&
     !isSet(env.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE) &&
@@ -436,21 +469,20 @@ export function readDaemonPasswordFile(home: string): string | undefined {
 export async function startLocalHubDetached(
   options: HubStartOptions = {},
   runtime: HubLaunchRuntime = defaultHubLaunchRuntime,
+  environment: NodeJS.ProcessEnv = process.env,
 ): Promise<DetachedStartResult> {
-  const home = resolveLocalHubHome(options);
-  const port = resolveHubPort(options);
-  const url = hubUrlFor(port);
-  const existing = readHubStateFile(home);
-  if (existing !== null && isProcessRunning(existing.pid)) {
-    throw new AlreadyRunningError(existing.url, existing.pid);
-  }
+  const { home, port, url, instanceId } = await prepareLocalHubLaunch(
+    options,
+    runtime,
+    environment,
+  );
   // The detached Hub's stdout/stderr land in `hub.log` (the path this command
   // reports and reads on failure); discarding them left the log empty.
   const logFd = fs.openSync(path.join(home, HUB_LOG_FILENAME), "a");
   const child = runtime.spawnDetached(process.execPath, [runtime.resolveHubBin()], {
     detached: true,
     envMode: "internal",
-    env: buildChildEnv(home, port),
+    env: buildChildEnv(home, port, { ...environment, CLISBOT_HUB_INSTANCE_ID: instanceId }),
     stdio: ["ignore", logFd, logFd],
   });
   child.unref();
@@ -477,8 +509,30 @@ export async function startLocalHubDetached(
     port,
     pid: child.pid ?? 0,
     startedAt: new Date().toISOString(),
+    ...(instanceId ? { instanceId } : {}),
   });
   return { pid: child.pid ?? null, logPath: path.join(home, HUB_LOG_FILENAME), url };
+}
+
+async function prepareLocalHubLaunch(
+  options: HubStartOptions,
+  runtime: HubLaunchRuntime,
+  environment: NodeJS.ProcessEnv,
+) {
+  const home = resolveLocalHubHome(options);
+  const existing = readHubStateFile(home);
+  if (existing !== null && !existing.stoppedAt && isProcessRunning(existing.pid)) {
+    throw new AlreadyRunningError(existing.url, existing.pid);
+  }
+  const preferred = resolveHubPort({ port: options.port ?? existing?.port.toString() });
+  const enabled = isOnboardingEnabled(environment);
+  const port =
+    enabled && runtime.selectPort
+      ? await runtime.selectPort(preferred, options.port === undefined && !existing?.instanceId)
+      : preferred;
+  const url = hubUrlFor(port);
+  const instanceId = enabled ? randomBytes(16).toString("hex") : undefined;
+  return { home, port, url, instanceId };
 }
 
 export function startLocalHubForeground(
@@ -511,15 +565,13 @@ export async function getLocalHubStatus(
 }
 
 export async function stopLocalHub(options: StopLocalHubOptions = {}): Promise<StopLocalHubResult> {
-  const timeoutMs = options.timeoutMs ?? DEFAULT_STOP_TIMEOUT_MS;
-  const killTimeoutMs = options.killTimeoutMs ?? DEFAULT_KILL_TIMEOUT_MS;
   const state = resolveLocalHubState({ home: options.home });
   const pid = state.state?.pid ?? null;
 
-  if (pid === null || !isProcessRunning(pid)) {
+  if (pid === null || !state.running) {
     const staleSuffix =
       state.staleStateFile && state.state ? ` (stale state file for ${state.state.pid})` : "";
-    removeHubStateFile(state.home);
+    recordHubStopped(state);
     return {
       action: "not_running",
       home: state.home,
@@ -532,7 +584,7 @@ export async function stopLocalHub(options: StopLocalHubOptions = {}): Promise<S
 
   const signaled = signalProcess(pid, "SIGTERM");
   if (!signaled) {
-    removeHubStateFile(state.home);
+    recordHubStopped(state);
     return {
       action: "not_running",
       home: state.home,
@@ -543,19 +595,8 @@ export async function stopLocalHub(options: StopLocalHubOptions = {}): Promise<S
     };
   }
 
-  let stopped = await waitForPidExit(pid, timeoutMs);
-  let forced = false;
-  if (!stopped && options.force === true) {
-    signalProcess(pid, "SIGKILL");
-    stopped = await waitForPidExit(pid, killTimeoutMs);
-    forced = true;
-  }
-  if (!stopped) {
-    throw new Error(
-      `Timed out waiting for Hub PID ${pid} to stop after ${Math.ceil(timeoutMs / 1000)}s`,
-    );
-  }
-  removeHubStateFile(state.home);
+  const forced = await waitForHubStop(pid, options);
+  recordHubStopped(state);
   return {
     action: "stopped",
     home: state.home,
@@ -564,4 +605,24 @@ export async function stopLocalHub(options: StopLocalHubOptions = {}): Promise<S
     reason: forced ? "owner_pid_sigkill" : "owner_pid_signal",
     message: forced ? "Hub owner process was force-stopped" : "Hub stopped via owner PID signal",
   };
+}
+
+async function waitForHubStop(pid: number, options: StopLocalHubOptions): Promise<boolean> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_STOP_TIMEOUT_MS;
+  if (await waitForPidExit(pid, timeoutMs)) return false;
+  if (options.force === true) {
+    signalProcess(pid, "SIGKILL");
+    if (await waitForPidExit(pid, options.killTimeoutMs ?? DEFAULT_KILL_TIMEOUT_MS)) return true;
+  }
+  throw new Error(
+    `Timed out waiting for Hub PID ${pid} to stop after ${Math.ceil(timeoutMs / 1000)}s`,
+  );
+}
+
+function recordHubStopped(local: LocalHubState): void {
+  if (local.state?.instanceId) {
+    writeHubStateFile(local.home, { ...local.state, stoppedAt: new Date().toISOString() });
+  } else {
+    removeHubStateFile(local.home);
+  }
 }

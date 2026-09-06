@@ -29,6 +29,30 @@ the titlebar row. Production builds leave the variable unset and show no label.
 
 `npm run dev` is only a shorthand for `npm run dev:server`. Keep `127.0.0.1:6767` for the packaged app and production-style `~/.paseo` state.
 
+For the unified Clisbot Web App, Hub, and daemon, use one command:
+
+```bash
+npm run dev:clisbot -- https://your-host.example:8444
+```
+
+The runner uses `~/.clisbot-dev-01` for daemon state, `~/.clisbot-dev-01/hub` for the embedded Hub database, and a persistent `~/.clisbot-dev-01.key` for credential encryption. It ignores ambient production `PASEO_HOME` and `DATABASE_URL` values, starts the daemon source on `6768`, Hub on `6868`, and Expo Web on `8081`, then prints `Ready` only after the daemon and Hub respond, the daemon WebSocket rejects an unauthenticated upgrade with 401, and Metro finishes the first Web bundle. Override the root only with an absolute `CLISBOT_DEV_HOME`.
+
+The Hub Vite plugin forwards `/api/daemons/socket` upgrades through the same TanStack SSR entry and
+application runtime as HTTP. Without this adapter, HTTP pages can work while enrolled daemons stay
+offline with `Opening handshake has timed out`. Keep WebSocket upgrades enabled on the `/api` proxy.
+Diagnose the dev daemon with `paseo hub status --host localhost:6768 --json`. A registered Host appears
+in the app's Host list after its daemon publishes connection details; registration alone does not
+provide a usable connection. Account and Configuration explain recovery when those details are missing.
+
+The external origin must proxy `/` to Expo on `8081`, and `/api`, `/mcp`, `/agent-executions`, and `/health` to Hub on `6868`, preserving those prefixes. `/mcp` serves Channel reply tools and `/agent-executions` serves Workflow tools and attachments, including Agents on another Host; routing it to Expo returns HTML instead of the tool protocol. For an existing Tailscale dev endpoint, add the tool routes once:
+
+```bash
+tailscale serve --bg --https=8444 --set-path=/mcp http://127.0.0.1:6868/mcp
+tailscale serve --bg --https=8444 --set-path=/agent-executions http://127.0.0.1:6868/agent-executions
+```
+
+Cold Metro builds can take up to 15 minutes before readiness times out. If a service exits during startup or you stop the stack, pending readiness requests are cancelled so the command exits promptly.
+
 ## Nix desktop package
 
 The flake exposes `packages.<system>.desktop` on Linux and macOS:

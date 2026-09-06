@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { getPaseoWorktreesRoot } from "../../utils/worktree.js";
 import { mkdtemp, mkdir, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -811,5 +813,128 @@ describe("ManagedResourceAuthorizer", () => {
         stripAnsi: true,
       }),
     ).resolves.toBe(false);
+  });
+});
+
+describe("managed workspace.create", () => {
+  it("requires the leaf and an explicit existing Project with an exact owned source root", async () => {
+    const authorizer = createHarness(["project.use", "workspace.create"]);
+    for (const source of [
+      { kind: "directory" as const, projectId: "project-a", path: "/work/a" },
+      { kind: "worktree" as const, projectId: "project-a" },
+      { kind: "worktree" as const, projectId: "project-a", cwd: "/work/a" },
+    ]) {
+      await expect(
+        authorizer.allowsInbound({
+          type: "workspace.create.request",
+          requestId: "allowed",
+          source,
+        }),
+      ).resolves.toBe(true);
+    }
+    for (const source of [
+      { kind: "directory" as const, path: "/work/a" },
+      { kind: "directory" as const, projectId: "new-project", path: "/work/a" },
+      { kind: "directory" as const, projectId: "project-b", path: "/work/b" },
+      { kind: "directory" as const, projectId: "project-a", path: "/work/b" },
+      { kind: "directory" as const, projectId: "project-a", path: "/work/a/child" },
+      { kind: "worktree" as const, projectId: "project-b" },
+      { kind: "worktree" as const, projectId: "project-a", cwd: "/work/b" },
+      { kind: "worktree" as const, cwd: "/work/a" },
+    ]) {
+      await expect(
+        authorizer.allowsInbound({
+          type: "workspace.create.request",
+          requestId: "denied",
+          source,
+        }),
+      ).resolves.toBe(false);
+    }
+    await expect(
+      createHarness(["project.use", "agent.create"]).allowsInbound({
+        type: "workspace.create.request",
+        requestId: "old-grant",
+        source: { kind: "directory", projectId: "project-a", path: "/work/a" },
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("rejects symlink source and generated-destination escapes while allowing the normal worktree root", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "managed-workspace-create-"));
+    const projectA = path.join(root, "project-a");
+    const projectB = path.join(root, "project-b");
+    const paseoHome = path.join(root, "paseo");
+    await Promise.all([mkdir(projectA), mkdir(projectB), mkdir(paseoHome)]);
+    execFileSync("git", ["init", "-b", "main"], { cwd: projectA, stdio: "pipe" });
+    const link = path.join(projectA, "foreign-link");
+    await symlink(projectB, link, process.platform === "win32" ? "junction" : "dir");
+    const authorizer = createHarness(["project.use", "workspace.create"], {
+      projectA,
+      projectB,
+    });
+    try {
+      await expect(
+        authorizer.allowsInbound({
+          type: "workspace.create.request",
+          requestId: "symlink",
+          source: { kind: "directory", projectId: "project-a", path: link },
+        }),
+      ).resolves.toBe(false);
+      await expect(authorizer.allowsWorktreeDestination(projectA, paseoHome)).resolves.toBe(true);
+      const destination = await getPaseoWorktreesRoot(projectA, paseoHome);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await symlink(projectB, destination, process.platform === "win32" ? "junction" : "dir");
+      await expect(authorizer.allowsWorktreeDestination(projectA, paseoHome)).resolves.toBe(false);
+    } finally {
+      authorizer.dispose();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("managed resource denial explanations", () => {
+  it("explains terminal permission denial inside a visible project", async () => {
+    const authorizer = createHarness(["project.use", "agent.interact"]);
+    const message = {
+      type: "create_terminal_request" as const,
+      requestId: "denied",
+      workspaceId: "workspace-a",
+      cwd: "/work/a",
+    };
+    await expect(authorizer.allowsInbound(message)).resolves.toBe(false);
+    await expect(authorizer.denialCode(message)).resolves.toBe("access_denied");
+    await expect(
+      authorizer.denialCode({
+        type: "capture_terminal_request",
+        requestId: "capture",
+        terminalId: "terminal-a",
+      }),
+    ).resolves.toBe("access_denied");
+  });
+  it.each(["workspace-b", "missing-workspace"])(
+    "does not disclose foreign or missing target %s",
+    async (workspaceId) => {
+      const authorizer = createHarness(["project.use"]);
+      await expect(
+        authorizer.denialCode({
+          type: "create_terminal_request",
+          requestId: "denied",
+          workspaceId,
+          cwd: "/work/a",
+        }),
+      ).resolves.toBe("resource_not_found");
+    },
+  );
+  it("keeps unknown and foreign terminal IDs indistinguishable", async () => {
+    const authorizer = createHarness(["project.use"]);
+    for (const terminalId of ["terminal-b", "missing-terminal"]) {
+      await expect(
+        authorizer.denialCode({
+          type: "capture_terminal_request",
+          requestId: "capture",
+          terminalId,
+        }),
+      ).resolves.toBe("resource_not_found");
+    }
   });
 });

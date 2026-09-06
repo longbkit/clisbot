@@ -12,6 +12,7 @@ import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
+import { hubResourceQueryKey } from "../query-keys";
 
 const API_KEY_SCOPES = [
   "projects:read",
@@ -74,10 +75,11 @@ const SCOPE_DETAILS: Record<ApiKeyScope, { label: string; description: string }>
 export function ApiKeySettings() {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
+  const accountId = hub.signedIn?.account.id ?? null;
   const query = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "api-keys"],
+    queryKey: hubResourceQueryKey({ origin: hub.origin, organizationId, accountId }, "api-keys"),
     queryFn: () => hub.api().getAuth("api-keys", ApiKeysSchema),
-    dataShape: "list",
+    dataShape: "value",
     enabled: organizationId.length > 0 && hub.signedIn?.capabilities.manageResources === true,
     retry: false,
     staleTimeMs: 0,

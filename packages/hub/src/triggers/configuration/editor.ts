@@ -128,7 +128,7 @@ export function patchTriggerYaml(yaml: string, value: TriggerFormValue): string 
   const agent = splitAgentId(value.agent);
   setIfChanged(document, ["run", "agent", "provider"], agent.provider);
   setOptional(document, ["run", "agent", "model"], agent.model);
-  setIfChanged(document, ["run", "agent", "mode"], value.mode.trim());
+  setOptional(document, ["run", "agent", "mode"], blankToUndefined(value.mode));
   setOptional(
     document,
     ["run", "agent", "thinkingOptionId"],
@@ -168,7 +168,7 @@ export function createTriggerYaml(value: TriggerFormValue): string {
         agent: {
           provider: agent.provider,
           ...(agent.model === undefined ? {} : { model: agent.model }),
-          mode: value.mode.trim(),
+          ...(value.mode.trim() ? { mode: value.mode.trim() } : {}),
           ...(blankToUndefined(value.thinkingOptionId) === undefined
             ? {}
             : { thinkingOptionId: value.thinkingOptionId.trim() }),
@@ -208,7 +208,6 @@ function validateFormValue(value: TriggerFormValue): void {
   if (!value.cwd.trim().startsWith("/")) {
     throw new Error("Working directory must be an absolute path.");
   }
-  if (value.mode.trim().length === 0) throw new Error("Execution mode is required.");
   if (value.maxRuntime.trim().length === 0) throw new Error("Maximum runtime is required.");
   if (value.idleTimeout.trim().length === 0) throw new Error("Idle timeout is required.");
 }

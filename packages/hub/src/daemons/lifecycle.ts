@@ -2121,6 +2121,7 @@ async function buildCreateAgentOptions(
   const channelTool = workflowChannelTool(
     intent,
     hubExecutionEnv.publicBaseUrl,
+    hubExecutionEnv.executionId,
     channelReplyCapabilities,
   );
   const createOptions: DaemonCreateAgentOptions = {
@@ -2200,6 +2201,7 @@ async function buildCreateAgentOptions(
 function workflowChannelTool(
   intent: LaunchMachineIntent,
   publicBaseUrl: string,
+  executionId: string,
   capabilities?: ChannelReplyCapabilityService,
 ):
   | {
@@ -2214,7 +2216,8 @@ function workflowChannelTool(
   const { channel, outbound } = context;
   const name = Reflect.get(channel, "name");
   if (name !== "slack" && name !== "telegram") return undefined;
-  if (!intent.allowOutputs.some((output) => output.type === `${name}.reply`)) return undefined;
+  const output = intent.allowOutputs.find((item) => item.type === `${name}.reply`);
+  if (output === undefined) return undefined;
   const accountId = Reflect.get(channel, "account_id");
   const conversationId = Reflect.get(channel, "external_conversation_id");
   const threadId = Reflect.get(channel, "external_thread_id");
@@ -2255,6 +2258,7 @@ function workflowChannelTool(
       externalThreadId: threadId,
     },
     ...(projectRoot === undefined ? {} : { projectRoot }),
+    outputBudget: { executionId, type: output.type, max: output.max },
   });
   return {
     url: `${publicBaseUrl.replace(/\/$/u, "")}/mcp/channel/${capabilityToken}`,

@@ -563,7 +563,7 @@ describe("workflow route", () => {
       controlPlane: makeControlPlane(account),
       authorizeChannelUse: async (input) => {
         requests.push(input);
-        return true;
+        return { allowed: true };
       },
     });
     await harness.plane.start(harness.fake.daemon, store);
@@ -579,7 +579,50 @@ describe("workflow route", () => {
     assert.equal(harness.workflowDispatches.length, 1);
     assert.equal(requests[0]?.account.connectionId, account.connectionId);
     assert.equal(requests[0]?.message.senderIdentity, "slack:U0MEMBER");
+    assert.equal(harness.activity.length, 1);
+    assert.equal(harness.activity[0]?.outcome, "workflow");
+    assert.equal(harness.activity[0]?.senderIdentity, "slack:U0MEMBER");
+    assert.equal("text" in harness.activity[0]!, false);
   });
+
+  it.each(["agent", "workflow"] as const)(
+    "records precise denied %s admission without executing",
+    async (targetKind) => {
+      for (const reason of [
+        "sender identity is not linked to a Hub Member on this Connection",
+        "linked Hub Member does not have access to this conversation",
+      ]) {
+        const base = makeRoute();
+        const route: CompiledRoute = {
+          ...base,
+          defaultRoles: [],
+          assignments: [],
+          target:
+            targetKind === "workflow"
+              ? { kind: "workflow", workflow: "engineering-assistant" }
+              : base.target,
+        };
+        const account = makeAccount(route);
+        const harness = makeHarness({
+          account,
+          controlPlane: makeControlPlane(account),
+          authorizeChannelUse: async () => ({ allowed: false, reason }),
+        });
+        await harness.plane.start(harness.fake.daemon, store);
+        harness.next.message = message({ senderIdentity: "slack:U0UNLINKED" });
+        const denied = await harness.plane.onInbound({
+          channel: "slack",
+          accountId: ACCOUNT_ID,
+          ctxPayload: {},
+        });
+        assert.deepEqual(denied.outcome, { kind: "ignored", reason });
+        assert.equal(harness.fake.created.length, 0);
+        assert.equal(harness.workflowDispatches.length, 0);
+        assert.equal(harness.activity.at(-1)?.outcomeDetail, reason);
+        await harness.plane.stop();
+      }
+    },
+  );
 
   it("consumes an identity-link command before route admission", async () => {
     const requests: Parameters<

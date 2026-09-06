@@ -42,6 +42,7 @@ describe("buildBotStartPlan", () => {
     );
     assert.equal(plan.name, "ops-bot");
     assert.equal(plan.botType, "team");
+    assert.equal(plan.workspacePath, `${HOME}/workspaces/team`);
     assert.equal(plan.account, "ops");
     assert.equal(plan.agentTitle, "Ops Agent");
     assert.equal(plan.channel, "slack");

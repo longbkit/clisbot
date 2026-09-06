@@ -1,3 +1,4 @@
+import type { ChannelPrivilegeDecision } from "../../access/store.js";
 // Shared vocabulary for the channel execution plane (plan §4-S2/§4-S5/§4-S6).
 // One place for the shapes that the bindings, relay, and approval engines all
 // read, so no engine re-derives an inbound message, a post, or an outcome. The
@@ -332,7 +333,7 @@ export type ChannelUseAuthorizer = (input: {
   organizationId: string;
   account: CompiledChannelAccount;
   message: InboundMessage;
-}) => Promise<boolean>;
+}) => Promise<ChannelPrivilegeDecision>;
 
 export interface ChannelAgentAccessTarget {
   daemonReference: string;

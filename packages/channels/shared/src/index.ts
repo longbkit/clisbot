@@ -13,7 +13,14 @@ export type {
   KeyedStoreTtlOptions,
   StartAccountContext,
 } from "./host.js";
-export type { ChannelPlugin, SendMediaFn, SendTextFn, StartAccountFn } from "./plugin.js";
+export type {
+  ChannelPlugin,
+  SendMediaFn,
+  SendTextFn,
+  StartAccountFn,
+  ChannelConversationMetadata,
+  ResolveConversationFn,
+} from "./plugin.js";
 export {
   evaluateOutboundMedia,
   mediaFileName,

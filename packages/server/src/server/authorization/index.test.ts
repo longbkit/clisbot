@@ -78,3 +78,50 @@ describe("SessionAuthorization", () => {
     expect(() => parseDaemonPermissions(["hub.execution.*"])).toThrow("Invalid daemon permission");
   });
 });
+
+describe("Project workspace creation", () => {
+  function managed(privileges: readonly ("project.use" | "workspace.create")[], expired = false) {
+    return new SessionAuthorization(["workspace.read", "workspace.write"], {
+      resourceMode: "projects",
+      projects: new Map([
+        ["project-a", { privileges: new Set(privileges), agentConfigurations: [] }],
+      ]),
+      leaseId: "lease-a",
+      leaseExpiresAt: Date.now() + (expired ? -1 : 60_000),
+    });
+  }
+
+  test("admits only workspace creation without granting daemon workspace management", () => {
+    const authorization = managed(["project.use", "workspace.create"]);
+    expect(authorization.allowsInbound(inboundMessage("workspace.create.request"))).toBe(true);
+    expect(authorization.allowsOutbound(outboundMessage("workspace.create.response"))).toBe(true);
+    expect(authorization.allowsPermission("workspace.manage")).toBe(false);
+    const revoked = managed(["project.use", "workspace.create"]);
+    revoked.replacePermissions([]);
+    expect(revoked.allowsInbound(inboundMessage("workspace.create.request"))).toBe(false);
+    for (const type of [
+      "project.add.request",
+      "project.rename.request",
+      "project.remove.request",
+      "project.create_directory.request",
+      "archive_workspace_request",
+      "create_paseo_worktree_request",
+    ] as const) {
+      expect(authorization.allowsInbound(inboundMessage(type))).toBe(false);
+    }
+  });
+
+  test("does not widen existing Project grants, expired leases, or ordinary Paseo clients", () => {
+    for (const authorization of [
+      managed(["project.use"]),
+      managed(["workspace.create"]),
+      managed(["project.use", "workspace.create"], true),
+      new SessionAuthorization(["workspace.write"]),
+    ]) {
+      expect(authorization.allowsInbound(inboundMessage("workspace.create.request"))).toBe(false);
+      expect(authorization.allowsOutbound(outboundMessage("workspace.create.response"))).toBe(
+        false,
+      );
+    }
+  });
+});

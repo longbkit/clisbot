@@ -19,12 +19,16 @@ export interface BotManifest {
   /** The workspace this bot's agent lives in (path + daemon workspace id). */
   workspacePath: string;
   workspaceId: string;
-  /** The idle agent created for the bot (no first prompt until a channel message). */
+  projectId?: string;
+  isolation?: string;
+  sourcePath?: string;
+  /** The initial assistant session available in the app; channel conversations have their own sessions. */
   agentId: string;
   agentTitle: string;
   /** The channel the bot answers on. */
   channel: "slack" | "telegram";
   account: string;
+  connectionId?: string;
   /** The intended route, recorded so `bot stop`/`bot status` can re-explain it. */
   routeNote?: string;
   /** Channel credential durability; current manifests point to encrypted Hub storage. */
@@ -60,8 +64,10 @@ export function assertBotName(name: string): void {
 }
 
 /** Channel credentials are durable encrypted Hub Connections. */
-export function credentialKindFor(_manifest: BotManifest): "persisted" {
-  return "persisted";
+export function credentialKindFor(manifest: BotManifest): "persisted" | "pending" {
+  return manifest.credentials[`${manifest.channel}:${manifest.account}`]?.persisted
+    ? "persisted"
+    : "pending";
 }
 
 export function botNameFromPath(filePath: string): string | null {
@@ -160,11 +166,16 @@ function parseBotManifest(value: unknown): BotManifest {
     ...(typeof record["mode"] === "string" ? { mode: record["mode"] } : {}),
     workspacePath: record["workspacePath"] as string,
     workspaceId: record["workspaceId"] as string,
+    ...(typeof record["sourcePath"] === "string" ? { sourcePath: record["sourcePath"] } : {}),
+    ...(typeof record["projectId"] === "string" ? { projectId: record["projectId"] } : {}),
+    ...(typeof record["isolation"] === "string" ? { isolation: record["isolation"] } : {}),
     agentId: record["agentId"] as string,
     agentTitle: record["agentTitle"] as string,
     channel: channel as "slack" | "telegram",
     account: record["account"] as string,
+    ...(typeof record["connectionId"] === "string" ? { connectionId: record["connectionId"] } : {}),
     credentials: parseManifestCredentials(record["credentials"]),
+    ...(typeof record["routeNote"] === "string" ? { routeNote: record["routeNote"] } : {}),
     createdAt,
     updatedAt,
   };

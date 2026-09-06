@@ -1,3 +1,6 @@
+import { createConversationMetadataResolver } from "../conversation-metadata.js";
+import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
+import { channelTestMessage } from "../test-message.js";
 // The channel supervisor (plan §4-S1 / implementation doc §4.3.9): the
 // coordinate/mount module that drives the per-account lifecycle —
 // install → load → start → drive — plus teardown. One in-process vertical per
@@ -455,6 +458,11 @@ interface AccountHandle {
   accountId: string;
   organizationId?: string;
   revisionId: string | null;
+  connectionId?: string;
+  resolveConversation?: (
+    to: string,
+    budget?: { remaining: number },
+  ) => Promise<ChannelConversationMetadata | null>;
   abortController: AbortController;
   plane?: ChannelPlane;
   daemon?: DaemonConnection;
@@ -526,7 +534,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     if (!this.enabled()) return;
     let snapshot: ChannelControlPlaneSnapshot;
     try {
-      snapshot = await loadChannelControlPlane(this.options.database);
+      snapshot = await loadChannelControlPlane(
+        this.options.database,
+        undefined,
+        this.options.publicBaseUrl,
+      );
     } catch (error) {
       // Mount-time recovery degrades: a missing org/configuration is operator
       // state, not a channel fault (P13: log, never throw).
@@ -557,7 +569,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const handle = this.createHandle(channel, accountId);
     try {
       // Resolve on demand: re-read the active revision, no caching.
-      const snapshot = await loadChannelControlPlane(this.options.database);
+      const snapshot = await loadChannelControlPlane(
+        this.options.database,
+        undefined,
+        this.options.publicBaseUrl,
+      );
       handle.organizationId = snapshot.organizationId;
       const compiled = snapshot.controlPlane.accounts.find(
         (candidate) => candidate.channel === channel && candidate.accountId === accountId,
@@ -629,7 +645,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     if (!this.enabled()) return empty;
     let snapshot: ChannelControlPlaneSnapshot;
     try {
-      snapshot = await loadChannelControlPlane(this.options.database);
+      snapshot = await loadChannelControlPlane(
+        this.options.database,
+        undefined,
+        this.options.publicBaseUrl,
+      );
     } catch (error) {
       this.logger.warn("channel reconcile skipped: the active configuration is unavailable", {
         error: errorMessage(error),
@@ -740,11 +760,35 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     });
   }
 
+  async resolveConversation(input: {
+    organizationId: string;
+    channel: P0ChannelName;
+    accountId: string;
+    connectionId: string;
+    conversationId: string;
+    budget?: { remaining: number };
+  }): Promise<ChannelConversationMetadata | null> {
+    const key = handleKey(input.channel, input.accountId);
+    const handle = this.handles.get(key);
+    if (
+      handle?.transport !== "started" ||
+      handle.organizationId !== input.organizationId ||
+      handle.connectionId !== input.connectionId ||
+      handle.resolveConversation === undefined
+    )
+      return null;
+    const result = await handle.resolveConversation(input.conversationId, input.budget);
+    return this.handles.get(key) === handle && !handle.abortController.signal.aborted
+      ? result
+      : null;
+  }
+
   async postTestMessage(input: {
     channel: P0ChannelName;
     accountId: string;
     conversationId: string;
     threadId?: string | undefined;
+    expectedRevisionId?: string | null | undefined;
   }): Promise<OutboundPostResult> {
     const handle = this.handles.get(handleKey(input.channel, input.accountId));
     const post = handle?.post;
@@ -754,12 +798,20 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         error: `the ${input.channel} account ${input.accountId} is not started`,
       };
     }
+    if (input.expectedRevisionId !== undefined && handle.revisionId !== input.expectedRevisionId) {
+      return {
+        ok: false,
+        error:
+          "The Channel runtime has not applied this configuration. Refresh status and preview again.",
+      };
+    }
+    const preview = channelTestMessage(input);
     return post({
       channel: input.channel,
       accountId: input.accountId,
       to: input.conversationId,
-      ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
-      text: "Paseo Channel test — the Connection can send messages.",
+      ...(preview.threadId === null ? {} : { threadId: preview.threadId }),
+      text: preview.text,
     });
   }
 
@@ -904,6 +956,19 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       compiled,
       handle.accountId,
     );
+    handle.connectionId = compiled.connectionId;
+    const lookup = loaded.vertical.plugin.directory?.resolveConversation;
+    if (lookup !== undefined) {
+      handle.resolveConversation = createConversationMetadataResolver({
+        channel: handle.channel,
+        organizationId: snapshot.organizationId,
+        connectionId: compiled.connectionId,
+        accountId: handle.accountId,
+        cfg,
+        runtime: loaded.hostRuntime,
+        lookup,
+      });
+    }
     if (compiled.channel === "slack" && this.options.claimSlackInbound !== undefined) {
       if (providerApplicationId === undefined) {
         throw new Error("the Slack connection has no Provider Application identity");

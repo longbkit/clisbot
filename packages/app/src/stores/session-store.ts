@@ -279,6 +279,7 @@ export interface AgentFileExplorerState {
 }
 
 export interface DaemonServerInfo {
+  permissions?: ServerInfoStatusPayload["permissions"];
   serverId: string;
   hostname: string | null;
   version: string | null;
@@ -688,6 +689,7 @@ function isSessionServerInfoUnchanged(input: {
   nextCapabilities: ServerCapabilities | undefined;
   nextFeatures: ServerInfoStatusPayload["features"] | undefined;
   nextServerId: string;
+  nextPermissions: ServerInfoStatusPayload["permissions"];
 }): boolean {
   const {
     currentServerInfo,
@@ -700,6 +702,7 @@ function isSessionServerInfoUnchanged(input: {
   const prevHostname = currentServerInfo?.hostname?.trim() || null;
   const prevVersion = currentServerInfo?.version?.trim() || null;
   return (
+    JSON.stringify(currentServerInfo?.permissions) === JSON.stringify(input.nextPermissions) &&
     currentServerInfo?.serverId === input.nextServerId &&
     prevHostname === nextHostname &&
     prevVersion === nextVersion &&
@@ -854,6 +857,7 @@ export const useSessionStore = create<SessionStore>()(
               nextCapabilities,
               nextFeatures,
               nextServerId: info.serverId,
+              nextPermissions: info.permissions,
             })
           ) {
             return prev;
@@ -867,6 +871,7 @@ export const useSessionStore = create<SessionStore>()(
                 ...session,
                 serverInfo: {
                   serverId: info.serverId,
+                  ...(info.permissions === undefined ? {} : { permissions: info.permissions }),
                   hostname: nextHostname,
                   version: nextVersion,
                   ...(nextDesktopManaged !== undefined

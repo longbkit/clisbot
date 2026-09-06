@@ -14,6 +14,9 @@ import { symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import { createMemoryDatabase } from "../db/memory.js";
+import type { ChannelReplyMcp } from "./channel-reply.js";
+import type { ChannelReplyOutputBudget } from "./channel-reply-capabilities.js";
 import type { ChannelStore } from "../db/channels.js";
 import { createFetchServer } from "../http/node-server.js";
 import { createChannelReplyServer, type ChannelReplyPost } from "./channel-reply.js";
@@ -321,6 +324,8 @@ function makeFixture(
     projectRoot?: string | null;
     ref?: ChannelReplyBindingRef;
     requestToken?: string;
+    outputBudget?: ChannelReplyOutputBudget;
+    outputStore?: ChannelReplyMcp["outputStore"];
   } = {},
 ): Fixture {
   const token = TOKEN;
@@ -329,6 +334,7 @@ function makeFixture(
     capabilityInput({
       ref: options.ref ?? REF,
       projectRoot: options.projectRoot === undefined ? process.cwd() : options.projectRoot,
+      ...(options.outputBudget === undefined ? {} : { outputBudget: options.outputBudget }),
     }),
   );
   assert.equal(registry.bind(capabilityToken, "agent-1"), true);
@@ -376,6 +382,7 @@ function makeFixture(
     organizationId: "org-1",
     store,
     resolveCapability: (candidate) => registry.resolve(candidate, "org-1"),
+    ...(options.outputStore === undefined ? {} : { outputStore: options.outputStore }),
     post,
     ...(options.mediaPost === undefined ? {} : { mediaPost: options.mediaPost }),
   });
@@ -411,6 +418,7 @@ function capabilityInput(
   options: {
     ref?: ChannelReplyBindingRef;
     projectRoot?: string | null;
+    outputBudget?: ChannelReplyOutputBudget;
   } = {},
 ) {
   return {
@@ -419,6 +427,7 @@ function capabilityInput(
     routePosition: 0,
     routeFingerprint: "route-a",
     ref: options.ref ?? REF,
+    ...(options.outputBudget === undefined ? {} : { outputBudget: options.outputBudget }),
     ...(options.projectRoot === null || options.projectRoot === undefined
       ? {}
       : { projectRoot: options.projectRoot }),
@@ -447,4 +456,165 @@ async function closeServer(server: import("node:http").Server): Promise<void> {
       else reject(error);
     });
   });
+}
+
+describe("Channel tool output budget", () => {
+  it("shares one durable ceiling across concurrent MCP sends and the Hub output surface", async () => {
+    const { database, outputBudget } = await outputBudgetFixture();
+    const fixture = makeFixture({ outputBudget, outputStore: database });
+    const results = await Promise.all([
+      fixture.call("tools/call", { name: "message", arguments: { text: "one" } }),
+      fixture.call("tools/call", { name: "message", arguments: { text: "two" } }),
+    ]);
+    assert.equal(results.filter((body) => ToolResultSchema.parse(body.result).isError).length, 1);
+    assert.equal(fixture.posts.length, 1);
+    assert.deepEqual(
+      (await database.findAgentExecutionById(outputBudget.executionId))?.outputEmissions,
+      { "slack.reply": 1 },
+    );
+    assert.equal(
+      await database.beginAgentExecutionOutput(
+        outputBudget.executionId,
+        "slack.reply",
+        1,
+        new Date(),
+      ),
+      undefined,
+    );
+  });
+
+  it("rejects MCP when another output surface already reserved the last send", async () => {
+    const { database, outputBudget } = await outputBudgetFixture();
+    assert.ok(
+      await database.beginAgentExecutionOutput(
+        outputBudget.executionId,
+        "slack.reply",
+        1,
+        new Date(),
+      ),
+    );
+    const fixture = makeFixture({ outputBudget, outputStore: database });
+    const body = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { text: "bypass" },
+    });
+    assert.equal(ToolResultSchema.parse(body.result).isError, true);
+    assert.equal(fixture.posts.length, 0);
+  });
+
+  it("counts files and captions against the same reply ceiling", async () => {
+    const { database, outputBudget } = await outputBudgetFixture();
+    const root = await mkdtemp(join(tmpdir(), "channel-budget-"));
+    const file = join(root, "report.txt");
+    await writeFile(file, "Report");
+    let mediaCalls = 0;
+    const fixture = makeFixture({
+      outputBudget,
+      outputStore: database,
+      projectRoot: root,
+      mediaPost: async () => {
+        mediaCalls += 1;
+        return { ok: true };
+      },
+    });
+    const body = await fixture.call("tools/call", {
+      name: "send_file",
+      arguments: { path: file, caption: "Extra send" },
+    });
+    assert.equal(ToolResultSchema.parse(body.result).isError, undefined);
+    assert.equal(mediaCalls, 1);
+    assert.equal(fixture.posts.length, 0);
+    assert.match(JSON.stringify(body.result), /caption not sent/);
+    const next = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { text: "bypass" },
+    });
+    assert.equal(ToolResultSchema.parse(next.result).isError, true);
+  });
+
+  it("releases a rejected send for retry without recording a successful output", async () => {
+    const { database, outputBudget } = await outputBudgetFixture();
+    let attempts = 0;
+    const fixture = makeFixture({
+      outputBudget,
+      outputStore: database,
+      post: async () => {
+        attempts += 1;
+        return attempts === 1 ? { ok: false, error: "chat_not_found" } : { ok: true };
+      },
+    });
+    const failed = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { text: "first" },
+    });
+    assert.equal(ToolResultSchema.parse(failed.result).isError, true);
+    assert.deepEqual(
+      (await database.findAgentExecutionById(outputBudget.executionId))?.outputEmissions,
+      {},
+    );
+    const retried = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { text: "second" },
+    });
+    assert.equal(ToolResultSchema.parse(retried.result).isError, undefined);
+    assert.equal(attempts, 2);
+  });
+
+  it("fails closed without output accounting and retains an ambiguous send's pending lease", async () => {
+    const { database, outputBudget } = await outputBudgetFixture();
+    const missingStore = makeFixture({ outputBudget });
+    const denied = await missingStore.call("tools/call", {
+      name: "message",
+      arguments: { text: "no store" },
+    });
+    assert.equal(ToolResultSchema.parse(denied.result).isError, true);
+    assert.equal(missingStore.posts.length, 0);
+    let attempts = 0;
+    const fixture = makeFixture({
+      outputBudget,
+      outputStore: database,
+      post: async () => {
+        attempts += 1;
+        throw new Error("transport closed after send");
+      },
+    });
+    await fixture.call("tools/call", { name: "message", arguments: { text: "maybe sent" } });
+    const retry = await fixture.call("tools/call", {
+      name: "message",
+      arguments: { text: "retry" },
+    });
+    assert.equal(ToolResultSchema.parse(retry.result).isError, true);
+    assert.equal(attempts, 1);
+  });
+});
+
+async function outputBudgetFixture() {
+  const database = createMemoryDatabase();
+  const workflow = await database.saveOrganizationTrigger({
+    organizationId: "org-1",
+    name: "channel-budget",
+    enabled: true,
+    format: "single_run",
+    yaml: "",
+    normalizedConfiguration: {},
+    contentHash: "hash",
+    sourceKind: "manual",
+    sourceEvidence: { kind: "test" },
+    createdByUserId: null,
+    routes: [],
+  });
+  const machine = await database.insertMachine({
+    orgId: "org-1",
+    source: { kind: "daemon", daemonId: "daemon" },
+    status: "alive",
+  });
+  const execution = await database.insertAgentExecution({
+    organizationId: "org-1",
+    workflowId: workflow.id,
+    machineId: machine.id,
+    triggerContext: null,
+    outputContext: null,
+    configurationRevisionId: workflow.activeRevisionId,
+  });
+  return { database, outputBudget: { executionId: execution.id, type: "slack.reply", max: 1 } };
 }

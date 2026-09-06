@@ -19,6 +19,18 @@ import { createHash } from "node:crypto";
 type WebClientCtor = new (token: string, options?: unknown) => WebClient;
 
 interface WebClientInstance {
+  conversations: {
+    info(args: { channel: string }): Promise<{
+      ok?: boolean;
+      channel?: {
+        id?: string;
+        name?: string;
+        is_im?: boolean;
+        is_mpim?: boolean;
+        is_private?: boolean;
+      };
+    }>;
+  };
   auth: { test(args?: unknown): Promise<AuthTestResult> };
   chat: {
     postMessage(args: {
@@ -113,6 +125,7 @@ export function slackWebClientStubForTest(): WebClient {
   const ok = async () => ({ ok: true }) as unknown as never;
   return {
     auth: { test: ok },
+    conversations: { info: ok },
     chat: { postMessage: ok, update: ok },
     files: { getUploadURLExternal: ok, completeUploadExternal: ok },
     assistant: { threads: { setStatus: ok } },

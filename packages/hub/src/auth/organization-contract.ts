@@ -15,6 +15,10 @@ const membershipSchema = z.object({
   membershipId: z.string(),
   role: organizationRoleSchema,
 });
+const activeMembershipSchema = z.object({
+  id: z.string(),
+  role: organizationRoleSchema,
+});
 const invitationSchema = z.object({
   id: z.string(),
   organization: z.object({ id: z.string(), name: z.string() }),
@@ -68,7 +72,19 @@ export const accountStateSchema = z.discriminatedUnion("status", [
     // that follows app setup addresses the organization by slug.
     organization: z.object({ id: z.string(), name: z.string(), slug: z.string() }),
     memberships: z.array(membershipSchema),
+    membership: activeMembershipSchema,
     capabilities: organizationCapabilitiesSchema,
+    isInstanceOperator: z.literal(true),
+    // Optional on read for older Hubs; setup does not change membership authority.
+    team: z
+      .object({
+        members: z.array(teamMemberSchema),
+        invitations: z.array(managerInvitationSchema).optional(),
+      })
+      .optional(),
+    canCreateOrganization: z.boolean().optional(),
+    invitation: invitationSchema.optional(),
+    invitationUnavailable: z.literal(true).optional(),
   }),
   z.object({
     status: z.literal("organizationRequired"),
@@ -83,7 +99,7 @@ export const accountStateSchema = z.discriminatedUnion("status", [
     account: accountSchema,
     memberships: z.array(membershipSchema),
     organization: z.object({ id: z.string(), name: z.string(), slug: z.string() }),
-    membership: z.object({ id: z.string(), role: organizationRoleSchema }),
+    membership: activeMembershipSchema,
     capabilities: organizationCapabilitiesSchema,
     isInstanceOperator: z.boolean(),
     team: z.object({

@@ -13,10 +13,9 @@
 // - `reaction` → `reactions.add` on the SENDER's own message for the length of
 //   the turn: the receipt that the message was taken, removed on close.
 //
-// One lease = one set and one clear. Slack holds an assistant status for about
-// two minutes and clears it itself when the bot answers, so a live turn needs
-// no re-push; the Hub's lease TTL (60s) sits inside that window, and a repeat
-// `start` for a surface this process already opened is a no-op.
+// Slack clears status on any bot reply and after two minutes. Refresh while the
+// Hub's lease is active, including after interim posts. Per-thread serialization
+// makes the terminal clear run after any status write already in flight.
 //
 // Scope: `assistant.threads.setStatus` is served by `chat:write` (already a
 // required bot scope); `assistant:write` is the compatibility scope Slack still
@@ -27,7 +26,7 @@
 
 import { getSlackWriteClient } from "./client/web-api.js";
 import type { HostRuntime } from "@getpaseo/channels-shared";
-import { resolveOutboundBotToken } from "./outbound.js";
+import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
 import { getSlackRuntime } from "./runtime.js";
 
 /** The status text Slack shows while the turn runs. */
@@ -75,11 +74,31 @@ function statusAnchor(args: SlackTypingArgs): string | undefined {
 }
 
 /** Surfaces this process currently holds open (the set-once / clear-once dedupe). */
-const openSurfaces = new Set<string>();
+interface ReactionSurface {
+  active: boolean;
+  queue: Promise<void>;
+}
+const reactionSurfaces = new Map<string, ReactionSurface>();
+export const SLACK_TYPING_REFRESH_MS = 60_000;
+interface StatusSurface {
+  args: SlackTypingArgs;
+  threadTs: string;
+  active: boolean;
+  queue: Promise<void>;
+  timer?: ReturnType<typeof setInterval>;
+  pendingRefreshes: number;
+}
+const statusSurfaces = new Map<string, StatusSurface>();
 
 /** Test seam: forget every open surface. */
 export function clearSlackTypingSurfacesForTest(): void {
-  openSurfaces.clear();
+  for (const surface of reactionSurfaces.values()) surface.active = false;
+  reactionSurfaces.clear();
+  for (const surface of statusSurfaces.values()) {
+    surface.active = false;
+    clearInterval(surface.timer);
+  }
+  statusSurfaces.clear();
 }
 
 function surfaceKey(args: SlackTypingArgs, kind: "status" | "reaction"): string {
@@ -125,40 +144,110 @@ export function clearSlackTypingScopeWarningsForTest(): void {
   scopeWarnings.clear();
 }
 
-/** The thread status: set on open, cleared on close, never re-called while
- * live, and never attempted without an anchor. */
-async function driveIndicator(args: SlackTypingArgs): Promise<void> {
+/** Serialize every status write, including a close followed immediately by a new turn. */
+function writeStatus(surface: StatusSurface, status: string): Promise<void> {
+  const operation = surface.queue.then(async () => {
+    if (status !== "" && !surface.active) return;
+    const client = await getSlackWriteClient(tokenFor(surface.args));
+    if (status !== "" && !surface.active) return;
+    await client.assistant.threads.setStatus({
+      channel_id: surface.args.to,
+      thread_ts: surface.threadTs,
+      status,
+      ...(status === "" ? {} : { loading_messages: [...SLACK_TYPING_LOADING_MESSAGES] }),
+    });
+    return undefined;
+  });
+  surface.queue = operation.catch(() => undefined);
+  return operation;
+}
+
+/** A failed cosmetic refresh must not turn a delivered message into a retryable send failure. */
+async function refreshStatus(surface: StatusSurface, afterPost = false): Promise<void> {
+  if (!surface.active || (surface.pendingRefreshes > 0 && !afterPost)) return;
+  surface.pendingRefreshes += 1;
+  try {
+    await writeStatus(surface, SLACK_TYPING_STATUS);
+  } catch (error) {
+    surface.active = false;
+    clearInterval(surface.timer);
+    if (slackErrorCode(error) === "missing_scope")
+      warnMissingScope(surface.args, "assistant:write");
+    const runtime = surface.args.hostRuntime ?? getSlackRuntime();
+    runtime?.logging
+      .getChildLogger({ channel: "slack", accountId: surface.args.accountId })
+      .warn("slack typing refresh stopped", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+  } finally {
+    surface.pendingRefreshes -= 1;
+  }
+}
+
+/** Slack clears status on every bot post, even when the Agent's turn is still running. */
+export async function refreshSlackTypingAfterPost(input: {
+  accountId: string;
+  to: string;
+  threadId?: string | undefined;
+}): Promise<void> {
+  await Promise.all(
+    [...statusSurfaces.values()]
+      .filter(
+        (surface) =>
+          surface.active &&
+          surface.args.accountId === input.accountId &&
+          surface.args.to === input.to &&
+          (input.threadId ? surface.threadTs === input.threadId : !surface.args.threadId),
+      )
+      .map((surface) => refreshStatus(surface, true)),
+  );
+}
+
+async function driveIndicator(args: SlackTypingArgs): Promise<StatusSurface | undefined> {
   const threadTs = statusAnchor(args);
   if (threadTs === undefined) return;
   const key = surfaceKey(args, "status");
-  const client = await getSlackWriteClient(tokenFor(args));
-  if (args.action === "start") {
-    // Set once per surface: Slack keeps the status live on its own, so a
-    // repeat drive is a no-op (see the header).
-    if (openSurfaces.has(key)) return;
+  const previous = statusSurfaces.get(key);
+  if (args.action === "stop") {
+    if (previous === undefined) return;
+    previous.active = false;
+    clearInterval(previous.timer);
     try {
-      await client.assistant.threads.setStatus({
-        channel_id: args.to,
-        thread_ts: threadTs,
-        status: SLACK_TYPING_STATUS,
-        loading_messages: [...SLACK_TYPING_LOADING_MESSAGES],
-      });
-    } catch (error) {
-      if (slackErrorCode(error) === "missing_scope") warnMissingScope(args, "assistant:write");
-      throw error;
+      await writeStatus(previous, "");
+    } finally {
+      if (statusSurfaces.get(key) === previous) statusSurfaces.delete(key);
     }
-    openSurfaces.add(key);
     return;
   }
-  // Only clear what this process opened: a status left by an earlier process
-  // dies with the TTL, and clearing a thread another turn is still using would
-  // hide that turn's indicator.
-  if (!openSurfaces.delete(key)) return;
-  await client.assistant.threads.setStatus({
-    channel_id: args.to,
-    thread_ts: threadTs,
-    status: "",
-  });
+  if (previous?.active) {
+    await previous.queue;
+    return previous;
+  }
+  const surface: StatusSurface = {
+    args,
+    threadTs,
+    active: true,
+    queue: previous?.queue ?? Promise.resolve(),
+    pendingRefreshes: 0,
+  };
+  statusSurfaces.set(key, surface);
+  const start = writeStatus(surface, SLACK_TYPING_STATUS);
+  const startQueue = surface.queue;
+  try {
+    await start;
+  } catch (error) {
+    surface.active = false;
+    if (statusSurfaces.get(key) === surface && surface.queue === startQueue)
+      statusSurfaces.delete(key);
+    if (slackErrorCode(error) === "missing_scope") warnMissingScope(args, "assistant:write");
+    throw error;
+  }
+  if (!surface.active) return surface;
+  surface.timer = setInterval(() => {
+    void refreshStatus(surface);
+  }, SLACK_TYPING_REFRESH_MS);
+  surface.timer.unref?.();
+  return surface;
 }
 
 /** The receipt reaction. Both directions are idempotent: a keepalive re-add
@@ -169,24 +258,43 @@ async function driveReaction(args: SlackTypingArgs): Promise<void> {
   const timestamp = args.messageId;
   if (name === undefined || timestamp === undefined) return;
   const key = surfaceKey(args, "reaction");
-  const client = await getSlackWriteClient(tokenFor(args));
-  const already = args.action === "start" ? openSurfaces.has(key) : !openSurfaces.delete(key);
-  if (already) return;
-  const call =
+  const previous = reactionSurfaces.get(key);
+  if (args.action === "start" && previous?.active) return previous.queue;
+  if (args.action === "stop" && previous === undefined) return;
+  const surface: ReactionSurface =
     args.action === "start"
-      ? () => client.reactions.add({ channel: args.to, timestamp, name })
-      : () => client.reactions.remove({ channel: args.to, timestamp, name });
-  try {
-    await call();
-  } catch (error) {
-    const code = slackErrorCode(error);
-    if (code === "already_reacted" || code === "no_reaction" || code === "message_not_found") {
-      if (args.action === "start") openSurfaces.add(key);
-      return;
+      ? { active: true, queue: previous?.queue ?? Promise.resolve() }
+      : previous!;
+  if (args.action === "start") reactionSurfaces.set(key, surface);
+  else surface.active = false;
+  const operation = surface.queue.then(async () => {
+    if (args.action === "start" && !surface.active) return;
+    const client = await getSlackWriteClient(tokenFor(args));
+    if (args.action === "start" && !surface.active) return;
+    try {
+      if (args.action === "start")
+        await client.reactions.add({ channel: args.to, timestamp, name });
+      else await client.reactions.remove({ channel: args.to, timestamp, name });
+    } catch (error) {
+      if (["already_reacted", "no_reaction", "message_not_found"].includes(slackErrorCode(error)))
+        return;
+      throw error;
     }
+    return undefined;
+  });
+  const settled = operation.catch(() => undefined);
+  surface.queue = settled;
+  try {
+    await operation;
+  } catch (error) {
+    surface.active = false;
+    if (reactionSurfaces.get(key) === surface && surface.queue === settled)
+      reactionSurfaces.delete(key);
     throw error;
+  } finally {
+    if (!surface.active && reactionSurfaces.get(key) === surface && surface.queue === settled)
+      reactionSurfaces.delete(key);
   }
-  if (args.action === "start") openSurfaces.add(key);
 }
 
 function tokenFor(args: SlackTypingArgs): string {
@@ -206,6 +314,29 @@ function tokenFor(args: SlackTypingArgs): string {
  * swallowed.
  */
 export async function slackTyping(args: SlackTypingArgs): Promise<void> {
-  if (args.indicator) await driveIndicator(args);
-  if (args.reactionEmoji !== undefined) await driveReaction(args);
+  if (args.action === "stop") {
+    await Promise.all([
+      args.indicator ? driveIndicator(args) : Promise.resolve(),
+      args.reactionEmoji !== undefined ? driveReaction(args) : Promise.resolve(),
+    ]);
+    return;
+  }
+  let indicator: StatusSurface | undefined;
+  try {
+    if (args.indicator) {
+      indicator = await driveIndicator(args);
+      if (
+        indicator !== undefined &&
+        (!indicator.active || statusSurfaces.get(surfaceKey(args, "status")) !== indicator)
+      )
+        return;
+    }
+    if (args.reactionEmoji !== undefined) await driveReaction(args);
+  } catch (error) {
+    // A delayed failure belongs only to its own turn, never a replacement's status.
+    if (indicator !== undefined && statusSurfaces.get(surfaceKey(args, "status")) === indicator) {
+      await driveIndicator({ ...args, action: "stop" }).catch(() => undefined);
+    }
+    throw error;
+  }
 }

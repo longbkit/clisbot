@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";
-import { hubSettingsNavigationItems } from "./catalog";
+import { hubSettingsNavigationItems, hubSettingsSection } from "./catalog";
 
 describe("Hub Settings navigation", () => {
   it("shows only sign-in before authentication", () => {
@@ -19,7 +19,10 @@ describe("Hub Settings navigation", () => {
         signedIn: true,
         canManage: false,
       }).map(({ section, label }) => ({ section, label })),
-      [{ section: "access", label: "Access" }],
+      [
+        { section: "account", label: "Account" },
+        { section: "access", label: "Access" },
+      ],
     );
   });
 
@@ -30,14 +33,22 @@ describe("Hub Settings navigation", () => {
         canManage: false,
         canRunAutomations: true,
       }).map(({ section }) => section),
-      ["automations", "access"],
+      ["account", "automations", "access"],
     );
   });
 
   it("shows every management destination to an owner or administrator", () => {
     assert.deepEqual(
       hubSettingsNavigationItems({ signedIn: true, canManage: true }).map(({ section }) => section),
-      ["channels", "automations", "team", "access", "configuration"],
+      ["account", "channels", "automations", "team", "access", "configuration"],
     );
+  });
+
+  it("keeps Account reachable without a Host or any management or Automation grant", () => {
+    const accountItems = hubSettingsNavigationItems({ signedIn: true }).filter(
+      ({ section }) => section === "account",
+    );
+    assert.deepEqual(accountItems, [hubSettingsSection("account")]);
+    assert.equal(accountItems[0]?.label, "Account");
   });
 });

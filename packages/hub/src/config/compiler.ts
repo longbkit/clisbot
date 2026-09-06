@@ -44,7 +44,7 @@ const AuthoredInputSchema = z
   })
   .strict();
 
-const AgentSchema = z
+export const AgentSchema = z
   .object({
     provider: z.string().min(1),
     model: z.string().min(1).optional(),
@@ -185,7 +185,7 @@ const StepSchema = z
   })
   .strict();
 
-const AuthoredTriggerSchema = z
+export const AuthoredTriggerSchema = z
   .object({
     name: z.string().min(1),
     on: z.string().min(1),

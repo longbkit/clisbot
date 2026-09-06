@@ -75,6 +75,7 @@ import type { ShortcutKey } from "@/utils/format-shortcut";
 import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
 import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarWorkspaceList } from "./sidebar-workspace-list";
+import { AutomationSidebarItem } from "@/clisbot/hub/automation-sidebar-item";
 import { PluginSidebarItems } from "@/plugins";
 import { HubSidebarAccountButton } from "@/clisbot/hub/sidebar-account";
 
@@ -698,6 +699,7 @@ function MobileSidebar({
             testID="sidebar-schedules"
             variant="compact"
           />
+          <AutomationSidebarItem onBeforeNavigate={closeSidebar} />
           <PluginSidebarItems onBeforeNavigate={closeSidebar} />
         </View>
         <WindowChromeSafeArea placement="inline" style={styles.mobileCloseButtonRow}>
@@ -923,6 +925,7 @@ function DesktopSidebar({
               testID="sidebar-schedules"
               variant="compact"
             />
+            <AutomationSidebarItem />
             <PluginSidebarItems />
           </View>
         </View>

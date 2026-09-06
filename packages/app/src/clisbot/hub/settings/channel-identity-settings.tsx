@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -11,6 +12,7 @@ import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { useHubAccount } from "../account-provider";
+import { hubResourceQueryKey } from "../query-keys";
 import {
   HubChannelIdentitiesSchema,
   HubChannelIdentityChallengeSchema,
@@ -21,9 +23,35 @@ import {
 
 export function ChannelIdentitySelfLinkSettings() {
   const hub = useHubAccount();
+  const params = useLocalSearchParams<{ channelConnectionId?: string }>();
+  const initialConnectionId =
+    typeof params.channelConnectionId === "string" && params.channelConnectionId.length > 0
+      ? params.channelConnectionId
+      : null;
+  return (
+    <ChannelIdentitySelfLinkForm
+      key={JSON.stringify([
+        hub.origin,
+        hub.signedIn?.account.id,
+        hub.signedIn?.organization.id,
+        initialConnectionId,
+      ])}
+      initialConnectionId={initialConnectionId}
+    />
+  );
+}
+
+function ChannelIdentitySelfLinkForm({
+  initialConnectionId,
+}: {
+  initialConnectionId: string | null;
+}) {
+  const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
-  const membershipId = hub.state?.status === "active" ? hub.state.membership.id : null;
-  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const accountId = hub.signedIn?.account.id ?? null;
+  const queryScope = { origin: hub.origin, organizationId, accountId };
+  const membershipId = hub.signedIn?.membership.id ?? null;
+  const [connectionId, setConnectionId] = useState<string | null>(initialConnectionId);
   const [challenge, setChallenge] = useState<{
     connectionId: string;
     command: string;
@@ -32,7 +60,7 @@ export function ChannelIdentitySelfLinkSettings() {
   const [pending, setPending] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const identities = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "channel-identities", "self"],
+    queryKey: [...hubResourceQueryKey(queryScope, "channel-identities"), "self"],
     queryFn: () => hub.api().get("channel-identities", HubChannelIdentitiesSchema),
     enabled: organizationId.length > 0 && membershipId !== null,
     retry: false,
@@ -41,7 +69,7 @@ export function ChannelIdentitySelfLinkSettings() {
     staleTimeMs: 15_000,
   });
   const connections = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "connections", "self"],
+    queryKey: [...hubResourceQueryKey(queryScope, "connections"), "self"],
     queryFn: () => hub.api().get("connections", HubConnectionsSchema),
     enabled: organizationId.length > 0 && membershipId !== null,
     retry: false,
@@ -81,21 +109,26 @@ export function ChannelIdentitySelfLinkSettings() {
     }
   }, [challenge, ownIdentities]);
 
+  const selectedConnection = channelConnections.find(({ id }) => id === connectionId);
   const createChallenge = useCallback(async () => {
-    if (connectionId === null) return;
+    if (selectedConnection === undefined) return;
     setPending(true);
     setMutationError(null);
     try {
       const value = await hub
         .api()
-        .post("channel-identities/challenges", { connectionId }, HubChannelIdentityChallengeSchema);
-      setChallenge({ connectionId, ...value });
+        .post(
+          "channel-identities/challenges",
+          { connectionId: selectedConnection.id },
+          HubChannelIdentityChallengeSchema,
+        );
+      setChallenge({ connectionId: selectedConnection.id, ...value });
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : "Hub request failed.");
     } finally {
       setPending(false);
     }
-  }, [connectionId, hub]);
+  }, [selectedConnection, hub]);
 
   const unlink = useCallback(
     async (id: string) => {
@@ -122,13 +155,14 @@ export function ChannelIdentitySelfLinkSettings() {
   const setSelectedConnection = useCallback((value: string) => {
     setConnectionId(value);
     setChallenge(null);
+    setMutationError(null);
   }, []);
   const handleCreateChallenge = useCallback(() => {
     void createChallenge();
   }, [createChallenge]);
-  const copyChallenge = useCallback(() => {
-    if (challenge !== null) void copyToClipboard(challenge.command);
-  }, [challenge]);
+  const refresh = useCallback(() => {
+    void Promise.all([identities.refetch(), connections.refetch()]);
+  }, [identities, connections]);
 
   if (membershipId === null) return null;
 
@@ -137,43 +171,57 @@ export function ChannelIdentitySelfLinkSettings() {
       <Alert
         variant="info"
         title="Link the account you use in Slack or Telegram"
-        description="A one-use command proves that the signed-in Hub Member controls the provider identity. The code expires after 10 minutes and cannot grant new access."
+        description="Choose the Connection used by your Channel account, create a one-use command, then send it from your own Slack or Telegram account. The command verifies your identity; your existing organization access stays unchanged."
       />
       <QueryFeedback queries={[identities, connections]} />
+      <Button size="sm" variant="outline" disabled={pending} onPress={refresh}>
+        Refresh identities
+      </Button>
+      <RequestedConnectionFeedback
+        requested={initialConnectionId}
+        ready={connections.data !== undefined}
+        selected={selectedConnection !== undefined}
+      />
       {mutationError ? <Alert variant="error" title={mutationError} /> : null}
-      <View style={settingsStyles.card}>
-        {ownIdentities.length === 0 ? (
-          <View style={settingsStyles.row}>
-            <Text style={settingsStyles.rowHint}>No provider identities are linked.</Text>
-          </View>
-        ) : (
-          ownIdentities.map((identity, index) => {
-            const connection = channelConnections.find(({ id }) => id === identity.connectionId);
-            return (
-              <View
-                key={identity.id}
-                style={[
-                  settingsStyles.row,
-                  styles.row,
-                  index > 0 ? settingsStyles.rowBorder : null,
-                ]}
-              >
-                <View style={settingsStyles.rowContent}>
-                  <Text style={settingsStyles.rowTitle}>
-                    {identity.displayName ?? identity.externalSubjectId}
-                  </Text>
-                  <Text style={settingsStyles.rowHint}>
-                    {connection
-                      ? `${providerLabel(connection.provider)} · ${connection.name}`
-                      : "Connection unavailable"}
-                  </Text>
+      {identities.data !== undefined ? (
+        <View style={settingsStyles.card}>
+          {ownIdentities.length === 0 ? (
+            <View style={settingsStyles.row}>
+              <Text style={settingsStyles.rowHint}>No provider identities are linked.</Text>
+            </View>
+          ) : (
+            ownIdentities.map((identity, index) => {
+              const connection = channelConnections.find(({ id }) => id === identity.connectionId);
+              return (
+                <View
+                  key={identity.id}
+                  style={[
+                    settingsStyles.row,
+                    styles.row,
+                    index > 0 ? settingsStyles.rowBorder : null,
+                  ]}
+                >
+                  <View style={settingsStyles.rowContent}>
+                    <Text style={settingsStyles.rowTitle}>
+                      {identity.displayName ?? identity.externalSubjectId}
+                    </Text>
+                    <Text style={settingsStyles.rowHint}>
+                      {connection
+                        ? `${providerLabel(connection.provider)} · ${connection.name}`
+                        : "Connection unavailable"}
+                    </Text>
+                  </View>
+                  <IdentityUnlinkButton
+                    identityId={identity.id}
+                    pending={pending}
+                    unlink={unlink}
+                  />
                 </View>
-                <IdentityUnlinkButton identityId={identity.id} pending={pending} unlink={unlink} />
-              </View>
-            );
-          })
-        )}
-      </View>
+              );
+            })
+          )}
+        </View>
+      ) : null}
       <View style={[settingsStyles.card, styles.form]}>
         <SelectField
           label="Connection"
@@ -187,33 +235,95 @@ export function ChannelIdentitySelfLinkSettings() {
           title="Connection"
           disabled={pending}
         />
-        <Button disabled={pending || connectionId === null} onPress={handleCreateChallenge}>
+        <Button
+          disabled={pending || selectedConnection === undefined}
+          onPress={handleCreateChallenge}
+        >
           {pending ? "Creating code…" : "Create link code"}
         </Button>
         {challenge !== null ? (
-          <>
-            <Alert
-              variant="success"
-              title={challenge.command}
-              description={`Send this exact command to the Channel account before ${new Date(challenge.expiresAt).toLocaleTimeString()}. Do not share it. This page updates automatically after the message is accepted.`}
-            />
-            <Button variant="outline" disabled={pending} onPress={copyChallenge}>
-              Copy link command
-            </Button>
-          </>
+          <ChannelIdentityChallenge
+            key={challenge.command}
+            challenge={challenge}
+            provider={selectedConnection?.provider}
+            pending={pending}
+            reportError={setMutationError}
+          />
         ) : null}
       </View>
     </SettingsSection>
   );
 }
 
+function RequestedConnectionFeedback({
+  requested,
+  ready,
+  selected,
+}: {
+  requested: string | null;
+  ready: boolean;
+  selected: boolean;
+}) {
+  if (requested === null || !ready || selected) return null;
+  return (
+    <Alert
+      variant="warning"
+      title="The requested Connection is unavailable"
+      description="Refresh or choose another Connection. Ask an owner to check your Channel access if the expected Slack or Telegram account is missing."
+    />
+  );
+}
+
+function ChannelIdentityChallenge({
+  challenge,
+  provider,
+  pending,
+  reportError,
+}: {
+  challenge: { command: string; expiresAt: string };
+  provider: string | undefined;
+  pending: boolean;
+  reportError(value: string): void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(() => {
+    void copyToClipboard(challenge.command)
+      .then(() => setCopied(true))
+      .catch((error: unknown) =>
+        reportError(
+          error instanceof Error
+            ? error.message
+            : "Unable to copy. Copy the command shown above manually.",
+        ),
+      );
+  }, [challenge.command, reportError]);
+  const instruction =
+    provider === "slack"
+      ? "In Slack, mention the bot, then paste this command in a message in a conversation where the bot is present. Send it from your own Slack account."
+      : "Send this command from your own Telegram account to the selected bot.";
+  return (
+    <>
+      <Alert
+        variant="info"
+        title={challenge.command}
+        description={`${instruction} Use it before ${new Date(challenge.expiresAt).toLocaleTimeString()}. Do not share it. After your identity appears here, send your original message again.`}
+      />
+      <Button variant="outline" disabled={pending} onPress={copy}>
+        {copied ? "Copied link command" : "Copy link command"}
+      </Button>
+    </>
+  );
+}
+
 export function ChannelIdentitySettings() {
   const hub = useHubAccount();
   const organizationId = hub.signedIn?.organization.id ?? "";
+  const accountId = hub.signedIn?.account.id ?? null;
+  const queryScope = { origin: hub.origin, organizationId, accountId };
   const canManage = hub.signedIn?.capabilities.manageResources === true;
-  const canOverrideIdentity = hub.state?.status === "active" && hub.state.isInstanceOperator;
+  const canOverrideIdentity = hub.signedIn?.isInstanceOperator === true;
   const identities = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "channel-identities"],
+    queryKey: hubResourceQueryKey(queryScope, "channel-identities"),
     queryFn: () => hub.api().get("channel-identities", HubChannelIdentitiesSchema),
     enabled: organizationId.length > 0,
     retry: false,
@@ -221,7 +331,7 @@ export function ChannelIdentitySettings() {
     staleTimeMs: 15_000,
   });
   const members = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "members"],
+    queryKey: hubResourceQueryKey(queryScope, "members"),
     queryFn: () => hub.api().get("members", HubMembersSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,
@@ -229,7 +339,7 @@ export function ChannelIdentitySettings() {
     staleTimeMs: 15_000,
   });
   const connections = useFetchQuery({
-    queryKey: ["clisbot", "hub", hub.origin, organizationId, "connections"],
+    queryKey: hubResourceQueryKey(queryScope, "connections"),
     queryFn: () => hub.api().get("connections", HubConnectionsSchema),
     enabled: organizationId.length > 0 && canManage,
     retry: false,

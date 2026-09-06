@@ -1,3 +1,4 @@
+import { toSessionServerInfo } from "./session-server-info";
 import { useRef, ReactNode, useCallback, useEffect } from "react";
 import { Buffer } from "buffer";
 import { AppState } from "react-native";
@@ -362,16 +363,7 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
       return;
     }
 
-    updateSessionServerInfo(serverId, {
-      serverId: serverInfo.serverId,
-      hostname: serverInfo.hostname,
-      version: serverInfo.version,
-      ...(serverInfo.desktopManaged !== undefined
-        ? { desktopManaged: serverInfo.desktopManaged }
-        : {}),
-      ...(serverInfo.capabilities ? { capabilities: serverInfo.capabilities } : {}),
-      ...(serverInfo.features ? { features: serverInfo.features } : {}),
-    });
+    updateSessionServerInfo(serverId, toSessionServerInfo(serverInfo));
   }, [client, serverId, updateSessionServerInfo]);
 
   useEffect(() => {
@@ -624,16 +616,7 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
         viewedTimelineSyncRef.current?.setDeliveryMode(
           getTimelineDeliveryMode(serverInfo.features?.selectiveAgentTimeline),
         );
-        updateSessionServerInfo(serverId, {
-          serverId: serverInfo.serverId,
-          hostname: serverInfo.hostname,
-          version: serverInfo.version,
-          ...(serverInfo.desktopManaged !== undefined
-            ? { desktopManaged: serverInfo.desktopManaged }
-            : {}),
-          ...(serverInfo.capabilities ? { capabilities: serverInfo.capabilities } : {}),
-          ...(serverInfo.features ? { features: serverInfo.features } : {}),
-        });
+        updateSessionServerInfo(serverId, toSessionServerInfo(serverInfo));
         return;
       }
     });

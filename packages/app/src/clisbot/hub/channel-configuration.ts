@@ -1,4 +1,5 @@
 import { parse, stringify } from "yaml";
+import { splitConversationIds } from "./conversation-picker";
 import type { WorktreeTarget } from "./workspace-configuration";
 
 export type ChannelConfigurationRecord = Record<string, unknown>;
@@ -41,7 +42,7 @@ export interface ChannelRouteBehavior {
 
 export const DEFAULT_MEMBER_ROUTE_BEHAVIOR: ChannelRouteBehavior = {
   requireMention: true,
-  replyAnchor: "default",
+  replyAnchor: "thread",
   outboundPath: "relay",
   finalAnswers: true,
   progressMessage: true,
@@ -63,9 +64,7 @@ export function hasRequiredChannelConversationIds(
   audience: "members" | "conversationParticipants",
   conversationIds: string,
 ): boolean {
-  return (
-    audience === "members" || conversationIds.split(",").some((value) => value.trim().length > 0)
-  );
+  return audience === "members" || splitConversationIds(conversationIds).length > 0;
 }
 
 interface ChannelRouteCandidateInput {
@@ -157,10 +156,7 @@ export function buildChannelRouteCandidate(input: ChannelRouteCandidateInput): {
   route: ChannelConfigurationRecord;
   resource: ChannelConfigurationRecord;
 } {
-  const ids = input.conversationIds
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const ids = splitConversationIds(input.conversationIds);
   const contains = input.contains?.trim();
   const match = {
     kind: input.matchKind,
@@ -444,4 +440,8 @@ function uniqueResourceName(accountId: string, resource: ChannelConfigurationRec
     ordinal += 1;
   }
   return `${base}-${String(ordinal)}`;
+}
+
+export function channelAccountResourceId(channel: string, accountId: string): string {
+  return `${encodeURIComponent(channel)}/${encodeURIComponent(accountId)}`;
 }

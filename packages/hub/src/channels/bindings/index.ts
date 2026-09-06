@@ -167,9 +167,7 @@ export class BindingEngine {
     } else if (route.defaults.requireMention && !message.mentionedBot) {
       return { allowed: false, reason: "not mentioned; requireMention is on" };
     }
-    return (await this.mayUse(message, account, route))
-      ? { allowed: true }
-      : { allowed: false, reason: "sender may not trigger this route" };
+    return this.mayUse(message, account, route);
   }
 
   /**
@@ -275,8 +273,9 @@ export class BindingEngine {
     if (defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
-    if (!(await this.mayUse(message, account, route))) {
-      return { kind: "ignored", reason: "sender may not trigger this route" };
+    const authorization = await this.mayUse(message, account, route);
+    if (!authorization.allowed) {
+      return { kind: "ignored", reason: authorization.reason };
     }
     const executionId = randomUUID();
     // Admitted: the turn is happening. Raise the surface before any daemon
@@ -406,8 +405,9 @@ export class BindingEngine {
     if (route.defaults.requireMention && !message.mentionedBot) {
       return { kind: "ignored", reason: "not mentioned; requireMention is on" };
     }
-    if (!(await this.mayUse(message, account, route))) {
-      return { kind: "ignored", reason: "sender may not trigger this route" };
+    const authorization = await this.mayUse(message, account, route);
+    if (!authorization.allowed) {
+      return { kind: "ignored", reason: authorization.reason };
     }
     const executionId = pendingExecutionId ?? "";
     const agents = await this.context.daemon.listAgents();
@@ -460,8 +460,9 @@ export class BindingEngine {
         reason: admission.reason ?? "follow-up not admitted",
       };
     }
-    if (!(await this.mayUse(message, account, route))) {
-      return { kind: "ignored", reason: "sender may not trigger this route" };
+    const authorization = await this.mayUse(message, account, route);
+    if (!authorization.allowed) {
+      return { kind: "ignored", reason: authorization.reason };
     }
     const leaseId = randomUUID();
     this.openSurface(leaseId, message, account, route, deriveBindingKey(message, route));
@@ -504,15 +505,16 @@ export class BindingEngine {
     message: InboundMessage,
     account: CompiledChannelAccount,
     route: CompiledRoute,
-  ): Promise<boolean> {
-    if (externalParticipantMayTrigger(message, route)) return true;
-    if (mayTrigger(message.senderIdentity, this.context.controlPlane, account, route)) return true;
+  ): ReturnType<ChannelUseAuthorizer> {
+    if (externalParticipantMayTrigger(message, route)) return { allowed: true };
+    if (mayTrigger(message.senderIdentity, this.context.controlPlane, account, route))
+      return { allowed: true };
     return (
       (await this.context.authorizeChannelUse?.({
         organizationId: this.context.organizationId,
         account,
         message,
-      })) ?? false
+      })) ?? { allowed: false, reason: "sender may not trigger this route" }
     );
   }
 

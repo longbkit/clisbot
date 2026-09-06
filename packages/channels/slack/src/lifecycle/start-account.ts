@@ -73,6 +73,18 @@ export function readSlackAccountConfig(
   return entry ?? {};
 }
 
+/** Resolve the bot token from the drive-time cfg (the outbound path reads
+ * tokens from cfg, not from ctx.account — start-account.md "Token source").
+ * Shared with the typing adapter (typing.ts). */
+export function resolveOutboundBotToken(
+  cfg: Record<string, unknown>,
+  accountId: string,
+): string | undefined {
+  const accountConfig = readSlackAccountConfig(cfg, accountId);
+  const token = accountConfig["botToken"];
+  return typeof token === "string" && token.trim() !== "" ? token : undefined;
+}
+
 /**
  * The duplicate-token guard (pinned `findTelegramTokenOwnerAccountId` family;
  * start-account.md "cfg.channels.<ch>.accounts.<id> holds exactly one account

@@ -8,6 +8,8 @@ const RUNTIME_CONTROL_ENV_KEYS = [
   ELECTRON_RUN_AS_NODE,
   "ELECTRON_NO_ATTACH_CONSOLE",
   "ESBUILD_BINARY_PATH",
+  // Clisbot Hub recovery authority must not be inherited by agents or terminals.
+  "CLISBOT_MASTER_PASSWORD",
 ] as const;
 
 export type PaseoNodeEnv = "development" | "production" | "test";
@@ -64,6 +66,7 @@ export function buildSelfNodeCommand(
 } {
   const env = buildExternalProcessEnv(process.env, []);
   Object.assign(env, { [ELECTRON_RUN_AS_NODE]: "1" }, envOverlay);
+  delete env.CLISBOT_MASTER_PASSWORD;
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) {
       delete env[key];

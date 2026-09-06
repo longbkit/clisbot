@@ -5057,7 +5057,7 @@ interface OrganizationTriggerRow extends QueryRow {
   organization_id: string;
   name: string;
   enabled: boolean;
-  format: "single_run" | "legacy_multistep";
+  format: "single_run" | "workflow" | "legacy_multistep";
   active_revision_id: string | null;
   created_at: Date;
   updated_at: Date;

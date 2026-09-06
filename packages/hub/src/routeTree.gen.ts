@@ -58,6 +58,8 @@ import { Route as ShellOOrganizationSlugConnectionsRouteImport } from './routes/
 import { Route as ShellOOrganizationSlugActivityRouteImport } from './routes/_shell/o/$organizationSlug/activity'
 import { Route as ShellOOrganizationSlugTriggersIndexRouteImport } from './routes/_shell/o/$organizationSlug/triggers/index'
 import { Route as ShellOOrganizationSlugSettingsIndexRouteImport } from './routes/_shell/o/$organizationSlug/settings/index'
+import { Route as ApiAuthPaseoCliAuthorizationsInspectRouteImport } from './routes/api/auth/paseo/cli-authorizations/inspect'
+import { Route as ApiAuthPaseoCliAuthorizationsDecisionRouteImport } from './routes/api/auth/paseo/cli-authorizations/decision'
 import { Route as ShellOOrganizationSlugTriggersTriggerIdRouteImport } from './routes/_shell/o/$organizationSlug/triggers/$triggerId'
 import { Route as ShellOOrganizationSlugSettingsUsageRouteImport } from './routes/_shell/o/$organizationSlug/settings/usage'
 import { Route as ShellOOrganizationSlugSettingsTeamRouteImport } from './routes/_shell/o/$organizationSlug/settings/team'
@@ -329,6 +331,18 @@ const ShellOOrganizationSlugSettingsIndexRoute =
     path: '/',
     getParentRoute: () => ShellOOrganizationSlugSettingsRoute,
   } as any)
+const ApiAuthPaseoCliAuthorizationsInspectRoute =
+  ApiAuthPaseoCliAuthorizationsInspectRouteImport.update({
+    id: '/api/auth/paseo/cli-authorizations/inspect',
+    path: '/api/auth/paseo/cli-authorizations/inspect',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAuthPaseoCliAuthorizationsDecisionRoute =
+  ApiAuthPaseoCliAuthorizationsDecisionRouteImport.update({
+    id: '/api/auth/paseo/cli-authorizations/decision',
+    path: '/api/auth/paseo/cli-authorizations/decision',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ShellOOrganizationSlugTriggersTriggerIdRoute =
   ShellOOrganizationSlugTriggersTriggerIdRouteImport.update({
     id: '/$triggerId',
@@ -412,6 +426,8 @@ export interface FileRoutesByFullPath {
   '/o/$organizationSlug/settings/team': typeof ShellOOrganizationSlugSettingsTeamRoute
   '/o/$organizationSlug/settings/usage': typeof ShellOOrganizationSlugSettingsUsageRoute
   '/o/$organizationSlug/triggers/$triggerId': typeof ShellOOrganizationSlugTriggersTriggerIdRoute
+  '/api/auth/paseo/cli-authorizations/decision': typeof ApiAuthPaseoCliAuthorizationsDecisionRoute
+  '/api/auth/paseo/cli-authorizations/inspect': typeof ApiAuthPaseoCliAuthorizationsInspectRoute
   '/o/$organizationSlug/settings/': typeof ShellOOrganizationSlugSettingsIndexRoute
   '/o/$organizationSlug/triggers/': typeof ShellOOrganizationSlugTriggersIndexRoute
 }
@@ -465,6 +481,8 @@ export interface FileRoutesByTo {
   '/o/$organizationSlug/settings/team': typeof ShellOOrganizationSlugSettingsTeamRoute
   '/o/$organizationSlug/settings/usage': typeof ShellOOrganizationSlugSettingsUsageRoute
   '/o/$organizationSlug/triggers/$triggerId': typeof ShellOOrganizationSlugTriggersTriggerIdRoute
+  '/api/auth/paseo/cli-authorizations/decision': typeof ApiAuthPaseoCliAuthorizationsDecisionRoute
+  '/api/auth/paseo/cli-authorizations/inspect': typeof ApiAuthPaseoCliAuthorizationsInspectRoute
   '/o/$organizationSlug/settings': typeof ShellOOrganizationSlugSettingsIndexRoute
   '/o/$organizationSlug/triggers': typeof ShellOOrganizationSlugTriggersIndexRoute
 }
@@ -522,6 +540,8 @@ export interface FileRoutesById {
   '/_shell/o/$organizationSlug/settings/team': typeof ShellOOrganizationSlugSettingsTeamRoute
   '/_shell/o/$organizationSlug/settings/usage': typeof ShellOOrganizationSlugSettingsUsageRoute
   '/_shell/o/$organizationSlug/triggers/$triggerId': typeof ShellOOrganizationSlugTriggersTriggerIdRoute
+  '/api/auth/paseo/cli-authorizations/decision': typeof ApiAuthPaseoCliAuthorizationsDecisionRoute
+  '/api/auth/paseo/cli-authorizations/inspect': typeof ApiAuthPaseoCliAuthorizationsInspectRoute
   '/_shell/o/$organizationSlug/settings/': typeof ShellOOrganizationSlugSettingsIndexRoute
   '/_shell/o/$organizationSlug/triggers/': typeof ShellOOrganizationSlugTriggersIndexRoute
 }
@@ -579,6 +599,8 @@ export interface FileRouteTypes {
     | '/o/$organizationSlug/settings/team'
     | '/o/$organizationSlug/settings/usage'
     | '/o/$organizationSlug/triggers/$triggerId'
+    | '/api/auth/paseo/cli-authorizations/decision'
+    | '/api/auth/paseo/cli-authorizations/inspect'
     | '/o/$organizationSlug/settings/'
     | '/o/$organizationSlug/triggers/'
   fileRoutesByTo: FileRoutesByTo
@@ -632,6 +654,8 @@ export interface FileRouteTypes {
     | '/o/$organizationSlug/settings/team'
     | '/o/$organizationSlug/settings/usage'
     | '/o/$organizationSlug/triggers/$triggerId'
+    | '/api/auth/paseo/cli-authorizations/decision'
+    | '/api/auth/paseo/cli-authorizations/inspect'
     | '/o/$organizationSlug/settings'
     | '/o/$organizationSlug/triggers'
   id:
@@ -688,6 +712,8 @@ export interface FileRouteTypes {
     | '/_shell/o/$organizationSlug/settings/team'
     | '/_shell/o/$organizationSlug/settings/usage'
     | '/_shell/o/$organizationSlug/triggers/$triggerId'
+    | '/api/auth/paseo/cli-authorizations/decision'
+    | '/api/auth/paseo/cli-authorizations/inspect'
     | '/_shell/o/$organizationSlug/settings/'
     | '/_shell/o/$organizationSlug/triggers/'
   fileRoutesById: FileRoutesById
@@ -725,6 +751,8 @@ export interface RootRouteChildren {
   ApiIntegrationsSlackCallbackRoute: typeof ApiIntegrationsSlackCallbackRoute
   ApiIntegrationsSlackEventsRoute: typeof ApiIntegrationsSlackEventsRoute
   ApiManagementV1SplatRoute: typeof ApiManagementV1SplatRoute
+  ApiAuthPaseoCliAuthorizationsDecisionRoute: typeof ApiAuthPaseoCliAuthorizationsDecisionRoute
+  ApiAuthPaseoCliAuthorizationsInspectRoute: typeof ApiAuthPaseoCliAuthorizationsInspectRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1072,6 +1100,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellOOrganizationSlugSettingsIndexRouteImport
       parentRoute: typeof ShellOOrganizationSlugSettingsRoute
     }
+    '/api/auth/paseo/cli-authorizations/inspect': {
+      id: '/api/auth/paseo/cli-authorizations/inspect'
+      path: '/api/auth/paseo/cli-authorizations/inspect'
+      fullPath: '/api/auth/paseo/cli-authorizations/inspect'
+      preLoaderRoute: typeof ApiAuthPaseoCliAuthorizationsInspectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/paseo/cli-authorizations/decision': {
+      id: '/api/auth/paseo/cli-authorizations/decision'
+      path: '/api/auth/paseo/cli-authorizations/decision'
+      fullPath: '/api/auth/paseo/cli-authorizations/decision'
+      preLoaderRoute: typeof ApiAuthPaseoCliAuthorizationsDecisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell/o/$organizationSlug/triggers/$triggerId': {
       id: '/_shell/o/$organizationSlug/triggers/$triggerId'
       path: '/$triggerId'
@@ -1272,6 +1314,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiIntegrationsSlackCallbackRoute: ApiIntegrationsSlackCallbackRoute,
   ApiIntegrationsSlackEventsRoute: ApiIntegrationsSlackEventsRoute,
   ApiManagementV1SplatRoute: ApiManagementV1SplatRoute,
+  ApiAuthPaseoCliAuthorizationsDecisionRoute:
+    ApiAuthPaseoCliAuthorizationsDecisionRoute,
+  ApiAuthPaseoCliAuthorizationsInspectRoute:
+    ApiAuthPaseoCliAuthorizationsInspectRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

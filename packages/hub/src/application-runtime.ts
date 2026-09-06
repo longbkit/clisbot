@@ -178,6 +178,8 @@ async function createOwnedApplicationRuntime(
     channelSupervisor,
     accessLeaseRevocation,
     application.publicOperations,
+    application.operations.handleOrganizationDaemonRevocation,
+    application.operations.handleOrganizationDaemonRename,
     async (request, input) => {
       const action = connections.get(input.provider)?.actions["disconnect"];
       if (action === undefined) {
@@ -504,6 +506,8 @@ function createManagementApi(
   channelSupervisor: import("./channels/supervisor/types.js").ChannelSupervisor | null,
   accessLeaseRevocation: AccessLeaseRevocation | null,
   publicOperations: import("./public-operations/index.js").PublicOperations | null,
+  revokeDaemon: NonNullable<ConstructorParameters<typeof ManagementApi>[0]["revokeDaemon"]>,
+  renameDaemon: NonNullable<ConstructorParameters<typeof ManagementApi>[0]["renameDaemon"]>,
   disconnectProviderConnection: NonNullable<
     ConstructorParameters<typeof ManagementApi>[0]["disconnectProviderConnection"]
   >,
@@ -529,6 +533,8 @@ function createManagementApi(
     disconnectProviderConnection,
     accessLeaseRevocation,
     manualRuns: publicOperations,
+    revokeDaemon,
+    renameDaemon,
   });
 }
 
@@ -560,6 +566,7 @@ async function createChannelSupervisorAtComposition(
       database,
       databaseRuntime,
       dataDir: hubDataDir,
+      ...(options.publicBaseUrl === undefined ? {} : { publicBaseUrl: options.publicBaseUrl }),
       // The packaged pins file lives at the Hub package root; in the Vite
       // bundle `import.meta.url` points into `.output/`, so pin it explicitly.
       pinsPath: runtimeFile("channel-pins.json"),
@@ -569,7 +576,7 @@ async function createChannelSupervisorAtComposition(
         ? {}
         : {
             authorizeChannelUse: ({ organizationId, account, message }) =>
-              access.allowsChannelPrivilege({
+              access.authorizeChannelPrivilege({
                 organizationId,
                 connectionId: account.connectionId,
                 channel: account.channel,
@@ -652,6 +659,7 @@ async function createChannelReplyServerAtComposition(
     return createChannelReplyServer({
       organizationId: organizations[0]!.id,
       store: new ChannelStore(options.databaseRuntime),
+      outputStore: options.database,
       resolveCapability: (token) =>
         supervisor.channelReplyCapabilities?.resolve(token, organizations[0]!.id),
       post: (ref, text) => supervisor.channelReplyPost(ref, text),
@@ -679,6 +687,7 @@ function hubApplicationOptions(
 ): HubRuntimeOptions {
   return {
     database: options.database,
+    ...(options.providerApplications ? { providerApplications: options.providerApplications } : {}),
     ...(options.databaseRuntime === undefined ? {} : { databaseRuntime: options.databaseRuntime }),
     ...(accessStore === null ? {} : { accessStore }),
     ...(accessTickets === null ? {} : { accessTickets }),

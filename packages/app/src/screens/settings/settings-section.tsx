@@ -5,6 +5,7 @@ import { settingsStyles } from "@/styles/settings";
 
 interface SettingsSectionProps {
   title: string;
+  prominence?: "default" | "primary";
   trailing?: ReactNode;
   testID?: string;
   style?: StyleProp<ViewStyle>;
@@ -23,6 +24,7 @@ interface SettingsSectionProps {
  */
 export function SettingsSection({
   title,
+  prominence = "default",
   trailing,
   testID,
   style,
@@ -36,7 +38,14 @@ export function SettingsSection({
   return (
     <View style={sectionStyle} testID={testID}>
       <View style={styles.header}>
-        <Text style={settingsStyles.sectionHeaderTitle}>{title}</Text>
+        <Text
+          style={[
+            settingsStyles.sectionHeaderTitle,
+            prominence === "primary" ? styles.primaryTitle : null,
+          ]}
+        >
+          {title}
+        </Text>
         {trailing}
       </View>
       <View style={styles.content}>{children}</View>
@@ -45,6 +54,11 @@ export function SettingsSection({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  primaryTitle: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",

@@ -14,7 +14,8 @@ import { statSync } from "node:fs";
 import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
 import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
 import { getSlackWriteClient, isSilentReplyText } from "./client/web-api.js";
-import { readSlackAccountConfig } from "./lifecycle/start-account.js";
+import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
+import { refreshSlackTypingAfterPost } from "./typing.js";
 import { getSlackRuntime } from "./runtime.js";
 import { renderSlackMrkdwn } from "./mrkdwn.js";
 import { uploadSlackFile } from "./outbound-media.js";
@@ -30,18 +31,6 @@ export interface SlackSentMessageRecord {
 /** The keyed-store seam namespace (state-store-namespaces.md §Slack). */
 export const SLACK_SENT_MESSAGES_NAMESPACE = "slack.sent-messages";
 export const SLACK_SENT_MESSAGES_MAX_ENTRIES = 10_000;
-
-/** Resolve the bot token from the drive-time cfg (the outbound path reads
- * tokens from cfg, not from ctx.account — start-account.md "Token source").
- * Shared with the typing adapter (typing.ts). */
-export function resolveOutboundBotToken(
-  cfg: Record<string, unknown>,
-  accountId: string,
-): string | undefined {
-  const accountConfig = readSlackAccountConfig(cfg, accountId);
-  const token = accountConfig["botToken"];
-  return typeof token === "string" && token.trim() !== "" ? token : undefined;
-}
 
 /** The keyed-store key for one sent message (accountId-scoped). */
 export function slackSentMessageKey(accountId: string, conversationId: string, ts: string): string {
@@ -169,6 +158,7 @@ export async function sendSlackText(args: Parameters<SendTextFn>[0]): Promise<{
   });
   /* eslint-enable eslint-plugin-unicorn/require-post-message-target-origin */
   const messageId = result.ts ?? "";
+  await refreshSlackTypingAfterPost({ accountId, to, threadId });
   void recordSlackSentMessage({
     accountId,
     conversationId: to,
@@ -279,6 +269,7 @@ export const sendMedia: SendMediaFn = async (args) => {
     channelId: String(to),
     ...(threadId !== undefined && threadId !== "" ? { threadTs: threadId } : {}),
   });
+  await refreshSlackTypingAfterPost({ accountId, to: String(to), threadId });
   // `completeUploadExternal` returns the file id, not the new message ts; the
   // sent-file record keys on the file id (a file post's channel-native id).
   void recordSlackSentMessage({

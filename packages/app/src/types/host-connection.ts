@@ -62,6 +62,8 @@ export interface HubHostManagement {
   hubOrigin: string;
   organizationId: string;
   daemonId: string;
+  /** Last shared Hub name, used to preserve a user-chosen local label on rename. */
+  daemonSlug?: string;
 }
 
 export interface HostProfile {
@@ -278,7 +280,12 @@ export function upsertHostConnectionInProfiles(input: {
   );
   const nextLifecycle = prev.lifecycle;
   const nextManagement = input.management ?? prev.management;
-  const nextLabel = prev.label === prev.serverId ? derivedLabel : prev.label;
+  const followsHubName =
+    labelTrimmed.length > 0 &&
+    prev.management?.daemonSlug !== undefined &&
+    prev.label === prev.management.daemonSlug &&
+    nextManagement?.daemonSlug !== undefined;
+  const nextLabel = prev.label === prev.serverId || followsHubName ? derivedLabel : prev.label;
   const nextPreferredConnectionId =
     prev.preferredConnectionId &&
     nextConnections.some((connection) => connection.id === prev.preferredConnectionId)
@@ -441,6 +448,7 @@ const StoredHostProfileSchema = z.strictObject({
       hubOrigin: z.string().url(),
       organizationId: z.string().min(1),
       daemonId: z.string().min(1),
+      daemonSlug: z.string().min(1).optional(),
     })
     .optional(),
   connections: z.array(StoredHostConnectionSchema).min(1),
