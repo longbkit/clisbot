@@ -305,6 +305,12 @@ async function channelActionCall(
       ...(capability.requesterSenderId === undefined
         ? {}
         : { requesterSenderId: capability.requesterSenderId }),
+      // The inbound message this turn is answering: the ported runner reads it
+      // as the CURRENT message (`react` with no id, and the current-message
+      // mutation shortcut).
+      ...(capability.requesterMessageId === undefined
+        ? {}
+        : { requesterMessageId: capability.requesterMessageId }),
       // Only `send` reaches this seam; a non-send action that asks core for a
       // durable send is a vertical bug, and failing loudly is the honest answer.
       send: async (params) => await mcp.post(ref, params.text),

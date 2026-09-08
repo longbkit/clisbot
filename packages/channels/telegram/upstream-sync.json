@@ -275,9 +275,14 @@
       "deviation": ["D-TG-052"]
     },
     {
+      "local": "src/fusion/message-action-refusal.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-058"]
+    },
+    {
       "local": "src/fusion/message-thread-observation.ts",
       "status": "fusion-owned",
-      "note": "Seam for the provider-observed thread binding `message-topic-binding.ts` needs; upstream reads its file-backed message cache (D-TG-031). Slice 20 installs the Hub-backed observation store."
+      "note": "The account's message-observation store: the read `message-topic-binding.ts` performs (D-TG-031) and the writes `fusion/admission.ts` (inbound) and `outbound-message-context.ts` (the bot's own sends) perform. It exists so writer and reader open the SAME cache: upstream's `createTelegramMessageCache()` resolves its persistent store from the ambient account runtime (D-TG-046), which the inbound transport has and a Hub `message` tool call does not, so the read fell back to a per-call in-memory map and refused every delegated topic edit/react. Opened by account id here instead."
     },
     {
       "local": "src/fusion/polling-session.test.ts",
@@ -392,7 +397,7 @@
       "local": "src/message-topic-binding.ts",
       "upstream": "extensions/telegram/src/message-topic-binding.ts",
       "status": "adapted",
-      "deviation": ["D-TG-031"]
+      "deviation": ["D-TG-031", "D-TG-058"]
     },
     {
       "local": "src/native-button-params.ts",
@@ -448,7 +453,7 @@
     {
       "local": "src/plugin.ts",
       "status": "fusion-owned",
-      "deviation": ["D-TG-027", "D-TG-057"]
+      "deviation": ["D-TG-027", "D-TG-057", "D-TG-058"]
     },
     {
       "local": "src/poll-answer-context.ts",
@@ -1155,7 +1160,7 @@
     },
     {
       "id": "D-TG-018",
-      "reason": "Prompt context is a Fusion boundary. `recordOutboundMessageForPromptContext` writes every outbound message into OpenClaw's Telegram message cache (`message-cache.ts`, ~1000 lines over the session store) so the agent's next prompt sees the bot's own turns; `prompt-context-projection.ts` stamps and parses the transcript marker on `ReplyPayload.channelData.telegram`. The Hub owns conversation history and prompt context in Fusion, so the recorder keeps upstream's signature and reports `false` (\"not recorded\"), and only the per-chunk projection cursor is carried. The message shapes the ported senders pass around are verbatim.",
+      "reason": "Prompt context is a Fusion boundary; the outbound OBSERVATION is not. Upstream's `recordOutboundMessageForPromptContext` writes every outbound message into OpenClaw's Telegram message cache so the agent's next prompt sees the bot's own turns AND so a later delegated mutation of a message the bot sent is authorized against the topic the provider put it in (D-TG-031). The cache write is carried, keyed by account through `src/fusion/message-thread-observation.ts`; upstream's group-history recorder (the self-history window, Hub-owned here) and its session-store-derived cache scope are not, and only the per-chunk projection cursor of `prompt-context-projection.ts` is carried. The message shapes the ported senders pass around are verbatim; `buildTelegramSelfSenderName` is inlined because its module (`group-history-window.ts`) is not ported.",
       "file": "src/outbound-message-context.ts"
     },
     {
@@ -1218,7 +1223,7 @@
     {
       "id": "D-TG-031",
       "file": "src/message-topic-binding.ts",
-      "reason": "The final step of a delegated forum-topic mutation reads the provider observation of the message being mutated. Upstream loads its file-backed Telegram message cache (`message-cache.ts`, 1022 lines over the OpenClaw session store) and asks `hasProviderObservedTelegramThreadBinding`. Fusion records no inbound observation yet (inbound parity is goal slice 20), so that one read moves to `src/fusion/message-thread-observation.ts`, which answers \"not observed\". Every decision upstream makes before it — direct-operator bypass, requester-account match, exact-chat match, thread-context rules, the server-owned current-message shortcut — is carried verbatim, and the missing observation takes upstream's own deny branch rather than allowing an unattested chat id.",
+      "reason": "The final step of a delegated forum-topic mutation reads the provider observation of the message being mutated. Upstream loads its file-backed Telegram message cache (`message-cache.ts`, 1022 lines over the OpenClaw session store) and asks `hasProviderObservedTelegramThreadBinding`. Fusion performs the same read through `src/fusion/message-thread-observation.ts`, which opens the ported cache BY ACCOUNT ID (upstream resolves it from the ambient runtime scope, which a Hub `message` tool call does not have) over the account's Hub keyed store. Every decision upstream makes before that read — direct-operator bypass, requester-account match, exact-chat match, thread-context rules, the server-owned current-message shortcut — is carried verbatim, and a message nobody observed still takes upstream's deny branch. The refusal additionally notes itself for D-TG-058.",
       "tests": ["src/action-runtime.test.ts"]
     },
     {
@@ -1260,6 +1265,11 @@
       "file": "src/presentation-outbound.ts",
       "reason": "Upstream renders a portable presentation through core's delivery adapter: the channel declares `presentationCapabilities` and core adapts the presentation to them before the channel renders it (`renderPresentationForDelivery` -> `adaptMessagePresentationForChannel`); the Telegram renderer itself (`interactive-fallback.ts` `resolveTelegramPresentationCapabilities`, `renderTelegramTableIsland`, `canonicalizeTelegramPresentationPayload`) was reachable only from the vertical's own `handleAction`, which the Hub bypasses (`forceCoreDelivery: true`). Fusion's Hub drives `plugin.outbound.sendText`, so the two steps run in the vertical: `src/presentation-outbound.ts` admits the presentation (D-W6-02 caption repair) and renders it through the ported `canonicalizeTelegramPresentationPayload` at THIS account's capabilities, and `sendText` posts the result. `plugin.outbound` now declares `presentationCapabilities` (upstream's spelling) so the Hub stops flattening the presentation before the seam (D-W6-01). One plugin object serves every account, so the declaration is the vertical's maximum (a rich account) and the per-account limits are resolved per send: a table posts as a native Bot API 10.3 `table` block where `richMessages` is on and as the portable fallback text otherwise, and a chart is always fallback text because Telegram has no chart primitive.",
       "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-TG-058",
+      "file": "src/fusion/message-action-refusal.ts",
+      "reason": "A refused delegated mutation must stay legible. Upstream's `react` catch (`action-runtime.ts`, verbatim) classifies the throw as REACTION_INVALID or answers `{ reason: \"error\", hint: \"Reaction failed. Do not retry.\" }`, so the topic-binding refusal reached the model as \"it failed\" and reached the operator log as nothing (wave 6d, live). The catch is upstream's, so the reason is carried beside it: `message-topic-binding.ts` notes the refusal on the call's own async slot and `plugin.ts` wraps the action adapter so the noted reason replaces `reason: \"error\"` with `unbound_topic_mutation` and the refusal text. Upstream's result shape is unchanged — a jsonResult, still `ok: false`."
     }
   ]
 }

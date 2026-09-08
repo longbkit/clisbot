@@ -3,7 +3,7 @@
 // the row carrying the expected text had no `UserID` and the driver reported
 // `identity-mismatch` against the marker it had just posted itself.
 import assert from "node:assert/strict";
-import { describe, it } from "vitest";
+import { describe, it } from "node:test";
 import { parseSlackCsv } from "./slack-live-assert.mjs";
 
 const HEADER = "MsgID,UserID,UserName,Text,Time,FileCount\n";

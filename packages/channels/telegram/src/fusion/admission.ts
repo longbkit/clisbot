@@ -10,9 +10,9 @@
 import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
 import type { Message } from "grammy/types";
 import { resolveTelegramMessageThreadSpec } from "../bot/helpers.js";
-import { createTelegramMessageCache } from "../message-cache.js";
 import { foldInboundTelegramMediaGroup, type TelegramMessageShape } from "../transport/media.js";
 import type { TelegramInboundBuild } from "./inbound-adapter.js";
+import { recordTelegramMessageObservation } from "./message-thread-observation.js";
 
 export interface TelegramAdmissionOptions {
   accountId: string;
@@ -32,13 +32,12 @@ export interface TelegramAdmissionOptions {
 export function buildTelegramAdmission(
   options: TelegramAdmissionOptions,
 ): (build: TelegramInboundBuild) => Promise<void> {
-  const cache = createTelegramMessageCache({ scope: options.accountId });
   return async (build) => {
     // Record the provider observation BEFORE the handoff: the thread binding a
     // delegated mutation is authorized against is what the provider actually
     // showed us, and a later admission failure must not erase that fact
     // (`fusion/message-thread-observation.ts`, D-TG-031).
-    await recordObservations(options, cache, build);
+    await recordObservations(options, build);
     const folded = await foldMedia(options, build);
     // A run whose whole body folded away (every attachment failed, no text) is
     // nothing to admit; it still advances the watermark.
@@ -49,7 +48,6 @@ export function buildTelegramAdmission(
 
 async function recordObservations(
   options: TelegramAdmissionOptions,
-  cache: ReturnType<typeof createTelegramMessageCache>,
   build: TelegramInboundBuild,
 ): Promise<void> {
   for (const message of build.messages as unknown as Message[]) {
@@ -57,7 +55,7 @@ async function recordObservations(
     if (chatId === undefined) continue;
     const threadSpec = resolveTelegramMessageThreadSpec(message);
     try {
-      await cache.record({
+      await recordTelegramMessageObservation({
         accountId: options.accountId,
         chatId,
         msg: message,

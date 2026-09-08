@@ -10,6 +10,7 @@ import type { ChannelPlugin, HostRuntime } from "@getpaseo/channels-shared";
 import { resolveTelegramConversation } from "./conversation-metadata.js";
 import { startTelegramAccount } from "./lifecycle/start-account.js";
 import { getHostRuntime } from "./runtime-store.js";
+import { withTelegramMutationRefusalReason } from "./fusion/message-action-refusal.js";
 import { disposeTelegramRuntime } from "./fusion/runtime.js";
 import { sendMedia, sendText, updateText } from "./outbound.js";
 import { TELEGRAM_PRESENTATION_CAPABILITIES } from "./presentation-outbound.js";
@@ -49,8 +50,10 @@ import {
 
 export const telegramPlugin: ChannelPlugin = {
   directory: { resolveConversation: resolveTelegramConversation },
-  /** Message-tool discovery, schema contributions and target aliases (slice 11 dispatches). */
-  actions: telegramMessageActions,
+  /** Message-tool discovery, schema contributions and target aliases (slice 11
+   * dispatches). Wrapped so a delegated mutation upstream's `react` catch
+   * swallows still reports why it was refused (`fusion/message-action-refusal.ts`). */
+  actions: withTelegramMutationRefusalReason(telegramMessageActions),
   gateway: {
     startAccount: (ctx) =>
       startTelegramAccount(

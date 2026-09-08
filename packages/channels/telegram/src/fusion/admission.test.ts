@@ -244,4 +244,43 @@ describe("provider-observed thread binding (D-TG-031)", () => {
       clearTelegramRuntimeForTest();
     }
   });
+
+  it("reads the account's own store with no ambient runtime scope (the Hub's shape)", async () => {
+    // The live shape: the Hub installs one runtime PER ACCOUNT and dispatches a
+    // `message` tool call on its own stack, so the read has no
+    // `withTelegramAccount` scope. Resolving the store from the ambient runtime
+    // (upstream's `createTelegramMessageCache()`) fell back to a per-call
+    // in-memory map here and refused every delegated topic mutation (wave 6d).
+    installMemoryTelegramRuntime("acct");
+    try {
+      const admit = buildTelegramAdmission({
+        accountId: "acct",
+        botToken: BOT_TOKEN,
+        apiRoot: "https://api.telegram.org",
+        abortSignal: new AbortController().signal,
+        botId: PARAMS.botId,
+        handleInbound: async () => undefined,
+      });
+      await admit(
+        build([
+          message(62, {
+            text: "in topic 9",
+            message_thread_id: 9,
+            is_topic_message: true,
+            chat: { id: -100_000_000_001, type: "supergroup", is_forum: true, title: "Forum" },
+          }),
+        ]),
+      );
+      await expect(
+        hasProviderObservedTelegramThreadBinding({
+          accountId: "acct",
+          chatId: "-100000000001",
+          messageId: "62",
+          threadId: 9,
+        }),
+      ).resolves.toBe(true);
+    } finally {
+      clearTelegramRuntimeForTest("acct");
+    }
+  });
 });

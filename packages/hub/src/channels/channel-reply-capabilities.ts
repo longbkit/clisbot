@@ -38,6 +38,20 @@ export interface ChannelReplyCapability {
    * and both consumers fail closed rather than guess. */
   requesterSenderId?: string | undefined;
   /**
+   * The channel-native id of the inbound message this turn is answering
+   * (Telegram message id, Slack `ts`).
+   *
+   * The ported message tool treats it as the CURRENT message: `react` with no
+   * `messageId` targets it, and a delegated mutation of it needs no stored
+   * provider observation because the id is the Hub's, not the model's
+   * (`telegram/src/message-topic-binding.ts`). Restamped per turn beside
+   * `turnId`; without it the model has to guess an id out of the prompt and
+   * `react` answers `missing_message_id`.
+   *
+   * Not persisted, for the same reason as `turnId`: it belongs to the turn.
+   */
+  requesterMessageId?: string | undefined;
+  /**
    * The plane's id for the turn this capability is answering right now — the
    * binding engine's per-inbound execution/lease id, restamped by `noteTurn`
    * on every follow-up.
@@ -66,6 +80,9 @@ export interface ChannelReplyCapabilityInput {
   projectRoot?: string | undefined;
   outputBudget?: ChannelReplyOutputBudget | undefined;
   requesterSenderId?: string | undefined;
+  /** The inbound message the turn is answering (see
+   * `ChannelReplyCapability.requesterMessageId`). */
+  requesterMessageId?: string | undefined;
   /** The turn that minted the capability (see `ChannelReplyCapability.turnId`). */
   turnId?: string | undefined;
   /** Channel-path output ceiling for one turn; absent = the registry default. */
@@ -170,7 +187,7 @@ export interface ChannelReplyCapabilityService {
    * steers a bound session calls this before the prompt goes out; the tool's
    * delivery keys and its output ceiling are scoped by it.
    */
-  noteTurn(agentId: string, turnId: string): void;
+  noteTurn(agentId: string, turnId: string, requesterMessageId?: string): void;
   /**
    * Reserve one output against the current turn's ceiling. `undefined` means
    * the capability is gone or the turn has spent its ceiling — either way the
@@ -308,11 +325,14 @@ export class ChannelReplyCapabilityRegistry implements ChannelReplyCapabilitySer
    * turn a fresh output ceiling. Silent for an Agent this process holds no
    * capability for: not every session is a channel session.
    */
-  noteTurn(agentId: string, turnId: string): void {
+  noteTurn(agentId: string, turnId: string, requesterMessageId?: string): void {
     if (agentId === "" || turnId === "") return;
     for (const capability of this.capabilities.values()) {
       if (capability.agentId !== agentId || capability.turnId === turnId) continue;
       capability.turnId = turnId;
+      // The current message moves with the turn: the tool's `react` default and
+      // the current-message mutation shortcut both read it.
+      capability.requesterMessageId = requesterMessageId;
       capability.turn = { posted: 0, inFlight: 0, max: capability.turn.max };
     }
   }

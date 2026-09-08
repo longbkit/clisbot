@@ -383,10 +383,11 @@ describe("a pre-0065 channel database migrates to latest", () => {
       }),
       {
         account: { accountId: TELEGRAM_ACCOUNT, token: TELEGRAM_BOT_TOKEN, config: {} },
+        // Flat, once (D-TG-056): the carrier stopped writing the nested
+        // `config` sub-object when `client/bot-api.ts` stopped reading it.
         cfgAccount: {
           botToken: TELEGRAM_BOT_TOKEN,
           gatewayClientScopes: [],
-          config: { apiRoot: "https://api.telegram.org" },
           apiRoot: "https://api.telegram.org",
         },
       },

@@ -31,6 +31,7 @@ import {
 } from "../channel-reply-capabilities.js";
 import {
   SLACK_THREAD_TS_PATTERN,
+  type ChannelReplyBindingRef,
   type InboundConversationDetail,
   type InboundMessage,
   type InboundOutcome,
@@ -493,7 +494,7 @@ export class BindingEngine {
     this.context.processing?.bind(leaseId, agentId);
     // The session's reply capability now answers for THIS turn: its delivery
     // keys and its per-turn output ceiling both reset here.
-    this.context.replyCapabilities?.noteTurn(agentId, leaseId);
+    this.context.replyCapabilities?.noteTurn(agentId, leaseId, message.externalMessageId);
     await subscribe?.(agentId);
     try {
       await this.context.daemon.sendAgentMessage(agentId, message.text, {
@@ -547,6 +548,52 @@ export class BindingEngine {
   }
 
   /**
+   * Mint the turn's reply capability for a `outbound.path: tool` route.
+   *
+   * Everything on it is the Hub's, never the model's: the conversation it may
+   * post into, the turn it is answering, the requester it acts for, and the
+   * inbound message that turn is answering.
+   */
+  private issueReplyCapability(input: {
+    account: CompiledChannelAccount;
+    route: CompiledRoute;
+    ref: ChannelReplyBindingRef;
+    executionId: string;
+    requester: InboundMessage;
+    target: Extract<CompiledRoute["target"], { kind: "agent" }>;
+  }): { token: string; canSendFiles: boolean } {
+    const { account, route, ref, executionId, requester } = input;
+    const capabilities = this.context.replyCapabilities;
+    const accessTarget = this.context.resolveAgentAccessTarget?.(input.target);
+    if (capabilities === undefined || accessTarget === undefined) {
+      throw new Error("Channel reply capability is unavailable");
+    }
+    const token = capabilities.issue({
+      organizationId: this.context.organizationId,
+      channelRevisionId: this.context.channelRevisionId ?? null,
+      routePosition: routePosition(account, route),
+      routeFingerprint: routeFingerprint(route),
+      ref,
+      // The turn that is minting the session. Every later turn restamps it
+      // (`noteTurn` in `followUp`): the tool's idempotency keys and its
+      // output ceiling are scoped by the turn, and the model reuses
+      // "reply-1" in every one of them.
+      turnId: executionId,
+      // The turn's requester, in the native form the platform reports back:
+      // the ported channel tools authorize against it, and a command button
+      // this Agent posts is clickable only by them.
+      requesterSenderId: nativeSenderId(account.channel, requester.senderIdentity),
+      // The message this turn is answering, so the tool's `react` has a
+      // current message to target (see `requesterMessageId`).
+      ...(requester.externalMessageId === undefined
+        ? {}
+        : { requesterMessageId: requester.externalMessageId }),
+      ...(accessTarget.projectRoot === undefined ? {} : { projectRoot: accessTarget.projectRoot }),
+    });
+    return { token, canSendFiles: accessTarget.projectRoot !== undefined };
+  }
+
+  /**
    * Issue the trusted `create_agent_request` with the route's agent target. The
    * bot is created IDLE (implementation doc §2.1): the caller delivers the
    * first channel prompt only after it has subscribed the session's stream,
@@ -577,35 +624,12 @@ export class BindingEngine {
       ...ref,
     });
     const target = routeTarget;
-    let capabilityToken: string | undefined;
-    let canSendFiles = false;
-    if (route.defaults.outbound.path === "tool") {
-      const capabilities = this.context.replyCapabilities;
-      const accessTarget = this.context.resolveAgentAccessTarget?.(target);
-      if (capabilities === undefined || accessTarget === undefined) {
-        throw new Error("Channel reply capability is unavailable");
-      }
-      capabilityToken = capabilities.issue({
-        organizationId: this.context.organizationId,
-        channelRevisionId: this.context.channelRevisionId ?? null,
-        routePosition: routePosition(account, route),
-        routeFingerprint: routeFingerprint(route),
-        ref,
-        // The turn that is minting the session. Every later turn restamps it
-        // (`noteTurn` in `followUp`): the tool's idempotency keys and its
-        // output ceiling are scoped by the turn, and the model reuses
-        // "reply-1" in every one of them.
-        turnId: executionId,
-        // The turn's requester, in the native form the platform reports back:
-        // the ported channel tools authorize against it, and a command button
-        // this Agent posts is clickable only by them.
-        requesterSenderId: nativeSenderId(account.channel, requester.senderIdentity),
-        ...(accessTarget.projectRoot === undefined
-          ? {}
-          : { projectRoot: accessTarget.projectRoot }),
-      });
-      canSendFiles = accessTarget.projectRoot !== undefined;
-    }
+    const issued =
+      route.defaults.outbound.path === "tool"
+        ? this.issueReplyCapability({ account, route, ref, executionId, requester, target })
+        : undefined;
+    const capabilityToken = issued?.token;
+    const canSendFiles = issued?.canSendFiles === true;
     try {
       const baseConfig = this.context.resolveAgentSpec(
         target,

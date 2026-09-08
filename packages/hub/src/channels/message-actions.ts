@@ -311,6 +311,11 @@ export interface ChannelMessageActionRequest extends ChannelAccountScope {
    * Discord's guild-admin actions) read it as `requesterSenderId`; without it
    * they either fail closed or act with no requester at all. */
   requesterSenderId?: string | undefined;
+  /** The channel-native id of the inbound message the turn is answering. The
+   * ported runner reads it as the CURRENT message: `react` with no `messageId`
+   * targets it, and a delegated mutation of it is server-owned, so it needs no
+   * stored provider observation. */
+  requesterMessageId?: string | undefined;
   agentId?: string;
   sessionId?: string;
   idempotencyKey?: string;
@@ -404,6 +409,9 @@ function messageActionInput(
     ...(request.conversation.threadId === undefined
       ? {}
       : { currentThreadTs: request.conversation.threadId }),
+    ...(request.requesterMessageId === undefined
+      ? {}
+      : { currentMessageId: request.requesterMessageId }),
   };
   return {
     cfg: getChannelDriveConfig(request),

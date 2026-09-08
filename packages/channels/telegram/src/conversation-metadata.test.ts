@@ -29,9 +29,13 @@ it("fetches the group title without claiming a forum topic name or exposing chat
     visibility: "unknown",
   });
   expect(getChat).toHaveBeenCalledWith("-123");
+  // The port made the per-method table (`request-timeouts.ts`) own the request
+  // bound and a configured `timeoutSeconds` only a floor over it, so the client
+  // is built with the send floor (60s) and this `getChat` is bounded at the
+  // table's 15s — the 5 asked for above can no longer lower either.
   expect(createTelegramApi).toHaveBeenCalledWith(
     "test-token",
-    expect.objectContaining({ timeoutSeconds: 5 }),
+    expect.objectContaining({ timeoutSeconds: 60 }),
   );
 });
 it("does not use a renamed alias or mismatched chat ID as another destination", async () => {

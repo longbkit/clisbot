@@ -254,7 +254,8 @@
     },
     {
       "local": "src/fusion/commands.ts",
-      "status": "fusion-owned"
+      "status": "fusion-owned",
+      "deviation": ["D-DC-014"]
     },
     {
       "local": "src/fusion/runtime-env.ts",

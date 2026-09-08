@@ -1449,3 +1449,97 @@ clear`, start it again — then the next marker binds a fresh session.
 - Forward read-back is still the only way to see a bot-authored reply's blocks,
   and the forwarded copy carries no `text` for a `rich_message` — read
   `rich_message.blocks`, not `text`.
+
+## Wave 7 — forum-topic mutations (2026-09-08, ledger R12)
+
+Same Hub home (`~/.clisbot-dev:6868`, `claude`/`claude-sonnet-5`). HEAD
+`e27af21f3` (the slash-command work) plus the R12 fixes:
+`fusion/message-thread-observation.ts` opens the account's observation cache by
+account id, `outbound-message-context.ts` records the bot's own sends into it
+(D-TG-018), `fusion/message-action-refusal.ts` carries the refusal reason across
+upstream's `react` catch (D-TG-058), and the Hub carries the inbound message id
+on the reply capability (`requesterMessageId` → `toolContext.currentMessageId`).
+`.hub-revision-write15.mjs telegram-dm-tool` put `outbound.path: tool` on the
+Telegram dm route (group and topic already had it) — revision `647e9518` v8 —
+bindings cleared with `.hub-bindings12.mjs clear`, `packages/channels/telegram`
+and `npm run build:hub` rebuilt, Hub restarted (PID `3195874`, which produced
+every row below; a post-wave lint extraction in `bindings/index.ts` was rebuilt
+and restarted after, PID `3260521`).
+
+| #   | Scenario                                    | Verdict | Evidence                                                                                          |
+| --- | ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| 7.1 | Topic `edit` of the bot's own reply         | PASS    | topic-1 msgs 219 and 223 — sent, then edited to `… EDITED`, read back off the platform            |
+| 7.2 | Topic `react` on the message being answered | PASS    | root msg 222 → `{"ok":true,"action":"react","result":{"added":"👍"}}`                             |
+| 7.3 | Refused mutation is legible                 | PASS    | root msg 218 drive → `reason: "unbound_topic_mutation"` + the binding text, not "Reaction failed" |
+| 7.4 | Basic group replies through the tool        | PASS    | group msg 474 → tool `send` msg 590, `deliveryId: channel-reply:b44b94f6…`                        |
+| 7.5 | Slash commands, Telegram                    | PASS    | `/help` msg 593, `/status` 595, `/me` 597, `/new` 600 — all answered                              |
+| 7.6 | Slash commands, Slack                       | PASS    | `/help` ts `1788855700.833549` in `SLACK_TEST_CHANNEL`; `/status` and `/me` answered privately    |
+
+### 7.1–7.3 — the D-TG-031 gate, live
+
+Drive 1 (root msg 218) asked for send → react → edit through the message tool.
+`send` posted msg 219, `edit` on 219 returned
+`{"ok":true,"action":"edit","messageId":"219"}` and the forwarded copy read
+`rich_message.blocks = [{paragraph "PONG-W7A EDITED"}]` — **the mutation wave 6d
+could not make**: the bot's own send is now recorded as a provider observation of
+topic 2, so the gate authorizes an edit of it. `react` failed twice and both
+failures were legible for the first time: with an explicit id the model had
+guessed the SENDER id (`1276408333`) out of the prompt and got
+`reason: "unbound_topic_mutation"` with the binding text (D-TG-058, previously
+`reason: "error"` / "Reaction failed. Do not retry."), and with no id at all it
+got `missing_message_id` — the Hub was not passing the inbound message id into
+the tool context, so upstream's own "react to the message you are answering"
+default had nothing to resolve.
+
+Drive 2 (root msg 222), after `requesterMessageId` landed: `send` posted msg 223,
+`react` with only an emoji returned `{"ok":true,"action":"react","result":{"ok":
+true,"added":"👍"}}`, and `edit` on 223 returned ok, read back as
+`PONG-W7B EDITED` off the platform. A bot's own reaction is not delivered as a
+`message_reaction` update to another bot even when the reader is an admin, so
+the Bot API's acceptance is the read-back for a reaction; the edit is read back
+by forwarding.
+
+### 7.4 — the basic group
+
+Drive 1 (msg 473) produced an assistant turn that never called the tool, and the
+user got nothing: with `outbound.path: tool` there is no relay fallback for the
+final answer, so a turn that skips the tool posts nothing at all (the injected
+system prompt says exactly that: "Skip tool = user gets nothing"). Drive 2
+(msg 474) named the tool and it posted msg 590 (`chatId=-5229819225`,
+`sendRichMessage`), read back by forwarding as `PONG-W7D`.
+
+### 7.5–7.6 — the slash commands
+
+Telegram (`TELEGRAM_TEST_GROUP_ID`): `/help` answered in the group (msg 593,
+the native rich list), `/status` (595) and `/me` (597) answered privately, `/new`
+(600) replied "Session cleared. Your next message starts a fresh session." Slack
+(`SLACK_TEST_CHANNEL`, posted with the user credential as
+`<@U08N4UZM8CF> /help`): the full command list posted in-channel at ts
+`1788855700.833549`, read back with `slack-cli conversations-history`. `/status`
+and `/me` are private commands; the Hub logged `handled: true` for both, and the
+private copy is not readable back with the configured credential.
+
+### Driver notes
+
+- **The access gate is now the first thing to check on a fresh Hub build.** HEAD
+  `e27af21f3` authorizes the configuration of every session a channel inbound
+  mints against the SENDER's grants (`channels/bindings/index.ts:623` →
+  `commands-dispatch.ts:172` → `commands-config.ts:341`). The live lane's senders
+  are unlinked identities, so they resolve to the organization's Guest grants —
+  and a dev home with none answers every inbound
+  `channel inbound ignored … "This configuration is outside your
+AgentConfigurationGrant."` with no session minted and nothing posted.
+  `node .hub-access-guest.mjs grant` (Hub stopped) writes the two rows the lane
+  needs: `channel.use` on each channel account with
+  `constraints.conversation = { kind: "all" }` (an absent conversation
+  constraint covers nothing), and `daemon.connect` + `daemon.manage` on the
+  daemon, which resolves as unrestricted.
+- A `POST` 400 + `GET` 500 pair on `/mcp/channel/<token>` at session start is
+  pre-existing noise (it is in the 2026-09-07 16:07 log too, on runs where the
+  tool worked); it is not evidence that the tool is unavailable.
+- `scripts/tg-live-assert.mjs` reports `outbound=no` for a reply posted through
+  the message tool: it matches the relay's `relay post completed` event and the
+  command branch's lines, and a tool `send` produces neither. Read the agent
+  transcript (`~/.claude/projects/-home-node--clisbot-dev-workspaces-default/
+<sessionId>.jsonl`, the session id is in the daemon's agent JSON) for the tool
+  calls and their results, and forward the posted id for the platform read-back.

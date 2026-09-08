@@ -1177,3 +1177,292 @@ describe("presentation over the Hub outbound seam", () => {
     assert.match(JSON.stringify(blocks), /Weekly runs/u);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Delegated forum-topic mutations (goal ledger R12).
+//
+// `edit` and `react` on a message inside a Telegram forum topic are authorized
+// against the PROVIDER's observation of that message: the topic Telegram itself
+// put it in, recorded when the bot received the message (`fusion/admission.ts`)
+// and when the bot sent one (`outbound-message-context.ts`). These cases run the
+// real path — `runChannelMessageAction` → the vertical's registered adapter →
+// the ported action runtime → a fake grammY `Api` — with a real inbound
+// admission and a real vertical send doing the recording.
+import { buildTelegramAdmission } from "@getpaseo/channels-telegram/dist/fusion/admission.js";
+import { buildTelegramMessageEvent } from "@getpaseo/channels-telegram/dist/fusion/inbound-adapter.js";
+import {
+  disposeTelegramRuntime,
+  installTelegramRuntime,
+} from "@getpaseo/channels-telegram/dist/fusion/runtime.js";
+
+const TOPIC_ACCOUNT = "default";
+const TOPIC_SCOPE = scope("telegram", TOPIC_ACCOUNT);
+const TOPIC_CHAT_ID = -1002200300400;
+const TOPIC_CHAT = String(TOPIC_CHAT_ID);
+const TOPIC_ID = 2;
+const TOPIC_BOT_ID = 123456;
+const TOPIC_TOKEN = `${TOPIC_BOT_ID}:hub-topic-test-token`;
+const TOPIC_CFG = {
+  channels: { telegram: { accounts: { [TOPIC_ACCOUNT]: { botToken: TOPIC_TOKEN } } } },
+};
+
+/** A HostRuntime whose keyed store actually keeps rows: the observation the
+ * mutation gate reads is the one the admission step wrote. */
+function memoryHostRuntime(): HostRuntime {
+  const namespaces = new Map<string, Map<string, unknown>>();
+  const mapFor = (namespace: string) => {
+    const existing = namespaces.get(namespace);
+    if (existing !== undefined) return existing;
+    const created = new Map<string, unknown>();
+    namespaces.set(namespace, created);
+    return created;
+  };
+  return {
+    state: {
+      openKeyedStore: (options: { namespace: string }) => {
+        const rows = mapFor(options.namespace);
+        return {
+          register: async (key: string, value: unknown) => void rows.set(key, value),
+          registerIfAbsent: async (key: string, value: unknown) =>
+            rows.has(key) ? false : (rows.set(key, value), true),
+          update: async (key: string, next: (previous: unknown) => unknown) => {
+            const value = next(rows.get(key));
+            if (value === undefined) return false;
+            rows.set(key, value);
+            return true;
+          },
+          lookup: async (key: string) => rows.get(key),
+          consume: async (key: string) => {
+            const value = rows.get(key);
+            rows.delete(key);
+            return value;
+          },
+          delete: async (key: string) => rows.delete(key),
+          entries: async () => [...rows].map(([key, value]) => ({ key, value })),
+          clear: async () => rows.clear(),
+        };
+      },
+      openSyncKeyedStore: () => {
+        const rows = new Map<string, unknown>();
+        return {
+          register: (key: string, value: unknown) => void rows.set(key, value),
+          registerIfAbsent: (key: string, value: unknown) =>
+            rows.has(key) ? false : (rows.set(key, value), true),
+          update: () => true,
+          deleteIf: () => false,
+          lookup: (key: string) => rows.get(key),
+          consume: (key: string) => rows.get(key),
+          delete: (key: string) => rows.delete(key),
+          entries: () => [...rows].map(([key, value]) => ({ key, value })),
+          clear: () => rows.clear(),
+        };
+      },
+    },
+    logging: { getChildLogger: () => ({ debug() {}, info() {}, warn() {}, error() {} }) },
+  } as unknown as HostRuntime;
+}
+
+/** The Bot API surface a topic mutation reaches, echoing the topic back the way
+ * Telegram does — which is what makes a send a provider observation. */
+function createFakeTopicApi(calls: BotApiCall[]) {
+  const chat = { id: TOPIC_CHAT_ID, type: "supergroup", is_forum: true };
+  let nextMessageId = 900;
+  return {
+    getChat: async () => chat,
+    sendMessage: async (...args: unknown[]) => {
+      calls.push({ method: "sendMessage", args });
+      const params = args[2] as { message_thread_id?: number } | undefined;
+      nextMessageId += 1;
+      return {
+        message_id: nextMessageId,
+        date: Math.floor(Date.now() / 1000),
+        chat,
+        ...(params?.message_thread_id === undefined
+          ? {}
+          : { message_thread_id: params.message_thread_id, is_topic_message: true }),
+      };
+    },
+    setMessageReaction: async (...args: unknown[]) => {
+      calls.push({ method: "setMessageReaction", args });
+      return true;
+    },
+    editMessageText: async (...args: unknown[]) => {
+      calls.push({ method: "editMessageText", args });
+      return {
+        message_id: args[1],
+        date: Math.floor(Date.now() / 1000),
+        chat,
+        text: String(args[2]),
+        message_thread_id: TOPIC_ID,
+      };
+    },
+  };
+}
+
+/** One inbound message the provider showed us, admitted for real. */
+async function observeInboundMessage(messageId: number, threadId: number): Promise<void> {
+  const build = buildTelegramMessageEvent(
+    [
+      {
+        message_id: messageId,
+        date: Math.floor(Date.now() / 1000),
+        chat: { id: TOPIC_CHAT_ID, type: "supergroup", is_forum: true, title: "Forum" },
+        from: { id: 4242, is_bot: false, first_name: "Human" },
+        message_thread_id: threadId,
+        is_topic_message: true,
+        text: "please react to this",
+      },
+    ] as never,
+    messageId,
+    { accountId: TOPIC_ACCOUNT, botId: TOPIC_BOT_ID, botUsername: "bot_under_test" },
+  );
+  assert.ok(build, "expected the inbound adapter to build an event");
+  await buildTelegramAdmission({
+    accountId: TOPIC_ACCOUNT,
+    botToken: TOPIC_TOKEN,
+    apiRoot: "https://api.telegram.org",
+    abortSignal: new AbortController().signal,
+    botId: TOPIC_BOT_ID,
+    handleInbound: async () => undefined,
+  })(build);
+}
+
+/** One reply the bot posts into the topic through the real vertical send. */
+async function sendBotMessage(api: unknown, text: string): Promise<number> {
+  const sent = (await telegramSendText({
+    cfg: TOPIC_CFG as unknown as Record<string, unknown>,
+    hostRuntime: TOPIC_HOST_RUNTIME,
+    accountId: TOPIC_ACCOUNT,
+    to: TOPIC_CHAT,
+    threadId: String(TOPIC_ID),
+    api,
+    text,
+  } as never)) as { messageId: number | string };
+  return Number(sent.messageId);
+}
+
+const TOPIC_HOST_RUNTIME = memoryHostRuntime();
+
+/** One Hub request bound to the forum topic under test. */
+function topicRequest(
+  action: string,
+  params: Record<string, unknown>,
+  threadId: string | undefined = String(TOPIC_ID),
+): ChannelMessageActionRequest {
+  return {
+    ...TOPIC_SCOPE,
+    action,
+    params,
+    conversation: { to: TOPIC_CHAT, ...(threadId === undefined ? {} : { threadId }) },
+    send: async () => {
+      throw new Error("Non-send actions must not reach the Hub outbound seam.");
+    },
+  };
+}
+
+describe("delegated mutations inside a Telegram forum topic", () => {
+  let calls: BotApiCall[];
+  let api: ReturnType<typeof createFakeTopicApi>;
+  let restoreApi: () => void;
+  let previousToken: string | undefined;
+
+  beforeEach(() => {
+    calls = [];
+    api = createFakeTopicApi(calls);
+    restoreApi = withFakeBotApi(api);
+    previousToken = process.env["TELEGRAM_BOT_TOKEN"];
+    process.env["TELEGRAM_BOT_TOKEN"] = TOPIC_TOKEN;
+    // The account's runtime is what makes the observation durable — and it is
+    // installed PER ACCOUNT, with no ambient scope around a tool call.
+    installTelegramRuntime(TOPIC_HOST_RUNTIME, TOPIC_ACCOUNT);
+    // The registered adapter is the plugin's own, so the refusal boundary
+    // (`fusion/message-action-refusal.ts`) is on the path.
+    registerChannelMessageActions(TOPIC_SCOPE, telegramPlugin as never);
+  });
+
+  afterEach(() => {
+    restoreApi();
+    clearChannelMessageActions(TOPIC_SCOPE);
+    disposeTelegramRuntime(TOPIC_ACCOUNT);
+    if (previousToken === undefined) delete process.env["TELEGRAM_BOT_TOKEN"];
+    else process.env["TELEGRAM_BOT_TOKEN"] = previousToken;
+  });
+
+  it("reacts to a message the provider showed us in that topic", async () => {
+    await observeInboundMessage(701, TOPIC_ID);
+    const outcome = await runChannelMessageAction(
+      topicRequest("react", { messageId: 701, emoji: "👍" }),
+    );
+    assert.equal(outcome.ok, true, outcome.toolText ?? outcome.error);
+    const call = calls.find((entry) => entry.method === "setMessageReaction");
+    assert.ok(call, `no setMessageReaction: ${JSON.stringify(calls.map((c) => c.method))}`);
+    assert.equal(call.args[1], 701);
+    assert.deepEqual(call.args[2], [{ type: "emoji", emoji: "👍" }]);
+  });
+
+  it("edits a message the provider showed us in that topic", async () => {
+    await observeInboundMessage(702, TOPIC_ID);
+    const outcome = await runChannelMessageAction(
+      topicRequest("edit", { messageId: 702, message: "edited in topic" }),
+    );
+    assert.equal(outcome.ok, true, outcome.toolText ?? outcome.error);
+    const call = calls.find((entry) => entry.method === "editMessageText");
+    assert.ok(call, `no editMessageText: ${JSON.stringify(calls.map((c) => c.method))}`);
+    assert.equal(call.args[1], 702);
+  });
+
+  it("edits the bot's own reply in that topic", async () => {
+    const messageId = await sendBotMessage(api, "first draft");
+    const outcome = await runChannelMessageAction(
+      topicRequest("edit", { messageId, message: "second draft" }),
+    );
+    assert.equal(outcome.ok, true, outcome.toolText ?? outcome.error);
+    const call = calls.find((entry) => entry.method === "editMessageText");
+    assert.ok(call, `no editMessageText: ${JSON.stringify(calls.map((c) => c.method))}`);
+    assert.equal(call.args[1], messageId);
+  });
+
+  it("reacts to the inbound message the turn is answering, with no message id", async () => {
+    // The Hub carries the current message on the capability
+    // (`requesterMessageId`), so upstream's inbound-context fallback resolves
+    // it and the mutation gate takes its server-owned current-message branch —
+    // no stored observation needed for the message being answered.
+    const outcome = await runChannelMessageAction({
+      ...topicRequest("react", { emoji: "👍" }),
+      requesterMessageId: "812",
+    });
+    assert.equal(outcome.ok, true, outcome.toolText ?? outcome.error);
+    const call = calls.find((entry) => entry.method === "setMessageReaction");
+    assert.ok(call, `no setMessageReaction: ${JSON.stringify(calls.map((c) => c.method))}`);
+    assert.equal(call.args[1], 812);
+  });
+
+  it("refuses an unobserved message id and says why", async () => {
+    const outcome = await runChannelMessageAction(
+      topicRequest("react", { messageId: 999_001, emoji: "👍" }),
+    );
+    assert.equal(outcome.ok, false);
+    assert.ok(
+      !calls.some((entry) => entry.method === "setMessageReaction"),
+      "an unattested topic mutation must not reach the Bot API",
+    );
+    // The refusal reason survives upstream's `react` catch (D-TG-058).
+    assert.match(outcome.toolText ?? "", /provider-observed binding/u);
+    assert.match(outcome.toolText ?? "", /unbound_topic_mutation/u);
+    assert.doesNotMatch(outcome.toolText ?? "", /Reaction failed/u);
+  });
+
+  it("refuses an unobserved message id on edit with the same reason", async () => {
+    // `edit` throws rather than answering a soft result, and the Hub turns the
+    // throw into `message edit failed: <reason>` (`channel-reply.ts`), so the
+    // reason reaches the model on this path without the D-TG-058 boundary.
+    await assert.rejects(
+      runChannelMessageAction(topicRequest("edit", { messageId: 999_002, message: "nope" })),
+      /provider-observed binding/u,
+    );
+    assert.ok(
+      !calls.some((entry) => entry.method === "editMessageText"),
+      "an unattested topic mutation must not reach the Bot API",
+    );
+  });
+});

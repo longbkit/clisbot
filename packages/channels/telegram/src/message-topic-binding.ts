@@ -23,6 +23,7 @@ import type {
 import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
 import { parseStrictPositiveInteger } from "@getpaseo/channels-core/plugin-sdk/number-runtime";
 import { resolveDefaultTelegramAccountId } from "./accounts.js";
+import { noteTelegramMutationRefusal } from "./fusion/message-action-refusal.js";
 import { hasProviderObservedTelegramThreadBinding } from "./fusion/message-thread-observation.js";
 import { parseTelegramTarget } from "./targets.js";
 
@@ -42,6 +43,10 @@ const CONVERSATION_BINDING_ERROR =
   "Delegated Telegram conversation read requires the exact current chat and account.";
 
 function rejectUnboundTopicMutation(): never {
+  // Fusion: upstream's `react` catch collapses this throw into an opaque
+  // "Reaction failed" hint, so the reason is carried out beside it
+  // (`fusion/message-action-refusal.ts`).
+  noteTelegramMutationRefusal(TOPIC_BINDING_ERROR);
   throw new Error(TOPIC_BINDING_ERROR);
 }
 

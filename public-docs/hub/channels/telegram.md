@@ -58,7 +58,7 @@ Buttons and select menus are inline keyboards; an approval prompt is an inline k
 ## Limits
 
 - No group DMs — Telegram has no such conversation.
-- Inside a forum topic the agent cannot `edit` or `react` to an earlier message: those actions need a provider-observed binding for that exact topic, and the message-observation cache is not built yet. Both come back as an error with no detail.
+- Inside a forum topic the agent can only `edit`, `react` to or `delete` a message the bot itself observed there: the message it is answering, a message it received in that topic, or one it sent there. A message id it did not observe is refused, and the refusal says so.
 - Sticker vision is unavailable: the agent is told a sticker arrived, not what it depicts.
 - The webhook transport is wired but has never run against a public URL.
 - Bot API rate limits apply per chat; sends are throttled rather than dropped.
@@ -72,6 +72,7 @@ Buttons and select menus are inline keyboards; an approval prompt is an inline k
 | Inbound files                                   | Verified 2026-09-07 — agent read the document body back.                                                                                      |
 | Outbound files                                  | Verified 2026-09-07 — document and photo.                                                                                                     |
 | Message tool actions                            | Verified 2026-09-07 for `send`, `edit`, and `poll`; `send` and `poll` re-verified 2026-09-08 in a forum topic.                                |
+| `edit` and `react` inside a forum topic         | Verified 2026-09-08 — the bot edited its own reply in a topic and reacted to the message it was answering, read back off the platform.        |
 | Structured `presentation` (tables)              | Verified 2026-09-08 — a 3x3 table asked for through the message tool posted as a native `table` block, read back off the platform.            |
 | Markdown rendering                              | Verified 2026-09-07 — headings, bold, italic, link, list, blockquote, inline and fenced code, and a native table, read back off the platform. |
 | Native rich blocks (`richMessages`)             | Verified 2026-09-07 — the default; heading, paragraph, list, blockquote, `pre` and `table` blocks accepted by the Bot API.                    |

@@ -121,12 +121,15 @@ describe("channel command buttons", () => {
     const [reset, docs, pick] = buttons.buttons;
     expect(JSON.stringify(minted)).not.toContain("/new");
     expect(reset?.action).toMatchObject({ type: "command" });
-    const token = (reset?.action as { command: string }).command;
+    if (!reset?.action) throw new Error("shape changed");
+    const token = (reset.action as { command: string }).command;
     expect(isChannelCommandButtonToken(token)).toBe(true);
     expect(docs?.url).toBe("https://example.test/docs");
     expect(pick?.value).toBe("opaque-callback");
     expect(redeemChannelCommandButton(token, CLICK)).toMatchObject({ ok: true, command: "/new" });
-    const optionToken = (select.options[0]?.action as { command: string }).command;
+    const [option] = select.options;
+    if (!option?.action) throw new Error("shape changed");
+    const optionToken = (option.action as { command: string }).command;
     expect(redeemChannelCommandButton(optionToken, CLICK)).toMatchObject({
       ok: true,
       command: "/stop",

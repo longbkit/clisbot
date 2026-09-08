@@ -620,10 +620,15 @@ describe("per-account plugin runtime", () => {
     ]);
 
     const chatIds = (writes: StoreWrite[]): string[] => [
-      ...new Set(writes.map((write) => String((write.value as { chatId?: unknown }).chatId))),
+      ...new Set(
+        writes
+          .filter((write) => write.namespace === "telegram.sent-messages")
+          .map((write) => String((write.value as { chatId?: unknown }).chatId)),
+      ),
     ];
-    // The ported sent-message cache is the store both sends write; each account's
-    // entries must be in its own host, addressed to its own chat.
+    // The ported sent-message cache is the store both sends write (the message
+    // observation cache is the other one, D-TG-018); each account's entries must
+    // be in its own host, addressed to its own chat.
     expect(writesA.length).toBeGreaterThan(0);
     expect(writesB.length).toBeGreaterThan(0);
     expect(chatIds(writesA)).toEqual(["-100200301"]);
