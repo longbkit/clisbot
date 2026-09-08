@@ -25,6 +25,7 @@ const defaultOwnedRunnerFields: Partial<Record<AgentCliToolId, string[]>> = {
     "startupBlockers",
     "promptSubmitDelayMs",
   ],
+  opencode: ["startupDelayMs", "startupReadyPattern"],
 };
 const defaultOwnedRunnerDefaultFields: Record<string, unknown> = {
   startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
@@ -159,7 +160,7 @@ function pruneRunnerDefaults(config: MutableRecord, forceRunnerStartupDefaults: 
       }
     }
   }
-  for (const toolId of ["codex", "gemini"] as const) {
+  for (const toolId of ["codex", "gemini", "opencode"] as const) {
     const target = runner[toolId];
     if (isRecord(target)) {
       pruneDefaultOwnedFields({

@@ -9,17 +9,17 @@ truthful guidance.
 
 ## Backend Capabilities By Provider
 
-| Capability | codex · tmux | codex · acp | claude · tmux | claude · acp | gemini · tmux | gemini · acp |
-| --- | --- | --- | --- | --- | --- | --- |
-| steer (mid-turn inject) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| interrupt (/stop) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| resume stored session | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| attach live view | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| permission requests | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
-| structured events | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
-| native slash commands | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| shell commands (!cmd) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
-| nudge (/nudge) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| Capability | codex · tmux | codex · acp | claude · tmux | claude · acp | gemini · tmux | gemini · acp | opencode · tmux | opencode · acp |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| steer (mid-turn inject) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| interrupt (/stop) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| resume stored session | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| attach live view | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| permission requests | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| structured events | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ |
+| native slash commands | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| shell commands (!cmd) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| nudge (/nudge) | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ❌ |
 
 ## Provider Notes
 
@@ -47,3 +47,12 @@ truthful guidance.
 - ACP auth methods: `oauth-personal` (subscription), `gemini-api-key` (api-key)
 - Gemini speaks ACP natively behind --experimental-acp; capability coverage varies by CLI version, so run the smoke matrix per installed version.
 - The ACP preset has not been smoke-validated yet; verify the advertised auth method ids and loadSession support on the installed version before first use.
+
+### OpenCode (`opencode`)
+
+- new-session command: `/new`
+- ACP adapter: `native (ships with the installed opencode CLI)` (maturity: validated)
+- ACP auth methods: `opencode-login` (subscription)
+- cost: opencode-login reuses your existing opencode subscription/API credentials; no extra cost versus the tmux path.
+- opencode is ACP-native; the ACP backend is the recommended path and passed the full smoke (initialize, session/new, session/prompt, session/load) on 2026-08-19.
+- The tmux backend can drive the opencode TUI for live chat, but cannot auto-capture the opencode session id, so tmux conversations do not resume across runner restarts. Prefer ACP for continuity.

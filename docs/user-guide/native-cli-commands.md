@@ -9,12 +9,14 @@ Today this matters most for:
 - Codex
 - Claude Code
 - Gemini CLI
+- OpenCode
 
 Related CLI-specific notes:
 
 - [Codex CLI Guide](codex-cli.md)
 - [Claude CLI Guide](claude-cli.md)
 - [Gemini CLI Guide](gemini-cli.md)
+- [OpenCode CLI Guide](opencode-cli.md)
 
 ## Core Rule
 
@@ -143,6 +145,16 @@ So current operator guidance is:
 
 - treat Gemini native command pass-through as the intended model
 - but validate your exact Gemini command or extension flow in your own route before depending on it heavily
+
+### OpenCode CLI
+
+The same pass-through rule applies to OpenCode:
+
+- reserved `clisbot` commands are handled by `clisbot`
+- other `/...` commands are forwarded unchanged, including OpenCode-native
+  commands such as `/new`, `/compact`, `/models`, and `/share`
+- OpenCode custom slash commands defined in `opencode.json` or
+  `.opencode/commands/` are reachable through the same pass-through path
 
 ## Force A `clisbot` Command
 

@@ -5,12 +5,14 @@
 import { claudeProvider } from "./claude.ts";
 import { codexProvider } from "./codex.ts";
 import { geminiProvider } from "./gemini.ts";
+import { opencodeProvider } from "./opencode.ts";
 import type { AgentCliToolId, CliProviderDefinition } from "./provider.ts";
 
 export const CLI_PROVIDERS: Record<AgentCliToolId, CliProviderDefinition> = {
   codex: codexProvider,
   claude: claudeProvider,
   gemini: geminiProvider,
+  opencode: opencodeProvider,
 };
 
 export function getCliProvider(id: AgentCliToolId): CliProviderDefinition {

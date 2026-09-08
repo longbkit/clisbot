@@ -76,7 +76,7 @@ function renderBootstrapCommandHelp(commandName: "init" | "start") {
     "",
     "Usage:",
     `  ${renderCliCommand(`${commandName} --help`)}`,
-    `  ${renderCliCommand(`${commandName} [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]`)}`,
+    `  ${renderCliCommand(`${commandName} [--cli <codex|claude|gemini|opencode>] [--bot-type <personal|team>] [--persist]`)}`,
     ...renderBootstrapUsageLines("                   "),
     "",
     "Behavior:",

@@ -7,6 +7,7 @@ import {
 import { clisbotConfigSchema } from "../../config/core/schema.ts";
 import { applyTemplate } from "../../infra/paths.ts";
 import { getCliProvider } from "../../runners/catalog/index.ts";
+import { DEFAULT_ACP_TURN_STALL_TIMEOUT_MS } from "../../runners/acp/turn-stall.ts";
 import { buildTmuxSessionName, normalizeMainKey } from "../session/session-key.ts";
 
 export type AgentSessionTarget = {
@@ -121,6 +122,10 @@ function resolveAgentTargetInternal(
           override?.runner?.acp?.authMethodId ??
           runnerFamily.acp?.authMethodId ??
           provider.acp?.defaultAuthMethodId,
+        turnStallTimeoutMs:
+          override?.runner?.acp?.turnStallTimeoutMs ??
+          runnerFamily.acp?.turnStallTimeoutMs ??
+          DEFAULT_ACP_TURN_STALL_TIMEOUT_MS,
       },
       trustWorkspace:
         override?.runner?.defaults?.trustWorkspace ??

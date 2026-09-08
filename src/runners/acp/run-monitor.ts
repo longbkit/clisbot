@@ -4,12 +4,19 @@
 // stream through onEvent for capability-aware channel rendering.
 
 import { sleep } from "../../infra/process.ts";
+import type { ResolvedAgentTarget } from "../../agents/routing/resolved-target.ts";
 import type { RunMonitorParams } from "../contract/runner-backend.ts";
 import { AcpAdapterProcessError } from "./adapter-process.ts";
 import { describeStopReason } from "./events.ts";
 import type { AcpSession } from "./session.ts";
+import {
+  AcpTurnStalledError,
+  DEFAULT_ACP_TURN_STALL_TIMEOUT_MS,
+} from "./turn-stall.ts";
 
 const PROMPTLESS_SETTLE_POLL_INTERVAL_MS = 250;
+const STALL_CANCEL_SETTLE_TIMEOUT_MS = 10_000;
+const STALL_CANCEL_OBSERVE_WINDOW_MS = 2_000;
 
 export async function monitorAcpRun(params: RunMonitorParams & { session: AcpSession }) {
   const { session } = params;
@@ -21,23 +28,21 @@ export async function monitorAcpRun(params: RunMonitorParams & { session: AcpSes
   const updates = new ThrottledRunningUpdates(params, session);
   const detachTimer = startDetachTimer(params, session);
   const adapterLost = watchAdapterExit(session);
+  const stallGuard = createTurnStallGuard(params.resolved);
   session.onEvent((event) => {
+    stallGuard.touch();
     void params.onEvent?.(event);
   });
-  session.onTurnChanged(() => updates.schedule());
+  session.onTurnChanged(() => {
+    stallGuard.touch();
+    updates.schedule();
+  });
 
   try {
-    const promptTurn = session.prompt(params.prompt);
-    // If the adapter-loss branch wins the race, the losing prompt promise may
-    // still reject later; keep that from becoming an unhandled rejection.
-    void promptTurn.catch(() => undefined);
-    // The prompt is a JSON-RPC request: once sent it is truthfully submitted.
-    await params.onPromptSubmitted?.();
-    const outcome = await Promise.race([promptTurn, adapterLost.promise]).catch(
-      async (error) => {
-        throw await classifyPromptFailure(session, error);
-      },
-    );
+    const outcome = await racePromptTurn(session, params, {
+      adapterLost: adapterLost.promise,
+      stallGuard: stallGuard.promise,
+    });
     const stopNote = describeStopReason(outcome.stopReason);
     const snapshot = [outcome.turnText, stopNote].filter(Boolean).join("\n\n");
     await params.onCompleted({
@@ -51,7 +56,91 @@ export async function monitorAcpRun(params: RunMonitorParams & { session: AcpSes
     updates.stop();
     detachTimer.stop();
     adapterLost.stop();
+    stallGuard.stop();
   }
+}
+
+async function racePromptTurn(
+  session: AcpSession,
+  params: RunMonitorParams,
+  racers: { adapterLost: Promise<never>; stallGuard: Promise<never> },
+) {
+  const promptTurn = session.prompt(params.prompt!);
+  // If the adapter-loss branch wins the race, the losing prompt promise may
+  // still reject later; keep that from becoming an unhandled rejection.
+  void promptTurn.catch(() => undefined);
+  // The prompt is a JSON-RPC request: once sent it is truthfully submitted.
+  await params.onPromptSubmitted?.();
+  try {
+    return await Promise.race([
+      promptTurn,
+      racers.adapterLost,
+      racers.stallGuard,
+    ]).catch(async (error) => {
+      throw await classifyPromptFailure(session, error);
+    });
+  } catch (error) {
+    if (error instanceof AcpTurnStalledError) {
+      await cancelStalledTurn(session);
+    }
+    throw error;
+  }
+}
+
+async function cancelStalledTurn(session: AcpSession) {
+  await session.cancel().catch(() => undefined);
+  const settled = await session.waitForTurnSettled(STALL_CANCEL_SETTLE_TIMEOUT_MS);
+  if (!settled && session.alive) {
+    // A stalled adapter that ignores cancel cannot be prompted again; stop it
+    // so the next run starts a fresh adapter and resumes the stored context.
+    session.stop();
+    // The alive flag settles via the async exit event; give it a short window
+    // so the next ensureRunnerReady observes a dead adapter immediately.
+    await session.waitForProcessAlive(STALL_CANCEL_OBSERVE_WINDOW_MS);
+  }
+}
+
+function createTurnStallGuard(resolved: ResolvedAgentTarget) {
+  const timeoutMs =
+    resolved.runner.acp?.turnStallTimeoutMs ?? DEFAULT_ACP_TURN_STALL_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let settled = false;
+  let rejectFn: ((error: AcpTurnStalledError) => void) | null = null;
+
+  const arm = () => {
+    timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      rejectFn?.(new AcpTurnStalledError(resolved.sessionName, timeoutMs));
+    }, timeoutMs);
+  };
+  const promise = new Promise<never>((_, reject) => {
+    rejectFn = reject;
+    arm();
+  });
+  // Keep the race from surfacing an unhandled rejection when another racer
+  // wins (prompt completed or adapter exited first).
+  void promise.catch(() => undefined);
+
+  return {
+    promise,
+    touch() {
+      if (settled || !timer) {
+        return;
+      }
+      clearTimeout(timer);
+      arm();
+    },
+    stop() {
+      settled = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    },
+  };
 }
 
 const ADAPTER_EXIT_OBSERVATION_WINDOW_MS = 250;

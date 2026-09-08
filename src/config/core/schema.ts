@@ -70,6 +70,7 @@ const runnerBackendSchema = z.enum(RUNNER_BACKEND_IDS);
 const runnerAcpSchema = z.object({
   permissionPolicy: z.enum(["auto-allow", "deny"]).optional(),
   authMethodId: z.string().min(1).optional(),
+  turnStallTimeoutMs: z.number().int().positive().optional(),
 });
 
 const runnerLaunchSchema = z.object({
@@ -503,6 +504,30 @@ const agentsDefaultsSchema = z.object({
         },
       },
     }),
+    opencode: runnerFamilySchema.default({
+      command: "opencode",
+      args: ["--auto"],
+      backend: "acp",
+      startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+      startupReadyPattern: "Ask anything",
+      sessionId: {
+        create: {
+          mode: "runner",
+          args: [],
+        },
+        capture: {
+          mode: "off",
+          statusCommand: "/status",
+          pattern: defaultSessionIdPattern,
+          timeoutMs: 5000,
+          pollIntervalMs: 250,
+        },
+        resume: {
+          mode: "command",
+          args: ["--session", "{sessionId}", "--auto"],
+        },
+      },
+    }),
   }),
   auth: agentAuthSchema.default(defaultAgentAuthConfig),
 });
@@ -752,6 +777,30 @@ export const clisbotConfigSchema = z.object({
             },
           },
         },
+        opencode: {
+          command: "opencode",
+          args: ["--auto"],
+          backend: "acp",
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+          startupReadyPattern: "Ask anything",
+          sessionId: {
+            create: {
+              mode: "runner",
+              args: [],
+            },
+            capture: {
+              mode: "off",
+              statusCommand: "/status",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 5000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: ["--session", "{sessionId}", "--auto"],
+            },
+          },
+        },
       },
       auth: defaultAgentAuthConfig,
     }),
@@ -882,6 +931,30 @@ export const clisbotConfigSchema = z.object({
             resume: {
               mode: "command",
               args: ["--resume", "{sessionId}", "--approval-mode=yolo", "--sandbox=false"],
+            },
+          },
+        },
+        opencode: {
+          command: "opencode",
+          args: ["--auto"],
+          backend: "acp",
+          startupDelayMs: INTERACTIVE_CLI_STARTUP_DELAY_MS,
+          startupReadyPattern: "Ask anything",
+          sessionId: {
+            create: {
+              mode: "runner",
+              args: [],
+            },
+            capture: {
+              mode: "off",
+              statusCommand: "/status",
+              pattern: defaultSessionIdPattern,
+              timeoutMs: 5000,
+              pollIntervalMs: 250,
+            },
+            resume: {
+              mode: "command",
+              args: ["--session", "{sessionId}", "--auto"],
             },
           },
         },

@@ -13,6 +13,8 @@ const RESUME_REJECTED_PATTERNS: RegExp[] = [
   // gemini and generic resume-by-id failures
   /no session found with id/i,
   /could not find (?:a )?session (?:with )?id/i,
+  // opencode: "Session not found: ses_xxx"
+  /session not found:/i,
 ];
 
 export function paneShowsResumeRejected(snapshot: string) {

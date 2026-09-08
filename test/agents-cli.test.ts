@@ -95,7 +95,7 @@ describe("agents cli", () => {
     const text = output.join("\n");
     expect(text).toContain("clisbot agents");
     expect(text).toContain("clisbot agents help");
-    expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini>");
+    expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini|opencode>");
     expect(text).toContain("`agents add` is the lower-level manual surface");
     expect(text).toContain("`agents add` without `--bot-type` is valid and does not seed any bootstrap files");
     expect(text).toContain("canonical workspace instructions live in `AGENTS.md`");
@@ -111,7 +111,7 @@ describe("agents cli", () => {
 
     const text = output.join("\n");
     expect(text).toContain("clisbot agents");
-    expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini>");
+    expect(text).toContain("clisbot agents add <id> --cli <codex|claude|gemini|opencode>");
   });
 
   test("team-assistant bootstrap overrides base USER.md with the team template", async () => {
@@ -228,6 +228,39 @@ describe("agents cli", () => {
     expect(existsSync(claudeBootstrapPath)).toBe(true);
     expect(lstatSync(claudeBootstrapPath).isSymbolicLink()).toBe(true);
     expect(readlinkSync(claudeBootstrapPath)).toBe("AGENTS.md");
+  });
+
+  test("adds an opencode agent with AGENTS.md and no discovery symlink", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-agents-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+
+    await runAgentsCli([
+      "add",
+      "oc",
+      "--cli",
+      "opencode",
+      "--workspace",
+      join(tempDir, "workspaces", "oc"),
+      "--bot-type",
+      "team",
+    ]);
+
+    const rawConfig = JSON.parse(
+      readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"),
+    ) as {
+      agents: {
+        list: Array<{ cli?: string; runner?: { command: string } }>;
+      };
+    };
+
+    expect(rawConfig.agents.list[0]?.cli).toBe("opencode");
+    expect(rawConfig.agents.list[0]?.runner).toBeUndefined();
+
+    const workspacePath = join(tempDir, "workspaces", "oc");
+    expect(existsSync(join(workspacePath, "AGENTS.md"))).toBe(true);
+    expect(existsSync(join(workspacePath, "CLAUDE.md"))).toBe(false);
+    expect(existsSync(join(workspacePath, "GEMINI.md"))).toBe(false);
   });
 
   test("keeps startup option and runner overrides when startup options differ from tool defaults", async () => {

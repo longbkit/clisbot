@@ -13,7 +13,7 @@
   <a href="https://www.npmjs.com/package/clisbot"><img src="https://img.shields.io/npm/v/clisbot?label=npm&color=cb3837" alt="npm version" /></a>
   <a href="https://www.npmjs.com/package/clisbot"><img src="https://img.shields.io/npm/dm/clisbot?label=downloads&color=22c55e" alt="npm downloads per month" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-d4a017" alt="MIT license" /></a>
-  <img src="https://img.shields.io/badge/CLI-Codex%20%7C%20Claude%20%7C%20Gemini-111827" alt="supported cli tools" />
+  <img src="https://img.shields.io/badge/CLI-Codex%20%7C%20Claude%20%7C%20Gemini%20%7C%20OpenCode-111827" alt="supported cli tools" />
   <img src="https://img.shields.io/badge/Channels-Slack%20%7C%20Telegram%20%7C%20Zalo-0a66c2" alt="supported channels" />
   <img src="https://img.shields.io/badge/Runtime-tmux%20backed-16a34a" alt="tmux backed runtime" />
   <img src="https://img.shields.io/badge/Workflow-AI--native-f59e0b" alt="AI-native workflow" />
@@ -276,8 +276,12 @@ Choose `gemini` when Gemini is already authenticated in the runtime environment
 and you specifically want Gemini. If Gemini opens OAuth or setup screens, fix
 Gemini auth directly first.
 
+Choose `opencode` when you want an ACP-native agent with reliable session
+resume across restarts. It defaults to the ACP backend; its tmux backend runs
+live chat but cannot auto-resume a conversation after a runner restart.
+
 Related pages: [Codex CLI Guide](docs/user-guide/codex-cli.md), [Claude CLI Guide](docs/user-guide/claude-cli.md),
-[Gemini CLI Guide](docs/user-guide/gemini-cli.md).
+[Gemini CLI Guide](docs/user-guide/gemini-cli.md), [OpenCode CLI Guide](docs/user-guide/opencode-cli.md).
 
 ### Should I start with Telegram or Slack?
 
@@ -640,19 +644,21 @@ clisbot auth get-permissions --sender <principal> --agent <agentId> --json
 
 ## CLI Compatibility Snapshot
 
-`clisbot` currently works well with Codex, Claude, and Gemini.
+`clisbot` currently works well with Codex, Claude, Gemini, and OpenCode.
 
-| CLI      | Current Stability   | Short Take                                                                                                  |
-| ----------| ---------------------| -------------------------------------------------------------------------------------------------------------|
-| `codex`  | Best today          | Strongest default for routed coding work.                                                                   |
-| `claude` | Usable with caveats | Claude can surface its own plan-approval and auto-mode behavior even when launched with bypass-permissions. |
-| `gemini` | Fully compatible   | Gemini is supported as a first-class runner for routed chat-native workflows.                               |
+| CLI        | Current Stability     | Short Take                                                                                                  |
+| -----------| ----------------------| -------------------------------------------------------------------------------------------------------------|
+| `codex`    | Best today            | Strongest default for routed coding work.                                                                   |
+| `claude`   | Usable with caveats   | Claude can surface its own plan-approval and auto-mode behavior even when launched with bypass-permissions. |
+| `gemini`   | Fully compatible      | Gemini is supported as a first-class runner for routed chat-native workflows.                              |
+| `opencode` | Fully compatible (ACP) | ACP-native with verified session resume; tmux runs live chat but cannot auto-resume a session after restart. |
 
 CLI-specific operator notes:
 
 - [Codex CLI Guide](docs/user-guide/codex-cli.md)
 - [Claude CLI Guide](docs/user-guide/claude-cli.md)
 - [Gemini CLI Guide](docs/user-guide/gemini-cli.md)
+- [OpenCode CLI Guide](docs/user-guide/opencode-cli.md)
 
 ## Recent Release Highlights
 

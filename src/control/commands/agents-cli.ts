@@ -58,7 +58,7 @@ function renderAgentsHelp() {
     `  ${renderCliCommand("agents --help")}`,
     `  ${renderCliCommand("agents help")}`,
     `  ${renderCliCommand("agents list [--json]")}`,
-    `  ${renderCliCommand("agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>]")}`,
+    `  ${renderCliCommand("agents add <id> --cli <codex|claude|gemini|opencode> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>]")}`,
     `  ${renderCliCommand("agents bootstrap <id> --bot-type <personal|team> [--force]")}`,
     `  ${renderCliCommand("agents response-mode <status|set|clear> --agent <id> [capture-pane|message-tool]")}`,
     `  ${renderCliCommand("agents additional-message-mode <status|set|clear> --agent <id> [queue|steer]")}`,
@@ -68,10 +68,10 @@ function renderAgentsHelp() {
     "",
     "Notes:",
     `  - \`agents add\` is the lower-level manual surface; first-run ${renderCliCommand("start", { inline: true })} and ${renderCliCommand("init", { inline: true })} can bootstrap the first \`default\` agent for you`,
-    "  - `--cli` is required on `agents add`; supported tools are `codex`, `claude`, and `gemini`",
+    "  - `--cli` is required on `agents add`; supported tools are `codex`, `claude`, `gemini`, and `opencode`",
     "  - `agents add` without `--bot-type` is valid and does not seed any bootstrap files",
     "  - `--bot-type` on `agents add` or `agents bootstrap` seeds a fresh workspace template; use it when you want clisbot to create guidance files for you",
-    "  - canonical workspace instructions live in `AGENTS.md`; Claude and Gemini add `CLAUDE.md` or `GEMINI.md` as symlinks to that same file",
+    "  - canonical workspace instructions live in `AGENTS.md`; Claude and Gemini add `CLAUDE.md` or `GEMINI.md` as symlinks to that same file, while opencode reads `AGENTS.md` directly",
     "  - omit `--startup-option` to inherit the built-in startup args for the selected CLI tool",
     "  - `response-mode` and `additional-message-mode` mutate per-agent overrides under `agents.list[]`",
     "  - use agent timezone only when one workspace/assistant should run wall-clock loops in a different timezone than app default",
@@ -259,7 +259,7 @@ export async function addAgentToEditableConfig(params: AddAgentParams) {
 async function addAgent(args: string[]) {
   const agentId = args[0]?.trim();
   if (!agentId) {
-    throw new Error("Usage: agents add <id> --cli <codex|claude|gemini> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...");
+    throw new Error("Usage: agents add <id> --cli <codex|claude|gemini|opencode> [--workspace <path>] [--startup-option <arg>]... [--bot-type <personal|team>] [--bind <channel[:accountId]>]...");
   }
   if (hasFlag(args, "--bootstrap")) {
     throw new Error("agents add no longer accepts --bootstrap; use --bot-type personal or --bot-type team");
@@ -270,7 +270,7 @@ async function addAgent(args: string[]) {
 
   const cliTool = parseSingleOption(args, "--cli") as AgentCliToolId | undefined;
   if (!cliTool || !(cliTool in DEFAULT_AGENT_TOOL_TEMPLATES)) {
-    throw new Error("agents add requires --cli codex, --cli claude, or --cli gemini");
+    throw new Error("agents add requires --cli codex, --cli claude, --cli gemini, or --cli opencode");
   }
 
   const workspace = parseSingleOption(args, "--workspace");

@@ -27,7 +27,7 @@ const activeHarnesses: Harness[] = [];
 
 function createHarness(
   env: Record<string, string> = {},
-  acp: { permissionPolicy?: string; authMethodId?: string } = {},
+  acp: { permissionPolicy?: string; authMethodId?: string; turnStallTimeoutMs?: number } = {},
 ): Harness {
   const tempDir = mkdtempSync(join(tmpdir(), "clisbot-acp-test-"));
   const sessionMapping = new SessionMapping(
@@ -426,4 +426,22 @@ describe("ACP backend", () => {
     const entry = await harness.sessionMapping.get(harness.target.sessionKey);
     expect(entry?.sessionId).toBe("fake-session-2");
   });
+
+  test(
+    "fails a stalled turn truthfully and the next prompt recovers on a fresh adapter",
+    async () => {
+      const harness = createHarness(
+        { FAKE_ACP_GO_SILENT: "1" },
+        { turnStallTimeoutMs: 300 },
+      );
+
+      await expect(runPrompt(harness, "stall please")).rejects.toThrow(
+        /produced no activity for/,
+      );
+
+      const retry = await runPrompt(harness, "second prompt");
+      expect(retry.completed?.snapshot).toContain("done -> second prompt");
+    },
+    20_000,
+  );
 });

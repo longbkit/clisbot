@@ -66,7 +66,7 @@ const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
     {
       name: "start",
       summary: "Seed __CONFIG_PATH__ if missing, apply explicit bot bootstrap intent, and start clisbot in the background.",
-      usage: ["start [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]"],
+      usage: ["start [--cli <codex|claude|gemini|opencode>] [--bot-type <personal|team>] [--persist]"],
       helpLines: [
         "                     See `start --help` for bootstrap-focused flags and examples.",
       ],
@@ -280,7 +280,7 @@ const ROOT_COMMAND_TREE: CommandTreeSpec<ParsedCliCommand> = {
     {
       name: "init",
       summary: "Seed __CONFIG_PATH__ and optionally create the first agent without starting clisbot.",
-      usage: ["init [--cli <codex|claude|gemini>] [--bot-type <personal|team>] [--persist]"],
+      usage: ["init [--cli <codex|claude|gemini|opencode>] [--bot-type <personal|team>] [--persist]"],
       helpLines: [
         "                     See `init --help` for bootstrap-focused flags and examples.",
       ],
@@ -337,7 +337,7 @@ export function renderCliHelp() {
     "  Fresh bootstrap only enables channels named by flags; ambient env vars alone do not auto-enable extra channels.",
     "",
     "Working hints:",
-    `  Add extra workspaces with ${renderCliCommand("agents add <id> --cli <codex|claude|gemini>", { inline: true })}, then point traffic with ${renderCliCommand("bots set-agent ...", { inline: true })} or ${renderCliCommand("routes set-agent ...", { inline: true })}.`,
+    `  Add extra workspaces with ${renderCliCommand("agents add <id> --cli <codex|claude|gemini|opencode>", { inline: true })}, then point traffic with ${renderCliCommand("bots set-agent ...", { inline: true })} or ${renderCliCommand("routes set-agent ...", { inline: true })}.`,
     `  For routed shared surfaces, the usual flow is ${renderCliCommand("routes add ...", { inline: true })} -> ${renderCliCommand("routes set-agent ...", { inline: true })} -> optional follow-up or allowlist tuning.`,
     `  For fast runner debugging, start with ${renderCliCommand("runner list", { inline: true })} and ${renderCliCommand("watch --latest", { inline: true })}.`,
     "",

@@ -254,6 +254,29 @@ export function renderDefaultConfigTemplate(options: DefaultConfigTemplateOption
                 },
               },
             },
+            opencode: {
+              command: "opencode",
+              args: ["--auto"],
+              backend: "acp",
+              sessionId: {
+                create: {
+                  mode: "runner",
+                  args: [],
+                },
+                capture: {
+                  mode: "off",
+                  statusCommand: "/status",
+                  pattern:
+                    "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b",
+                  timeoutMs: 5000,
+                  pollIntervalMs: 250,
+                },
+                resume: {
+                  mode: "command",
+                  args: ["--session", "{sessionId}", "--auto"],
+                },
+              },
+            },
           },
         },
         list: [],

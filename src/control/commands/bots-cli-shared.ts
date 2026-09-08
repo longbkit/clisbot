@@ -108,8 +108,8 @@ export async function maybeCreateBotAgent(
     return undefined;
   }
 
-  if (cliTool !== "codex" && cliTool !== "claude" && cliTool !== "gemini") {
-    throw new Error("Bot agent CLI must be one of: codex, claude, gemini.");
+  if (cliTool !== "codex" && cliTool !== "claude" && cliTool !== "gemini" && cliTool !== "opencode") {
+    throw new Error("Bot agent CLI must be one of: codex, claude, gemini, opencode.");
   }
   if (botType !== "personal" && botType !== "team") {
     throw new Error("Bot agent type must be `personal` or `team`.");

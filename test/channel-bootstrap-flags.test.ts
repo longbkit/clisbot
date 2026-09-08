@@ -41,6 +41,17 @@ describe("parseBootstrapFlags", () => {
     expect(parsed.bootstrap).toBe("team-assistant");
   });
 
+  test("accepts --cli opencode", () => {
+    const parsed = parseBootstrapFlags([
+      "--cli",
+      "opencode",
+      "--telegram-bot-token",
+      "TELEGRAM_BOT_TOKEN",
+    ]);
+
+    expect(parsed.cliTool).toBe("opencode");
+  });
+
   test("rejects legacy --bootstrap alias", () => {
     expect(() =>
       parseBootstrapFlags([

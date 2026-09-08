@@ -24,6 +24,7 @@ Related pages:
 - [Codex CLI Guide](codex-cli.md)
 - [Claude CLI Guide](claude-cli.md)
 - [Gemini CLI Guide](gemini-cli.md)
+- [OpenCode CLI Guide](opencode-cli.md)
 - [Runner Backends: tmux And ACP](runner-backends.md)
 - [Telegram Bot Setup](telegram-setup.md)
 - [Zalo Bot Setup](zalo-bot-setup.md)
@@ -46,6 +47,7 @@ If you are choosing a default coding CLI or debugging routed behavior, start her
 - [Codex CLI Guide](codex-cli.md)
 - [Claude CLI Guide](claude-cli.md)
 - [Gemini CLI Guide](gemini-cli.md)
+- [OpenCode CLI Guide](opencode-cli.md)
 - [Runner Backends: tmux And ACP](runner-backends.md)
 
 ## Platform Support
@@ -191,7 +193,7 @@ Most-used commands:
 
 - `clisbot agents list`
 - `clisbot agents list --json`
-- `clisbot agents add <id> --cli <codex|claude|gemini>`
+- `clisbot agents add <id> --cli <codex|claude|gemini|opencode>`
 - `clisbot agents bootstrap <id> --bot-type <personal|team>`
 - `clisbot agents response-mode status --agent <id>`
 - `clisbot agents response-mode set <capture-pane|message-tool> --agent <id>`
@@ -203,7 +205,7 @@ Most-used commands:
 Important rules:
 
 - `agents add` requires `--cli`
-- supported tools are `codex`, `claude`, and `gemini`
+- supported tools are `codex`, `claude`, `gemini`, and `opencode`
 - `agents bootstrap` requires `--bot-type`
 - first-run public choices stay `--bot-type personal|team`
 - bot fallback routing now belongs to `clisbot bots ...`
@@ -217,6 +219,7 @@ Bootstrap behavior:
 - codex bootstrap requires `AGENTS.md` and `IDENTITY.md`
 - claude bootstrap requires `AGENTS.md`, `IDENTITY.md`, and a `CLAUDE.md -> AGENTS.md` symlink for Claude discovery
 - gemini bootstrap requires `AGENTS.md`, `IDENTITY.md`, and a `GEMINI.md -> AGENTS.md` symlink for Gemini discovery
+- opencode reads `AGENTS.md` directly, so bootstrap requires only `AGENTS.md` and `IDENTITY.md`; opencode also needs its own direct auth via `opencode auth login` before routed prompts can succeed
 - bootstrap state is `missing`, `not-bootstrapped`, or `bootstrapped`
 - Gemini still needs its own direct auth or headless auth path before routed prompts can succeed
 
