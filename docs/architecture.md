@@ -418,6 +418,9 @@ Providers that can accept native tool definitions should set `supportsNativePase
 ```
 $PASEO_HOME/
 ├── agents/{cwd-with-dashes}/{agent-id}.json   # Agent record
+├── hub/                                        # Embedded Hub data (Clisbot default)
+│   ├── PG_VERSION, base/, global/, pg_*/       # PGlite/PostgreSQL cluster
+│   └── channels/                               # Channel installs and runtime state
 ├── projects/projects.json                      # Project registry
 ├── projects/workspaces.json                    # Workspace registry
 ├── projects/icons/                             # Custom project icon images
@@ -428,6 +431,11 @@ $PASEO_HOME/
 ├── paseo.sock / paseo.pid                      # Local IPC socket and pidfile
 └── daemon.log                                  # Daemon trace logs (rotated)
 ```
+
+Clisbot keeps one machine home but gives the embedded Hub the owned `hub/` child. An explicit
+`CLISBOT_HUB_DATA_DIR`/`PASEO_HUB_DATA_DIR` overrides it. Homes created before this layout may have
+PGlite's `PG_VERSION`, `base/`, `global/`, and `pg_*` entries at the root; compatibility detection
+continues to open that legacy location until it is migrated while the Hub is stopped.
 
 ## Deployment models
 

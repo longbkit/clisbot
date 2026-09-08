@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vitest";
 import { applyClisbotEnvDefaults } from "./env-alias.js";
@@ -45,11 +47,11 @@ describe("applyClisbotEnvDefaults", () => {
     assert.equal(env["PASEO_HUB_BIND"], "0.0.0.0");
   });
 
-  it("defaults the data dir to the shared home and honors the home var", () => {
+  it("defaults the data dir to a Hub-owned child of the shared home", () => {
     const env = emptyEnv();
     env["CLISBOT_HOME"] = "/home/op/.clisbot";
     applyClisbotEnvDefaults(env);
-    assert.equal(env["PASEO_HUB_DATA_DIR"], "/home/op/.clisbot");
+    assert.equal(env["PASEO_HUB_DATA_DIR"], "/home/op/.clisbot/hub");
   });
 
   it("falls back to the home dir .clisbot when no home is configured", () => {
@@ -59,7 +61,35 @@ describe("applyClisbotEnvDefaults", () => {
     applyClisbotEnvDefaults(env);
     const dataDir = env["PASEO_HUB_DATA_DIR"];
     assert.ok(dataDir !== undefined && dataDir.length > 0);
-    assert.ok(dataDir.endsWith(join(".clisbot")));
+    assert.ok(dataDir.endsWith(join(".clisbot", "hub")) || dataDir.endsWith(join(".clisbot")));
+  });
+
+  it("keeps a legacy root-level PGlite directory working until migration", () => {
+    const home = mkdtempSync(join(tmpdir(), "clisbot-legacy-home-"));
+    try {
+      writeFileSync(join(home, "PG_VERSION"), "17\n");
+      const env = emptyEnv();
+      env["CLISBOT_HOME"] = home;
+      applyClisbotEnvDefaults(env);
+      assert.equal(env["PASEO_HUB_DATA_DIR"], home);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("prefers a migrated nested PGlite directory over a stale legacy marker", () => {
+    const home = mkdtempSync(join(tmpdir(), "clisbot-migrated-home-"));
+    try {
+      mkdirSync(join(home, "hub"));
+      writeFileSync(join(home, "PG_VERSION"), "17\n");
+      writeFileSync(join(home, "hub", "PG_VERSION"), "17\n");
+      const env = emptyEnv();
+      env["CLISBOT_HOME"] = home;
+      applyClisbotEnvDefaults(env);
+      assert.equal(env["PASEO_HUB_DATA_DIR"], join(home, "hub"));
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it("is idempotent", () => {

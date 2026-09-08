@@ -5,6 +5,7 @@
 #   home     ~/.clisbot-dev   (CLISBOT_HOME — never ~/.paseo, never .dev/paseo-home)
 #   hub      127.0.0.1:6868   via `node packages/cli/bin/paseo hub start`
 #   daemon   127.0.0.1:6867   PASEO_PASSWORD sourced from ~/.clisbot-dev/.daemon-password (0600)
+#   hub data ~/.clisbot-dev/hub (PGlite + channel runtime)
 #   log      ~/.clisbot-dev/hub.log
 #
 # Usage:
@@ -14,11 +15,13 @@
 #   scripts/e2e-dev.sh status       channels status (per-account pin/integrity/load/transport/detail)
 #   scripts/e2e-dev.sh logs [n]     last n lines of hub.log (default 40); `logs -f` to follow
 #   scripts/e2e-dev.sh stop         stop the hub (--force)
+#   scripts/e2e-dev.sh migrate-layout  move a stopped legacy root-level Hub DB into hub/
 #
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOME_DEV="${CLISBOT_HOME:-$HOME/.clisbot-dev}"
+HUB_DATA_DIR="${CLISBOT_HUB_DATA_DIR:-$HOME_DEV/hub}"
 PW_FILE="$HOME_DEV/.daemon-password"
 LOG_FILE="$HOME_DEV/hub.log"
 CLI=(node "$REPO_ROOT/packages/cli/bin/paseo")
@@ -42,6 +45,15 @@ sanitize_agent_environment() {
   unset CODEX_HOME
 }
 
+configure_hub_environment() {
+  if [ -f "$HOME_DEV/PG_VERSION" ] && [ ! -f "$HUB_DATA_DIR/PG_VERSION" ]; then
+    echo "legacy Hub database is still at $HOME_DEV; run '$0 migrate-layout' first" >&2
+    exit 1
+  fi
+  export CLISBOT_HOME="$HOME_DEV"
+  export CLISBOT_HUB_DATA_DIR="$HUB_DATA_DIR"
+}
+
 hub_stop_force() {
   # `"${CLI[@]}"`, not `"$CLI"`: in bash, the latter expands only element 0.
   "${CLI[@]}" hub stop --home "$HOME_DEV" --force
@@ -58,7 +70,7 @@ case "${1:-}" in
     source_password
     sanitize_agent_environment
     hub_stop_force
-    export CLISBOT_HOME="$HOME_DEV"
+    configure_hub_environment
     # Verbose OpenClaw file log (<openclaw-tmp-dir>/openclaw.log): the channel
     # verticals' native drop gates (mention policy, allowlist, debounce, ACP
     # binding) only log at debug — the E2E loop needs them visible.
@@ -70,7 +82,7 @@ case "${1:-}" in
     source_password
     sanitize_agent_environment
     hub_stop_force
-    export CLISBOT_HOME="$HOME_DEV"
+    configure_hub_environment
     export OPENCLAW_LOG_LEVEL=debug
     "${CLI[@]}" hub start --home "$HOME_DEV" --foreground 2>&1 | tee -a "$LOG_FILE"
     ;;
@@ -89,8 +101,12 @@ case "${1:-}" in
   stop)
     hub_stop_force
     ;;
+  migrate-layout)
+    hub_stop_force
+    node "$REPO_ROOT/scripts/migrate-dev-hub-data.mjs" --home "$HOME_DEV"
+    ;;
   *)
-    echo "usage: $0 {build|restart|foreground|status|logs [-f|n]|stop}" >&2
+    echo "usage: $0 {build|restart|foreground|status|logs [-f|n]|stop|migrate-layout}" >&2
     exit 2
     ;;
 esac

@@ -51,6 +51,10 @@ import type { ChannelSupervisor, ChannelSupervisorOptions } from "./types.js";
 // --- Fixed dev state (e2e-dev.sh): never ~/.paseo, never .dev/paseo-home -----
 
 const DEV_HOME = process.env["CLISBOT_HOME"] ?? join(homedir(), ".clisbot-dev");
+const DEV_HUB_DATA_DIR =
+  process.env["CLISBOT_HUB_DATA_DIR"] ??
+  process.env["PASEO_HUB_DATA_DIR"] ??
+  (existsSync(join(DEV_HOME, "hub", "PG_VERSION")) ? join(DEV_HOME, "hub") : DEV_HOME);
 // The test file's location: packages/hub/src/channels/supervisor/ — six
 // levels up (the file itself is the first) reaches the repo root.
 const REPO_ROOT = fileURLToPath(new URL("../../../../..", import.meta.url));
@@ -500,7 +504,7 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     // caches) — reused across runs (CLAUDE.md channel E2E guardrail) so a
     // fresh boot does not replay the dev bot's whole update history from
     // offset 0 into the fake daemon.
-    const liveState = join(DEV_HOME, "channels", "work", "state");
+    const liveState = join(DEV_HUB_DATA_DIR, "channels", "work", "state");
     if (existsSync(liveState)) {
       cpSync(liveState, join(workAccountRoot, "state"), { recursive: true });
     }

@@ -6,13 +6,14 @@ Running, debugging, and live-testing the channel plane. The platform itself is [
 
 Live channel work runs against one fixed home, reused across runs so offsets, bindings, approval state, and agent threads stay inspectable. **Never `~/.paseo`** (a real daemon owns it and port 6767) and never this checkout's `.dev/paseo-home`.
 
-| Thing  | Value                                                      |
-| ------ | ---------------------------------------------------------- |
-| Home   | `~/.clisbot-dev` (`CLISBOT_HOME`)                          |
-| Hub    | `127.0.0.1:6868`                                           |
-| Daemon | `127.0.0.1:6867` — the loop never stops it                 |
-| Log    | `~/.clisbot-dev/hub.log`                                   |
-| Binary | `node packages/cli/bin/paseo`, never a built `dist/cli.js` |
+| Thing    | Value                                                      |
+| -------- | ---------------------------------------------------------- |
+| Home     | `~/.clisbot-dev` (`CLISBOT_HOME`)                          |
+| Hub data | `~/.clisbot-dev/hub` (`CLISBOT_HUB_DATA_DIR`)              |
+| Hub      | `127.0.0.1:6868`                                           |
+| Daemon   | `127.0.0.1:6867` — the loop never stops it                 |
+| Log      | `~/.clisbot-dev/hub.log`                                   |
+| Binary   | `node packages/cli/bin/paseo`, never a built `dist/cli.js` |
 
 `scripts/e2e-dev.sh` is the only entry point. Anything it does not do, do by hand and then teach it:
 
@@ -23,7 +24,14 @@ scripts/e2e-dev.sh foreground # same, but attached and tee'd into hub.log
 scripts/e2e-dev.sh status     # paseo channels status
 scripts/e2e-dev.sh logs -f
 scripts/e2e-dev.sh stop
+scripts/e2e-dev.sh migrate-layout # one time: stopped root-level PGlite → hub/
 ```
+
+The nested Hub directory is an ownership boundary, not a second machine home. Daemon state and
+local Hub discovery remain directly under `~/.clisbot-dev`; PGlite's `PG_VERSION`, `base/`,
+`global/`, `pg_*`, PostgreSQL config, and Channel runtime stay under `hub/`. The migration command
+refuses to run while the Hub lock owner is alive and moves only an explicit allowlist of Hub-owned
+entries. Existing unmigrated homes remain readable through the legacy-layout detector.
 
 `build` stops the Hub first on purpose: the Vite build is OOM-killed (exit 137) on an 8 GB box with the Hub resident.
 

@@ -6,6 +6,11 @@
 > revisions no longer contain `secretRef` and `bot stop` never deletes Connection credentials. See
 > [the Hub credential, Application, and Connection gap decision](2026-09-01-hub-credential-application-connection-gaps.md).
 
+> Home-layout correction, 2026-09-08: the one-machine-home decision remains, but embedded Hub data
+> now defaults to the owned `~/.clisbot/hub/` child. PGlite exposes a PostgreSQL cluster tree rather
+> than one `hub.db`, so sharing the root made the home noisy. Explicit data-dir overrides still win;
+> a legacy `PG_VERSION` at the home root keeps that location readable until stopped migration.
+
 Implementation companion to [2026-08-23-openclaw-channel-reuse-plan.md](2026-08-23-openclaw-channel-reuse-plan.md). The plan owns _what_ and _why_ (control plane in the Hub, in-process verticals §14.5; **P0: the Hub reaches the daemon as an ordinary client — both forms: embedded pairs over loopback, team/remote over the relay, `scopes: ["*"]`, existing RPCs — zero daemon diff; P1: a flag-gated per-resource grant engine in the daemon** — plan §4-S3/§14.6/§14.7). This doc owns _how it is built, shipped, installed, and where every source change lands_. Verified against both codebases 2026-08-24/25.
 
 > Upstream merge update, 2026-09-01: use organization Trigger APIs and
@@ -328,8 +333,9 @@ All of it is flag-gated: the `CLISBOT_HUB_CHANNELS_ENABLED` env (read by the Hub
 ### 4.2 Per-channel install and state layout
 
 ```
-CLISBOT_HUB_DATA_DIR/          # default ~/.clisbot (the shared home; internal PASEO_HUB_DATA_DIR, §4.5)
-  hub.db                       # PGlite (or Postgres via CLISBOT_HUB_DATABASE_URL, team form)
+CLISBOT_HUB_DATA_DIR/          # default ~/.clisbot/hub (inside the machine home; §4.5)
+  PG_VERSION, base/, global/   # embedded PGlite/PostgreSQL cluster
+  pg_*/, postgresql*.conf      # database-owned internals; never edit individually
   secrets/                     # 0600 files referenced by secretRef
   channels/                    # runtime state only, scoped per account
     <organizationId>/<channel>/<accountId>/{state,downloads}/
@@ -340,7 +346,11 @@ CLISBOT_HUB_DATA_DIR/          # default ~/.clisbot (the shared home; internal P
       node_modules/…           # extracted, integrity-verified tarballs (openclaw, @openclaw/…)
 ```
 
-The Hub's data dir is the shared home `~/.clisbot` by default (§4.5): the daemon and the Hub coexist in it without top-level entry collisions. Install is idempotent: re-running `channels add` for the same pin is a no-op (the lock + extracted tree match the pin); a pin bump re-fetches, re-extracts into the same `node_modules/` paths, and re-records the lock. `channels status` reports pin, integrity check, load-trace result, and transport state per account.
+The Hub's data dir is `~/.clisbot/hub` by default (§4.5), so its PGlite cluster and Channel runtime
+have one visible owner beneath the machine home. Install is idempotent: re-running `channels add`
+for the same pin is a no-op; a pin bump is a fresh dir + cutover on the next Hub restart (module
+cache). `channels status` reports pin, integrity check, load-trace result, and transport state per
+account.
 
 **In-repo route (2026-08-26 pull):** for `loadMode: "in-repo"` (Slack, Telegram) the install skips the supply path entirely — no tarball fetch, no integrity gate, no main-dir provisioning under `plugins/channels`; the Hub drives its own workspace package (`inRepoPackage`, resolved from the monorepo; a missing built entry module fails closed, refusing the install). In-repo resolution writes no installation metadata at all (it removes the legacy `channels/<accountId>/install-<channel>.lock` that pre-managed-project revisions left behind); the workspace package manifest and repository lockfile are authoritative.
 
@@ -843,13 +853,21 @@ The fork changes two things operators actually type: the env prefix is `CLISBOT_
 | Operator sets                             | Maps to (internal)                    | Default                                        | Meaning                                                   |
 | ----------------------------------------- | ------------------------------------- | ---------------------------------------------- | --------------------------------------------------------- |
 | `CLISBOT_HOME`                            | `PASEO_HOME`                          | `~/.clisbot`                                   | daemon home                                               |
-| `CLISBOT_HUB_DATA_DIR`                    | `PASEO_HUB_DATA_DIR`                  | `~/.clisbot` (the shared home)                 | Hub data dir                                              |
+| `CLISBOT_HUB_DATA_DIR`                    | `PASEO_HUB_DATA_DIR`                  | `~/.clisbot/hub`                               | Hub data dir                                              |
 | `CLISBOT_HUB_DATABASE_URL`                | `DATABASE_URL`                        | unset (embedded PGlite)                        | team-form Postgres                                        |
 | `CLISBOT_HUB_CHANNELS_ENABLED`            | `PASEO_HUB_CHANNELS_ENABLED`          | on                                             | channel kill switch (supervisor env, restart)             |
 | `CLISBOT_HUB_BIND`                        | `PASEO_HUB_BIND`                      | `127.0.0.1` (loopback, not upstream `0.0.0.0`) | Hub listen address                                        |
 | `CLISBOT_HUB_URL` / `CLISBOT_HUB_API_KEY` | `PASEO_HUB_URL` / `PASEO_HUB_API_KEY` | —                                              | team/remote Hub target (local verbs auto-discover, below) |
 
-**Shared home `~/.clisbot`.** The daemon (`CLISBOT_HOME`) and the Hub (`CLISBOT_HUB_DATA_DIR`) both default to `~/.clisbot` — one directory, two writers, no conflict (verified: the daemon writes `agents/`, `projects/`, `worktrees/`, `config.json`, `daemon.log`, …; the Hub writes `hub.db`, `secrets/`, `channels/`, `.paseo-hub.lock` — no top-level entry overlaps). Upstream kept them separate (`~/.paseo` and `$XDG_DATA_HOME/paseo-hub`); the fork merges them so there is one mental home and one place to back up. The **project-local** `.paseo/` config dir (CWD-relative, upstream-defined: `hub.yml` + `workflows/` + `channels/`, `bundle-contract.ts`) is a different thing — it lives in the operator's project repo, not the machine home, and keeps the `.paseo` name. Do not conflate the machine home with the project config dir.
+**One machine home, nested Hub owner.** The daemon defaults to `~/.clisbot`; the Hub defaults to
+`~/.clisbot/hub`. This preserves one mental home and one backup root while preventing PGlite's
+PostgreSQL tree (`PG_VERSION`, `base/`, `global/`, `pg_*`, configuration files) from flooding the
+daemon home. `hub-local.json` remains at the machine-home root because it is CLI discovery state,
+not Hub database state. Upstream keeps separate default roots (`~/.paseo` and
+`$XDG_DATA_HOME/paseo-hub`). The **project-local** `.paseo/` config dir (CWD-relative,
+upstream-defined: `hub.yml` + `workflows/` + `channels/`, `bundle-contract.ts`) is a different thing
+— it lives in the operator's project repo, not the machine home, and keeps the `.paseo` name. Do not
+conflate the machine home with the project config dir.
 
 **Local Hub auto-discovery — no `CLISBOT_HUB_URL` / `CLISBOT_HUB_API_KEY` to set.** `clisbot hub start` binds loopback on port **6868** (the fork's default port, distinct from upstream's 3000) and writes a `hub-local.json` state file in the home recording the URL and pid. The local verbs (`hub init`, `channels …`, `users …`) read that file to find the Hub — the operator types no URL and no key. The name is distinct from the daemon's `hub-relationship.json` (the daemon-side enrolled-hub record), so both can live in the shared home without confusion. Auth: the embedded control plane trusts loopback clients (the Hub binds loopback, so only local clients reach it — the Hub's existing `resolveClientAddress`/`trustedClientIpHeader` loopback-trust mechanism), so the local state file carries no secret. The Hub still auto-generates and persists its auth secret in `hub.db` (`runtime_configuration`), and that secret is the credential for the **team/remote (non-loopback)** form, where the operator points the CLI at the Hub with `CLISBOT_HUB_URL` (+ `CLISBOT_HUB_API_KEY`) — the same flag → env → stored-login precedence as upstream, `CLISBOT_`-prefixed.
 
@@ -865,7 +883,7 @@ The fork changes two things operators actually type: the env prefix is `CLISBOT_
 2. **The supervisor is part of P0 acceptance, not a nicety** (plan §14.5 condition 2): in-process means a channel hang kills the Hub and nothing inside it can restart it. Acceptance (§10 of the plan) includes the demonstrated kill/restart/resume case with no double-post.
 3. **Two wire-schema sources must stay in lockstep** (§3.2): vacuous at P0 (no new RPC on either side, and no form uses the `hub.execution.*` schemas — both forms reuse the existing trusted-client schemas, plan §14.7); every **P1** grant-engine wire addition is a two-sided change (monorepo `packages/protocol` + Hub `src/hub/protocol.ts`) with matching `COMPAT` tags; the conformance test fails CI on drift.
 4. **Node floor is 22** for the whole onboarding path: module customization hooks need ≥20.6, and the monorepo pins 22.20.0 — one version for the daemon and the Hub.
-5. **Data-dir separation from an upstream Hub.** The Clisbot Hub defaults to `~/.clisbot` (internal `CLISBOT_HUB_DATA_DIR` → `PASEO_HUB_DATA_DIR`, §4.5) and port 6868; an upstream `paseo-hub` defaults to `$XDG_DATA_HOME/paseo-hub` and port 3000. The fork's defaults are disjoint, so an upgrade (one Hub, data dir moved to `~/.clisbot`) is clean. Pointing two Hub instances at the _same_ data dir is not supported — one Hub owns a data dir; parallel instances need distinct `CLISBOT_HUB_DATA_DIR` (and the one-owner-per-account rule, plan §11, still applies across instances).
+5. **Data-dir separation from an upstream Hub.** The Clisbot Hub defaults to `~/.clisbot/hub` (internal `CLISBOT_HUB_DATA_DIR` → `PASEO_HUB_DATA_DIR`, §4.5) and port 6868; an upstream `paseo-hub` defaults to `$XDG_DATA_HOME/paseo-hub` and port 3000. The fork's defaults are disjoint. Pointing two Hub instances at the _same_ data dir is not supported — one Hub owns a data dir; parallel instances need distinct `CLISBOT_HUB_DATA_DIR` (and the one-owner-per-account rule, plan §11, still applies across instances).
 6. **The Hub build is not in `build:server`.** Desktop/mobile/daemon builds do not pay for the Hub's `vite build`; `build:hub` is explicit (§1.2).
 7. **e2e tests are cross-repo by design.** The Hub's e2e harness (`src/e2e/harness/`) spawns a real monorepo daemon; fork CI must build the monorepo stack before Hub e2e. At P0 the harness exercises the stock daemon — **both forms** connect through the existing trusted-client path (embedded over loopback, team/remote relay-paired, plan §14.7), so the harness pins no fork-added wire. From P1, any grant-engine daemon-side behavior the e2e asserts is pinned by the conformance test, not by the harness.
 8. **Fork artifacts are identifiable by scope, not suffix.** Everything this repo publishes is `@clisbot/*` (upstream names survive only inside the fork's source tree and `npm link` dev installs). Diagnostics and support triage should report the installed scope + version (`@clisbot/cli@0.5.0`), so "is this machine running the fork or upstream" is a one-line answer. (The P1 grant engine's pairing-grant verification reports through the same channel: grant checks and their outcomes are daemon diagnostics, not a separate surface.)
