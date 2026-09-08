@@ -7,7 +7,7 @@
 
 import { createChannelEntry } from "@getpaseo/channels-shared";
 import type { HostRuntime } from "@getpaseo/channels-shared";
-import { setSlackChannelRuntime } from "./runtime.js";
+import { setSlackChannelRuntime } from "./runtime-store.js";
 
 export const slackEntry = createChannelEntry(
   {
@@ -16,7 +16,7 @@ export const slackEntry = createChannelEntry(
     description: "Slack channel vertical (Socket Mode + Web API, in-repo pull).",
     importMetaUrl: import.meta.url,
     plugin: { specifier: "./plugin.js", exportName: "slackPlugin" },
-    runtime: { specifier: "./runtime.js", exportName: "setSlackChannelRuntime" },
+    runtime: { specifier: "./runtime-store.js", exportName: "setSlackChannelRuntime" },
   },
   (): ((runtime: HostRuntime) => void) => setSlackChannelRuntime,
 );

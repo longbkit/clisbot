@@ -1,111 +1,131 @@
-// Outbound: `plugin.outbound.sendText` (blueprint §6.5 hard rule 2, B3):
-// resolve the account + token from `cfg`, resolve the target chat id (numeric
-// pass-through or getChat lookup), send through the L1 text path, and record
-// each delivered chunk in the plane's keyed-store seam (D-001 — the pinned
-// `sent-message-cache` config-file write is re-targeted at the seam).
-
-import { statSync } from "node:fs";
-import { extname } from "node:path";
+// Fusion drive-surface bridge onto the ported OpenClaw send path.
+//
+// `plugin.outbound.*` is the Hub's contract (`@getpaseo/channels-shared`), so
+// this file is the only place that translates between it and upstream's
+// `send.ts` entry points. Every wire decision — chunking, rich/HTML rendering,
+// topic and reply params, retries, receipts, media routing, the sent-message
+// cache — now lives in the ported source, not here.
+import { readFile } from "node:fs/promises";
+import { dirname, extname } from "node:path";
 import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
-import { evaluateOutboundMedia, mediaFileName, mimeFromExtension } from "@getpaseo/channels-shared";
-import { getHostRuntime } from "./runtime-store.js";
-import { sendTelegramMedia } from "./outbound-media.js";
+import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
+import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import type { MessagePresentationBlockNote } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
 import {
-  buildTelegramClientOptions,
-  createTelegramApi,
-  editTelegramMessageText,
-  openTelegramSeamStores,
-  parseOutboundTarget,
-  resolveChatId,
-  resolveTelegramAccount,
-  sendTelegramText,
-  type TelegramCfg,
-  type TelegramSeamStores,
-} from "./client/bot-api.js";
-import { recordSentMessage } from "./client/sent-messages.js";
-
-const SEAM_STORES: WeakMap<object, TelegramSeamStores> = new WeakMap();
-
-/** The per-host-runtime seam stores (one set per runtime object). */
-function runtimeOf(args: Record<string, unknown>): HostRuntime {
-  return (args["hostRuntime"] as HostRuntime | undefined) ?? getHostRuntime();
-}
-
-function openSeamStores(runtime: HostRuntime): TelegramSeamStores {
-  let stores = SEAM_STORES.get(runtime);
-  if (stores === undefined) {
-    stores = openTelegramSeamStores(runtime);
-    SEAM_STORES.set(runtime, stores);
-  }
-  return stores;
-}
-
-/** The `reply_markup` value the send args carry (the Hub's card builder
- * mints it; the vertical posts it verbatim on chunk 0). */
-function replyMarkupOf(args: Parameters<SendTextFn>[0]): Record<string, unknown> | undefined {
-  const markup = args["replyMarkup"];
-  if (typeof markup === "object" && markup !== null && !Array.isArray(markup)) {
-    return markup as Record<string, unknown>;
-  }
-  return undefined;
-}
-
-/** COMPAT(clisbot-control-plane): `plugin.outbound.sendText` — the Hub relay
- * posts text answers through this. Media is posted only through the Hub's
- * explicit `send_file` MCP tool, which routes into this vertical's
- * `sendMedia`; G7–G11 semantics remain unchanged. `to` is a chat id or
- * `@username`, optional `:topic:<id>`; `threadId`
- * is the topic's numeric id as a string when `to` carried none. The optional
- * `replyMarkup` arg (COMPAT(clisbot-control-plane)) carries the native
- * approval card's inline keyboard, posted on chunk 0 alongside the text. */
-export const sendText: SendTextFn = async (args) => {
-  const { cfg, accountId, to, threadId, text, replyTo } = args;
-  const runtime = runtimeOf(args);
-  // The token comes from `cfg.channels.telegram.accounts.<id>.botToken`
-  // (start-account.md: the outbound path reads tokens from cfg, not the
-  // flat drive-time account).
-  const account = resolveTelegramAccount(cfg as unknown as TelegramCfg, accountId);
-  const target = parseOutboundTarget(String(to));
-  const messageThreadId =
-    target.messageThreadId ??
-    (threadId !== undefined && threadId !== "" ? Number(threadId) : undefined);
-  if (
-    messageThreadId !== undefined &&
-    (!Number.isSafeInteger(messageThreadId) || messageThreadId <= 0)
-  ) {
-    throw new Error(`invalid Telegram topic id "${String(threadId)}"`);
-  }
-  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
-  const chatId = await resolveChatId(target.chatId, api);
-  const stores = openSeamStores(runtime);
-  const replyMarkup = replyMarkupOf(args);
-  const result = await sendTelegramText({
-    api,
-    chatId,
-    text: String(text),
-    // The account's `richMessages` (D-003, default on): markdown → Bot API
-    // HTML (`parse_mode: HTML`); an explicit `richMessages: false` opts out
-    // to plain text. `messageThreadId` rides on EVERY chunk,
-    // `replyToMessageId` on chunk 0 only (the shared thread-param builders
-    // inside `sendTelegramText` — F-07).
-    rich: account.config.richMessages,
-    ...(messageThreadId !== undefined ? { messageThreadId } : {}),
-    ...(typeof replyTo === "number" ? { replyToMessageId: replyTo } : {}),
-    ...(replyMarkup !== undefined ? { replyMarkup, cardPosted: true } : {}),
-    log: (message) => runtime.logging.getChildLogger().debug?.(message),
-    recordSent: async (sentChatId, messageId) => {
-      await recordSentMessage(stores.sentMessages, sentChatId, messageId);
-    },
-  });
-  return result;
-};
+  accountRendersRichMessages,
+  resolveTelegramOutboundPresentation,
+} from "./presentation-outbound.js";
+import { getHostRuntime } from "./runtime-store.js";
+import { installTelegramRuntime } from "./fusion/runtime.js";
+import { withTelegramAccount } from "./runtime.js";
+import { editMessageTelegram } from "./send-edit.js";
+import { sendMessageTelegram } from "./send-message.js";
+import type { TelegramSendOpts } from "./send-message-types.js";
+import { normalizeTelegramOutboundTarget } from "./targets.js";
 
 /**
- * COMPAT(clisbot-control-plane): the in-place update (`plugin.outbound
- * .updateText` → `editMessageText`). The approval card's decided state lands
- * here; `clearCard` (on unless the caller opts out) strips the inline
- * keyboard so a stale button click has no live markup. The Hub's approval
- * engine decides against it. Args mirror the plane's `OutboundUpdateParams`.
+ * Runs one send under its own account's ported plugin runtime.
+ *
+ * The Hub drives every account of every organization from one process, so the
+ * install is keyed by account: it resolves the account's HostRuntime (the drive
+ * args carry it; `getHostRuntime()` is the single-account fallback), installs
+ * the ported runtime for that account if it is not already installed against
+ * that host, and makes the account current for the call. Everything the send
+ * awaits — the ported sent-message cache, the topic-name cache, the poll
+ * registry — then resolves that account's keyed stores through the upstream
+ * zero-arg `getTelegramRuntime()`.
+ */
+async function withAccountRuntime<T>(
+  args: Record<string, unknown>,
+  run: () => Promise<T>,
+): Promise<T> {
+  const host = (args["hostRuntime"] as HostRuntime | undefined) ?? getHostRuntime();
+  const accountId = String(args["accountId"] ?? "");
+  installTelegramRuntime(host, accountId);
+  return await withTelegramAccount(accountId, run);
+}
+
+/** Numeric topic id from the Hub's `threadId` string, or undefined. */
+function resolveMessageThreadId(threadId: unknown): number | undefined {
+  if (threadId === undefined || threadId === null || threadId === "") {
+    return undefined;
+  }
+  const parsed = Number(threadId);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`invalid Telegram topic id "${String(threadId)}"`);
+  }
+  return parsed;
+}
+
+/** Base send options shared by the text and media paths. */
+function baseSendOpts(args: Record<string, unknown>): TelegramSendOpts {
+  const messageThreadId = resolveMessageThreadId(args["threadId"]);
+  const replyTo = args["replyTo"];
+  return {
+    cfg: args["cfg"] as OpenClawConfig,
+    accountId: String(args["accountId"] ?? ""),
+    ...(messageThreadId !== undefined ? { messageThreadId } : {}),
+    ...(typeof replyTo === "number" ? { replyToMessageId: replyTo } : {}),
+    // Test seam: upstream's own Bot API override, forwarded from the drive args.
+    ...(args["api"] ? { api: args["api"] as TelegramSendOpts["api"] } : {}),
+  };
+}
+
+/**
+ * `plugin.outbound.sendText` — the Hub's final-answer post. `to` is a chat id,
+ * `@username`, or the `<chat>:topic:<id>` form upstream's `targets.ts` parses.
+ * The optional `replyMarkup` arg (COMPAT(clisbot-control-plane)) carries the
+ * native approval card's inline keyboard.
+ */
+export const sendText: SendTextFn = async (args) =>
+  await withAccountRuntime(args, async () => {
+    const to = normalizeTelegramOutboundTarget(String(args.to));
+    const opts = baseSendOpts(args);
+    const replyMarkup = args["replyMarkup"];
+    // A portable `presentation` renders through the vertical (D-TG-057): a
+    // table posts as a native Bot API 10.3 `table` block on a rich account and
+    // as the portable fallback text everywhere else. Without this the Hub's
+    // send reached Telegram as core's flattened text and a table was a bullet
+    // list (D-W6-01).
+    const presented = resolveTelegramOutboundPresentation({
+      text: String(args.text),
+      presentation: args["presentation"],
+      richMessages: accountRendersRichMessages({
+        cfg: opts.cfg,
+        accountId: opts.accountId ?? "",
+      }),
+    });
+    logPresentationAdmission({ args, notes: presented.notes });
+    const result = await sendMessageTelegram(to, presented.text ?? String(args.text), {
+      ...opts,
+      ...(replyMarkup && typeof replyMarkup === "object"
+        ? { buttons: (replyMarkup as { inline_keyboard?: unknown }).inline_keyboard as never }
+        : presented.buttons === undefined
+          ? {}
+          : { buttons: presented.buttons as never }),
+    });
+    return { messageId: result.messageId, chatId: result.chatId, ...result.receipt };
+  });
+
+/** D-W6-02: what admission repaired or refused is an operator fact — the tool
+ * result the model reads is the Hub's to write, but the account's log must not
+ * be the one place a dropped block is invisible. */
+function logPresentationAdmission(params: {
+  args: Record<string, unknown>;
+  notes: readonly MessagePresentationBlockNote[];
+}): void {
+  if (params.notes.length === 0) return;
+  const accountId = String(params.args["accountId"] ?? "");
+  const runtime = (params.args["hostRuntime"] as HostRuntime | undefined) ?? getHostRuntime();
+  runtime?.logging
+    .getChildLogger({ channel: "telegram", accountId })
+    .warn("telegram presentation admission", { notes: params.notes });
+}
+
+/**
+ * COMPAT(clisbot-control-plane): the in-place update (`editMessageText`). The
+ * approval card's decided state lands here; `clearCard` (on unless the caller
+ * opts out) strips the inline keyboard so a stale button click has no live markup.
  */
 export async function updateText(args: {
   cfg: Record<string, unknown>;
@@ -117,86 +137,55 @@ export async function updateText(args: {
   clearCard?: boolean;
   [key: string]: unknown;
 }): Promise<{ ok: boolean }> {
-  const runtime = runtimeOf(args);
-  const account = resolveTelegramAccount(args.cfg as unknown as TelegramCfg, args.accountId);
-  const target = parseOutboundTarget(String(args.to));
-  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
-  const chatId = await resolveChatId(target.chatId, api);
-  const messageId = Number(args.externalMessageId);
-  if (!Number.isSafeInteger(messageId) || messageId === 0) {
-    throw new Error(`invalid Telegram message id "${String(args.externalMessageId)}"`);
-  }
-  await editTelegramMessageText({
-    api,
-    chatId,
-    messageId,
-    text: String(args.text),
-    clearCard: args.clearCard !== false,
-    rich: account.config.richMessages,
-    log: (message) => runtime.logging.getChildLogger().debug?.(message),
+  return await withAccountRuntime(args, async () => {
+    const to = normalizeTelegramOutboundTarget(String(args.to));
+    const messageId = Number(args.externalMessageId);
+    if (!Number.isSafeInteger(messageId) || messageId === 0) {
+      throw new Error(`invalid Telegram message id "${String(args.externalMessageId)}"`);
+    }
+    await editMessageTelegram(to, messageId, String(args.text), {
+      ...baseSendOpts(args),
+      ...(args.clearCard === false ? {} : { buttons: [] }),
+    });
+    return { ok: true };
   });
-  return { ok: true };
 }
 
 /**
- * COMPAT(clisbot-control-plane): the native-media post
- * (`plugin.outbound.sendMedia`, G7–G11). One call posts ONE local media file
- * through the mime-routed Bot API method (any file type: a mapped mime routes
- * to its native method, everything else — including an unknown extension —
- * to `sendDocument` as `application/octet-stream`). The G11 gate runs FIRST
- * and is size-only (the Bot API's 50 MB upload cap): an oversized file is
- * not dropped — the in-channel notice is posted through the plain text path
- * and `mediaPosted` reports false. A transport fault (missing file, Bot API
- * failure) throws (the Hub's failDelivery owns it).
+ * COMPAT(clisbot-control-plane): the native-media post (`plugin.outbound.sendMedia`,
+ * G7–G11). The G11 gate runs FIRST and is size-only (the Bot API's 50 MB upload
+ * cap): an oversized file is not dropped — the in-channel notice is posted
+ * through the text path and `mediaPosted` reports false. Mime→method routing,
+ * caption splitting and the HTML fallback are upstream's (`outbound-media.ts`).
  */
-export const sendMedia: SendMediaFn = async (args) => {
-  const { cfg, accountId, to, threadId, filePath } = args;
-  const runtime = runtimeOf(args);
-  const account = resolveTelegramAccount(cfg as unknown as TelegramCfg, accountId);
-  const target = parseOutboundTarget(String(to));
-  const messageThreadId =
-    target.messageThreadId ??
-    (threadId !== undefined && threadId !== "" ? Number(threadId) : undefined);
-  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
-  const chatId = await resolveChatId(target.chatId, api);
-  const stores = openSeamStores(runtime);
-  const log = (message: string) => runtime.logging.getChildLogger().debug?.(message);
-  const postText = (text: string): Promise<{ messageId: string }> =>
-    sendText({
-      cfg,
-      hostRuntime: runtime,
-      accountId,
-      to: String(to),
-      ...(threadId !== undefined && threadId !== "" ? { threadId } : {}),
-      text,
+export const sendMedia: SendMediaFn = async (args) =>
+  await withAccountRuntime(args, async () => {
+    const to = normalizeTelegramOutboundTarget(String(args.to));
+    const fileName = mediaFileName(args.filePath);
+    const { statSync } = await import("node:fs");
+    let sizeBytes: number;
+    try {
+      sizeBytes = statSync(args.filePath).size;
+    } catch {
+      throw new Error(`Telegram sendMedia: local media file not found: ${args.filePath}`);
+    }
+    const decision = evaluateOutboundMedia({ sizeBytes, channel: "telegram", fileName });
+    if (!decision.ok) {
+      const notice = await sendText({ ...args, text: decision.notice });
+      return { messageId: notice.messageId, mediaPosted: false };
+    }
+    const caption = typeof args["caption"] === "string" ? (args["caption"] as string) : "";
+    const result = await sendMessageTelegram(to, caption, {
+      ...baseSendOpts(args),
+      mediaUrl: args.filePath,
+      // The Hub authorizes the file before it reaches the vertical; the root is
+      // scoped to the authorized file's own directory so upstream's local-read
+      // guard still has a boundary to check.
+      mediaAccess: {
+        localRoots: [dirname(args.filePath)],
+        readFile: async (filePath: string) => await readFile(filePath),
+      },
+      ...(extname(args.filePath) === ".ogg" && args["asVoice"] === true ? { asVoice: true } : {}),
     });
-  const fileName = mediaFileName(filePath);
-  const mime = mimeFromExtension(extname(filePath));
-  let sizeBytes: number;
-  try {
-    sizeBytes = statSync(filePath).size;
-  } catch {
-    throw new Error(`Telegram sendMedia: local media file not found: ${filePath}`);
-  }
-  const decision = evaluateOutboundMedia({
-    sizeBytes,
-    channel: "telegram",
-    fileName,
+    return { messageId: result.messageId, chatId: result.chatId, mediaPosted: true };
   });
-  if (!decision.ok) {
-    // G11: the file is not posted natively — post the notice instead.
-    const notice = await postText(decision.notice);
-    return { messageId: notice.messageId, mediaPosted: false };
-  }
-  const result = await sendTelegramMedia({
-    api,
-    chatId,
-    filePath,
-    fileName,
-    mime: mime ?? "application/octet-stream",
-    ...(messageThreadId !== undefined ? { messageThreadId } : {}),
-    log,
-  });
-  await recordSentMessage(stores.sentMessages, Number(result.chatId), result.messageId);
-  return { messageId: result.messageId, mediaPosted: true };
-};

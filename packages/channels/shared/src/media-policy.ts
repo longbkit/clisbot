@@ -21,9 +21,11 @@ import { basename } from "node:path";
 /** The G11 per-channel upload caps (bytes). */
 export const TELEGRAM_MAX_MEDIA_BYTES = 50 * 1024 * 1024;
 export const SLACK_MAX_MEDIA_BYTES = 250 * 1024 * 1024;
+/** Discord's default (non-boosted) attachment cap. */
+export const DISCORD_MAX_MEDIA_BYTES = 10 * 1024 * 1024;
 
 /** The channel the G11 policy is applied under. */
-export type MediaChannel = "telegram" | "slack";
+export type MediaChannel = "telegram" | "slack" | "discord";
 
 /** Why an outbound file may not be posted natively: the G11 gate is size-only
  * (an unknown/unmapped extension posts as `application/octet-stream`). */
@@ -33,11 +35,38 @@ export type MediaRejectReason = "too-large";
 const CHANNEL_LABEL: Record<MediaChannel, string> = {
   telegram: "Telegram",
   slack: "Slack",
+  discord: "Discord",
+};
+
+const MAX_MEDIA_BYTES: Record<MediaChannel, number> = {
+  telegram: TELEGRAM_MAX_MEDIA_BYTES,
+  slack: SLACK_MAX_MEDIA_BYTES,
+  discord: DISCORD_MAX_MEDIA_BYTES,
 };
 
 /** The channel's G11 cap in bytes. */
 export function mediaMaxBytesForChannel(channel: MediaChannel): number {
-  return channel === "telegram" ? TELEGRAM_MAX_MEDIA_BYTES : SLACK_MAX_MEDIA_BYTES;
+  return MAX_MEDIA_BYTES[channel];
+}
+
+/** The Bot API's own `getFile` ceiling. A bot cannot download a larger file,
+ * so a larger `file_size` is either a lie or a redirected host. */
+export const TELEGRAM_MAX_INBOUND_MEDIA_BYTES = 20 * 1024 * 1024;
+
+/** INBOUND ceilings. The remote decides how big an inbound attachment is, so
+ * every download the verticals perform is bounded — otherwise one message
+ * fills the Hub's disk. Slack and Discord reuse their platform upload caps
+ * (nothing larger can exist in the conversation); Telegram's is smaller than
+ * its outbound cap because `getFile` refuses anything above 20 MB. */
+const MAX_INBOUND_MEDIA_BYTES: Record<MediaChannel, number> = {
+  telegram: TELEGRAM_MAX_INBOUND_MEDIA_BYTES,
+  slack: SLACK_MAX_MEDIA_BYTES,
+  discord: DISCORD_MAX_MEDIA_BYTES,
+};
+
+/** The channel's inbound download ceiling in bytes. */
+export function mediaInboundMaxBytesForChannel(channel: MediaChannel): number {
+  return MAX_INBOUND_MEDIA_BYTES[channel];
 }
 
 /** The in-channel notice for a file the channel will not post natively.

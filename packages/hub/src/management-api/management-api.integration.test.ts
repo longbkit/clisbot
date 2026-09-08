@@ -13,10 +13,12 @@ import { replaceDaemonProjects } from "../access/daemon-projects.js";
 import { replaceDaemonConnectionOffer } from "../daemons/registration.js";
 import { AccessStore } from "../access/store.js";
 import type { BrowserOrganizationAccess } from "../auth/browser-organization-access.js";
+import type { OrganizationCapabilities } from "../auth/organization-policy.js";
 import { createTestCredentialCipher } from "../credentials/test-utils.js";
 import { createDatabase } from "../db/pg.js";
 import { embeddedDatabaseRuntime, type DatabaseRuntimeBundle } from "../db/runtime/index.js";
 import * as schema from "../db/schema.js";
+import { ChannelAccessStore } from "../db/channel-access.js";
 import { AccessTicketService } from "../managed-access/tickets.js";
 import type { ChannelSupervisor } from "../channels/supervisor/types.js";
 import type {
@@ -72,6 +74,90 @@ it("keeps organization-wide Channel activity behind management authority and val
     "https://hub.example.test/api/management/v1/organizations/other/channel-activity",
   );
   assert.equal((await owner.handle(otherOrganization)).status, 404);
+});
+
+it("keeps the durable ingress queue operations behind Channel management authority", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  const access = new AccessStore(bundle.runtime);
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: null,
+  };
+  const owner = new ManagementApi({ ...common, auth: ownerAccess() });
+  const member = new ManagementApi({ ...common, auth: memberAccess() });
+  assert.equal((await member.handle(request("/channel-ingress", "GET"))).status, 403);
+  assert.equal((await member.handle(request("/channel-ingress/events", "GET"))).status, 403);
+  assert.equal(
+    (await member.handle(request("/channel-ingress/resubmit", "POST", { ids: [] }))).status,
+    403,
+  );
+
+  const status = await owner.handle(request("/channel-ingress", "GET"));
+  assert.equal(status.status, 200);
+  assert.deepEqual(await status.json(), {
+    accounts: [],
+    totals: {
+      pending: 0,
+      claimed: 0,
+      retrying: 0,
+      deadLettered: 0,
+      completed: 0,
+      oldestPendingAgeMs: null,
+      lanesBlocked: 0,
+    },
+  });
+  const events = await owner.handle(request("/channel-ingress/events?limit=5", "GET"));
+  assert.equal(events.status, 200);
+  assert.deepEqual(await events.json(), { events: [], nextOffset: null });
+  // An account id without its channel is ambiguous, and a bad id is not a lookup.
+  assert.equal(
+    (await owner.handle(request("/channel-ingress/events?accountId=support", "GET"))).status,
+    400,
+  );
+  assert.equal(
+    (await owner.handle(request("/channel-ingress/resubmit", "POST", { ids: ["nope"] }))).status,
+    400,
+  );
+  const pruned = await owner.handle(request("/channel-ingress/prune", "POST", {}));
+  assert.equal(pruned.status, 200);
+  assert.deepEqual(await pruned.json(), { deleted: 0 });
+  assert.equal((await owner.handle(request("/channel-ingress/unknown", "GET"))).status, 404);
+  const otherOrganization = new Request(
+    "https://hub.example.test/api/management/v1/organizations/other/channel-ingress",
+  );
+  assert.equal((await owner.handle(otherOrganization)).status, 404);
+});
+
+it("gates the channel control plane on manageChannels, not on Project administration", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  const access = new AccessStore(bundle.runtime);
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: null,
+  };
+  // An administrator whose organization withheld the channel capability: a
+  // channel account is a live credential to an outside workspace and its
+  // backlog holds message content, so `manageResources` must not carry it.
+  const withheld = new ManagementApi({
+    ...common,
+    auth: ownerAccess({ manageChannels: false }),
+  });
+  assert.equal((await withheld.handle(request("/channel-activity", "GET"))).status, 403);
+  assert.equal((await withheld.handle(request("/channel-ingress", "GET"))).status, 403);
+  // Everything gated on `manageResources` still answers.
+  assert.equal((await withheld.handle(request("/daemons", "GET"))).status, 200);
+  // And the capability alone is enough: no `manageResources` needed.
+  const channelsOnly = new ManagementApi({
+    ...common,
+    auth: ownerAccess({ manageResources: false }),
+  });
+  assert.equal((await channelsOnly.handle(request("/channel-activity", "GET"))).status, 200);
 });
 
 it("renames shared Hosts through canonical Hub authority, normalization, and conflict handling", async () => {
@@ -756,10 +842,11 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
   );
   assert.equal(automationResponse.status, 201);
   const automation = await automationResponse.json();
-  const channelConnection = await database.configureTelegramConnection({
+  const channelConnection = await database.configureChannelConnection({
     organizationId: ORGANIZATION_ID,
+    channel: "telegram",
     accountId: "support",
-    botToken: "telegram-secret",
+    credentials: { botToken: "telegram-secret" },
   });
 
   const candidate = {
@@ -914,6 +1001,55 @@ it("updates one Channel revision for Agent and Automation routes and rejects a s
     },
   });
   assert.deepEqual(retryStarts, [{ channel: "telegram", account: "support" }]);
+
+  // Pairing (`access.dmPolicy: pairing`): the operator sees who is waiting and
+  // decides. Approving is what adds the sender to the account's allowlist.
+  await new ChannelAccessStore(bundle.runtime.drizzle()).requestPairing({
+    organizationId: ORGANIZATION_ID,
+    channel: "telegram",
+    accountId: "support",
+    senderIdentity: "telegram:77001",
+    senderName: "Stranger",
+    externalConversationId: "77001",
+    code: "ABC234",
+  });
+  const pairings = await api.handle(request("/channel-accounts/telegram/support/pairing", "GET"));
+  assert.equal(pairings.status, 200);
+  const pairingRows = (await pairings.json()).pairings;
+  assert.deepEqual(pairingRows, [
+    {
+      channel: "telegram",
+      accountId: "support",
+      senderIdentity: "telegram:77001",
+      senderName: "Stranger",
+      code: "ABC234",
+      status: "pending",
+      externalConversationId: "77001",
+      decidedAt: null,
+      createdAt: pairingRows[0].createdAt,
+    },
+  ]);
+  const approved = await api.handle(
+    request("/channel-accounts/telegram/support/pairing/approve", "POST", {
+      senderIdentity: "telegram:77001",
+    }),
+  );
+  assert.equal(approved.status, 200, JSON.stringify(await approved.clone().json()));
+  assert.equal((await approved.json()).status, "approved");
+  assert.deepEqual(
+    await new ChannelAccessStore(bundle.runtime.drizzle()).listApprovedPairedSenders({
+      organizationId: ORGANIZATION_ID,
+      channel: "telegram",
+      accountId: "support",
+    }),
+    ["telegram:77001"],
+  );
+  const unknownPairing = await api.handle(
+    request("/channel-accounts/telegram/support/pairing/deny", "POST", {
+      senderIdentity: "telegram:404",
+    }),
+  );
+  assert.equal(unknownPairing.status, 404);
 
   const testMessage = await api.handle(
     request("/channel-accounts/telegram/support/test", "POST", {
@@ -1497,6 +1633,237 @@ it("stores provider credentials in the Connection owner and never returns them",
   assert.equal((await unavailableConnection.json()).error, "resource_unavailable");
 });
 
+// A channel bot credential is a live token into an outside workspace, so it is
+// `channel.manage` authority — not `hub.configure`. Writing and deleting one
+// used to require `manageResources`, which made the separate `manageChannels`
+// capability unusable on its own and handed channel credentials to every
+// resource admin.
+it("gates channel bot Connection writes on channel.manage, not hub.configure", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  await bundle.runtime
+    .drizzle()
+    .insert(schema.organizations)
+    .values({ id: ORGANIZATION_ID, name: "Org", slug: "org" });
+  await bundle.runtime.drizzle().insert(schema.users).values({
+    id: USER_ID,
+    name: "Owner",
+    email: "owner@example.test",
+    emailVerified: true,
+  });
+  await bundle.runtime.drizzle().insert(schema.members).values({
+    id: MEMBERSHIP_ID,
+    organizationId: ORGANIZATION_ID,
+    userId: USER_ID,
+    role: "owner",
+  });
+  const access = new AccessStore(bundle.runtime);
+  const common = {
+    database,
+    runtime: bundle.runtime,
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: null,
+  };
+  const body = {
+    provider: "discord",
+    accountId: "guild-gated",
+    credentials: { botToken: DISCORD_BOT_TOKEN },
+  };
+  const probes: Array<string | null> = [];
+  const restoreFetch = stubDiscordProbe(probes);
+  try {
+    const resourceAdmin = new ManagementApi({
+      ...common,
+      auth: ownerAccess({ manageChannels: false }),
+    });
+    assert.equal((await resourceAdmin.handle(request("/connections", "POST", body))).status, 403);
+
+    const channelAdmin = new ManagementApi({
+      ...common,
+      auth: ownerAccess({ manageResources: false }),
+    });
+    const created = await channelAdmin.handle(request("/connections", "POST", body));
+    assert.equal(created.status, 201, "channel.manage alone configures a channel credential");
+    const connection = await created.json();
+
+    // A member with neither capability never reaches the resource.
+    const member = new ManagementApi({ ...common, auth: memberAccess() });
+    assert.equal(
+      (await member.handle(request(`/connections/${connection.id}`, "DELETE"))).status,
+      403,
+    );
+    assert.equal(
+      (await resourceAdmin.handle(request(`/connections/${connection.id}`, "DELETE"))).status,
+      403,
+    );
+    assert.equal(
+      (await channelAdmin.handle(request(`/connections/${connection.id}`, "DELETE"))).status,
+      204,
+    );
+  } finally {
+    restoreFetch();
+  }
+});
+
+it("probes and stores a Discord bot Connection, keeps it organization scoped, and disconnects it", async () => {
+  const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
+  for (const id of [ORGANIZATION_ID, "other-org"]) {
+    await bundle.runtime.drizzle().insert(schema.organizations).values({ id, name: id, slug: id });
+  }
+  await bundle.runtime.drizzle().insert(schema.users).values({
+    id: USER_ID,
+    name: "Owner",
+    email: "owner@example.test",
+    emailVerified: true,
+  });
+  await bundle.runtime.drizzle().insert(schema.members).values({
+    id: MEMBERSHIP_ID,
+    organizationId: ORGANIZATION_ID,
+    userId: USER_ID,
+    role: "owner",
+  });
+  const access = new AccessStore(bundle.runtime);
+  const restarts: Array<{ channel: string; account: string }> = [];
+  const api = new ManagementApi({
+    database,
+    runtime: bundle.runtime,
+    auth: ownerAccess(),
+    access,
+    tickets: new AccessTicketService(bundle.runtime, access),
+    channelSupervisor: {
+      startAccount: async (channel: string, account: string) => {
+        restarts.push({ channel, account });
+        return { channel, account, installed: false, transport: "started" as const };
+      },
+      status: () => [
+        {
+          channel: "discord",
+          account: "guild-ops",
+          integrity: "ok",
+          loadTrace: "ok",
+          transport: "started",
+        },
+      ],
+    } as unknown as ChannelSupervisor,
+  });
+
+  // A Connection another organization owns: it must never appear in this
+  // organization's list, and its id must not be deletable from here.
+  const foreign = await database.configureChannelConnection({
+    organizationId: "other-org",
+    channel: "discord",
+    accountId: "guild-ops",
+    credentials: { botToken: DISCORD_BOT_TOKEN },
+  });
+
+  const probes: Array<string | null> = [];
+  const restoreFetch = stubDiscordProbe(probes);
+  try {
+    const create = await api.handle(
+      request("/connections", "POST", {
+        provider: "discord",
+        accountId: "guild-ops",
+        credentials: { botToken: DISCORD_BOT_TOKEN },
+      }),
+    );
+    assert.equal(create.status, 201);
+    const connection = await create.json();
+    assert.equal(connection.provider, "discord");
+    assert.equal(connection.name, "guild-ops");
+    // The identity the probe returned names the connection; the token does not leak.
+    assert.equal(connection.externalName, "fusion-bot");
+    assert.equal(JSON.stringify(connection).includes(DISCORD_BOT_TOKEN), false);
+    assert.deepEqual(probes, [`Bot ${DISCORD_BOT_TOKEN}`]);
+    assert.deepEqual(
+      await database.resolveChannelConnection({
+        organizationId: ORGANIZATION_ID,
+        channel: "discord",
+        connectionId: connection.id,
+      }),
+      { botToken: DISCORD_BOT_TOKEN },
+    );
+
+    const list = await api.handle(request("/connections", "GET"));
+    const listed = (await list.json()).connections as Array<{ id: string; provider: string }>;
+    assert.deepEqual(
+      listed.map(({ id }) => id),
+      [connection.id],
+    );
+    assert.equal(listed[0]?.provider, "discord");
+
+    // Another organization's Connection is invisible and undeletable here.
+    const foreignDelete = await api.handle(
+      request(`/connections/${foreign.connectionId}`, "DELETE"),
+    );
+    assert.equal(foreignDelete.status, 404);
+    assert.deepEqual(
+      await database.resolveChannelConnection({
+        organizationId: "other-org",
+        channel: "discord",
+        connectionId: foreign.connectionId,
+      }),
+      { botToken: DISCORD_BOT_TOKEN },
+    );
+
+    // A rejected token never reaches the Connection owner.
+    const rejected = await api.handle(
+      request("/connections", "POST", {
+        provider: "discord",
+        accountId: "guild-ops",
+        credentials: { botToken: "not-a-discord-token" },
+      }),
+    );
+    assert.equal(rejected.status, 422);
+    assert.equal((await rejected.text()).includes("not-a-discord-token"), false);
+
+    // `channel-accounts/status` reports a configured Discord account from the
+    // running supervisor, the same shape Telegram gets.
+    await database.saveChannelConfiguration({
+      organizationId: ORGANIZATION_ID,
+      files: [
+        {
+          path: ".paseo/channels/discord/guild-ops.yml",
+          content: `channel: discord\naccountId: guild-ops\nenabled: true\nconnectionId: ${connection.id}\ntransport:\n  mode: gateway\n`,
+        },
+      ],
+      contentHash: "discord-account",
+      createdByUserId: USER_ID,
+    });
+    const status = await api.handle(request("/channel-accounts/status", "GET"));
+    assert.equal(status.status, 200);
+    const statusBody = (await status.json()) as {
+      runtimeAvailable: boolean;
+      accounts: Array<Record<string, unknown>>;
+    };
+    assert.equal(statusBody.runtimeAvailable, true);
+    assert.equal(statusBody.accounts.length, 1);
+    assert.equal(statusBody.accounts[0]?.["channel"], "discord");
+    assert.equal(statusBody.accounts[0]?.["account"], "guild-ops");
+    assert.equal(statusBody.accounts[0]?.["transport"], "started");
+
+    const removed = await api.handle(request(`/connections/${connection.id}`, "DELETE"));
+    assert.equal(removed.status, 409, "a Connection a Channel account uses stays put");
+    await database.saveChannelConfiguration({
+      organizationId: ORGANIZATION_ID,
+      files: [],
+      contentHash: "discord-account-removed",
+      createdByUserId: USER_ID,
+    });
+    const disconnected = await api.handle(request(`/connections/${connection.id}`, "DELETE"));
+    assert.equal(disconnected.status, 204);
+    assert.equal(
+      await database.resolveChannelConnection({
+        organizationId: ORGANIZATION_ID,
+        channel: "discord",
+        connectionId: connection.id,
+      }),
+      undefined,
+    );
+  } finally {
+    restoreFetch();
+  }
+});
+
 it("reuses Provider Application capabilities for management reads, saves, and Connections", async () => {
   const database = createDatabase(bundle.runtime, bundle.locks, createTestCredentialCipher());
   await bundle.runtime.drizzle().insert(schema.organizations).values({
@@ -1875,6 +2242,29 @@ it("stores the daemon Connection Offer and managed access mode with an off compa
   assert.equal((await database.findDaemonById(TEST_DAEMON_ID))?.managedAccessMode, "off");
 });
 
+const DISCORD_BOT_TOKEN = "MTE4MDAwMDAwMDAwMDAwMDAwOQ.fusion.canary-secret";
+
+/**
+ * Answers `GET /users/@me` the way Discord does, recording the Authorization
+ * header so the test can prove the stored credential is the probed one. Any
+ * other token is rejected with Discord's 401.
+ */
+function stubDiscordProbe(probes: Array<string | null>): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    probes.push(headers.get("authorization"));
+    assert.equal(String(input), "https://discord.com/api/v10/users/@me");
+    if (headers.get("authorization") !== `Bot ${DISCORD_BOT_TOKEN}`) {
+      return new Response("{}", { status: 401 });
+    }
+    return Response.json({ id: "1180000000000000009", username: "fusion-bot", bot: true });
+  }) as typeof fetch;
+  return () => {
+    globalThis.fetch = original;
+  };
+}
+
 function request(path: string, method: string, body?: unknown): Request {
   return new Request(
     `https://hub.example.test/api/management/v1/organizations/${ORGANIZATION_ID}${path}`,
@@ -1905,7 +2295,9 @@ function automationYaml(mode: string): string {
   ].join("\n");
 }
 
-function ownerAccess(): BrowserOrganizationAccess {
+function ownerAccess(
+  capabilities: Partial<OrganizationCapabilities> = {},
+): BrowserOrganizationAccess {
   const value = {
     session: { id: "session" },
     account: { id: USER_ID, name: "Owner", email: "owner@example.test" },
@@ -1916,6 +2308,8 @@ function ownerAccess(): BrowserOrganizationAccess {
       manageMembers: true,
       manageOwners: true,
       manageResources: true,
+      manageChannels: true,
+      ...capabilities,
     },
   };
   return {
@@ -1944,6 +2338,7 @@ function memberAccess(): BrowserOrganizationAccess {
       manageMembers: false,
       manageOwners: false,
       manageResources: false,
+      manageChannels: false,
     },
   };
   return {

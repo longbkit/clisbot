@@ -4,7 +4,11 @@
 // "one assertion script per surface").
 //
 // Read-back combines the MASTER bot's getUpdates stream with the Hub's
-// content-free `relay post completed` event. Telegram does not reliably
+// content-free `relay post completed` event, plus the command branch's own
+// lines (`channel inbound answered an approval command` and
+// `[telegram/send] telegram outbound send ok … messageId=N`), which is how
+// `/help`, `/new` and `/stop` answer — they never produce a relay post.
+// Telegram does not reliably
 // deliver bot-authored group messages to another bot, so getUpdates alone
 // cannot prove outbound. The Hub event distinguishes assistant output from
 // progress/tool posts without logging message content or credentials.
@@ -32,6 +36,7 @@
 
 import { appendFileSync, readFileSync, openSync, readSync, closeSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { basename } from "node:path";
 
 const args = process.argv.slice(2);
 const mode = args[0];
@@ -70,6 +75,17 @@ async function api(method, body = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+  const j = await res.json().catch(() => ({}));
+  if (!j.ok) throw new Error(`${method}: ${j.description ?? res.status}`);
+  return j.result;
+}
+
+/** Multipart upload for the file-inbound scenario (`sendDocument`). */
+async function apiUpload(method, body, filePath) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(body)) form.append(key, String(value));
+  form.append("document", new Blob([readFileSync(filePath)]), basename(filePath));
+  const res = await fetch(`${API}/${method}`, { method: "POST", body: form });
   const j = await res.json().catch(() => ({}));
   if (!j.ok) throw new Error(`${method}: ${j.description ?? res.status}`);
   return j.result;
@@ -187,6 +203,48 @@ function hubEventsSince(sinceMs) {
   return events;
 }
 
+/** The tail of `hub.log`, ANSI-stripped and split into lines. */
+function hubLogLines() {
+  try {
+    const st = statSync(HUB_LOG);
+    const size = Math.min(st.size, 5 * 1024 * 1024);
+    const buf = Buffer.alloc(size);
+    const fd = openSync(HUB_LOG, "r");
+    readSync(fd, buf, 0, size, st.size - size);
+    closeSync(fd);
+    return buf.toString("utf8").replace(ANSI_ESCAPE, "").split("\n");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The vertical's own send lines, for replies that never go through the relay.
+ *
+ * `/help`, `/new`, `/stop` and the other session commands are answered on the
+ * command branch: the Hub logs `channel inbound answered an approval command`
+ * and the vertical logs `[telegram/send] telegram outbound send ok … messageId=N`.
+ * Neither produces a `relay post completed` event, so a wave-6 `check` reported
+ * `no outbound evidence` for replies that were sitting in the group. The
+ * command line dates the answer; the send line carries the posted message id.
+ */
+function commandRepliesSince(sinceMs) {
+  const replies = [];
+  for (const line of hubLogLines()) {
+    const isCommand = /INFO:.*channel inbound answered an approval command/.test(line);
+    const isSend = /INFO:.*\[telegram\/send\] telegram outbound send ok/.test(line);
+    if (!isCommand && !isSend) continue;
+    const t = parseLogTime(line);
+    if (t === null || t < sinceMs) continue;
+    replies.push({
+      t: new Date(t).toISOString(),
+      kind: isCommand ? "command" : "send",
+      externalMessageId: line.match(/messageId=(\S+)/)?.[1] ?? "",
+    });
+  }
+  return replies;
+}
+
 function assistantPostsSince(sinceMs) {
   let raw;
   try {
@@ -248,9 +306,14 @@ if (mode === "post") {
   const t0 = Date.now();
   let markerMsgId;
   try {
-    const body = { chat_id: CHAT, text };
+    // `--file <path>` posts the marker as a document caption instead of a
+    // plain message, so an inbound-attachment scenario uses the same driver.
+    const filePath = opt("file");
+    const body = filePath ? { chat_id: CHAT, caption: text } : { chat_id: CHAT, text };
     if (THREAD !== undefined) body.message_thread_id = THREAD;
-    const r = await api("sendMessage", body);
+    const r = filePath
+      ? await apiUpload("sendDocument", body, filePath)
+      : await api("sendMessage", body);
     markerMsgId = r.message_id;
   } catch (e) {
     console.log(`VERDICT FAIL marker-post-failed: ${e.message}`);
@@ -287,7 +350,9 @@ if (mode === "post") {
     }`,
   );
   if (relayPost) {
-    console.log(`[relay] assistant posted message=${relayPost.externalMessageId} at=${relayPost.t}`);
+    console.log(
+      `[relay] assistant posted message=${relayPost.externalMessageId} at=${relayPost.t}`,
+    );
   }
   console.log(
     ok
@@ -318,6 +383,13 @@ if (mode === "post") {
   const sinceMs = windowSince(sinceHM);
   const match = findReply(rows, master.id, master.username, expect, sinceMs);
   const relayPost = assistantPostsSince(sinceMs).at(-1) ?? null;
+  // The command branch answers without a relay post; its own lines are
+  // outbound evidence too (wave 6: `/help`, `/new`, `/stop` all replied while
+  // this reported "no outbound evidence").
+  const commandEntries = commandRepliesSince(sinceMs);
+  // Prefer the vertical's own send line: it names the posted message id.
+  const commandReply =
+    commandEntries.findLast((entry) => entry.kind === "send") ?? commandEntries.at(-1) ?? null;
   const events = hubEventsSince(sinceMs);
   console.log(
     `[check since ${sinceHM}] hub events: ${events.map((e) => `${e.t} ${e.line.slice(0, 90)}`).join(" | ") || "none"}`,
@@ -330,14 +402,21 @@ if (mode === "post") {
     }`,
   );
   if (relayPost) {
-    console.log(`[check] relay assistant: message=${relayPost.externalMessageId} at=${relayPost.t}`);
+    console.log(
+      `[check] relay assistant: message=${relayPost.externalMessageId} at=${relayPost.t}`,
+    );
   }
-  console.log(
-    match || relayPost
-      ? `VERDICT PASS outbound=${match ? `observer:${match.msg.message_id}` : `relay:${relayPost.externalMessageId}`}`
-      : "VERDICT FAIL no outbound evidence",
-  );
-  process.exit(match || relayPost ? 0 : 1);
+  if (commandReply) {
+    console.log(
+      `[check] command reply: ${commandReply.kind} message=${commandReply.externalMessageId || "n/a"} at=${commandReply.t}`,
+    );
+  }
+  let outbound = null;
+  if (match) outbound = `observer:${match.msg.message_id}`;
+  else if (relayPost) outbound = `relay:${relayPost.externalMessageId}`;
+  else if (commandReply) outbound = `command:${commandReply.externalMessageId || commandReply.t}`;
+  console.log(outbound ? `VERDICT PASS outbound=${outbound}` : "VERDICT FAIL no outbound evidence");
+  process.exit(outbound ? 0 : 1);
 }
 
 function windowSince(sinceHM) {

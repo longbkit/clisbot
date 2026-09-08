@@ -5,6 +5,9 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { registerSlackWriteClientForTest, type WebClient } from "./client/web-api.js";
+
+/** The fake handed to the ported send path through `SlackSendOpts.client`. */
+let installedFakeClient: WebClient | undefined;
 import {
   clearSlackTypingScopeWarningsForTest,
   clearSlackTypingSurfacesForTest,
@@ -39,8 +42,9 @@ function fakeClient(
       },
     },
     chat: {
-      async postMessage() {
-        return { ok: true } as never;
+      async postMessage(args: Record<string, unknown>) {
+        // The ported send path requires a real message timestamp back.
+        return { ok: true, ts: "1700.0002", channel: args["channel"] } as never;
       },
       async update() {
         return { ok: true } as never;
@@ -80,7 +84,8 @@ function fakeClient(
 
 function install(failures?: Partial<Record<"status" | "add" | "remove", unknown>>): Calls {
   const calls: Calls = { status: [], add: [], remove: [] };
-  registerSlackWriteClientForTest("xoxb-test-typing", fakeClient(calls, failures));
+  installedFakeClient = fakeClient(calls, failures);
+  registerSlackWriteClientForTest("xoxb-test-typing", installedFakeClient);
   return calls;
 }
 
@@ -250,8 +255,19 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+/** Slice 10b: `sendSlackText` now posts through the ported upstream `send.ts`,
+ * which builds its write client from the ported `client.ts` cache. Upstream's
+ * own injection point is `SlackSendOpts.client`, so the fake is passed per call
+ * rather than registered in that cache. */
 function postText(text: string) {
-  return sendSlackText({ cfg: CFG, accountId: "work", to: "C1", threadId: "1700.0001", text });
+  return sendSlackText({
+    cfg: CFG,
+    accountId: "work",
+    to: "C1",
+    threadId: "1700.0001",
+    text,
+    client: installedFakeClient,
+  } as never);
 }
 
 it("restores status after interim text, refreshes long turns, and leaves terminal posts clear", async () => {
@@ -284,6 +300,7 @@ it("queues post-send restoration behind an in-flight periodic refresh", async ()
     if (calls.status.length === 2) await pending.promise;
     return { ok: true } as never;
   };
+  installedFakeClient = client;
   registerSlackWriteClientForTest("xoxb-test-typing", client);
   await slackTyping(typingArgs());
   await vi.advanceTimersByTimeAsync(SLACK_TYPING_REFRESH_MS);
@@ -302,6 +319,7 @@ it("clears a delayed start before opening a replacement turn, without adding a s
     if (calls.status.length === 1) await pending.promise;
     return { ok: true } as never;
   };
+  installedFakeClient = client;
   registerSlackWriteClientForTest("xoxb-test-typing", client);
   const args = typingArgs({ reactionEmoji: "eyes" });
   const opening = slackTyping(args);
@@ -329,6 +347,7 @@ it("does not clear a replacement status when an older reaction fails late", asyn
     if (calls.add.length === 1) await pending.promise;
     return { ok: true } as never;
   };
+  installedFakeClient = client;
   registerSlackWriteClientForTest("xoxb-test-typing", client);
   const args = typingArgs({ reactionEmoji: "eyes" });
   const opening = slackTyping(args);
@@ -367,6 +386,7 @@ it("removes a reaction whose add was still in flight when the turn stopped", asy
     await pending.promise;
     return { ok: true } as never;
   };
+  installedFakeClient = client;
   registerSlackWriteClientForTest("xoxb-test-typing", client);
   const args = typingArgs({ indicator: false, reactionEmoji: "eyes" });
   const opening = slackTyping(args);

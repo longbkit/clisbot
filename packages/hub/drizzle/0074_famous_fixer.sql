@@ -1,0 +1,1 @@
+ALTER TABLE "channel_reply_capabilities" ADD COLUMN "requester_sender_id" text;

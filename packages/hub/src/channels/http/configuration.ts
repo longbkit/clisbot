@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isChannelsEnabled } from "../loader/channel-gate.js";
 import type { Database } from "../../db/types.js";
 import { compileHubBundle, HubBundleError, type HubBundleFile } from "../../config/bundle.js";
 import {
@@ -12,7 +13,7 @@ import {
   compileChannelControlPlane,
   type ChannelControlPlane,
 } from "../config/compile.js";
-import { invalidConfiguration } from "./problems.js";
+import { channelPlaneAbsent, invalidConfiguration } from "./problems.js";
 
 /**
  * Pre-compile the channel control plane from the candidate files, then insert
@@ -58,12 +59,18 @@ export interface ChannelConfigurationCandidate {
   controlPlane: ChannelControlPlane;
 }
 
-/** Compiles the authored bundle and effective Channel policy used by activation authorization. */
+/** Compiles the authored bundle and effective Channel policy used by activation
+ * authorization. Both the deploy and the validate verb funnel through here, so
+ * the kill-switch is stated once: a Hub that loads no channel code must not
+ * compile or persist a channel configuration revision either. The
+ * `/api/v1/channels` ops layer already gates itself; the organization-scoped
+ * management contract reaches this writer directly. */
 export async function prepareChannelConfigurationCandidate(
   database: Database,
   snapshot: ChannelControlPlaneSnapshot,
   files: readonly HubBundleFile[],
 ): Promise<ChannelConfigurationCandidate> {
+  if (!isChannelsEnabled()) throw channelPlaneAbsent();
   try {
     const candidateResourceFiles = [...files];
     if (!candidateResourceFiles.some(({ path }) => path === ".paseo/hub.yml")) {

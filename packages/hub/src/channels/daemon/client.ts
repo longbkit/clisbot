@@ -1,6 +1,8 @@
 import { TrustedDaemonClient } from "./ws-client.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
-import type { AgentPermissionResponse, AgentSnapshot, CreateAgentConfig } from "./types.js";
+import type { AgentPermissionResponse, AgentSnapshot, CreateAgentConfig, CreateAgentOptions,
+  DaemonServerInfo, ProviderModel, ProviderMode, AgentProfile, AgentCommand, AgentConfigApply,
+  TextAttachment } from "./types.js";
 
 // The channel control plane's one code path to a daemon, for both forms
 // (plan §14.7): the embedded form connects over loopback; the team/remote form
@@ -40,8 +42,8 @@ export interface DaemonConnection {
   discovery: DaemonDiscoveryResult;
   /** Resolves when the trusted session is established (daemon `server_info` seen). */
   waitForConnected(timeoutMs?: number): Promise<void>;
-  createAgent(config: CreateAgentConfig, options?: { title?: string }): Promise<CreateAgentResult>;
-  sendAgentMessage(agentId: string, text: string, options?: { steer?: boolean }): Promise<void>;
+  createAgent(config: CreateAgentConfig, options?: CreateAgentOptions): Promise<CreateAgentResult>;
+  sendAgentMessage(agentId: string, text: string, options?: { steer?: boolean; attachments?: TextAttachment[] }): Promise<void>;
   /** Interrupt the active turn without creating a replacement turn. */
   cancelAgent(agentId: string): Promise<void>;
   respondToAgentPermission(
@@ -50,6 +52,18 @@ export interface DaemonConnection {
     response: AgentPermissionResponse,
   ): Promise<void>;
   listAgents(): Promise<AgentSnapshot[]>;
+  getServerInfo(): DaemonServerInfo | undefined;
+  listAvailableProviders(): Promise<{ provider: string; available: boolean }[]>;
+  listProviderModels(provider: string, cwd?: string): Promise<ProviderModel[]>;
+  listProviderModes(provider: string, cwd?: string): Promise<ProviderMode[]>;
+  listAgentProfiles(): Promise<AgentProfile[]>;
+  listCommands(agentId: string): Promise<AgentCommand[]>;
+  setAgentModel(agentId: string, modelId: string | null): Promise<void>;
+  setAgentThinkingOption(agentId: string, thinkingOptionId: string | null): Promise<void>;
+  setAgentMode(agentId: string, modeId: string): Promise<void>;
+  applyAgentConfig(agentId: string, config: AgentConfigApply): Promise<void>;
+  buildAgentForkContext(agentId: string): Promise<{ attachment: TextAttachment | null; itemCount: number }>;
+
   setTimelineSubscription(agentIds: readonly string[]): Promise<void>;
   /** Stop the socket. In-flight RPCs reject; streams stop. */
   stop(): void;
@@ -90,13 +104,14 @@ function createFacade(
     waitForConnected: (timeoutMs) => socket.waitForConnected(timeoutMs),
     createAgent: (config, options) =>
       socket
-        .call("create_agent_request", createAgentPayload(config, options?.title))
+        .call("create_agent_request", createAgentPayload(config, options))
         .then(mapCreatedAgent),
     sendAgentMessage: (agentId, text, options) =>
       socket
         .call("send_agent_message_request", {
           agentId,
           text,
+          ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
           activeTurnBehavior: options?.steer === false ? "interrupt" : "steer",
         })
         .then((payload) => {
@@ -132,6 +147,31 @@ function createFacade(
           .map((entry) => (entry as { agent?: unknown })?.agent)
           .filter((agent): agent is AgentSnapshot => isAgentSnapshot(agent));
       }),
+    getServerInfo: () => socket.serverInfo as DaemonServerInfo | undefined,
+    listAvailableProviders: () => listField(socket, "list_available_providers_request", {}, "providers"),
+    listProviderModels: (provider, cwd) => listField(socket, "list_provider_models_request", { provider, cwd }, "models"),
+    listProviderModes: (provider, cwd) => listField(socket, "list_provider_modes_request", { provider, cwd }, "modes"),
+    listAgentProfiles: async () => {
+      const payload = checkedPayload(await socket.call("get_daemon_config_request", {}));
+      const config = asRecord(payload["config"]);
+      return Array.isArray(config?.["agentProfiles"]) ? config["agentProfiles"] as AgentProfile[] : [];
+    },
+    listCommands: (agentId) => listField(socket, "list_commands_request", { agentId }, "commands"),
+    setAgentModel: (agentId, modelId) => mutate(socket, "set_agent_model_request", { agentId, modelId }),
+    setAgentThinkingOption: (agentId, thinkingOptionId) => mutate(socket, "set_agent_thinking_request", { agentId, thinkingOptionId }),
+    setAgentMode: (agentId, modeId) => mutate(socket, "set_agent_mode_request", { agentId, modeId }),
+    applyAgentConfig: (agentId, config) => mutate(socket, "agent.config.apply.request", { agentId, config }),
+    buildAgentForkContext: async (agentId) => {
+      if (socket.serverInfo?.["features"] === undefined ||
+          asRecord(socket.serverInfo["features"])?.["agentForkContext"] !== true) {
+        throw new Error("This daemon does not support agent fork context.");
+      }
+      const payload = checkedPayload(await socket.call("agent.fork_context.request", { agentId }));
+      const attachment = payload["attachment"];
+      if (attachment !== null && (asRecord(attachment)?.["type"] !== "text" ||
+          typeof asRecord(attachment)?.["text"] !== "string")) throw new Error("Invalid fork context attachment.");
+      return { attachment: attachment as TextAttachment | null, itemCount: Number(payload["itemCount"]) };
+    },
     setTimelineSubscription: (agentIds) =>
       socket
         .call("agent.timeline.set_subscription.request", {
@@ -156,10 +196,13 @@ function withTitle(config: CreateAgentConfig, title?: string): CreateAgentConfig
   return { ...config, title };
 }
 
-function createAgentPayload(config: CreateAgentConfig, title?: string) {
+function createAgentPayload(config: CreateAgentConfig, options?: CreateAgentOptions) {
   const { projectId, worktree, ...sessionConfig } = config;
   return {
-    config: withTitle(sessionConfig, title),
+    config: withTitle(sessionConfig, options?.title),
+    ...(options?.initialPrompt === undefined ? {} : { initialPrompt: options.initialPrompt }),
+    ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
+    ...(options?.autoArchive === undefined ? {} : { autoArchive: options.autoArchive }),
     ...(projectId === undefined ? {} : { projectId }),
     ...(worktree === undefined ? {} : { worktree }),
   };
@@ -176,4 +219,20 @@ function isAgentSnapshot(value: unknown): value is AgentSnapshot {
   return (
     typeof value === "object" && value !== null && typeof (value as AgentSnapshot).id === "string"
   );
+}
+
+function checkedPayload(value: unknown): Record<string, unknown> {
+  const payload = asRecord(value);
+  if (payload === undefined) throw new Error("Invalid daemon response.");
+  if (typeof payload["error"] === "string" && payload["error"] !== "") throw new Error(payload["error"]);
+  if (payload["accepted"] === false) throw new Error("Daemon rejected configuration change.");
+  return payload;
+}
+async function listField<T>(socket: TrustedDaemonClient, type: string, fields: Record<string, unknown>, key: string): Promise<T[]> {
+  const payload = checkedPayload(await socket.call(type, fields, 90_000));
+  return Array.isArray(payload[key]) ? payload[key] as T[] : [];
+}
+async function mutate(socket: TrustedDaemonClient, type: string, fields: Record<string, unknown>): Promise<void> {
+  const payload = checkedPayload(await socket.call(type, fields));
+  if (payload["accepted"] !== true) throw new Error("Daemon did not accept configuration change.");
 }

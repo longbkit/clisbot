@@ -53,6 +53,9 @@ describe("keyed store surface", () => {
       assert.equal(typeof asyncStore[method], "function", `async ${method}`);
       assert.equal(typeof syncStore[method], "function", `sync ${method}`);
     }
+    // Only the sync facade needs a barrier: every async mutation already awaits
+    // the backing's durability before it resolves.
+    assert.equal(typeof syncStore.flush, "function");
   });
 
   it("reopening a namespace returns the same store (same signature)", async () => {
@@ -297,6 +300,38 @@ describe("keyed store persistence (restart-reload)", () => {
     assert.equal(await asyncStore.lookup("k"), "sync-wrote");
     await asyncStore.register("k2", "async-wrote");
     assert.equal(syncStore.lookup("k2"), "async-wrote");
+  });
+
+  // The sync surface cannot await its own write and the encrypted backing is
+  // write-behind, so the durability barrier is what lets a caller (the QR link
+  // path) report "linked" only once the session is really stored.
+  it("flushes the encrypted backing behind a sync namespace", async () => {
+    const written: string[] = [];
+    let pending = 0;
+    const backend = {
+      load: () => [],
+      save: (namespace: string) => {
+        pending += 1;
+        queueMicrotask(() => {
+          written.push(namespace);
+          pending -= 1;
+        });
+      },
+      flush: async () => {
+        // One macrotask: every queued microtask write has run by then.
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(pending, 0);
+      },
+    };
+    const root = createHostKeyedStoreRoot({
+      secret: { namespaces: ["session"], backend },
+    });
+    const sessions = root.openSyncKeyedStore({ namespace: "session", maxEntries: 5 });
+    sessions.register("cookie", { value: "linked" });
+    assert.deepEqual(written, [], "the encrypted write is behind the call");
+    await sessions.flush();
+    assert.deepEqual(written, ["session"]);
+    await root.flush();
   });
 
   it("an in-memory root (no dir) behaves identically but persists nothing", async () => {

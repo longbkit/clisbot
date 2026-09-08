@@ -30,6 +30,16 @@ const channelAccountSchema = z
 
 const channelListResponseSchema = z.object({ accounts: z.array(channelAccountSchema) }).strict();
 
+const channelRemoveResultSchema = z
+  .object({
+    channel: z.string(),
+    account: z.string(),
+    removed: z.boolean(),
+    revision: z.boolean(),
+    connectionId: z.string(),
+  })
+  .strict();
+
 const channelStatusAccountSchema = z
   .object({
     channel: z.string(),
@@ -47,6 +57,7 @@ const channelStatusResponseSchema = z
   .strict();
 
 export type ChannelAddResult = z.infer<typeof channelAddResultSchema>;
+export type ChannelRemoveResult = z.infer<typeof channelRemoveResultSchema>;
 export type ChannelAccount = z.infer<typeof channelAccountSchema>;
 export type ChannelStatusAccount = z.infer<typeof channelStatusAccountSchema>;
 
@@ -62,11 +73,39 @@ export interface ChannelSetupInput {
   ownerEmail?: string;
   ownerIdentity?: string;
 }
+/** The token-native channels: one bot token, or an existing Connection id. */
+export type BotTokenChannel = "telegram" | "discord" | "zalo";
+
+/** Every channel `channels add` can install. */
+export type AddableChannel = "slack" | BotTokenChannel | "feishu" | "googlechat" | "zalouser";
+
+/** The Feishu custom-app credential (four fields; `domain` is not a secret). */
+export interface FeishuCredential {
+  appId: string;
+  appSecret: string;
+  verificationToken?: string;
+  encryptKey?: string;
+  domain?: "feishu" | "lark";
+}
+
+/** The Google Chat credential: the service-account document, or a path to it. */
+export interface GoogleChatCredential {
+  serviceAccount?: string;
+  serviceAccountFile?: string;
+}
+
 export type ChannelAddInput = { setup?: ChannelSetupInput } & (
-  | { channel: "slack"; account: string; connectionId: string }
   | { channel: "slack"; account: string; botToken: string; appToken: string }
-  | { channel: "telegram"; account: string; botToken: string }
-  | { channel: "telegram"; account: string; connectionId: string }
+  | ({ channel: BotTokenChannel; account: string; botToken: string } & {
+      /** Zalo webhook mode only. */
+      webhookSecret?: string;
+    })
+  | ({ channel: "feishu"; account: string } & FeishuCredential)
+  | ({ channel: "googlechat"; account: string } & GoogleChatCredential)
+  /** Zalo Personal carries no secret: the account is linked afterwards by a QR
+   * scan, so `profile` is just the label its session is stored under. */
+  | { channel: "zalouser"; account: string; profile?: string }
+  | { channel: AddableChannel; account: string; connectionId: string }
 );
 
 /** POST /api/v1/channels — install an account and start or defer its transport. */
@@ -84,6 +123,26 @@ export function addChannel(
       successStatus: 200,
       schema: channelAddResultSchema,
       failureMessage: "Hub channel add failed",
+    }),
+  );
+}
+
+/** DELETE /api/v1/channels — uninstall an account and stop its transport. The
+ * credential Connection it used is left in place; the result names it. */
+export function removeChannel(
+  target: ControlPlaneTarget,
+  input: { channel: string; account: string },
+): Promise<ChannelRemoveResult> {
+  return controlPlaneRequest(() =>
+    requestHub({
+      origin: target.origin,
+      ...(target.apiKey === undefined ? {} : { apiKey: target.apiKey }),
+      path: "/api/v1/channels",
+      method: "DELETE",
+      body: input,
+      successStatus: 200,
+      schema: channelRemoveResultSchema,
+      failureMessage: "Hub channel removal failed",
     }),
   );
 }

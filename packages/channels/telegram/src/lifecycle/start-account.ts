@@ -1,10 +1,21 @@
 // L4 account lifecycle (blueprint §6.5 L4, start-account.md): resolve the
 // token, probe getMe, cache the bot info in the plane's keyed-store seam,
 // run the duplicate-token guard across the configured accounts, then hand
-// off to the L2 poll transport. The startAccount promise resolves only when
+// off to the transport. The startAccount promise resolves only when
 // `ctx.abortSignal` fires — "start" is the transport lifetime.
+//
+// Slice 20 swapped the transport: the hand-rolled `transport/poll.ts` fetch loop
+// is retired and the account now polls (or, when a public URL is configured,
+// receives) through a grammY 1.46.0 client — the same SDK at the same version
+// upstream uses. `fusion/polling-session.ts` owns the loop and keeps the Fusion
+// invariant (durable admission before the offset watermark advances);
+// `fusion/webhook-session.ts` owns the webhook mode.
 
-import type { HostRuntime, StartAccountContext } from "@getpaseo/channels-shared";
+import type {
+  ChannelInboundEvent,
+  HostRuntime,
+  StartAccountContext,
+} from "@getpaseo/channels-shared";
 import {
   buildTelegramClientOptions,
   createTelegramApi,
@@ -14,12 +25,20 @@ import {
   type TelegramCfg,
 } from "../client/bot-api.js";
 import { registerAccountInbound, unregisterAccountInbound } from "../runtime-store.js";
+import { withTelegramAccount } from "../runtime.js";
 import {
   approvalCallbackRootKind,
   parseApprovalCallbackClick,
   type TelegramCallbackQueryShape,
 } from "../transport/approval-callback.js";
-import { fingerprintTelegramBotToken, runTelegramPoll } from "../transport/poll.js";
+import { fingerprintTelegramBotToken } from "../token-fingerprint.js";
+import { TelegramPollingSession } from "../fusion/polling-session.js";
+import {
+  resolveTelegramWebhookMode,
+  startTelegramWebhookSession,
+} from "../fusion/webhook-session.js";
+import { buildTelegramAdmission } from "../fusion/admission.js";
+import type { CallbackQuery } from "grammy/types";
 
 export const TELEGRAM_BOT_INFO_CACHE_TTL_MS = 86_400_000;
 
@@ -143,14 +162,18 @@ export async function probeTelegramBotInfo(
 export function assertNoDuplicateTelegramTokens(cfg: TelegramCfg, activeAccountId: string): void {
   void activeAccountId;
   const accounts = telegramConfiguredAccounts(cfg);
-  let owner: [string, string] | null = null; // [accountId, trimmedToken]
+  // Every pair, not each account against the first one that had a token:
+  // `a=X, b=Y, c=Y` shares a token between `b` and `c`, and a single-owner scan
+  // walks past it.
+  const owners = new Map<string, string>(); // token → first accountId holding it
   for (const [accountId, token] of accounts) {
     const trimmed = token === null ? "" : token.trim();
     if (trimmed === "") continue;
-    if (owner !== null && owner[1] === trimmed) {
-      throw new Error(duplicateTokenMessage(owner[0], accountId));
+    const owner = owners.get(trimmed);
+    if (owner !== undefined) {
+      throw new Error(duplicateTokenMessage(owner, accountId));
     }
-    if (owner === null) owner = [accountId, trimmed];
+    owners.set(trimmed, accountId);
   }
 }
 
@@ -216,7 +239,6 @@ export async function startTelegramAccount(
     botId: botInfo.id,
     botUsername: botInfo.username ?? null,
   });
-  const updateOffsetStore = openTelegramSeamStores(hostRuntime).updateOffsets;
   const downloadDir = resolveMediaDownloadDir(ctx);
   // COMPAT(clisbot-control-plane): the approval card's button-click seam (E2
   // — the mirror of the Slack vertical's `onInteractive`). The Hub supervisor
@@ -225,22 +247,47 @@ export async function startTelegramAccount(
   // never authority). Absent (unit posture, pinned vertical) = no card
   // clicks; the typed command still answers the prompt.
   const onApprovalCallback = telegramApprovalCallback(ctx.channelRuntime, accountId);
+  const apiRoot = account.config.apiRoot?.trim() || "https://api.telegram.org";
+  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
+  const admit = buildTelegramAdmission({
+    accountId,
+    botToken: account.token,
+    apiRoot,
+    abortSignal,
+    ...(downloadDir !== undefined ? { downloadDir } : {}),
+    ...(log !== undefined ? { logger: log } : {}),
+    botId: botInfo.id,
+    handleInbound: (event: ChannelInboundEvent) => inbound.handleInbound(event),
+  });
+  const sessionOptions = {
+    accountId,
+    botToken: account.token,
+    api,
+    botId: botInfo.id,
+    ...(botInfo.username !== undefined ? { botUsername: botInfo.username } : {}),
+    abortSignal,
+    admit,
+    ...(log !== undefined ? { logger: log } : {}),
+    setStatus: (patch: Record<string, unknown>) => {
+      ctx.setStatus({ ...patch, accountId } as never);
+    },
+    ...(onApprovalCallback !== undefined
+      ? { onApprovalCallback: (query: CallbackQuery) => onApprovalCallback(query as never) }
+      : {}),
+  };
   try {
-    await runTelegramPoll({
-      accountId,
-      botToken: account.token,
-      apiRoot: account.config.apiRoot?.trim() || "https://api.telegram.org",
-      botId: botInfo.id,
-      ...(botInfo.username !== undefined ? { botUsername: botInfo.username } : {}),
-      abortSignal,
-      updateOffsetStore,
-      ...(downloadDir !== undefined ? { downloadDir } : {}),
-      ...(log !== undefined ? { logger: log } : {}),
-      ...(onApprovalCallback !== undefined ? { onApprovalCallback } : {}),
-      onEvent: async (event) => {
-        // L3 dedupe/ledger/handoff: the shared processor this account registered.
-        await inbound.handleInbound(event);
-      },
+    // D-TG-046: the transport runs inside the account's runtime scope, so every
+    // ported inbound store the session touches (update offset, message cache,
+    // topic names) resolves THIS account through the upstream zero-arg
+    // `getTelegramRuntime()`. Without the scope an account that never sent
+    // would fail every offset persist with "Telegram runtime not initialized".
+    await withTelegramAccount(accountId, async () => {
+      const webhook = resolveTelegramWebhookMode(account.config);
+      if (webhook !== null) {
+        await startTelegramWebhookSession({ ...sessionOptions, webhook });
+      } else {
+        await new TelegramPollingSession(sessionOptions).runUntilAbort();
+      }
     });
   } finally {
     unregisterAccountInbound(accountId, hostRuntime);

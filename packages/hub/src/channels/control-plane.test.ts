@@ -108,6 +108,7 @@ const RELAY_DEFAULTS: EffectiveDefaults = {
   bindingKey: "thread",
   replyAnchor: "thread",
   outbound: { path: "relay", template: null },
+  inbound: { reactionNotifications: "off", editNotifications: "off" },
   sync: {
     finalAnswers: true,
     progress: {
@@ -537,11 +538,6 @@ describe("createChannelAgentSpecResolver (E4/E6 tool path)", () => {
           kind: "mcp",
           server: CHANNEL_REPLY_MCP_SERVER_NAME,
           tool: CHANNEL_REPLY_TOOL_NAME,
-        },
-        {
-          kind: "mcp",
-          server: CHANNEL_REPLY_MCP_SERVER_NAME,
-          tool: "send_file",
         },
       ],
     });

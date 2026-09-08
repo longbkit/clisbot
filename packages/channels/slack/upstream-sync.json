@@ -1,0 +1,868 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "extensions/slack/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/__fixtures__/upstream-differential.cases.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/account-configured.ts",
+      "upstream": "extensions/slack/src/account-configured.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/account-inspect.ts",
+      "upstream": "extensions/slack/src/account-inspect.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/account-reply-mode.ts",
+      "upstream": "extensions/slack/src/account-reply-mode.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/account-surface-fields.ts",
+      "upstream": "extensions/slack/src/account-surface-fields.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/accounts.runtime.ts",
+      "upstream": "extensions/slack/src/accounts.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/accounts.ts",
+      "upstream": "extensions/slack/src/accounts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/action-runtime.runtime.ts",
+      "upstream": "extensions/slack/src/action-runtime.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/action-runtime.ts",
+      "upstream": "extensions/slack/src/action-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/action-threading.ts",
+      "upstream": "extensions/slack/src/action-threading.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions.ts",
+      "upstream": "extensions/slack/src/actions.ts",
+      "status": "adapted",
+      "deviation": ["D-034"]
+    },
+    {
+      "local": "src/agent-context.ts",
+      "upstream": "extensions/slack/src/agent-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/approval-actions.ts",
+      "upstream": "extensions/slack/src/approval-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/authored-text.ts",
+      "upstream": "extensions/slack/src/authored-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/blocks-fallback.ts",
+      "upstream": "extensions/slack/src/blocks-fallback.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/blocks-input.ts",
+      "upstream": "extensions/slack/src/blocks-input.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/blocks-render.ts",
+      "upstream": "extensions/slack/src/blocks-render.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "upstream": "extensions/slack/src/channel-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-type.ts",
+      "upstream": "extensions/slack/src/channel-type.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/client-delivery.ts",
+      "upstream": "extensions/slack/src/client-delivery.ts",
+      "status": "adapted",
+      "deviation": ["D-030"]
+    },
+    {
+      "local": "src/client-options.ts",
+      "upstream": "extensions/slack/src/client-options.ts",
+      "status": "adapted",
+      "deviation": ["D-030"]
+    },
+    {
+      "local": "src/client.ts",
+      "upstream": "extensions/slack/src/client.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/client/web-api.ts",
+      "upstream": "extensions/slack/src/client.ts",
+      "status": "reimplemented",
+      "deviation": ["D-011", "D-002", "D-004"]
+    },
+    {
+      "local": "src/conversation-metadata.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/conversation-open.ts",
+      "upstream": "extensions/slack/src/conversation-open.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/cursor-pages.ts",
+      "upstream": "extensions/slack/src/cursor-pages.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/data-table.ts",
+      "upstream": "extensions/slack/src/data-table.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/data-visualization.ts",
+      "upstream": "extensions/slack/src/data-visualization.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/detached-target-admission.ts",
+      "upstream": "extensions/slack/src/detached-target-admission.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/edit-text.ts",
+      "upstream": "extensions/slack/src/edit-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/errors.ts",
+      "upstream": "extensions/slack/src/errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/file-reference.ts",
+      "upstream": "extensions/slack/src/file-reference.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/format.ts",
+      "upstream": "extensions/slack/src/format.ts",
+      "status": "verbatim",
+      "deviation": ["D-023", "D-025"]
+    },
+    {
+      "local": "src/fusion/fetch.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/fetch.types.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/media-runtime.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/plugin-config.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/question-gateway.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/runtime-env.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/runtime.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/slack-entities.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/group-policy.ts",
+      "upstream": "extensions/slack/src/group-policy.ts",
+      "status": "verbatim",
+      "deviation": ["D-037"]
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/installation-identity-state.ts",
+      "upstream": "extensions/slack/src/installation-identity-state.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "upstream": "extensions/slack/src/channel.ts",
+      "status": "reimplemented",
+      "deviation": "D-012"
+    },
+    {
+      "local": "src/limits.ts",
+      "upstream": "extensions/slack/src/limits.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/message-action-dispatch.ts",
+      "upstream": "extensions/slack/src/message-action-dispatch.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/message-actions.ts",
+      "upstream": "extensions/slack/src/message-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/message-tool-api.ts",
+      "upstream": "extensions/slack/src/message-tool-api.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/modal-metadata.ts",
+      "upstream": "extensions/slack/src/modal-metadata.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/allow-list.ts",
+      "upstream": "extensions/slack/src/monitor/allow-list.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/block-text.ts",
+      "upstream": "extensions/slack/src/monitor/block-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/channel-config.ts",
+      "upstream": "extensions/slack/src/monitor/channel-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/enterprise-install.ts",
+      "upstream": "extensions/slack/src/monitor/enterprise-install.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/event-scope.ts",
+      "upstream": "extensions/slack/src/monitor/event-scope.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/events/interactions.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-041"]
+    },
+    {
+      "local": "src/monitor/events/message-subtype-handlers.ts",
+      "upstream": "extensions/slack/src/monitor/events/message-subtype-handlers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/events/modal-input-summary.ts",
+      "upstream": "extensions/slack/src/monitor/events/modal-input-summary.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/events/system-events.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-040"]
+    },
+    {
+      "local": "src/monitor/ingress.ts",
+      "upstream": "extensions/slack/src/monitor/ingress.ts",
+      "status": "reimplemented",
+      "deviation": ["D-039"]
+    },
+    {
+      "local": "src/monitor/media-types.ts",
+      "upstream": "extensions/slack/src/monitor/media-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/media.runtime.ts",
+      "upstream": "extensions/slack/src/monitor/media.runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-031"]
+    },
+    {
+      "local": "src/monitor/media.ts",
+      "upstream": "extensions/slack/src/monitor/media.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/message-handler/preview-finalize.ts",
+      "upstream": "extensions/slack/src/monitor/message-handler/preview-finalize.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/mrkdwn.ts",
+      "upstream": "extensions/slack/src/monitor/mrkdwn.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/policy.ts",
+      "upstream": "extensions/slack/src/monitor/policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/provider-support.ts",
+      "upstream": "extensions/slack/src/monitor/provider-support.ts",
+      "status": "adapted",
+      "deviation": ["D-042"]
+    },
+    {
+      "local": "src/monitor/provider.ts",
+      "upstream": "extensions/slack/src/monitor/provider.ts",
+      "status": "adapted",
+      "deviation": ["D-038", "D-042"]
+    },
+    {
+      "local": "src/monitor/reconnect-policy.ts",
+      "upstream": "extensions/slack/src/monitor/reconnect-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/slack-client-kind.ts",
+      "upstream": "extensions/slack/src/monitor/slack-client-kind.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/thread.runtime.ts",
+      "upstream": "extensions/slack/src/monitor/thread.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/thread.ts",
+      "upstream": "extensions/slack/src/monitor/thread.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/types.ts",
+      "upstream": "extensions/slack/src/monitor/types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/native-data-blocks.ts",
+      "upstream": "extensions/slack/src/native-data-blocks.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/native-data-fallback.ts",
+      "upstream": "extensions/slack/src/native-data-fallback.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound-media.ts",
+      "upstream": "extensions/slack/src/client-delivery.ts",
+      "status": "reimplemented",
+      "deviation": ["D-015", "D-008"]
+    },
+    {
+      "local": "src/outbound.ts",
+      "upstream": "extensions/slack/src/outbound-adapter.ts",
+      "status": "reimplemented",
+      "deviation": ["D-014", "D-001", "D-006", "D-026", "D-035", "D-044"]
+    },
+    {
+      "local": "src/plugin.ts",
+      "upstream": "extensions/slack/src/channel.ts",
+      "status": "reimplemented",
+      "deviation": ["D-016", "D-044"]
+    },
+    {
+      "local": "src/post-message-identity.ts",
+      "upstream": "extensions/slack/src/post-message-identity.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/post-message-payload.ts",
+      "upstream": "extensions/slack/src/post-message-payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/presentation-fallback.ts",
+      "upstream": "extensions/slack/src/presentation-fallback.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/presentation.ts",
+      "upstream": "extensions/slack/src/presentation.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/presentation-outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-044"]
+    },
+    {
+      "local": "src/probe.ts",
+      "upstream": "extensions/slack/src/probe.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/progress-blocks.ts",
+      "upstream": "extensions/slack/src/progress-blocks.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/question-actions.ts",
+      "upstream": "extensions/slack/src/question-actions.ts",
+      "status": "adapted",
+      "deviation": ["D-032"]
+    },
+    {
+      "local": "src/reply-action-ids.ts",
+      "upstream": "extensions/slack/src/reply-action-ids.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reply-blocks.ts",
+      "upstream": "extensions/slack/src/reply-blocks.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/resolve-channels.ts",
+      "upstream": "extensions/slack/src/resolve-channels.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/resolve-users.ts",
+      "upstream": "extensions/slack/src/resolve-users.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/rich-text.ts",
+      "upstream": "extensions/slack/src/rich-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime.ts",
+      "upstream": "extensions/slack/src/runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-036", "D-043"]
+    },
+    {
+      "local": "src/runtime.types.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/scopes.ts",
+      "upstream": "extensions/slack/src/scopes.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-results.ts",
+      "upstream": "extensions/slack/src/send-results.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.runtime.ts",
+      "upstream": "extensions/slack/src/send.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.ts",
+      "upstream": "extensions/slack/src/send.ts",
+      "status": "adapted",
+      "deviation": ["D-034"]
+    },
+    {
+      "local": "src/sent-thread-cache.ts",
+      "upstream": "extensions/slack/src/sent-thread-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/session-status.ts",
+      "upstream": "extensions/slack/src/session-status.ts",
+      "status": "adapted",
+      "deviation": ["D-033"]
+    },
+    {
+      "local": "src/stream-mode.ts",
+      "upstream": "extensions/slack/src/stream-mode.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/streaming-compat.ts",
+      "upstream": "extensions/slack/src/streaming-compat.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/streaming.ts",
+      "upstream": "extensions/slack/src/streaming.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/target-parsing.ts",
+      "upstream": "extensions/slack/src/target-parsing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/targets.ts",
+      "upstream": "extensions/slack/src/targets.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/thread-ts.ts",
+      "upstream": "extensions/slack/src/thread-ts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/threading-tool-context.ts",
+      "upstream": "extensions/slack/src/threading-tool-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/threading.ts",
+      "upstream": "extensions/slack/src/threading.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/token.ts",
+      "upstream": "extensions/slack/src/token.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/transport/approval-card.ts",
+      "upstream": "extensions/slack/src/monitor/events/interactions.block-actions.ts",
+      "status": "reimplemented",
+      "deviation": "D-010"
+    },
+    {
+      "local": "src/transport/media.ts",
+      "upstream": "extensions/slack/src/monitor/media.ts",
+      "status": "reimplemented",
+      "deviation": ["D-017", "D-007"]
+    },
+    {
+      "local": "src/transport/socket-event-filter.ts",
+      "upstream": "extensions/slack/src/monitor/events/messages.ts",
+      "status": "reimplemented",
+      "deviation": ["D-018", "D-024"]
+    },
+    {
+      "local": "src/truncate.ts",
+      "upstream": "extensions/slack/src/truncate.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/types.ts",
+      "upstream": "extensions/slack/src/types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/typing.ts",
+      "upstream": "extensions/slack/src/session-status.ts",
+      "status": "reimplemented",
+      "deviation": ["D-022", "D-009"]
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/slack/src/__traces__",
+      "reason": "Upstream delivery-pipeline trace fixtures; the Fusion vertical has no draft/streaming pipeline to replay."
+    },
+    {
+      "upstream": "extensions/slack/src/monitor/message-handler",
+      "reason": "Upstream's own inbound dispatch pipeline (routing, sessions, progress cards, streaming). The Hub owns admission, routing and turns; the vertical stops at the inbound event."
+    },
+    {
+      "upstream": "extensions/slack/src/outbound-adapter.ts",
+      "reason": "Upstream's `ChannelOutboundAdapter` implementation (sendText/sendMedia/sendPayload/presentation over OpenClaw's reply-payload send helpers and the question gateway). Fusion's Hub owns outbound delivery and drives `plugin.outbound` directly (D-035); the upstream send primitives it wraps are ported and exposed there instead. Lands with the streaming/presentation slice (goal ledger slice 22)."
+    },
+    {
+      "upstream": "extensions/slack/src/progress-blocks.ts",
+      "reason": "Slack progress-card/compact-draft block builder. Needs the progress-draft compositor closure from `src/channels/streaming.ts` (~1130 lines: plan checklists, draft lines, diffstat) which core does not carry. Lands with the streaming/progress slice (goal ledger slice 22)."
+    },
+    {
+      "upstream": "extensions/slack/src/streaming.ts",
+      "reason": "Slack native chat-stream driver (`@slack/web-api` `ChatStreamer`, listener write clients, per-stream pruning). The Hub does not stream partial answers into a channel yet; lands with the streaming/progress slice (goal ledger slice 22)."
+    },
+    {
+      "upstream": "extensions/slack/src/interactive-dispatch.ts",
+      "reason": "Registers Slack interactive handlers on OpenClaw's plugin interactive registry (`openclaw/plugin-sdk/plugin-runtime` `createChannelInteractiveDispatcher`, conversation-binding requests). The Hub owns interactive callbacks and bindings; lands with the Slack inbound-parity slice (goal ledger slice 21)."
+    },
+    {
+      "upstream": "extensions/slack/src/monitor/suggested-prompts.ts",
+      "reason": "Assistant suggested-prompt publisher, written against a Bolt `App`. The vertical is Socket Mode only (D-003) and has no Bolt app object."
+    },
+    {
+      "upstream": "extensions/slack/src/secret-contract.ts",
+      "reason": "Slack's secret-target registry, built on `openclaw/plugin-sdk/channel-secret-basic-runtime` (`src/secrets/*`, ~900 lines wired to OpenClaw's secret providers and config writer). Its only consumer is `shared.ts`. Fusion's Hub owns credentials."
+    },
+    {
+      "upstream": "extensions/slack/src/shared.ts",
+      "reason": "The OpenClaw plugin definition surface: setup plugin, doctor, config adapter, security adapter, secret contract and account snapshot. Pulls `channel.setup.ts`, `setup-core.ts`, `setup-shared.ts`, `doctor.ts`, `doctor-contract.ts`, `config-schema.ts`, `config-ui-hints.ts`, `security.ts` and their setup/zod SDK subpaths. Fusion's Hub is the plugin host and owns setup UX; lands with the setup/capability UI slice (goal ledger slice 18)."
+    },
+    {
+      "upstream": "extensions/slack/src/sent-thread-cache.test.ts",
+      "reason": "Needs OpenClaw's SQLite plugin-state test harness (`plugin-state-test-runtime`, `test-state`, `importFreshModule`). `sent-thread-cache.ts` itself is ported verbatim over the injected Hub store (D-036)."
+    },
+    {
+      "upstream": "extensions/slack/src/send.upload.test.ts",
+      "reason": "Also `send.upload-rate-limit.test.ts` and `send.enterprise.test.ts`'s upload case: they assert the pinned-DNS/SSRF guard behaviour (RFC2544 fake-IP policy, GovSlack host pinning, hostname resolution mocking) that the Fusion fetch boundary does not implement (D-030)."
+    },
+    {
+      "upstream": "extensions/slack/src/action-runtime.download-image.test.ts",
+      "reason": "Asserts downscaled image dimensions from OpenClaw's image-sanitization pipeline (`src/agents/tool-images.runtime.ts`), which Fusion has no equivalent for (D-CORE-253); the adapter returns the image unsanitized."
+    },
+    {
+      "upstream": "extensions/slack/src/message-action-dispatch.test.ts",
+      "reason": "Also `actions.blocks.test.ts`, `outbound-payload.test.ts`, `client.rate-limit.test.ts`, `monitor/media.test.ts`, `send.identity-fallback.test.ts`, `blocks.test.ts` modal cases: each needs an omitted module (`channel.setup.ts`, `channel.ts`, `streaming.ts`, `monitor/message-handler/*`) or an unported test barrel (`channel-test-helpers`, `channel-contract-testing`). `message-action-dispatch.ts` itself is ported verbatim and covered by `action-runtime.test.ts` (111 cases)."
+    },
+    {
+      "upstream": "extensions/slack/src/http",
+      "reason": "Bolt HTTP receiver routes + plugin HTTP surfaces. The vertical is Socket Mode only; the ported `createSlackBoltApp` keeps the `http` branch but no account selects it."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-001",
+      "file": "src/outbound.ts",
+      "reason": "Sent-message write-back targets the plane's keyed-store seam, not OpenClaw's config file (`sent-thread-cache.ts`'s `recordSlackSentMessage` persists through the Hub store).",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-002",
+      "file": "src/client/web-api.ts",
+      "reason": "The L1 client is a straight `@slack/web-api` `WebClient` with a write-client LRU cache; upstream `client.ts` wraps it in OpenClaw runtime plumbing (`openclaw/plugin-sdk/*`) that the Fusion package must not import.",
+      "tests": ["src/client/web-api.test.ts"]
+    },
+    {
+      "id": "D-004",
+      "file": "src/client/web-api.ts",
+      "reason": "`WebClient` is loaded through a dynamic `import()` so the Hub can load the vertical's metadata without pulling the Slack SDK into the boot path.",
+      "tests": ["src/client/web-api.test.ts"]
+    },
+    {
+      "id": "D-006",
+      "file": "src/outbound.ts",
+      "reason": "Retired reply-text media parsing. Upstream parses reply text for media paths; media is posted only through the Hub's explicit file tool routed into `outbound.sendMedia`.",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-007",
+      "file": "src/transport/media.ts",
+      "reason": "Inbound media fold (F-06, G5+G6): `files[]` download plus the shared `[Attached files]` manifest, trimmed to the P0 admission surface; upstream `monitor/media.ts` also feeds its media-understanding runtime.",
+      "tests": ["src/transport/media.test.ts"]
+    },
+    {
+      "id": "D-008",
+      "file": "src/outbound-media.ts",
+      "reason": "Native media outbound (G7-G11): the 3-step external upload, one post per file. Upstream `client-delivery.ts` batches uploads into its delivery pipeline.",
+      "tests": ["src/outbound-media.test.ts"]
+    },
+    {
+      "id": "D-009",
+      "file": "src/typing.ts",
+      "reason": "`plugin.outbound.typing` is the `sync.progress` liveness surface driven by the Hub's processing lease; upstream raises the same status inside its own dispatch pipeline.",
+      "tests": ["src/typing.test.ts"]
+    },
+    {
+      "id": "D-010",
+      "file": "src/transport/approval-card.ts",
+      "reason": "Native approval-card seam: `blocks` on send, `updateText` adapter, `block_actions` hand-off. The vertical parses the channel envelope only; the card value stays opaque and is parsed in the Hub. Renumbered 2026-09-07 from a second `D-006` in DEVIATIONS.md (duplicate id).",
+      "tests": ["src/transport/approval-card.test.ts"]
+    },
+    {
+      "id": "D-011",
+      "file": "src/client/web-api.ts",
+      "reason": "Provenance: gathers `client.ts` (client options, write-client cache), `client-options.ts`, `probe.ts` (auth.test probe), `token.ts` (bot-token identity warning), `errors.ts` (error shaping) and `limits.ts` (`SLACK_TEXT_LIMIT`) into one L1 module. Upstream hunk boundaries are lost; an upstream patch to any of those files has to be re-applied by hand.",
+      "tests": ["src/client/web-api.test.ts"]
+    },
+    {
+      "id": "D-012",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "Provenance: gathers `channel.ts` (`startAccount`, flat account read), `probe.ts` (auth.test), `accounts.ts` / `accounts.runtime.ts` (token source, duplicate-token guard) and `token.ts` into one lifecycle module."
+    },
+    {
+      "id": "D-014",
+      "file": "src/outbound.ts",
+      "reason": "Provenance: gathers `outbound-adapter.ts` (text + thread send, `NO_REPLY` token), `send.ts` (write client) and `sent-thread-cache.ts` (`recordSlackSentMessage`).",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-015",
+      "file": "src/outbound-media.ts",
+      "reason": "Provenance: gathers `client-delivery.ts` (`files.getUploadURLExternal` -> byte POST -> `files.completeUploadExternal`) and `errors.ts` (the DNS-request retry wrapper shape).",
+      "tests": ["src/outbound-media.test.ts"]
+    },
+    {
+      "id": "D-016",
+      "file": "src/plugin.ts",
+      "reason": "Provenance: the drive surface is the Fusion `ChannelPlugin` object (`gateway.startAccount`, `outbound.sendText`/`sendMedia`/`typing`) assembled from upstream `channel.ts`'s plugin definition; the OpenClaw plugin-SDK registration shape is not ported."
+    },
+    {
+      "id": "D-017",
+      "file": "src/transport/media.ts",
+      "reason": "Provenance: gathers `monitor/media.ts` (download URL, Bearer headers, Slack-host allowlist) and `types.ts` (`SlackFile` fields) on top of the shared download/manifest helpers in `@getpaseo/channels-shared`.",
+      "tests": ["src/transport/media.test.ts"]
+    },
+    {
+      "id": "D-018",
+      "file": "src/transport/socket-event-filter.ts",
+      "reason": "Provenance: gathers `monitor/events/messages.ts` (ts->ms, mention fact, own-message filter, payload -> inbound event) and `monitor/channel-type.ts` (`inferSlackChannelType` / `normalizeSlackChannelType` / `resolveSlackChatType`). Mention handling stays a fact; the policy is the Hub's."
+    },
+    {
+      "id": "D-022",
+      "file": "src/typing.ts",
+      "reason": "Provenance: derived from `session-status.ts` (`setSlackSessionStatus` / `assistant.threads.setStatus`) plus the upstream loading-message list; the refresh timer and the missing-scope handling are Fusion-side because the Hub owns the processing lease.",
+      "tests": ["src/typing.test.ts"]
+    },
+    {
+      "id": "D-023",
+      "file": "tsconfig.json",
+      "reason": "`exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are turned off for the package so the ported OpenClaw files compile verbatim; OpenClaw's own tsconfig sets neither flag. Applies to every `verbatim` entry in this manifest, not only the anchor file. Mirrors the Telegram package's D-TG-001.",
+      "tests": ["src/format.test.ts"]
+    },
+    {
+      "id": "D-024",
+      "file": "src/fusion/slack-entities.ts",
+      "reason": "Inbound entity decode is Fusion-owned. Upstream keeps its equivalent private inside `format.ts` (`decodeSlackMrkdwnEntities`, three entities) with no exported symbol to import, and the Fusion transport also decodes `&quot;`/`&#39;`, which Slack emits in some payloads. Retired `src/mrkdwn.ts` used to own this.",
+      "tests": ["src/transport/socket-event-filter.ts"]
+    },
+    {
+      "id": "D-025",
+      "file": ".oxlintrc.json",
+      "reason": "Nested lint override for ported OpenClaw source (copied from `packages/channels/markdown-core/.oxlintrc.json`): the stylistic rules the root config enforces are not in OpenClaw's lint config, and applying them would mean editing every ported file and losing the upstream diff. Correctness/suspicious/perf rules still apply."
+    },
+    {
+      "id": "D-026",
+      "file": "src/outbound.ts",
+      "reason": "Outbound text and Block Kit `mrkdwn` fields now render through the upstream `format.ts` (`normalizeSlackOutboundText`) instead of the retired in-repo `mrkdwn.ts` `renderSlackMrkdwn`. Behavior change on the production path: `>` is now escaped to `&gt;` (upstream escapes all three XML-unsafe characters; the retired renderer left `>` literal). `src/mrkdwn.ts` and `src/mrkdwn.test.ts` are deleted; the two behavior cases they pinned that still apply moved into `src/outbound.test.ts`, the rest are covered by the upstream `src/format.test.ts` (25 cases).",
+      "tests": ["src/outbound.test.ts", "src/format.test.ts"]
+    },
+    {
+      "id": "D-030",
+      "file": "src/fusion/fetch.ts",
+      "reason": "Network is a Fusion boundary. Upstream routes the Slack Web API fetch and the external-upload POST through OpenClaw's net stack: `openclaw/plugin-sdk/fetch-runtime` (pinned-DNS dispatcher pool, managed-proxy TLS injector, `resolveFetch` abort wrapper), `ssrf-runtime` (`fetchWithSsrFGuard` with per-request policies) and `proxy-capture` (the debug-proxy global fetch patch) - about 11k lines under `src/infra/net/`, the same call the Telegram vertical made (D-TG-013). `src/fusion/fetch.ts` keeps upstream's call shapes, option records and the `release()` contract so `client-options.ts` and `client-delivery.ts` stay byte-verbatim (only their import specifiers move, which the sync check normalizes). Env proxy options keep upstream's precedence. Dropped: DNS pinning and the private-network SSRF policy; both call sites address Slack-owned hosts only and the caller's `requireHttps` + host allowlist are still enforced. Rebinding protection for user-supplied URLs lands with the host media/SSRF slice.",
+      "tests": ["src/client.test.ts", "src/client-delivery.payload.test.ts"]
+    },
+    {
+      "id": "D-031",
+      "file": "src/fusion/media-runtime.ts",
+      "reason": "Inbound media staging is a Fusion boundary. Upstream's `monitor/media.runtime.ts` re-exports `fetchWithRuntimeDispatcher` and `saveRemoteMedia` from `openclaw/plugin-sdk/runtime-fetch` / `media-runtime`, which write downloaded bytes into OpenClaw's media store. The Hub owns media staging in Fusion, so the fetch is the process fetch and `saveRemoteMedia` fails loudly instead of writing somewhere the Hub does not know about; it lands with the Telegram/Slack inbound-parity slices (goal ledger slice 20/21). `monitor/media.ts` itself is verbatim."
+    },
+    {
+      "id": "D-032",
+      "file": "src/fusion/question-gateway.ts",
+      "reason": "`ask_user` question resolution is a Fusion boundary. Upstream's `questionGatewayRuntime` calls the OpenClaw Gateway (`question.get` / `question.resolve`) and registers a channel delivery so a later press can be matched back to the question record. Fusion's Hub owns questions and there is no Gateway in this process. The pure encode/decode half of `question-actions.ts` (the Slack button-value envelope) stays on the production path; `resolveOption` / `registerChannelDelivery` throw. Lands with the interactive callback slice (goal ledger slice 21).",
+      "tests": ["src/question-actions.test.ts"]
+    },
+    {
+      "id": "D-033",
+      "file": "src/fusion/runtime-env.ts",
+      "reason": "Upstream's `openclaw/plugin-sdk/runtime-env` exports `warn` / `danger` / `info` / `success` as chalk-backed theme formatters (`(text) => string`); core's carried `globals.ts` is Fusion-owned (D-CORE-203) and exports them as logger calls, which every other ported file uses that way. `session-status.ts` writes `runtime.log(warn(...))`, so its import specifier points at this module: everything comes from core, the four formatters are the identity function because the Hub logger owns colour."
+    },
+    {
+      "id": "D-034",
+      "file": "src/fusion/plugin-config.ts",
+      "reason": "Runtime config resolution is a Fusion boundary. Upstream loads `config.json` once at the command/gateway boundary and threads the resolved `OpenClawConfig` through every call, so `requireRuntimeConfig` only asserts it is present. Fusion's Hub passes config on the drive surface, but the shared `message` tool's action runner does not: `packages/hub/src/channels/message-actions.ts` calls core's runner with an empty `cfg`. The vertical therefore remembers the last drive-time config it was handed (`rememberSlackDriveConfig`, called from `sendSlackText`) and `requireRuntimeConfig` falls back to it. That is what makes a Hub-dispatched `handleAction` able to resolve `channels.slack.accounts.<id>.botToken`. `send.ts` and `actions.ts` stay byte-verbatim; only their import specifier moves.",
+      "tests": ["src/action-runtime.test.ts"]
+    },
+    {
+      "id": "D-035",
+      "file": "src/outbound.ts",
+      "reason": "`sendSlackText` now posts through the ported upstream `send.ts` `sendMessageSlack` (per-target queue, identity fallback, unfurl policy, receipt, blocks validation, chunking) instead of calling `chat.postMessage` on the L1 write client directly; `plugin.outbound` additionally exposes the upstream-named primitives (`sendMessageSlack`, `updateMessageSlack`, `editSlackMessage`, `deleteSlackMessage`, `reactSlackMessage`, `pinSlackMessage`, `readSlackMessages`, `uploadSlackFile`, ...). The Fusion wrapper keeps the drive-surface contract (`{messageId, channel, cardPosted}`, the NO_REPLY short-circuit, the typing refresh and the `recordSlackSentMessage` write-back, D-001). Upstream's own `SlackSendOpts.client` is surfaced on the open drive args so a test can inject a fake WebClient; `outbound.test.ts` and `typing.test.ts` were migrated from the write-client cache seam to it. `updateText` and `sendMedia` still use the L1 client (`client/web-api.ts`, `outbound-media.ts`); moving them onto `updateMessageSlack` / `client-delivery.uploadSlackFile` is the remaining half of this re-point.",
+      "tests": ["src/outbound.test.ts", "src/typing.test.ts"]
+    },
+    {
+      "id": "D-036",
+      "file": "src/runtime.ts",
+      "reason": "Upstream stores the plugin runtime in OpenClaw's plugin runtime store (`openclaw/plugin-sdk/runtime-store`) and opens SQLite-backed keyed stores from the OpenClaw state directory. Fusion's Hub injects the runtime through `src/fusion/runtime.ts` over `HostRuntime.state.openKeyedStore`; the accessor names (`setSlackRuntime` / `getOptionalSlackRuntime` / `getSlackRuntime`) and the throw-on-unset contract are unchanged, and `runtime.types.ts` carries the shape. Mirrors the Telegram package's D-TG-014. The pre-existing Fusion host-runtime store moved to `src/runtime-store.ts` (`setSlackChannelRuntime` / `getSlackHostRuntime`) so both stores can coexist; the entry's `runtime` sidecar specifier moved with it."
+    },
+    {
+      "id": "D-037",
+      "file": "src/group-policy.test.ts",
+      "reason": "Dropped upstream assertions, with reasons. `group-policy.test.ts`: the `toolsBySender` sender-overlay cases - core does not carry `resolveToolsBySender` (D-CORE-222), so the scope resolver falls through to the node's own `tools`; lands with the access/policy slice (goal ledger slice 23). `account-inspect.test.ts`: the strict-refusal case for a configured-but-unresolved SecretRef - Fusion's Hub resolves credentials before the drive-time cfg reaches the vertical (D-CORE-257), so a remaining ref reads as absent; the `configured_unavailable` status is still asserted. `errors.test.ts`: the in-place token mask spelling (`xoxb-1...cdef`) - core's carried redactor emits `[redacted]` (D-CORE-002); the security property (the raw token never reaches the message) is still asserted. `client.test.ts`: two proxy cases skipped - the debug-proxy capture patch and the undici EnvHttpProxyAgent precedence live in OpenClaw's net stack (D-030).",
+      "tests": [
+        "src/group-policy.test.ts",
+        "src/account-inspect.test.ts",
+        "src/errors.test.ts",
+        "src/client.test.ts"
+      ]
+    },
+    {
+      "id": "D-038",
+      "file": "src/monitor/provider.ts",
+      "reason": "The Bolt provider keeps upstream construction (`createSlackBoltApp`, `startSlackSocketAndWaitForDisconnect`, the reconnect diagnostics) and the same listener families, but cuts where upstream hands a prepared message to OpenClaw's auto-reply/agent pipeline: the Fusion listener builds a `ChannelInboundEvent` and admits it through the shared monitor. It also installs the account lifecycle's already-probed `auth.test` identity as Bolt's `authorize`, instead of letting Bolt re-probe on the first event.",
+      "tests": ["src/monitor/provider.test.ts"]
+    },
+    {
+      "id": "D-039",
+      "file": "src/monitor/ingress.ts",
+      "reason": "Upstream stores the raw Events API envelope in OpenClaw's single-process SQLite `ChannelIngressQueue` and replays it from there. Fusion's Hub owns the durable queue, lease, lane and drain, so only upstream's receiver wrapper survives: it defers Bolt's eager Events API ack so the envelope is acked after the listener's Hub admission resolved, and never acked when that admission faults.",
+      "tests": ["src/monitor/provider.test.ts"]
+    },
+    {
+      "id": "D-040",
+      "file": "src/monitor/events/system-events.ts",
+      "reason": "Upstream's `monitor/events/{reactions,members,channels,pins}.ts` register on the OpenClaw monitor context and publish through `enqueueRoutedSystemEvent`. Fusion reproduces the notification text and the dedupe context key character for character and emits a `ChannelInboundEvent` instead, so the Hub routes or ignores them. `message_changed` / `message_deleted` reuse the verbatim `message-subtype-handlers.ts` registry.",
+      "tests": ["src/monitor/provider.test.ts"]
+    },
+    {
+      "id": "D-041",
+      "file": "src/monitor/events/interactions.ts",
+      "reason": "Upstream's `interactions.block-actions.ts` decodes the payload and then drives OpenClaw approval gates, question finalization and its command runner. Fusion keeps the decode half (callback authority: actor id, action id, value, message ts, thread) and admits it as an inbound event. Interactive payloads and slash commands ack FIRST, inside Slack's 3s response window — the documented exception to admission-before-ack, which upstream's own ingress wrapper also makes.",
+      "tests": ["src/monitor/provider.test.ts"]
+    },
+    {
+      "id": "D-042",
+      "file": "src/monitor/provider.ts",
+      "reason": "Upstream sets Bolt's `shuttingDown` flag only inside `gracefulStopSlackApp`, which the provider runs in its `finally` — after `startSlackSocketAndWaitForDisconnect` resolves. The patched reconnect scheduler reads that flag when its timer fires, so a stopping account could reconnect its socket and keep consuming events with no monitor left to admit them. Fusion splits `markSlackSocketShuttingDown` out of `gracefulStopSlackApp` (the only change to the otherwise verbatim `monitor/provider-support.ts`) and calls it from the provider's `abort` listener, so the stop signal reaches the socket client before anything is awaited.",
+      "tests": ["src/monitor/provider.test.ts"]
+    },
+    {
+      "id": "D-043",
+      "file": "src/runtime.ts",
+      "reason": "Upstream runs one Slack account per OpenClaw process, so one module slot holds the plugin runtime. The Hub runs every account of every organization in one process, each with its own HostRuntime, keyed stores and logger, and loads one vertical per (channel, account) out of one cached ESM module — so a single slot let the account loaded last own every other account's state root and logger. `src/runtime.ts` keys the runtime by account id and carries the account being served in `AsyncLocalStorage` (`withSlackAccount` / `currentSlackAccountId`), the zero-arg accessors resolve that account and fall back to the unkeyed slot; `src/fusion/runtime.ts` installs and disposes per account, `src/runtime-store.ts` binds each account's HostRuntime and `plugin.disposeAccount` releases one account. Same shape as the Telegram vertical's D-TG-046.",
+      "tests": ["src/fusion/account-runtime.test.ts"]
+    },
+    {
+      "id": "D-044",
+      "file": "src/presentation-outbound.ts",
+      "reason": "Upstream renders a portable presentation on core's delivery adapter: `slackOutbound.presentationCapabilities` + `slackOutbound.renderPresentation` (`extensions/slack/src/outbound-adapter.ts:259`, `channel.ts:466`), with core adapting the presentation to those capabilities first (`renderPresentationForDelivery`). Fusion's Hub drives `plugin.outbound.sendText` instead of core's delivery adapter, so the same two steps run in the vertical: `src/presentation-outbound.ts` adapts the presentation to `SLACK_PRESENTATION_CAPABILITIES` (now declared on `plugin.outbound`, upstream's spelling) and compiles it with the same `reply-blocks.ts` compiler the `message` tool's `handleAction` send uses, and `sendSlackText` posts the compiled messages. D-W6-01: without this the Hub's send reached Slack as core's flattened fallback text, so charts and tables never posted natively.",
+      "tests": ["src/presentation-outbound.test.ts", "src/outbound.test.ts", "src/plugin.test.ts"]
+    }
+  ]
+}

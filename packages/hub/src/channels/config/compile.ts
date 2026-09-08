@@ -32,14 +32,17 @@ import {
   type Fallback,
   type SyncProgress,
   type SyncProgressGroup,
+  type SyncStreaming,
   type RoleAssignment,
   type Route,
   type RouteLimits,
 } from "./schema.js";
+import type { DmPolicy, GroupPolicy } from "./enums.js";
 import type { CompiledRole } from "./privileges.js";
 import { privilegeCovers } from "./privileges.js";
 import {
   compileRoles,
+  compileAccountConfig,
   compileTransport,
   compileUsers,
   issue,
@@ -61,6 +64,21 @@ type OrgPolicy = z.infer<typeof OrgPolicySchema>;
 
 // --- Compiled snapshot ---------------------------------------------------------
 
+/**
+ * One route's folded `access:` block. Leaves stay optional: the ported
+ * decision applies upstream's own per-leaf defaults (`dmPolicy: pairing`,
+ * `groupPolicy: allowlist`) once the block exists at all, so authoring only
+ * `allowFrom` behaves exactly as it does in OpenClaw.
+ */
+export interface EffectiveAccess {
+  dmPolicy?: DmPolicy | undefined;
+  groupPolicy?: GroupPolicy | undefined;
+  allowFrom?: readonly (string | number)[] | undefined;
+  groupAllowFrom?: readonly (string | number)[] | undefined;
+  groupAllowFromFallbackToAllowFrom?: boolean | undefined;
+  deniedReply?: string | undefined;
+}
+
 export interface EffectiveDefaults {
   requireMention: boolean;
   followUp: { mode: "auto" | "mention-only"; ttlMinutes: number };
@@ -69,6 +87,19 @@ export interface EffectiveDefaults {
   /** The reply-path toggle (E4/E6), folded like every other default leaf;
    * `template` stays null at the org floor (= the default injection block). */
   outbound: { path: "relay" | "tool"; template: string | null };
+  /** What the plane does with the non-message inbound families
+   * (`plane/inbound-kinds.ts` owns the routing table; these are its knobs). */
+  inbound: {
+    reactionNotifications: "off" | "own" | "all";
+    editNotifications: "off" | "all";
+  };
+  /**
+   * The upstream sender-admission gate (`access:`). ABSENT is the floor and
+   * means "not authored": the plane runs the RBAC gate alone, exactly as it
+   * did before the knob existed. Present = the ported
+   * `resolveDmGroupAccessWithLists` decision runs in front of the RBAC gate.
+   */
+  access?: EffectiveAccess | undefined;
   sync: {
     finalAnswers: boolean;
     /** The "the bot is working" group: the relayed progress line, the
@@ -83,6 +114,15 @@ export interface EffectiveDefaults {
     };
     toolCalls: boolean;
     threadLink: "full" | "final-only" | "none";
+    /** The live-draft surface for a running turn (`sync.streaming`). ABSENT is
+     * the org floor and means off: nothing streams and the turn's answer is
+     * one final post. The compiler omits the key unless a layer authored a
+     * leaf, so every revision written before the knob existed compiles to the
+     * defaults it always had. The leaves stay optional inside it too — the
+     * vertical's own resolver (Slack `resolveSlackStreamingMode` /
+     * `resolveSlackNativeStreaming`) owns the per-leaf default, which is how
+     * an account authored for OpenClaw keeps upstream's semantics. */
+    streaming?: SyncStreaming | undefined;
     /** The subagent (Task tool) relay knobs; off at the org floor. */
     subagents: {
       finalAnswers: boolean;
@@ -118,6 +158,15 @@ export interface CompiledRoute {
   approval: readonly ApprovalRule[];
   /** Route-local execution limits; open-audience Routes always have every leaf. */
   limits?: RouteLimits;
+  /** What `/agent <name>` and `/model <name>` may switch to. Omitted when the
+   * route authored neither list — switching is then refused, not silent. */
+  selectable?: RouteSelectable;
+}
+
+/** The alternatives a route offers its owners/admins (`agents:` / `models:`). */
+export interface RouteSelectable {
+  agents: readonly string[];
+  models: readonly string[];
 }
 
 export interface CompiledFallback {
@@ -129,6 +178,7 @@ export interface CompiledFallback {
   defaults?: EffectiveDefaults;
   approval?: readonly ApprovalRule[];
   limits?: RouteLimits;
+  selectable?: RouteSelectable;
 }
 
 export interface CompiledChannelAccount {
@@ -317,7 +367,7 @@ function compileAccount(
     channelEnabled: org.channels?.[channel]?.enabled ?? true,
     connectionId: account.connectionId,
     transport: compileTransport(file.path, channel, account.transport),
-    config: account.config ?? {},
+    config: compileAccountConfig(file.path, channel, account.config),
     defaultRoles: layers.defaultRoles,
     assignments: layers.accountAssignments,
     defaults: foldDefaults(layers.layers),
@@ -401,7 +451,30 @@ function compileRoute(
     defaults: context.defaults,
     approval: context.approval,
     ...compileRouteLimits(route.limits, audience.kind),
+    ...compileRouteSelectable(route, context),
   };
+}
+
+/**
+ * The `/agent` and `/model` menus. An agent name must exist in `hub.yml` — a
+ * typo here would otherwise fail at the next turn, in a channel, with the
+ * session already reset. Model names stay open vocabulary: they are the
+ * provider's, and the daemon owns that catalog.
+ */
+function compileRouteSelectable(
+  route: Route,
+  context: { file: HubBundleFile; index: number; input: ChannelCompileInput },
+): { selectable?: RouteSelectable } {
+  if (route.agents === undefined && route.models === undefined) return {};
+  for (const [position, agent] of (route.agents ?? []).entries()) {
+    if (!context.input.agentNames.includes(agent)) {
+      issue(
+        [context.file.path, "routes", context.index, "agents", position],
+        `agent ${agent} is not defined in hub.yml`,
+      );
+    }
+  }
+  return { selectable: { agents: [...(route.agents ?? [])], models: [...(route.models ?? [])] } };
 }
 
 function compileRouteLimits(
@@ -425,6 +498,9 @@ function openAudienceUsesBoundedOutput(defaults: EffectiveDefaults): boolean {
     defaults.sync.progress.messageReaction === "off" &&
     !defaults.sync.toolCalls &&
     defaults.sync.threadLink === "none" &&
+    // A live draft is more output than one final post, so an open-audience
+    // route must not stream either.
+    (defaults.sync.streaming?.mode ?? "off") === "off" &&
     !defaults.sync.subagents.finalAnswers &&
     !defaults.sync.subagents.progress &&
     !defaults.sync.subagents.toolCalls
@@ -449,6 +525,21 @@ function validateRouteKind(
   let supported: readonly string[] = [];
   if (channel === "slack") supported = ["dm", "channel", "thread", "group"];
   if (channel === "telegram") supported = ["dm", "group", "topic"];
+  // A Discord thread IS a channel, so a thread route matches on `thread`; a
+  // guild text channel is `channel` and a DM is `dm`. Discord never emits a
+  // Telegram-style forum `topic`.
+  if (channel === "discord") supported = ["dm", "channel", "thread"];
+  // A Google Chat space is a `channel`; a message thread inside it is `thread`;
+  // a 1:1 DM space is `dm`. There is no Slack-style multi-person `group` and no
+  // forum `topic`.
+  if (channel === "googlechat") supported = ["dm", "channel", "thread"];
+  // A Feishu chat is a `channel`, a `p2p` chat a `dm`, and a reply chain a
+  // `thread` (`root_id`). No `group` and no `topic`.
+  if (channel === "feishu") supported = ["dm", "channel", "thread"];
+  // Zalo has exactly two conversation kinds and no thread surface at all.
+  if (channel === "zalo") supported = ["dm", "group"];
+  // Zalo Personal likewise: a friend DM or a group, and no threads.
+  if (channel === "zalouser") supported = ["dm", "group"];
   if (!supported.includes(kind)) {
     issue(path, `${channel} never emits a ${kind} conversation`);
   }
@@ -542,6 +633,11 @@ function compileFallback(
     defaults: foldDefaults([...context.accountLayers, fallback]),
     approval,
     ...(fallback.limits === undefined ? {} : { limits: fallback.limits }),
+    ...compileRouteSelectable(fallback as Route, {
+      file: context.file,
+      index: -1,
+      input: context.input,
+    }),
   };
 }
 
@@ -579,8 +675,61 @@ function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): Effecti
     bindingKey: pick((layer) => layer?.binding?.key) ?? floor.binding.key,
     replyAnchor: pick((layer) => layer?.reply?.anchor) ?? floor.reply.anchor,
     outbound,
+    inbound: {
+      reactionNotifications:
+        pick((layer) => layer?.inbound?.reactionNotifications) ??
+        floor.inbound.reactionNotifications,
+      editNotifications:
+        pick((layer) => layer?.inbound?.editNotifications) ?? floor.inbound.editNotifications,
+    },
+    ...foldAccessDefaults(pick),
     sync: toolPathSyncFold(outbound.path, foldSyncDefaults(pick, floor.sync)),
   };
+}
+
+/**
+ * Fold the `access:` leaves. Like `sync.streaming`, the floor is ABSENCE: the
+ * key is omitted unless some layer authored a leaf, so a revision written
+ * before the knob existed keeps the admission behaviour it always had. Once
+ * ANY leaf is authored the block exists and the ported upstream decision runs,
+ * with upstream's own per-leaf defaults for the leaves nobody set.
+ */
+function foldAccessDefaults(
+  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
+): { access?: EffectiveAccess } {
+  const access: EffectiveAccess = {
+    ...optional(
+      "dmPolicy",
+      pick((layer) => layer?.access?.dmPolicy),
+    ),
+    ...optional(
+      "groupPolicy",
+      pick((layer) => layer?.access?.groupPolicy),
+    ),
+    ...optional(
+      "allowFrom",
+      pick((layer) => layer?.access?.allowFrom),
+    ),
+    ...optional(
+      "groupAllowFrom",
+      pick((layer) => layer?.access?.groupAllowFrom),
+    ),
+    ...optional(
+      "groupAllowFromFallbackToAllowFrom",
+      pick((layer) => layer?.access?.groupAllowFromFallbackToAllowFrom),
+    ),
+    ...optional(
+      "deniedReply",
+      pick((layer) => layer?.access?.deniedReply),
+    ),
+  };
+  return Object.keys(access).length === 0 ? {} : { access };
+}
+
+/** `{ [key]: value }` when the value is set, `{}` otherwise — the one spelling
+ * the folds use under `exactOptionalPropertyTypes`. */
+function optional<K extends string, T>(key: K, value: T | undefined): { [P in K]?: T } {
+  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: T };
 }
 
 /**
@@ -616,11 +765,31 @@ function foldSyncDefaults(
     },
     toolCalls: pick((layer) => layer?.sync?.toolCalls) ?? floor.toolCalls,
     threadLink: pick((layer) => layer?.sync?.threadLink) ?? floor.threadLink,
+    ...foldStreamingDefaults(pick),
     subagents: {
       finalAnswers:
         pick((layer) => layer?.sync?.subagents?.finalAnswers) ?? floor.subagents.finalAnswers,
       progress: pick((layer) => layer?.sync?.subagents?.progress) ?? floor.subagents.progress,
       toolCalls: pick((layer) => layer?.sync?.subagents?.toolCalls) ?? floor.subagents.toolCalls,
+    },
+  };
+}
+
+/**
+ * Fold the `sync.streaming` leaves. The floor is ABSENCE, not a value: the key
+ * is omitted unless some layer authored a leaf, so an unauthored revision
+ * compiles to the exact effective defaults it did before the knob existed.
+ */
+function foldStreamingDefaults(
+  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
+): { streaming?: SyncStreaming } {
+  const mode = pick((layer) => layer?.sync?.streaming?.mode);
+  const nativeTransport = pick((layer) => layer?.sync?.streaming?.nativeTransport);
+  if (mode === undefined && nativeTransport === undefined) return {};
+  return {
+    streaming: {
+      ...(mode === undefined ? {} : { mode }),
+      ...(nativeTransport === undefined ? {} : { nativeTransport }),
     },
   };
 }
@@ -641,8 +810,13 @@ function toolPathSyncFold(
   sync: EffectiveDefaults["sync"],
 ): EffectiveDefaults["sync"] {
   if (path !== "tool") return sync;
+  // The draft streams the relay's answer text; on the tool path there is no
+  // relayed answer to draft, so the key is dropped rather than set to `off`
+  // (absence IS off, and an emitted key would claim the route authored one).
+  const withoutStreaming: EffectiveDefaults["sync"] = { ...sync };
+  delete withoutStreaming.streaming;
   return {
-    ...sync,
+    ...withoutStreaming,
     finalAnswers: false,
     // Only the relayed TEXT leaf goes quiet. The typing indicator and the
     // reaction are not posts — they are the liveness signal, and a tool-path

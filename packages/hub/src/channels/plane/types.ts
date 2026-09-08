@@ -18,9 +18,14 @@ import type { CreateAgentConfig } from "../daemon/types.js";
 import type { InboundReplyParams, InboundReplyResult } from "../loader/host.js";
 import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
 import type { RecordChannelInboundActivityInput } from "../../db/channels.js";
+import type { ChannelStreamingDriver } from "../streaming/types.js";
+import type { SupportedChannelName } from "../catalog.js";
+import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
 
-/** A channel native to P0 (the two verticals the control plane drives). */
-export type P0ChannelName = "slack" | "telegram";
+// The channel-name vocabulary is catalog-owned (`catalog.ts`
+// SUPPORTED_CHANNEL_NAMES); re-exported here because the plane is where the
+// engines read their shared shapes from.
+export type { SupportedChannelName };
 
 /** The native conversation shape an inbound message arrives in. */
 export interface InboundConversationDetail {
@@ -40,7 +45,7 @@ export interface InboundConversationDetail {
  * shape from the raw `ctxPayload`; the plane never reads the raw payload.
  */
 export interface InboundMessage {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   /** The channel identity of the sender (`<channel>:<provider-id>`). */
   senderIdentity: string;
@@ -81,11 +86,38 @@ export type InboundOutcome =
   | { kind: "command"; handled: boolean; detail?: string | undefined }
   | { kind: "ignored"; reason: string };
 
+/**
+ * Back-pressure, not a decision. The plane would accept this message but has no
+ * capacity for it right now (a Route rate or concurrency ceiling), so whoever
+ * holds the durable copy must bring it back rather than treat it as handled.
+ */
+export interface PlaneInboundDeferral {
+  reason: string;
+  retryAfterMs: number;
+}
+
 /** The reply result a host returns for an inbound message, plus the plane's
  * structured outcome for tests and diagnostics. */
 export type PlaneInboundResult = InboundReplyResult & {
   outcome?: InboundOutcome | undefined;
+  /** Set only alongside `dispatched: false`, when the refusal is temporary. */
+  deferred?: PlaneInboundDeferral | undefined;
 };
+
+/**
+ * Read a deferral off a host inbound result. The host contract carries an index
+ * signature, so a plane field arrives at the supervisor untyped; this is the
+ * one place that narrows it.
+ */
+export function planeInboundDeferral(result: {
+  [key: string]: unknown;
+}): PlaneInboundDeferral | undefined {
+  const deferred = result["deferred"];
+  if (typeof deferred !== "object" || deferred === null) return undefined;
+  const { reason, retryAfterMs } = deferred as Record<string, unknown>;
+  if (typeof reason !== "string" || typeof retryAfterMs !== "number") return undefined;
+  return { reason, retryAfterMs };
+}
 
 /** Minimal structured logger the plane writes through (host `logging.getChildLogger`). */
 export interface PlaneLogger {
@@ -102,7 +134,7 @@ export interface PlaneClock {
 
 /** Where one outbound post lands (channel-native, resolved by `reply.anchor`). */
 export interface OutboundPostParams {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   /** The conversation to post into. */
   to: string;
@@ -117,6 +149,10 @@ export interface OutboundPostParams {
   /** COMPAT(clisbot-control-plane): the native card payload (Telegram
    * `reply_markup` inline keyboard), sent on chunk 0 alongside `text`. */
   replyMarkup?: Record<string, unknown> | undefined;
+  /** The portable presentation the message renders (charts, tables, controls).
+   * Only a vertical that declares presentation support is given one; it
+   * compiles the blocks itself and `text` stays the fallback rendering. */
+  presentation?: MessagePresentation | undefined;
 }
 
 export interface OutboundPostResult {
@@ -143,7 +179,7 @@ export type PostFn = (params: OutboundPostParams) => Promise<OutboundPostResult>
  * (missing file / API failure) lands as `{ ok: false, error }` — the relay's
  * failDelivery owns it. */
 export interface MediaPostParams {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   /** The conversation to post into. */
   to: string;
@@ -176,7 +212,7 @@ export type MediaPostFn = (params: MediaPostParams) => Promise<MediaPostResult>;
  * strips the interactive markup (Slack `blocks: []`, Telegram
  * `reply_markup: {}`). */
 export interface OutboundUpdateParams {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   to: string;
   threadId?: string | undefined;
@@ -217,7 +253,7 @@ export type UpdateFn = (params: OutboundUpdateParams) => Promise<OutboundUpdateR
  * the surface, so a typing fault never disturbs the reply path.
  */
 export interface TypingParams {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   /** The conversation the turn is running in. */
   to: string;
@@ -271,7 +307,6 @@ export interface ApprovalCallbackParams {
  */
 export const CHANNEL_REPLY_MCP_SERVER_NAME = "channel_reply";
 export const CHANNEL_REPLY_TOOL_NAME = "message";
-export const CHANNEL_REPLY_FILE_TOOL_NAME = "send_file";
 
 /**
  * The thread a tool-path MCP endpoint posts into: the account (channel +
@@ -282,16 +317,11 @@ export const CHANNEL_REPLY_FILE_TOOL_NAME = "send_file";
  * existing session, so pre-existing agents never get the tool).
  */
 export interface ChannelReplyBindingRef {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   externalConversationId: string;
   externalThreadId: string | null;
 }
-
-export type ChannelReplyFilePostFn = (
-  ref: ChannelReplyBindingRef,
-  filePath: string,
-) => Promise<MediaPostResult>;
 
 /** Opaque server-issued capability attached to one Agent at create time. */
 export interface ChannelReplyAgentCapability {
@@ -304,6 +334,7 @@ export interface ChannelReplyAgentCapability {
 export type ChannelReplyPostFn = (
   ref: ChannelReplyBindingRef,
   text: string,
+  options?: { presentation?: MessagePresentation | undefined },
 ) => Promise<OutboundPostResult>;
 
 /** Resolve a route's agent target (names into `hub.yml`) into a daemon create config.
@@ -314,6 +345,9 @@ export type AgentSpecResolver = (
   defaults: EffectiveDefaults,
   bindingRef: ChannelReplyBindingRef,
   capability?: ChannelReplyAgentCapability | undefined,
+  /** The conversation's `/model` choice, when one was made. `/agent` needs no
+   * override — it names a different agent, and that IS the target. */
+  overrides?: { model?: string | undefined } | undefined,
 ) => CreateAgentConfig;
 
 /** Render the back-link to a live session (threadLink); absent = no link rendered. */
@@ -371,7 +405,7 @@ export interface ChannelPlaneDeps {
   /** Immutable Channel configuration revision backing this plane. */
   channelRevisionId?: string | null | undefined;
   /** This plane's transport owner; recovery and inbound never cross it. */
-  accountScope: { channel: P0ChannelName; accountId: string };
+  accountScope: { channel: SupportedChannelName; accountId: string };
   /** Normalize the channel's raw inbound event into the plane's flat shape. */
   normalizeInbound: InboundNormalizer;
   /** The process-level kill switch (`CLISBOT_HUB_CHANNELS_ENABLED`); the per-decision
@@ -405,6 +439,11 @@ export interface ChannelPlaneDeps {
    * `outbound.typing`); absent = no processing surface at all. Gated per turn by
    * the route's `sync.progress.typingIndicator` / `.messageReaction`. */
   typing?: TypingFn | undefined;
+  /** COMPAT(clisbot-control-plane): the account's streaming surface, detected
+   * off the loaded vertical's `plugin.outbound` (slice 22b). Absent = the relay
+   * posts final answers only, exactly as before. Gated per route by
+   * `sync.streaming`. */
+  streaming?: ChannelStreamingDriver | undefined;
   /** The wall-clock seam; `realClock()` when absent. */
   clock?: PlaneClock | undefined;
   /** Resolve a route's agent target into a `create_agent_request` config. */
@@ -458,7 +497,7 @@ export interface StreamContext {
    * Workflow executions. Provider-local turn ids may restart at zero after
    * restore/reload, so they are not globally unique for a reused Agent. */
   deliveryScopeId?: string;
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   externalConversationId: string;
   externalThreadId: string | null;

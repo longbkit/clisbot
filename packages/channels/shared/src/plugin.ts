@@ -4,6 +4,7 @@
 // name (`telegramPlugin` / `slackPlugin`). Declared in-repo; never imported
 // from OpenClaw.
 
+import type { ChannelMessageActionAdapter as ChannelMessageActionAdapterRef } from "@getpaseo/channels-core/channels/plugins/types.public";
 import type { StartAccountContext } from "./host.js";
 
 /** The account monitor: `gateway.startAccount(ctx)`. The returned promise
@@ -26,7 +27,7 @@ export type SendTextFn = (args: {
 }) => Promise<{ messageId: string; [key: string]: unknown }>;
 
 /** The outbound native-media post: `outbound.sendMedia(args)`. The Hub's relay
- * calls it for the explicit Hub `send_file` MCP tool. One call posts ONE file
+ * calls it for the Hub `message` MCP tool's media params. One call posts ONE file
  * (the vertical posts one message per file). `filePath` is an absolute path under
  * the agent's home that the vertical reads + uploads. `mediaPosted` is the
  * G11 contract: true when the file was posted natively; false when the
@@ -45,10 +46,27 @@ export type SendMediaFn = (args: {
   [key: string]: unknown;
 }) => Promise<{ messageId: string; mediaPosted: boolean; [key: string]: unknown }>;
 
+/** The channel-owned action surface for the shared `message` tool: upstream's
+ * `ChannelMessageActionAdapter` (`describeMessageTool`, `supportsAction`,
+ * `handleAction`, `prepareSendPayload`, `extractToolSend*`,
+ * `isToolDeliveryAction`, the target aliases). Optional and additive: a vertical
+ * that does not declare it keeps the send-only tool, and the Hub answers every
+ * other advertised action with a structured `unsupported_action` result.
+ * Declared here so the drive surface stays one contract; the type itself is the
+ * ported upstream one. */
+export type { ChannelMessageActionAdapter } from "@getpaseo/channels-core/channels/plugins/types.public";
+
 /** The plugin chunk the pin drives. Unknown keys stay open — the vertical's
  * own surface may carry more; the Hub reads only these (sendText today;
  * sendMedia is the native-media seam, G7–G11). */
 export interface ChannelPlugin {
+  /** Upstream's message-action adapter, when the vertical ships one. */
+  messageActions?: ChannelMessageActionAdapterRef | undefined;
+  /** Per-account teardown, called by the loader when it unloads the account.
+   * A vertical that keeps process state per account (the Telegram port installs
+   * a keyed-store runtime and a log sink per account) releases it here; the
+   * loader's own registries do not reach inside the vertical. */
+  disposeAccount?: ((accountId: string) => void) | undefined;
   directory?: { resolveConversation?: ResolveConversationFn | undefined };
   gateway?: { startAccount?: StartAccountFn | undefined } | undefined;
   outbound?: {

@@ -51,7 +51,8 @@ function envFileValue(name) {
 async function telegram(method, token) {
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`);
   const body = await response.json();
-  if (!body.ok) throw new Error(`Telegram ${method} failed: ${body.description ?? response.status}`);
+  if (!body.ok)
+    throw new Error(`Telegram ${method} failed: ${body.description ?? response.status}`);
   return body.result;
 }
 
@@ -72,8 +73,9 @@ let slackApplicationId;
 let entitlement;
 try {
   organization = (await source.runtime.query("select * from organization limit 1")).rows[0];
-  machine = (await source.runtime.query("select * from machines where source ->> 'kind' = 'daemon' limit 1"))
-    .rows[0];
+  machine = (
+    await source.runtime.query("select * from machines where source ->> 'kind' = 'daemon' limit 1")
+  ).rows[0];
   daemon = (await source.runtime.query("select * from daemons where status = 'active' limit 1"))
     .rows[0];
   slackApplicationId = (
@@ -137,11 +139,8 @@ try {
   const activeDaemon =
     activeDaemonId === undefined
       ? undefined
-      : (
-          await target.runtime.query("select id, slug from daemons where id = $1", [
-            activeDaemonId,
-          ])
-        ).rows[0];
+      : (await target.runtime.query("select id, slug from daemons where id = $1", [activeDaemonId]))
+          .rows[0];
   const workflowDaemon = activeDaemon ?? { id: daemon.id, slug: daemon.slug };
   await target.runtime.query(
     `insert into "user" (id, name, email, email_verified, is_instance_operator)
@@ -304,9 +303,7 @@ try {
   const normalizedConfiguration = {
     ...compiled,
     environments: compiled.environments.map((environment) =>
-      environment.kind === "daemon"
-        ? { ...environment, daemonId: workflowDaemon.id }
-        : environment,
+      environment.kind === "daemon" ? { ...environment, daemonId: workflowDaemon.id } : environment,
     ),
   };
   const existingWorkflow = (await database.listOrganizationTriggers(organizationId)).find(

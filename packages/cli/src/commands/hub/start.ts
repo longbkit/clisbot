@@ -17,6 +17,10 @@ export function startCommand(): Command {
     .option("--port <port>", "Fixed port (background default: saved port, or 6868 when available)")
     .option("--home <path>", "Clisbot home directory (default: $CLISBOT_HOME or ~/.clisbot)")
     .option("--foreground", "Run in foreground (don't detach)")
+    .option(
+      "--init-master-key",
+      "First run only: mint the local credential master key when it is absent",
+    )
     .action(async (options: HubStartOptions) => {
       try {
         if (options.foreground) {

@@ -1,0 +1,1148 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "extensions/discord/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/__fixtures__/upstream-differential.cases.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/account-inspect.ts",
+      "upstream": "extensions/discord/src/account-inspect.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/account-token-inspect.ts",
+      "upstream": "extensions/discord/src/account-token-inspect.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/accounts.ts",
+      "upstream": "extensions/discord/src/accounts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/handle-action.guild-admin.ts",
+      "upstream": "extensions/discord/src/actions/handle-action.guild-admin.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/handle-action.ts",
+      "upstream": "extensions/discord/src/actions/handle-action.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime-deps.ts",
+      "upstream": "extensions/discord/src/actions/runtime-deps.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.guild.ts",
+      "upstream": "extensions/discord/src/actions/runtime.guild.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.messaging.messages.ts",
+      "upstream": "extensions/discord/src/actions/runtime.messaging.messages.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.messaging.reactions.ts",
+      "upstream": "extensions/discord/src/actions/runtime.messaging.reactions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.messaging.runtime.ts",
+      "upstream": "extensions/discord/src/actions/runtime.messaging.runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-004"]
+    },
+    {
+      "local": "src/actions/runtime.messaging.send.ts",
+      "upstream": "extensions/discord/src/actions/runtime.messaging.send.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-004"]
+    },
+    {
+      "local": "src/actions/runtime.messaging.shared.ts",
+      "upstream": "extensions/discord/src/actions/runtime.messaging.shared.ts",
+      "status": "verbatim",
+      "deviation": ["D-DC-001"]
+    },
+    {
+      "local": "src/actions/runtime.messaging.ts",
+      "upstream": "extensions/discord/src/actions/runtime.messaging.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.moderation-shared.ts",
+      "upstream": "extensions/discord/src/actions/runtime.moderation-shared.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.moderation.ts",
+      "upstream": "extensions/discord/src/actions/runtime.moderation.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.presence.ts",
+      "upstream": "extensions/discord/src/actions/runtime.presence.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.shared.ts",
+      "upstream": "extensions/discord/src/actions/runtime.shared.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/actions/runtime.ts",
+      "upstream": "extensions/discord/src/actions/runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/active-turn-thread-route.ts",
+      "upstream": "extensions/discord/src/active-turn-thread-route.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/api.ts",
+      "upstream": "extensions/discord/src/api.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/approval-custom-id.ts",
+      "upstream": "extensions/discord/src/approval-custom-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-actions.runtime.ts",
+      "upstream": "extensions/discord/src/channel-actions.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-actions.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "upstream": "extensions/discord/src/channel-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-type.ts",
+      "upstream": "extensions/discord/src/channel-type.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/chunk.test.ts",
+      "upstream": "extensions/discord/src/chunk.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/chunk.ts",
+      "upstream": "extensions/discord/src/chunk.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/client.ts",
+      "upstream": "extensions/discord/src/client.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/command-deploy-store.ts",
+      "upstream": "extensions/discord/src/command-deploy-store.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/component-custom-id.test.ts",
+      "upstream": "extensions/discord/src/component-custom-id.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/component-custom-id.ts",
+      "upstream": "extensions/discord/src/component-custom-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components-registry-state.ts",
+      "upstream": "extensions/discord/src/components-registry-state.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components-registry.test-support.ts",
+      "upstream": "extensions/discord/src/components-registry.test-support.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components-registry.ts",
+      "upstream": "extensions/discord/src/components-registry.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components.builders.ts",
+      "upstream": "extensions/discord/src/components.builders.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components.modal.ts",
+      "upstream": "extensions/discord/src/components.modal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components.parse.ts",
+      "upstream": "extensions/discord/src/components.parse.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components.ts",
+      "upstream": "extensions/discord/src/components.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/components.types.ts",
+      "upstream": "extensions/discord/src/components.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/custom-id-codec.test.ts",
+      "upstream": "extensions/discord/src/custom-id-codec.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/custom-id-codec.ts",
+      "upstream": "extensions/discord/src/custom-id-codec.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/directory-cache-state.ts",
+      "upstream": "extensions/discord/src/directory-cache-state.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/directory-cache.test-support.ts",
+      "upstream": "extensions/discord/src/directory-cache.test-support.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/directory-cache.ts",
+      "upstream": "extensions/discord/src/directory-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/directory-live.ts",
+      "upstream": "extensions/discord/src/directory-live.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/error-body.ts",
+      "upstream": "extensions/discord/src/error-body.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/fusion/runtime-env.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-DC-005"]
+    },
+    {
+      "local": "src/fusion/runtime.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-DC-002"]
+    },
+    {
+      "local": "src/group-policy.ts",
+      "upstream": "extensions/discord/src/group-policy.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-011"]
+    },
+    {
+      "local": "src/inbound-event-delivery.ts",
+      "upstream": "extensions/discord/src/inbound-event-delivery.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/internal/api.commands.ts",
+      "upstream": "extensions/discord/src/internal/api.commands.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/api.guild.ts",
+      "upstream": "extensions/discord/src/internal/api.guild.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/api.interactions.ts",
+      "upstream": "extensions/discord/src/internal/api.interactions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/api.messages.ts",
+      "upstream": "extensions/discord/src/internal/api.messages.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/api.reactions.ts",
+      "upstream": "extensions/discord/src/internal/api.reactions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/api.users.ts",
+      "upstream": "extensions/discord/src/internal/api.users.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/api.webhooks.ts",
+      "upstream": "extensions/discord/src/internal/api.webhooks.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/client.ts",
+      "upstream": "extensions/discord/src/internal/client.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/command-comparison.ts",
+      "upstream": "extensions/discord/src/internal/command-comparison.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/command-deploy.ts",
+      "upstream": "extensions/discord/src/internal/command-deploy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/commands.ts",
+      "upstream": "extensions/discord/src/internal/commands.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/component-registry.ts",
+      "upstream": "extensions/discord/src/internal/component-registry.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/components.base.ts",
+      "upstream": "extensions/discord/src/internal/components.base.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/components.message.ts",
+      "upstream": "extensions/discord/src/internal/components.message.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/components.modal.ts",
+      "upstream": "extensions/discord/src/internal/components.modal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/components.ts",
+      "upstream": "extensions/discord/src/internal/components.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/discord.ts",
+      "upstream": "extensions/discord/src/internal/discord.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/embeds.ts",
+      "upstream": "extensions/discord/src/internal/embeds.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/entity-cache.test.ts",
+      "upstream": "extensions/discord/src/internal/entity-cache.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/entity-cache.ts",
+      "upstream": "extensions/discord/src/internal/entity-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/event-queue.ts",
+      "upstream": "extensions/discord/src/internal/event-queue.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-close-codes.ts",
+      "upstream": "extensions/discord/src/internal/gateway-close-codes.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-dispatch.ts",
+      "upstream": "extensions/discord/src/internal/gateway-dispatch.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-identify-limiter.ts",
+      "upstream": "extensions/discord/src/internal/gateway-identify-limiter.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-lifecycle.ts",
+      "upstream": "extensions/discord/src/internal/gateway-lifecycle.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-payload.ts",
+      "upstream": "extensions/discord/src/internal/gateway-payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-rate-limit.ts",
+      "upstream": "extensions/discord/src/internal/gateway-rate-limit.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-voice-state-cache.ts",
+      "upstream": "extensions/discord/src/internal/gateway-voice-state-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway-websocket-options.test.ts",
+      "upstream": "extensions/discord/src/internal/gateway-websocket-options.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/gateway.ts",
+      "upstream": "extensions/discord/src/internal/gateway.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/interaction-dispatch.ts",
+      "upstream": "extensions/discord/src/internal/interaction-dispatch.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/interaction-options.ts",
+      "upstream": "extensions/discord/src/internal/interaction-options.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/interaction-response.ts",
+      "upstream": "extensions/discord/src/internal/interaction-response.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/interactions.ts",
+      "upstream": "extensions/discord/src/internal/interactions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/listeners.ts",
+      "upstream": "extensions/discord/src/internal/listeners.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/modal-fields.ts",
+      "upstream": "extensions/discord/src/internal/modal-fields.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/payload.ts",
+      "upstream": "extensions/discord/src/internal/payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/rest-body.ts",
+      "upstream": "extensions/discord/src/internal/rest-body.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/rest-errors.ts",
+      "upstream": "extensions/discord/src/internal/rest-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/rest-routes.test.ts",
+      "upstream": "extensions/discord/src/internal/rest-routes.test.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-012"]
+    },
+    {
+      "local": "src/internal/rest-routes.ts",
+      "upstream": "extensions/discord/src/internal/rest-routes.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/rest-scheduler.ts",
+      "upstream": "extensions/discord/src/internal/rest-scheduler.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/rest.ts",
+      "upstream": "extensions/discord/src/internal/rest.ts",
+      "status": "verbatim",
+      "deviation": ["D-DC-001"]
+    },
+    {
+      "local": "src/internal/schemas.ts",
+      "upstream": "extensions/discord/src/internal/schemas.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/structures.test.ts",
+      "upstream": "extensions/discord/src/internal/structures.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/structures.ts",
+      "upstream": "extensions/discord/src/internal/structures.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/internal/undefined-fields.ts",
+      "upstream": "extensions/discord/src/internal/undefined-fields.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-DC-009"]
+    },
+    {
+      "local": "src/markdown.test.ts",
+      "upstream": "extensions/discord/src/markdown.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/markdown.ts",
+      "upstream": "extensions/discord/src/markdown.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/mentions.test.ts",
+      "upstream": "extensions/discord/src/mentions.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/mentions.ts",
+      "upstream": "extensions/discord/src/mentions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/allow-list.ts",
+      "upstream": "extensions/discord/src/monitor/allow-list.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/format.ts",
+      "upstream": "extensions/discord/src/monitor/format.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/gateway-registry.ts",
+      "upstream": "extensions/discord/src/monitor/gateway-registry.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/monitor/presence-cache.ts",
+      "upstream": "extensions/discord/src/monitor/presence-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/network-config.ts",
+      "upstream": "extensions/discord/src/network-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalize.test.ts",
+      "upstream": "extensions/discord/src/normalize.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalize.ts",
+      "upstream": "extensions/discord/src/normalize.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound-components.ts",
+      "upstream": "extensions/discord/src/outbound-components.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-DC-010"]
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/probe.parse-token.test.ts",
+      "upstream": "extensions/discord/src/probe.parse-token.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/probe.ts",
+      "upstream": "extensions/discord/src/probe.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/proxy-fetch.ts",
+      "upstream": "extensions/discord/src/proxy-fetch.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-005", "D-DC-006"]
+    },
+    {
+      "local": "src/proxy-request-client.ts",
+      "upstream": "extensions/discord/src/proxy-request-client.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/question-custom-id.test.ts",
+      "upstream": "extensions/discord/src/question-custom-id.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/question-custom-id.ts",
+      "upstream": "extensions/discord/src/question-custom-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/recipient-resolution.ts",
+      "upstream": "extensions/discord/src/recipient-resolution.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reply-reference.ts",
+      "upstream": "extensions/discord/src/reply-reference.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/retry-after.ts",
+      "upstream": "extensions/discord/src/retry-after.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/retry.test.ts",
+      "upstream": "extensions/discord/src/retry.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/retry.ts",
+      "upstream": "extensions/discord/src/retry.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/runtime-config.ts",
+      "upstream": "extensions/discord/src/runtime-config.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-007"]
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime.ts",
+      "upstream": "extensions/discord/src/runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-002", "D-DC-003"]
+    },
+    {
+      "local": "src/send-target-parsing.ts",
+      "upstream": "extensions/discord/src/send-target-parsing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.channels.ts",
+      "upstream": "extensions/discord/src/send.channels.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.components.ts",
+      "upstream": "extensions/discord/src/send.components.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.emojis-stickers.ts",
+      "upstream": "extensions/discord/src/send.emojis-stickers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.guild.ts",
+      "upstream": "extensions/discord/src/send.guild.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.message-request.ts",
+      "upstream": "extensions/discord/src/send.message-request.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.messages.ts",
+      "upstream": "extensions/discord/src/send.messages.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.outbound.ts",
+      "upstream": "extensions/discord/src/send.outbound.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.permissions.ts",
+      "upstream": "extensions/discord/src/send.permissions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.reactions.ts",
+      "upstream": "extensions/discord/src/send.reactions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.receipt.ts",
+      "upstream": "extensions/discord/src/send.receipt.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.shared.ts",
+      "upstream": "extensions/discord/src/send.shared.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.ts",
+      "upstream": "extensions/discord/src/send.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-004"]
+    },
+    {
+      "local": "src/send.types.ts",
+      "upstream": "extensions/discord/src/send.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.typing.ts",
+      "upstream": "extensions/discord/src/send.typing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.webhook.ts",
+      "upstream": "extensions/discord/src/send.webhook.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared-interactive.ts",
+      "upstream": "extensions/discord/src/shared-interactive.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/target-parsing.ts",
+      "upstream": "extensions/discord/src/target-parsing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/target-resolver.ts",
+      "upstream": "extensions/discord/src/target-resolver.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/targets.test.ts",
+      "upstream": "extensions/discord/src/targets.test.ts",
+      "status": "adapted",
+      "deviation": ["D-DC-013"]
+    },
+    {
+      "local": "src/targets.ts",
+      "upstream": "extensions/discord/src/targets.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/token.ts",
+      "upstream": "extensions/discord/src/token.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/transport/gateway.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/transport/gateway.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-DC-008"]
+    },
+    {
+      "local": "src/trusted-requester-actions.ts",
+      "upstream": "extensions/discord/src/trusted-requester-actions.ts",
+      "status": "verbatim"
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/discord/src/voice",
+      "reason": "Voice channel conversations (@discordjs/voice, libopus-wasm, realtime providers). Out of scope for slice 13; the Hub owns agent audio."
+    },
+    {
+      "upstream": "extensions/discord/src/activities",
+      "reason": "Discord Activities embedded-app surface (@discord/embedded-app-sdk, an HTTP shell and its own store). Needs a public endpoint the Hub does not expose."
+    },
+    {
+      "upstream": "extensions/discord/src/monitor",
+      "reason": "Upstream's monitor tree is the OpenClaw agent runtime for Discord: provider/session lifecycle, thread bindings, model picker, native commands, approvals, presence, draft streaming. Fusion's Hub owns agent lifecycle, routing, approvals and streaming. The pure leaves the send/action closure needs (allow-list, format, timeouts, gateway registry, presence cache) ARE carried."
+    },
+    {
+      "upstream": "extensions/discord/src/send.voice.ts",
+      "reason": "See D-DC-004."
+    },
+    {
+      "upstream": "extensions/discord/src/voice-message.ts",
+      "reason": "See D-DC-004."
+    },
+    {
+      "upstream": "extensions/discord/src/doctor.ts",
+      "reason": "OpenClaw `doctor` CLI surface; the Hub's setup/capability UI owns account diagnostics (goal ledger slice 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/doctor-shared.ts",
+      "reason": "See doctor.ts."
+    },
+    {
+      "upstream": "extensions/discord/src/doctor-contract.ts",
+      "reason": "See doctor.ts."
+    },
+    {
+      "upstream": "extensions/discord/src/security-doctor.ts",
+      "reason": "See doctor.ts."
+    },
+    {
+      "upstream": "extensions/discord/src/setup-entry.ts",
+      "reason": "OpenClaw setup wizard entry; the Hub owns onboarding (goal ledger slice 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/approval-handler.runtime.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/approval-message-safety.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/approval-native.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/approval-runtime.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/approval-shared.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/exec-approvals.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/outbound-approval.ts",
+      "reason": "OpenClaw's own approval engine (native approval cards, approver resolution, exec-approval forwarding). Fusion's Hub owns approvals and their authority (docs/permissions.md); the channel-side card lands with the approval/interaction slice."
+    },
+    {
+      "upstream": "extensions/discord/src/channel.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/channel-api.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/channel.conversation.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/channel.loaders.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/channel.runtime.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/channel.setup.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/config-schema.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/config-ui-hints.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/directory-config.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/secret-config-contract.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/session-contract.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/setup-account-state.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/setup-adapter.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/setup-core.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/setup-surface.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/status-issues.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/thread-binding-api.ts",
+      "reason": "OpenClaw plugin-host registration, config schema and setup wizard surfaces. Fusion's Hub owns channel registration, configuration and onboarding (goal ledger slices 4 and 18)."
+    },
+    {
+      "upstream": "extensions/discord/src/audit.ts",
+      "reason": "OpenClaw's security-audit CLI surface; the Hub owns audit logging and its own security posture (SECURITY.md)."
+    },
+    {
+      "upstream": "extensions/discord/src/audit-core.ts",
+      "reason": "OpenClaw's security-audit CLI surface; the Hub owns audit logging and its own security posture (SECURITY.md)."
+    },
+    {
+      "upstream": "extensions/discord/src/security.ts",
+      "reason": "OpenClaw's security-audit CLI surface; the Hub owns audit logging and its own security posture (SECURITY.md)."
+    },
+    {
+      "upstream": "extensions/discord/src/security-audit.ts",
+      "reason": "OpenClaw's security-audit CLI surface; the Hub owns audit logging and its own security posture (SECURITY.md)."
+    },
+    {
+      "upstream": "extensions/discord/src/security-audit.runtime.ts",
+      "reason": "OpenClaw's security-audit CLI surface; the Hub owns audit logging and its own security posture (SECURITY.md)."
+    },
+    {
+      "upstream": "extensions/discord/src/security-contract.ts",
+      "reason": "OpenClaw's security-audit CLI surface; the Hub owns audit logging and its own security posture (SECURITY.md)."
+    },
+    {
+      "upstream": "extensions/discord/src/draft-chunking.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/draft-stream.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/interactive-dispatch.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/outbound-adapter.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/outbound-payload.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/outbound-send-context.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/outbound-session-route.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/preview-streaming.ts",
+      "reason": "OpenClaw's outbound delivery adapter, draft/preview streaming and interaction dispatch. Fusion's Hub owns durable delivery and streaming (goal ledger slices 3, 8, 22)."
+    },
+    {
+      "upstream": "extensions/discord/src/command-owners.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/conversation-identity.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/conversation-route-owner.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/gateway-logging.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/guilds.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/monitor.gateway.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/session-key-normalization.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/shared.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/subagent-hooks.ts",
+      "reason": "OpenClaw session routing, group policy and agent binding. Fusion's Hub owns routing, bindings and access policy (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/discord/src/internal/voice.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/media-detection.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/pluralkit.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/probe.runtime.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/resolve-allowlist-common.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/resolve-channels.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/resolve-users.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/ui.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/ui-colors.ts",
+      "reason": "CLI/UI helper leaves and the PluralKit identity resolver, none of which the send/action/gateway closure imports. Available for a later slice; carrying them now would pull the OpenClaw CLI surface."
+    },
+    {
+      "upstream": "extensions/discord/src/test-http-helpers.ts",
+      "reason": "Upstream test fixtures for the surfaces above; they build OpenClaw config graphs and plugin hosts Fusion does not have."
+    },
+    {
+      "upstream": "extensions/discord/src/test-support/component-runtime.ts",
+      "reason": "Upstream test fixtures for the surfaces above; they build OpenClaw config graphs and plugin hosts Fusion does not have."
+    },
+    {
+      "upstream": "extensions/discord/src/test-support/config.ts",
+      "reason": "Upstream test fixtures for the surfaces above; they build OpenClaw config graphs and plugin hosts Fusion does not have."
+    },
+    {
+      "upstream": "extensions/discord/src/test-support/configured-binding-runtime.ts",
+      "reason": "Upstream test fixtures for the surfaces above; they build OpenClaw config graphs and plugin hosts Fusion does not have."
+    },
+    {
+      "upstream": "extensions/discord/src/test-support/mock-calls.ts",
+      "reason": "Upstream test fixtures for the surfaces above; they build OpenClaw config graphs and plugin hosts Fusion does not have."
+    },
+    {
+      "upstream": "extensions/discord/src/test-support/partial-channel.ts",
+      "reason": "Upstream test fixtures for the surfaces above; they build OpenClaw config graphs and plugin hosts Fusion does not have."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-DC-001",
+      "reason": "tsconfig: `exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off and `lib` is `DOM, DOM.Iterable, ES2023`, matching OpenClaw's own tsconfig, so the ported Discord source compiles unchanged.",
+      "file": "tsconfig.json"
+    },
+    {
+      "id": "D-DC-002",
+      "reason": "`src/runtime.ts` \u2014 upstream stores the plugin runtime in OpenClaw's global plugin runtime store (`openclaw/plugin-sdk/runtime-store`), which opens SQLite-backed keyed stores from the OpenClaw state directory. Fusion's Hub injects the runtime through `src/fusion/runtime.ts` over `HostRuntime.state.openKeyedStore`; the accessor names and the throw-on-unset contract are unchanged.",
+      "file": "src/runtime.ts"
+    },
+    {
+      "id": "D-DC-003",
+      "reason": "`src/runtime.ts` \u2014 upstream runs one Discord account per OpenClaw process, so one slot holds the runtime. The Hub runs every account of every organization in one process, so the runtime is keyed by account id and the account being served travels in `AsyncLocalStorage` (`withDiscordAccount`). Zero-arg callers are unchanged; a caller outside any scope resolves the unkeyed slot. Same shape as the Telegram vertical's D-TG-046.",
+      "file": "src/runtime.ts"
+    },
+    {
+      "id": "D-DC-004",
+      "reason": "Voice messages are omitted: `src/send.voice.ts` and `src/voice-message.ts` need ffmpeg/ffprobe transcoding, opus waveform extraction and `openclaw/plugin-sdk/temp-path`, none of which Fusion carries yet. `send.ts` drops the re-export, `actions/runtime.messaging.runtime.ts` drops the runtime entry, and the `asVoice` branch in `actions/runtime.messaging.send.ts` throws instead of silently degrading to a file upload.",
+      "file": "src/send.ts"
+    },
+    {
+      "id": "D-DC-005",
+      "reason": "`src/fusion/runtime-env.ts` \u2014 upstream's `openclaw/plugin-sdk/runtime-env` exports `warn`/`danger`/`info`/`success` as chalk-backed theme formatters `(text) => string`; core's carried `globals.ts` exports them as logger calls (D-CORE-203). This module restores the formatter spelling for the ported files that use it, as the Slack vertical's D-033 already does.",
+      "file": "src/fusion/runtime-env.ts"
+    },
+    {
+      "id": "D-DC-006",
+      "reason": "`src/proxy-fetch.ts` \u2014 upstream imports `makeProxyFetch` from `openclaw/plugin-sdk/fetch-runtime` (`src/infra/net/proxy-fetch.ts`), which pulls the SSRF guard, the pinned dispatcher pool and OpenClaw's global undici dispatcher. The Discord transport owns its own fetch stack, so the proxy fetch is a `ProxyAgent`-backed undici fetch declared in the file, the same shape as the Telegram vertical's D-TG-013.",
+      "file": "src/proxy-fetch.ts"
+    },
+    {
+      "id": "D-DC-007",
+      "reason": "`src/runtime-config.ts` \u2014 upstream reconciles the caller's config against OpenClaw's process-wide runtime config snapshot. Fusion's Hub owns channel configuration and hands every drive-time entry point the already-resolved `cfg`, so `selectDiscordRuntimeConfig` returns its input. `selectDiscordActivitiesRuntimeConfig` is omitted with the Activities surface.",
+      "file": "src/runtime-config.ts"
+    },
+    {
+      "id": "D-DC-008",
+      "reason": "`src/transport/gateway.ts` \u2014 upstream's transport wiring is `monitor/gateway-plugin.ts`, which pulls OpenClaw's debug proxy-capture recorder (`plugin-sdk/proxy-capture`), its node proxy-agent factory and the voice intent resolver. The socket construction, the intent resolution and the reconnect policy are upstream's; the capture recorder is omitted, the voice intent follows the explicit config only, and a configured gateway proxy fails loudly instead of being silently ignored.",
+      "file": "src/transport/gateway.ts"
+    },
+    {
+      "id": "D-DC-009",
+      "reason": "`src/lifecycle/start-account.ts` \u2014 Fusion-owned L4: upstream's account lifecycle is `monitor/provider.startup.ts` over OpenClaw's provider/session runtime, agent binding and command deployment. The Hub owns agent lifecycle and routing, so the L4 here does only what the seam contract asks: token, identity probe, duplicate-token guard, one gateway per bot identity, L3 registration, and a promise that resolves on abort.",
+      "file": "src/lifecycle/start-account.ts"
+    },
+    {
+      "id": "D-DC-010",
+      "reason": "`src/outbound.ts` \u2014 Fusion-owned bridge from the Hub's `plugin.outbound.*` contract onto the ported `send.ts` entry points. No wire decision lives here; it resolves the account runtime, normalizes the Hub target/thread pair to a Discord channel target, applies the size-only G11 media gate and returns the Hub receipt shape.",
+      "file": "src/outbound.ts"
+    },
+    {
+      "id": "D-DC-011",
+      "file": "src/group-policy.ts",
+      "reason": "`src/group-policy.ts` \u2014 `ChannelGroupContext.cfg` is core's host-narrowed `OpenClawConfig`, whose channel sections are opaque (D-CORE-010). The one config read is retyped through the channel-typed view (`plugin-sdk/config-contracts`); the expression is upstream's.",
+      "tests": ["src/targets.test.ts"]
+    },
+    {
+      "id": "D-DC-012",
+      "file": "src/internal/rest-routes.test.ts",
+      "reason": "One ported case is skipped locally, not a behavior difference: this vitest's fake-timer backend clamps `setSystemTime(MAX_DATE_TIMESTAMP_MS)` to 0, so the case never reaches the Date-range guard it asserts. The guard (`resolveRateLimitResetAt` -> `resolveExpiresAtMsFromDurationMs`) is carried verbatim and the absolute-reset case in the same file covers the rule without fake timers."
+    },
+    {
+      "id": "D-DC-013",
+      "file": "src/targets.test.ts",
+      "reason": "One ported case is skipped: its sender-specific half asserts upstream's `toolsBySender` resolution, which core's carried `resolveScopeToolsPolicy` narrows away (D-CORE-222 \u2014 the OpenClaw sender-policy resolver is not ported). The channel-over-guild precedence the same case covers is asserted by the account-scoped case in the same file."
+    }
+  ]
+}

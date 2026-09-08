@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HubApiError } from "../api-client";
+import { CHANNEL_CATALOG_RESPONSE } from "../channel-catalog.fixture";
 import { ChannelSettings } from "./channel-settings";
 import { HubSettingsDetailScrollProvider } from "./detail-scroll";
 
@@ -247,6 +248,9 @@ const configuration = {
 };
 const data: Record<string, unknown> = {
   "channel-configuration": configuration,
+  // The Add-connection form is catalog-driven, so the accounts editor reads the
+  // Hub's catalog before it can offer a channel to connect.
+  "channel-catalog": CHANNEL_CATALOG_RESPONSE,
   connections: {
     connections: [
       {
@@ -739,7 +743,9 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Connect a provider account" }));
     expect(screen.queryByRole("button", { name: "Activate Route" })).toBeNull();
-    fireEvent.change(screen.getByRole("textbox", { name: "Account name" }), {
+    // The Add-connection form is catalog-driven, so it mounts once the Hub's
+    // catalog read lands and the first connectable channel is chosen.
+    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
       target: { value: "new-bot" },
     });
     fireEvent.change(screen.getByLabelText("Bot token"), {
@@ -763,6 +769,24 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to accounts" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
     expect((screen.getByLabelText("Account name") as HTMLInputElement).value).toBe("");
+  });
+
+  it("offers every channel this Hub can connect and swaps the credential form", async () => {
+    renderChannels();
+    await screen.findByRole("button", { name: "Manage" });
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect a provider account" }));
+    expect(await screen.findByText("Connect Telegram")).toBeTruthy();
+    // Slack Socket Mode is created from a Provider Application; this Member is
+    // not an instance operator, so it is not on offer.
+    expect(screen.queryByRole("button", { name: "Slack" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Zalo Official Bot" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Feishu / Lark" }));
+    expect(await screen.findByText("Connect Feishu / Lark")).toBeTruthy();
+    expect(screen.getByLabelText("App ID")).toBeTruthy();
+    expect(screen.getByLabelText("App secret")).toBeTruthy();
+    expect(screen.getByLabelText("Domain")).toBeTruthy();
+    expect(screen.queryByLabelText("Bot token")).toBeNull();
   });
 
   it("keeps the authoritative saved revision and closes the editor when refresh fails", async () => {
@@ -824,7 +848,7 @@ describe("Channel Route focused editing", { timeout: 20_000 }, () => {
     await screen.findByRole("button", { name: "Manage" });
     fireEvent.click(screen.getByRole("button", { name: "Add Channel account" }));
     fireEvent.click(screen.getByRole("button", { name: "Connect a provider account" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Account name" }), {
+    fireEvent.change(await screen.findByRole("textbox", { name: "Account name" }), {
       target: { value: "bot" },
     });
     fireEvent.change(screen.getByLabelText("Bot token"), {

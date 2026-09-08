@@ -17,13 +17,7 @@ import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { InboundReplyParams } from "./loader/host.js";
-import {
-  externalParticipantMayTrigger,
-  isEnabled,
-  mayTrigger,
-  matchRoute,
-  routeConversationMatches,
-} from "./policy.js";
+import { isEnabled, mayTrigger, matchRoute, routeConversationMatches } from "./policy.js";
 import {
   ApprovalEngine,
   assertChannelPosture,
@@ -37,6 +31,14 @@ import {
   textCommandHelpText,
   type ChannelTextCommand,
 } from "./commands.js";
+import { redeemChannelCommandButton } from "./command-buttons.js";
+import {
+  admitChannelAccess,
+  mayUseChannelRoute,
+  type ChannelAccessGateOutcome,
+} from "./policy/gate.js";
+import { mayRunChannelCommand, resolveChannelActorRole } from "./policy/roles.js";
+import { resolveSelection, selectionMenu } from "./policy/selection.js";
 import {
   admitFollowUp,
   BindingEngine,
@@ -47,8 +49,17 @@ import {
   routePosition,
 } from "./bindings/index.js";
 import { DEFAULT_PROGRESS_THROTTLE_MS, RelayEngine } from "./relay/index.js";
+import { ChannelStreamingProducer } from "./streaming/index.js";
 import { realClock } from "./plane/clock.js";
 import { createProcessingController, type ProcessingController } from "./plane/processing.js";
+import {
+  dispositionFor,
+  INBOUND_DEFAULTS_FLOOR,
+  readInboundKind,
+  recordsActivity,
+  roomEventReason,
+  type InboundKindReading,
+} from "./plane/inbound-kinds.js";
 import {
   RouteExecutionLimiter,
   type RouteExecutionLease,
@@ -65,11 +76,12 @@ import type {
   ChannelPlaneDeps,
   InboundMessage,
   InboundOutcome,
-  P0ChannelName,
+  SupportedChannelName,
   PlaneInboundResult,
   PlaneLogger,
   StreamContext,
 } from "./plane/types.js";
+import { isSupportedChannel } from "./catalog.js";
 import { ChannelWorkflowRequestPayloadSchema } from "../triggers/channel/provider.js";
 
 /**
@@ -84,6 +96,13 @@ export interface InboundTriggerRef {
   /** The marker's native message id (Slack `ts`); absent when uncarried. */
   messageId?: string | undefined;
 }
+
+/**
+ * Post one session-command answer where the command was asked. Resolves to
+ * whether it reached the channel — the callers that have no other effect
+ * (`/help`, `/status`) report that as their `handled` flag.
+ */
+type CommandReply = (text: string) => Promise<boolean>;
 
 /** The execution plane the loader drives for a channel's account(s). */
 export interface ChannelPlane {
@@ -224,69 +243,37 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           reason: "event is not a plane-bound message",
         });
       }
-      const account = deps.controlPlane.accounts.find(
-        (candidate) =>
-          message.channel === deps.accountScope.channel &&
-          message.accountId === deps.accountScope.accountId &&
-          candidate.channel === message.channel &&
-          candidate.accountId === message.accountId,
-      );
-      if (account === undefined) {
-        return result(false, {
-          kind: "ignored",
-          reason: "unknown channel account",
-        });
+      const admission = admitAccount(message);
+      if (admission.account === undefined) {
+        return result(false, { kind: "ignored", reason: admission.reason });
       }
-      // Per-decision kill switch: env flag > org > channel > account. Flag off
-      // means no ingest, no binding, no relay (the loader's env short-circuit is
-      // the first line; this is the per-decision line — both must hold).
-      if (!isEnabled(deps.envFlag, deps.controlPlane, account)) {
-        return result(false, {
-          kind: "ignored",
-          reason: "channels disabled (kill switch)",
-        });
+      const account = admission.account;
+      // The inbound FAMILY decides what may happen next: only `message` and
+      // `command` reach the text parsers below, so a reaction body or a
+      // "[Joined] …" notice can never be read as a command or as user text.
+      const inbound = readInboundKind(params.ctxPayload);
+      if (inbound.kind === "callback" || inbound.kind === "interactive") {
+        return await handleInboundCallback(message, account, inbound);
+      }
+      if (inbound.kind !== "message" && inbound.kind !== "command") {
+        const roomEvent = await admitRoomEvent(message, account, inbound);
+        // `undefined` = the route promoted this event to a message
+        // (`inbound.editNotifications: all`); everything else is settled.
+        if (roomEvent !== undefined) return roomEvent;
       }
       const identityCode = parseChannelIdentityLinkCommand(message.text);
       if (identityCode !== null && deps.consumeChannelIdentityChallenge !== undefined) {
-        const status = await deps.consumeChannelIdentityChallenge({
-          organizationId: deps.organizationId,
-          account,
-          senderIdentity: message.senderIdentity,
-          ...(message.senderName === undefined ? {} : { senderName: message.senderName }),
-          code: identityCode,
-        });
-        const response = await deps.post({
-          channel: channelName(account),
-          accountId: account.accountId,
-          to: message.conversation.rootConversationId,
-          ...(message.conversation.threadId === null
-            ? {}
-            : { threadId: message.conversation.threadId }),
-          text: identityLinkReplyText(status),
-        });
-        if (!response.ok) {
-          logger.warn("channel identity link reply failed", {
-            channel: account.channel,
-            accountId: account.accountId,
-            status,
-            error: response.error,
-          });
-        }
-        return result(status === "linked" || status === "already_linked", {
-          kind: "command",
-          handled: true,
-          detail: `identity link ${status}`,
-        });
+        return await handleIdentityLinkCommand(message, account, identityCode);
       }
       const command = parseApprovalCommand(message.text);
       if (command !== null) {
         return await handleApprovalCommand(message, account, command);
       }
-      const textCommand = parseChannelTextCommand(message.text);
+      const textCommand = resolveTextCommand(message.text, inbound);
       const workflowCommandRoute =
         textCommand === null ? undefined : activeWorkflowRouteFor(message);
       if (textCommand !== null && workflowCommandRoute !== undefined) {
-        return await handleTextCommand(message, account, workflowCommandRoute, textCommand);
+        return await handleWorkflowTextCommand(message, account, workflowCommandRoute, textCommand);
       }
       const resolved = await resolveInboundRoute(message, account);
       if (resolved.kind !== "selected") {
@@ -299,10 +286,27 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         });
       }
       const route = resolved.route;
+      // The upstream sender-admission gate (`access:`), in front of everything
+      // that could start or steer a turn. A route with no `access:` block
+      // allows here and only the RBAC gate decides, exactly as before.
+      const gated = await admitAccess(message, account, route);
+      if (gated !== undefined) return gated;
       // The channel's other plain-text commands (/status, /stop, /new, /help —
-      // shared, channel-agnostic; see commands.ts).
+      // shared, channel-agnostic; see commands.ts). Commands are deliberately
+      // NOT mention-gated: `requireMention` is about waking the agent, and an
+      // admitted sender controlling their own session already addressed the bot
+      // by naming a command. The same holds for `kind: command` (a native slash
+      // command) and for a button callback, which carry no mention at all.
       if (textCommand !== null) {
         return await handleTextCommand(message, account, route, textCommand);
+      }
+      // A native command this Hub does not own (`/deploy`, `/model`): it is
+      // forwarded to the agent as text only when it addressed the bot.
+      if (inbound.kind === "command" && !message.mentionedBot) {
+        return recordChannelActivity(message, account, route, {
+          result: result(false, { kind: "ignored", reason: "unknown command, bot not addressed" }),
+          limitDecision: "not_evaluated",
+        });
       }
       return handleAgentMessage(message, account, route);
     },
@@ -524,12 +528,25 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         resolveAgentAccessTarget: deps.resolveAgentAccessTarget,
         ...(processing !== undefined ? { processing } : {}),
       });
+      // The live-draft producer (slice 22b): mounted only when the loaded
+      // vertical exposes a drivable streaming primitive. Absent = the relay's
+      // final-only post path, unchanged.
+      const streaming =
+        deps.streaming === undefined
+          ? undefined
+          : new ChannelStreamingProducer({
+              logger,
+              clock,
+              driver: deps.streaming,
+              post: deps.post,
+            });
       relay = new RelayEngine({
         organizationId: deps.organizationId,
         logger,
         clock,
         store: channelStore,
         post: deps.post,
+        ...(streaming === undefined ? {} : { streaming }),
         // COMPAT(clisbot-control-plane): the native-media post + media home
         // resolution (the agent's recorded cwd, else the shared home root).
         sessionLink: deps.sessionLink,
@@ -620,6 +637,213 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
 
   // --- Inbound sub-flows -----------------------------------------------------
 
+  /**
+   * The account this transport owns, when the kill switch lets it act. The
+   * switch is per decision — env flag > org > channel > account — and the
+   * loader's env short-circuit is only the first line: both must hold.
+   */
+  function admitAccount(
+    message: InboundMessage,
+  ):
+    | { account: CompiledChannelAccount; reason?: undefined }
+    | { account?: undefined; reason: string } {
+    const account = deps.controlPlane.accounts.find(
+      (candidate) =>
+        message.channel === deps.accountScope.channel &&
+        message.accountId === deps.accountScope.accountId &&
+        candidate.channel === message.channel &&
+        candidate.accountId === message.accountId,
+    );
+    if (account === undefined) return { reason: "unknown channel account" };
+    if (!isEnabled(deps.envFlag, deps.controlPlane, account)) {
+      return { reason: "channels disabled (kill switch)" };
+    }
+    return { account };
+  }
+
+  /**
+   * The session command this inbound carries. A `command`-family event names
+   * its verb in structured facts (a Slack native slash command has no `/` in
+   * its text at all); everything else is matched from the text. Both spellings
+   * land on the one alias table in `commands.ts`.
+   */
+  function resolveTextCommand(
+    text: string,
+    inbound: InboundKindReading,
+  ): ChannelTextCommand | null {
+    const fromText = parseChannelTextCommand(text);
+    if (fromText !== null || inbound.kind !== "command") return fromText;
+    const command = inbound.facts.command;
+    if (command === undefined) return null;
+    // `args` carries what a native slash command puts after the verb, which is
+    // where `/model gpt-5.6-luna` keeps its argument.
+    return parseChannelTextCommand(`/${command.name} ${command.args ?? ""}`.trimEnd());
+  }
+
+  /**
+   * `/new` — a fresh session for this conversation. Stop what the bound agent is
+   * doing, then let go of the binding: the daemon has no session-reset RPC and
+   * does not need one, because the plane owns the conversation→agent map, so
+   * releasing the row makes the NEXT message mint a new agent through the
+   * ordinary first-mention path. The old agent is left in the app, not deleted.
+   */
+  async function startNewSession(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    agentId: string,
+    post: CommandReply,
+  ): Promise<PlaneInboundResult> {
+    const { released } = await endBoundSession(account, deriveBindingKey(message, route), agentId);
+    if (!released) {
+      await post("No agent session is bound to this conversation yet.");
+      return result(false, { kind: "command", handled: false, detail: "no bound session" });
+    }
+    await post("🆕 Started fresh — the next message opens a new session.");
+    return result(true, { kind: "command", handled: true, detail: "new session" });
+  }
+
+  /** The `link <code>` reply: consume the challenge, then say what happened.
+   * A link is not a session command — it answers before any route is resolved,
+   * because linking is how an unknown sender BECOMES known. */
+  async function handleIdentityLinkCommand(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    code: string,
+  ): Promise<PlaneInboundResult> {
+    const status = await deps.consumeChannelIdentityChallenge!({
+      organizationId: deps.organizationId,
+      account,
+      senderIdentity: message.senderIdentity,
+      ...(message.senderName === undefined ? {} : { senderName: message.senderName }),
+      code,
+    });
+    const response = await deps.post({
+      channel: channelName(account),
+      accountId: account.accountId,
+      to: message.conversation.rootConversationId,
+      ...(message.conversation.threadId === null
+        ? {}
+        : { threadId: message.conversation.threadId }),
+      text: identityLinkReplyText(status),
+    });
+    if (!response.ok) {
+      logger.warn("channel identity link reply failed", {
+        channel: account.channel,
+        accountId: account.accountId,
+        status,
+        error: response.error,
+      });
+    }
+    return result(status === "linked" || status === "already_linked", {
+      kind: "command",
+      handled: true,
+      detail: `identity link ${status}`,
+    });
+  }
+
+  /**
+   * Room activity — a reaction, a join, a pin, a topic or poll event, an edit,
+   * a delete. None of these is a request, so none starts a turn; they are
+   * recorded against the route that owns the conversation so an operator can
+   * see them in channel activity. Returns `undefined` only when the route
+   * promoted the event to a message (`inbound.editNotifications: all`).
+   */
+  async function admitRoomEvent(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    inbound: InboundKindReading,
+  ): Promise<PlaneInboundResult | undefined> {
+    const resolved = await resolveInboundRoute(message, account);
+    const route = resolved.kind === "selected" ? resolved.route : undefined;
+    const defaults = route?.defaults.inbound ?? INBOUND_DEFAULTS_FLOOR;
+    if (dispositionFor(inbound.kind, defaults) === "message") return undefined;
+    const ignored = result(false, { kind: "ignored", reason: roomEventReason(inbound.kind) });
+    if (route === undefined || !recordsActivity(inbound.kind, defaults)) return ignored;
+    return await recordChannelActivity(message, account, route, {
+      result: ignored,
+      limitDecision: "not_evaluated",
+    });
+  }
+
+  /**
+   * A button, select or modal submit. Three outcomes, in order: the value is an
+   * approval card and goes to the one exactly-once approval resolver (the same
+   * entry a native card click takes, so authority is checked identically); the
+   * action id redeems a command button this Hub minted, and the recorded
+   * command runs; neither, and it is ignored with a log — an unknown action id
+   * is a card this Hub did not post.
+   *
+   * The action id is never parsed as a command directly. A `message` tool call
+   * can put any text in a button, so a raw `/new` reaching `handleTextCommand`
+   * would be the model handing every member of the conversation a session
+   * control (`command-buttons.ts`).
+   */
+  async function handleInboundCallback(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    inbound: InboundKindReading,
+  ): Promise<PlaneInboundResult> {
+    const callback = inbound.facts.callback;
+    if (callback === undefined) {
+      return result(false, {
+        kind: "command",
+        handled: false,
+        detail: "callback carries no action facts",
+      });
+    }
+    if (callback.value !== undefined && parseCardValue(callback.value) !== null) {
+      return await plane.onApprovalCallback({
+        channel: message.channel,
+        accountId: message.accountId,
+        senderIdentity: message.senderIdentity,
+        cardValue: callback.value,
+        externalConversationId: message.conversation.rootConversationId,
+        externalThreadId: message.conversation.threadId,
+        rootKind: rootKindOf(message.conversation.kind),
+      });
+    }
+    const redeemed = redeemChannelCommandButton(callback.actionId, {
+      organizationId: deps.organizationId,
+      channel: message.channel,
+      accountId: message.accountId,
+      conversationId: message.conversation.rootConversationId,
+      ...(message.conversation.threadId === null
+        ? {}
+        : { threadId: message.conversation.threadId }),
+      actorId: callback.actorId,
+    });
+    const command = redeemed.ok ? parseChannelTextCommand(redeemed.command) : null;
+    if (command === null) {
+      const reason = redeemed.ok ? "unrecognized-command" : redeemed.reason;
+      logger.info?.("channel command button refused", {
+        channel: message.channel,
+        accountId: message.accountId,
+        actionId: callback.actionId,
+        actorId: callback.actorId,
+        reason,
+      });
+      return result(false, {
+        kind: "command",
+        handled: false,
+        detail: `unknown callback action (${callback.actionId}): ${reason}`,
+      });
+    }
+    const resolved = await resolveInboundRoute(message, account);
+    if (resolved.kind !== "selected") {
+      return result(false, {
+        kind: "command",
+        handled: false,
+        detail: "no route owns this conversation",
+      });
+    }
+    // The same sender gate a typed command passes: a token this Hub minted is
+    // still not authority for a sender the route's `access:` block refuses.
+    const gated = await admitAccess(message, account, resolved.route);
+    if (gated !== undefined) return gated;
+    return await handleTextCommand(message, account, resolved.route, command);
+  }
+
   async function handleAgentMessage(
     message: InboundMessage,
     account: CompiledChannelAccount,
@@ -647,11 +871,14 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       ...(deliveryId === undefined ? {} : { leaseId: deliveryId }),
     }) ?? { allowed: true as const };
     if (!routeLimit.allowed) {
+      // A ceiling that clears with time is back-pressure: say so, so a durable
+      // ingress returns the message instead of completing it as handled.
+      const declined = result(false, { kind: "ignored", reason: routeLimit.reason });
+      if (routeLimit.retryAfterMs !== undefined) {
+        declined.deferred = { reason: routeLimit.reason, retryAfterMs: routeLimit.retryAfterMs };
+      }
       return recordChannelActivity(message, account, route, {
-        result: result(false, {
-          kind: "ignored",
-          reason: routeLimit.reason,
-        }),
+        result: declined,
         limitDecision: "denied",
         limitReason: routeLimit.reason,
       });
@@ -803,7 +1030,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
     decision: {
       result: PlaneInboundResult;
-      outcome?: "bound" | "steered" | "workflow" | "ignored" | "error";
+      outcome?: "bound" | "steered" | "workflow" | "ignored" | "denied" | "error";
       outcomeDetail?: string | undefined;
       limitDecision: "not_evaluated" | "allowed" | "denied";
       limitReason?: string | undefined;
@@ -953,41 +1180,10 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     route: CompiledRoute,
     command: ChannelTextCommand,
   ): Promise<PlaneInboundResult> {
-    // Commands answer where they were asked, at the marker's own level (the
-    // binding key may be coarser, e.g. `binding.key: channel`); they never
-    // mint threads — that is the relay's `reply.anchor: thread` behavior.
-    const location = {
-      to: message.conversation.rootConversationId,
-      ...(message.conversation.threadId !== null
-        ? { threadId: message.conversation.threadId }
-        : {}),
-    };
-    const post = (text: string): Promise<void> =>
-      deps
-        .post({
-          channel: channelName(account),
-          accountId: account.accountId,
-          to: location.to,
-          ...(location.threadId !== undefined ? { threadId: location.threadId } : {}),
-          text,
-        })
-        .then((res) => {
-          if (!res.ok) {
-            logger.warn("channel text command reply failed", {
-              channel: account.channel,
-              accountId: account.accountId,
-              command: command.name,
-              error: res.error,
-            });
-          }
-          return undefined;
-        });
-
+    const post = commandReplyFor(message, account, command.name);
     if (command.name === "help") {
-      await post(textCommandHelpText());
-      return result(true, { kind: "command", handled: true, detail: "help" });
+      return replyOnlyOutcome(await post(textCommandHelpText()), "help");
     }
-
     if (!(await mayUseChannel(message, account, route)).allowed) {
       return result(false, {
         kind: "command",
@@ -995,92 +1191,312 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         detail: "sender may not control this conversation",
       });
     }
-
-    const agentId = await conversationAgentFor(message, account, route);
-    if (agentId === undefined) {
-      await post("No agent session is bound to this conversation yet.");
+    const role = await actorRole(message, account, route);
+    if (!mayRunChannelCommand(command.name, role)) {
+      await post(`\`/${command.name}\` needs owner or admin rights in this conversation.`);
       return result(false, {
         kind: "command",
         handled: false,
-        detail: "no bound session",
+        detail: `role ${role} may not run /${command.name}`,
       });
     }
+    // `/agent` and `/model` are conversation-scoped and need no session: the
+    // choice applies to the session the NEXT message opens.
+    if (command.name === "agent" || command.name === "model") {
+      return await switchConversationTarget(message, account, route, command, post);
+    }
+    const agentId = await conversationAgentFor(message, account, route);
+    if (agentId === undefined) {
+      await post("No agent session is bound to this conversation yet.");
+      return result(false, { kind: "command", handled: false, detail: "no bound session" });
+    }
     switch (command.name) {
-      case "status": {
-        let agent: AgentSnapshot | undefined;
-        try {
-          agent = (await daemon?.listAgents().catch(() => [] as AgentSnapshot[]))?.find(
-            (candidate) => candidate.id === agentId,
-          );
-        } catch {
-          agent = undefined;
-        }
-        if (agent === undefined) {
-          await post("The bound agent is not available (it may have stopped).");
-          return result(false, {
-            kind: "command",
-            handled: false,
-            detail: "agent not found",
-          });
-        }
-        const lines = [
-          `Agent: ${agent.title || agent.id} (${agent.provider})`,
-          `Status: ${agent.status}`,
-          `Model: ${agent.model ?? "n/a"}`,
-          `Working directory: ${agent.cwd}`,
-        ];
-        const pending = engineOpenPrompts(agentId);
-        if (pending.length > 0) {
-          lines.push(`Pending approvals: ${pending.length}`);
-        }
-        await post(lines.join("\n"));
-        return result(true, {
-          kind: "command",
-          handled: true,
-          detail: "status",
-        });
-      }
-      case "stop": {
-        // Cancellation is a lifecycle RPC. Sending an empty message with
-        // activeTurnBehavior=interrupt would replace the turn with a new empty
-        // turn, which is observably different and can accidentally continue work.
-        try {
-          await daemon?.cancelAgent(agentId);
-          await post("⏹️ Stop requested — the running turn is being interrupted.");
-          return result(true, {
-            kind: "command",
-            handled: true,
-            detail: "stop requested",
-          });
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          await post(`Stop request failed: ${errorMessage}`);
-          return result(false, {
-            kind: "command",
-            handled: false,
-            detail: "stop failed",
-          });
-        }
-      }
-      case "new": {
-        // The in-chat /new surface is not wired yet: the binding engine owns
-        // session lifecycle and the daemon wire has no session-reset RPC the
-        // plane can call safely. Answer honestly instead of faking it.
-        await post(
-          "/new is not supported in-channel yet — start a fresh session from the app, or keep this thread going.",
-        );
-        return result(false, {
-          kind: "command",
-          handled: false,
-          detail: "new not wired",
-        });
-      }
+      case "status":
+        return await reportSessionStatus(message, account, route, agentId, post);
+      case "stop":
+        return await stopBoundTurn(agentId, post);
+      case "new":
+        return await startNewSession(message, account, route, agentId, post);
       default:
-        return result(false, {
-          kind: "command",
-          handled: false,
-          detail: "unsupported command",
+        return result(false, { kind: "command", handled: false, detail: "unsupported command" });
+    }
+  }
+
+  /**
+   * The sender's role in this conversation: `owner` for whoever started the
+   * bound session, then the privilege projection in `policy/roles.ts`.
+   */
+  async function actorRole(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ) {
+    const key = deriveBindingKey(message, route);
+    const binding = await store?.findThreadBinding(
+      deps.organizationId,
+      account.accountId,
+      key.externalConversationId,
+      key.externalThreadId,
+    );
+    return resolveChannelActorRole({
+      senderIdentity: message.senderIdentity,
+      controlPlane: deps.controlPlane,
+      route,
+      ...(binding?.initiator === undefined ? {} : { initiator: binding.initiator }),
+    });
+  }
+
+  /**
+   * `/agent <name>` and `/model <name>`. The choice is persisted against the
+   * CONVERSATION, then the running session is ended the way `/new` ends it, so
+   * the next message opens a session on the new target. Ending it is the whole
+   * mechanism: a running agent's provider and model are fixed at create time.
+   *
+   * A bare `/agent` or `/model` prints the route's menu and changes nothing.
+   */
+  async function switchConversationTarget(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    command: Extract<ChannelTextCommand, { name: "agent" | "model" }>,
+    post: CommandReply,
+  ): Promise<PlaneInboundResult> {
+    const menu = selectionMenu(route);
+    const options = command.name === "agent" ? menu.agents : menu.models;
+    if (command.value === undefined) {
+      const listed = options.length === 0 ? "none configured" : options.join(", ");
+      return replyOnlyOutcome(
+        await post(`Available ${command.name}s: ${listed}.`),
+        `${command.name} menu`,
+      );
+    }
+    const selection = resolveSelection(command.name, command.value, route);
+    if (!selection.ok) {
+      await post(selection.message);
+      return result(false, { kind: "command", handled: false, detail: selection.message });
+    }
+    const key = deriveBindingKey(message, route);
+    await store?.access.setConversationSelection(
+      {
+        organizationId: deps.organizationId,
+        channel: message.channel,
+        accountId: account.accountId,
+        externalConversationId: key.externalConversationId,
+        externalThreadId: key.externalThreadId,
+      },
+      {
+        ...(selection.kind === "agent"
+          ? { selectedAgent: selection.value }
+          : { selectedModel: selection.value }),
+        selectedBy: message.senderIdentity,
+      },
+    );
+    await endBoundSession(account, key, await conversationAgentFor(message, account, route));
+    await post(`✅ ${selection.kind === "agent" ? "Agent" : "Model"} set to ${selection.value}.`);
+    return result(true, {
+      kind: "command",
+      handled: true,
+      detail: `${selection.kind} set to ${selection.value}`,
+    });
+  }
+
+  /**
+   * Cancel and release whatever session owns this conversation. The shared half
+   * of `/new` and of an `/agent` / `/model` switch: the daemon has no
+   * session-reset RPC and does not need one, because the plane owns the
+   * conversation→agent map, so releasing the row makes the NEXT message mint a
+   * session through the ordinary first-mention path. The old agent is left in
+   * the app, not deleted.
+   */
+  async function endBoundSession(
+    account: CompiledChannelAccount,
+    key: ReturnType<typeof deriveBindingKey>,
+    agentId?: string,
+  ): Promise<{ released: boolean }> {
+    if (agentId !== undefined) await daemon?.cancelAgent(agentId).catch(() => undefined);
+    const released = await store?.releaseThreadBinding({
+      organizationId: deps.organizationId,
+      accountId: account.accountId,
+      externalConversationId: key.externalConversationId,
+      externalThreadId: key.externalThreadId,
+    });
+    const detached = released?.agentId ?? agentId;
+    if (detached !== undefined) await detachChannelAgent(detached);
+    return { released: released !== undefined };
+  }
+
+  /**
+   * The ONE reply path every session command answers on — `/help` and
+   * `/status` take it exactly as `/stop` and `/new` do. Commands answer where
+   * they were asked, at the marker's own level (the binding key may be
+   * coarser, e.g. `binding.key: channel`); they never mint threads — that is
+   * the relay's `reply.anchor: thread` behavior.
+   *
+   * It reports whether the post reached the channel, because a command whose
+   * only effect is its reply is not "handled" when the post failed: reporting
+   * it as handled makes a lost answer indistinguishable from a delivered one
+   * in the operator's log.
+   */
+  function commandReplyFor(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    command: ChannelTextCommand["name"],
+  ): CommandReply {
+    const threadId = message.conversation.threadId;
+    return async (text) => {
+      const response = await deps.post({
+        channel: channelName(account),
+        accountId: account.accountId,
+        to: message.conversation.rootConversationId,
+        ...(threadId === null ? {} : { threadId }),
+        text,
+      });
+      if (!response.ok) {
+        logger.warn("channel text command reply failed", {
+          channel: account.channel,
+          accountId: account.accountId,
+          command,
+          error: response.error,
         });
+      }
+      return response.ok;
+    };
+  }
+
+  /** `/status` — the bound agent's snapshot plus its open approval count. */
+  async function reportSessionStatus(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    agentId: string,
+    post: CommandReply,
+  ): Promise<PlaneInboundResult> {
+    const agents = await daemon?.listAgents().catch(() => [] as AgentSnapshot[]);
+    const agent = agents?.find((candidate) => candidate.id === agentId);
+    if (agent === undefined) {
+      await post("The bound agent is not available (it may have stopped).");
+      return result(false, { kind: "command", handled: false, detail: "agent not found" });
+    }
+    const key = deriveBindingKey(message, route);
+    const chosen = await store?.access.findConversationSelection({
+      organizationId: deps.organizationId,
+      channel: message.channel,
+      accountId: account.accountId,
+      externalConversationId: key.externalConversationId,
+      externalThreadId: key.externalThreadId,
+    });
+    // The route's own target, unless `/agent` moved the conversation off it.
+    const targetAgent =
+      chosen?.selectedAgent ?? (route.target.kind === "agent" ? route.target.agent : undefined);
+    const lines = [
+      `Agent: ${agent.title || agent.id} (${agent.provider})`,
+      ...(targetAgent === undefined ? [] : [`Route agent: ${targetAgent}`]),
+      `Status: ${agent.status}`,
+      `Model: ${agent.model ?? "n/a"}`,
+      `Working directory: ${agent.cwd}`,
+    ];
+    const pending = engineOpenPrompts(agentId);
+    if (pending.length > 0) lines.push(`Pending approvals: ${pending.length}`);
+    return replyOnlyOutcome(await post(lines.join("\n")), "status");
+  }
+
+  /**
+   * `/stop` — cancellation is a lifecycle RPC. Sending an empty message with
+   * activeTurnBehavior=interrupt would replace the turn with a new empty turn,
+   * which is observably different and can accidentally continue work.
+   */
+  async function stopBoundTurn(agentId: string, post: CommandReply): Promise<PlaneInboundResult> {
+    try {
+      await daemon?.cancelAgent(agentId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await post(`Stop request failed: ${errorMessage}`);
+      return result(false, { kind: "command", handled: false, detail: "stop failed" });
+    }
+    await post("⏹️ Stop requested — the running turn is being interrupted.");
+    return result(true, { kind: "command", handled: true, detail: "stop requested" });
+  }
+
+  /** The outcome of a command whose ONLY effect is its reply (`/help`,
+   * `/status`): undelivered is not handled, and the detail says so. */
+  function replyOnlyOutcome(delivered: boolean, detail: string): PlaneInboundResult {
+    return result(delivered, {
+      kind: "command",
+      handled: delivered,
+      detail: delivered ? detail : `${detail} reply not delivered`,
+    });
+  }
+
+  /**
+   * A session command against the captured Workflow route (`/stop`, `/help`).
+   *
+   * This branch never reaches the route selection below, so it runs the route's
+   * own `access:` gate itself: without it the branch handed session control to a
+   * sender the route refuses.
+   */
+  async function handleWorkflowTextCommand(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+    command: ChannelTextCommand,
+  ): Promise<PlaneInboundResult> {
+    const gated = await admitAccess(message, account, route);
+    return gated ?? (await handleTextCommand(message, account, route, command));
+  }
+
+  /**
+   * Run the route's `access:` gate. Returns the settled result when the sender
+   * is refused (or handed a pairing code), `undefined` when the message may
+   * continue. A refusal is recorded in channel activity with the family and the
+   * upstream reason code, and — only when the route authored `deniedReply` —
+   * answered; upstream refuses silently and so does this by default.
+   */
+  async function admitAccess(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    route: CompiledRoute,
+  ): Promise<PlaneInboundResult | undefined> {
+    if (route.defaults.access === undefined || store === undefined) return undefined;
+    const gated = await admitChannelAccess({
+      store: store.access,
+      organizationId: deps.organizationId,
+      account,
+      route,
+      message,
+    });
+    if (gated.kind === "allow") return undefined;
+    await postAccessRefusal(message, account, gated);
+    return recordChannelActivity(message, account, route, {
+      result: result(false, { kind: "ignored", reason: gated.reason }),
+      outcome: "denied",
+      outcomeDetail: `${gated.kind === "pairing" ? "pairing" : "denied"}:${gated.reasonCode}`,
+      limitDecision: "not_evaluated",
+    });
+  }
+
+  /** The one reply a refused sender may see. Absent = silence, as upstream. */
+  async function postAccessRefusal(
+    message: InboundMessage,
+    account: CompiledChannelAccount,
+    gated: ChannelAccessGateOutcome,
+  ): Promise<void> {
+    const text = gated.kind === "allow" ? undefined : gated.reply;
+    if (text === undefined) return;
+    const response = await deps.post({
+      channel: channelName(account),
+      accountId: account.accountId,
+      to: message.conversation.rootConversationId,
+      ...(message.conversation.threadId === null
+        ? {}
+        : { threadId: message.conversation.threadId }),
+      text,
+    });
+    if (!response.ok) {
+      logger.warn("channel access refusal reply failed", {
+        channel: account.channel,
+        accountId: account.accountId,
+        error: response.error,
+      });
     }
   }
 
@@ -1089,16 +1505,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): Promise<ChannelPrivilegeDecision> {
-    if (externalParticipantMayTrigger(message, route)) return { allowed: true };
-    if (mayTrigger(message.senderIdentity, deps.controlPlane, account, route))
-      return { allowed: true };
-    return (
-      (await deps.authorizeChannelUse?.({
-        organizationId: deps.organizationId,
-        account,
-        message,
-      })) ?? { allowed: false, reason: "sender may not trigger this route" }
-    );
+    return await mayUseChannelRoute({
+      ...(store === undefined ? {} : { store: store.access }),
+      organizationId: deps.organizationId,
+      controlPlane: deps.controlPlane,
+      account,
+      route,
+      message,
+      ...(deps.authorizeChannelUse === undefined
+        ? {}
+        : { authorizeChannelUse: deps.authorizeChannelUse }),
+    });
   }
 
   async function mayVerifiedMemberUseChannel(
@@ -1125,7 +1542,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     account: CompiledChannelAccount,
   ): InboundMessage {
     return {
-      channel: account.channel === "slack" ? "slack" : "telegram",
+      channel: channelName(account),
       accountId: account.accountId,
       senderIdentity: params.senderIdentity,
       text: "",
@@ -1256,6 +1673,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       relay?.detach(agentId);
       approvals?.detach(agentId);
     }
+  }
+
+  /** Let go of an agent the plane no longer speaks for: its stream stops
+   * reaching the relay and the approval engine, its liveness surface is
+   * released, and the daemon stops sending us its timeline. */
+  async function detachChannelAgent(agentId: string): Promise<void> {
+    relay?.detach(agentId);
+    approvals?.detach(agentId);
+    processing?.closeAgent(agentId);
+    routeExecutionLimiter?.completeAgent(agentId);
+    if (subscribed.delete(agentId)) await resubscribe();
   }
 
   /** The operator-visible detail of a channel answer (card click or typed
@@ -1430,8 +1858,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     await daemon.setTimelineSubscription([...subscribed]);
   }
 
-  function channelName(account: CompiledChannelAccount): P0ChannelName {
-    if (account.channel === "slack" || account.channel === "telegram") return account.channel;
+  function channelName(account: CompiledChannelAccount): SupportedChannelName {
+    if (isSupportedChannel(account.channel)) return account.channel;
     throw new Error(`unsupported Channel vertical: ${account.channel}`);
   }
 
@@ -1625,7 +2053,7 @@ function workflowOutputDelivery(
 
 function channelWorkflowOutput(value: unknown):
   | {
-      name: P0ChannelName;
+      name: SupportedChannelName;
       account_id: string;
       binding_key: string;
       external_conversation_id: string;

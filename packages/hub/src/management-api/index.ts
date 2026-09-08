@@ -1,6 +1,22 @@
 import { editableAutomationYaml } from "../triggers/configuration/workflow-document.js";
 import { configuredChannelDestinations } from "../channels/configured-destinations.js";
+import { ChannelAccessStore, type ChannelPairingRecord } from "../db/channel-access.js";
 import { channelTestPreview, CHANNEL_TEST_MESSAGE } from "../channels/test-message.js";
+import {
+  channelIngressListPage,
+  channelIngressPrune,
+  channelIngressPruneBodySchema,
+  channelIngressResubmit,
+  channelIngressResubmitBodySchema,
+  channelIngressStatusView,
+  parseChannelIngressListQuery,
+  withChannelIngressHealth,
+} from "./channel-ingress.js";
+import { channelIngressAccountKey } from "../channels/ingress/health.js";
+import type { SupportedChannelName } from "../channels/catalog.js";
+import { channelCatalogView } from "./channel-catalog.js";
+import { channelConfigurationRevisionList, channelControlPlaneView } from "./channel-plane-gate.js";
+import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 import {
   channelActivityPage,
   channelActivityView,
@@ -38,6 +54,11 @@ import {
 } from "../channels/http/operations.js";
 import type { ChannelSupervisor } from "../channels/supervisor/types.js";
 import {
+  qrLoginVerb,
+  QrLoginUnavailableError,
+  type QrLoginVerb,
+} from "../channels/supervisor/qr-login.js";
+import {
   CHANNELS_DIRECTORY,
   CHANNEL_POLICY_PATH,
   HUB_RESOURCE_PATH,
@@ -51,11 +72,22 @@ import {
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import * as schema from "../db/schema.js";
 import type {
+  ChannelBotIdentity,
   ChannelConfigurationRevisionRecord,
+  ChannelConnectionChannel,
   Database,
   OrganizationTriggerRecord,
   OrganizationTriggerRevisionRecord,
 } from "../db/types.js";
+import { configureDiscordConnection } from "../channels/connections/discord.js";
+import { configureFeishuConnection } from "../channels/connections/feishu.js";
+import { configureGoogleChatConnection } from "../channels/connections/googlechat.js";
+import { ChannelCredentialProbeError } from "../channels/connections/probe.js";
+import { configureZaloConnection } from "../channels/connections/zalo.js";
+import {
+  CHANNEL_CONNECTION_TABLE_ENTRIES,
+  type ChannelConnectionTable,
+} from "../db/channel-connections.js";
 import { reportFailure } from "../failures/index.js";
 import { AccessLeaseRevocation } from "../managed-access/revocation.js";
 import { AccessTicketError, AccessTicketService } from "../managed-access/tickets.js";
@@ -97,6 +129,11 @@ const channelAccountTestTargetSchema = z
     conversationId: z.string().trim().min(1),
     threadId: z.string().trim().min(1).optional(),
   })
+  .strict();
+/** The operator names the sender, not the code: the code is a handle the
+ * sender was shown so two strangers can be told apart, never an authority. */
+const channelPairingDecisionSchema = z
+  .object({ senderIdentity: z.string().trim().min(1).max(512) })
   .strict();
 const channelAccountTestRequestSchema = channelAccountTestTargetSchema.extend({
   expectedText: z.string().optional(),
@@ -153,11 +190,57 @@ const providerApplicationRequestSchema = z.discriminatedUnion("provider", [
     .strict(),
 ]);
 const connectionRequestSchema = z.union([
+  // The Channel Connections: the Hub owns the credential, there is no Provider
+  // Application. Discord's variant must precede the generic
+  // `provider + providerApplicationId` member below, which also accepts
+  // `provider: "discord"` for the upstream per-guild connection flow.
   z
     .object({
-      provider: z.literal("telegram"),
+      provider: z.enum(["telegram", "discord", "zalo"]),
       accountId: z.string().trim().min(1).max(128),
-      credentials: z.object({ botToken: z.string().trim().min(1) }).strict(),
+      credentials: z
+        .object({
+          botToken: z.string().trim().min(1),
+          /** Zalo webhook mode only. */
+          webhookSecret: z.string().trim().min(8).max(256).optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("feishu"),
+      accountId: z.string().trim().min(1).max(128),
+      credentials: z
+        .object({
+          appId: z.string().trim().min(1),
+          appSecret: z.string().trim().min(1),
+          verificationToken: z.string().trim().min(1).optional(),
+          encryptKey: z.string().trim().min(1).optional(),
+          domain: z.enum(["feishu", "lark"]).optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("googlechat"),
+      accountId: z.string().trim().min(1).max(128),
+      credentials: z
+        .object({
+          serviceAccount: z.string().trim().min(1).optional(),
+          serviceAccountFile: z.string().trim().min(1).optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("zalouser"),
+      accountId: z.string().trim().min(1).max(128),
+      // No secret: the Connection is a label plus the profile the QR session is
+      // stored under (packages/channels/zalouser/HUB-WIRING.md §5).
+      credentials: z.object({ profile: z.string().trim().min(1).max(128).optional() }).strict(),
     })
     .strict(),
   z
@@ -180,6 +263,13 @@ const connectionRequestSchema = z.union([
     })
     .strict(),
 ]);
+
+/** The Channel-Connection members of `connectionRequestSchema` (the ones with an
+ * `accountId`), as the store dispatch reads them. */
+type ChannelConnectionRequest = Extract<
+  z.infer<typeof connectionRequestSchema>,
+  { accountId: string }
+>;
 
 function providerApplicationConfiguration(
   input: z.infer<typeof providerApplicationRequestSchema>,
@@ -226,7 +316,18 @@ function providerApplicationConfiguration(
   throw new Error("unsupported Provider Application");
 }
 
-type ManagementConnectionProvider = "github" | "slack" | "discord" | "linear" | "telegram";
+/** The upstream provider Connections plus every Channel Connection owner. The
+ * Channel names come from the catalog, so a new in-repo vertical is listable as
+ * soon as it has a Connection table. */
+type ManagementConnectionProvider =
+  | "github"
+  | "slack"
+  | "discord"
+  | "linear"
+  | ChannelConnectionChannel;
+
+/** The Channel-owned Connection tables, in listing order (`db/channel-connections.ts`). */
+const CHANNEL_BOT_CONNECTION_TABLES = CHANNEL_CONNECTION_TABLE_ENTRIES;
 
 interface ManagementConnectionView {
   id: string;
@@ -323,16 +424,9 @@ export class ManagementApi {
     const access = await this.organizationAccess(request, organizationId);
     const resource = segments[2];
 
-    if (method === "GET" && segments.length === 3 && resource === "access-catalog") {
-      this.requireHubAction(access, "hub.access.manage");
-      return Response.json({
-        privileges: ACCESS_PRIVILEGES,
-        accessLevels: RESOURCE_ACCESS_LEVELS,
-        resources: await this.options.access.listResources(organizationId),
-      });
-    }
-    if (method === "GET" && segments.length === 3 && resource === "members") {
-      return this.listMembers(organizationId);
+    if (method === "GET" && segments.length === 3) {
+      const collection = await this.organizationCollection(resource, organizationId, access);
+      if (collection !== undefined) return collection;
     }
     if (resource === "teams") {
       return this.handleTeams(request, requestId, access, segments);
@@ -348,6 +442,9 @@ export class ManagementApi {
     }
     if (resource === "channel-activity") {
       return this.handleChannelActivity(request, requestId, access, segments);
+    }
+    if (resource === "channel-ingress") {
+      return this.handleChannelIngress(request, requestId, access, segments);
     }
     if (resource === "channel-accounts") {
       return this.handleChannelAccounts(request, requestId, access, segments);
@@ -365,6 +462,34 @@ export class ManagementApi {
       return this.handleDaemons(request, requestId, access, segments);
     }
     return problem(requestId, 404, "not_found", "No management resource matches this path.");
+  }
+
+  /**
+   * The organization's whole-collection reads: `GET /organizations/<id>/<name>`
+   * with nothing after the name. Undefined means "not one of these", so the
+   * caller falls through to the per-resource handlers.
+   */
+  private async organizationCollection(
+    resource: string | undefined,
+    organizationId: string,
+    access: OrganizationAccessValue,
+  ): Promise<Response | undefined> {
+    if (resource === "access-catalog") {
+      this.requireHubAction(access, "hub.access.manage");
+      return Response.json({
+        privileges: ACCESS_PRIVILEGES,
+        accessLevels: RESOURCE_ACCESS_LEVELS,
+        resources: await this.options.access.listResources(organizationId),
+      });
+    }
+    if (resource === "members") return this.listMembers(organizationId);
+    // The channel catalog is the same for every organization; the guard is what
+    // makes it organization-scoped (`management-api/channel-catalog.ts`).
+    if (resource === "channel-catalog") {
+      this.requireHubAction(access, "channel.manage");
+      return Response.json({ channels: channelCatalogView() });
+    }
+    return undefined;
   }
 
   private async handleTeams(
@@ -634,7 +759,7 @@ export class ManagementApi {
       return problem(requestId, 404, "not_found", "No management resource matches this path.");
     }
     if (request.method === "DELETE" && segments.length === 4) {
-      this.requireHubAction(access, "hub.configure");
+      this.requireConnectionMutation(access);
       this.requireMutation(request);
       return this.disconnectConnection(request, requestId, access, segments[3]!);
     }
@@ -642,29 +767,20 @@ export class ManagementApi {
       return problem(requestId, 404, "not_found", "No management resource matches this path.");
     }
     if (request.method === "POST") {
-      this.requireHubAction(access, "hub.configure");
+      this.requireConnectionMutation(access);
       this.requireMutation(request);
       const input = await parseBody(request, connectionRequestSchema);
-      if (input.provider === "telegram") {
-        const { connectionId } = await this.options.database.configureTelegramConnection({
-          organizationId: access.organization.id,
-          accountId: input.accountId,
-          botToken: input.credentials.botToken,
-        });
-        await this.restartChannelAccountsUsingConnection(access.organization.id, connectionId);
-        return Response.json(
-          {
-            id: connectionId,
-            provider: "telegram",
-            providerApplicationId: null,
-            name: input.accountId,
-            externalName: null,
-            status: "active",
-            consumers: [],
-          },
-          { status: 201 },
-        );
+      // `accountId` is unique to the token-native Channel Connection member;
+      // `provider` alone does not separate it from the generic
+      // `provider + providerApplicationId` member, which also accepts "discord".
+      if ("accountId" in input) {
+        // A channel bot credential is `channel.manage` authority, not
+        // `hub.configure`: it is a live token into an outside workspace and it
+        // is grantable on its own terms (see `requireHubAction`).
+        this.requireHubAction(access, "channel.manage");
+        return this.configureChannelConnection(requestId, access, input);
       }
+      this.requireHubAction(access, "hub.configure");
       if ("providerApplicationId" in input) {
         const applications = this.options.providerApplications;
         if (applications === null || applications === undefined) {
@@ -757,20 +873,182 @@ export class ManagementApi {
     });
   }
 
+  /**
+   * The organization's Channel-owned bot Connections. Discord appears under the
+   * `discord` provider name alongside the upstream per-guild connections: they
+   * are different installations of the same provider, told apart by id.
+   */
+  private async channelBotConnectionSummaries(
+    organizationId: string,
+  ): Promise<ManagementConnectionSummary[]> {
+    const summaries: ManagementConnectionSummary[] = [];
+    for (const [provider, table] of CHANNEL_BOT_CONNECTION_TABLES) {
+      const rows = await this.options.runtime
+        .drizzle()
+        .select({ id: table.id, name: table.accountId, identity: table.externalIdentity })
+        .from(table)
+        .where(eq(table.organizationId, organizationId))
+        .orderBy(asc(table.accountId));
+      for (const row of rows) {
+        summaries.push({
+          id: row.id,
+          provider,
+          providerApplicationId: null,
+          name: row.name,
+          externalName: externalIdentityLabel(row.identity),
+          status: "active",
+        });
+      }
+    }
+    return summaries;
+  }
+
+  /**
+   * Deletes a Channel-owned bot Connection and the identities linked to it,
+   * reporting whether the id belonged to one. The id decides, not the provider
+   * label: `discord` names both the upstream per-guild connection (which the
+   * provider lifecycle disconnects) and this Channel bot connection.
+   */
+  private async deleteChannelBotConnection(
+    organizationId: string,
+    connectionId: string,
+  ): Promise<boolean> {
+    const table = await this.channelBotConnectionOwner(organizationId, connectionId);
+    if (table === undefined) return false;
+    await this.options.runtime.transaction(async (transaction) => {
+      await transaction
+        .drizzle()
+        .delete(schema.channelIdentities)
+        .where(
+          and(
+            eq(schema.channelIdentities.organizationId, organizationId),
+            eq(schema.channelIdentities.connectionId, connectionId),
+          ),
+        );
+      await transaction
+        .drizzle()
+        .delete(table)
+        .where(and(eq(table.id, connectionId), eq(table.organizationId, organizationId)));
+    });
+    return true;
+  }
+
+  /** The Channel bot table that owns this Connection id, or `undefined` when no
+   * Channel table does (the id belongs to an upstream provider Connection). */
+  private async channelBotConnectionOwner(
+    organizationId: string,
+    connectionId: string,
+  ): Promise<ChannelConnectionTable | undefined> {
+    for (const [, table] of CHANNEL_BOT_CONNECTION_TABLES) {
+      const [owned] = await this.options.runtime
+        .drizzle()
+        .select({ id: table.id })
+        .from(table)
+        .where(and(eq(table.id, connectionId), eq(table.organizationId, organizationId)))
+        .limit(1);
+      if (owned !== undefined) return table;
+    }
+    return undefined;
+  }
+
+  /**
+   * The Channel Connections the Hub owns the credential for. Every one except
+   * Telegram is probed for its bot identity first, so a stored credential is
+   * always one the provider accepted and the connection can name its bot; a
+   * rejected credential is a 422 and an unreachable provider a 502.
+   */
+  private async configureChannelConnection(
+    requestId: string,
+    access: OrganizationAccessValue,
+    input: ChannelConnectionRequest,
+  ): Promise<Response> {
+    let configured: { connectionId: string; identity?: ChannelBotIdentity };
+    try {
+      configured = await this.storeChannelConnection(access.organization.id, input);
+    } catch (error) {
+      if (!(error instanceof ChannelCredentialProbeError)) throw error;
+      return problem(
+        requestId,
+        error.rejected ? 422 : 502,
+        "connection_unavailable",
+        error.message,
+      );
+    }
+    await this.restartChannelAccountsUsingConnection(
+      access.organization.id,
+      configured.connectionId,
+    );
+    return Response.json(
+      {
+        id: configured.connectionId,
+        provider: input.provider,
+        providerApplicationId: null,
+        name: input.accountId,
+        externalName: externalIdentityLabel(configured.identity),
+        status: "active",
+        consumers: [],
+      },
+      { status: 201 },
+    );
+  }
+
+  /** One channel's credential into its Connection owner, probe included. */
+  private async storeChannelConnection(
+    organizationId: string,
+    input: ChannelConnectionRequest,
+  ): Promise<{ connectionId: string; identity?: ChannelBotIdentity }> {
+    const { database } = this.options;
+    const accountId = input.accountId;
+    if (input.provider === "feishu") {
+      return await configureFeishuConnection(database, {
+        organizationId,
+        accountId,
+        credential: input.credentials,
+      });
+    }
+    if (input.provider === "googlechat") {
+      return await configureGoogleChatConnection(database, {
+        organizationId,
+        accountId,
+        ...input.credentials,
+      });
+    }
+    if (input.provider === "discord") {
+      return await configureDiscordConnection(database, {
+        organizationId,
+        accountId,
+        botToken: input.credentials.botToken,
+      });
+    }
+    if (input.provider === "zalouser") {
+      return await database.configureChannelConnection({
+        organizationId,
+        channel: "zalouser",
+        accountId,
+        credentials: { profile: input.credentials.profile ?? accountId },
+      });
+    }
+    if (input.provider === "zalo") {
+      return await configureZaloConnection(database, {
+        organizationId,
+        accountId,
+        botToken: input.credentials.botToken,
+        webhookSecret: input.credentials.webhookSecret,
+      });
+    }
+    return await database.configureChannelConnection({
+      organizationId,
+      channel: "telegram",
+      accountId,
+      credentials: { botToken: input.credentials.botToken },
+    });
+  }
+
   private async connectionViews(
     organizationId: string,
   ): Promise<readonly ManagementConnectionView[]> {
     const usage = await this.options.database.organizationConnectionUsage(organizationId);
-    const telegram = await this.options.runtime
-      .drizzle()
-      .select({
-        id: schema.telegramConnections.id,
-        name: schema.telegramConnections.accountId,
-        identity: schema.telegramConnections.externalIdentity,
-      })
-      .from(schema.telegramConnections)
-      .where(eq(schema.telegramConnections.organizationId, organizationId))
-      .orderBy(asc(schema.telegramConnections.accountId));
+    const channelBots = await this.channelBotConnectionSummaries(organizationId);
     const connections: ManagementConnectionSummary[] = [
       ...usage.github.map(
         (connection): ManagementConnectionSummary => ({
@@ -812,16 +1090,7 @@ export class ManagementApi {
           status: "active",
         }),
       ),
-      ...telegram.map(
-        (connection): ManagementConnectionSummary => ({
-          id: connection.id,
-          provider: "telegram",
-          providerApplicationId: null,
-          name: connection.name,
-          externalName: externalIdentityLabel(connection.identity),
-          status: "active",
-        }),
-      ),
+      ...channelBots,
     ];
     const consumers = await connectionConsumersById({
       database: this.options.database,
@@ -867,28 +1136,25 @@ export class ManagementApi {
     if (connection.consumers.length > 0) {
       return connectionInUseProblem(requestId, connection.consumers);
     }
-    if (connection.provider === "telegram") {
-      await this.options.runtime.transaction(async (transaction) => {
-        await transaction
-          .drizzle()
-          .delete(schema.channelIdentities)
-          .where(
-            and(
-              eq(schema.channelIdentities.organizationId, access.organization.id),
-              eq(schema.channelIdentities.connectionId, connectionId),
-            ),
-          );
-        await transaction
-          .drizzle()
-          .delete(schema.telegramConnections)
-          .where(
-            and(
-              eq(schema.telegramConnections.organizationId, access.organization.id),
-              eq(schema.telegramConnections.id, connectionId),
-            ),
-          );
-      });
-    } else {
+    // Which capability answers for this id is only known once the id is
+    // resolved: a Channel bot Connection is `channel.manage`, every other
+    // Connection is `hub.configure`.
+    this.requireHubAction(
+      access,
+      (await this.channelBotConnectionOwner(access.organization.id, connectionId)) === undefined
+        ? "hub.configure"
+        : "channel.manage",
+    );
+    if (!(await this.deleteChannelBotConnection(access.organization.id, connectionId))) {
+      // A Channel Connection id that no Channel table owns is simply gone; only
+      // the upstream provider Connections have a lifecycle to disconnect. The
+      // `discord` and `slack` labels are shared with the Channel plane, so the
+      // ID decides which owner it was (see `deleteChannelBotConnection`).
+      if (connection.provider !== "github" && connection.provider !== "linear") {
+        if (connection.provider !== "discord" && connection.provider !== "slack") {
+          return problem(requestId, 404, "connection_unavailable", "Connection is unavailable.");
+        }
+      }
       const disconnect = this.options.disconnectProviderConnection;
       if (disconnect === undefined) {
         return problem(
@@ -941,7 +1207,8 @@ export class ManagementApi {
     }
     this.requireHubAction(access, "channel.manage");
     if (isRevisionList) {
-      const revisions = await this.options.database.listChannelConfigurationRevisions(
+      const revisions = await channelConfigurationRevisionList(
+        this.options.database,
         access.organization.id,
         50,
       );
@@ -949,7 +1216,7 @@ export class ManagementApi {
         revisions: revisions.map((revision) => channelRevisionSummary(revision)),
       });
     }
-    const snapshot = await loadChannelControlPlane(this.options.database, access.organization.id);
+    const snapshot = await channelControlPlaneView(this.options.database, access.organization.id);
     if (request.method === "GET") {
       return Response.json(channelConfigurationView(snapshot));
     }
@@ -1006,7 +1273,7 @@ export class ManagementApi {
         }),
     });
     const reconciliation = await this.options.channelSupervisor?.reconcile();
-    const active = await loadChannelControlPlane(this.options.database, access.organization.id);
+    const active = await channelControlPlaneView(this.options.database, access.organization.id);
     return Response.json({
       ...channelConfigurationView(active),
       reconciliation: reconciliation ?? null,
@@ -1032,6 +1299,46 @@ export class ManagementApi {
     );
   }
 
+  /**
+   * The durable ingress queue's operator surface: depth (`hub.channels.ingress.status`),
+   * a redacted page of rows (`.list`), dead-letter recovery (`.resubmit`), and an
+   * explicit retention pass (`.prune`). Same `channel.manage` authority as the
+   * rest of the channel control plane, same organization scope.
+   */
+  private async handleChannelIngress(
+    request: Request,
+    requestId: string,
+    access: OrganizationAccessValue,
+    segments: readonly string[],
+  ): Promise<Response> {
+    this.requireHubAction(access, "channel.manage");
+    const organizationId = access.organization.id;
+    const operation = segments[3];
+    if (request.method === "GET" && segments.length === 3) {
+      return Response.json(await channelIngressStatusView(this.options.runtime, organizationId));
+    }
+    if (request.method === "GET" && operation === "events" && segments.length === 4) {
+      return Response.json(
+        await channelIngressListPage(
+          this.options.runtime,
+          organizationId,
+          parseChannelIngressListQuery(new URL(request.url).searchParams),
+        ),
+      );
+    }
+    if (request.method === "POST" && operation === "resubmit" && segments.length === 4) {
+      this.requireMutation(request);
+      const { ids } = await parseBody(request, channelIngressResubmitBodySchema);
+      return Response.json(await channelIngressResubmit(this.options.runtime, organizationId, ids));
+    }
+    if (request.method === "POST" && operation === "prune" && segments.length === 4) {
+      this.requireMutation(request);
+      const body = await parseBody(request, channelIngressPruneBodySchema);
+      return Response.json(await channelIngressPrune(this.options.runtime, organizationId, body));
+    }
+    return problem(requestId, 404, "not_found", "No management resource matches this path.");
+  }
+
   private async handleChannelAccounts(
     request: Request,
     requestId: string,
@@ -1047,7 +1354,7 @@ export class ManagementApi {
     }
     this.requireHubAction(access, "channel.manage");
     if (request.method !== "GET") this.requireMutation(request);
-    const channel = z.enum(["slack", "telegram"]).safeParse(segments[3]);
+    const channel = SupportedChannelNameSchema.safeParse(segments[3]);
     if (!channel.success) {
       return problem(
         requestId,
@@ -1057,7 +1364,7 @@ export class ManagementApi {
       );
     }
     const accountId = segments[4];
-    const snapshot = await loadChannelControlPlane(this.options.database, access.organization.id);
+    const snapshot = await channelControlPlaneView(this.options.database, access.organization.id);
     const account = snapshot.controlPlane.accounts.find(
       (candidate) => candidate.channel === channel.data && candidate.accountId === accountId,
     );
@@ -1069,46 +1376,81 @@ export class ManagementApi {
         "Channel account is unavailable.",
       );
     }
+    return this.channelAccountOperationResponse({
+      request,
+      requestId,
+      access,
+      operation,
+      channel: channel.data,
+      accountId,
+      account,
+      revisionId: snapshot.revision?.id ?? null,
+    });
+  }
+
+  /** One resolved account's operation. Split from the routing preamble above so
+   * each half stays readable: that one decides WHICH account, this one WHAT. */
+  private async channelAccountOperationResponse(input: {
+    request: Request;
+    requestId: string;
+    access: OrganizationAccessValue;
+    operation: ChannelAccountOperation;
+    channel: SupportedChannelName;
+    accountId: string;
+    account: CompiledChannelAccount;
+    revisionId: string | null;
+  }): Promise<Response> {
+    const { request, requestId, access, operation, channel, accountId, account } = input;
     if (operation === "activity") {
       return Response.json(
-        await channelActivityView(
-          this.options.runtime,
-          access.organization.id,
-          channel.data,
-          accountId,
-        ),
+        await channelActivityView(this.options.runtime, access.organization.id, channel, accountId),
       );
     }
     if (operation === "conversations") {
-      return this.listChannelAccountConversations(access, channel.data, accountId, account);
+      return this.listChannelAccountConversations(access, channel, accountId, account);
     }
     if (operation === "test-preview") {
       return this.previewChannelAccountTest(
         request,
         access,
-        channel.data,
+        channel,
         accountId,
         account,
-        snapshot.revision?.id ?? null,
+        input.revisionId,
       );
     }
-    if (operation === "retry") {
-      return this.retryChannelAccount(requestId, channel.data, accountId);
+    if (
+      operation === "pairing" ||
+      operation === "pairing:approve" ||
+      operation === "pairing:deny"
+    ) {
+      return this.channelAccountPairing(request, requestId, access, channel, accountId, operation);
     }
-    return this.testChannelAccount(
-      request,
+    if (operation === "retry") return this.retryChannelAccount(requestId, channel, accountId);
+    if (operation === "test") {
+      return this.testChannelAccount(
+        request,
+        requestId,
+        channel,
+        accountId,
+        account,
+        input.revisionId,
+      );
+    }
+    return this.runChannelAccountQrLogin(
       requestId,
-      channel.data,
+      access.organization.id,
+      channel,
       accountId,
       account,
-      snapshot.revision?.id ?? null,
+      operation.slice("qr:".length) as QrLoginVerb,
     );
   }
 
   private async previewChannelAccountTest(
     request: Request,
     access: OrganizationAccessValue,
-    channel: "slack" | "telegram",
+    channel: SupportedChannelName,
     accountId: string,
     account: CompiledChannelAccount,
     revisionId: string | null,
@@ -1149,7 +1491,7 @@ export class ManagementApi {
 
   private async configuredMetadataRoot(
     organizationId: string,
-    channel: "slack" | "telegram",
+    channel: SupportedChannelName,
     account: CompiledChannelAccount,
     input: { conversationId: string; threadId?: string | undefined },
   ): Promise<boolean> {
@@ -1182,24 +1524,66 @@ export class ManagementApi {
     );
   }
 
+  /**
+   * One QR-login verb. The account only has to be CONFIGURED, not running:
+   * linking is what an unlinked account needs before its transport can start.
+   * The response carries the code and the login state, never session bytes
+   * (`channels/supervisor/qr-login.ts`).
+   */
+  private async runChannelAccountQrLogin(
+    requestId: string,
+    organizationId: string,
+    channel: SupportedChannelName,
+    accountId: string,
+    account: CompiledChannelAccount,
+    verb: QrLoginVerb,
+  ): Promise<Response> {
+    const qrLogin = this.options.channelSupervisor?.qrLogin;
+    if (this.options.channelSupervisor == null || qrLogin === undefined) {
+      return problem(requestId, 503, "channel_runtime_unavailable", "Channel runtime is offline.");
+    }
+    try {
+      return Response.json(
+        await qrLogin.call(this.options.channelSupervisor, {
+          organizationId,
+          channel,
+          accountId,
+          compiled: account,
+          verb,
+        }),
+      );
+    } catch (error) {
+      if (error instanceof QrLoginUnavailableError) {
+        return problem(requestId, 422, "qr_login_unsupported", error.message);
+      }
+      throw error;
+    }
+  }
+
   private async channelAccountStatus(access: OrganizationAccessValue): Promise<Response> {
     this.requireHubAction(access, "channel.manage");
-    const snapshot = await loadChannelControlPlane(this.options.database, access.organization.id);
+    const snapshot = await channelControlPlaneView(this.options.database, access.organization.id);
     const configured = new Set(
-      snapshot.controlPlane.accounts.map(({ channel, accountId }) => `${channel}\0${accountId}`),
+      snapshot.controlPlane.accounts.map(({ channel, accountId }) =>
+        channelIngressAccountKey(channel, accountId),
+      ),
     );
+    const ingress = await channelIngressStatusView(this.options.runtime, access.organization.id);
+    const running =
+      this.options.channelSupervisor
+        ?.status()
+        .filter(({ channel, account }) =>
+          configured.has(channelIngressAccountKey(channel, account)),
+        ) ?? [];
     return Response.json({
       runtimeAvailable: this.options.channelSupervisor !== null,
-      accounts:
-        this.options.channelSupervisor
-          ?.status()
-          .filter(({ channel, account }) => configured.has(`${channel}\0${account}`)) ?? [],
+      accounts: withChannelIngressHealth(running, ingress),
     });
   }
 
   private async listChannelAccountConversations(
     access: OrganizationAccessValue,
-    channel: "slack" | "telegram",
+    channel: SupportedChannelName,
     accountId: string,
     account: CompiledChannelAccount,
   ): Promise<Response> {
@@ -1231,9 +1615,41 @@ export class ManagementApi {
     });
   }
 
+  /**
+   * The operator half of `access.dmPolicy: pairing`: list who is waiting, then
+   * approve or deny one sender. Approval adds them to the account's allowlist
+   * (the plane merges `channel_pairings` into `allowFrom` through upstream's
+   * own `mergeDmAllowFromSources`), so this is the only write in the flow.
+   */
+  private async channelAccountPairing(
+    request: Request,
+    requestId: string,
+    access: OrganizationAccessValue,
+    channel: SupportedChannelName,
+    accountId: string,
+    operation: "pairing" | "pairing:approve" | "pairing:deny",
+  ): Promise<Response> {
+    const store = new ChannelAccessStore(this.options.runtime.drizzle());
+    const key = { organizationId: access.organization.id, channel, accountId };
+    if (operation === "pairing") {
+      return Response.json({ pairings: (await store.listPairings(key)).map(serializePairing) });
+    }
+    const input = await parseBody(request, channelPairingDecisionSchema);
+    const decided = await store.decidePairing({
+      ...key,
+      senderIdentity: input.senderIdentity,
+      decision: operation === "pairing:approve" ? "approved" : "denied",
+      decidedByUserId: access.account.id,
+    });
+    if (decided === undefined) {
+      return problem(requestId, 404, "not_found", "No pairing request from that sender.");
+    }
+    return Response.json(serializePairing(decided));
+  }
+
   private async retryChannelAccount(
     requestId: string,
-    channel: "slack" | "telegram",
+    channel: SupportedChannelName,
     accountId: string,
   ): Promise<Response> {
     if (this.options.channelSupervisor === null) {
@@ -1254,7 +1670,7 @@ export class ManagementApi {
   private async testChannelAccount(
     request: Request,
     requestId: string,
-    channel: "slack" | "telegram",
+    channel: SupportedChannelName,
     accountId: string,
     account: CompiledChannelAccount,
     revisionId: string | null,
@@ -1766,7 +2182,24 @@ export class ManagementApi {
     if (rejected !== undefined) throw new ManagementResponse(rejected);
   }
 
-  /** Maps semantic Hub actions onto the current fixed BetterAuth role capabilities. */
+  /**
+   * Maps semantic Hub actions onto organization capabilities. `channel.manage`
+   * has its own (`manageChannels`) rather than aliasing `manageResources`: a
+   * channel account is a live credential to an outside workspace and its
+   * backlog holds message content, so it is grantable on its own terms.
+   */
+  /**
+   * The outer gate on a Connection mutation. Which of the two capabilities the
+   * request actually needs is only known after its body is parsed (POST) or its
+   * id is resolved (DELETE), so this keeps a member with neither from probing
+   * Connection ids through the answers on the way there.
+   */
+  private requireConnectionMutation(access: OrganizationAccessValue): void {
+    if (!access.capabilities.manageResources && !access.capabilities.manageChannels) {
+      throw new ProductRequestError(403, "forbidden");
+    }
+  }
+
   private requireHubAction(
     access: OrganizationAccessValue,
     action: "hub.configure" | "hub.access.manage" | "channel.manage",
@@ -1774,7 +2207,7 @@ export class ManagementApi {
     const permitted = {
       "hub.configure": access.capabilities.manageResources,
       "hub.access.manage": access.capabilities.manageResources,
-      "channel.manage": access.capabilities.manageResources,
+      "channel.manage": access.capabilities.manageChannels,
     }[action];
     if (!permitted) {
       throw new ProductRequestError(403, "forbidden");
@@ -2103,17 +2536,68 @@ function problem(requestId: string, status: number, error: string, message: stri
   return Response.json({ error, message, requestId }, { status });
 }
 
+/** Every per-account operation the management contract routes. `qr:*` is the
+ * QR login (`channels/supervisor/qr-login.ts`); the rest are the pre-existing
+ * conversation, activity and test verbs. */
+type ChannelAccountOperation =
+  | "conversations"
+  | "activity"
+  | "retry"
+  | "test"
+  | "test-preview"
+  | "pairing"
+  | "pairing:approve"
+  | "pairing:deny"
+  | `qr:${QrLoginVerb}`;
+
 function channelAccountOperation(
   request: Request,
   segments: readonly string[],
-): "conversations" | "activity" | "retry" | "test" | "test-preview" | undefined {
+): ChannelAccountOperation | undefined {
+  if (segments.length === 7 && request.method === "POST") {
+    return channelAccountSubOperation(segments[5], segments[6]);
+  }
   if (segments.length !== 6) return undefined;
+  if (request.method === "GET" && segments[5] === "pairing") return "pairing";
   if (request.method === "GET" && segments[5] === "conversations") return "conversations";
   if (request.method === "GET" && segments[5] === "activity") return "activity";
   if (request.method === "GET" && segments[5] === "test-preview") return "test-preview";
   if (request.method === "POST" && segments[5] === "retry") return "retry";
   if (request.method === "POST" && segments[5] === "test") return "test";
   return undefined;
+}
+
+function serializePairing(record: ChannelPairingRecord) {
+  return {
+    channel: record.channel,
+    accountId: record.accountId,
+    senderIdentity: record.senderIdentity,
+    senderName: record.senderName,
+    code: record.code,
+    status: record.status,
+    externalConversationId: record.externalConversationId,
+    decidedAt: record.decidedAt?.toISOString() ?? null,
+    createdAt: record.createdAt.toISOString(),
+  };
+}
+
+/**
+ * The two-segment operations: `.../qr/<verb>` — the QR login the app drives
+ * while a code is on screen, every verb a POST because `poll` advances the
+ * vertical's login state machine — and `.../pairing/<approve|deny>`, the
+ * operator half of `access.dmPolicy: pairing`.
+ */
+function channelAccountSubOperation(
+  group: string | undefined,
+  verb: string | undefined,
+): ChannelAccountOperation | undefined {
+  if (group === "pairing") {
+    if (verb === "approve") return "pairing:approve";
+    return verb === "deny" ? "pairing:deny" : undefined;
+  }
+  if (group !== "qr") return undefined;
+  const login = qrLoginVerb(verb);
+  return login === undefined ? undefined : `qr:${login}`;
 }
 
 function delegationPrincipal(access: OrganizationAccessValue) {

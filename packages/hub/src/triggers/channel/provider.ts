@@ -2,6 +2,7 @@ import { z } from "zod";
 import { parseCompiledHubConfig } from "../../config/compiler.js";
 import type { Database } from "../../db/types.js";
 import type { CompiledRoute } from "../../channels/config/compile.js";
+import { SupportedChannelNameSchema } from "../../channels/config/enums.js";
 import { parseInvocation } from "../invocation.js";
 import type { TriggerProvider, TriggerProviderMatch } from "../index.js";
 
@@ -9,7 +10,7 @@ export const ChannelWorkflowRequestPayloadSchema = z.object({
   workflow: z.string().min(1),
   text: z.string(),
   channel: z.object({
-    name: z.enum(["slack", "telegram"]),
+    name: SupportedChannelNameSchema,
     account_id: z.string().min(1),
     binding_key: z.string().min(1),
     external_conversation_id: z.string().min(1),

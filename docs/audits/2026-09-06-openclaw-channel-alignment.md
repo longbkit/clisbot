@@ -1,6 +1,6 @@
 # Slack / Telegram: mức khớp với OpenClaw ngày 2026-09-06
 
-Mode: `architect / plan`. CURRENT: audit working tree, không sửa code sản phẩm. TARGET: giữ tối đa code và invariant của OpenClaw ở phần giao tiếp nền tảng; Hub tiếp tục sở hữu policy và agent execution.
+Mode: `architect / implementation follow-up`. The measurements below remain the 2026-09-06 source baseline; the implementation checkpoint after that audit is recorded explicitly in the runtime strategy. TARGET: giữ tối đa code và invariant của OpenClaw ở phần giao tiếp nền tảng; Hub tiếp tục sở hữu policy và agent execution.
 
 **Kết luận:** Slack hiện là implementation riêng lấy OpenClaw làm tham chiếu; Telegram là implementation rút gọn, giữ lại nhiều nhất ở HTML utilities. Không nên mô tả hai package là một vendor copy chỉ có vài patch. Điểm cần ưu tiên là reliability và khả năng sync lại, không phải tăng phần trăm bằng cách chép thêm tính năng không dùng.
 
@@ -77,9 +77,13 @@ Những phần Telegram còn gần source nhất:
 
 ## 5. CURRENT / GAP: những khác biệt cần ưu tiên
 
+### Implementation update after the measured baseline
+
+The audit snapshot described a ledger-only path. The current working tree now has a Hub-owned `channel_ingress_queue` and supervisor drain: normalized payload is persisted before Slack message/app-mention ACK or Telegram offset advancement; claims are organization-scoped and fenced by token/lease, lane selection is protected by a transaction advisory lock, stale claims can be recovered, and an active claim can refresh its lease. The existing ledger remains an audit join. These changes reduce the P1 admission/replay gap but do not make the whole channel implementation upstream-equivalent: retry disposition, operator resubmit/prune, and full upstream drain lifecycle are still open.
+
 ### P1 — Durable ingress và replay không tương đương, có đường mất xử lý tin
 
-CURRENT local:
+Measured baseline (before the checkpoint above):
 
 - Slack `transport/socket-mode.ts`: `onMessage`/`onAppMention` gọi `ackSafe` trước `handleEnvelope`, media download và ledger admission.
 - Shared `monitor.ts`: nhớ event ID trước write/handoff; ledger `created: false` bị drop bất kể tin đã consumed hay chỉ recorded. Handoff lỗi bị log và trả `dispatched: false`.
@@ -90,7 +94,7 @@ Reference giữ durable admission trước ACK: Slack `monitor/ingress.ts:accept
 
 **Probe cô lập đã xác nhận:** handoff lỗi lần đầu → `handoff fault`; tạo processor mới mô phỏng restart với cùng ledger → `ledger replay`, số handoff vẫn 1. Poll có `onEvent` throw vẫn ghi offset 10. Xem [probes.json](2026-09-06-openclaw-channel-alignment/probes.json). Đây là failure path trong code, chưa phải khẳng định đã xảy ra mất tin trên production.
 
-TARGET: Hub sở hữu durable payload admission/retry/claim; channel xác nhận sau admission. Không cần kéo toàn bộ agent/session engine của OpenClaw về để giữ invariant này. Ưu tiên crash-window/restart-replay contract trước khi tối ưu phần trăm source.
+TARGET/current direction: Hub sở hữu durable payload admission/retry/claim; channel xác nhận sau admission. Không cần kéo toàn bộ agent/session engine của OpenClaw về để giữ invariant này. Ưu tiên crash-window/restart-replay contract trước khi tối ưu phần trăm source.
 
 ### P1 — Telegram poll mất phân loại lỗi; outbound retry rộng hơn upstream
 
@@ -169,7 +173,7 @@ Khả năng merge: audit không đổi code nên không làm tăng conflict vớ
 - [per-file.csv](2026-09-06-openclaw-channel-alignment/per-file.csv): từng file và source match mạnh nhất. `best_reference` là nơi tìm thấy block trùng mạnh nhất, không phải tuyên bố file đó chỉ có một nguồn.
 - [slack-numstat.tsv](2026-09-06-openclaw-channel-alignment/slack-numstat.tsv), [telegram-numstat.tsv](2026-09-06-openclaw-channel-alignment/telegram-numstat.tsv): raw path-level diff. Đường dẫn `/tmp/.../snapshot/` là snapshot đo, không phải source production bị sửa.
 - [probes.json](2026-09-06-openclaw-channel-alignment/probes.json): execution cô lập ba nhóm failure cases, fake poll, memory ledger; không mạng/credential/DB/live agent.
-- Script đo và probe tại `/tmp/channel-upstream-audit-20260906/{measure,probes}.cjs`; production snapshots tại `/tmp/channel-upstream-audit-20260906/snapshot/`. Output bền vững được lưu cùng audit này. Không commit/push, không restart daemon, không chạy full suite. Không sửa code sản phẩm; audit không chứng minh production runtime/build hiện đang chạy đúng các bytes source này.
+- Script đo và probe tại `/tmp/channel-upstream-audit-20260906/{measure,probes}.cjs`; production snapshots tại `/tmp/channel-upstream-audit-20260906/snapshot/`. Output bền vững được lưu cùng audit này. Không commit/push, không restart daemon, không chạy full suite. Snapshot này không chứng minh production runtime/build hiện đang chạy đúng các bytes source; implementation checkpoint và các test mới phải được đánh giá riêng.
 
 Đã kiểm tra lại SHA-256 của toàn bộ 46 file production local: nội dung không đổi trong lúc đo. Functional-parity percentage vẫn chưa xác định: cần quyết định tập capability + trọng số + chạy đối chiếu hành vi, không suy ra từ LOC.
 

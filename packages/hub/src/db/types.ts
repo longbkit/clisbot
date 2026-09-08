@@ -5,12 +5,14 @@ import type {
   AgentExecutionStatus,
   ChannelLedgerDirection,
   DeliveryLedgerStatus,
+  ChannelIngressQueueStatus,
   MachineSource,
   MachineStatus,
   ThreadBindingStatus,
 } from "./schema.js";
 import type { JsonValue } from "../config/compiler.js";
 import type { HubBundleFile } from "../config/bundle-contract.js";
+import type { SupportedChannelName } from "../channels/catalog.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { InvocationRejection } from "../triggers/invocation.js";
 import type { ProviderEventDropReasonCode } from "../triggers/drop-reason.js";
@@ -1636,17 +1638,103 @@ export interface Database {
     guildId: string,
   ): Promise<DiscordConnectionRecord | undefined>;
   removeDiscordConnection(guildId: string): Promise<void>;
-  configureTelegramConnection(input: {
-    organizationId: string;
-    accountId: string;
-    botToken: string;
-  }): Promise<{ connectionId: string }>;
+  configureChannelConnection(
+    input: ConfigureChannelConnectionInput,
+  ): Promise<{ connectionId: string }>;
   resolveChannelConnection(input: {
     organizationId: string;
-    channel: "slack" | "telegram";
+    channel: SupportedChannelName;
     connectionId: string;
-  }): Promise<{ botToken: string; appToken?: string; providerApplicationId?: string } | undefined>;
+  }): Promise<ChannelConnectionCredentials | undefined>;
+  /** Every encrypted keyed-store namespace stored for one channel account. */
+  loadChannelStateSecrets(input: ChannelStateSecretScope): Promise<ChannelStateSecretRecord[]>;
+  /** Replace one namespace's sealed snapshot (insert or update). */
+  saveChannelStateSecret(
+    input: ChannelStateSecretScope & { namespace: string; entries: unknown },
+  ): Promise<void>;
+  /** Drop every namespace for one account — account removal and unlink. */
+  deleteChannelStateSecrets(input: ChannelStateSecretScope): Promise<void>;
   close(): Promise<void>;
+}
+
+/**
+ * The channels whose credential the Hub owns in its own Connection table.
+ * Slack is absent on purpose: its credential belongs to the upstream Slack
+ * Connection plus its owning Provider Application.
+ */
+export type ChannelConnectionChannel = Extract<
+  SupportedChannelName,
+  "telegram" | "discord" | "zalo" | "zalouser" | "feishu" | "googlechat"
+>;
+
+/** The bot identity a credential probe recorded. Never carries credential material. */
+export interface ChannelBotIdentity {
+  /** Provider-side bot user id. */
+  id: string;
+  username?: string;
+  /** Discord application id; absent for channels without one. */
+  applicationId?: string;
+  /** When the credential last probed successfully (ISO 8601). */
+  probedAt: string;
+}
+
+/**
+ * What one channel Connection carries, keyed by the CARRIER FIELD NAME the
+ * vertical reads (`supervisor/account-carriers.ts`). Every field is optional
+ * because a credential is a different thing per channel: a bot token (Telegram,
+ * Discord, Zalo), a bot token plus a Socket Mode app token (Slack), a four-field
+ * app credential (Feishu), a service-account document (Google Chat), or — for
+ * Zalo Personal — no secret at all, only the profile that names a QR session.
+ */
+export interface ChannelConnectionCredentials {
+  botToken?: string | undefined;
+  /** Slack Socket Mode app token. */
+  appToken?: string | undefined;
+  /** Zalo's `x-bot-api-secret-token` value (webhook mode). */
+  webhookSecret?: string | undefined;
+  /** Feishu custom-app credential. */
+  appId?: string | undefined;
+  appSecret?: string | undefined;
+  verificationToken?: string | undefined;
+  encryptKey?: string | undefined;
+  /** Google Chat service-account JSON, inline or by absolute path. */
+  serviceAccount?: string | undefined;
+  serviceAccountFile?: string | undefined;
+  /** Zalo Personal's credential profile — the ONLY non-secret member of this
+   * vocabulary. That channel has no operator secret at all: the profile names
+   * the QR session, and the session bytes rest in the encrypted keyed-store
+   * namespace (`channels/state/encrypted-namespaces.ts`), never here. */
+  profile?: string | undefined;
+  /** Slack only: the Provider Application the bot credential belongs to. */
+  providerApplicationId?: string | undefined;
+}
+
+/**
+ * The owner of one encrypted keyed-store namespace: an organization's channel
+ * account. Every read, write and delete is scoped by all three, and the cipher
+ * binds the same triple (plus the namespace) into the envelope's AAD, so a row
+ * copied to another organization does not decrypt.
+ */
+export interface ChannelStateSecretScope {
+  organizationId: string;
+  channel: SupportedChannelName;
+  accountId: string;
+}
+
+/** One namespace's decrypted snapshot. `entries` is opaque to the Hub — the
+ * keyed store owns its shape; the Hub only seals and unseals it. */
+export interface ChannelStateSecretRecord {
+  namespace: string;
+  entries: unknown;
+}
+
+export interface ConfigureChannelConnectionInput {
+  organizationId: string;
+  channel: ChannelConnectionChannel;
+  accountId: string;
+  /** The credential fields to seal into the envelope, by carrier field name. */
+  credentials: ChannelConnectionCredentials;
+  identity?: ChannelBotIdentity;
 }
 
 // --- Channel control plane (P0: Slack + Telegram) -------------------------------------
@@ -1660,7 +1748,7 @@ export interface Database {
 export interface ThreadBindingRecord {
   id: string;
   organizationId: string;
-  channel: "slack" | "telegram";
+  channel: SupportedChannelName;
   accountId: string;
   externalConversationId: string;
   externalThreadId: string | null;
@@ -1676,7 +1764,7 @@ export interface ThreadBindingRecord {
 
 export interface PendingThreadBindingInput {
   organizationId: string;
-  channel: "slack" | "telegram";
+  channel: SupportedChannelName;
   accountId: string;
   externalConversationId: string;
   externalThreadId: string | null;
@@ -1719,7 +1807,7 @@ export interface AbandonThreadBindingInput {
 export interface DeliveryLedgerRecord {
   id: string;
   organizationId: string;
-  channel: "slack" | "telegram";
+  channel: SupportedChannelName;
   accountId: string;
   direction: ChannelLedgerDirection;
   externalConversationId: string;
@@ -1738,7 +1826,7 @@ export interface DeliveryLedgerRecord {
 
 export interface RecordDeliveryInput {
   organizationId: string;
-  channel: "slack" | "telegram";
+  channel: SupportedChannelName;
   accountId: string;
   externalConversationId: string;
   externalThreadId: string | null;
@@ -1778,7 +1866,7 @@ export type RecordDeliveryResult =
  * key: (channel, account, external conversation, external message id). */
 export interface RecordInboundInput {
   organizationId: string;
-  channel: "slack" | "telegram";
+  channel: SupportedChannelName;
   accountId: string;
   externalConversationId: string;
   externalMessageId: string;
@@ -1797,4 +1885,169 @@ export interface ConsumeInboundInput {
   externalMessageId: string;
   turnId: string;
   consumedAt: Date;
+}
+
+/** Durable normalized channel ingress envelope. Payload is retained so a
+ * restart can retry handoff without asking the provider to replay it. */
+export interface ChannelIngressQueueRecord {
+  id: string;
+  organizationId: string;
+  channel: string;
+  accountId: string;
+  externalEventId: string;
+  externalMessageId: string;
+  externalConversationId: string;
+  externalThreadId: string | null;
+  laneKey: string;
+  payload: unknown;
+  status: ChannelIngressQueueStatus;
+  attempts: number;
+  /** Non-resetting count of plane back-pressure releases. */
+  releases: number;
+  availableAt: Date;
+  claimedBy: string | null;
+  claimToken: string | null;
+  leaseExpiresAt: Date | null;
+  lastAttemptAt: Date | null;
+  lastError: string | null;
+  failedReason: string | null;
+  failedAt: Date | null;
+  createdAt: Date;
+  /** When an operator reopened this row from the dead letter; null if never. */
+  resubmittedAt: Date | null;
+  completedAt: Date | null;
+}
+
+export interface EnqueueChannelIngressInput {
+  organizationId: string;
+  channel: string;
+  accountId: string;
+  externalEventId: string;
+  externalMessageId: string;
+  externalConversationId: string;
+  externalThreadId?: string | null;
+  laneKey: string;
+  payload: unknown;
+  availableAt?: Date;
+}
+
+export type EnqueueChannelIngressResult =
+  | { record: ChannelIngressQueueRecord; created: true }
+  | { record: ChannelIngressQueueRecord; created: false };
+
+export interface ClaimChannelIngressInput {
+  organizationId: string;
+  workerId: string;
+  leaseMs: number;
+  channel?: string;
+  accountId?: string;
+  now?: Date;
+}
+
+export interface SettleChannelIngressInput {
+  id: string;
+  workerId: string;
+  claimToken: string;
+  completedAt?: Date;
+}
+
+export interface RefreshChannelIngressInput {
+  id: string;
+  workerId: string;
+  claimToken: string;
+  leaseMs: number;
+  now?: Date;
+}
+
+/**
+ * Settle a claim that did not deliver. The caller decides between retry and
+ * dead-letter with the upstream ingress retry policy (`@getpaseo/channels-core`
+ * `resolveIngressFailureDisposition`), or releases the row when the refusal was
+ * back-pressure rather than a failure; the store only writes the decision, so
+ * one policy owns both surfaces.
+ */
+export interface FailChannelIngressInput {
+  id: string;
+  workerId: string;
+  claimToken: string;
+  error: string;
+  /**
+   * `retry` reopens the row at `retryAt` and keeps the attempt it spent;
+   * `dead_letter` is terminal; `release` reopens the row at `retryAt` with the
+   * attempt given back (the plane deferred the event, it did not fail it).
+   */
+  disposition: "retry" | "dead_letter" | "release";
+  /** Upstream `failed_reason` (`retry-limit-exceeded`, `invalid-event`, ...). */
+  reason?: string;
+  retryAt?: Date;
+  now?: Date;
+  /** Applied to a `release` only. Absent = releases are unbounded. */
+  budget?: ChannelIngressReleaseBudget;
+}
+
+/** The release budget the store enforces on a `release`. Releases do not spend
+ * `attempts`, so this is the only thing that ends a permanently deferred row. */
+export interface ChannelIngressReleaseBudget {
+  /** Releases allowed before the row dead-letters. */
+  maxReleases: number;
+  /** Age past which the row dead-letters however few releases it spent. */
+  pendingTtlMs: number;
+}
+
+/** Operator recovery: move dead-lettered rows back to pending. */
+export interface ResubmitChannelIngressInput {
+  organizationId: string;
+  ids: readonly string[];
+  now?: Date;
+}
+
+/** Retention sweep over terminal rows. Omitted cutoffs are not swept. */
+export interface PruneChannelIngressInput {
+  organizationId: string;
+  completedOlderThan?: Date;
+  deadLetteredOlderThan?: Date;
+  /**
+   * Non-terminal rows (`pending`/`failed`) admitted before this cutoff. The
+   * release budget dead-letters anything the drain can still claim; this is the
+   * floor for a row the drain can never reach — a lane blocked forever, or an
+   * account deleted with a backlog behind it.
+   */
+  pendingOlderThan?: Date;
+}
+
+/**
+ * Operator-facing per-account ingress aggregate. Counts only — a payload is
+ * message content and never leaves the queue through a health surface.
+ */
+export interface ChannelIngressSummaryRecord {
+  channel: string;
+  accountId: string;
+  pending: number;
+  claimed: number;
+  /** `failed` rows: a retry is scheduled, the row is still in the backlog. */
+  retrying: number;
+  deadLettered: number;
+  completed: number;
+  /** Oldest row still awaiting a drain (`pending` or `failed`), or null. */
+  oldestPendingAt: Date | null;
+  /**
+   * Lanes whose head cannot move: a claim whose lease expired (the lane stays
+   * blocked until recovery), a retry still inside its backoff window, or a row
+   * the plane deferred and released. One lane is one conversation, so this is
+   * the operator's "who is stuck" count.
+   */
+  lanesBlocked: number;
+}
+
+export interface SummarizeChannelIngressInput {
+  organizationId: string;
+  now?: Date;
+}
+
+export interface RecoverStaleChannelIngressInput {
+  organizationId: string;
+  channel?: string;
+  accountId?: string;
+  now?: Date;
+  limit?: number;
 }

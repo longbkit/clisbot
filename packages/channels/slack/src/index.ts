@@ -5,4 +5,4 @@
 export { default } from "./entry.js";
 export { slackEntry } from "./entry.js";
 export { slackPlugin } from "./plugin.js";
-export { setSlackChannelRuntime, getSlackRuntime } from "./runtime.js";
+export { setSlackChannelRuntime, getSlackHostRuntime } from "./runtime-store.js";

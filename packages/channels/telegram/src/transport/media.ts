@@ -5,15 +5,37 @@
 // out of scope. A per-attachment failure is a skip (logged), not a fault:
 // admission of the message is unaffected.
 
+import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
 import type { HostChildLogger, InboundAttachedFile } from "@getpaseo/channels-shared";
 import {
   buildAttachedFilesManifest,
   downloadMediaFile,
   foldAttachedFilesIntoBody,
+  mediaInboundMaxBytesForChannel,
   MEDIA_DOWNLOAD_TIMEOUT_MS,
   type ChannelInboundEvent,
 } from "@getpaseo/channels-shared";
-import type { TelegramMessageShape } from "./poll.js";
+/** The Bot API file carriers this extractor reads. Structurally a subset of
+ * grammY's `Message`, declared here so the module stays loadable without the
+ * SDK types (slice 20 retired `./poll.js`, which used to own this shape). */
+export interface TelegramFileShape {
+  file_id?: string;
+  file_unique_id?: string;
+  file_size?: number;
+  file_name?: string;
+}
+
+export interface TelegramMessageShape {
+  message_id: number;
+  text?: string;
+  caption?: string;
+  photo?: TelegramFileShape[];
+  document?: TelegramFileShape;
+  audio?: TelegramFileShape;
+  voice?: TelegramFileShape;
+  video?: TelegramFileShape;
+  animation?: TelegramFileShape;
+}
 
 /** The media carriers the extractor handles (sticker is out of scope). */
 export type TelegramAttachmentKind =
@@ -186,10 +208,49 @@ export async function downloadTelegramAttachment(
     url: streamUrl,
     dir: ctx.downloadDir,
     fileName,
+    // The remote picks the size; without a ceiling one message fills the disk.
+    maxBytes: mediaInboundMaxBytesForChannel("telegram"),
     ...(ctx.fetchImpl !== undefined ? { fetchImpl: ctx.fetchImpl } : {}),
     signal,
   });
   return { name: base, kind: attachment.kind, bytes, path };
+}
+
+/** Fold a media GROUP into the event: every message in the album contributes
+ * its carriers to one manifest, in arrival order, so a multi-file album reaches
+ * the agent as one turn with N attachments (slice 20). An empty list, or a list
+ * with no carriers at all, leaves the event untouched. */
+export async function foldInboundTelegramMediaGroup(
+  ctx: TelegramMediaDownloadContext,
+  messages: readonly TelegramMessageShape[],
+  event: ChannelInboundEvent,
+): Promise<ChannelInboundEvent | null> {
+  const saved: InboundAttachedFile[] = [];
+  let index = 0;
+  let anyCarrier = false;
+  for (const message of messages) {
+    for (const attachment of extractTelegramAttachments(message)) {
+      anyCarrier = true;
+      try {
+        saved.push(await downloadTelegramAttachment(ctx, attachment, message.message_id, index));
+      } catch (error) {
+        ctx.logger?.error?.("telegram inbound media download failed (skipping attachment)", {
+          accountId: ctx.accountId,
+          messageId: message.message_id,
+          kind: attachment.kind,
+          // The Bot API URL carries the token, so only the redacting
+          // formatter may stringify a download fault.
+          error: formatErrorMessage(error),
+        });
+      }
+      index += 1;
+    }
+  }
+  if (!anyCarrier) return event;
+  const manifest = buildAttachedFilesManifest(saved);
+  const folded = foldAttachedFilesIntoBody(event.body, manifest);
+  if (folded.trim() === "") return null;
+  return { ...event, body: folded };
 }
 
 /** Fold the message's media into the event: download each attachment,
@@ -215,7 +276,9 @@ export async function foldInboundTelegramMedia(
         accountId: ctx.accountId,
         messageId: message.message_id,
         kind: attachment.kind,
-        error: error instanceof Error ? error.message : String(error),
+        // The Bot API URL carries the token, so only the redacting
+        // formatter may stringify a download fault.
+        error: formatErrorMessage(error),
       });
     }
   }

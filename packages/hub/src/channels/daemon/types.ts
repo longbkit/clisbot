@@ -9,6 +9,11 @@ export interface AgentSnapshot {
   provider: string;
   cwd: string;
   model?: string;
+  modeId?: string;
+  thinkingOptionId?: string;
+  featureValues?: Record<string, unknown>;
+  contextWindowUsedTokens?: number;
+  contextWindowMaxTokens?: number;
   title: string | null;
   status: string;
   createdAt: string;
@@ -111,4 +116,58 @@ export interface CreateAgentConfig {
   toolPolicy?: { preapproved: { kind: "mcp"; server: string; tool: string }[] };
   systemPrompt?: string;
   mcpServers?: Record<string, unknown>;
+}
+
+export interface TextAttachment {
+  type: "text";
+  mimeType: "text/plain";
+  contextKind?: string;
+  title?: string | null;
+  text: string;
+}
+export interface AgentProfile {
+  id: string;
+  name: string;
+  provider: string;
+  model?: string;
+  modeId?: string;
+  thinkingOptionId?: string;
+  featureValues?: Record<string, unknown>;
+}
+export interface DaemonServerInfo {
+  serverId: string;
+  features?: Record<string, boolean | undefined>;
+}
+export interface ProviderModel {
+  id: string;
+  provider: string;
+  label: string;
+  aliases?: string[];
+  isSelectable?: boolean;
+  isDefault?: boolean;
+  thinkingOptions?: { id: string; label: string; isDefault?: boolean }[];
+  defaultThinkingOptionId?: string;
+}
+export interface ProviderMode {
+  id: string;
+  label: string;
+  isUnattended?: boolean;
+}
+export interface AgentCommand {
+  name: string;
+  description: string;
+  argumentHint: string;
+  kind?: "command" | "skill";
+}
+export interface AgentConfigApply {
+  modelId?: string | null;
+  modeId?: string;
+  thinkingOptionId?: string | null;
+  featureValues?: Record<string, unknown>;
+}
+export interface CreateAgentOptions {
+  title?: string;
+  initialPrompt?: string;
+  attachments?: TextAttachment[];
+  autoArchive?: boolean;
 }

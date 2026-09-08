@@ -635,6 +635,7 @@ function accessFor(
       manageMembers: role !== "member",
       manageOwners: role === "owner",
       manageResources: role !== "member",
+      manageChannels: role !== "member",
     },
   };
 }

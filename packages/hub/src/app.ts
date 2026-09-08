@@ -149,6 +149,7 @@ export interface HubOperations {
   handleManualTrigger(request: Request, entrypoint: "trigger" | "smoke"): Promise<Response>;
   // COMPAT(clisbot-control-plane): the channel control-plane ops.
   handleChannelAdd(request: Request): Promise<Response>;
+  handleChannelRemove(request: Request): Promise<Response>;
   handleChannelList(request: Request): Promise<Response>;
   handleChannelStatus(request: Request): Promise<Response>;
   handleUsersList(request: Request): Promise<Response>;
@@ -404,6 +405,7 @@ export function createHubApplication(options: HubRuntimeOptions): HubApplication
         ? databaseUnavailable()
         : handleManualTriggerRequest(request, manualSource, entrypoint),
     handleChannelAdd: (request) => channelControlPlane.addChannel(request),
+    handleChannelRemove: (request) => channelControlPlane.removeChannel(request),
     handleChannelList: (request) => channelControlPlane.listChannels(request),
     handleChannelStatus: (request) => channelControlPlane.channelStatus(request),
     handleUsersList: (request) => channelControlPlane.listUsers(request),

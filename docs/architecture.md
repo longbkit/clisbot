@@ -179,6 +179,14 @@ See [SECURITY.md](../SECURITY.md) for the full threat model.
 The optional Hub relationship is daemon-outbound and does not use the relay. Its connection,
 authorization, ownership, persistence, and lifecycle contract is documented in [hub.md](hub.md).
 
+### `packages/channels/*` — Channel verticals
+
+One package per chat platform, ported from OpenClaw source and driven by the Hub, never by the
+daemon. A vertical owns protocol facts only — addressing, formatting, chunking, mentions, uploads
+— behind a shared plugin contract; credentials, routing, durable admission, and the agent seam
+belong to the Hub. See [channels-platform.md](channels-platform.md) for the contract and the
+layout rule, and [channels-operations.md](channels-operations.md) for running it.
+
 ### `packages/desktop` — Desktop app (Electron)
 
 Electron wrapper for macOS, Linux, and Windows.

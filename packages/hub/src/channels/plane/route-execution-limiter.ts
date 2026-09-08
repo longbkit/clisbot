@@ -4,6 +4,13 @@ import type { CompiledChannelAccount, CompiledRoute } from "../config/compile.js
 import type { PlaneLogger } from "./types.js";
 
 const RATE_WINDOW_MS = 60_000;
+/**
+ * How long to hold a message back when the Route is at its concurrency ceiling.
+ * Nothing announces when a run ends, so this is a poll interval, not a deadline:
+ * short enough that a freed slot is taken promptly, long enough that a busy
+ * Route is not re-claimed on every drain tick.
+ */
+const CONCURRENCY_RETRY_AFTER_MS = 5_000;
 
 export interface RouteExecutionLease {
   id: string;
@@ -11,7 +18,12 @@ export interface RouteExecutionLease {
 
 export type RouteExecutionAdmission =
   | { allowed: true; lease?: RouteExecutionLease }
-  | { allowed: false; reason: string };
+  /**
+   * `retryAfterMs` separates back-pressure from a decision: present, the
+   * message is admissible and only has to wait; absent, this Route will never
+   * accept it (the caller must not hold it in a queue).
+   */
+  | { allowed: false; reason: string; retryAfterMs?: number };
 
 interface RouteExecutionLimiterDeps {
   now: () => number;
@@ -79,6 +91,7 @@ export class RouteExecutionLimiter {
       return {
         allowed: false,
         reason: "Route rate limit exceeded for this sender",
+        retryAfterMs: windowRetryAfterMs(senderMessages, now),
       };
     }
     if (
@@ -86,13 +99,21 @@ export class RouteExecutionLimiter {
       routeMessages.length >= limits.messagesPerMinute
     ) {
       this.messagesByRoute.set(routeKey, routeMessages);
-      return { allowed: false, reason: "Route rate limit exceeded" };
+      return {
+        allowed: false,
+        reason: "Route rate limit exceeded",
+        retryAfterMs: windowRetryAfterMs(routeMessages, now),
+      };
     }
     if (
       limits.maxConcurrentRuns !== undefined &&
       (this.leaseIdsByRoute.get(routeKey)?.size ?? 0) >= limits.maxConcurrentRuns
     ) {
-      return { allowed: false, reason: "Route concurrency limit exceeded" };
+      return {
+        allowed: false,
+        reason: "Route concurrency limit exceeded",
+        retryAfterMs: CONCURRENCY_RETRY_AFTER_MS,
+      };
     }
 
     senderMessages.push(now);
@@ -273,4 +294,11 @@ function keyFor(account: CompiledChannelAccount, route: CompiledRoute): string {
 
 function recent(values: number[] | undefined, after: number): number[] {
   return (values ?? []).filter((timestamp) => timestamp > after);
+}
+
+/** When the oldest message in a full rate window falls out of it. */
+function windowRetryAfterMs(windowed: number[], now: number): number {
+  const oldest = windowed[0];
+  if (oldest === undefined) return RATE_WINDOW_MS;
+  return Math.max(1, oldest + RATE_WINDOW_MS - now);
 }

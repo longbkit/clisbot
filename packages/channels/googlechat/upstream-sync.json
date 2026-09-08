@@ -1,0 +1,415 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "extensions/googlechat/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/accounts.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/accounts.ts",
+      "deviation": ["D-GC-001", "D-GC-006", "D-GC-007", "D-GC-008"]
+    },
+    {
+      "local": "src/actions.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/actions.ts"
+    },
+    {
+      "local": "src/api.fetchok.transport.test.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/api.fetchok.transport.test.ts",
+      "deviation": ["D-GC-018"]
+    },
+    {
+      "local": "src/api.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/api.ts",
+      "deviation": ["D-GC-001", "D-GC-005", "D-GC-009"]
+    },
+    {
+      "local": "src/auth.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/auth.ts",
+      "deviation": ["D-GC-005"]
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-017"]
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/format.test.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/format.test.ts"
+    },
+    {
+      "local": "src/format.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/format.ts"
+    },
+    {
+      "local": "src/fusion/account-config.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-007"]
+    },
+    {
+      "local": "src/fusion/admission.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-012"]
+    },
+    {
+      "local": "src/fusion/inbound-adapter.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/inbound-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-013"]
+    },
+    {
+      "local": "src/fusion/runtime.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-002"]
+    },
+    {
+      "local": "src/fusion/secret-file.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-006"]
+    },
+    {
+      "local": "src/fusion/ssrf-fetch.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-005"]
+    },
+    {
+      "local": "src/fusion/webhook-session.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/webhook-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-014"]
+    },
+    {
+      "local": "src/google-auth-limits.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/google-auth-limits.ts"
+    },
+    {
+      "local": "src/google-auth.runtime.test.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/google-auth.runtime.test.ts",
+      "deviation": ["D-GC-019"]
+    },
+    {
+      "local": "src/google-auth.runtime.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/google-auth.runtime.ts"
+    },
+    {
+      "local": "src/group-policy.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/group-policy.ts"
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/ingress-identity.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/ingress-identity.ts",
+      "deviation": ["D-GC-010"]
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-015"]
+    },
+    {
+      "local": "src/message-tool-api.test.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/message-tool-api.test.ts"
+    },
+    {
+      "local": "src/message-tool-api.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/message-tool-api.ts"
+    },
+    {
+      "local": "src/monitor-event.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/monitor-event.ts"
+    },
+    {
+      "local": "src/monitor-types.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/monitor-types.ts",
+      "deviation": ["D-GC-012"]
+    },
+    {
+      "local": "src/monitor-webhook.test.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/monitor-webhook.test.ts",
+      "deviation": ["D-GC-019"]
+    },
+    {
+      "local": "src/monitor-webhook.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/monitor-webhook.ts"
+    },
+    {
+      "local": "src/outbound.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-GC-016"]
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/runtime.ts",
+      "deviation": ["D-GC-002", "D-GC-003"]
+    },
+    {
+      "local": "src/targets.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/targets.ts",
+      "deviation": ["D-GC-011"]
+    },
+    {
+      "local": "src/types.config.ts",
+      "status": "adapted",
+      "upstream": "extensions/googlechat/src/types.config.ts",
+      "deviation": ["D-GC-007"]
+    },
+    {
+      "local": "src/types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/googlechat/src/types.ts"
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/googlechat/src/monitor.ts",
+      "reason": "The OpenClaw inbound pipeline: route resolution, access policy, ctxPayload build and `core.channel.inbound.run`, which owns the agent runtime, the reply pipeline, the typing indicator and the media download. The Hub owns every one of those. Replaced at the smallest boundary by `fusion/inbound-adapter.ts` + `fusion/admission.ts` (D-GC-013, D-GC-012). Consequence: inbound attachments are NOT downloaded and the typing-indicator message is not sent."
+    },
+    {
+      "upstream": "extensions/googlechat/src/monitor-access.ts",
+      "reason": "OpenClaw's pairing controller, group allowlist, dangerous-name matching and channel-ingress identity resolution. The Hub owns access policy (goal ledger slice 23). Its `extractMentionInfo` is carried into `fusion/inbound-adapter.ts` (D-GC-013)."
+    },
+    {
+      "upstream": "extensions/googlechat/src/monitor-ingress.ts",
+      "reason": "OpenClaw's SQLite-backed ingress queue and drain. The Hub owns durable admission and the drain (D-GC-012)."
+    },
+    {
+      "upstream": "extensions/googlechat/src/monitor-routing.ts",
+      "reason": "Binds the webhook path on OpenClaw's process-wide gateway HTTP server. Fusion has no such server (D-GC-014)."
+    },
+    {
+      "upstream": "extensions/googlechat/src/monitor-reply-delivery.ts",
+      "reason": "The OpenClaw reply-delivery pipeline (typing-message edit-in-place, partial-delivery errors, chunk-mode lookup through the OpenClaw runtime). The Hub owns reply delivery; `outbound.ts` is the Fusion bridge (D-GC-016)."
+    },
+    {
+      "upstream": "extensions/googlechat/src/monitor-durable.ts",
+      "reason": "The durable reply-option resolver for `monitor-reply-delivery.ts`; an orphan once that pipeline is Hub-owned."
+    },
+    {
+      "upstream": "extensions/googlechat/src/gateway.ts",
+      "reason": "OpenClaw's passive account lifecycle plus the native-approval channel-runtime-context registration. Replaced by `lifecycle/start-account.ts` (D-GC-015)."
+    },
+    {
+      "upstream": "extensions/googlechat/src/channel.ts",
+      "reason": "The OpenClaw `ChannelPlugin` assembly (`createChatChannelPlugin`): meta, capabilities, doctor contract, status adapter, directory/groups/threading/security/pairing adapters. Fusion's Hub owns the control plane; `plugin.ts` is the Hub drive surface. Same cut as `channel-base.ts`, `channel.adapters.ts`, `channel.deps.runtime.ts`, `channel.runtime.ts`, `channel.setup.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/channel-base.ts",
+      "reason": "See `channel.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/channel.adapters.ts",
+      "reason": "See `channel.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/channel.deps.runtime.ts",
+      "reason": "See `channel.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/channel.runtime.ts",
+      "reason": "See `channel.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/channel.setup.ts",
+      "reason": "See `channel.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/setup-core.ts",
+      "reason": "The OpenClaw setup wizard/contract tree. The Hub owns onboarding; the setup surface the Hub needs is described in HUB-WIRING.md. Same cut as `setup-surface.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/setup-surface.ts",
+      "reason": "See `setup-core.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/doctor.ts",
+      "reason": "The OpenClaw `doctor` allowlist-warning collector, wired to `channel-policy`'s dangerous-name matching. The Hub owns diagnostics. Same cut as `doctor-contract.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/doctor-contract.ts",
+      "reason": "See `doctor.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/config-schema.ts",
+      "reason": "Builds the OpenClaw channel config schema. The Hub owns channel configuration and its own schema/compile step (HUB-WIRING.md)."
+    },
+    {
+      "upstream": "extensions/googlechat/src/secret-contract.ts",
+      "reason": "The OpenClaw secret-target registry and runtime config assignments. The Hub owns credentials."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-auth.ts",
+      "reason": "The whole native-approval surface (`approval-auth.ts`, `approval-card-actions.ts`, `approval-card-click.ts`, `approval-card-text.ts`, `approval-handler.runtime.ts`, `approval-native.ts`, `approval-terminal-card.ts`) sits on OpenClaw's approval gateway runtime (`resolveApprovalOverGateway`), its exec-approval decision types and its approval-handler registry. The Hub owns approvals. Consequence: a Google Chat approval card is not rendered and a card click is delivered to the Hub as an inbound `callback` event instead (D-GC-013), for the Hub's own approval policy to act on."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-card-actions.ts",
+      "reason": "See `approval-auth.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-card-click.ts",
+      "reason": "See `approval-auth.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-card-text.ts",
+      "reason": "See `approval-auth.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-handler.runtime.ts",
+      "reason": "See `approval-auth.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-native.ts",
+      "reason": "See `approval-auth.ts`."
+    },
+    {
+      "upstream": "extensions/googlechat/src/approval-terminal-card.ts",
+      "reason": "See `approval-auth.ts`."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-GC-001",
+      "reason": "tsconfig: `exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off so the upstream Google Chat source compiles verbatim; OpenClaw's own tsconfig sets neither flag. Same cut the Discord vertical makes (D-DC-001)."
+    },
+    {
+      "id": "D-GC-002",
+      "file": "src/fusion/runtime.ts",
+      "reason": "`src/runtime.ts` \u2014 upstream stores the plugin runtime in OpenClaw's global plugin runtime store (`openclaw/plugin-sdk/runtime-store`), which opens SQLite-backed keyed stores from the OpenClaw state directory. Fusion's Hub injects a `PluginRuntime` over `HostRuntime.state.openKeyedStore` through `fusion/runtime.ts`; the accessor names and the throw-on-unset contract are unchanged."
+    },
+    {
+      "id": "D-GC-003",
+      "file": "src/runtime.ts",
+      "reason": "Upstream runs one Google Chat account per OpenClaw process, so one slot holds the runtime. The Hub runs every account of every organization in one process, so the runtime is keyed by account id and the account being served travels in `AsyncLocalStorage`; the ported zero-arg accessors resolve it. Same shape as the Discord (D-DC-003) and Telegram (D-TG-046) verticals."
+    },
+    {
+      "id": "D-GC-005",
+      "file": "src/fusion/ssrf-fetch.ts",
+      "reason": "`fetchWithSsrFGuard` \u2014 upstream's guard sits on OpenClaw's pinned-dispatcher SSRF stack (`src/infra/net/fetch-guard.ts` + `src/infra/net/ssrf.ts` + `@openclaw/net-policy`, ~2000 lines): hostname resolution pinned into an undici dispatcher, per-redirect-hop re-validation, dispatcher leasing. Fusion channel transports own their own fetch (Discord D-DC-006, Telegram D-TG-013), so the boundary keeps the call contract and the two guards this closure depends on \u2014 the hostname suffix allowlist and a private/loopback/link-local block on the resolved host \u2014 and refuses redirects outright instead of re-validating them. Address pinning between the DNS check and the connect, and the explicit-proxy / TLS-client-cert dispatcher policies, are NOT carried; a `dispatcherPolicy` is accepted and ignored, which costs the ported google-auth transport its proxy support.",
+      "tests": ["src/api.fetchok.transport.test.ts", "src/google-auth.runtime.test.ts"]
+    },
+    {
+      "id": "D-GC-006",
+      "file": "src/fusion/secret-file.ts",
+      "reason": "`tryReadSecretFileSync` \u2014 upstream's reader is the `@openclaw/fs-safe` workspace package (O_NOFOLLOW, hardlink and group/other permission refusal, parent-directory tightening, structured `FsSafeError` codes). Fusion never depends on an OpenClaw workspace package, so the boundary keeps the call shape and result contract the ported `accounts.ts` reads, over `node:fs`, with the size cap and the regular-file check. The symlink/hardlink/permission hardening is not carried: the Hub is the credential authority and the path comes from operator-authored account config, not from channel traffic."
+    },
+    {
+      "id": "D-GC-007",
+      "file": "src/fusion/account-config.ts",
+      "reason": "Account resolution reads the Hub's drive-time carriers instead of OpenClaw's process-wide `config.json`. `accounts.ts` keeps its upstream shape and flow (merge, credential source, inspect); `fusion/account-config.ts` is the single place that names the carrier fields the Hub must fill (`serviceAccount`, `serviceAccountFile`), so the Hub wiring slice has one file to match. `types.config.ts` re-points its `GoogleChatAccountConfig` import at the carried core config types (D-CORE-324)."
+    },
+    {
+      "id": "D-GC-008",
+      "file": "src/accounts.ts",
+      "reason": "Three cuts inside upstream's credential resolution: (1) the inline service-account parse uses `asNullableObjectRecord` instead of `safeParseJsonWithSchema(z.record(...))` \u2014 same contract (JSON object or null) without adding a zod dependency; (2) `coerceSecretRef` is replaced by `isSecretRef`, because the Hub resolves secret references before the carrier reaches the vertical so an unresolved reference is only ever an explicit one; (3) core's `resolveSecretInputString` always reports its status (D-CORE-257) while upstream throws in `strict` mode, so the strict throw is restored at the call site \u2014 a drive-time resolve must fail loudly rather than start an account with no credential.",
+      "tests": ["src/message-tool-api.test.ts"]
+    },
+    {
+      "id": "D-GC-009",
+      "file": "src/api.ts",
+      "reason": "`sendGoogleChatMessage` no longer consults `shouldSuppressGoogleChatManualExecApprovalFollowupText`. Upstream suppresses a text follow-up that repeats an `/approve <id> <decision>` command whose native approval card is still live; the approval-card surface is not ported (the Hub owns approvals), so there is no live card to suppress against."
+    },
+    {
+      "id": "D-GC-010",
+      "file": "src/ingress-identity.ts",
+      "reason": "`googleChatIngressIdentity` is omitted \u2014 the `defineStableChannelIngressIdentity` declaration OpenClaw's message-access resolver reads to match allowFrom entries against a sender. It pulls the whole `src/channels/message-access` tree and the Hub owns access policy (goal ledger slice 23). The sender-id normalizer it is built on is carried: the inbound adapter's mention detection compares normalized ids with it."
+    },
+    {
+      "id": "D-GC-011",
+      "file": "src/targets.ts",
+      "reason": "`resolveGoogleChatOutboundSessionRoute` is omitted. It builds an OpenClaw outbound session key through `buildChannelOutboundSessionRoute` (`src/plugin-sdk/core.ts` \u2192 `src/infra/outbound/base-session-key.ts` \u2192 the OpenClaw session-key routing tree). Fusion's Hub owns session keys and thread bindings; the space classification the function existed to obtain stays exported (`isGoogleChatGroupSpace`, `resolveGoogleChatOutboundSpace`)."
+    },
+    {
+      "id": "D-GC-012",
+      "file": "src/fusion/admission.ts",
+      "reason": "`monitor-ingress.ts` is omitted and replaced by `fusion/admission.ts`. Upstream opens OpenClaw's SQLite-backed `openChannelIngressQueue`, serializes the raw envelope into it and runs its own drain with its own retry policy. The Hub owns the durable queue (`channel_ingress_queue`), the retry policy and one drain per account, and the shared inbound processor persists the normalized event before it returns. The `receive` contract the webhook handler depends on is upstream's, unchanged \u2014 `durable` / `ignored` / `invalid` / throw \u2014 because that is what makes the HTTP 200 honest. `monitor-types.ts` re-points the `ingress` field at it.",
+      "tests": ["src/fusion/webhook-session.test.ts"]
+    },
+    {
+      "id": "D-GC-013",
+      "file": "src/fusion/inbound-adapter.ts",
+      "reason": "`monitor.ts` and `monitor-access.ts` are omitted and replaced by `fusion/inbound-adapter.ts`. Upstream's pipeline resolves the OpenClaw route, runs the pairing controller and group allowlist, builds the OpenClaw ctxPayload and calls `core.channel.inbound.run`, which owns the agent runtime, the reply pipeline and the typing indicator \u2014 all Hub-owned in Fusion. The adapter does only the normalization the Hub cannot: envelope \u2192 `ChannelInboundEvent` with `kind` and `facts`. `extractMentionInfo` is upstream's function from `monitor-access.ts`, carried unchanged.",
+      "tests": ["src/fusion/inbound-adapter.test.ts"]
+    },
+    {
+      "id": "D-GC-014",
+      "file": "src/fusion/webhook-session.ts",
+      "reason": "`monitor-routing.ts` is omitted and replaced by `fusion/webhook-session.ts`. Upstream binds its path on OpenClaw's process-wide gateway HTTP server (`registerWebhookTargetWithPluginRoute` \u2192 `src/plugins/http-registry.ts`, D-CORE-321); Fusion has no such server, so the session owns one `node:http` listener per account. Everything else stays upstream: the ported target registry, the ported request pipeline (method / content-type / rate-limit / in-flight guards) and the ported `createGoogleChatWebhookRequestHandler`. UNEXERCISED IN PRODUCTION \u2014 Google Chat needs a public HTTPS endpoint the dev host does not have.",
+      "tests": ["src/fusion/webhook-session.test.ts"]
+    },
+    {
+      "id": "D-GC-015",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "Fusion-owned L4: upstream's account lifecycle is `gateway.ts` + `monitor.ts`'s `monitorGoogleChatProvider` over OpenClaw's passive account lifecycle, channel runtime context registry and status-snapshot store. The Hub owns agent lifecycle, routing and status, so the L4 here does only what the seam contract asks: resolve the account and its credential, refuse an account without an audience or with an unparseable webhook URL, install the ported runtime, probe the Chat API, register the L3 processor, run the webhook session, and resolve on abort. `normalizeAudienceType` is upstream's function from `monitor.ts`."
+    },
+    {
+      "id": "D-GC-016",
+      "file": "src/outbound.ts",
+      "reason": "Fusion-owned bridge from the Hub's `plugin.outbound.*` contract onto the ported `api.ts` entry points. No wire decision lives here: the markdown rendering and byte-bounded chunking are `format.ts`, the thread-name validity rule and the reply option are `api.ts`. `sendMedia` refuses natively \u2014 Google Chat's attachment upload is user-OAuth only, so the G11 shape (in-channel notice through the text path, `mediaPosted: false`) is the honest answer rather than a transport error.",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-GC-017",
+      "file": "src/channel-actions.ts",
+      "reason": "Upstream's `actions.ts` is carried unchanged and advertises only `send`. This module composes it so the two REST verbs upstream's own client already implements \u2014 `updateGoogleChatMessage` and `deleteGoogleChatMessage`, which upstream calls from its reply-delivery and approval-card paths but never exposes as tool actions \u2014 reach the Hub message tool as `edit` and `delete`. Nothing else is added: `react`, `pin`, `upload-file`, `read` and the emoji verbs have no service-account API on this channel.",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-GC-018",
+      "file": "src/api.fetchok.transport.test.ts",
+      "reason": "One ported case is omitted: \"delivers task-list fallback at the default chunk limit through the SDK\" drives OpenClaw's own durable outbound batch (`sendDurableMessageBatch` over `googlechatPlugin.outbound`) through the plugin-runtime test registry, and the Hub owns durable outbound in Fusion. The chunking it asserts is covered by `format.test.ts` and the chunked-send case in `outbound.test.ts`. The guarded-fetch mock is re-pointed at `fusion/ssrf-fetch.ts` (D-GC-005)."
+    },
+    {
+      "id": "D-GC-019",
+      "reason": "Test-only, mechanical: `vi.mock(\"openclaw/plugin-sdk/...\")` targets are rewritten to the local module the ported file now imports \u2014 `@getpaseo/channels-core/plugin-sdk/webhook-request-guards` / `.../webhook-targets` in `monitor-webhook.test.ts`, and `./fusion/ssrf-fetch.js` in `google-auth.runtime.test.ts` (D-GC-005). The sync check's normalizer collapses `from`/`import()` specifiers but not `vi.mock`'s first argument, so these two files cannot be marked verbatim. No case, fixture or assertion differs.",
+      "file": "src/monitor-webhook.test.ts"
+    }
+  ]
+}

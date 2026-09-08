@@ -67,6 +67,7 @@ function inRepoPackageDir(packageName: string): string {
 }
 const SLACK_IN_REPO = inRepoPackageDir("@getpaseo/channels-slack");
 const TELEGRAM_IN_REPO = inRepoPackageDir("@getpaseo/channels-telegram");
+const DISCORD_IN_REPO = inRepoPackageDir("@getpaseo/channels-discord");
 
 // Every hub-side log line (info/warn/error), captured for assertions: a
 // dropped marker must be named by a log line, never asserted by silence.
@@ -128,6 +129,26 @@ function envVar(name: string): string | undefined {
   const value = line?.slice(name.length + 1).trim();
   return value !== undefined && value !== "" ? value : undefined;
 }
+
+/** A live-test setting from the process env, falling back to the repo `.env`. */
+function configuredVar(name: string): string | undefined {
+  return process.env[name] ?? envVar(name);
+}
+
+/**
+ * Discord joins the boot only when its bot token and a test channel are
+ * configured (slice 13c). The credentials are not in the repo `.env` today, so
+ * the case skips instead of failing; export `DISCORD_BOT_TOKEN` and
+ * `DISCORD_TEST_CHANNEL_ID` to run it.
+ */
+const DISCORD_BOT_TOKEN = configuredVar("DISCORD_BOT_TOKEN");
+const DISCORD_TEST_CHANNEL_ID = configuredVar("DISCORD_TEST_CHANNEL_ID");
+const DISCORD_SKIP =
+  DISCORD_BOT_TOKEN === undefined || DISCORD_TEST_CHANNEL_ID === undefined
+    ? "DISCORD_BOT_TOKEN / DISCORD_TEST_CHANNEL_ID are not configured"
+    : existsSync(join(DISCORD_IN_REPO, "dist", "plugin.js"))
+      ? false
+      : "the in-repo Discord vertical is not built (@getpaseo/channels-discord dist missing)";
 
 function supplyPresent(): boolean {
   // In-repo (blueprint §6.5): the supply is the Hub's own built workspace
@@ -342,7 +363,7 @@ channels:
   slack:
     enabled: true
   telegram:
-    enabled: true
+    enabled: true${DISCORD_SKIP === false ? "\n  discord:\n    enabled: true" : ""}
 roles:
   ops:
     grants:
@@ -400,6 +421,26 @@ fallback:
   deny: true
 `;
 }
+
+function discordAccountYaml(connectionId: string): string {
+  return `
+channel: discord
+accountId: work
+connectionId: ${connectionId}
+transport:
+  mode: gateway
+routes:
+  - match:
+      kind: channel
+      ids: [${DISCORD_TEST_CHANNEL_ID ?? ""}]
+    agent: codex-e2e
+    environment: work
+fallback:
+  deny: true
+`;
+}
+
+const DISCORD_CONNECTION_ID = "00000000-0000-4000-8000-000000000003";
 
 describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, () => {
   let workDir: string;
@@ -512,6 +553,36 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
       { mode: 0o600 },
     );
 
+    if (DISCORD_SKIP === false) {
+      const discordPin = pins.channels["discord"];
+      if (discordPin === undefined || discordPin.loadMode !== "in-repo") {
+        throw new Error("channel-pins.json must pull the Discord vertical in-repo");
+      }
+      writeFileSync(
+        join(workAccountRoot, "install-discord.lock"),
+        `${JSON.stringify(
+          {
+            channel: "discord",
+            accountId: "work",
+            loadMode: discordPin.loadMode,
+            main: mainRef,
+            channelPackage: {
+              package: discordPin.channel.package,
+              version: discordPin.channel.version,
+              integrity: discordPin.channel.dist.integrity,
+              gitHead: discordPin.channel.dist.gitHead,
+            },
+            entry: discordPin.entry,
+            inRepoPackageDir: DISCORD_IN_REPO,
+            installedAt,
+          },
+          null,
+          2,
+        )}\n`,
+        { mode: 0o600 },
+      );
+    }
+
     // 2. Test-only credential fixtures supplied through the resolver seam. `cpSync`
     // copies the file's own mode, so chmod only if the source was wider.
     const slackSecret = join(dataDir, "secrets", "slack-work.json");
@@ -564,6 +635,14 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
         path: ".paseo/channels/telegram/work.yml",
         content: telegramAccountYaml("00000000-0000-4000-8000-000000000002"),
       },
+      ...(DISCORD_SKIP === false
+        ? [
+            {
+              path: ".paseo/channels/discord/work.yml",
+              content: discordAccountYaml(DISCORD_CONNECTION_ID),
+            },
+          ]
+        : []),
     ];
     await database.saveChannelConfiguration({
       organizationId: ORG_ID,
@@ -592,6 +671,11 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
       pinsPath: PINS_PATH,
       daemon: { host: `127.0.0.1:${daemon.port}` },
       resolveConnection: ({ channel }) => {
+        if (channel === "discord") {
+          return Promise.resolve(
+            DISCORD_BOT_TOKEN === undefined ? undefined : { botToken: DISCORD_BOT_TOKEN },
+          );
+        }
         const raw = readFileSync(channel === "slack" ? slackSecret : telegramSecret, "utf8");
         const parsed = JSON.parse(raw) as {
           botToken?: string;
@@ -644,6 +728,21 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
         slack: ["ok", "ok", "started"],
         telegram: ["ok", "ok", "started"],
       },
+    );
+  });
+
+  it("boots the Discord account on its gateway transport", { skip: DISCORD_SKIP }, () => {
+    const discord = supervisor
+      .status()
+      .find((entry) => entry.channel === "discord" && entry.account === "work");
+    assert.ok(
+      discord !== undefined,
+      `discord:work handle missing: ${JSON.stringify(supervisor.status())}`,
+    );
+    assert.equal(discord.detail, undefined, `discord:work deferred: ${discord.detail}`);
+    assert.deepEqual(
+      [discord.integrity, discord.loadTrace, discord.transport],
+      ["ok", "ok", "started"],
     );
   });
 

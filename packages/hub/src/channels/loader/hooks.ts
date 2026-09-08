@@ -14,7 +14,9 @@
 // So the resolve hook routes aliased specifiers by matching the importing
 // module's `parentURL` against every loaded channel's install root, for the
 // lifetime of the process. The active load is still tracked, but only to (a)
-// guard against concurrent loads and (b) record the load-trace set.
+// guard against concurrent loads and (b) open a load-trace set. What goes INTO
+// that set is decided by import-graph attribution (`moduleOwner`), not by the
+// window's clock — see below.
 //
 // Mechanism choice: the programmatic `node:module` `registerHooks({resolve,load})`
 // (stable on Node 22.20) rather than `register()` + a separate hooks file. The
@@ -33,6 +35,7 @@
 //   - anything else -> typed throw: a matrix miss fails the account, never a
 //     mid-conversation crash (§14.5).
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerHooks } from "node:module";
@@ -86,11 +89,56 @@ export interface LoadedChannelInfo {
 const registry = new Map<string, LoadedChannelInfo>();
 // The in-progress load (concurrency guard + load-trace set). Undefined when no
 // channel is currently importing its entry/plugin.
-let active: { info: LoadedChannelInfo; loaded: Set<string> } | undefined;
+let active: { key: string; info: LoadedChannelInfo; loaded: Set<string> } | undefined;
+// Module URL -> the account key whose import graph pulled it in. The load-trace
+// window is a TIME window, but a vertical's imports are not confined to it: both
+// pinned verticals finish importing their SDK (Bolt, grammY) AFTER
+// `startAccount` resolves, so a neighbour account started right after would
+// otherwise record those modules in ITS window and fail a load-trace it never
+// caused. Attribution follows the import graph instead: the entry/plugin import
+// (whose importer is the Hub itself) is attributed to the open load, and every
+// module resolved from an already-attributed importer inherits that importer's
+// account. First importer wins — a module shared by two accounts keeps the
+// account that pulled it in first, which is also the only one that paid for it.
+const moduleOwner = new Map<string, string>();
 // Synthetic seam URL -> the info + bound subpath needed to serve its merged source.
 // Populated at resolve time; consulted at load time (which may be drive-time, after
 // the active load is cleared).
 const seamSources = new Map<string, { info: LoadedChannelInfo; bound: BoundSubpath }>();
+
+// The account whose code is currently running. The Hub drives one account at a
+// time per call chain — load it, start its transport, post through it — and an
+// import issued anywhere in that chain (including from a timer the monitor
+// scheduled) belongs to that account. This is the attribution of last resort
+// and the one that works when the importer's URL says nothing: under vitest,
+// vite-node issues a vertical's externalized dynamic imports from its OWN
+// module, so `parentURL` is the test runner, not the vertical.
+const runningAccount = new AsyncLocalStorage<string>();
+
+/** Runs `run` as the given account: every module its call chain imports —
+ * now or from anything it schedules — is attributed to that account's load
+ * trace, never to whichever account happens to be loading at the time. */
+export function runAsChannelAccount<T>(channel: string, accountId: string, run: () => T): T {
+  return runningAccount.run(`${channel}:${accountId}`, run);
+}
+
+/** The account whose import graph reached `parentURL`, when it is a module a
+ * loaded account pulled in. Undefined for the Hub's own modules (the entry and
+ * plugin imports come from `load-channel.ts`), which is what makes those two
+ * fall back to the running account / open load. */
+function ownerKeyForParent(parentURL: string | undefined): string | undefined {
+  return parentURL === undefined ? undefined : moduleOwner.get(parentURL);
+}
+
+/** Attribute one resolution and record it in its account's load trace. A module
+ * attributed to an account whose load window has already closed is dropped: it
+ * belongs to that account's graph, not to whoever happens to be loading now. */
+function recordResolvedModule(url: string, parentURL: string | undefined): void {
+  const owner = ownerKeyForParent(parentURL) ?? runningAccount.getStore() ?? active?.key;
+  if (owner === undefined) return;
+  if (!moduleOwner.has(url)) moduleOwner.set(url, owner);
+  if (owner === active?.key) active.loaded.add(url);
+}
 
 function isAliasedSpecifier(specifier: string): boolean {
   return specifier.startsWith(PLUGIN_SDK_PREFIX);
@@ -161,12 +209,12 @@ const resolveHook: ResolveHookSync = (specifier, context, nextResolve) => {
       if (bound !== undefined) {
         const url = syntheticSeamUrlFor(info);
         seamSources.set(url, { info, bound });
-        active?.loaded.add(url);
+        recordResolvedModule(url, context.parentURL);
         return { url, shortCircuit: true };
       }
       if (PASSTHROUGH_SUBPATHS.includes(specifier)) {
         const url = passthroughFileUrl(info, specifier);
-        active?.loaded.add(url);
+        recordResolvedModule(url, context.parentURL);
         return { url, shortCircuit: true };
       }
       throw new ChannelLoaderError(
@@ -181,7 +229,7 @@ const resolveHook: ResolveHookSync = (specifier, context, nextResolve) => {
     // not claim it (a channel's own dist always resolves under a registered root).
   }
   const resolved = nextResolve(specifier, resolveContext(context.parentURL));
-  active?.loaded.add(resolved.url);
+  recordResolvedModule(resolved.url, context.parentURL);
   return resolved;
 };
 
@@ -240,8 +288,9 @@ export function beginChannelLoad(info: LoadedChannelInfo): void {
       info.accountId,
       "load",
     );
-  registry.set(registryKey(info), info);
-  active = { info, loaded: new Set<string>() };
+  const key = registryKey(info);
+  registry.set(key, info);
+  active = { key, info, loaded: new Set<string>() };
 }
 
 function registryKey(info: LoadedChannelInfo): string {

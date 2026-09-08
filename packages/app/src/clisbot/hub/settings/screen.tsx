@@ -31,7 +31,8 @@ import {
 import { type HubSectionSlug } from "../navigation";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
-import { ChannelSettings, ChannelConnectionForm } from "./channel-settings";
+import { ChannelSettings } from "./channel-settings";
+import { AddChannelConnection } from "./channel-connection-add";
 import { ManagedHostRow } from "./managed-host-row";
 import { AutomationSettings } from "./automation-settings";
 import { AccessSettings } from "./access-settings";
@@ -2357,11 +2358,11 @@ function HubConfigurationSettings() {
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [connectingApplicationId, setConnectingApplicationId] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [addingTelegram, setAddingTelegram] = useState(false);
-  const openTelegram = useCallback(() => setAddingTelegram(true), []);
-  const closeTelegram = useCallback(() => setAddingTelegram(false), []);
-  const telegramSaved = useCallback(async () => {
-    setAddingTelegram(false);
+  const [addingConnection, setAddingConnection] = useState(false);
+  const openConnection = useCallback(() => setAddingConnection(true), []);
+  const closeConnection = useCallback(() => setAddingConnection(false), []);
+  const connectionSaved = useCallback(async () => {
+    setAddingConnection(false);
     await connections.refetch();
   }, [connections]);
   const refreshHosts = useCallback(() => void daemons.refetch(), [daemons]);
@@ -2461,8 +2462,8 @@ function HubConfigurationSettings() {
           </View>
         ) : null}
         {canManage ? (
-          <Button size="sm" variant="outline" disabled={addingTelegram} onPress={openTelegram}>
-            Add Telegram account
+          <Button size="sm" variant="outline" disabled={addingConnection} onPress={openConnection}>
+            Add Channel Connection
           </Button>
         ) : null}
         {canManage && (connections.data?.providerApplications.length ?? 0) > 0 ? (
@@ -2482,8 +2483,8 @@ function HubConfigurationSettings() {
           </View>
         ) : null}
       </SettingsSection>
-      {canManage && addingTelegram ? (
-        <TelegramConnectionSetup close={closeTelegram} saved={telegramSaved} />
+      {canManage && addingConnection ? (
+        <ChannelConnectionSetupSection close={closeConnection} saved={connectionSaved} />
       ) : null}
       {canManage ? <ApiKeySettings /> : null}
       <SettingsSection title="Managed Hosts" trailing={refreshHostsAction}>
@@ -2508,29 +2509,35 @@ function HubConfigurationSettings() {
   );
 }
 
-function TelegramConnectionSetup({ close, saved }: { close(): void; saved(): Promise<void> }) {
+/**
+ * Configuration settings adds a Connection with the same catalog-driven form the
+ * Channels editor uses. Provider Applications are administered from their own
+ * section here, so this one offers only the pasted-credential channels.
+ */
+function ChannelConnectionSetupSection({
+  close,
+  saved,
+}: {
+  close(): void;
+  saved(): Promise<void>;
+}) {
   const hub = useHubAccount();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const save = useCallback(
-    (body: unknown) => {
+  const create = useCallback(
+    async (body: Record<string, unknown>) => {
       setPending(true);
-      setError(null);
-      void hub
-        .api()
-        .post("connections", body, HubConnectionSchema)
-        .then(saved)
-        .catch((cause: unknown) =>
-          setError(cause instanceof Error ? cause.message : "Unable to add Telegram account."),
-        )
-        .finally(() => setPending(false));
+      try {
+        await hub.api().post("connections", body, HubConnectionSchema);
+        await saved();
+      } finally {
+        setPending(false);
+      }
     },
     [hub, saved],
   );
   return (
     <View>
-      {error ? <Alert variant="error" title={error} /> : null}
-      <ChannelConnectionForm pending={pending} allowSlackSocket={false} save={save} />
+      <AddChannelConnection allowProviderApplications={false} disabled={pending} create={create} />
       <Button variant="outline" disabled={pending} onPress={close}>
         Cancel
       </Button>

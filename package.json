@@ -35,7 +35,14 @@
     "packages/hub",
     "packages/channels/shared",
     "packages/channels/telegram",
-    "packages/channels/slack"
+    "packages/channels/discord",
+    "packages/channels/googlechat",
+    "packages/channels/feishu",
+    "packages/channels/zalo",
+    "packages/channels/zalouser",
+    "packages/channels/slack",
+    "packages/channels/core",
+    "packages/channels/markdown-core"
   ],
   "scripts": {
     "dev": "npm run dev:server",
@@ -84,6 +91,8 @@
     "acp:version-drift": "node scripts/check-acp-catalog-version-drift.mjs",
     "acp:version-drift:check": "node scripts/check-acp-catalog-version-drift.mjs --fail-on-drift",
     "acp:version-drift:update": "node scripts/check-acp-catalog-version-drift.mjs --update",
+    "channels:sync:check": "node scripts/channel-upstream-sync.mjs check",
+    "channels:sync:report": "node scripts/channel-upstream-sync.mjs report",
     "start": "npm run start --workspace=@getpaseo/server",
     "android": "npm run android --workspace=@getpaseo/app",
     "android:development": "npm run android:development --workspace=@getpaseo/app",

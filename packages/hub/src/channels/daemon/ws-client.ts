@@ -61,6 +61,7 @@ export class TrustedDaemonClient extends EventEmitter {
   private reconnectDelayMs: number;
   private stopped = false;
   connected = false;
+  serverInfo: Record<string, unknown> | undefined;
 
   constructor(options: TrustedDaemonClientOptions) {
     super();
@@ -144,7 +145,6 @@ export class TrustedDaemonClient extends EventEmitter {
     const requestId = randomUUID();
     const timer = setTimeout(
       () => {
-        this.pending.delete(requestId);
         this.emit("rpcError", { requestId, requestType, error: `RPC ${requestType} timed out` });
         this.reject(
           requestId,
@@ -223,6 +223,7 @@ export class TrustedDaemonClient extends EventEmitter {
       isRecord(message["payload"]) &&
       message["payload"]["status"] === "server_info"
     ) {
+      this.serverInfo = message["payload"];
       this.onServerInfo();
       return;
     }

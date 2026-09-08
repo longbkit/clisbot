@@ -1,0 +1,415 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "extensions/zalo/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/accounts.test.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/accounts.test.ts",
+      "deviation": ["D-ZL-019"]
+    },
+    {
+      "local": "src/accounts.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/accounts.ts"
+    },
+    {
+      "local": "src/actions.runtime.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/actions.runtime.ts"
+    },
+    {
+      "local": "src/actions.test.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/actions.test.ts"
+    },
+    {
+      "local": "src/actions.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/actions.ts"
+    },
+    {
+      "local": "src/api.test.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/api.test.ts",
+      "deviation": ["D-ZL-020"]
+    },
+    {
+      "local": "src/api.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/api.ts",
+      "deviation": ["D-ZL-006", "D-ZL-009"]
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-017"]
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/account-config.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-008"]
+    },
+    {
+      "local": "src/fusion/admission.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-013"]
+    },
+    {
+      "local": "src/fusion/inbound-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-012"]
+    },
+    {
+      "local": "src/fusion/polling-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-015"]
+    },
+    {
+      "local": "src/fusion/proxy-fetch.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-005"]
+    },
+    {
+      "local": "src/fusion/secret-file.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-007"]
+    },
+    {
+      "local": "src/fusion/ssrf.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-006"]
+    },
+    {
+      "local": "src/fusion/webhook-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-014"]
+    },
+    {
+      "local": "src/group-access.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/group-access.ts"
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-018"]
+    },
+    {
+      "local": "src/monitor.types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/monitor.types.ts"
+    },
+    {
+      "local": "src/monitor.webhook.test.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/monitor.webhook.test.ts",
+      "deviation": ["D-ZL-010"]
+    },
+    {
+      "local": "src/monitor.webhook.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/monitor.webhook.ts",
+      "deviation": ["D-ZL-010"]
+    },
+    {
+      "local": "src/outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-ZL-016"]
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/probe.test.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/probe.test.ts"
+    },
+    {
+      "local": "src/probe.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/probe.ts"
+    },
+    {
+      "local": "src/proxy.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/proxy.ts"
+    },
+    {
+      "local": "src/runtime-api.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/runtime-api.ts",
+      "deviation": ["D-ZL-001"]
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/runtime.ts",
+      "deviation": ["D-ZL-002", "D-ZL-003"]
+    },
+    {
+      "local": "src/secret-input.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/secret-input.ts",
+      "deviation": ["D-ZL-004"]
+    },
+    {
+      "local": "src/send.test.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/send.test.ts"
+    },
+    {
+      "local": "src/send.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/send.ts"
+    },
+    {
+      "local": "src/timeouts.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/timeouts.ts"
+    },
+    {
+      "local": "src/token.test.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/token.test.ts"
+    },
+    {
+      "local": "src/token.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/token.ts"
+    },
+    {
+      "local": "src/types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/zalo/src/types.ts"
+    },
+    {
+      "local": "src/webhook-spool.ts",
+      "status": "adapted",
+      "upstream": "extensions/zalo/src/webhook-spool.ts",
+      "deviation": ["D-ZL-011"]
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/zalo/src/monitor.ts",
+      "reason": "The OpenClaw inbound pipeline: route resolution, pairing/allowlist policy, media download, ctxPayload build, `core.channel.inbound.dispatch`, the reply-delivery closure and the typing indicator, plus the provider lifecycle around them. The Hub owns every one of those. Replaced at the smallest boundary by `fusion/inbound-adapter.ts`, `fusion/admission.ts`, `fusion/polling-session.ts`, `fusion/webhook-session.ts` and `lifecycle/start-account.ts` (D-ZL-012/013/015/014/018). Consequence: the typing indicator (`sendChatAction`) is wired on the client but not driven, and the hosted-media outbound path is gone with `outbound-media.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/src/monitor-durable.ts",
+      "reason": "The durable reply-option resolver for the OpenClaw reply-delivery pipeline; an orphan once that pipeline is Hub-owned (the Hub's delivery ledger + `message` tool own it)."
+    },
+    {
+      "upstream": "extensions/zalo/src/outbound-media.ts",
+      "reason": "Hosts an outbound media file on the account's own webhook origin so `sendPhoto` can be given a URL. It needs a public HTTPS endpoint the Hub does not have, an OpenClaw keyed-store pair and `registerPluginHttpRoute` on the OpenClaw gateway server (D-CORE-321). Consequence, named in `outbound.ts` (D-ZL-016) and the README: local-file media outbound is refused; an image already published at an HTTPS URL works."
+    },
+    {
+      "upstream": "extensions/zalo/src/channel.ts",
+      "reason": "The OpenClaw `ChannelPlugin` definition (`createChatChannelPlugin`): capabilities, config adapter, directory, status adapter, pairing, threading, security warnings and the outbound delivery profile. Fusion's drive surface is `plugin.ts` and the Hub owns config, status, pairing, policy and delivery. The parts that are behaviour and not host wiring are carried where they are read: the 2000-char chunk limit (`outbound.ts`), the target prefixes (`send.ts`), `isConfigured` (`accounts.ts`)."
+    },
+    {
+      "upstream": "extensions/zalo/src/channel.runtime.ts",
+      "reason": "The lazy runtime half of `channel.ts` (send/probe/startAccount trampolines). Its `startZaloGatewayAccount` is carried into `lifecycle/start-account.ts` (D-ZL-018); the rest is OpenClaw plugin plumbing."
+    },
+    {
+      "upstream": "extensions/zalo/src/config-schema.ts",
+      "reason": "The zod channel-config schema OpenClaw validates `config.json` with. The Hub compiles and validates channel config (`packages/hub/src/channels/config/compile.ts`); the field list this vertical actually reads is documented in HUB-WIRING.md \u00a73."
+    },
+    {
+      "upstream": "extensions/zalo/src/secret-contract.ts",
+      "reason": "OpenClaw's secret-target registry and runtime config assignments (how the wizard writes `ZALO_BOT_TOKEN` into a config file). The Hub owns credentials in its connection store and never writes a channel config file."
+    },
+    {
+      "upstream": "extensions/zalo/src/setup-core.ts",
+      "reason": "The OpenClaw setup adapter/wizard proxy (config promotion, account patching, dm-policy writes). The Hub owns onboarding."
+    },
+    {
+      "upstream": "extensions/zalo/src/setup-surface.ts",
+      "reason": "The interactive OpenClaw setup wizard surface. The Hub owns onboarding."
+    },
+    {
+      "upstream": "extensions/zalo/src/setup-allow-from.ts",
+      "reason": "The wizard's allow-from prompt/writer. Access policy and its UI are Hub-owned (goal ledger slice 23)."
+    },
+    {
+      "upstream": "extensions/zalo/src/status-issues.ts",
+      "reason": "OpenClaw `doctor`/status issue builders (the `dmPolicy: open` warning). The Hub owns the status surface; the ported `accounts.ts` still reports `dmPolicy` and `mode` on the account snapshot."
+    },
+    {
+      "upstream": "extensions/zalo/src/approval-auth.ts",
+      "reason": "OpenClaw's channel approval-auth capability (who may answer an approval prompt), built on its approval gateway runtime. The Hub owns approval authority."
+    },
+    {
+      "upstream": "extensions/zalo/src/session-route.ts",
+      "reason": "The outbound session-route builder that maps a `zalo:` target onto an OpenClaw agent session key. The Hub owns routing and session keys."
+    },
+    {
+      "upstream": "extensions/zalo/index.ts",
+      "reason": "The OpenClaw bundled-channel entry (`defineBundledChannelEntry`). Fusion's equivalent is `src/entry.ts` over `@getpaseo/channels-shared` `createChannelEntry`."
+    },
+    {
+      "upstream": "extensions/zalo/api.ts",
+      "reason": "OpenClaw plugin export barrels (`api.ts`, `channel-plugin-api.ts`, `contract-api.ts`, `secret-contract-api.ts`, `setup-api.ts`, `setup-entry.ts`, `setup-surface.ts`). They re-export the omitted setup/secret/channel surfaces; `src/index.ts` is the Fusion barrel."
+    },
+    {
+      "upstream": "extensions/zalo/channel-plugin-api.ts",
+      "reason": "See `extensions/zalo/api.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/contract-api.ts",
+      "reason": "See `extensions/zalo/api.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/secret-contract-api.ts",
+      "reason": "See `extensions/zalo/api.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/setup-api.ts",
+      "reason": "See `extensions/zalo/api.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/setup-entry.ts",
+      "reason": "See `extensions/zalo/api.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/setup-surface.ts",
+      "reason": "See `extensions/zalo/api.ts`."
+    },
+    {
+      "upstream": "extensions/zalo/src/test-support",
+      "reason": "The OpenClaw monitor/lifecycle test doubles (a fake plugin runtime, gateway context, reply pipeline and pairing store). They exist to drive the omitted `monitor.ts` pipeline; the Fusion sessions are tested against a real `node:http` listener and a fake admission instead (`fusion/*.test.ts`)."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-ZL-001",
+      "file": "src/runtime-api.ts",
+      "reason": "`runtime-api.ts` \u2014 upstream's file is the plugin's OpenClaw host binding: ~60 re-exports of `openclaw/plugin-sdk/*` (pairing controller, reply pipeline, setup/wizard helpers, gateway webhook registry) so a bundled plugin can be loaded without importing `openclaw`. Fusion has no OpenClaw host; the members this closure reads come from `@getpaseo/channels-core`, which mirrors the same upstream source modules. Kept at the same name and job so the ported `monitor.webhook.ts` keeps upstream's import block; the Hub-owned members (setup, pairing, reply delivery, plugin HTTP routes) are dropped rather than re-implemented."
+    },
+    {
+      "id": "D-ZL-002",
+      "file": "src/runtime.ts",
+      "reason": "`src/runtime.ts` \u2014 upstream stores the plugin runtime in OpenClaw's global plugin runtime store (`openclaw/plugin-sdk/runtime-store`), which opens SQLite-backed keyed stores from the OpenClaw state directory. Fusion's Hub owns channel state; the accessor names and the throw-on-unset contract are unchanged. NOTE: nothing in the CARRIED closure opens a keyed store (upstream's only consumer, `outbound-media.ts`, is omitted), so the accessors are kept for sync fidelity and are currently inactive \u2014 no `PluginRuntime` is installed."
+    },
+    {
+      "id": "D-ZL-003",
+      "file": "src/runtime.ts",
+      "reason": "Upstream runs one Zalo account per OpenClaw process, so one slot holds the runtime. The Hub runs every account of every organization in one process, so the runtime is keyed by account id and the account being served travels in `AsyncLocalStorage`; the ported zero-arg accessors resolve it. Same shape as the Google Chat (D-GC-003), Discord (D-DC-003) and Telegram (D-TG-046) verticals."
+    },
+    {
+      "id": "D-ZL-004",
+      "file": "src/secret-input.ts",
+      "reason": "`buildSecretInputSchema` is dropped from the re-export: it is the zod builder upstream's `config-schema.ts` composes, and the Hub owns the channel config schema (`config-schema.ts` is omitted), so the builder is not carried in `@getpaseo/channels-core` either. The two readers the ported token/account code calls are unchanged."
+    },
+    {
+      "id": "D-ZL-005",
+      "file": "src/fusion/proxy-fetch.ts",
+      "reason": "`makeProxyFetch` \u2014 upstream's (`src/infra/net/proxy-fetch.ts`) pulls the SSRF fetch guard, the pinned-dispatcher pool and OpenClaw's global undici dispatcher. Fusion channel transports own their own fetch stack (Discord D-DC-006, Telegram D-TG-013), so the proxy fetch is a `ProxyAgent`-backed undici fetch declared at the boundary. The ported `proxy.ts` keeps its cache and call shape.",
+      "tests": ["src/send.test.ts"]
+    },
+    {
+      "id": "D-ZL-006",
+      "file": "src/fusion/ssrf.ts",
+      "reason": "`resolvePinnedHostnameWithPolicy` \u2014 upstream's (`src/infra/net/ssrf.ts`, ~700 lines) resolves the hostname, re-checks every DNS answer against the private-network policy and returns a pinned `lookup` for an undici dispatcher. The one call site (`api.ts` `sendPhoto`, a URL Zalo's servers fetch) needs only the throw, so the boundary keeps the call contract plus the private/loopback/link-local/CGNAT/metadata refusal. NOT carried: address pinning between the DNS check and the connect, the trusted-hostname exemptions and the dispatcher/proxy policies.",
+      "tests": ["src/api.test.ts"]
+    },
+    {
+      "id": "D-ZL-007",
+      "file": "src/fusion/secret-file.ts",
+      "reason": "`tryReadSecretFileSync` \u2014 upstream's reader is the `@openclaw/fs-safe` workspace package (O_NOFOLLOW, hardlink and group/other permission refusal, parent-directory tightening, structured `FsSafeError` codes). Fusion never depends on an OpenClaw workspace package, so the boundary keeps the call shape, the overload set and the result contract the ported `token.ts` reads, over `node:fs`, with the size cap, the regular-file check, the O_NOFOLLOW symlink refusal and the `FsSafeErrorCode` spellings (`not-found`, `symlink`, \u2026). The hardlink and permission-mode hardening and the parent-directory tightening are NOT carried: the Hub is the credential authority and the path comes from operator-authored account config, not from channel traffic.",
+      "tests": ["src/token.test.ts", "src/accounts.test.ts"]
+    },
+    {
+      "id": "D-ZL-008",
+      "file": "src/fusion/account-config.ts",
+      "reason": "Account resolution input. Upstream reads OpenClaw's process-wide `config.json` (`channels.zalo.accounts.<id>` plus `ZALO_BOT_TOKEN`); in Fusion the Hub supervisor compiles the account's config revision and hands the vertical the flat `ctx.account` carrier plus the `cfg.channels.zalo.accounts.<id>` entry. This module is the ONLY reader of those carrier field names (`token`/`botToken`, `webhookSecret`), so the Hub wiring slice has one file to match (HUB-WIRING.md). The ported `accounts.ts` / `token.ts` keep their upstream shape and flow.",
+      "tests": ["src/outbound.test.ts", "src/channel-actions.test.ts"]
+    },
+    {
+      "id": "D-ZL-009",
+      "reason": "tsconfig: `exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off so the upstream Zalo source compiles verbatim; OpenClaw's own tsconfig sets neither flag. Same cut the Discord (D-DC-001) and Google Chat (D-GC-001) verticals make."
+    },
+    {
+      "id": "D-ZL-010",
+      "file": "src/monitor.webhook.ts",
+      "reason": "Two cuts at the OpenClaw gateway boundary. (1) `registerWebhookTargetWithPluginRoute` binds the path on OpenClaw's process-wide gateway HTTP server (`src/plugins/http-registry.ts`), which Fusion does not have (`@getpaseo/channels-core` D-CORE-321): the `route` option and its branch are dropped and the vertical owns one `node:http` listener per account (D-ZL-014). (2) upstream's `resolveClientIp` reads the already-validated client ip out of the gateway request scope before falling back to headers; Fusion has no such scope, so the header resolver IS the resolver (`resolveRequestClientIp`), which fails closed the same way. Everything the 200 depends on is unchanged: the rate-limit/method guards, the constant-time secret compare answering 401 BEFORE the body is read, the 415 ordering, the bounded body read and the ack written only after `acceptWebhook` resolves. The ported test drops upstream's plugin-registry reset for the same reason.",
+      "tests": ["src/monitor.webhook.test.ts", "src/fusion/webhook-session.test.ts"]
+    },
+    {
+      "id": "D-ZL-011",
+      "file": "src/webhook-spool.ts",
+      "reason": "The spool's DURABILITY is replaced, its PARSING is not. Upstream opens OpenClaw's SQLite-backed `openChannelIngressQueue`, appends the raw envelope and runs its own drain (`createChannelIngressMonitor` plus retry policy, dead-letter and claim lifecycle). The Hub already owns that store and that drain \u2014 `channel_ingress_queue` with lease/fencing, per-lane ordering, retry, dead-letter and restart drain (goal slices 1 and 8) \u2014 so `createZaloWebhookIngress` and `zaloWebhookIngressRuntime` are dropped and `fusion/admission.ts` is the boundary, keeping upstream's flow (persist, then ack \u2014 upstream 0ac69b9fe80). Everything that decides WHAT an envelope is stays verbatim: the zod schemas, the ok/result unwrapping, the admission facts (`message_id` as the event id, `chat:<id>` as the lane key), `parseClaimedUpdate`'s post-admission identity check and `isZaloAuthenticationFailure`.",
+      "tests": ["src/fusion/admission.test.ts"]
+    },
+    {
+      "id": "D-ZL-012",
+      "file": "src/fusion/inbound-adapter.ts",
+      "reason": "`monitor.ts`'s inbound normalization. Upstream resolves the route, runs the pairing/allowlist policy, downloads the photo, builds the OpenClaw `ctxPayload` and calls `core.channel.inbound.dispatch`. The Hub owns all of that, so this module only turns the native update into the shared `ChannelInboundEvent` (kind + facts). Carried from upstream: the seconds-vs-milliseconds timestamp rule, the group/direct split, the sender-label preference and the addressing. ADDED, because the Bot API carries no mention annotation and upstream leans on OpenClaw core's name matching for its `resolveRequireMention: () => true` group rule: `wasMentioned` is computed by matching the bot's `getMe` account name and operator aliases.",
+      "tests": ["src/fusion/inbound-adapter.test.ts"]
+    },
+    {
+      "id": "D-ZL-013",
+      "file": "src/fusion/admission.ts",
+      "reason": "Durable admission. Replaces upstream's spool ingress with the Hub queue via the shared inbound processor, and keeps the receive contract the two transports depend on: `durable` (ack with the marker), `ignored` (ack), `invalid` (400, never retried), THROW (5xx / do not consume). Inbound photos are downloaded through the shared media helper into the account's download dir and folded into the body as `[Attached files]`; a failed download keeps upstream's `[zalo image attachment unavailable]` notice.",
+      "tests": ["src/fusion/admission.test.ts"]
+    },
+    {
+      "id": "D-ZL-014",
+      "file": "src/fusion/webhook-session.ts",
+      "reason": "Webhook receive mode. Upstream binds its path on the OpenClaw gateway server; Fusion has none, so this module owns one `node:http` listener per account and keeps the ported request handler, the target registry, `setWebhook` on start and `deleteWebhook` (with upstream's 5s budget) on stop. UNEXERCISED IN PRODUCTION: Zalo needs a public HTTPS URL the dev host does not have.",
+      "tests": ["src/fusion/webhook-session.test.ts"]
+    },
+    {
+      "id": "D-ZL-015",
+      "file": "src/fusion/polling-session.ts",
+      "reason": "Long-poll mode. Upstream's `startPollingLoop` is carried unchanged in every observable rule (30s window, 408 = no updates, auth error terminal, `5s \u00b7 2^(n-1)` capped at 60s backoff, ready/recovering patches, pre-start webhook cleanup with its 404 tolerance), but the loop now AWAITS durable admission before it issues the next `getUpdates`. Zalo's `getUpdates` has no offset and no ack, so there is no watermark to hold back: admission failure is retried in place up to `ZALO_UPDATE_MAX_ATTEMPTS` and only then dropped with an error-level line, because the provider cannot re-serve the update. Webhook mode, which can answer 500 and be redelivered, is the durable one.",
+      "tests": ["src/fusion/polling-session.test.ts"]
+    },
+    {
+      "id": "D-ZL-016",
+      "file": "src/outbound.ts",
+      "reason": "The Hub's `plugin.outbound.*` bridge onto the ported `send.ts`. `sendText` chunks with upstream's outbound chunker at upstream's 2000-char limit and confirms with the first chunk's id. `sendMedia` REFUSES a local file loudly (the Hub's G11 shape: the in-channel notice through the text path plus `mediaPosted: false`) because the Zalo Bot API has no upload endpoint \u2014 `sendPhoto` takes a URL its servers fetch \u2014 and upstream's workaround (`outbound-media.ts`, hosting the file on the account's own webhook origin) needs the public HTTPS endpoint the Hub does not have. An image referenced by URL works, through the `send` action.",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-ZL-017",
+      "file": "src/channel-actions.ts",
+      "reason": "The `message` tool surface. Upstream's `actions.ts` adapter is carried unchanged and advertises exactly one action, `send`, which is the whole Zalo message API (`sendMessage` + `sendPhoto`). This module adds only the drive-time account carrier fold, so `fusion/account-config.ts` stays the single reader of the Hub's carrier field names, and pins the supported-action set so the Hub answers `unsupported_action` for everything else.",
+      "tests": ["src/channel-actions.test.ts"]
+    },
+    {
+      "id": "D-ZL-018",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "L4 lifecycle. Upstream's `channel.runtime.ts` `startZaloGatewayAccount` plus `monitor.ts`'s `monitorZaloProvider` prologue: the pre-start probe, the webhook-vs-polling mode split off `webhookUrl`, the webhook preconditions (HTTPS, 8\u2013256-char secret) and the status patches are carried. The OpenClaw pieces \u2014 the gateway HTTP route, the SQLite ingress queue, the pairing controller, the reply pipeline and the hosted-media route \u2014 are Hub-owned. One behaviour change: a failed probe FAILS the start (upstream only warns), because the Hub supervisor has no other place to learn the token is dead."
+    },
+    {
+      "id": "D-ZL-019",
+      "file": "src/accounts.test.ts",
+      "reason": "Two ported expectations move with their boundaries. (1) Upstream's strict mode THROWS on an unresolved SecretRef because the OpenClaw host resolves refs lazily at read time; in Fusion the Hub resolves credentials before handing the carrier over, and the core boundary (D-CORE-257) reports an unresolved ref as `configured_unavailable`, so the account starts blocked with a diagnostic instead of throwing inside a send. (2) `zaloPlugin.config.isConfigured` is asserted through `isZaloAccountConfigured`, which is the function upstream's omitted `channel.ts` wires there."
+    },
+    {
+      "id": "D-ZL-020",
+      "file": "src/api.test.ts",
+      "reason": "Two ported expectations move with the core provider-HTTP boundary (`@getpaseo/channels-core` D-CORE-036 / D-CORE-306): upstream throws a size-named error at the JSON cap and re-raises the caller's abort when a body read is cut short, while the Fusion reader stops at the cap / at its own 10s per-chunk idle deadline and the truncated body fails to parse. The invariants the cases exist for are asserted unchanged: the oversized stream is bounded and cancelled exactly once, and a hanging response body cannot hold the send."
+    }
+  ]
+}

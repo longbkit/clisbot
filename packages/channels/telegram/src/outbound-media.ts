@@ -1,134 +1,284 @@
-// COMPAT(clisbot-control-plane): Telegram OUTBOUND native media (G7–G10) —
-// post a local media file through the Bot API's typed send methods
-// (sendPhoto / sendDocument / sendAudio / sendVoice / sendVideo /
-// sendAnimation), one post per file. The mime→method routing mirrors OpenClaw
-// `extensions/telegram/src/outbound-media.ts` (`resolveTelegramOutboundMediaSenders`),
-// trimmed to the P0 surface (no force-document/video-note/dimension-validation:
-// those ride on the Hub's failDelivery + the pinned retry policy, not here; the
-// size-trimmed photo fallback — an image over the Bot API's 10 MB photo limit
-// goes out as a document, mirroring OpenClaw's "…Sending as document instead.").
-//
-// The G11 size/format gate + the in-channel "could not post" notice are NOT
-// here — they live in the shared policy (`@getpaseo/channels-shared`
-// `evaluateOutboundMedia`), applied by `outbound.sendMedia` before this runs.
-// A transport fault (missing file, Bot API failure) THROWS from here; the Hub
-// owns retry accounting.
-
-import { readFileSync } from "node:fs";
+// upstream: extensions/telegram/src/outbound-media.ts@5d8067a4483
 import { InputFile } from "grammy";
-import type { TelegramApi } from "./client/bot-api.js";
-import { withTelegramSendRetry } from "./client/bot-api.js";
-import { buildTelegramReplyParams, buildTelegramThreadParams } from "./leaves/rich-message.js";
+import type { MarkdownTableMode } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import { extensionForMime, type MediaKind } from "@getpaseo/channels-core/plugin-sdk/media-mime";
+import { isGifMedia, kindFromMime } from "@getpaseo/channels-core/plugin-sdk/media-runtime";
+import { logVerbose } from "@getpaseo/channels-core/plugin-sdk/runtime-env";
+import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/ssrf-runtime";
+import type { loadWebMedia } from "@getpaseo/channels-core/plugin-sdk/web-media";
+import { resolveTelegramPlainCaption, splitTelegramCaption } from "./caption.js";
+import { renderTelegramHtmlText, telegramHtmlToPlainTextFallback } from "./format.js";
+import type { TelegramOutboundPromptContextMessage } from "./outbound-message-context.js";
+import { isTelegramEmptyContentError, isTelegramHtmlParseError } from "./rich-plain-fallback.js";
+import type { TelegramApi } from "./send-context.js";
+import { isTelegramPhotoLimitError } from "./send-error-predicates.js";
+import { resolveTelegramVoiceSend } from "./voice.js";
 
-/** The Bot API media-send method label the mime routes to. */
-export type TelegramMediaMethod =
-  | "sendPhoto"
-  | "sendDocument"
-  | "sendAudio"
-  | "sendVoice"
-  | "sendVideo"
-  | "sendAnimation";
+type TelegramLoadedMedia = Awaited<ReturnType<typeof loadWebMedia>>;
 
-/** The Bot API result every media send returns: the new message id (+ chat). */
-export interface TelegramMediaResult {
-  message_id: number;
-  chat?: { id: number };
-}
+type TelegramOutboundMediaKind =
+  | "animation"
+  | "photo"
+  | "video"
+  | "video_note"
+  | "voice"
+  | "audio"
+  | "document";
 
-/** The Bot API's `sendPhoto` upload cap (bytes). An image over it goes out
- * as a `sendDocument` — OpenClaw's photo fallback, trimmed to the size check. */
-export const TELEGRAM_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-
-/** The media method label for one mime (OpenClaw routing, trimmed):
- * gif → animation; image → photo; video → video; ogg/opus audio → voice;
- * other audio → audio; anything else (pdf, …) → document. */
-export function telegramMediaMethod(mime: string | undefined): TelegramMediaMethod {
-  const m = (mime ?? "").trim().toLowerCase();
-  if (m === "image/gif") return "sendAnimation";
-  if (m.startsWith("image/")) return "sendPhoto";
-  if (m.startsWith("video/")) return "sendVideo";
-  if (m === "audio/ogg" || m === "audio/opus") return "sendVoice";
-  if (m.startsWith("audio/")) return "sendAudio";
-  return "sendDocument";
-}
-
-/** The thread/reply/silent/caption params that ride on the media post
- * (the SAME `buildTelegramThreadParams` + `buildTelegramReplyParams`
- * builders the text path uses — F-07; a single media post carries both,
- * the way the text path's chunk 0 does). */
-function mediaThreadParams(params: {
-  messageThreadId?: number | undefined;
-  replyToMessageId?: number | undefined;
-  silent?: boolean | undefined;
-  caption?: string | undefined;
-}): Record<string, unknown> {
-  const out = {
-    ...buildTelegramThreadParams({
-      messageThreadId: params.messageThreadId,
-      silent: params.silent,
-    }),
-    ...buildTelegramReplyParams({
-      replyToMessageId: params.replyToMessageId,
-    }),
-  };
-  if (params.caption !== undefined && params.caption !== "") out["caption"] = params.caption;
-  return out;
-}
-
-/** Post one local media file to `chatId` through the mime-routed Bot API
- * method, with the pinned outbound retry policy. `params` carries the thread /
- * reply / silent / caption facts. Returns the new message id. THROWS on a
- * missing file or a non-retryable Bot API fault. */
-export async function sendTelegramMedia(params: {
-  api: TelegramApi;
-  chatId: number;
-  filePath: string;
+type TelegramOutboundMediaPlan = {
+  kind: MediaKind | undefined;
+  deliveryKind: MediaKind | undefined;
+  isGif: boolean;
+  isVideoNote: boolean;
   fileName: string;
-  mime: string;
-  log?: (message: string) => void;
-  messageThreadId?: number;
-  replyToMessageId?: number;
-  silent?: boolean;
+  file: InputFile;
   caption?: string;
-}): Promise<{ messageId: string; chatId: string }> {
-  const { api, chatId, filePath, fileName, mime } = params;
-  const log = params.log ?? (() => {});
-  // The Bot API upload: read the file into a grammy InputFile (filename = the
-  // native name, so the post carries the real extension, not a guessed one).
-  const buffer = readFileSync(filePath);
-  const file = new InputFile(buffer, fileName);
-  let method = telegramMediaMethod(mime);
-  // OpenClaw's photo fallback (size-trimmed): the Bot API caps `sendPhoto` at
-  // 10 MB — an oversized image goes out as a document instead of failing the
-  // post (OpenClaw logs "…Sending as document instead." when photo validation
-  // fails).
-  if (method === "sendPhoto" && buffer.length > TELEGRAM_MAX_PHOTO_BYTES) {
-    log("Photo exceeds the Bot API's 10 MB photo limit. Sending as document instead.");
-    method = "sendDocument";
+  htmlCaption?: string;
+  plainCaption?: string;
+  followUpText?: string;
+};
+
+export type TelegramOutboundMediaSender<T = TelegramOutboundPromptContextMessage> = {
+  label: TelegramOutboundMediaKind;
+  operation: string;
+  send: (effectiveParams: Record<string, unknown>) => Promise<T>;
+};
+
+function resolveTelegramOutboundMediaFilename(params: {
+  fileName?: string;
+  contentType?: string;
+  kind?: MediaKind;
+  isGif: boolean;
+}): string {
+  if (params.fileName) {
+    return params.fileName;
   }
-  const requestParams = mediaThreadParams({
-    messageThreadId: params.messageThreadId,
-    replyToMessageId: params.replyToMessageId,
-    silent: params.silent,
-    caption: params.caption,
+  if (params.isGif) {
+    return "animation.gif";
+  }
+
+  // Telegram receives only the multipart filename, so preserve the detected
+  // MIME extension instead of labeling every anonymous upload as another format.
+  const basename =
+    params.kind === "image" || params.kind === "video" || params.kind === "audio"
+      ? params.kind
+      : "file";
+  const defaultExtension =
+    params.kind === "image"
+      ? ".jpg"
+      : params.kind === "video"
+        ? ".mp4"
+        : params.kind === "audio"
+          ? ".ogg"
+          : ".bin";
+  return `${basename}${extensionForMime(params.contentType) ?? defaultExtension}`;
+}
+
+export function prepareTelegramOutboundMedia(params: {
+  media: TelegramLoadedMedia;
+  text?: string;
+  textMode?: "markdown" | "html";
+  tableMode?: MarkdownTableMode;
+  forceDocument?: boolean;
+  asVideoNote?: boolean;
+  preparedHtml?: boolean;
+}): TelegramOutboundMediaPlan {
+  const kind = kindFromMime(params.media.contentType ?? undefined);
+  const isGif = isGifMedia({
+    contentType: params.media.contentType,
+    fileName: params.media.fileName,
   });
-  const sendFn = api[method] as unknown as (
-    chatId: number,
-    file: InputFile,
-    params?: Record<string, unknown>,
-  ) => Promise<TelegramMediaResult>;
-  const result = await withTelegramSendRetry(
-    () =>
-      Object.keys(requestParams).length > 0
-        ? sendFn.call(api, chatId, file, requestParams)
-        : sendFn.call(api, chatId, file),
-    `telegram ${method}`,
-    log,
-  );
-  if (!Number.isFinite(result.message_id)) {
-    throw new Error(`Telegram ${method} returned no message_id`);
+  const deliveryKind =
+    params.forceDocument === true && (kind === "image" || kind === "video") ? "document" : kind;
+  if (params.asVideoNote === true && deliveryKind !== "video") {
+    throw new Error("Telegram video notes require video media.");
   }
-  const lastChatId = String(result.chat?.id ?? chatId);
-  log(`telegram outbound media ok (${method}) chatId=${lastChatId} messageId=${result.message_id}`);
-  return { messageId: String(result.message_id), chatId: lastChatId };
+  const isVideoNote = deliveryKind === "video" && params.asVideoNote === true;
+  const fileName = resolveTelegramOutboundMediaFilename({
+    fileName: params.media.fileName,
+    contentType: params.media.contentType,
+    kind,
+    isGif,
+  });
+  const text = params.text;
+  const trimmedText = text?.trim();
+  const renderedCaption =
+    !isVideoNote && trimmedText
+      ? params.preparedHtml === true && params.textMode === "html"
+        ? trimmedText
+        : renderTelegramHtmlText(trimmedText, {
+            textMode: params.textMode ?? "markdown",
+            tableMode: params.tableMode,
+          })
+      : undefined;
+  const { caption, followUpText } = isVideoNote
+    ? { caption: undefined, followUpText: trimmedText ? text : undefined }
+    : splitTelegramCaption(text, renderedCaption);
+  const htmlCaption = caption ? renderedCaption : undefined;
+
+  return {
+    kind,
+    deliveryKind,
+    isGif,
+    isVideoNote,
+    fileName,
+    file: new InputFile(params.media.buffer, fileName),
+    caption,
+    htmlCaption,
+    plainCaption: resolveTelegramPlainCaption(
+      caption && params.textMode === "html" ? telegramHtmlToPlainTextFallback(caption) : caption,
+      htmlCaption,
+    ),
+    followUpText,
+  };
+}
+
+export function resolveTelegramOutboundMediaSenders<
+  T = TelegramOutboundPromptContextMessage,
+>(params: {
+  api: TelegramApi;
+  chatId: string;
+  media: TelegramLoadedMedia;
+  plan: TelegramOutboundMediaPlan;
+  forceDocument?: boolean;
+  asVoice?: boolean;
+  sendImageAsPhoto?: boolean;
+}): { sender: TelegramOutboundMediaSender<T>; documentSender: TelegramOutboundMediaSender<T> } {
+  const createSender = (label: TelegramOutboundMediaKind): TelegramOutboundMediaSender<T> => {
+    const operation = `send${label
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}`;
+    const method = params.api[operation as keyof TelegramApi] as unknown as (
+      chatId: string,
+      file: InputFile,
+      options: Record<string, unknown>,
+    ) => Promise<T>;
+    return {
+      label,
+      operation,
+      send: (effectiveParams) =>
+        method.call(
+          params.api,
+          params.chatId,
+          params.plan.file,
+          label === "document" && params.forceDocument
+            ? { ...effectiveParams, disable_content_type_detection: true }
+            : effectiveParams,
+        ),
+    };
+  };
+  const documentSender = createSender("document");
+  let label: TelegramOutboundMediaKind = "document";
+  if (params.plan.isGif && params.plan.deliveryKind !== "document") {
+    label = "animation";
+  } else if (
+    params.plan.deliveryKind === "image" &&
+    !params.plan.isGif &&
+    params.sendImageAsPhoto !== false
+  ) {
+    label = "photo";
+  } else if (params.plan.deliveryKind === "video") {
+    label = params.plan.isVideoNote ? "video_note" : "video";
+  } else if (params.plan.kind === "audio") {
+    const { useVoice } = resolveTelegramVoiceSend({
+      wantsVoice: params.asVoice === true,
+      contentType: params.media.contentType,
+      fileName: params.plan.fileName,
+      logFallback: logVerbose,
+    });
+    label = useVoice ? "voice" : "audio";
+  }
+  return { sender: label === "document" ? documentSender : createSender(label), documentSender };
+}
+
+export async function sendTelegramCaptionedMediaWithFallback<T>(params: {
+  operation: string;
+  requestParams: Record<string, unknown>;
+  plainCaption?: string;
+  shouldLog?: (err: unknown) => boolean;
+  send: (
+    requestParams: Record<string, unknown>,
+    shouldLog?: (err: unknown) => boolean,
+  ) => Promise<T>;
+}): Promise<{ result: T; deliveredCaption?: string; captionRemoved?: true }> {
+  const requestCaption =
+    typeof params.requestParams.caption === "string" ? params.requestParams.caption : undefined;
+  const sendCaptionless = async () => {
+    const captionlessParams = { ...params.requestParams };
+    delete captionlessParams.caption;
+    delete captionlessParams.parse_mode;
+    return {
+      result: await params.send(captionlessParams, params.shouldLog),
+      ...(requestCaption !== undefined ? { captionRemoved: true as const } : {}),
+    };
+  };
+  try {
+    return {
+      result: await params.send(
+        params.requestParams,
+        (err) =>
+          !isTelegramHtmlParseError(err) &&
+          !isTelegramEmptyContentError(err) &&
+          (params.shouldLog?.(err) ?? true),
+      ),
+      ...(requestCaption !== undefined
+        ? { deliveredCaption: params.plainCaption ?? requestCaption }
+        : {}),
+    };
+  } catch (err) {
+    if (isTelegramEmptyContentError(err) && requestCaption !== undefined) {
+      return await sendCaptionless();
+    }
+    if (!isTelegramHtmlParseError(err) || !params.plainCaption) {
+      throw err;
+    }
+    // Captions share the text-send contract: retain visible content after an
+    // HTML parse failure without disturbing the topic, quote, or keyboard.
+    logVerbose(
+      `telegram ${params.operation} caption HTML rejected; retrying as plain caption: ${formatErrorMessage(
+        err,
+      )}`,
+    );
+    const plainParams: Record<string, unknown> = {
+      ...params.requestParams,
+      caption: params.plainCaption,
+    };
+    delete plainParams.parse_mode;
+    try {
+      return {
+        result: await params.send(
+          plainParams,
+          (plainError) =>
+            !isTelegramEmptyContentError(plainError) && (params.shouldLog?.(plainError) ?? true),
+        ),
+        deliveredCaption: params.plainCaption,
+      };
+    } catch (plainError) {
+      if (!isTelegramEmptyContentError(plainError)) {
+        throw plainError;
+      }
+      return await sendCaptionless();
+    }
+  }
+}
+
+export async function sendTelegramOutboundMediaWithPhotoFallback<T, TMessage>(params: {
+  sender: TelegramOutboundMediaSender<TMessage>;
+  documentSender: TelegramOutboundMediaSender<TMessage>;
+  send: (sender: TelegramOutboundMediaSender<TMessage>) => Promise<T>;
+}): Promise<{ result: T; sender: TelegramOutboundMediaSender<TMessage> }> {
+  try {
+    return { result: await params.send(params.sender), sender: params.sender };
+  } catch (error) {
+    if (params.sender.label !== "photo" || !isTelegramPhotoLimitError(error)) {
+      throw error;
+    }
+    // Telegram is authoritative for photo limits; preserve the same bytes and
+    // accepted caption/topic/quote/keyboard when retrying as a document.
+    logVerbose(
+      `telegram sendPhoto exceeded photo limits; retrying as document: ${formatErrorMessage(error)}`,
+    );
+    return { result: await params.send(params.documentSender), sender: params.documentSender };
+  }
 }

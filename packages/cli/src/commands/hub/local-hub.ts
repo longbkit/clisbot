@@ -58,6 +58,8 @@ export interface HubStartOptions {
   home?: string;
   port?: string;
   foreground?: boolean;
+  /** First run only: mint the local credential master key when it is absent. */
+  initMasterKey?: boolean;
 }
 
 export interface HubStateRecord {
@@ -364,35 +366,55 @@ export function localHubMasterKeyPath(home: string, hubDataDirectory = home): st
 }
 
 /**
- * Provision the local-only Hub master key as a sibling of, never inside, the
- * effective Hub data directory. Hosted deployments keep using their externally managed env/file
- * secret; this helper only makes `paseo hub start` secure-by-default locally.
+ * The local-only Hub master key file, as a sibling of — never inside — the
+ * effective Hub data directory. Hosted deployments keep using their externally
+ * managed env/file secret; this helper only makes `paseo hub start`
+ * secure-by-default locally.
+ *
+ * Absent, it is NOT regenerated. A silently minted key starts a Hub that cannot
+ * read a single stored Connection, and every credential in the database is
+ * lost with no error. Minting is the explicit first-run act
+ * `--init-master-key` asks for.
  */
-export function readOrCreateLocalHubMasterKey(home: string, hubDataDirectory = home): string {
-  const keyPath = localHubMasterKeyPath(home, hubDataDirectory);
+export function resolveLocalHubMasterKeyFile(
+  home: string,
+  options: { hubDataDirectory?: string; initialize?: boolean } = {},
+): string {
+  const keyPath = localHubMasterKeyPath(home, options.hubDataDirectory ?? home);
   try {
     const value = readFileSync(keyPath, "utf8").trim();
     if (!/^[A-Za-z0-9+/]{43}=$/u.test(value)) {
       throw new Error(`Local Hub credential master key is malformed: ${keyPath}`);
     }
     if (process.platform !== "win32") chmodSync(keyPath, PRIVATE_FILE_MODE);
-    return value;
+    return keyPath;
   } catch (error) {
     if (readNodeErrnoCode(error) !== "ENOENT") throw error;
   }
+  if (options.initialize !== true) {
+    throw new Error(
+      [
+        `No Hub credential master key at ${keyPath}.`,
+        "Restore it from your backup, or run `paseo hub start --init-master-key` to mint a new one.",
+        "Minting a new key makes every credential already stored in this Hub unreadable.",
+      ].join(" "),
+    );
+  }
+  return writeLocalHubMasterKey(keyPath, home, options.hubDataDirectory ?? home);
+}
 
-  const generated = randomBytes(32).toString("base64");
+function writeLocalHubMasterKey(keyPath: string, home: string, hubDataDirectory: string): string {
   let descriptor: number | undefined;
   try {
     descriptor = openSync(keyPath, "wx", PRIVATE_FILE_MODE);
-    writeFileSync(descriptor, `${generated}\n`, "utf8");
+    writeFileSync(descriptor, `${randomBytes(32).toString("base64")}\n`, "utf8");
     closeSync(descriptor);
-    descriptor = undefined;
-    return generated;
+    return keyPath;
   } catch (error) {
     if (descriptor !== undefined) closeSync(descriptor);
     if (readNodeErrnoCode(error) === "EEXIST") {
-      return readOrCreateLocalHubMasterKey(home, hubDataDirectory);
+      // Another `hub start` won the race; read what it wrote.
+      return resolveLocalHubMasterKeyFile(home, { hubDataDirectory });
     }
     throw new Error(`Could not provision local Hub credential master key: ${keyPath}`, {
       cause: error,
@@ -404,6 +426,7 @@ function buildChildEnv(
   home: string,
   port: number,
   inherited: NodeJS.ProcessEnv = process.env,
+  options: { initMasterKey?: boolean } = {},
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...inherited,
@@ -438,7 +461,12 @@ function buildChildEnv(
       (isSet(env.PASEO_HUB_DATA_DIR) ? env.PASEO_HUB_DATA_DIR : undefined) ??
       (isSet(env.CLISBOT_HUB_DATA_DIR) ? env.CLISBOT_HUB_DATA_DIR : undefined) ??
       home;
-    env.PASEO_HUB_CREDENTIAL_MASTER_KEY = readOrCreateLocalHubMasterKey(home, hubDataDirectory);
+    // The path, never the key: an env var is readable from the process table
+    // and lands verbatim in any log that dumps the child's environment.
+    env.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE = resolveLocalHubMasterKeyFile(home, {
+      hubDataDirectory,
+      ...(options.initMasterKey === true ? { initialize: true } : {}),
+    });
   }
   const password = readDaemonPasswordFile(home);
   if (password !== undefined) env.PASEO_PASSWORD = password;
@@ -482,7 +510,12 @@ export async function startLocalHubDetached(
   const child = runtime.spawnDetached(process.execPath, [runtime.resolveHubBin()], {
     detached: true,
     envMode: "internal",
-    env: buildChildEnv(home, port, { ...environment, CLISBOT_HUB_INSTANCE_ID: instanceId }),
+    env: buildChildEnv(
+      home,
+      port,
+      { ...environment, CLISBOT_HUB_INSTANCE_ID: instanceId },
+      { initMasterKey: options.initMasterKey === true },
+    ),
     stdio: ["ignore", logFd, logFd],
   });
   child.unref();
@@ -542,7 +575,9 @@ export function startLocalHubForeground(
   const home = resolveLocalHubHome(options);
   const port = resolveHubPort(options);
   const result = runtime.spawnForeground(process.execPath, [runtime.resolveHubBin()], {
-    env: buildChildEnv(home, port),
+    env: buildChildEnv(home, port, process.env, {
+      initMasterKey: options.initMasterKey === true,
+    }),
     stdio: "inherit",
   });
   if (result.error) {

@@ -49,6 +49,15 @@ export const organizationCapabilitiesSchema = z.object({
   manageMembers: z.boolean(),
   manageOwners: z.boolean(),
   manageResources: z.boolean(),
+  /**
+   * The channel control plane: Connections, accounts, routes, the ingress
+   * backlog. Held apart from `manageResources` because a channel account is a
+   * live credential to an outside workspace and its backlog holds message
+   * content, so an organization has to be able to grant Project and daemon
+   * administration without granting that. Owner and admin hold it by default,
+   * which is what `manageResources` granted before it was named.
+   */
+  manageChannels: z.boolean(),
 });
 
 export const accountStateSchema = z.discriminatedUnion("status", [

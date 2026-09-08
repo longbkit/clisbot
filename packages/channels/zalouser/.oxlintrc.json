@@ -1,0 +1,16 @@
+{
+  // Nested override for ported OpenClaw source. These rules are stylistic and
+  // OpenClaw's own lint config does not apply them; enforcing them here would
+  // mean editing every ported file and losing the upstream diff. Correctness,
+  // suspicious and perf rules from the root config still apply.
+  // Mapping and deviations: upstream-sync.json.
+  "$schema": "../../../node_modules/oxlint/configuration_schema.json",
+  "rules": {
+    "typescript/consistent-type-definitions": "off",
+    "no-nested-ternary": "off",
+    "complexity": "off",
+    "max-depth": "off",
+    "max-nested-callbacks": "off",
+    "no-control-regex": "off"
+  }
+}

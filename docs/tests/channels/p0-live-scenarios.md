@@ -428,8 +428,10 @@ still carries `text` only (the manifest rides in the body); the Slack
 ctxPayload carries no `files` array, so Slack inbound media remains a gap.
 Outbound (G7–G11) changed shape on 2026-08-29: the relay no longer parses
 final-answer text for media paths (the text-parse heuristics are retired) —
-the agent sends files ONLY through the explicit Hub MCP tool `send_file`
-(absolute path under the agent home, optional caption), which posts natively
+the agent sends files ONLY through the Hub MCP `message` tool's media params
+(`attachments`/`media`/`buffer`, absolute path under the Project root, optional
+caption; the 2026-08-29 runs below drove the same path through the since-deleted
+`send_file` tool), which posts natively
 through the vertical's `outbound.sendMedia` (Slack generic external upload;
 Telegram mime-routed Bot API send methods, OpenClaw-mirrored routing incl.
 the >10 MB photo→document fallback). G7–G10 are LIVE-PASS 2026-08-29 under
@@ -680,3 +682,770 @@ rows above carry the evidence.
   campaign. The grok provider override remains in `~/.clisbot-dev/config.json`
   (dev-daemon onboarding state for the H5 scenario; rollback
   `removeProviders:["grok"]`).
+
+## Wave 4 — post-port deep workflows (2026-09-07, slice 12)
+
+First live wave after the OpenClaw channel port (slices 5–24). Hub on
+`127.0.0.1:6868`, `CLISBOT_HOME=~/.clisbot-dev`, dev daemon `127.0.0.1:6867`
+(never restarted). Active revision `0712b046-e77d-4d2d-8154-cb861e4a80ac` v5
+(written by `.hub-revision-write12.mjs toolpath`): policy identities + approval
+floor; Slack `channel`/`thread` routes and the Telegram `group` route on
+`outbound.path: tool`; the Telegram `topic` route on the relay path with
+`sync.streaming.mode: block`. Agent = `codex` / `gpt-5.6-luna` on both channels.
+Slack bot `U08N4UZM8CF`; Telegram bot under test `@longluong3bot`, driver
+`TELEGRAM_MASTER_BOT_TOKEN`.
+
+Marker convention this wave: `S12-W1-<CH>-<n>`, answer token `PONG-W1<CH><n>`.
+
+### Fixes that had to land before the wave could run
+
+| Defect                                                                                                                                                                                   | Evidence                                                                                                                    | Fix                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Telegram inbound had no plugin runtime: **1286** `telegram update offset persist failed (retrying) … "Telegram runtime not initialized"` warnings, one every 5 s, offset never persisted | `hub.log` 06:5x–08:44, attempt 1179, updateId 318879853                                                                     | `runtime-store.ts` installs the account runtime in `registerAccountInbound`; `lifecycle/start-account.ts` runs the transport inside `withTelegramAccount` |
+| Every idle long poll aborted at 30 s — `telegram poll fault (kept polling)` with `delayMs` climbing 30 s → 600 s, so a quiet chat went blind for up to 10 minutes                        | `hub.log` 09:10:14 / 09:11:14 / 09:15:38 `delayMs: 249965` / 09:20:18 `delayMs: 549019`; reproduced standalone at 30 073 ms | client request cap floored at the outbound send budget (60 s) and never handed to grammY; poll window from `resolveTelegramLongPollTimeoutSeconds` (30 s) |
+| The fault backoff only reset when the watermark advanced, so an idle account escalated across unrelated faults                                                                           | same lines                                                                                                                  | `polling-session.ts` resets on any completed poll, empty batch included                                                                                   |
+| Hub would not boot: `Cannot find package 'better-auth' imported from node_modules/@better-auth/oauth-provider`                                                                           | `hub.log` 08:52 / 09:05                                                                                                     | environment-only workaround (symlink guard in `~/.clisbot-dev/start-hub.sh`); see Findings below — the lockfile places the peer under `packages/hub`      |
+
+After the restart at 09:30:11 the Telegram account polled with **zero** offset
+warnings and **zero** poll faults for the rest of the wave.
+
+### Scenario results
+
+| #   | Scenario                 | Slack                                                                                                                                                                                                                                                                                                                                 | Telegram                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Baseline mention → reply | **PASS** marker `1788772455.298159` → reply `1788772483.410119` `PONG-W1SL1` in thread, 39 s                                                                                                                                                                                                                                          | **PASS** marker 421 → 422 `PONG-W1TG1`, 30 s (after `/new`; see the capability finding)                                                                                                                                                                                                                                                                                                      |
+| 2   | Long formatted reply     | **PASS** 4 chunks `1788775345.946339`…`1788775346.399119` in thread `1788775035.467529`, order kept, ends `PONG-W1SL2`                                                                                                                                                                                                                | **PASS** 7 chunks (real ids 153–159) all in topic-1 `message_thread_id=2` of `TELEGRAM_TEST_TOPIC_GROUP_ID`, no 400, ends `PONG-W1TG2`                                                                                                                                                                                                                                                       |
+| 3   | Files both ways          | **FAIL out** (re-scored 2026-09-07 from the user's screenshots): the two files and `PONG-W1SL3` were posted by a DIFFERENT app identity ("vaiclaude"), i.e. the agent used a workspace user/app credential instead of `channel_reply`. The wave-4 read-back matched on content only. Re-driven and passed in wave 4b. **in: not run** | **PASS** in: `sendDocument` marker 425 → agent echoed the file body `SILVER-OTTER-3312` (msg 426); out: msg 428 `document s12b-note.txt` + msg 429 `photo 1×1` + msg 430 `PONG-W1TG3B`                                                                                                                                                                                                       |
+| 4   | Message tool actions     | **FAIL** only `send` executed; the agent reported react / edit / pin were refused by `channel_reply` (msgs `1788777131.264409`, `1788777156.035789`)                                                                                                                                                                                  | **PASS** msg 432 sent as `PONG-W1TG4-A` then **edited in place** to `PONG-W1TG4-B` (verified by forwarding 432 → text is `-B`); poll msg 433 question `S12POLL`; 👍 reaction claimed, no Bot API read-back exists for it                                                                                                                                                                     |
+| 5   | Commands                 | not run (Telegram lane)                                                                                                                                                                                                                                                                                                               | `/new` **PASS** (msg 420 "🆕 Started fresh…", next marker minted agent `8b2e369e`); `/stop` **PASS** (`channel processing stopped` 10:33:08 then `channel inbound answered an approval command … "stop requested"` 10:33:09); `/help` **FAIL** — hub logs `handled: true detail: "help"` at 10:27:58 but nothing was posted to the group                                                     |
+| 6   | Restart durability       | not run (Telegram lane)                                                                                                                                                                                                                                                                                                               | **FAIL** marker 160 in topic-1 10:35:28; hub SIGTERM 10:35:57, gone 10:38:45, back 10:39:18. The topic kept only the pre-restart fragments (161 `I`, 162 preamble, 163 `Running shell…`, 164 `P`). `PONG-W1TG6` never arrived — lost, not duplicated                                                                                                                                         |
+| 7   | Streaming `mode: block`  | not run                                                                                                                                                                                                                                                                                                                               | **FAIL** the draft stub is posted and never edited: msg 152 = `##`, 161 = `I`, 164 = `P`; `editMessageText` appears **0** times in `hub.log` and the final answer arrives as new messages (153–159) beside the orphan stub                                                                                                                                                                   |
+| 8   | Approval button          | SKIPPED                                                                                                                                                                                                                                                                                                                               | **SKIPPED** driven 10:40 with an escalation-requiring shell command (`touch /etc/…`) on the group route: the turn ran (10:40:47 steer → 10:41:30 stop), `paseo permit ls` stayed empty, and no card and no reply reached the group. That session was minted at 09:37 under the pre-restart Hub, so **D-W4-01 swallowed the outbound again** — no approval-gated route was actually exercised |
+
+### Findings
+
+- **D-W4-01 — the channel reply capability dies with the Hub process and is
+  never re-issued for a live session.** `workflowChannelTool`
+  (`packages/hub/src/daemons/lifecycle.ts:2202`) mints the `channel_reply` MCP
+  URL at agent **create** time, and `ChannelReplyCapabilityRegistry`
+  (`packages/hub/src/channels/channel-reply-capabilities.ts:57`) holds tokens in
+  process memory. After a Hub restart every steered turn on an
+  `outbound.path: tool` route calls a dead capability: `tools/call` answers
+  `isError: true, "unknown, expired, or revoked channel reply capability"`,
+  `tools/list` answers `200` with an **empty** tool list, and the Hub logs
+  nothing. Live shape: agent `110a46da` emitted `channel_reply.message` four
+  times between 07:07 and 09:30 and the group message-id sequence
+  (417 → 418 → 419) proves nothing was posted. Recovered only by `/new`.
+- **D-W4-02 — Slack tool actions do not execute.** The schema advertises
+  `send, react, reactions, read, edit, delete, pin, unpin, list-pins,
+member-info, emoji-list, download-file, upload-file`
+  (`listChannelMessageToolActions("slack")`), but the live tool refused
+  everything except `send`. Telegram's adapter dispatched `edit` and `poll` on
+  the same Hub build, so the gate is Slack-specific — start at
+  `resolveExecutableActions` (`packages/hub/src/channels/message-actions.ts:135`)
+  and the registration in `loader/load-channel.ts:300`.
+- **D-W4-03 — `sync.streaming.mode: block` posts an orphan stub.** See scenario 7.
+- **D-W4-04 — `/help` is handled but never delivered.** `/new` and `/stop` both
+  reach the channel; `/help` does not.
+- **D-W4-05 — Hub SIGTERM does not stop the process while channel accounts run.**
+  `process.once("SIGTERM", stopAfterSignal)` (`packages/hub/src/index.ts:440`)
+  fired at 10:35:57 and the Hub was still admitting Slack inbound at 10:37:10;
+  the restarted instance died on `acquireDataDirectoryLock`. A **second**
+  SIGTERM (handler already consumed by `once`) killed it in 8 s.
+- **D-W4-06 — `better-auth` is unreachable from the repo root.**
+  `package-lock.json` places `better-auth` under `packages/hub/node_modules`
+  while `@better-auth/oauth-provider` hoists to the root, so
+  `node packages/hub/bin/paseo-hub.js` cannot resolve the peer after any
+  `npm install`. Worked around outside the repo; the lockfile still needs the fix.
+- **Provider capacity is the wave's main source of noise.** `Selected model is at
+capacity. Please try a different model.` aborted five drives (09:0x, 09:38,
+  10:12, 10:20). It is surfaced truthfully into the channel on the **relay**
+  path (Telegram topic msg 150) and **swallowed** on the tool path.
+- **Slack test-design trap.** The channel workspace also carries a Slack user
+  credential and `slack-cli`, so an agent asked to "react / pin" will do it
+  through the Slack API and report success without touching `channel_reply`.
+  Tool-path scenarios must say "do NOT use slack-cli, curl or the Slack Web API".
+- **Assert-window drift.** Two Slack drives were scored FAIL at 280–286 s and
+  the reply landed 30–60 s later. Slack tool-path turns on this box need
+  `--timeout 420`.
+
+## Wave 4b — the wave-4 defect re-drive (2026-09-07, ledger R3)
+
+Same surfaces as wave 4. Hub rebuilt from this tree and restarted three times
+during the wave (`~/.clisbot-dev/start-hub.sh`, `127.0.0.1:6868`,
+`CLISBOT_HOME=~/.clisbot-dev`, revision `0712b046-e77d-4d2d-8154-cb861e4a80ac`
+v5 unchanged). Agent `codex` / `gpt-5.6-luna`. Slack bot `U08N4UZM8CF`
+(`clisbot`), Telegram bot under test `@longluong3bot`, driver
+`TELEGRAM_MASTER_BOT_TOKEN`. Marker convention `S12-W2-<CH><n>`.
+
+### What the wave found beyond the six recorded defects
+
+- **D-W4-07 (new, worst of the wave) — the capability was refused for the
+  whole pending window.** `ChannelReplyCapabilityRegistry.resolve` required a
+  BOUND capability, but the daemon starts the Agent — and the Agent dials the
+  MCP URL — before `createAgent` returns and the Hub can bind. Live at
+  11:43:32.055 the Hub answered `tools/list` with an empty list, bound the
+  capability 340 ms later, and agent `b33fd0d6` spent its whole session with no
+  reply tool: its own words in the codex rollout were _"I can't complete this
+  because the required `channel_reply` message tool isn't available in the
+  current session."_ This, not the schema, is why a tool-path turn silently
+  produced nothing. Fixed by resolving pending capabilities
+  (`channel-reply-capabilities.ts` `resolve`); the token is the bearer
+  credential and a failed create still revokes it.
+- **A failed account start used to delete the account's durable
+  capabilities.** The start-failure path stops the handle with
+  `cancelActive: true`, which retired every capability the account owned — a
+  boot that failed once poisoned every live Agent. `stopHandle` now retires
+  capabilities only for `retireCapabilities: true` (reconcile removal and
+  teardown), never for a shutdown, a monitor fault or a failed start.
+- **`@getpaseo/channels-shared` lost `"./package.json"` from its `exports`**
+  (edited at 11:55 by a parallel agent), which broke `require.resolve` in
+  `loader/load-channel.ts:173` and failed BOTH accounts at start
+  (`Package subpath './package.json' is not defined by "exports"`). Restored
+  the subpath the way `channels-core` already declares it.
+- **Slack `pins:write` is missing from the app.** `pin` is the only tool action
+  that fails, with `missing_scope` from the Slack API. Workspace scope gap, not
+  code — add the scope before scoring `pin`.
+
+### Defect results
+
+| Defect                             | Verdict                    | Live evidence                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D-W4-01 capability lost on restart | **FIXED**                  | Hub boot logs `channel reply capabilities restored restored: 1 rows: 1` (12:05:34) after a SIGTERM at 12:04:33. The next marker into the same Slack thread steered the pre-restart session (agent `d5d5e934`) and the reply `PONG-W2SL6` landed in 28 s, once, authored by `U08N4UZM8CF` (`ts=1788782792.061979`)        |
+| D-W4-01 logging                    | **FIXED**                  | `channel reply capability unknown verb: "tools/list"` (11:43:32) and `verb: "tools/call" tool: "message"` (11:48:07, 12:08) — the dead-capability case is no longer silent                                                                                                                                               |
+| D-W4-02 Slack tool actions         | **FIXED**                  | Thread `1788782326.061779`: `send` → `1788782362.174539`, `edit` → same ts now reads `PONG-W2SL4-B`, `react` → `eyes:1` on that ts, `pin` → `missing_scope` (scope gap). Summary `1788782421.034569`. Every row authored by `U08N4UZM8CF`/`clisbot`                                                                      |
+| D-W4-03 streaming `block` stub     | **FIXED**                  | Telegram topic-1 turn 11:45:32→11:46:46: exactly ONE message (166) — posted as the draft at 11:46:41 and finalized in place at 11:46:46 (`relay post completed externalMessageId: "166" sequence: 0`). Forward read-back of 166 is the whole answer ending `PONG-W2TG7`. No orphan stub, no second message               |
+| D-W4-04 `/help` not delivered      | **WAS AN OBSERVATION GAP** | `/help` at 11:44:04 → `telegram outbound send ok … messageId=574` → forward read-back of 574 (dev-bot token) returns the full command list, author `longluong3bot`. The wave-4 FAIL came from `getUpdates` not delivering bot-authored group messages. The code fix that landed makes `handled` truthful                 |
+| D-W4-05 SIGTERM                    | **FIXED**                  | Old build 11:36:15: alive after 120 s, killed only by a second SIGTERM. New build 11:54:27: one SIGTERM, `ERROR shutdown did not finish within 20000ms — exiting anyway`, process gone at 11:54:50 (23 s). Two later restarts: 22 s and 2 s                                                                              |
+| D-W4-06 `better-auth` placement    | **FIXED**                  | Lockfile moves `better-auth` + `@better-auth/{drizzle,prisma}-adapter` to the root, matching a from-scratch resolution. `npm install` converges (`packages/hub/node_modules/better-auth` gone) and `node packages/hub/bin/paseo-hub.js` now reaches `createProductionRuntime`. Symlink guard removed from `start-hub.sh` |
+
+### Scenario results
+
+| #   | Scenario                | Slack                                                                                                                                                                          | Telegram                                                                                                                                                                                                                        |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3   | Files out (re-drive)    | **PASS** `s12b-w2.txt` (`F0C0X73BEHE`) + `s12b-w2.png` (`F0C06FLNGKW`) via `send_file`, both rows `files=1` authored by `U08N4UZM8CF`, then `PONG-W2SL3` (`1788782906.634099`) | not re-run (wave 4 passed both ways)                                                                                                                                                                                            |
+| 4   | Message tool actions    | **PASS** except `pin` (`missing_scope`) — see the defect table                                                                                                                 | **PASS** msg 584 sent as `PONG-W2TG4-A` and edited in place to `PONG-W2TG4-B`, summary 585, both forward-verified as `longluong3bot`                                                                                            |
+| 5   | `/help`                 | not run (Telegram lane)                                                                                                                                                        | **PASS** msg 574, forward-verified                                                                                                                                                                                              |
+| 6   | Restart durability      | **PASS** `PONG-W2SL6` exactly once after SIGTERM + restart, on the pre-restart session                                                                                         | pre-restart sessions minted before this build have no durable row and stay dead until `/new` — expected, one-time                                                                                                               |
+| 7   | Streaming `mode: block` | not run                                                                                                                                                                        | **PASS** one message, edited in place, no stub                                                                                                                                                                                  |
+| 8   | Approval button         | **NOT APPLICABLE on this revision**                                                                                                                                            | **NOT APPLICABLE** — the route's agent runs with `approval_policy: "never"` and `sandbox_policy: danger-full-access` (codex `turn_context`), so no escalation can be raised. Needs a permit-gated route before it can be scored |
+
+### Driving hygiene added this wave
+
+- `scripts/slack-live-assert.mjs` now resolves the bot under test from
+  `auth.test` and **fails on identity mismatch**: a content match authored by
+  any other identity prints
+  `VERDICT FAIL identity-mismatch: ts=… was posted by …`, and every run prints
+  an `[authors]` table (ts, user, file count, text prefix). Wave 4's Slack
+  file-out PASS could not happen again.
+- Every Slack tool-path prompt says "use ONLY your `channel_reply` tools; do
+  NOT use slack-cli, curl, the Slack Web API or any other credential".
+- **Telegram read-back for bot-authored group messages:** `getUpdates` (the
+  master-bot observer) does not receive them, and message ids are per-observer,
+  so the master bot cannot forward the id the Hub logged. Forward the id with
+  the BOT-UNDER-TEST token instead (`forwardMessage` from the group to itself):
+  the response carries the origin author and the current text — that is how
+  `/help`, the edited `PONG-W2TG4-B` and the streamed answer were verified.
+  Driving inbound with that token is still forbidden; this is read-back only.
+
+## Wave 5 — rendering (2026-09-07)
+
+Wave 4 scenario 2 only checked chunk placement, so nothing had ever asserted how
+a reply _renders_. This wave drives one markdown showcase per channel and reads
+the rendered result back off the platform.
+
+**Root cause found and fixed:** `resolveMarkdownTableMode`
+(`packages/channels/core/src/config/markdown-tables.ts`) defaulted to `"off"`
+and downgraded `"block"` to `"bullets"`. Upstream defaults to the channel
+plugin's `messaging.defaultMarkdownTableMode` (Telegram `"block"`, everything
+else the registry fallback `"code"`) and downgrades `"block"` to `"code"`. Every
+Slack and Telegram reply therefore posted markdown tables as raw `| a | b |`
+lines. Both channels now render the table; `richMessages` Telegram accounts get
+a native `table` block.
+
+### Telegram
+
+Marker 169 from the master bot into `TELEGRAM_TEST_TOPIC_GROUP_ID` topic-1
+(thread 2) at 14:43:14; bot-under-test reply message **170** at 14:43:27
+(`relay assistant posted message=170`). Read back by forwarding 170 with the
+bot-under-test token (forward 171, origin `longluong3bot`):
+
+| Element         | Rendered as                                                              |
+| --------------- | ------------------------------------------------------------------------ |
+| `**đậm**`       | entity `bold` (offset 26, len 3)                                         |
+| `*italic*`      | entity `italic` (offset 34, len 6)                                       |
+| `[link](url)`   | entity `text_link` → `https://example.com/`                              |
+| `> quote`       | entity `blockquote` (offset 104, len 18)                                 |
+| `` `mã` ``      | entity `code` (offset 131, len 2)                                        |
+| ` ```js `       | entity `pre` `language: "js"` (offset 141)                               |
+| 3-column table  | entity `pre` (offset 155, len 104) — column-aligned, `tableMode: "code"` |
+| `# Tiêu đề một` | flattened to plain text                                                  |
+
+The table `pre` is the fix: before it, the same reply carried the raw pipe
+lines with no entity. Heading flattening is upstream behaviour for the HTML
+path — `markdownToTelegramHtml` parses with `headingStyle: "none"` and upstream's
+own `format.test.ts` pins `["flattens headings", "# Title", "Title"]`. Telegram
+HTML has no heading tag; only the native rich-blocks path (`richMessages: true`
+on the account → `sendRichMessage`) emits a `heading` block. `sendRichMessage`
+was confirmed accepted by the live Bot API (probe message 168 into topic-1).
+
+### Slack
+
+Marker `1788793586.717609` from the user credential into `SLACK_TEST_CHANNEL`;
+bot-under-test reply **`1788793662.128819`** (author `U08N4UZM8CF`), read back
+with `conversations.replies`:
+
+| Element        | Rendered as                             |
+| -------------- | --------------------------------------- |
+| `# heading`    | `*Tiêu đề một*` (mrkdwn has no heading) |
+| bold / italic  | `*Đậm*` / `_nghiêng_`                   |
+| link           | `<https://example.com\|một liên kết>`   |
+| bullets        | `• Mục một`                             |
+| numbered list  | `1. Mục một`                            |
+| blockquote     | `&gt; Đây là một dòng…`                 |
+| inline code    | `` `mã nội tuyến` ``                    |
+| fenced code    | ` ` ``` block                           |
+| 3-column table | fenced code block, column-aligned       |
+
+Smoke reply `PONG-W5SL3` (`1788793568.111219`) confirmed the lane before the
+showcase.
+
+### Not proven this wave
+
+- **Slack native `presentation` (chart + table) live.** Two drives
+  (`1788793956.644119`, `1788794057.005589`) produced no agent output at all —
+  no `channel reply capability` tool traffic in `hub.log`, no reply, the turn
+  just stopped (15:13:39 and 15:15:26). Wave 5b found the cause, and it is not
+  the prompt: the second drive's agent record carries `lastError: "Selected model
+is at capacity. Please try a different model."` A short prompt fails the same
+  way while `gpt-5.6-luna` is throttled. The path itself is covered
+  against the real dist by `packages/channels/slack/src/presentation-send.test.ts`:
+  a `message` `send` with a `presentation` posts `data_visualization` +
+  `data_table` blocks through `chat.postMessage`, and an invalid chart degrades
+  to text. Slack charts are **native Block Kit blocks, not PNG uploads** — this
+  vertical has no image-encoding path.
+- **Telegram native rich blocks end to end.** The account config carries no
+  `richMessages`, so the live lane runs the HTML path. Closed in wave 5b: the
+  Hub now defaults the key to `true`, and the blocks were read back live. The rich path is covered
+  by `packages/channels/telegram/src/outbound.test.ts` (heading, paragraph with
+  inline entities, lists, blockquote, `pre`, and a native `table` block).
+
+### Environment notes
+
+Both are fixed in wave 5b below.
+
+- Slack `auth.test` at account start had a hardcoded 2500 ms budget
+  (`packages/channels/slack/src/lifecycle/start-account.ts`). Under box load
+  (load average > 10) it timed out on two consecutive Hub boots and the account
+  never started, while `curl` to the same endpoint answered in 0.6 s. A third
+  boot on a quieter box connected.
+- `scripts/slack-live-assert.mjs` mis-parsed a multi-line marker: the CSV
+  read-back split the marker's own lines into rows and it reported
+  `identity-mismatch` against its own text. This wave worked around it with
+  `conversations.replies`.
+
+## Wave 5b — rendering follow-ups (2026-09-07)
+
+Wave 5's three loose ends: Telegram's native rich blocks were never driven live,
+the Slack boot probe dropped the account on a loaded host, and the Slack
+assertion driver could not read a multi-line marker back.
+
+### Telegram native rich blocks are the default now
+
+The `richMessages` default moved to the **Hub defaults layer**
+(`packages/hub/src/channels/config/compile-support.ts`
+`ACCOUNT_CONFIG_DEFAULTS`), not the vertical: upstream's `richMessages === true`
+read stays byte-identical, and a compiled Telegram account whose author wrote no
+`richMessages` gets `true`. The live revision was **not** rewritten — the
+default is applied at compile, so the existing active revision picked it up on
+the next Hub boot, and no thread binding was invalidated:
+
+```
+before build: telegram/onboarding-telegram: {}
+after  build: telegram/onboarding-telegram: {"richMessages":true}
+```
+
+Marker **172** from the master bot into `TELEGRAM_TEST_TOPIC_GROUP_ID` topic-1
+(thread 2) at 15:39:07; bot-under-test reply **173** at 15:39:26
+(`relay post completed externalMessageId: "173"`). Read back by forwarding 173
+with the bot-under-test token (forward **174**, origin `longluong3bot`). The
+forwarded message carries a `rich_message` object, not `entities` — the whole
+showcase rendered as native Telegram blocks and the Bot API accepted every one
+of them (no 400, so `rich-plain-fallback.ts` never ran):
+
+| Markdown             | `rich_message.blocks[]`                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `# Tiêu đề một`      | `{type: "heading", text: "Tiêu đề một", size: 1}` — **not** flattened   |
+| bold/italic/link     | `paragraph` with `bold`, `italic`, `url` (`https://example.com/`) spans |
+| `- Mục một/hai`      | `list` with two `•` items                                               |
+| `> …trích dẫn`       | `blockquote`                                                            |
+| `` `mã nội tuyến` `` | `paragraph` with a `code` span                                          |
+| ` ```js `            | `pre` `language: "js"`                                                  |
+| 3-column table       | `table` with `is_header` on row 0, `is_bordered`, `is_striped`          |
+
+That heading is the wave-5 finding closed: the HTML path has no heading tag and
+flattens `#`, the rich path emits a `heading` block.
+
+Unit coverage over the same seam (compile → the supervisor's carriers → the
+real telegram dist): `packages/hub/src/channels/config/telegram-rich-default.test.ts`
+(5 cases — absent fills, authored `false`/`true` survive, no other channel is
+touched, and the showcase reaches `sendRichMessage` with
+heading/paragraph/list/blockquote/pre/table).
+
+### Slack boot probe: 15 s and one retry
+
+`startSlackAccount` probed `auth.test` with a hardcoded 2500 ms budget and a
+timeout was silent. `probeSlackAuthAtStart`
+(`packages/channels/slack/src/lifecycle/start-account.ts`) now spends
+`SLACK_START_PROBE_TIMEOUT_MS` (15 s), retries **once** on a transport fault or
+timeout (`status === null` — a Slack-answered `invalid_auth` is still final),
+and logs an `error` naming the budget on each failed attempt. Upstream has no
+number to inherit here: its `startAccount` does not probe at all, and
+`probeSlack`'s 2500 ms default belongs to the interactive health check.
+Covered by `packages/channels/slack/src/lifecycle/start-account.test.ts`
+(6 cases, including a fake Web API that answers after 3 s).
+
+### `slack-live-assert.mjs` reads a multi-line marker
+
+The read-back split slack-cli's CSV on every `\n`, including the ones inside a
+quoted message body. `parseSlackCsv` now scans the whole output and ends a row
+only on a newline **outside** quotes, so a multi-line message stays one row with
+its own `UserID` and the bot-identity assertion is unchanged. `--output json` is
+not an escape hatch: the MCP tool returns CSV and the `json`/`raw` formats wrap
+the same text. The module is import-safe (`IS_ENTRYPOINT`) so
+`scripts/slack-live-assert.test.mjs` can drive the parser directly (5 cases).
+
+Regression-checked against the wave-5 thread that broke it —
+`conversations-replies --thread-ts 1788793586.717609`, whose bot reply is 26
+lines:
+
+```
+naive line-split rows: 27 | quote-aware rows: 2
+  ts=1788793586.717609 user=U8ZTVGJJF        lines=1
+  ts=1788793662.128819 user=U08N4UZM8CF      lines=26
+check --since 15:00 --thread-ts 1788793586.717609 --expect PONG-W5SL4
+  VERDICT PASS replyTs=1788793662.128819 author=U08N4UZM8CF
+```
+
+### Slack native chart + table: still not proven live
+
+Blocked on the model, not on the channel. Two drives, both with a short prompt:
+
+| Marker              | Session    | Outcome                                        |
+| ------------------- | ---------- | ---------------------------------------------- |
+| `1788795597.539679` | `1753b61b` | bound 15:40:13, no output, turn ended 15:41:50 |
+| `1788795945.681409` | `804214ba` | bound 15:45:50, no output, turn ended 15:46:26 |
+
+Both agent records say the same thing:
+
+```
+~/.clisbot-dev/agents/…/<agentId>.json
+  lastStatus: "error"
+  lastError:  "Selected model is at capacity. Please try a different model."
+```
+
+Reproduced outside the Hub: `codex exec --model gpt-5.6-luna` on a one-line
+prompt answers the same error on roughly every other request (probe 1 `PROBE-OK`,
+probe 2 the capacity error, five seconds apart). A Hub turn spends several model
+calls, so it loses that coin flip more often than a one-shot probe does — which
+also explains why the Telegram drive 6 minutes earlier went through.
+
+Wave 5's session `b8192200` (15:15:25) carries the identical `lastError`, so
+**wave 5's "long JSON prompt" diagnosis was wrong**: those drives died on
+provider capacity too, not on prompt shape. Stopped at two drives per the stop
+rule; no prompt or tool-description gap was observed, because the model never
+reached the tool.
+
+The Slack Route runs `outbound.path: tool`, so a turn that never reaches the
+model posts nothing at all — that is what "no agent output" looks like from the
+channel side. `scripts/slack-live-assert.mjs` reports it as
+`VERDICT FAIL admission=yes reply=no`.
+
+The path itself stays covered against the real dist by
+`packages/channels/slack/src/presentation-send.test.ts`. Before the next
+re-drive, probe the model twice in a row
+(`docs/lessons/2026-08-28-live-e2e-speedups.md`) and only drive when both answer.
+
+## Wave 6 — Sonnet 5 (2026-09-07)
+
+`codex`/`gpt-5.6-luna` answers "Selected model is at capacity" on roughly every
+other request (wave 5b), so the live routes moved to the `claude` provider with
+`claude-sonnet-5`. Revision **`179fef26-a841-4d0b-87c5-b87603761c98` v6**
+(`.hub-revision-write13.mjs sonnet`) rewrites only the two `hub.yml` agent
+definitions — `bot-personal-assistant` and `bot-onboarding-telegram` — from
+`codex`/`gpt-5.6-luna` to `claude`/`claude-sonnet-5`. Route `outbound.path`,
+`sync.streaming`, `access`, approval grants and `policy.yml` are carried through
+byte-for-byte, so no thread binding was invalidated.
+
+The Hub ran on the bundle already resident (`packages/hub/dist` + `.output`
+built 15:36–15:38, the boot the wave-5b Hub was started from). No rebuild: the
+tree carries in-flight R9a/R9b edits that are newer than that build.
+
+Provider probe, cheap to expensive, all green before the revision cycle:
+`command -v claude`; `paseo provider ls --host 127.0.0.1:6867` (claude —
+available, enabled, default mode `auto`); `provider models claude` lists
+`claude-sonnet-5`; one minimal daemon turn (`paseo run --provider claude
+--model claude-sonnet-5`, agent `3a5e2c00`) answered `PROBE-SONNET-OK`.
+
+### Scenario results
+
+| #   | Scenario                             | Verdict | Evidence                                                                    |
+| --- | ------------------------------------ | ------- | --------------------------------------------------------------------------- |
+| 6.1 | Slack native chart + table           | FAIL    | replies `1788797238.981049`, `1788797586.659179` — text fallback, no blocks |
+| 6.2 | Slack files + react + edit + pin     | PASS    | reply `1788797669.985769`, 2 file rows, `+1` by `U08N4UZM8CF`, pinned       |
+| 6.3 | Telegram markdown showcase (topic-1) | PASS    | reply **176**, forward **177** carries native `rich_message` blocks         |
+| 6.4 | Telegram `/help`, `/new`, `/stop`    | PASS    | replies **179**, **181**, **183**, all `answered an approval command`       |
+| 6.5 | Idempotency across turns (R9a)       | FAIL    | second turn replayed the first reply; the fix is not in the running bundle  |
+
+The wave-5b blocker is gone: every drive reached the tool on the first attempt,
+and no agent record carries a capacity error. 6.1 and 6.5 are code defects, not
+model failures.
+
+### 6.1 — the presentation never reaches the Slack vertical
+
+Both drives got the model to call the tool with a well-formed presentation
+(agent `528e265a`, then `25ccb639`):
+
+```
+{"action":"send","message":"W6CHART-OK","presentation":{"blocks":[
+  {"type":"chart","chartType":"bar","title":"Bar Chart",
+   "categories":["A","B","C"],"series":[{"name":"Value","values":[3,5,2]}]},
+  {"type":"table","headers":["X","Y","Z"],"rows":[[1,2,3],[4,5,6],[7,8,9]]}]}}
+```
+
+What Slack received was a plain message with a single auto-generated
+`rich_text` block and the **portable** fallback text appended:
+`W6CHART-OK\n\nBar Chart (bar chart)\n\n• Value: A: 3; B: 5; C: 2`. The second
+drive, whose table carried the required `caption`, came back the same way:
+`W6TABLE-OK\n\nTotals (table)\n\n• X: 1; Y: 2; Z: 3 …`.
+
+The workspace is not the constraint. A direct `chat.postMessage` with
+`SLACK_BOT_TOKEN` carrying the exact block the vertical builds was accepted and
+read back as `blocks: ['data_visualization']` (`1788797431.178749`), so the app,
+the token and the channel all render native charts.
+
+The flattening happens in core, before the vertical:
+`materializeMessagePresentationFallback`
+(`packages/channels/core/src/infra/outbound/outbound-send-service.ts:54`)
+produces exactly that text, and it runs when
+`hasCorePresentationDelivery(channelPlugin?.outbound)` is false
+(`packages/channels/core/src/infra/outbound/message-action-send.ts:555`). Two
+things point at the same gap: the Slack plugin's outbound adapter
+(`packages/channels/slack/src/plugin.ts:104`) never sets
+`presentationCapabilities`, and `SLACK_PRESENTATION_CAPABILITIES`
+(`packages/channels/slack/src/presentation.ts:13`, `charts: true`,
+`tables: true`) has no reader anywhere — where Discord
+(`packages/channels/discord/src/actions/handle-action.ts:201`) and Telegram
+(`packages/channels/telegram/src/interactive-fallback.ts:219`) pass their
+capabilities into `adaptMessagePresentationForChannel`, nothing in the Slack
+path calls the adapter at all. `presentation-send.test.ts` stays green because
+it drives `createSlackActions().handleAction` directly, downstream of the point
+where production loses the presentation.
+
+Secondary, found on the way: `normalizeTableBlock`
+(`packages/channels/core/src/interactive/payload.ts:778`) requires `caption`,
+while the tool schema marks it optional
+(`packages/channels/core/src/agents/tools/message-tool-schema.ts:111`). A table
+without a caption is dropped silently — no block, no fallback text, no error to
+the model. The first drive's table vanished exactly this way.
+
+### 6.2 — files, react, edit, pin
+
+One drive, agent `5b33b7e7`, every step through the `message` tool: two file
+sends (`1788797664.787119`, `1788797667.809819`, both `files=1` under
+`U08N4UZM8CF`), `react` `+1` on the marker (`reactions.get` → `('+1',
+['U08N4UZM8CF'])`), `send` then `edit` (`1788797669.985769`, read back as
+`W6FILES-OK EDITED-W6`), and `pin`, confirmed by `pins.list` **with the bot
+token** — the wave-4 `missing_scope` is on the _reader_ credential
+(`SLACK_MCP_XOXP_TOKEN`), not on the pin itself.
+
+The agent's first two sends named `/tmp/w6/*` and were refused by the media
+stager's project-root check; it recreated both files under the workspace root
+and both went through. Attachment paths have to be inside the Project root.
+
+### 6.5 — idempotency across turns, reproduced live
+
+Two prompts in one Slack thread (`1788798005.986929`), one agent session
+(`5084917b`), each asking for `idempotencyKey: "reply-1"`. Turn 1 posted
+`W6IDEM-1` (`1788798020.292439`); turn 2 posted nothing and the tool answered
+the model with `"replayed": true` and turn 1's `messageId`.
+
+This is R9a's defect and the fix is already in the tree — `deliveryKey` reads
+`capability.turnId` first (`packages/hub/src/channels/channel-reply-send.ts:151`)
+— but the running bundle predates it (`packages/hub/dist/channels/channel-reply-send.js:101`
+still scopes by `outputBudget.executionId ?? agentId`). Re-drive after the next
+Hub build.
+
+### Driver notes
+
+- `tg-live-assert.mjs` reports `VERDICT FAIL no outbound evidence` for command
+  replies: it matches the Hub's `relay post completed`, and `/help`, `/new` and
+  `/stop` answer through `channel inbound answered an approval command` plus a
+  `[telegram/send] telegram outbound send ok … operation=sendRichMessage` line.
+  The reply is real; the evidence rule does not cover the command branch.
+- `~/.clisbot-dev/.daemon-password` does not exist any more and the daemon link
+  comes up without it (`channel daemon connected`, twice, at 16:05:50). The
+  master key still has to be `~/.clisbot-dev-secrets/hub-credential-master-key`,
+  which is why this wave started the Hub with `~/.clisbot-dev/start-hub.sh`
+  rather than `scripts/e2e-dev.sh restart` — the latter's
+  `paseo hub start` path looks for the sibling-of-home key file, which is absent.
+- `hub-local.json` still records the PID of a long-dead Hub, so
+  `paseo channels status` refuses to run against a Hub started by
+  `start-hub.sh`. Account startup was read from `hub.log` instead
+  (`telegram account started`, `slack socket mode connected`).
+
+## Wave 6b — the two wave-6 defects (2026-09-07)
+
+Same Hub home and revision as wave 6 (`~/.clisbot-dev:6868`, revision
+`179fef26` v6, `claude`/`claude-sonnet-5`), rebuilt and restarted at 16:48 —
+`packages/channels/{core,slack}` and `npm run build:hub` after
+`packages/hub` `typecheck:node` came back green, then
+`~/.clisbot-dev/start-hub.sh` (new PID `2607622`). The R9a Hub work in the tree
+went into that bundle, so 6.5 was re-drivable.
+
+| #   | Scenario                   | Verdict | Evidence                                                             |
+| --- | -------------------------- | ------- | -------------------------------------------------------------------- |
+| 6.5 | Idempotency across turns   | PASS    | root `1788799732.793749`, replies `…744.309319` + `…759.941019`      |
+| 6.1 | Slack native chart + table | FAIL    | reply `1788799786.115629`, blocks `['rich_text']` — Hub seam is text |
+
+### 6.5 — fixed, live
+
+One thread (`1788799732.793749`), one session (agent `c6029930`, turn 2 logged
+`channel inbound steered an existing session`), both turns asking for
+`idempotencyKey: "reply-1"`. Turn 1 posted `W6BIDEM-1`
+(`1788799744.309319`); turn 2 posted `W6BIDEM-2` (`1788799759.941019`) instead
+of replaying turn 1. R9a's `deliveryKey` reads `capability.turnId` first
+(`packages/hub/src/channels/channel-reply-send.ts:151`), so the second turn
+claims its own row under the same key.
+
+### 6.1 — the vertical is wired, the Hub seam still is not
+
+The Slack vertical now does what upstream does: `plugin.outbound`
+declares `presentationCapabilities` (`packages/channels/slack/src/plugin.ts:113`,
+upstream's `outbound-adapter.ts:259` spelling) and `sendSlackText` adapts the
+portable presentation to them and compiles it with the same `reply-blocks.ts`
+compiler the `message` tool's `handleAction` uses
+(`packages/channels/slack/src/presentation-outbound.ts`,
+`outbound.ts:195`). `outbound.test.ts` drives the real `sendSlackText` against a
+fake Web API and reads `data_visualization` + `data_table` off `chat.postMessage`.
+
+The live drive still came back flattened (`W6BCHART-OK\n\nBar Chart (bar
+chart)\n\n• Value: A: 3; B: 5; C: 2`, `conversations.replies` →
+`blocks: ['rich_text']`) because the presentation never reaches the vertical.
+The Hub's seam carries **text only**, on every one of its four legs:
+
+- `packages/hub/src/channels/message-actions.ts:206` — `corePlugin` hands core
+  `{ id, actions }` with no `outbound`, so `hasCorePresentationDelivery` is
+  false and `executeMessageSend` materializes the portable fallback
+  (`core/src/infra/outbound/message-action-send.ts:556`).
+- `packages/hub/src/channels/message-actions.ts:461` — `hubSendMessage` posts
+  `{ to, text, media, threadId, idempotencyKey }`; core hands it the payload
+  (with its `presentation`) as `params.payloads[0]` and it is dropped there.
+- `packages/hub/src/channels/channel-reply.ts:65` — `ChannelReplyPost` is
+  `(ref, text)`.
+- `packages/hub/src/channels/supervisor/index.ts:247` — `postFor` already
+  forwards a `blocks` argument to `outbound.sendText`, so the last leg exists.
+
+The fix is to carry the portable `presentation` down those four legs (not
+channel-native blocks — the vertical renders). R9a owns the Hub files; this
+wave did not touch them.
+
+### 6.2 — the table without a caption
+
+Core's `normalizeTableBlock` requires `caption`
+(`core/src/interactive/payload.ts:778`) and upstream at `5d8067a4483` is the
+same, while the tool schema marks it optional
+(`message-tool-schema.ts:109`) — so the model's caption-less table was dropped
+with no block, no fallback text and no error. Admission now repairs it:
+`admitMessagePresentation`
+(`packages/channels/core/src/interactive/presentation-admission.ts`) defaults
+the caption to the table's first header and reports every block the normalizer
+still refuses. The Slack outbound path runs it and logs what it repaired or
+refused; the note in the **tool result** the model reads has to be written where
+the result is built (`packages/hub/src/channels/channel-reply-send.ts:307`
+`sendStructuredContent`), which is a Hub file.
+
+### Driver notes
+
+- `scripts/tg-live-assert.mjs check` now counts the command branch as outbound
+  evidence (`channel inbound answered an approval command` plus
+  `[telegram/send] telegram outbound send ok … messageId=N`), preferring the
+  send line because it names the id: `check --since 16:18` over the wave-6
+  `/help`/`/new`/`/stop` window reports `VERDICT PASS outbound=command:183`
+  where wave 6 got `no outbound evidence`.
+- The Hub's daemon link needs no `PASEO_PASSWORD` — the pairing in
+  `hub-relationship.json` is active, and this wave's Hub booted from
+  `start-hub.sh` (which exports none) with `channel daemon connected` twice.
+  `docs/channels-operations.md` now says what `PASEO_PASSWORD` is still for and
+  why `hub-local.json` leaves `paseo channels status` unusable after a
+  `start-hub.sh` boot.
+
+## Wave 6c — the Hub presentation seam (2026-09-08)
+
+Same Hub home and revision as wave 6b (`~/.clisbot-dev:6868`, revision
+`179fef26` v6, `claude`/`claude-sonnet-5`). The Hub was stopped, rebuilt
+(`packages/channels/{core,shared,slack,telegram}`, then `npm run build:hub`
+after `packages/hub` `typecheck:node` came back green) and restarted from
+`~/.clisbot-dev/start-hub.sh` at 00:29 — new PID `2728203`, `channel daemon
+connected` twice, `slack socket mode connected` (`personal-assistant`) and
+`telegram account started` (`onboarding-telegram`).
+
+| #   | Scenario                    | Verdict | Evidence                                                                                                       |
+| --- | --------------------------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| 6.1 | Slack native chart + table  | PASS    | root `1788827473.270769`, reply `1788827496.792399` — `['section','data_visualization','data_table']`          |
+| 6.2 | Slack caption-less table    | PASS    | root `1788827526.570249`, reply `1788827545.058829` — `data_table` `caption: "Run"`                            |
+| 6.6 | Telegram presentation table | BLOCKED | msgs 190 and 198 — the route attaches no `message` tool and the vertical declares no presentation capabilities |
+
+### 6.1 and 6.2 — the seam carries the presentation
+
+Wave 6b left the delivery blocked on four Hub legs; all four now carry the
+portable `presentation`. `corePlugin` hands core the account's presentation
+outbound when the vertical declares one
+(`packages/hub/src/channels/message-actions.ts:133` `readPluginPresentationOutbound`),
+`hubSendMessage` reads it back off `payloads[0]`
+(`message-actions.ts:571` `readSendPresentation`), `ChannelReplyPost` takes it
+as a third options argument (`channel-reply.ts:65`) and `postFor` forwards it to
+`plugin.outbound.sendText` (`supervisor/index.ts:285`). A vertical that declares
+nothing is unchanged: `presentationOutbounds` stays empty for it, core
+materializes the fallback and the seam is handed text only.
+
+The live chart drive asked for one `send` with a bar chart and a captioned
+table. `conversations.replies` on the marker root returns the bot's reply with
+`['section','data_visualization','data_table']` — wave 6b's same drive returned
+`['rich_text']`. The message `text` still carries the portable fallback
+(`W6CCHART-OK  Weekly runs (bar chart) …`), which is what a client that cannot
+draw the blocks reads.
+
+The caption-less drive asked for a table with `headers` `Run`/`Status` and no
+`caption` at all. It posted as a native `data_table` whose `caption` is `Run`:
+`admitMessagePresentation`
+(`packages/channels/core/src/interactive/presentation-admission.ts`) runs at the
+Hub's send site (`channel-reply-send.ts:180`) and defaults the caption to the
+first header, and `sendStructuredContent` (`channel-reply-send.ts:339`) puts the
+`presentationNotes` in the tool result the model reads. Wave 6b's same input was
+dropped with no block, no fallback text and no error.
+
+The vertical's own admission log stays silent on this path, and that is correct:
+the Hub admits before the post, so Slack's `logPresentationAdmission`
+(`packages/channels/slack/src/outbound.ts:220`) has no note left to report.
+
+### 6.6 — Telegram cannot take this path yet
+
+Two drives into `TELEGRAM_TEST_TOPIC_GROUP_ID` topic-1. The first steered the
+existing session (msg 190) and the model refused the marker as an injected
+third-party directive. `/new` (msg 192) reset the session and the second drive
+(msg 198, forward read-back into topic-2) came back with the model saying it has
+no such tool: _"The only messaging tool available to me (`SendMessage`) sends
+plain text"_. The Hub log agrees — the Slack drives show
+`/mcp/channel/<token>` requests in their window and the Telegram drives show
+none, so this revision's Telegram route attaches no channel reply capability.
+
+Attaching one would still not produce a native table. `packages/channels/telegram`'s
+`plugin.outbound` declares no `presentationCapabilities`, so
+`readPluginPresentationOutbound` skips it, core flattens, and the fallback text
+for a table is a bullet list rather than the `<table>` island that becomes a Bot
+API 10.3 `table` block. Telegram's presentation renderer exists
+(`packages/channels/telegram/src/interactive-fallback.ts:53`
+`resolveTelegramPresentationCapabilities`, `tables: true` when `richMessages` is
+on, and `renderTelegramTableIsland`), but it is reached only from
+`action-runtime.ts` — the vertical's own `handleAction` — which the Hub bypasses
+by design (`forceCoreDelivery: true`, `message-actions.ts:425`). Closing 6.6
+needs the mirror of the wave-6b Slack change inside
+`packages/channels/telegram`: declare per-account `presentationCapabilities` on
+`plugin.outbound` and run the presentation through `sendText`. The reply itself
+did arrive as a `rich_message` (blocks `paragraph`/`list`), so the account's rich
+path is live and a table island would render.
+
+`packages/hub/src/channels/message-actions.test.ts` pins today's behaviour on the
+real Telegram dist: a `send` carrying a chart and a table reaches
+`plugin.outbound.sendText` with no `presentation` and with core's fallback text,
+and only `sendMessage` is called.
+
+### Driver notes
+
+- `slack-cli conversations-add-message` reported `tool
+'conversations_add_message' not found` on both drives;
+  `scripts/slack-live-assert.mjs` fell back to `chat.postMessage` with the user
+  credential (`SLACK_MCP_XOXP_TOKEN`) and kept read-back on `slack-cli`, exactly
+  as CLAUDE.md prescribes. Block-level read-back is not something `slack-cli`
+  prints, so the block types above come from `conversations.replies` read with
+  `SLACK_BOT_TOKEN` — a read, never the inbound driver.
+- A Telegram reply's blocks are only visible by forwarding it: the master bot's
+  `forwardMessage` back into topic-2 returns the full `rich_message` object in
+  the API response, which `getUpdates` never carries for a bot-authored group
+  message.
+
+## Wave 6d — Telegram takes the presentation path (2026-09-08)
+
+Same Hub home (`~/.clisbot-dev:6868`, `claude`/`claude-sonnet-5`), new revision.
+Wave 6c's `179fef26` v6 attached no `message` tool to the Telegram topic route,
+so `.hub-revision-write14.mjs telegram-tool` set `outbound.path: tool` on it and
+left everything else (`sync.streaming.mode: block`, `interaction`, `audience`,
+the agent) untouched — revision `354df33c` v7. `packages/channels/telegram` was
+rebuilt, then `npm run build:hub` after `packages/hub` `typecheck:node` came
+back green, and `~/.clisbot-dev/start-hub.sh` restarted the Hub at 00:58:55 —
+new PID `2740416`, `channel daemon connected`, `telegram account started`
+(`onboarding-telegram`), `slack socket mode connected` (`personal-assistant`).
+
+| #   | Scenario                     | Verdict | Evidence                                                                                 |
+| --- | ---------------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| 6.6 | Telegram presentation table  | PASS    | root msg 202, reply msg 203 — `sendRichMessage`, blocks `['paragraph','table']`          |
+| 6.7 | `send`/`poll`/`edit`/`react` | PARTIAL | root msg 206 — `send` 207 ok, `poll` 208 ok; `edit` and `react` refused in a forum topic |
+
+### 6.6 — the native table, live
+
+One drive into `TELEGRAM_TEST_TOPIC_GROUP_ID` topic-1 asked for a 3x3 table
+through the message tool's `presentation`. The model called
+`mcp__channel_reply__message` with `action: "send"` and a `table` block
+(caption `Runs`, headers `Run`/`Status`/`Owner`, three rows) and the tool
+answered `messageId: "203"`; the Hub logged
+`telegram outbound send ok … messageId=203 operation=sendRichMessage threadId=2`.
+Forwarding msg 203 into topic-2 (forwarded ids 204 and 205) returns
+`rich_message.blocks` `['paragraph','table']`: the paragraph is the marker
+`W6DTABLE-OK` and the table is a native Bot API 10.3 block —
+`caption: "Runs"`, header cells `Run`/`Status`/`Owner` with `is_header: true`,
+three data rows, `is_bordered` and `is_striped`. Wave 6c's same input came back
+as `paragraph`/`list`.
+
+Two changes close it, mirroring the wave-6b Slack pair:
+`packages/channels/telegram/src/plugin.ts:75` declares
+`outbound.presentationCapabilities`, so the Hub hands the seam the portable
+presentation instead of core's flattened text, and
+`packages/channels/telegram/src/outbound.ts:90` runs it through
+`presentation-outbound.ts` — admission (D-W6-02), then the ported
+`canonicalizeTelegramPresentationPayload` at the posting account's own
+capabilities (`resolveTelegramPresentationCapabilities`). A rich account gets
+the `<table>` island the island → rich-block converter turns into the native
+block; a plain account gets the portable fallback text. Charts have no Telegram
+primitive and stay text on both.
+
+### 6.7 — `send` and `poll` ride the tool; `edit` and `react` do not, in a topic
+
+One drive (msg 206) asked for react + send + edit + poll through the tool.
+`send` posted msg 207 and `poll` posted msg 208 (`pollAnswerRouting:
+"unavailable"` — an anonymous poll, which is the tool's own documented
+warning). `edit` was refused with _"Delegated Telegram message mutation requires
+a provider-observed binding to the exact current topic and account"_
+(`packages/channels/telegram/src/message-topic-binding.ts:40`) — the D-TG-031
+gap: Fusion has no inbound message-observation cache until goal slice 20, so
+upstream's own deny branch runs for a mutation of an earlier message inside a
+forum topic. `react` failed opaquely; a second drive (msg 213) with the correct
+`messageId: "206"` failed the same way, which places it on the same gate:
+`action-runtime.ts:585` catches every error from
+`resolveTelegramMessageMutationChatId` and reports `reason: "error"`,
+`hint: "Reaction failed. Do not retry."`, so the topic-binding refusal is
+invisible to the operator and to the model. Both are recorded as ledger row 12;
+neither is a regression from this wave (the gate predates it, and wave 6's
+`edit` PASS was on a non-topic conversation).
+
+### Driver notes
+
+- A channel-configuration revision invalidates every live thread binding whose
+  captured route selection no longer matches: the first two drives after v7 were
+  answered with `channel inbound ignored … "the bound session is not valid under
+the active Channel configuration"`, and `/new` cannot recover it because it is
+  parsed after route resolution. Stop the Hub, run `node .hub-bindings12.mjs
+clear`, start it again — then the next marker binds a fresh session.
+- Forward read-back is still the only way to see a bot-authored reply's blocks,
+  and the forwarded copy carries no `text` for a `rich_message` — read
+  `rich_message.blocks`, not `text`.

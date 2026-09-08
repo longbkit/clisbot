@@ -159,6 +159,7 @@ builtServerTests("built TanStack public API PostgreSQL contract", () => {
           capabilities: {
             view: true as const,
             manageResources: true,
+            manageChannels: true,
             manageMembers: true,
             manageOwners: true,
           },

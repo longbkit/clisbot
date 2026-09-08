@@ -21,6 +21,7 @@ import {
   type StreamContext,
 } from "../plane/types.js";
 import type { ProcessingController } from "../plane/processing.js";
+import type { ChannelStreamingProducer, StreamingFinalizeTransport } from "../streaming/index.js";
 
 /**
  * The relay knobs of a scope: root gates on `sync`, subagents on
@@ -120,6 +121,12 @@ interface RelayContext {
    * not by this relay. The relay only keeps it alive and releases it. Absent
    * = no surface. */
   processing?: ProcessingController | undefined;
+  /** COMPAT(clisbot-control-plane): the live-draft producer (slice 22b). It
+   * turns the accumulating assistant text into a draft the channel updates
+   * while the turn runs, and hands back the transport that finishes that draft
+   * in place. Absent (no `sync.streaming`, or a vertical with no drivable
+   * streaming primitive) leaves this relay's final-only post path untouched. */
+  streaming?: ChannelStreamingProducer | undefined;
 }
 
 /** One agent's relay state: its stream context, the subagent labels, and the
@@ -165,6 +172,7 @@ export class RelayEngine {
   /** Drop an agent's stream state (plane stop). Its surface goes with it. */
   detach(agentId: string): void {
     this.relay.processing?.closeAgent(agentId);
+    this.relay.streaming?.detach(agentId);
     this.streams.delete(agentId);
   }
 
@@ -341,6 +349,15 @@ export class RelayEngine {
     }
     turn.pendingAssistantMessageId = messageId;
     turn.pendingAssistantText += text;
+    // Subagent scopes carry a prefix and are relayed as their own posts; only
+    // the root answer is drafted.
+    if (prefix !== "") return;
+    await this.relay.streaming?.onAssistantText(
+      stream.context,
+      key,
+      replyLocationFor(stream.context),
+      turn.pendingAssistantText,
+    );
   }
 
   /**
@@ -366,12 +383,19 @@ export class RelayEngine {
     turn.pendingAssistantMessageId = undefined;
     if (messageId !== undefined) turn.postedAssistantMessageIds.add(messageId);
     if (!sync.finalAnswers) return;
-    if (turn.postedAssistantTexts.has(text)) return;
+    if (turn.postedAssistantTexts.has(text)) {
+      this.relay.streaming?.discard(stream.context, key);
+      return;
+    }
     turn.postedAssistantTexts.add(text);
     const caption = `${prefix}${text}`;
-    // The caption posts verbatim: files leave through the explicit `send_file`
-    // tool (channel-reply.ts), never through a text parse of the answer.
-    await this.post(stream, key, turn, caption, finalAnswer, "assistant");
+    // The message is closing, so its draft closes with it: the transport
+    // finishes the draft in place (and falls back to the plain post path
+    // itself), which keeps this one post on one ledger row either way.
+    const transport = this.relay.streaming?.takeFinalizeTransport(stream.context, key);
+    // The caption posts verbatim: files leave through the `message` tool's
+    // media params (channel-reply.ts), never through a text parse of the answer.
+    await this.post(stream, key, turn, caption, finalAnswer, "assistant", transport);
   }
 
   private async onToolCall(
@@ -388,7 +412,20 @@ export class RelayEngine {
     const turn = this.turn(stream, key);
     if (item.status === "running") {
       if (!sync.progress || item.name === undefined) return;
-      await this.postProgressSnapshot(stream, key, turn, `${prefix}Running ${item.name}…`);
+      const line = `${prefix}Running ${item.name}…`;
+      await this.relay.streaming?.onProgress(
+        stream.context,
+        key,
+        replyLocationFor(stream.context),
+        {
+          kind: "tool",
+          text: line,
+          label: item.name,
+          toolName: item.name,
+          status: "running",
+        },
+      );
+      await this.postProgressSnapshot(stream, key, turn, line);
       return;
     }
     if (!isTerminalToolStatus(item.status)) return;
@@ -414,6 +451,7 @@ export class RelayEngine {
   /** A turn that did not complete stops any further relay posts for it. */
   private onTurnClosed(stream: RelayStream, turnId: string): void {
     this.turn(stream, turnId).closed = true;
+    this.relay.streaming?.discard(stream.context, turnId);
   }
 
   // --- Progress snapshots --------------------------------------------------
@@ -445,6 +483,7 @@ export class RelayEngine {
     text: string,
     finalAnswer: boolean,
     outputKind: "assistant" | "progress" | "tool",
+    transport?: StreamingFinalizeTransport | undefined,
   ) {
     const context = stream.context;
     const sync = context.route.defaults.sync;
@@ -492,7 +531,7 @@ export class RelayEngine {
       sequence,
       outputKind,
     });
-    const result = await this.relay.post({
+    const result = await (transport ?? this.relay.post)({
       channel: context.channel,
       accountId: context.accountId,
       to: location.to,
@@ -621,4 +660,4 @@ function ledgerTurnId(scopeId: string, turnId: string): string {
   return `${scopeId}:${turnId}`;
 }
 
-// Media is sent only through the Hub's explicit `send_file` MCP tool.
+// Media is sent only through the Hub's `message` MCP tool (`attachments`/`media`/`buffer`).

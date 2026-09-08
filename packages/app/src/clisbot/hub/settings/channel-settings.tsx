@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type ReactElement,
   type SetStateAction,
 } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react-native";
@@ -74,6 +75,12 @@ import {
 import { buildHubSettingsRoute } from "../navigation";
 import { splitConversationIds } from "../conversation-picker";
 import { ChannelActivity, initialChannelActivityState } from "./channel-activity";
+import { AddChannelConnection } from "./channel-connection-add";
+import { ChannelCatalogView } from "./channel-catalog-view";
+import { ChannelPairingPanel } from "./channel-pairing-panel";
+import { ChannelQrLinkPanel } from "./channel-qr-link-panel";
+import { CHANNEL_QR_OPERATIONS_AVAILABLE, useChannelQrVerbs } from "./channel-qr-verbs";
+import { ChannelOperationsView } from "./channel-operations-view";
 import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/segmented-control";
 import { useHubSettingsDetailScroll } from "./detail-scroll";
 import { ConversationSelectionFields } from "./conversation-picker-field";
@@ -98,7 +105,6 @@ type RouteAudience = "members" | "conversationParticipants";
 type RouteApprovalChoice = NonNullable<ChannelRouteBehavior["approvalMode"]> | "custom";
 type RouteLimitsDraft = Record<keyof ChannelRouteLimits, string>;
 type ConfigurationKind = "account" | "route";
-type ConnectionProvider = "telegram" | "slack";
 type HubConnection = z.infer<typeof HubConnectionsSchema>["connections"][number];
 type HubConnections = z.infer<typeof HubConnectionsSchema>;
 type HubAutomation = z.infer<typeof HubAutomationsSchema>["automations"][number];
@@ -147,12 +153,6 @@ const APPROVAL_LABELS = {
   require: "Ask authorized members",
   "auto-deny": "Deny",
   "auto-allow": "Allow automatically",
-};
-const TELEGRAM_CONNECTION_VALUES = ["telegram"];
-const ALL_CONNECTION_VALUES = ["telegram", "slack"];
-const CONNECTION_PROVIDER_LABELS = {
-  telegram: "Telegram",
-  slack: "Slack Socket Mode",
 };
 interface EditingRoute {
   accountKey: string;
@@ -207,10 +207,22 @@ export function ChannelSettings({
   );
 }
 
-const CHANNEL_VIEWS: SegmentedControlOption<"accounts" | "activity">[] = [
+/** Accounts is the canonical Route editor; Catalog is setup and capabilities,
+ * Operations is the durable ingress queue, Activity is inbound admission. */
+type ChannelView = "accounts" | "catalog" | "operations" | "activity";
+
+const CHANNEL_VIEWS: SegmentedControlOption<ChannelView>[] = [
   { value: "accounts", label: "Accounts" },
+  { value: "catalog", label: "Catalog" },
+  { value: "operations", label: "Operations" },
   { value: "activity", label: "Activity" },
 ];
+
+/** The views that render on their own, with no state from the accounts editor. */
+const CHANNEL_SECONDARY_VIEWS: Partial<Record<ChannelView, () => ReactElement>> = {
+  catalog: ChannelCatalogView,
+  operations: ChannelOperationsView,
+};
 
 function ChannelSettingsContent({
   automationName,
@@ -342,7 +354,7 @@ function ChannelSettingsContent({
     [channels.data?.revision?.id],
   );
   const [selectedAccountKey, setSelectedAccountKey] = useState<string | null>(null);
-  const [channelView, setChannelView] = useState<"accounts" | "activity">("accounts");
+  const [channelView, setChannelView] = useState<ChannelView>("accounts");
   const [activityState, setActivityState] = useState(initialChannelActivityState);
   const openAccountActivity = useCallback(() => {
     setActivityState(initialChannelActivityState(selectedAccountKey ?? "all"));
@@ -849,6 +861,14 @@ function ChannelSettingsContent({
       />
     </SettingsSection>
   );
+  const SecondaryView = CHANNEL_SECONDARY_VIEWS[channelView];
+  if (SecondaryView !== undefined)
+    return (
+      <View>
+        {navigation}
+        <SecondaryView />
+      </View>
+    );
   if (channelView === "activity")
     return (
       <View>
@@ -1138,26 +1158,20 @@ function ChannelManagementSection({
   const [createdConnectionId, setCreatedConnectionId] = useState<string | null>(null);
   const [addingConnection, setAddingConnection] = useState(false);
   const [connectionPending, setConnectionPending] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const openConnection = useCallback(() => {
-    setConnectionError(null);
-    setAddingConnection(true);
-  }, []);
+  const openConnection = useCallback(() => setAddingConnection(true), []);
   const closeConnection = useCallback(() => setAddingConnection(false), []);
+  // The form renders the Hub's own guidance for a rejection, so this only has to
+  // hold the pending flag the two navigation exits are disabled by, and rethrow.
   const submitConnection = useCallback(
-    (body: unknown) => {
+    async (body: Record<string, unknown>) => {
       setConnectionPending(true);
-      setConnectionError(null);
-      void saveConnection(body)
-        .then((created) => {
-          setCreatedConnectionId(created.id);
-          setAddingConnection(false);
-          return undefined;
-        })
-        .catch((cause: unknown) =>
-          setConnectionError(cause instanceof Error ? cause.message : "Unable to add Connection."),
-        )
-        .finally(() => setConnectionPending(false));
+      try {
+        const created = await saveConnection(body);
+        setCreatedConnectionId(created.id);
+        setAddingConnection(false);
+      } finally {
+        setConnectionPending(false);
+      }
     },
     [saveConnection],
   );
@@ -1221,11 +1235,10 @@ function ChannelManagementSection({
       </View>
       {addingConnection ? (
         <View>
-          {connectionError ? <Alert variant="error" title={connectionError} /> : null}
-          <ChannelConnectionForm
-            pending={connectionPending}
-            allowSlackSocket={isInstanceOperator}
-            save={submitConnection}
+          <AddChannelConnection
+            allowProviderApplications={isInstanceOperator}
+            disabled={connectionPending}
+            create={submitConnection}
           />
           <Button variant="outline" disabled={connectionPending} onPress={closeConnection}>
             Back to Channel account
@@ -1496,46 +1509,38 @@ function ChannelAccountDetails({
   const toggleRuntimeDetails = useCallback(() => setShowRuntimeDetails((value) => !value), []);
   const [showAccess, setShowAccess] = useState(false);
   const toggleAccess = useCallback(() => setShowAccess((value) => !value), []);
+  const [showLinking, setShowLinking] = useState(false);
+  const toggleLinking = useCallback(() => setShowLinking((value) => !value), []);
   const router = useRouter();
   const openConfiguration = useCallback(
     () => router.push(buildHubSettingsRoute("configuration")),
     [router],
   );
-  const retry = useCallback(() => {
-    void retryAccount(account);
-  }, [account, retryAccount]);
   if (!visible) return null;
-  const needsConnection = connection === undefined || connection.status !== "connected";
   return (
     <View style={settingsStyles.rowBorder}>
-      <View style={[settingsStyles.row, styles.actions]}>
-        <Button size="sm" variant="ghost" onPress={toggleAccess}>
-          {showAccess ? "Hide access" : "Who can use this?"}
-        </Button>
-        <Button size="sm" variant="ghost" onPress={toggleRuntimeDetails}>
-          {showRuntimeDetails ? "Hide status details" : "Status details"}
-        </Button>
-        {needsConnection ? (
-          <Button size="sm" variant="outline" disabled={pending} onPress={openConfiguration}>
-            Manage Connection
-          </Button>
-        ) : null}
-        {!needsConnection && enabled && runtime?.transport !== "started" ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pending || runtimeAvailable === false}
-            onPress={retry}
-          >
-            Retry runtime
-          </Button>
-        ) : null}
-      </View>
+      <ChannelAccountActions
+        account={account}
+        connection={connection}
+        runtime={runtime}
+        runtimeAvailable={runtimeAvailable}
+        enabled={enabled}
+        pending={pending}
+        showingAccess={showAccess}
+        showingRuntimeDetails={showRuntimeDetails}
+        showingLinking={showLinking}
+        toggleAccess={toggleAccess}
+        toggleRuntimeDetails={toggleRuntimeDetails}
+        toggleLinking={toggleLinking}
+        openConfiguration={openConfiguration}
+        retryAccount={retryAccount}
+      />
       {runtime?.detail ? (
         <View style={settingsStyles.row}>
           <Text style={styles.errorText}>{runtime.detail}</Text>
         </View>
       ) : null}
+      {showLinking ? <ChannelAccountQrLinking channel={channel} accountId={accountId} /> : null}
       {showAccess ? (
         <ChannelAccountAccess
           channel={channel}
@@ -1555,6 +1560,91 @@ function ChannelAccountDetails({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/** The account's row of runtime actions. What is on offer is entirely the Hub's
+ * report: an unconnected Connection, an account waiting to be linked, or a
+ * transport that is not running. */
+function ChannelAccountActions({
+  account,
+  connection,
+  runtime,
+  runtimeAvailable,
+  enabled,
+  pending,
+  showingAccess,
+  showingRuntimeDetails,
+  showingLinking,
+  toggleAccess,
+  toggleRuntimeDetails,
+  toggleLinking,
+  openConfiguration,
+  retryAccount,
+}: {
+  account: RecordValue;
+  connection: HubConnection | undefined;
+  runtime: HubRuntimeAccount | undefined;
+  runtimeAvailable: boolean | undefined;
+  enabled: boolean;
+  pending: boolean;
+  showingAccess: boolean;
+  showingRuntimeDetails: boolean;
+  showingLinking: boolean;
+  toggleAccess(): void;
+  toggleRuntimeDetails(): void;
+  toggleLinking(): void;
+  openConfiguration(): void;
+  retryAccount(account: RecordValue): Promise<void>;
+}) {
+  const retry = useCallback(() => {
+    void retryAccount(account);
+  }, [account, retryAccount]);
+  const connected = connection?.status === "connected";
+  // The Hub reports `needs-login` for a QR-auth account whose profile has no live
+  // session. That is the whole signal: nothing else says an account is linkable.
+  const needsLinking = runtime?.transport === "needs-login";
+  const canRetry = connected && enabled && runtime?.transport !== "started";
+  return (
+    <View style={[settingsStyles.row, styles.actions]}>
+      <Button size="sm" variant="ghost" onPress={toggleAccess}>
+        {showingAccess ? "Hide access" : "Who can use this?"}
+      </Button>
+      <Button size="sm" variant="ghost" onPress={toggleRuntimeDetails}>
+        {showingRuntimeDetails ? "Hide status details" : "Status details"}
+      </Button>
+      {needsLinking ? (
+        <Button size="sm" variant="secondary" disabled={pending} onPress={toggleLinking}>
+          {showingLinking ? "Hide linking" : "Link with QR"}
+        </Button>
+      ) : null}
+      {connected || needsLinking ? null : (
+        <Button size="sm" variant="outline" disabled={pending} onPress={openConfiguration}>
+          Manage Connection
+        </Button>
+      )}
+      {canRetry ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={pending || runtimeAvailable === false}
+          onPress={retry}
+        >
+          Retry runtime
+        </Button>
+      ) : null}
+    </View>
+  );
+}
+
+function ChannelAccountQrLinking({ channel, accountId }: { channel: string; accountId: string }) {
+  const verbs = useChannelQrVerbs({ channel, accountId });
+  return (
+    <ChannelQrLinkPanel
+      accountId={accountId}
+      available={CHANNEL_QR_OPERATIONS_AVAILABLE}
+      verbs={verbs}
+    />
   );
 }
 
@@ -1612,6 +1702,7 @@ function ChannelAccountAccess({
             ? "Access information is not loaded yet. Refresh status to retry."
             : channelAccessStatus(teamNames, access.length)}
         </Text>
+        <ChannelPairingPanel channel={channel} accountId={accountId} disabled={pending} />
         <View style={styles.actions}>
           {canLinkIdentity ? (
             <Button size="sm" variant="outline" disabled={pending} onPress={openIdentity}>
@@ -2531,7 +2622,9 @@ function ChannelAccountForm({
       <SingleAgentAutomationForm
         key={selectedConnection?.provider}
         title="Create Automation for this Route"
-        channelReplyProvider={p0ChannelName(selectedConnection?.provider ?? null) ?? undefined}
+        channelReplyProvider={
+          channelReplyProviderName(selectedConnection?.provider ?? null) ?? undefined
+        }
         daemons={daemons}
         connections={automationConnections}
         existingNames={automationNames}
@@ -3035,98 +3128,6 @@ function AgentTargetFields({
         />
       </Field>
     </>
-  );
-}
-
-export function ChannelConnectionForm({
-  pending,
-  allowSlackSocket,
-  save,
-}: {
-  pending: boolean;
-  allowSlackSocket: boolean;
-  save(body: unknown): void;
-}) {
-  const [provider, setProvider] = useState<ConnectionProvider>("telegram");
-  const [accountId, setAccountId] = useState("");
-  const [botToken, setBotToken] = useState("");
-  const [appToken, setAppToken] = useState("");
-  const canSave =
-    botToken.trim().length > 0 &&
-    (provider === "telegram" ? accountId.trim().length > 0 : appToken.trim().length > 0);
-  const providerValues = allowSlackSocket ? ALL_CONNECTION_VALUES : TELEGRAM_CONNECTION_VALUES;
-  const changeProvider = useCallback((value: string) => {
-    setProvider(value as ConnectionProvider);
-  }, []);
-  const submit = useCallback(() => {
-    if (provider === "telegram") {
-      save({
-        provider,
-        accountId: accountId.trim(),
-        credentials: { botToken: botToken.trim() },
-      });
-      return;
-    }
-    save({
-      provider,
-      transport: "socket",
-      credentials: { appToken: appToken.trim(), botToken: botToken.trim() },
-    });
-  }, [accountId, appToken, botToken, provider, save]);
-  return (
-    <SettingsSection title="Add Connection">
-      <View style={[settingsStyles.card, styles.form]}>
-        <ChoiceRow
-          label="Provider"
-          values={providerValues}
-          selected={provider}
-          labels={CONNECTION_PROVIDER_LABELS}
-          onChange={changeProvider}
-          disabled={pending}
-        />
-        {provider === "telegram" ? (
-          <Field label="Account name">
-            <FormTextInput
-              initialValue=""
-              onChangeText={setAccountId}
-              placeholder="support"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!pending}
-            />
-          </Field>
-        ) : (
-          <Field label="App token" hint="Slack Socket Mode token beginning with xapp-.">
-            <FormTextInput
-              initialValue=""
-              onChangeText={setAppToken}
-              placeholder="xapp-…"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!pending}
-            />
-          </Field>
-        )}
-        <Field
-          label="Bot token"
-          hint={provider === "slack" ? "Slack bot token beginning with xoxb-." : undefined}
-        >
-          <FormTextInput
-            initialValue=""
-            onChangeText={setBotToken}
-            placeholder={provider === "slack" ? "xoxb-…" : "Telegram bot token"}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!pending}
-          />
-        </Field>
-        <Button disabled={pending || !canSave} onPress={submit}>
-          Verify and add Connection
-        </Button>
-      </View>
-    </SettingsSection>
   );
 }
 
@@ -3650,7 +3651,11 @@ function channelLabel(value: string): string {
   return value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1);
 }
 
-function p0ChannelName(value: string | null): "slack" | "telegram" | null {
+/** The channels whose Automation reply inputs this app can edit. Narrower than
+ * the Hub's supported set on purpose: the reply-input editors are per-provider
+ * (`automation-configuration.ts`), so a channel without one has no editor to
+ * open. */
+function channelReplyProviderName(value: string | null): "slack" | "telegram" | null {
   return value === "slack" || value === "telegram" ? value : null;
 }
 
@@ -3754,7 +3759,7 @@ function channelFormSelection(input: {
     selectedConnection,
     effectiveAccountId:
       input.configurationKind === "account" ? input.accountId.trim() : existingAccountId,
-    observedAccountChannel: p0ChannelName(stringField(selectedAccount, "channel")),
+    observedAccountChannel: channelReplyProviderName(stringField(selectedAccount, "channel")),
     observedAccountId: stringField(selectedAccount, "accountId"),
   };
 }

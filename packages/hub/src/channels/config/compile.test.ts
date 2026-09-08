@@ -745,7 +745,83 @@ routes:
     });
   });
 
-  it("rejects an unsupported channel at P0", () => {
+  it("rejects a channel with no in-repo vertical", () => {
+    // Every catalogued channel now has one, so the guard is proved with a name
+    // that is not a channel at all — which is what it exists to refuse.
+    expectCompileError(
+      {
+        [".paseo/channels/whatsapp/main.yml"]: `
+channel: whatsapp
+accountId: main
+connectionId: connection-id
+transport: { mode: qr }
+`,
+      },
+      /has no in-repo vertical/,
+    );
+  });
+
+  it("compiles a Zalo Personal account: the QR transport and the profile label", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/zalouser/main.yml"]: `
+channel: zalouser
+accountId: main
+connectionId: connection-id
+transport: { mode: qr }
+config:
+  profile: long-personal
+  textChunkMode: newline
+  dangerouslyAllowNameMatching: false
+routes:
+  - match: { kind: group }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.equal(account.channel, "zalouser");
+    assert.deepEqual(account.transport, { mode: "qr" });
+    assert.equal(account.config["profile"], "long-personal");
+    assert.equal(account.config["textChunkMode"], "newline");
+  });
+
+  it("rejects a Zalo Personal route kind the channel never emits", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/zalouser/main.yml"]: `
+channel: zalouser
+accountId: main
+connectionId: connection-id
+transport: { mode: qr }
+routes:
+  - match: { kind: thread }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /zalouser never emits a thread conversation/,
+    );
+  });
+
+  it("rejects a wrong-typed Zalo Personal config knob at deploy", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/zalouser/main.yml"]: `
+channel: zalouser
+accountId: main
+connectionId: connection-id
+transport: { mode: qr }
+config:
+  textChunkLimit: "2000"
+`,
+      },
+      /config/,
+    );
+  });
+
+  it("rejects a Discord transport mode the vertical does not implement", () => {
     expectCompileError(
       {
         [".paseo/channels/discord/main.yml"]: `
@@ -755,7 +831,55 @@ connectionId: connection-id
 transport: { mode: polling }
 `,
       },
-      /not supported at P0/,
+      /expected "gateway"/,
+    );
+  });
+
+  it("compiles a Discord gateway account with dm/channel/thread routes", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/discord/main.yml"]: `
+channel: discord
+accountId: main
+connectionId: connection-id
+transport: { mode: gateway }
+routes:
+  - match: { kind: dm }
+    agent: worker-app
+    environment: repo-app
+  - match: { kind: channel, ids: ["123456789012345678"] }
+    agent: worker-app
+    environment: repo-app
+  - match: { kind: thread }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.equal(account.channel, "discord");
+    assert.deepEqual(account.transport, { mode: "gateway" });
+    assert.deepEqual(
+      account.routes.map((route) => route.match.kind),
+      ["dm", "channel", "thread"],
+    );
+  });
+
+  it("rejects a Discord route kind Discord never emits", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/discord/main.yml"]: `
+channel: discord
+accountId: main
+connectionId: connection-id
+transport: { mode: gateway }
+routes:
+  - match: { kind: topic }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /discord never emits a topic conversation/i,
     );
   });
 
@@ -827,6 +951,326 @@ routes:
 `,
       },
       /telegram never emits a thread conversation/,
+    );
+  });
+});
+
+// --- Slices 14b/15b/16b: Google Chat, Feishu, Zalo -------------------------------
+
+describe("channel compile: the later in-repo verticals", () => {
+  it("compiles a Google Chat account and carries its webhook knobs verbatim", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/googlechat/workspace.yml"]: `
+channel: googlechat
+accountId: workspace
+connectionId: googlechat-workspace
+transport: { mode: webhook }
+config:
+  audienceType: app-url
+  audience: https://chat.example.com/googlechat
+  appPrincipal: "123456789012345678901"
+  webhookUrl: https://chat.example.com/googlechat
+  webhookPort: 8443
+  webhookHost: 127.0.0.1
+  botUser: users/1234
+  allowBots: false
+  mediaMaxMb: 20
+routes:
+  - match: { kind: channel, ids: [spaces/AAAA] }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.equal(account.channel, "googlechat");
+    assert.deepEqual(account.transport, { mode: "webhook" });
+    // The vertical's own account resolution reads these; the Hub passes them
+    // through untouched (`supervisor/account-carriers.ts` googlechat).
+    assert.equal(account.config["audienceType"], "app-url");
+    assert.equal(account.config["appPrincipal"], "123456789012345678901");
+    assert.equal(account.config["webhookPort"], 8443);
+    assert.equal(account.config["webhookHost"], "127.0.0.1");
+    assert.equal(account.config["botUser"], "users/1234");
+  });
+
+  it("compiles a Feishu long-connection account with its tool-family gate", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/feishu/lark.yml"]: `
+channel: feishu
+accountId: lark
+connectionId: feishu-lark
+transport: { mode: websocket }
+config:
+  domain: lark
+  allowBots: false
+  actions: { reactions: true }
+  tools: { doc: true, chat: true, perm: false, bitable: true }
+  httpTimeoutMs: 20000
+routes:
+  - match: { kind: dm }
+    agent: assistant-personal
+    environment: personal-lab
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.deepEqual(account.transport, { mode: "websocket" });
+    assert.equal(account.config["domain"], "lark");
+    assert.deepEqual(account.config["tools"], {
+      doc: true,
+      chat: true,
+      perm: false,
+      bitable: true,
+    });
+  });
+
+  it("compiles a Zalo polling account with its Fusion-added mention aliases", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/zalo/oa.yml"]: `
+channel: zalo
+accountId: oa
+connectionId: zalo-oa
+transport: { mode: polling }
+config:
+  mediaMaxMb: 5
+  botNames: [fusion, "trợ lý"]
+routes:
+  - match: { kind: group, ids: ["4000"] }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    const account = plane.accounts[0]!;
+    assert.deepEqual(account.transport, { mode: "polling" });
+    assert.deepEqual(account.config["botNames"], ["fusion", "trợ lý"]);
+  });
+
+  it("type-checks the vertical-owned account config instead of passing a typo through", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/zalo/oa.yml"]: `
+channel: zalo
+accountId: oa
+connectionId: zalo-oa
+transport: { mode: polling }
+config: { webhookPort: "8443" }
+`,
+      },
+      /config\.webhookPort/,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/googlechat/workspace.yml"]: `
+channel: googlechat
+accountId: workspace
+connectionId: googlechat-workspace
+transport: { mode: webhook }
+config: { audienceType: project }
+`,
+      },
+      /config\.audienceType/,
+    );
+    // A knob this Hub does not read still compiles: an OpenClaw-authored
+    // account must stay compilable.
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/feishu/lark.yml"]: `
+channel: feishu
+accountId: lark
+connectionId: feishu-lark
+transport: { mode: websocket }
+config: { streamingCard: true }
+`,
+      }),
+    );
+    assert.equal(plane.accounts[0]!.config["streamingCard"], true);
+  });
+
+  it("refuses a transport mode the Hub cannot receive events on", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/feishu/lark.yml"]: `
+channel: feishu
+accountId: lark
+connectionId: feishu-lark
+transport: { mode: webhook }
+`,
+      },
+      /feishu webhook transport is not implemented/,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/zalo/oa.yml"]: `
+channel: zalo
+accountId: oa
+connectionId: zalo-oa
+transport: { mode: webhook }
+`,
+      },
+      /zalo webhook transport is not implemented/,
+    );
+    // Google Chat has no alternative delivery model, so its webhook IS drivable.
+    expectCompileError(
+      {
+        [".paseo/channels/googlechat/workspace.yml"]: `
+channel: googlechat
+accountId: workspace
+connectionId: googlechat-workspace
+transport: { mode: polling }
+`,
+      },
+      /Invalid option|expected/,
+    );
+  });
+
+  it("refuses a conversation kind the channel never emits", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/zalo/oa.yml"]: `
+channel: zalo
+accountId: oa
+connectionId: zalo-oa
+transport: { mode: polling }
+routes:
+  - match: { kind: thread }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /zalo never emits a thread conversation/,
+    );
+    expectCompileError(
+      {
+        [".paseo/channels/googlechat/workspace.yml"]: `
+channel: googlechat
+accountId: workspace
+connectionId: googlechat-workspace
+transport: { mode: webhook }
+routes:
+  - match: { kind: topic }
+    agent: worker-app
+    environment: repo-app
+`,
+      },
+      /googlechat never emits a topic conversation/,
+    );
+  });
+});
+
+describe("access defaults", () => {
+  const account = (body: string) => `
+channel: telegram
+accountId: butler
+connectionId: telegram-butler
+transport: { mode: polling }
+${body}
+`;
+
+  it("omits the key entirely when no layer authored a leaf", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/telegram/butler.yml"]: account(`routes:
+  - match: { kind: dm }
+    agent: telegram-butler
+    environment: personal-lab
+fallback: { deny: true }`),
+      }),
+    );
+    assert.equal(plane.accounts[0]?.routes[0]?.defaults.access, undefined);
+  });
+
+  it("folds org < account < route with the upstream leaf names", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/policy.yml"]: `
+enabled: true
+defaults:
+  access:
+    dmPolicy: pairing
+    groupPolicy: allowlist
+    allowFrom: [111]
+`,
+        [".paseo/channels/telegram/butler.yml"]: account(`defaults:
+  access:
+    groupAllowFrom: [222, "tg:333"]
+    deniedReply: "Not allowed."
+routes:
+  - match: { kind: dm }
+    agent: telegram-butler
+    environment: personal-lab
+    access: { dmPolicy: allowlist }
+fallback: { deny: true }`),
+      }),
+    );
+    const route = plane.accounts[0]?.routes[0];
+    assert.deepEqual(route?.defaults.access, {
+      dmPolicy: "allowlist",
+      groupPolicy: "allowlist",
+      allowFrom: [111],
+      groupAllowFrom: [222, "tg:333"],
+      deniedReply: "Not allowed.",
+    });
+  });
+
+  it("refuses a policy name upstream does not have", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/telegram/butler.yml"]: account(`defaults:
+  access: { dmPolicy: everyone }
+routes:
+  - match: { kind: dm }
+    agent: telegram-butler
+    environment: personal-lab
+fallback: { deny: true }`),
+      },
+      /Invalid option|expected/,
+    );
+  });
+});
+
+describe("route selectable targets", () => {
+  const account = (body: string) => `
+channel: telegram
+accountId: butler
+connectionId: telegram-butler
+transport: { mode: polling }
+${body}
+`;
+
+  it("compiles the agents and models a route offers", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/telegram/butler.yml"]: account(`routes:
+  - match: { kind: dm }
+    agent: telegram-butler
+    environment: personal-lab
+    agents: [worker-app]
+    models: [gpt-5.6-luna]
+fallback: { deny: true }`),
+      }),
+    );
+    assert.deepEqual(plane.accounts[0]?.routes[0]?.selectable, {
+      agents: ["worker-app"],
+      models: ["gpt-5.6-luna"],
+    });
+  });
+
+  it("refuses an agent name hub.yml does not define", () => {
+    expectCompileError(
+      {
+        [".paseo/channels/telegram/butler.yml"]: account(`routes:
+  - match: { kind: dm }
+    agent: telegram-butler
+    environment: personal-lab
+    agents: [ghost]
+fallback: { deny: true }`),
+      },
+      /agent ghost is not defined in hub\.yml/,
     );
   });
 });

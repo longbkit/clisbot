@@ -53,6 +53,7 @@ import {
 import { AccessStore } from "./access/store.js";
 import { AccessLeaseRevocation } from "./managed-access/revocation.js";
 import { AccessTicketService, readAccessLeaseDuration } from "./managed-access/tickets.js";
+import { createSignalShutdown } from "./shutdown.js";
 
 export function startProductionRuntime(): Promise<ApplicationRuntime> {
   return startApplication(createProductionRuntime);
@@ -409,13 +410,22 @@ async function main(): Promise<void> {
   const config = loadRuntimeConfig();
   const port = readPort();
   const canonicalRequestOrigin = nonEmptyEnvironment(process.env["PASEO_HUB_APP_URL"]);
-  const server = createFetchServer((request) => build.default.fetch(request), {
+  // COMPAT(clisbot-control-plane): admission is closed before anything is torn
+  // down (D-W4-05). Without it the first shutdown step disposed the runtime
+  // while the listener was still accepting, so a request that arrived during
+  // the teardown reached a half-disposed database or supervisor.
+  const admission = createHttpAdmission((request) => build.default.fetch(request));
+  const server = createFetchServer((request) => admission.fetch(request), {
     ...(config.trustedClientIpHeader === undefined
       ? {}
       : { trustedClientIpHeader: config.trustedClientIpHeader }),
     ...(canonicalRequestOrigin === undefined ? {} : { canonicalRequestOrigin }),
   });
   server.on("upgrade", (request, socket, head) => {
+    if (!admission.open) {
+      socket.destroy();
+      return;
+    }
     void handleDaemonUpgradeRequest({
       request,
       socket,
@@ -428,36 +438,106 @@ async function main(): Promise<void> {
     logger.info(`server started, available at: ${appUrl}`);
   });
 
-  const stop = () => stopProductionServer(server, () => build.stopProductionRuntime());
-  const stopAfterSignal = () => {
-    void shutdownProductionServer(stop)
-      .then((clean) => {
-        if (!clean) process.exitCode = 1;
-        return undefined;
-      })
-      .finally(removeProcessFailureHandlers);
+  // COMPAT(clisbot-control-plane): bounded, twice-signalable shutdown
+  // (D-W4-05). Installed with `on`, not `once`: the handler itself decides
+  // what a repeat signal means, so a second SIGTERM always ends the process.
+  const stopAfterSignal = createSignalShutdown({
+    sequence: {
+      steps: [
+        {
+          // Before anything is disposed: new HTTP requests and new daemon
+          // upgrades stop being accepted, and the ones in flight finish.
+          name: "admission",
+          run: async () => {
+            admission.close();
+          },
+        },
+        {
+          // First, because it stops ADMISSION. The composed runtime's
+          // disposal chain runs in reverse acquisition order, and
+          // `application-runtime.ts` registers the channel supervisor's
+          // `stopAll` last for exactly that reason: the account transports
+          // (Slack Socket Mode, Telegram getUpdates) stop taking inbound
+          // before the hub's daemon links and the database close.
+          name: "runtime",
+          run: () => build.stopProductionRuntime(),
+        },
+        {
+          // Then the listener. The order is load-bearing — see
+          // `closeHttpListener`.
+          name: "listener",
+          run: () => closeHttpListener(server),
+        },
+      ],
+      // Idempotent: `stopApplication` clears the runtime singleton, so this is
+      // a no-op after a clean stop and finishes the disposal chain (including
+      // the embedded database close that unlinks the data-directory lock)
+      // when a step threw before it ran.
+      release: () => build.stopProductionRuntime(),
+    },
+    exit: (code) => {
+      removeProcessFailureHandlers();
+      process.exit(code);
+    },
+    logger,
+  });
+  process.on("SIGTERM", () => stopAfterSignal("SIGTERM"));
+  process.on("SIGINT", () => stopAfterSignal("SIGINT"));
+}
+
+/** HTTP admission, as one switch the shutdown sequence can throw.
+ *
+ * A closed gate answers every new request 503 with `retry-after` and refuses
+ * new WebSocket upgrades; requests already inside the handler run to
+ * completion, which is what makes it safe to dispose the runtime next. */
+export function createHttpAdmission(handler: (request: Request) => Promise<Response> | Response): {
+  readonly open: boolean;
+  fetch(request: Request): Promise<Response>;
+  close(): void;
+} {
+  let open = true;
+  return {
+    get open() {
+      return open;
+    },
+    close(): void {
+      open = false;
+    },
+    async fetch(request: Request): Promise<Response> {
+      if (!open) {
+        return new Response("The Hub is shutting down.", {
+          status: 503,
+          headers: { "retry-after": "5", connection: "close" },
+        });
+      }
+      return await handler(request);
+    },
   };
-  process.once("SIGTERM", stopAfterSignal);
-  process.once("SIGINT", stopAfterSignal);
 }
 
 /**
- * The production stop sequence, extracted so it is testable: stop the runtime
- * FIRST, then close the listener (the same order the test harnesses use —
- * `hub-harness.ts` `stopApp`, `hub-child.ts` `shutdown`).
- *
- * The order is load-bearing: the daemon's accepted WebSocket is an active
- * connection the http server-level `closeIdleConnections` / `closeAllConnections`
- * cannot reach — an upgraded socket leaves the http connection tracker on Node
- * 22, so a bare `server.close()` hangs on it. Stopping the runtime first lets
- * its registry close that socket; the close then only has to drain the idle
- * keep-alives below.
+ * The production stop sequence: stop the runtime FIRST, then close the
+ * listener (the same order the test harnesses use — `hub-harness.ts`
+ * `stopApp`, `hub-child.ts` `shutdown`). The signal path runs these as two
+ * ordered steps of `createSignalShutdown`; this composition stays for the
+ * harnesses that stop the server without a signal.
  */
 export async function stopProductionServer(
   server: Server,
   stopRuntime: () => Promise<void>,
 ): Promise<void> {
   await stopRuntime();
+  await closeHttpListener(server);
+}
+
+/**
+ * Drain and close the listener. Runs only AFTER the runtime stop: the daemon's
+ * accepted WebSocket is an active connection the http server-level
+ * `closeIdleConnections` / `closeAllConnections` cannot reach — an upgraded
+ * socket leaves the http connection tracker on Node 22, so a bare
+ * `server.close()` hangs on it.
+ */
+export async function closeHttpListener(server: Server): Promise<void> {
   // Drain the remaining sockets with the same duck-typed guard the test
   // harnesses use. `Server` is a minimal interface, so probe with `in` before
   // calling rather than assuming the method exists.

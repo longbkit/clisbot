@@ -20,14 +20,75 @@ import {
   type HostRuntime,
   type StartAccountContext,
 } from "@getpaseo/channels-shared";
-import { probeSlackAuth } from "../client/web-api.js";
-import { getSlackRuntime } from "../runtime.js";
+import { resolveSlackWebClientOptions } from "../client-options.js";
+import {
+  probeSlackAuth,
+  type SlackAuthProbeResult,
+  type WebClient,
+} from "../client/web-api.js";
+import { createSlackBoltProvider } from "../monitor/provider.js";
+import { getSlackHostRuntime } from "../runtime-store.js";
 import { approvalRootKind, parseApprovalCardClick } from "../transport/approval-card.js";
-import { acquireSharedSlackSocket } from "../transport/socket-pool.js";
-import { createSlackSocketTransport } from "../transport/socket-mode.js";
+
+/** Bolt's Socket Mode receiver builds its own `WebClient`, so it does not see
+ * the API URL every other Slack call resolves through
+ * `resolveSlackWebClientOptions` (`SLACK_API_URL`). Without this the receiver
+ * always dials `slack.com`, which breaks an API-proxied workspace and makes the
+ * transport untestable against a simulated platform. Only the URL crosses over;
+ * the receiver keeps its own fetch and retry policy. */
+function resolveSlackReceiverClientOptions(): Record<string, unknown> {
+  const { slackApiUrl } = resolveSlackWebClientOptions();
+  return slackApiUrl === undefined ? {} : { slackApiUrl };
+}
 
 /** The pinned default account id when `ctx.account` carries no `accountId`. */
 export const SLACK_DEFAULT_ACCOUNT_ID = "default";
+
+/**
+ * The boot probe's budget. Upstream never probes at `startAccount`, so there is
+ * no upstream number to inherit: its `probeSlack` default (2500 ms) belongs to
+ * the interactive health check, where a fast answer beats a complete one. Boot
+ * is the opposite trade — a busy host that answers `auth.test` in four seconds
+ * must still get its Slack lane. Wave 5 lost the account on two consecutive
+ * boots at load average > 10 while `curl` to the same endpoint answered in
+ * 0.6 s (docs/tests/channels/p0-live-scenarios.md).
+ */
+export const SLACK_START_PROBE_TIMEOUT_MS = 15_000;
+
+/**
+ * `auth.test` at boot: the Fusion budget, one retry, and a loud `error` naming
+ * the budget so a slow host never drops the lane silently. Only a transport
+ * fault or timeout is retried (`status === null`); a Slack-answered rejection
+ * — `invalid_auth`, `account_inactive` — is final and fails the account now.
+ */
+export async function probeSlackAuthAtStart(
+  botToken: string,
+  opts: {
+    accountId: string;
+    log?: HostChildLogger;
+    client?: WebClient;
+    timeoutMs?: number;
+  },
+): Promise<SlackAuthProbeResult> {
+  const timeoutMs = opts.timeoutMs ?? SLACK_START_PROBE_TIMEOUT_MS;
+  const probeOnce = async (): Promise<SlackAuthProbeResult> =>
+    await probeSlackAuth(botToken, timeoutMs, {
+      accountId: opts.accountId,
+      ...(opts.client !== undefined ? { client: opts.client } : {}),
+    });
+  const first = await probeOnce();
+  if (first.ok || first.status !== null) return first;
+  opts.log?.error?.(
+    `Slack auth.test for account "${opts.accountId}" did not answer within the ${timeoutMs}ms start budget (${first.error ?? "unknown"}); retrying once before failing the account`,
+  );
+  const second = await probeOnce();
+  if (!second.ok && second.status === null) {
+    opts.log?.error?.(
+      `Slack auth.test for account "${opts.accountId}" failed twice within the ${timeoutMs}ms start budget (${second.error ?? "unknown"}); the account will not start`,
+    );
+  }
+  return second;
+}
 
 /** COMPAT(clisbot-control-plane): the account's inbound-media download dir
  * (`<dataDir>/channels/<accountId>/downloads`, filled by the Hub supervisor as
@@ -123,7 +184,11 @@ export function assertNoDuplicateSlackBotTokens(
  * is not mounted yet (unit-test posture): the inboundLedger sink is the
  * Hub's durable dedupe when present; without a Hub the in-flight set is the
  * whole dedupe. */
-function createSlackL3Processor(accountId: string, botId?: string, runtime = getSlackRuntime()) {
+function createSlackL3Processor(
+  accountId: string,
+  botId?: string,
+  runtime = getSlackHostRuntime(),
+) {
   const hostRuntime = runtime;
   if (hostRuntime === undefined) return undefined;
   return createInboundEventProcessor({
@@ -157,7 +222,7 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
 
   // L4 auth.test probe on the bot token (blueprint §6.5). A bad bot token
   // fails the account here, before the socket ever starts.
-  const probe = await probeSlackAuth(botToken, 2500, { accountId });
+  const probe = await probeSlackAuthAtStart(botToken, { accountId, ...(log ? { log } : {}) });
   if (!probe.ok) {
     throw new Error(
       `Slack auth.test failed for account "${accountId}": ${probe.error ?? "unknown"}`,
@@ -175,10 +240,6 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
     probe.botId,
     ctx["hostRuntime"] as HostRuntime | undefined,
   );
-  const socket = acquireSharedSlackSocket({
-    appToken,
-    ...(log === undefined ? {} : { logger: log }),
-  });
   const accountLifetime = new AbortController();
   const abortAccount = (): void => accountLifetime.abort();
   ctx.abortSignal.addEventListener("abort", abortAccount, { once: true });
@@ -191,13 +252,14 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
   // stays opaque to the vertical — the hub's card parser owns its format.
   const onInteractive = slackApprovalInteractive(ctx.channelRuntime, accountId, log);
   // COMPAT(clisbot-control-plane): inbound media (F-06, G5+G6). When the Hub
-  // fills `ctx.mediaDownloadDir`, the L2 folds a message's `files[]` into the
-  // inbound body before the L3 handoff (the mirror of the Telegram vertical's
-  // `downloadDir`). Absent (unit posture, pinned vertical) = text-only.
+  // fills `ctx.mediaDownloadDir`, the provider folds a message's `files[]` into
+  // the inbound body before admission (the mirror of the Telegram vertical's
+  // `downloadDir`). Absent (unit posture) = text-only.
   // COMPAT(clisbot-control-plane): the account's registered native slash
-  // command (`transport.slashCommand`, e.g. `/paseo`). Set = the L2 rewrites
-  // matching `slash_commands` envelopes to the shared plain-text command form
-  // (the hub's commands.ts owns the verbs); absent = native ingestion off.
+  // command (`transport.slashCommand`, e.g. `/paseo`). Set = the provider
+  // rewrites matching `slash_commands` payloads to the shared plain-text
+  // command form (the hub's commands.ts owns the verbs); absent = native
+  // ingestion off.
   const transportRecord = ctx.account["transport"];
   const slashCommandSetting =
     typeof transportRecord === "object" && transportRecord !== null
@@ -209,18 +271,17 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
       : undefined;
   const mediaDownloadDir = resolveMediaDownloadDir(ctx);
   const media =
-    mediaDownloadDir !== undefined
-      ? { accountId, botToken, downloadDir: mediaDownloadDir }
-      : undefined;
-  const transport = createSlackSocketTransport({
-    client: socket.client,
-    sharedClient: true,
+    mediaDownloadDir !== undefined ? { accountId, downloadDir: mediaDownloadDir } : undefined;
+  const provider = createSlackBoltProvider({
+    botToken,
+    appToken,
     identity: {
       ...(probe.botUserId !== undefined ? { botUserId: probe.botUserId } : {}),
       ...(probe.botId !== undefined ? { botId: probe.botId } : {}),
       ...(probe.teamId !== undefined ? { teamId: probe.teamId } : {}),
       ...(probe.apiAppId !== undefined ? { apiAppId: probe.apiAppId } : {}),
     },
+    ...(probe.botId !== undefined ? { botId: probe.botId } : {}),
     onInbound:
       processor !== undefined
         ? async (event) => {
@@ -231,6 +292,7 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
             // with no host is not a channel.
           },
     abortSignal: accountLifetime.signal,
+    clientOptions: resolveSlackReceiverClientOptions(),
     ...(log !== undefined ? { logger: log } : {}),
     ...(onInteractive !== undefined ? { onInteractive } : {}),
     ...(slashCommand !== undefined ? { slashCommand } : {}),
@@ -244,12 +306,10 @@ export async function startSlackAccount(ctx: StartAccountContext): Promise<void>
     lifecycle: "ready",
   });
   try {
-    socket.start();
-    await Promise.all([transport.start(), socket.wait(accountLifetime.signal)]);
+    await provider.start();
   } finally {
     accountLifetime.abort();
     ctx.abortSignal.removeEventListener("abort", abortAccount);
-    await socket.release();
     ctx.setStatus?.({ channel: "slack", accountId, connected: false });
   }
 }

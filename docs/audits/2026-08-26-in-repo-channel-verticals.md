@@ -6,6 +6,8 @@ This doc answers one question and records one decision:
 
 - **Decision (user, 2026-08-26):** pull Telegram **and Slack** into the repo as first-party verticals (level **S2** — own the slice, both channels in one work item, fully replacing the pinned-OpenClaw mechanism for both), keep the pinned OpenClaw dists as sync references, and generalize the package shape so zalouser can be pulled the same way later. Priority order: (1) customer experience — deviations from upstream are allowed when needed; (2) maximizing the ability to re-sync OpenClaw updates; (3) owning the parts we must fix.
 
+> **Status 2026-09-07.** The decision held and was extended: all seven catalog channels now ship as in-repo verticals against an OpenClaw source baseline, ported from upstream **source** rather than from the pinned dists this audit measured. §1–§3 remain the dist-verified record of _why_ the pull was taken and what the pinned supply looked like; the parts of §4 that describe the mechanics have been overtaken and are annotated in place. For the platform as built — layout rule, shared contract, admission invariant, Hub pipeline, `fusion/*` pattern, add-a-channel checklist — read [channels-platform.md](../channels-platform.md). Do not treat this audit as a build guide.
+
 ## 1. What "the same contract as openclaw/slack" actually is
 
 The Hub drives a channel vertical through **four surfaces**, and they belong to two different families:
@@ -131,7 +133,7 @@ Per vertical, the in-repo package owns **four layers** and leaves the rest as up
 **Per-vertical L-layer notes.** The four layers are channel-agnostic; their contents differ per channel:
 
 - **Slack:** L1 = `@slack/web-api` (bundled `node_modules`, ~80 packages — vendor as a first-party dep), L2 = Socket Mode (WebSocket), L3 = shared, L4 = `auth.test` probe.
-- **zalouser:** L1 = `zca-js` user-client wrapper (pure library, no CLI), L2 = user-client subscription (not poll, not WS to the channel), L3 = shared (media-group coalescing lives here, channel-agnostic), L4 = QR-login lifecycle + session restore + the risk-confirm gate. **The owned surface for zalouser is the Clisbot reference surface (§2.2), not the thin OpenClaw zalouser surface** — send/voice/react±/read/delete + media-group inbound + the QR lifecycle. The extended contact/group directory queries and the operator CLI surface are **not** part of the vertical pull: they ride with the operator-surface decision (§7.8), keeping group E's directory exclusion intact. This makes the zalouser L-layers larger than their OpenClaw source chunks imply, and the sync reference is `zca-js` + the Zalo protocol rather than an OpenClaw dist (see §4.2).
+- **zalouser:** L1 = `zca-js` user-client wrapper (pure library, no CLI), L2 = user-client subscription (not poll, not WS to the channel), L3 = shared (media-group coalescing lives here, channel-agnostic), L4 = QR-login lifecycle + session restore + the risk-confirm gate. **The owned surface for zalouser is the Clisbot reference surface (§2.2), not the thin OpenClaw zalouser surface** — send/voice/react±/read/delete + media-group inbound + the QR lifecycle. The extended contact/group directory queries and the operator CLI surface are **not** part of the vertical pull: they ride with the operator-surface decision (§7.8), keeping group E's directory exclusion intact. This makes the zalouser L-layers larger than their OpenClaw source chunks imply, and the sync reference is `zca-js` + the Zalo protocol rather than an OpenClaw dist (see §4.2). **Not what was built** — the vertical was ported from OpenClaw source like every other channel; see the note in §4.2.
 
 **Group E (out of scope, never pulled):** pairing, exec-approvals, thread-bindings, config doctor/migrations, security-audit, directory, setup wizard, model-selection keyboards (`interactive-dispatch`), `allow-from` policy machinery, secret contracts. This is the part of OpenClaw that changes most often — keeping it out is what keeps the sync delta small. The plane has its own equivalents (approvals, bindings, state stores) where needed.
 
@@ -154,27 +156,20 @@ S2 lives at B1 with B2 entries recorded, and B3 is structurally excluded by the 
 
 ### 4.2 Sync manifest (per package)
 
-`SYNC.md` maps each in-repo module to its upstream chunk + symbol + version stamp, and names the out-of-scope set (as load-bearing as the in-scope set — it answers "does this hunk matter?" in seconds during a diff):
+The sync record is `packages/channels/<pkg>/upstream-sync.json`: one entry per local
+production file with its upstream path at a pinned baseline commit, a status
+(`verbatim` / `adapted` / `reimplemented` / `fusion-owned`), the deviation ids that
+explain the drift, and the omitted upstream files with reasons.
+`node scripts/channel-upstream-sync.mjs check` fails when the manifest and the tree
+disagree; `report` shows what moved upstream since the baseline; `sync-md` regenerates
+the `## Source manifest` section of `SYNC.md`. The hand-written module tables this
+replaces went stale silently — no baseline commit, no tooling, many-to-one rows that
+could not be diffed (see the 2026-09-06 alignment audit §11). Usage and field meanings:
+[upstream-sync-and-contribution.md](../guides/developer-guide/upstream-sync-and-contribution.md#openclaw-channel-source-manifests).
 
-```
-# packages/channels/telegram SYNC (reference: openclaw@2026.7.1-2, gitHead 2d2ddc43…)
-src/client/bot-api.ts       ← dist/send-BgA996pw.js   (+30 leaf chunks, enumerated below)
-src/client/leaves/*.ts      ← string-coerce / number-coercion / redact / retry-policy /
-                              request-timeouts / polls / markdown-tables / … (30, enumerated)
-src/client/grammy-deps      ← grammy / @grammyjs/runner / @grammyjs/transformer-throttler
-                              (kept as pinned deps of the in-repo package — decided, §7)
-src/transport/poll.ts       ← hosts/telegram-monitor.ts long-poll loop (Hub option-A, pre-existing)
-src/monitor.ts              ← shared L3 (offset store, dedupe, mention gate, ctxPayload,
-                              inbound ledger record + consume-mark — Hub-owned, §2.4)
-src/lifecycle/start-account.ts ← dist/channel-DP5CkqKN.js [subset: probe→bot-info→guard→handoff]
-src/lifecycle/probe.ts      ← dist/probe-bGTVpKvS.js [subset: getMe + getUpdates + bot-info]
-src/outbound.ts             ← sendText + resolveAndPersistChatId + recordSentMessage
-                              (write-back re-targeted to plane storage — see DEVIATIONS D-001)
-# OUT OF SCOPE (group E): pairing, exec-approvals, thread-bindings, doctor, security-audit,
-# directory, setup-wizard, interactive-dispatch, allow-from, secret contracts
-```
+**Not what was built (2026-09-07).** The zalouser plan below was overtaken: the vertical was ported from `extensions/zalouser/src` at the OpenClaw baseline like every other channel, so its manifest maps to OpenClaw source and its re-sync loop is the ordinary one. The Clisbot reference surface named in §2.2 was not used as the port source. The paragraph and layout sketch are kept as the reasoning that was considered and dropped.
 
-The zalouser manifest maps differently — the sync reference is **`zca-js@2.1.2` + the Clisbot T3Claw fusion repo's `src/channels/zalo-personal/`** (the already-ported reference surface), with the OpenClaw zalouser dist as secondary reference for anything we share with it:
+The zalouser manifest maps differently — the sync reference is **`zca-js@2.1.2` + the Clisbot T3Claw fusion repo's `src/channels/zalo-personal/`** (the already-ported reference surface), with the OpenClaw zalouser source as secondary reference for anything we share with it:
 
 ```
 # packages/channels/zalouser SYNC (reference: zca-js@2.1.2; Clisbot zalo-personal;
@@ -195,7 +190,9 @@ zalouser's re-sync loop (§4.4) diffs against `zca-js` releases instead of OpenC
 
 ### 4.3 Deviation ledger (per package)
 
-`DEVIATIONS.md`, one entry per behavioral deviation:
+**Where the ledger lives now (2026-09-07).** The per-package `DEVIATIONS.md` was folded into the manifest: `upstream-sync.json` carries a `deviations[]` array of `{ id, file?, reason, tests?[] }`, and `channels:sync:check` enforces unique ids, non-empty reasons, and a citation from every `adapted`/`reimplemented` file entry — none of which a prose file could enforce. Only the two oldest packages still carry a `DEVIATIONS.md`, as history. The operating rule below is unchanged and is the important part; the format is described in [channels-platform.md](../channels-platform.md#the-deviation-ledger).
+
+`DEVIATIONS.md` carries the reasoning, one entry per behavioral deviation; the ids it defines are what the manifest's `files[].deviation` references:
 
 ```
 D-001 — chatid/sent-message write-back targets the plane's keyed-store seam,
@@ -213,10 +210,10 @@ Operating rule: **at every sync, walk the ledger.** Entry fixed upstream → del
 ### 4.4 The re-sync loop
 
 1. Re-extract the bumped OpenClaw tarball(s) under the scout dir; bump the pin reference in `channel-pins.json`.
-2. Diff each manifest-listed module: in-scope hunk → port; out-of-scope (group E) → ignore; new surface (new tool, new endpoint) → decide whether the plane exposes it; if yes, add to the package + manifest.
+2. `npm run channels:sync:report` to list the changed upstream files and dependency deltas, then diff each: in-scope hunk → port; out-of-scope (group E) → ignore; new surface (new tool, new endpoint) → decide whether the plane exposes it; if yes, add to the package + manifest.
 3. Walk the deviation ledger (revert where upstream caught up).
 4. Gate: `npm run test:contract:native` (pinned verticals + any in-repo package, §4.5) + targeted unit tests + live E2E on the fixed dev home per CLAUDE.md. A sync that lands without a green gate is not a sync.
-5. Bump the version stamps in `SYNC.md`.
+5. Bump `baselineCommit` in each `upstream-sync.json`, re-run `npm run channels:sync:check`, and regenerate `SYNC.md` with `sync-md`.
 
 Cost concentrates in step 2. The pinned-dist evidence bounds it: most of an OpenClaw release lands in group E (ignored), and the L1/L2 surfaces track the stable Bot-API/transport boundary.
 

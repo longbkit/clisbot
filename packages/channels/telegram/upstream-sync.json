@@ -1,0 +1,1265 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "extensions/telegram/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/__fixtures__/upstream-differential.cases.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/account-inspect.ts",
+      "upstream": "extensions/telegram/src/account-inspect.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-010"]
+    },
+    {
+      "local": "src/account-owner.ts",
+      "upstream": "extensions/telegram/src/account-owner.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-011"]
+    },
+    {
+      "local": "src/account-throttler.ts",
+      "upstream": "extensions/telegram/src/account-throttler.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/accounts.ts",
+      "upstream": "extensions/telegram/src/accounts.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-010"]
+    },
+    {
+      "local": "src/action-runtime.test.ts",
+      "upstream": "extensions/telegram/src/action-runtime.test.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-032"]
+    },
+    {
+      "local": "src/action-runtime.ts",
+      "upstream": "extensions/telegram/src/action-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/allowed-updates.ts",
+      "upstream": "extensions/telegram/src/allowed-updates.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/api-logging.ts",
+      "upstream": "extensions/telegram/src/api-logging.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/api-root.ts",
+      "upstream": "extensions/telegram/src/api-root.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/approval-callback-data.ts",
+      "upstream": "extensions/telegram/src/approval-callback-data.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/bot-access.ts",
+      "upstream": "extensions/telegram/src/bot-access.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-015"]
+    },
+    {
+      "local": "src/bot-message-context.types.ts",
+      "upstream": "extensions/telegram/src/bot-message-context.types.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-050"]
+    },
+    {
+      "local": "src/bot-updates.ts",
+      "upstream": "extensions/telegram/src/bot-updates.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/bot.runtime.ts",
+      "upstream": "extensions/telegram/src/bot.runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-023"]
+    },
+    {
+      "local": "src/bot/body-helpers.ts",
+      "upstream": "extensions/telegram/src/bot/body-helpers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/bot/helpers.ts",
+      "upstream": "extensions/telegram/src/bot/helpers.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-017"]
+    },
+    {
+      "local": "src/bot/inbound-text-entities.ts",
+      "upstream": "extensions/telegram/src/bot/inbound-text-entities.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/bot/types.ts",
+      "upstream": "extensions/telegram/src/bot/types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/button-types.test-helpers.ts",
+      "upstream": "extensions/telegram/src/button-types.test-helpers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/button-types.test.ts",
+      "upstream": "extensions/telegram/src/button-types.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/button-types.ts",
+      "upstream": "extensions/telegram/src/button-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/caption.ts",
+      "upstream": "extensions/telegram/src/caption.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-actions.test.ts",
+      "upstream": "extensions/telegram/src/channel-actions.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "upstream": "extensions/telegram/src/channel-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/chat-action-timing.ts",
+      "upstream": "extensions/telegram/src/chat-action-timing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/chunk-delivery.ts",
+      "upstream": "extensions/telegram/src/chunk-delivery.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/client-fetch.ts",
+      "upstream": "extensions/telegram/src/client-fetch.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/client/bot-api.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-026"]
+    },
+    {
+      "local": "src/client/bot-api.ts",
+      "upstream": "extensions/telegram/src/send-message.ts",
+      "status": "reimplemented",
+      "deviation": ["D-020", "D-005", "D-015", "D-016", "D-019", "D-TG-026", "D-TG-056"]
+    },
+    {
+      "local": "src/conversation-metadata.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/conversation-metadata.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/draft-chunking.ts",
+      "upstream": "extensions/telegram/src/draft-chunking.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/draft-stream.test-helpers.ts",
+      "upstream": "extensions/telegram/src/draft-stream.test-helpers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/draft-stream.test.ts",
+      "upstream": "extensions/telegram/src/draft-stream.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/draft-stream.ts",
+      "upstream": "extensions/telegram/src/draft-stream.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fetch.ts",
+      "upstream": "extensions/telegram/src/fetch.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-013"]
+    },
+    {
+      "local": "src/format-assistant-transcript.ts",
+      "upstream": "extensions/telegram/src/format-assistant-transcript.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/format-html.ts",
+      "upstream": "extensions/telegram/src/format-html.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/format-render.ts",
+      "upstream": "extensions/telegram/src/format-render.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/format.local-golden.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-003"]
+    },
+    {
+      "local": "src/format.test.ts",
+      "upstream": "extensions/telegram/src/format.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/format.ts",
+      "upstream": "extensions/telegram/src/format.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-001", "D-TG-006"]
+    },
+    {
+      "local": "src/format.wrap-md.test.ts",
+      "upstream": "extensions/telegram/src/format.wrap-md.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/forum-service-message.ts",
+      "upstream": "extensions/telegram/src/forum-service-message.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/fusion/account-config.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-010", "D-TG-056"]
+    },
+    {
+      "local": "src/fusion/admission.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/admission.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-054"]
+    },
+    {
+      "local": "src/fusion/approval-dispatch.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/inbound-adapter.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/inbound-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-052"]
+    },
+    {
+      "local": "src/fusion/message-thread-observation.ts",
+      "status": "fusion-owned",
+      "note": "Seam for the provider-observed thread binding `message-topic-binding.ts` needs; upstream reads its file-backed message cache (D-TG-031). Slice 20 installs the Hub-backed observation store."
+    },
+    {
+      "local": "src/fusion/polling-session.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/polling-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-053"]
+    },
+    {
+      "local": "src/fusion/runtime.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-014"]
+    },
+    {
+      "local": "src/fusion/test-support.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/webhook-session.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/webhook-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-055"]
+    },
+    {
+      "local": "src/group-access.ts",
+      "upstream": "extensions/telegram/src/group-access.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-020"]
+    },
+    {
+      "local": "src/group-config-helpers.ts",
+      "upstream": "extensions/telegram/src/group-config-helpers.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-021"]
+    },
+    {
+      "local": "src/inbound-event-delivery.ts",
+      "upstream": "extensions/telegram/src/inbound-event-delivery.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/inline-buttons.ts",
+      "upstream": "extensions/telegram/src/inline-buttons.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/inline-keyboard.ts",
+      "upstream": "extensions/telegram/src/inline-keyboard.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/interactive-fallback.ts",
+      "upstream": "extensions/telegram/src/interactive-fallback.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/leaves/coerce.ts",
+      "upstream": "extensions/telegram/src/targets.ts",
+      "status": "reimplemented",
+      "deviation": ["D-026", "D-006"]
+    },
+    {
+      "local": "src/leaves/rich-message.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-002"]
+    },
+    {
+      "local": "src/leaves/telegram-policy.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/leaves/telegram-policy.ts",
+      "upstream": "extensions/telegram/src/send-error-predicates.ts",
+      "status": "reimplemented",
+      "deviation": ["D-028", "D-002"]
+    },
+    {
+      "local": "src/lifecycle/start-account.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "upstream": "extensions/telegram/src/bot-info.ts",
+      "status": "reimplemented",
+      "deviation": ["D-029", "D-008", "D-009", "D-010"]
+    },
+    {
+      "local": "src/message-cache-persistence.ts",
+      "upstream": "extensions/telegram/src/message-cache-persistence.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/message-cache.ts",
+      "upstream": "extensions/telegram/src/message-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/message-tool-schema.ts",
+      "upstream": "extensions/telegram/src/message-tool-schema.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/message-topic-binding.ts",
+      "upstream": "extensions/telegram/src/message-topic-binding.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-031"]
+    },
+    {
+      "local": "src/native-button-params.ts",
+      "upstream": "extensions/telegram/src/native-button-params.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/native-command-callback-data.ts",
+      "upstream": "extensions/telegram/src/native-command-callback-data.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/network-config.ts",
+      "upstream": "extensions/telegram/src/network-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/network-errors.test.ts",
+      "upstream": "extensions/telegram/src/network-errors.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/network-errors.ts",
+      "upstream": "extensions/telegram/src/network-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound-media.ts",
+      "upstream": "extensions/telegram/src/outbound-media.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound-message-context.ts",
+      "upstream": "extensions/telegram/src/outbound-message-context.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-018"]
+    },
+    {
+      "local": "src/outbound-params.ts",
+      "upstream": "extensions/telegram/src/outbound-params.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/outbound.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-004", "D-TG-024", "D-TG-057"]
+    },
+    {
+      "local": "src/outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-027", "D-TG-057"]
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-027", "D-TG-057"]
+    },
+    {
+      "local": "src/poll-answer-context.ts",
+      "upstream": "extensions/telegram/src/poll-answer-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/poll-registry.ts",
+      "upstream": "extensions/telegram/src/poll-registry.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/poll-visibility.ts",
+      "upstream": "extensions/telegram/src/poll-visibility.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/polling-liveness.ts",
+      "upstream": "extensions/telegram/src/polling-liveness.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/polling-session-restart-policy.ts",
+      "upstream": "extensions/telegram/src/polling-session-restart-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/polling-status.ts",
+      "upstream": "extensions/telegram/src/polling-status.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/polling-transport-state.ts",
+      "upstream": "extensions/telegram/src/polling-transport-state.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/presentation-outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-057"]
+    },
+    {
+      "local": "src/prompt-context-projection.ts",
+      "upstream": "extensions/telegram/src/prompt-context-projection.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-018"]
+    },
+    {
+      "local": "src/provider-thread-proof.ts",
+      "upstream": "extensions/telegram/src/provider-thread-proof.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/proxy.ts",
+      "upstream": "extensions/telegram/src/proxy.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-013"]
+    },
+    {
+      "local": "src/question-callback-data.ts",
+      "upstream": "extensions/telegram/src/question-callback-data.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reaction-level.test.ts",
+      "upstream": "extensions/telegram/src/reaction-level.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reaction-level.ts",
+      "upstream": "extensions/telegram/src/reaction-level.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reply-parameters.test.ts",
+      "upstream": "extensions/telegram/src/reply-parameters.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/reply-parameters.ts",
+      "upstream": "extensions/telegram/src/reply-parameters.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/request-timeouts.test.ts",
+      "upstream": "extensions/telegram/src/request-timeouts.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/request-timeouts.ts",
+      "upstream": "extensions/telegram/src/request-timeouts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/retry-after.ts",
+      "upstream": "extensions/telegram/src/retry-after.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/rich-block-model.ts",
+      "upstream": "extensions/telegram/src/rich-block-model.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/rich-block-split.ts",
+      "upstream": "extensions/telegram/src/rich-block-split.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/rich-blocks-html-map.ts",
+      "upstream": "extensions/telegram/src/rich-blocks-html-map.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/rich-blocks-html.test.ts",
+      "upstream": "extensions/telegram/src/rich-blocks-html.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/rich-blocks-html.ts",
+      "upstream": "extensions/telegram/src/rich-blocks-html.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/rich-blocks-list.ts",
+      "upstream": "extensions/telegram/src/rich-blocks-list.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/rich-blocks.test.ts",
+      "upstream": "extensions/telegram/src/rich-blocks.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/rich-blocks.ts",
+      "upstream": "extensions/telegram/src/rich-blocks.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-005", "D-TG-006"]
+    },
+    {
+      "local": "src/rich-message.ts",
+      "upstream": "extensions/telegram/src/rich-message.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-001", "D-TG-006"]
+    },
+    {
+      "local": "src/rich-plain-fallback.test.ts",
+      "upstream": "extensions/telegram/src/rich-plain-fallback.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/rich-plain-fallback.ts",
+      "upstream": "extensions/telegram/src/rich-plain-fallback.ts",
+      "status": "verbatim",
+      "deviation": ["D-TG-006"]
+    },
+    {
+      "local": "src/runtime-store.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime.test-support.ts",
+      "upstream": "extensions/telegram/src/runtime.test-support.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-028"]
+    },
+    {
+      "local": "src/runtime.ts",
+      "upstream": "extensions/telegram/src/runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-014", "D-TG-028"]
+    },
+    {
+      "local": "src/runtime.types.ts",
+      "upstream": "extensions/telegram/src/runtime.types.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-014"]
+    },
+    {
+      "local": "src/send-actions.ts",
+      "upstream": "extensions/telegram/src/send-actions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-context.ts",
+      "upstream": "extensions/telegram/src/send-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-edit.ts",
+      "upstream": "extensions/telegram/src/send-edit.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-error-predicates.ts",
+      "upstream": "extensions/telegram/src/send-error-predicates.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-forum-topics.ts",
+      "upstream": "extensions/telegram/src/send-forum-topics.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-location.ts",
+      "upstream": "extensions/telegram/src/send-location.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-message-text.ts",
+      "upstream": "extensions/telegram/src/send-message-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-message-types.ts",
+      "upstream": "extensions/telegram/src/send-message-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-message.ts",
+      "upstream": "extensions/telegram/src/send-message.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-outbound.ts",
+      "upstream": "extensions/telegram/src/send-outbound.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-prepared.ts",
+      "upstream": "extensions/telegram/src/send-prepared.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-runtime.ts",
+      "upstream": "extensions/telegram/src/send-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send-special.ts",
+      "upstream": "extensions/telegram/src/send-special.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.chunks.test.ts",
+      "upstream": "extensions/telegram/src/send.chunks.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.runtime.ts",
+      "upstream": "extensions/telegram/src/send.runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/send.ts",
+      "upstream": "extensions/telegram/src/send.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/sendchataction-401-backoff.ts",
+      "upstream": "extensions/telegram/src/sendchataction-401-backoff.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/sent-message-cache.legacy-state.ts",
+      "upstream": "extensions/telegram/src/sent-message-cache.legacy-state.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-019"]
+    },
+    {
+      "local": "src/sent-message-cache.ts",
+      "upstream": "extensions/telegram/src/sent-message-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/state-account-id.ts",
+      "upstream": "extensions/telegram/src/state-account-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/status-reaction-variants.ts",
+      "upstream": "extensions/telegram/src/status-reaction-variants.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/sticker-cache-store.legacy-state.ts",
+      "upstream": "extensions/telegram/src/sticker-cache-store.legacy-state.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/sticker-cache-store.ts",
+      "upstream": "extensions/telegram/src/sticker-cache-store.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/sticker-cache.ts",
+      "upstream": "extensions/telegram/src/sticker-cache.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-030"]
+    },
+    {
+      "local": "src/target-writeback.ts",
+      "upstream": "extensions/telegram/src/target-writeback.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-016"]
+    },
+    {
+      "local": "src/targets.ts",
+      "upstream": "extensions/telegram/src/targets.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/telegram-ingress-non-retryable.ts",
+      "upstream": "extensions/telegram/src/telegram-ingress-non-retryable.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-051"]
+    },
+    {
+      "local": "src/telegram-ingress-spool.payload.ts",
+      "upstream": "extensions/telegram/src/telegram-ingress-spool.payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/telegram-text-delivery.ts",
+      "upstream": "extensions/telegram/src/telegram-text-delivery.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/text-chunk-limit.ts",
+      "upstream": "extensions/telegram/src/text-chunk-limit.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/text-width.test.ts",
+      "upstream": "extensions/telegram/src/text-width.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/text-width.ts",
+      "upstream": "extensions/telegram/src/text-width.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/thread-spec.test.ts",
+      "upstream": "extensions/telegram/src/thread-spec.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/thread-spec.ts",
+      "upstream": "extensions/telegram/src/thread-spec.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/threading-tool-context.ts",
+      "upstream": "extensions/telegram/src/threading-tool-context.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/token-fingerprint.ts",
+      "upstream": "extensions/telegram/src/token-fingerprint.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/token.ts",
+      "upstream": "extensions/telegram/src/token.ts",
+      "status": "adapted",
+      "deviation": ["D-TG-029"]
+    },
+    {
+      "local": "src/topic-conversation.test.ts",
+      "upstream": "extensions/telegram/src/topic-conversation.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/topic-conversation.ts",
+      "upstream": "extensions/telegram/src/topic-conversation.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/topic-name-cache.ts",
+      "upstream": "extensions/telegram/src/topic-name-cache.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/transport/approval-callback.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/transport/approval-callback.ts",
+      "upstream": "extensions/telegram/src/bot-handlers.callback-router.ts",
+      "status": "reimplemented",
+      "deviation": ["D-013"]
+    },
+    {
+      "local": "src/transport/media.test.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/transport/media.ts",
+      "upstream": "extensions/telegram/src/bot-handlers.inbound-media.ts",
+      "status": "reimplemented",
+      "deviation": ["D-034"]
+    },
+    {
+      "local": "src/typing.test.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-TG-025"]
+    },
+    {
+      "local": "src/typing.ts",
+      "upstream": "extensions/telegram/src/chat-action-timing.ts",
+      "status": "reimplemented",
+      "deviation": ["D-036", "D-018", "D-TG-025"]
+    },
+    {
+      "local": "src/update-offset-persistence.ts",
+      "upstream": "extensions/telegram/src/update-offset-persistence.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/update-offset-store.ts",
+      "upstream": "extensions/telegram/src/update-offset-store.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/voice.test.ts",
+      "upstream": "extensions/telegram/src/voice.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/voice.ts",
+      "upstream": "extensions/telegram/src/voice.ts",
+      "status": "verbatim"
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/telegram/src/__traces__",
+      "reason": "Upstream delivery-pipeline trace fixtures; the Fusion vertical has no draft/streaming pipeline to replay."
+    },
+    {
+      "upstream": "extensions/telegram/src/message-dispatch-dedupe.ts",
+      "reason": "Persistent (bot, chat, message) replay guard over plugin-sdk/persistent-dedupe (721 lines of claim store). The Hub ingress queue is Fusion durable dedupe (goal slices 1/8); see D-TG-051."
+    },
+    {
+      "upstream": "extensions/telegram/src/miniapp",
+      "reason": "Telegram Mini App surface (launch tickets, routes, owner checks) — out of scope for the channel plane."
+    },
+    {
+      "upstream": "extensions/telegram/src/monitor-polling.runtime.ts",
+      "reason": "Lazy re-export shim for the monitor entry above."
+    },
+    {
+      "upstream": "extensions/telegram/src/monitor-webhook.runtime.ts",
+      "reason": "Lazy re-export shim for the monitor entry above."
+    },
+    {
+      "upstream": "extensions/telegram/src/monitor.ts",
+      "reason": "Upstream monitor entry: resolves the OpenClaw runtime config, registers process-level unhandled-rejection handlers and picks polling vs webhook. The Hub supervisor owns account lifecycle; lifecycle/start-account.ts is the Fusion equivalent."
+    },
+    {
+      "upstream": "extensions/telegram/src/monitor.types.ts",
+      "reason": "Types for the monitor entry above."
+    },
+    {
+      "upstream": "extensions/telegram/src/polling-lease.ts",
+      "reason": "Cross-process polling lease keyed on the bot token, over the OpenClaw state dir. Fusion enforces one poller per bot in-process (claimTelegramBotPoller in lifecycle/start-account.ts); a cross-process lease belongs to the Hub supervisor, not the vertical."
+    },
+    {
+      "upstream": "extensions/telegram/src/polling-session.ts",
+      "reason": "Upstream polling session: creates the full OpenClaw bot (bot-core.ts → bot-handlers/bot-message-*/bot-native-command*, ~19k lines over the OpenClaw session store, reply pipeline and approval gateway) and runs the worker/spool ingress. Replaced at the smallest boundary by fusion/polling-session.ts (D-TG-053), which reuses every upstream polling module that carries no OpenClaw coupling."
+    },
+    {
+      "upstream": "extensions/telegram/src/session-conversation.ts",
+      "reason": "Session-key <-> conversation projection for the omitted `thread-bindings.ts`."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-drain-factory.ts",
+      "reason": "Factory for the spool drain above; same reason."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-drain.ts",
+      "reason": "Upstream ingress drain; same reason as the spool."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-spool.ts",
+      "reason": "Upstream's own ingress spool. The Hub owns durable admission through `channel_ingress_queue` (goal slice 1)."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-supersede-auth.ts",
+      "reason": "Authority half of the spool supersede; same reason."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-supersede.ts",
+      "reason": "Spool-row supersede/adoption bookkeeping; the Hub queue owns lane ordering and replacement (goal slices 8/R2)."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-worker.runtime.ts",
+      "reason": "Worker-thread entry for the ingress worker; Fusion polls in-process (D-TG-053)."
+    },
+    {
+      "upstream": "extensions/telegram/src/telegram-ingress-worker.ts",
+      "reason": "Upstream ingress worker; same reason as the spool."
+    },
+    {
+      "upstream": "extensions/telegram/src/thread-bindings-store.ts",
+      "reason": "File-backed store for the omitted `thread-bindings.ts` (`openclaw/plugin-sdk/state-paths`, `node:fs`)."
+    },
+    {
+      "upstream": "extensions/telegram/src/thread-bindings.ts",
+      "reason": "Thread/session bindings (791 lines) over `openclaw/plugin-sdk/conversation-runtime` (session-binding service, thread-binding policy/messages/lifecycle), `acp-runtime` and `routing`. Fusion's Hub owns conversation bindings; porting this would create a second binding owner. Deferred with the binding surface."
+    },
+    {
+      "upstream": "extensions/telegram/src/webhook-status.ts",
+      "reason": "Status helpers for the upstream webhook server above."
+    },
+    {
+      "upstream": "extensions/telegram/src/webhook.ts",
+      "reason": "Upstream webhook server: shared multi-account server registry, TLS certificate upload, health/status endpoints, setWebhook retry ladder and OpenClaw runtime plumbing. Replaced by fusion/webhook-session.ts (D-TG-055), which keeps the secret check, the admit-before-200 invariant and the callback ack."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-002",
+      "file": "src/leaves/telegram-policy.ts",
+      "reason": "Retry-after cap decided at 60 s (`TELEGRAM_OUTBOUND_RETRY_AFTER_CAP_MS`); the exact upstream constant was not read when the leaf was written. Max 3 retries, 3 s default backoff.",
+      "tests": ["src/leaves/telegram-policy.test.ts"]
+    },
+    {
+      "id": "D-005",
+      "file": "src/client/bot-api.ts",
+      "reason": "The grammY stack loads lazily (`import(\"grammy\")` inside `createTelegramApi`'s default factory, `apiThrottler` inside `createTelegramAccountThrottler`), not at module load.",
+      "tests": ["src/client/bot-api.test.ts"]
+    },
+    {
+      "id": "D-006",
+      "file": "src/leaves/coerce.ts",
+      "reason": "`to` target grammar decided locally: `<chatId>` or `@username` with an optional `:topic:<id>` suffix. Upstream `targets.ts` was not read when the leaf was written."
+    },
+    {
+      "id": "D-008",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "Bot-info cache timestamp is epoch ms, not an ISO string; the keyed store is JSON-native and has no date semantics. TTL 24 h unchanged.",
+      "tests": ["src/lifecycle/start-account.test.ts"]
+    },
+    {
+      "id": "D-009",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "Bot-info shape narrowed to `id / is_bot / first_name / username`; upstream's capability booleans are not ported because nothing in the drive surface reads them.",
+      "tests": ["src/lifecycle/start-account.test.ts"]
+    },
+    {
+      "id": "D-010",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "Duplicate-token guard is a config scan (`assertNoDuplicateTelegramTokens`), not a drive-time probe.",
+      "tests": ["src/lifecycle/start-account.test.ts"]
+    },
+    {
+      "id": "D-013",
+      "file": "src/transport/approval-callback.ts",
+      "reason": "Native approval-card seam (COMPAT(clisbot-control-plane)): `reply_markup` on chunk 0, `editMessageText` update, `callback_query` wired into the poll loop. The vertical parses the callback envelope; the card value stays opaque and is parsed in the Hub.",
+      "tests": ["src/transport/approval-callback.test.ts"]
+    },
+    {
+      "id": "D-015",
+      "file": "src/client/bot-api.ts",
+      "reason": "The injected Bot API fetch normalizes Node `Readable` bodies to web `ReadableStream`s (the multipart-upload fix); the L1 always hands grammY its own fetch.",
+      "tests": ["src/client/bot-api.test.ts"]
+    },
+    {
+      "id": "D-016",
+      "file": "src/client/bot-api.ts",
+      "reason": "An omitted `timeoutSeconds` defaults to 30 s for Bot API requests, so one unbounded fetch cannot block every later post for a chat behind the per-account throttler.",
+      "tests": ["src/client/bot-api.test.ts"]
+    },
+    {
+      "id": "D-018",
+      "file": "src/typing.ts",
+      "reason": "`plugin.outbound.typing` (the `sync.progress` surface): `sendChatAction(chat, \"typing\")` re-armed on a local refresh timer because the cue expires in ~5 s; upstream raises it inside its ingress spool.",
+      "tests": ["src/typing.test.ts"]
+    },
+    {
+      "id": "D-019",
+      "file": "src/client/bot-api.ts",
+      "reason": "Multi-chunk topic sends carry `message_thread_id` (and silent) on EVERY chunk, not just chunk 0 — single-use reply semantics apply to the reply-to quote, not to topic placement. Renumbered 2026-09-07 from a second `D-016` in DEVIATIONS.md (duplicate id).",
+      "tests": ["src/client/bot-api.test.ts"]
+    },
+    {
+      "id": "D-020",
+      "file": "src/client/bot-api.ts",
+      "reason": "Provenance: gathers `send-message.ts` (text path), `outbound-adapter.ts` (`baseOpts`, `TELEGRAM_TEXT_CHUNK_LIMIT`), `send-context.ts` (send surface), `fetch.ts` and `client-fetch.ts` (transport) into one L1 client module. Upstream hunk boundaries are lost.",
+      "tests": ["src/client/bot-api.test.ts"]
+    },
+    {
+      "id": "D-026",
+      "file": "src/leaves/coerce.ts",
+      "reason": "Provenance: gathers `targets.ts` (target parsing / chat-id normalization) and the chat-not-found error wrap from upstream's outbound preparation path."
+    },
+    {
+      "id": "D-028",
+      "file": "src/leaves/telegram-policy.ts",
+      "reason": "Provenance: gathers `send-error-predicates.ts`, `network-errors.ts` (429/5xx classification), `retry-after.ts`, `fetch.ts` (transport) and `accounts.ts` (api root).",
+      "tests": ["src/leaves/telegram-policy.test.ts"]
+    },
+    {
+      "id": "D-029",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "Provenance: gathers `bot-info.ts` (getMe shape), `bot-info-cache.ts` (fingerprint-keyed cache, 24 h TTL) and `startup-probe-limiter.ts` (2-slot probe limiter).",
+      "tests": ["src/lifecycle/start-account.test.ts"]
+    },
+    {
+      "id": "D-034",
+      "file": "src/transport/media.ts",
+      "reason": "Provenance: derived from `bot-handlers.inbound-media.ts` and `bot/delivery.resolve-media.ts` (getFile -> file path -> download URL), on top of the shared download/manifest helpers in `@getpaseo/channels-shared`.",
+      "tests": ["src/transport/media.test.ts"]
+    },
+    {
+      "id": "D-036",
+      "file": "src/typing.ts",
+      "reason": "Provenance: derived from `chat-action-timing.ts` and `send-actions.ts`; the refresh timer is Fusion-side because the Hub owns the processing lease.",
+      "tests": ["src/typing.test.ts"]
+    },
+    {
+      "id": "D-TG-001",
+      "file": "tsconfig.json",
+      "reason": "`exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off so the upstream source compiles unedited (`rich-message.ts` reads Bot API snake_case keys off an index-signature record; several call sites pass `tableMode: MarkdownTableMode | undefined`). OpenClaw's own tsconfig sets neither flag. `noUncheckedIndexedAccess` stays on, matching upstream.",
+      "tests": ["src/rich-blocks.test.ts", "src/format.test.ts"]
+    },
+    {
+      "id": "D-TG-002",
+      "file": "src/leaves/rich-message.ts",
+      "reason": "Fusion-owned send-param builders (`buildTelegramThreadParams`, `buildTelegramReplyParams`). Upstream builds these inline in `send-message-text.ts` / `reply-parameters.ts`, which are not ported yet. This file no longer carries a plain-text chunker: `splitTelegramPlainTextChunks` is now the upstream one in `src/rich-plain-fallback.ts`, and `src/client/bot-api.ts` imports it from there.",
+      "tests": ["src/client/bot-api.test.ts", "src/outbound.test.ts"]
+    },
+    {
+      "id": "D-TG-003",
+      "file": "src/format.local-golden.test.ts",
+      "reason": "Fusion-owned regression goldens captured from upstream on 2026-08-27 while `format.ts` was a local rewrite; kept as an independent check on the restored formatter. Cases asserting the local rewrite's own behaviour were deleted (see the file header and the slice-5 report).",
+      "tests": ["src/format.local-golden.test.ts"]
+    },
+    {
+      "id": "D-TG-004",
+      "file": "src/outbound.test.ts",
+      "reason": "Two assertions in `sendText - local-file links remain text-only` were rewritten. They asserted the local formatter's `<a href=\"/abs/path\">label</a>` rendering for a markdown link to a local file. The upstream formatter drops a non-http anchor (Bot API `parse_mode: HTML` only accepts http/https/tg links) and keeps the label, or wraps a recognised file ref in `<code>`. The tests still assert the label survives and that no media is posted.",
+      "tests": ["src/outbound.test.ts"]
+    },
+    {
+      "id": "D-TG-005",
+      "file": "src/rich-blocks.ts",
+      "reason": "Repo formatter (oxfmt) reflow only: one `.map((node): StructuralSegment => ({...}))` spread argument is wrapped across lines. No behaviour change. Every ported file is run through `npm run format:files`; this is the only one oxfmt rewrote.",
+      "tests": ["src/rich-blocks.test.ts"]
+    },
+    {
+      "id": "D-TG-006",
+      "file": ".oxlintrc.json",
+      "reason": "Nested oxlint override turning off `typescript/consistent-type-definitions`, `no-nested-ternary`, `complexity`, `max-depth`, `max-nested-callbacks` and `no-control-regex` for this package. They are stylistic, OpenClaw's lint config does not apply them, and enforcing them would mean editing every ported file. Correctness, suspicious and perf rules from the root config still apply.",
+      "tests": []
+    },
+    {
+      "id": "D-TG-010",
+      "reason": "Account + credential resolution is a Fusion boundary. Upstream reads the OpenClaw config graph through `openclaw/plugin-sdk/account-core` (account gates, default-account fallback), `token.ts` (env / tokenFile / SecretRef resolution) and `account-selection.ts` (listing + default warnings). Fusion's Hub owns channel configuration and credentials; the drive-time `cfg` already carries `channels.telegram.accounts.<id>`. `src/fusion/account-config.ts` keeps every upstream function signature and the `ResolvedTelegramAccount` shape; `src/accounts.ts` is a re-export so ported files keep importing `./accounts.js`. `src/account-inspect.ts` keeps upstream's credential precedence (account.tokenFile -> account.botToken -> channel.tokenFile -> channel.botToken -> TELEGRAM_BOT_TOKEN for the default account), its `allowChannelCredentialFallback` rule and `configured = tokenStatus !== \"missing\"`; only the `credentialDiagnostics` array (no Fusion producer) is dropped. Config is never written back.",
+      "file": "src/fusion/account-config.ts",
+      "tests": ["src/channel-actions.test.ts"]
+    },
+    {
+      "id": "D-TG-011",
+      "reason": "`resolveTelegramAccountOwnerAgentId` resolves the owning agent through OpenClaw routing (`resolveAgentRoute`). Fusion's Hub owns routing and resolves the agent before a send reaches the vertical, so account-scoped state is keyed by the normalized account id.",
+      "file": "src/account-owner.ts"
+    },
+    {
+      "id": "D-TG-013",
+      "reason": "The Bot API transport is a Fusion boundary. Upstream's `fetch.ts` (863 lines) and `proxy.ts` are wired to `openclaw/plugin-sdk/fetch-runtime` — the SSRF guard, the pinned dispatcher pool, `proxy-env`, the undici global dispatcher and the proxy-capture harness (~11k lines under `src/infra/net/`). `src/fetch.ts` keeps upstream's `TelegramTransport` shape and `resolveTelegramTransport` signature over global/undici fetch, with the same idempotent `close()` contract; `src/proxy.ts` builds a `ProxyAgent`-backed fetch and tracks its URL. DNS ordering and IPv4 fallback become host concerns. `client-fetch.ts`, `api-root.ts`, `network-config.ts` and `request-timeouts.ts` are verbatim.",
+      "file": "src/fetch.ts"
+    },
+    {
+      "id": "D-TG-014",
+      "reason": "Plugin state is a Fusion boundary. Upstream opens SQLite-backed keyed stores from the OpenClaw state directory (`openclaw/plugin-sdk/plugin-state-runtime`, `src/plugin-state/plugin-state-store.ts`). The store *contracts* are ported verbatim into `@getpaseo/channels-core` (D-CORE-227); `src/runtime.ts` / `src/runtime.types.ts` keep the accessor names and throw-on-unset contract, and `src/fusion/runtime.ts` installs a runtime backed by the Hub's `HostRuntime.state.openKeyedStore`. The async store maps one-to-one. The sync store has no host equivalent (the Hub's is promise-based) and is an in-memory namespace with upstream's TTL / maxEntries / overflow semantics that write-throughs to the host store, so a sync cache does not survive a process restart yet; every user of it (sent-message dedupe, sticker cache, the poll-registry fast path) is a TTL'd rebuildable cache.",
+      "file": "src/fusion/runtime.ts"
+    },
+    {
+      "id": "D-TG-015",
+      "reason": "`bot-access.ts` upstream owns inbound sender authorization (allow-from matching, pairing, warn dedupe) for the Telegram inbound pipeline, which the Hub owns in Fusion (goal slices 1-3). Only the `firstDefined` config-precedence helper the ported group/send code reuses is carried, re-exported from the ported `src/channels/allow-from.ts` in core.",
+      "file": "src/bot-access.ts"
+    },
+    {
+      "id": "D-TG-016",
+      "reason": "`maybePersistResolvedTelegramTarget` persists a resolved `@username` -> numeric chat id back into the OpenClaw config file (`openclaw/plugin-sdk/config-mutation`) and rewrites cron-store targets. Fusion's Hub owns channel configuration and never lets a vertical write it, so the resolve step stands alone: the caller still gets the numeric chat id, nothing is written back.",
+      "file": "src/target-writeback.ts"
+    },
+    {
+      "id": "D-TG-017",
+      "reason": "`bot/helpers.ts` upstream (725 lines) is the inbound bot helper module: sender identity, command auth, conversation ids, forum-flag probing, stream mode and allow-from config. The inbound pipeline is Hub-owned in Fusion, so only the thread-identity half the ported send path calls is carried — `TELEGRAM_GENERAL_TOPIC_ID`, `resolveTelegramMessageForumFlagHint`, `resolveTelegramForumThreadId`, `resolveTelegramThreadSpec`, `resolveTelegramMessageThreadSpec`, `buildTelegramThreadParams`, `buildTelegramRoutingTarget`, `buildTelegramInboundOriginTarget`, `buildTypingThreadParams` — verbatim.",
+      "file": "src/bot/helpers.ts",
+      "tests": ["src/thread-spec.test.ts"]
+    },
+    {
+      "id": "D-TG-018",
+      "reason": "Prompt context is a Fusion boundary. `recordOutboundMessageForPromptContext` writes every outbound message into OpenClaw's Telegram message cache (`message-cache.ts`, ~1000 lines over the session store) so the agent's next prompt sees the bot's own turns; `prompt-context-projection.ts` stamps and parses the transcript marker on `ReplyPayload.channelData.telegram`. The Hub owns conversation history and prompt context in Fusion, so the recorder keeps upstream's signature and reports `false` (\"not recorded\"), and only the per-chunk projection cursor is carried. The message shapes the ported senders pass around are verbatim.",
+      "file": "src/outbound-message-context.ts"
+    },
+    {
+      "id": "D-TG-019",
+      "reason": "`sent-message-cache.legacy-state.ts` derives the cache scope from the OpenClaw session store path (`openclaw/plugin-sdk/session-store-paths`) and migrates a legacy `.telegram-sent-messages.json` file off disk. Fusion's Hub owns state location, so the scope key is derived from the account owner and the legacy file reader is not carried. Constants, entry-key hashing and the persisted row shape are verbatim.",
+      "file": "src/sent-message-cache.legacy-state.ts"
+    },
+    {
+      "id": "D-TG-020",
+      "reason": "`group-access.ts` upstream is the inbound admission gate (allow-from matching, chat allowlists, DM pairing, block reasons), which the Hub owns in Fusion. Only the group-policy precedence the ported send path consults before posting a poll is carried (`resolveTelegramRuntimeGroupPolicy`, `resolveTelegramEffectiveGroupPolicy`), verbatim, over the ported `src/config/runtime-group-policy.ts` in core.",
+      "file": "src/group-access.ts"
+    },
+    {
+      "id": "D-TG-021",
+      "reason": "`group-config-helpers.ts` keeps `resolveTelegramScopedGroupConfig` verbatim (the send path's scoped group/topic reader). `resolveTelegramGroupIngestEnabled`, `resolveTelegramGroupPromptSettings` and `resolveTelegramDirectToolPolicy` are not ported: they read `resolveChannelGroupPolicy` / `resolveToolsBySender` from `openclaw/plugin-sdk/channel-policy` (`src/config/group-policy.ts`, 548 lines over OpenClaw's account-lookup and session-key routing) and feed the inbound turn's skill/tool policy, which the Hub owns.",
+      "file": "src/group-config-helpers.ts"
+    },
+    {
+      "id": "D-TG-023",
+      "reason": "`@grammyjs/transformer-throttler` declares `grammy: ^1.0.0`, so npm resolves it against the hoisted grammy while this package pins grammy 1.46.0 (the upstream version). The two `Transformer` declarations are structurally identical but nominally distinct, so `bot.runtime.ts` re-types the throttler factory against the pinned grammy. Runtime behavior is the upstream throttler, unchanged. Removing this needs a root-level grammy alignment.",
+      "file": "src/bot.runtime.ts"
+    },
+    {
+      "id": "D-TG-024",
+      "reason": "`src/outbound.test.ts` was rewritten against the production path. The pre-port file (plus `src/outbound-media.test.ts`, deleted) asserted against the local reimplementation — `client/bot-api.ts#sendTelegramText` and the old `outbound-media.ts#telegramMediaMethod` / `sendTelegramMedia` / `TELEGRAM_MAX_PHOTO_BYTES`. Behaviours carried over: thread params on every chunk, the reply target on chunk 0, mime -> Bot API method routing (photo / animation / document), the G11 oversize notice through the text path, and the missing-file throw. Dropped because the module they asserted no longer exists: `telegramMediaMethod` unit table (routing is now asserted end to end), the photo-size document fallback (upstream decides it from image dimensions, covered by the sendPhoto case), \"omits the params object when there is no thread/caption\" (upstream always sends an options object), and the three `sendText` local-file-link cases (upstream never parses media out of reply text; media is an explicit `mediaUrl`).",
+      "file": "src/outbound.test.ts"
+    },
+    {
+      "id": "D-TG-025",
+      "reason": "`src/typing.test.ts` now injects the fake Bot API through upstream's own `TelegramSendOpts.api` override (forwarded by `typing.ts`) instead of the deleted `registerTelegramApiForTest` seam on the local L1 client. Two assertions changed value only: upstream passes the resolved chat id to `sendChatAction` as a string, the local client passed a number.",
+      "file": "src/typing.test.ts"
+    },
+    {
+      "id": "D-TG-026",
+      "reason": "`client/bot-api.ts#sendTelegramText` and `#editTelegramMessageText` were the local reimplementation of the OpenClaw text send/edit and are deleted, together with `client/sent-messages.ts` (superseded by the ported `sent-message-cache.ts`). What remains in `client/bot-api.ts` is the inbound/lifecycle half the Hub still drives (account + api-root resolution, the grammy client factory, the update-offset and sent-message seam stores, chat-id resolution, retry/error helpers) — that half is out of scope for this slice and moves with the inbound port. The four removed `client/bot-api.test.ts` describes are named in the file header; their behaviours are asserted on the production path in `src/outbound.test.ts` and by the ported upstream tests.",
+      "file": "src/client/bot-api.ts"
+    },
+    {
+      "id": "D-TG-027",
+      "reason": "`src/outbound.ts` and `src/plugin.ts` are the Fusion drive-surface bridge: they translate the Hub's `ChannelPlugin.outbound` contract (`@getpaseo/channels-shared`) into upstream's `send.ts` entry points and nothing else. Every wire decision (chunking, rich/HTML rendering, thread and reply params, retries, receipts, media routing, the sent-message cache) now lives in the ported source. `plugin.outbound` additionally exposes the ported send primitives under their upstream names so the message-action runner slice can dispatch them. This supersedes the pre-port reimplementation deviations D-001, D-004, D-012, D-014, D-017, D-021, D-030, D-031 and D-032, whose modules no longer exist.",
+      "file": "src/outbound.ts"
+    },
+    {
+      "id": "D-TG-028",
+      "reason": "Per-account plugin runtime. Upstream runs one Telegram account per OpenClaw process, so `src/runtime.ts` holds a single runtime slot and the ported callers read it with the zero-arg `getTelegramRuntime()`. The Hub runs every account of every organization in one process, each with its own HostRuntime, keyed stores and child logger, so `src/runtime.ts` keys the installed runtime by account id and carries the account being served in `AsyncLocalStorage`: the upstream accessor names, arity and throw-on-unset contract are unchanged (the argument is optional and the unkeyed slot serves single-account callers). The Fusion send entry points (`src/outbound.ts`, `src/typing.ts`) install per account and wrap the call in `withTelegramAccount`; `src/fusion/runtime.ts` installs one process-wide subsystem log sink that resolves the current account's logger, and `disposeTelegramRuntime` releases an account on stop (`src/runtime-store.ts`) and on vertical unload (`telegramPlugin.disposeAccount`).",
+      "file": "src/runtime.ts"
+    },
+    {
+      "id": "D-TG-029",
+      "file": "src/token.ts",
+      "reason": "Credential resolution is a Fusion boundary. Upstream resolves the bot token through OpenClaw's secret system (`tryReadSecretFileSync` with symlink rejection and diagnostics, `SecretRef` resolution against `secrets.providers`/`secrets.defaults`, `resolveNormalizedAccountEntry`). Fusion's Hub owns channel credentials and hands the vertical a drive-time `cfg` that already carries the resolved account block; `src/account-inspect.ts` (D-TG-010) already implements upstream's precedence and multi-account fallback decisions against it. `resolveTelegramToken` keeps upstream's signature and result shape and answers from that inspection. `credentialDiagnostics` has no Fusion producer and is not carried.",
+      "tests": ["src/action-runtime.test.ts"]
+    },
+    {
+      "id": "D-TG-030",
+      "file": "src/sticker-cache.ts",
+      "reason": "Sticker vision is a Fusion boundary. Upstream's `describeStickerImage` picks a vision-capable provider/model through `openclaw/plugin-sdk/agent-runtime` (prepared model catalog, per-agent dirs, provider API keys) and `media-runtime`, then calls `getTelegramRuntime().mediaUnderstanding.describeImageFileWithModel`; the Hub owns agents, models and provider credentials and the `HostRuntime` has no media-understanding surface. The function keeps upstream's signature and reports unavailable (`null`), which is upstream's own contract when no vision provider is configured. The sticker cache the `sticker-search` action reads is carried verbatim in `sticker-cache-store.ts`. Media/model selection lands with goal slice 21.",
+      "tests": ["src/action-runtime.test.ts"]
+    },
+    {
+      "id": "D-TG-031",
+      "file": "src/message-topic-binding.ts",
+      "reason": "The final step of a delegated forum-topic mutation reads the provider observation of the message being mutated. Upstream loads its file-backed Telegram message cache (`message-cache.ts`, 1022 lines over the OpenClaw session store) and asks `hasProviderObservedTelegramThreadBinding`. Fusion records no inbound observation yet (inbound parity is goal slice 20), so that one read moves to `src/fusion/message-thread-observation.ts`, which answers \"not observed\". Every decision upstream makes before it — direct-operator bypass, requester-account match, exact-chat match, thread-context rules, the server-owned current-message shortcut — is carried verbatim, and the missing observation takes upstream's own deny branch rather than allowing an unattested chat id.",
+      "tests": ["src/action-runtime.test.ts"]
+    },
+    {
+      "id": "D-TG-032",
+      "file": "src/action-runtime.test.ts",
+      "reason": "Ported whole. Two adaptations, both at host boundaries: the `TelegramRuntime` mock is cast through `unknown` because Fusion's runtime type also declares `openSyncKeyedStore` (D-TG-014), and one case is dropped — \"persists sendMessage action deliveries before Telegram platform send\", which drives OpenClaw's own durable delivery queue through `openclaw/plugin-sdk/plugin-test-runtime` (test plugin registry, `readQueuedDeliveryEntriesForTest` over a state directory) and asserts the queued row shape. The Hub owns durable delivery in Fusion, so that invariant lives in `packages/hub/src/channels/*`. The drop is recorded in the file at the point it was removed.",
+      "tests": ["src/action-runtime.test.ts"]
+    },
+    {
+      "id": "D-TG-050",
+      "reason": "upstream bot-message-context.types.ts declares the whole inbound message-context contract (the grammY bot handle, the resolved channel ingress binding, the group/topic config resolvers, the structured-context projection and the OpenClaw auto-reply logger). Fusion cuts inbound at the prepared ChannelInboundEvent (slice 20), so the file carries only the two declarations the ported transport modules read."
+    },
+    {
+      "id": "D-TG-051",
+      "reason": "upstream also classifies dispatch-dedupe-rollback-failed, raised by its message-dispatch-dedupe.ts persistent replay guard (a 721-line claim store over plugin-sdk/persistent-dedupe). Fusion durable dedupe is the Hub ingress queue (slices 1/8), so that branch and its import are omitted; every other class is verbatim."
+    },
+    {
+      "id": "D-TG-052",
+      "reason": "Fusion-owned inbound adapter: the cut point where upstream hands a prepared grammY message to its auto-reply pipeline (bot-handlers.inbound-pipeline → bot-message-context → bot-message-dispatch, ~19k lines over the OpenClaw session store, reply pipeline, native-command registry and approval gateway, all Hub-owned in Fusion). Builds the shared ChannelInboundEvent from the ported bot/body-helpers primitives. Two audited bugs are fixed here because upstream has no equivalent check: a text_mention of our bot counts as a mention, and a leading /cmd@other_bot is not ours. Facts upstream types as MsgContext members (ReplyChain, ForwardedFrom*, media) ride in body under stable bracket labels, because the Hub ctxPayload has no field for them."
+    },
+    {
+      "id": "D-TG-053",
+      "reason": "Fusion-owned grammY long-poll session. Upstream polling-session.ts runs getUpdates in a worker thread that writes each update into a file-backed spool (telegram-ingress-spool/worker) before the parent advances the offset, then a separate drain replays the spool into bot.handleUpdate. Fusion already owns that durability at the Hub (channel_ingress_queue: payload, lease, fencing, lane, retry, dead-letter, restart drain — slices 1/8), so running upstream spool as well would be a second durable store for the same rows. The session keeps upstream FLOW (admit durably, then advance the watermark) and reuses the ported update-offset store/persistence, allowed-updates, polling-liveness, polling-status, polling-session-restart-policy and network-errors. Upstream polling-lease, transport-state rebuild, delivery drain and the isolated worker are omitted."
+    },
+    {
+      "id": "D-TG-054",
+      "reason": "Fusion-owned admission step: folds a run media into the event body and records each observed message into the ported message cache before handing the event to the shared inbound processor. Upstream performs the equivalent inside bot-handlers.inbound-media/bot-message-context, which Fusion does not port."
+    },
+    {
+      "id": "D-TG-055",
+      "reason": "Fusion-owned webhook receive mode. Upstream webhook.ts (680 lines) owns a shared multi-account server registry, TLS certificate upload, health/status endpoints, the setWebhook retry ladder and the OpenClaw runtime plumbing. Fusion keeps the secret-token check, the admit-before-200 invariant and the callback ack. UNEXERCISED: no live scenario drives it (it needs a public HTTPS URL); unit tests only."
+    },
+    {
+      "id": "D-TG-056",
+      "reason": "One account reader for the vertical. client/bot-api.ts resolved the drive-time account out of a nested cfg.channels.telegram.accounts.<id>.config sub-object while accounts.ts (fusion/account-config.ts, upstream's own shape) read the entry flat, so the same account answered with two different configs depending on which reader ran — an apiRoot authored once was honoured inbound and ignored outbound, and the Hub carrier had to write both shapes. bot-api.ts now reads through mergeTelegramAccountConfig like every other reader: upstream's flat entry with channel-level keys inherited. The narrow L1 view (timeoutSeconds, apiRoot, linkPreview, richMessages and the webhook* keys) is projected off that merged block, richMessages still defaulting ON per D-003."
+    },
+    {
+      "id": "D-TG-057",
+      "file": "src/presentation-outbound.ts",
+      "reason": "Upstream renders a portable presentation through core's delivery adapter: the channel declares `presentationCapabilities` and core adapts the presentation to them before the channel renders it (`renderPresentationForDelivery` -> `adaptMessagePresentationForChannel`); the Telegram renderer itself (`interactive-fallback.ts` `resolveTelegramPresentationCapabilities`, `renderTelegramTableIsland`, `canonicalizeTelegramPresentationPayload`) was reachable only from the vertical's own `handleAction`, which the Hub bypasses (`forceCoreDelivery: true`). Fusion's Hub drives `plugin.outbound.sendText`, so the two steps run in the vertical: `src/presentation-outbound.ts` admits the presentation (D-W6-02 caption repair) and renders it through the ported `canonicalizeTelegramPresentationPayload` at THIS account's capabilities, and `sendText` posts the result. `plugin.outbound` now declares `presentationCapabilities` (upstream's spelling) so the Hub stops flattening the presentation before the seam (D-W6-01). One plugin object serves every account, so the declaration is the vertical's maximum (a rich account) and the per-account limits are resolved per send: a table posts as a native Bot API 10.3 `table` block where `richMessages` is on and as the portable fallback text otherwise, and a chart is always fallback text because Telegram has no chart primitive.",
+      "tests": ["src/outbound.test.ts"]
+    }
+  ]
+}

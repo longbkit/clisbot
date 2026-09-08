@@ -19,10 +19,14 @@ import type {
   MediaPostResult,
   OutboundPostResult,
   PlaneLogger,
-  P0ChannelName,
+  SupportedChannelName,
 } from "../plane/types.js";
 import type { ChannelDaemonClientOptions } from "../daemon/client.js";
+import type { CompiledChannelAccount } from "../config/compile.js";
+import type { QrLoginResult, QrLoginVerb } from "./qr-login.js";
 import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
+import type { StagedChannelMedia } from "../media/outbound-stager.js";
+import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
 
 /** The per-account transport state the ops layer reports (`channels status`). */
 export type ChannelTransportState =
@@ -31,6 +35,10 @@ export type ChannelTransportState =
   | "deferred"
   | "stopped"
   | "failed"
+  /** A QR-auth account whose profile has no live session. Terminal until an
+   * operator completes the channel-accounts QR login; the supervisor does not
+   * restart it on the same revision (`supervisor/needs-login.ts`). */
+  | "needs-login"
   | "disabled";
 
 /** One account's outcome of an install → start attempt. */
@@ -120,12 +128,19 @@ export interface ChannelSupervisor {
    * Fail-closed for an unstarted/unknown account (`{ok: false}`) — the
    * endpoint maps that to a clean tool error.
    */
-  channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult>;
-  channelReplyMediaPost(ref: ChannelReplyBindingRef, filePath: string): Promise<MediaPostResult>;
+  channelReplyPost(
+    ref: ChannelReplyBindingRef,
+    text: string,
+    options?: { presentation?: MessagePresentation | undefined },
+  ): Promise<OutboundPostResult>;
+  channelReplyMediaPost(
+    ref: ChannelReplyBindingRef,
+    file: StagedChannelMedia,
+  ): Promise<MediaPostResult>;
   /** Optional read-only lookup through the currently configured Connection. */
   resolveConversation?(input: {
     organizationId: string;
-    channel: P0ChannelName;
+    channel: SupportedChannelName;
     accountId: string;
     connectionId: string;
     conversationId: string;
@@ -133,12 +148,25 @@ export interface ChannelSupervisor {
   }): Promise<ChannelConversationMetadata | null>;
   /** Sends the fixed management test message through one already-started account. */
   postTestMessage(input: {
-    channel: P0ChannelName;
+    channel: SupportedChannelName;
     accountId: string;
     conversationId: string;
     threadId?: string | undefined;
     expectedRevisionId?: string | null | undefined;
   }): Promise<OutboundPostResult>;
+  /**
+   * Run one QR-login setup verb for a QR-auth account (`supervisor/qr-login.ts`).
+   * The account is LOADED for this, not started: linking is what a start needs,
+   * so it has to work before the transport can come up. Never returns session
+   * material — only the code to scan and where the login stands.
+   */
+  qrLogin?(input: {
+    organizationId: string;
+    channel: SupportedChannelName;
+    accountId: string;
+    compiled: CompiledChannelAccount;
+    verb: QrLoginVerb;
+  }): Promise<QrLoginResult>;
   workflowStreamEvent?(input: {
     execution: AgentExecutionRecord;
     agentId: string;

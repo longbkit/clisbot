@@ -2,6 +2,12 @@
 
 Date: 2026-08-29
 
+Consolidated and extended into a full command vocabulary by
+[Channel slash commands](../features/slash-commands/README.md) (spec) and its
+[gap audit & implementation plan](../features/slash-commands/implementation-plan.md).
+This audit remains the record of the shared-parser / per-channel-adapter boundary
+those docs build on.
+
 ## Findings
 
 OpenClaw defines command metadata in a shared registry. Built-ins, generated commands, and plugin commands contribute entries with names, aliases, arguments, descriptions, categories, and access requirements. The Gateway handles standalone text commands; supported providers also register native commands. Directives can be stripped from messages and applied inline, while local commands execute in the client or Gateway. Unknown commands produce a visible localized result.

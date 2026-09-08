@@ -187,7 +187,7 @@ it("validates bounded query filters before touching history", () => {
     "accountId=a",
     "routePosition=0",
     "outcome=other",
-    "channel=discord",
+    "channel=irc",
     "unknown=1",
   ]) {
     expect(() => parseChannelActivityQuery(new URLSearchParams(query))).toThrow(

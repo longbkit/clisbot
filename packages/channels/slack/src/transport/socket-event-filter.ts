@@ -9,7 +9,7 @@
 // are unit-testable without a live socket. No OpenClaw imports.
 
 import type { ChannelInboundEvent } from "@getpaseo/channels-shared";
-import { decodeSlackEntities } from "../mrkdwn.js";
+import { decodeSlackEntities } from "../fusion/slack-entities.js";
 
 /** The identity facts L4 probes from `auth.test` (client/web-api.ts): the
  * bot user id + app/team ids this account's tokens belong to. */
@@ -193,6 +193,7 @@ export function buildSlackInboundEvent(
     body: text,
     wasMentioned: resolveSlackWasMentioned(event, source, identity),
     timestampMs,
+    kind: "message",
     ...(isSlackOwnMessage(event, identity, botId) ? { isOwnMessage: true } : {}),
   };
 }
@@ -240,6 +241,9 @@ export function buildSlackSlashCommandEvent(
   if (channelId === "" || userId === "") return undefined;
   const args = (body.text ?? "").trim();
   const text = args === "" ? "help" : args;
+  // The registered alias is one command whose FIRST WORD picks the sub-command,
+  // so the verb the Hub acts on is that word, not `/paseo`.
+  const [verb = "help", ...rest] = text.split(/\s+/u);
   const nowMs = Date.now();
   return {
     channel: "slack",
@@ -260,6 +264,8 @@ export function buildSlackSlashCommandEvent(
     body: `<@${userId}> ${text}`,
     wasMentioned: true,
     timestampMs: nowMs,
+    kind: "command",
+    facts: { command: { name: verb.replace(/^[/\\]/u, "").toLowerCase(), args: rest.join(" ") } },
   };
 }
 

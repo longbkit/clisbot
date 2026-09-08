@@ -1,18 +1,53 @@
-// COMPAT(clisbot-control-plane): Telegram channel format — HTML entity
-// decoding + `&`/`<`/`>` escape (C5) — verbatim port of openclaw-private
-// `extensions/telegram/src/format-html.ts` (the entity half; the
-// structural-line-break tag set belongs to the transcript-protection pass,
-// which the in-repo vertical does not run, so it is omitted here).
-
-// Escape `&`, `<`, `>` for Bot API HTML mode. Lives here (the HTML entity /
-// format leaf) rather than `format.ts` so both `format.ts` and
-// `format-sanitize.ts` can import it without a cycle (`format.ts` already
-// imports `renderSupportedTelegramHtml` from `format-sanitize.ts`).
-export function escapeTelegramHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
+// upstream: extensions/telegram/src/format-html.ts@5d8067a4483
 const TELEGRAM_HTML_ENTITY_PATTERN = /&(#[xX][0-9A-Fa-f]+|#\d+|amp|lt|gt|quot|apos);/g;
+
+// Structural tags that force a line boundary when projecting HTML to plain text
+// (assistant transcript protection). Block-counting helpers for rich HTML are gone.
+const TELEGRAM_LINE_BREAK_STRUCTURAL_TAGS = new Set([
+  "aside",
+  "audio",
+  "blockquote",
+  "caption",
+  "col",
+  "colgroup",
+  "details",
+  "figcaption",
+  "figure",
+  "footer",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "hr",
+  "img",
+  "li",
+  "ol",
+  "p",
+  "pre",
+  "summary",
+  "table",
+  "tbody",
+  "td",
+  "tfoot",
+  "th",
+  "thead",
+  "tg-collage",
+  "tg-map",
+  "tg-math-block",
+  "tg-slideshow",
+  "tr",
+  "ul",
+  "video",
+]);
+
+export function isTelegramRichLineBreakStructuralTag(rawTag: string, tagName: string): boolean {
+  return (
+    TELEGRAM_LINE_BREAK_STRUCTURAL_TAGS.has(tagName) ||
+    (tagName === "a" && /\sname="[^"]+"/i.test(rawTag))
+  );
+}
 
 function isValidTelegramHtmlEntityCodePoint(codePoint: number): boolean {
   return (

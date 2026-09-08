@@ -10,6 +10,7 @@ import type {
   InboundEventDecision,
 } from "@getpaseo/channels-shared";
 import { createInboundEventProcessor } from "@getpaseo/channels-shared";
+import { disposeTelegramRuntime, installTelegramRuntime } from "./fusion/runtime.js";
 
 interface AccountInbound {
   hostRuntime: HostRuntime;
@@ -36,12 +37,22 @@ export function getHostRuntime(): HostRuntime {
 }
 
 /** The L3 processor for one account (created once per (runtime, account));
- * the transport's `onEvent` hands its normalized updates to it. */
+ * the transport's `onEvent` hands its normalized updates to it.
+ *
+ * D-TG-046: this is also where the account's ported plugin runtime is
+ * installed. The inbound path (polling session offset store, message cache,
+ * topic-name cache) resolves its keyed stores through the upstream zero-arg
+ * `getTelegramRuntime()`, so an account that only ever receives — no send yet
+ * — would otherwise fail every offset persist with "Telegram runtime not
+ * initialized". Installing here keeps it symmetric with
+ * `unregisterAccountInbound`, which disposes it.
+ */
 export function registerAccountInbound(
   accountId: string,
   botId?: number,
   runtime: HostRuntime = getHostRuntime(),
 ): AccountInbound {
+  installTelegramRuntime(runtime, accountId);
   let entry = accounts.get(accountId);
   if (entry === undefined || entry.hostRuntime !== runtime) {
     const processor = createInboundEventProcessor({
@@ -73,7 +84,11 @@ export function getAccountRuntime(accountId: string): AccountInbound {
   return entry;
 }
 
-/** Remove only the registration owned by this account lifecycle. */
+/** Remove only the registration owned by this account lifecycle, and release the
+ * ported plugin runtime installed for that account (its keyed stores and log
+ * sink) so a stopped account leaves nothing behind for the next one. */
 export function unregisterAccountInbound(accountId: string, runtime: HostRuntime): void {
-  if (accounts.get(accountId)?.hostRuntime === runtime) accounts.delete(accountId);
+  if (accounts.get(accountId)?.hostRuntime !== runtime) return;
+  accounts.delete(accountId);
+  disposeTelegramRuntime(accountId);
 }

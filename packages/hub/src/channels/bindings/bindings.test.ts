@@ -21,6 +21,7 @@ import type { DaemonConnection } from "../daemon/client.js";
 import { ManualClock } from "../plane/clock.js";
 import type { InboundConversationDetail, InboundMessage, PlaneLogger } from "../plane/types.js";
 import { BindingEngine, admitFollowUp, deriveBindingKey, executionMarker } from "./index.js";
+import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
 
 const ORGANIZATION_ID = "channel-org";
 const ACCOUNT_ID = "work";
@@ -79,6 +80,7 @@ const DEFAULTS = {
   bindingKey: "thread" as const,
   replyAnchor: "thread" as const,
   outbound: { path: "relay" as const, template: null },
+  inbound: { reactionNotifications: "off" as const, editNotifications: "off" as const },
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
@@ -627,6 +629,97 @@ describe("orphan recovery (restart / resume)", () => {
     const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0ORPHAN", null);
     assert.equal(binding?.status, "bound");
     assert.equal(binding?.agentId, "agent-100", "re-bound to the surviving agent, no duplicate");
+  });
+
+  // The tool-path capability is what a Channel agent replies through, and two
+  // of its consumers must not take the requester from the model: the ported
+  // channel tools authorize against it, and a command button this Agent posts
+  // is minted for exactly that actor. It is issued with the turn's own sender.
+  it("issues the reply capability with the turn's requester", async () => {
+    const { daemon } = makeFakeDaemon();
+    const account = makeAccount(
+      makeRoute("C0TOOL", { defaults: { outbound: { path: "tool", template: null } } }),
+    );
+    const capabilities = new ChannelReplyCapabilityRegistry();
+    let issuedToken: string | undefined;
+    const engine = new BindingEngine({
+      organizationId: ORGANIZATION_ID,
+      controlPlane: makeControlPlane(account),
+      logger: SILENT,
+      clock: new ManualClock(),
+      store,
+      daemon,
+      resolveAgentSpec: (_target, _defaults, _ref, reply) => {
+        issuedToken = reply?.token;
+        return { provider: "codex", cwd: "/tmp/repo" };
+      },
+      resolveAgentAccessTarget: () => ({ daemonReference: "daemon-1", projectId: "project-1" }),
+      replyCapabilities: capabilities,
+    });
+    const outcome = await engine.bindOrSteer(
+      message({
+        conversation: {
+          kind: "channel",
+          id: "C0TOOL",
+          rootConversationId: "C0TOOL",
+          threadId: null,
+        },
+      }),
+      account,
+      account.routes[0] as CompiledRoute,
+    );
+    assert.equal(outcome.kind, "bound");
+    assert.ok(issuedToken);
+    // The NATIVE id, as the platform reports a click back — the plane's
+    // `<channel>:` prefix belongs to the identity model, not to Slack.
+    assert.equal(capabilities.resolve(issuedToken, ORGANIZATION_ID)?.requesterSenderId, "U0ALICE");
+  });
+
+  // The Agent keeps one capability for the whole session, so the turn it is
+  // answering has to be restamped on every steer: the tool's delivery keys and
+  // its output ceiling are scoped by it, and the model reuses "reply-1" in
+  // every turn.
+  it("restamps the reply capability with each follow-up turn", async () => {
+    const { daemon } = makeFakeDaemon();
+    const account = makeAccount(
+      makeRoute("C0TOOL", { defaults: { outbound: { path: "tool", template: null } } }),
+    );
+    const capabilities = new ChannelReplyCapabilityRegistry();
+    let issuedToken: string | undefined;
+    const engine = new BindingEngine({
+      organizationId: ORGANIZATION_ID,
+      controlPlane: makeControlPlane(account),
+      logger: SILENT,
+      clock: new ManualClock(),
+      store,
+      daemon,
+      resolveAgentSpec: (_target, _defaults, _ref, reply) => {
+        issuedToken = reply?.token;
+        return { provider: "codex", cwd: "/tmp/repo" };
+      },
+      resolveAgentAccessTarget: () => ({ daemonReference: "daemon-1", projectId: "project-1" }),
+      replyCapabilities: capabilities,
+    });
+    const inbound = () =>
+      message({
+        conversation: {
+          kind: "channel",
+          id: "C0TURNS",
+          rootConversationId: "C0TURNS",
+          threadId: null,
+        },
+      });
+    const route = account.routes[0] as CompiledRoute;
+    const created = await engine.bindOrSteer(inbound(), account, route);
+    assert.equal(created.kind, "bound");
+    assert.ok(issuedToken);
+    const firstTurn = capabilities.resolve(issuedToken, ORGANIZATION_ID)?.turnId;
+    assert.ok(firstTurn, "the creating turn stamps the capability");
+    const steered = await engine.bindOrSteer(inbound(), account, route);
+    assert.equal(steered.kind, "steered");
+    const secondTurn = capabilities.resolve(issuedToken, ORGANIZATION_ID)?.turnId;
+    assert.ok(secondTurn);
+    assert.notEqual(secondTurn, firstTurn, "the follow-up turn replaced the create-time one");
   });
 
   it("leaves a marker pending when no agent survived the create", async () => {

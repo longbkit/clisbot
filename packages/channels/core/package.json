@@ -1,0 +1,37 @@
+{
+  "name": "@getpaseo/channels-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenClaw core source ported for the in-repo channel verticals; mirrors upstream src/<path> under src/<path> (docs/audits/2026-09-07-openclaw-channel-port-goal.md)",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsgo -p tsconfig.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@getpaseo/channels-markdown-core": "*",
+    "file-type": "22.0.2",
+    "p-map": "7.0.7",
+    "pretty-ms": "9.3.1",
+    "typebox": "1.3.18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@typescript/native-preview": "7.0.0-dev.20260423.1",
+    "vitest": "^3.2.4"
+  }
+}

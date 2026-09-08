@@ -1,7 +1,9 @@
 # Upstream Sync & Contribution Playbook
 
 How the Clisbot fusion tracks `getpaseo/paseo` and how fixes flow back to it.
-Read this before syncing upstream or opening an upstream PR.
+Read this before syncing upstream or opening an upstream PR. The channel
+verticals track a second upstream — OpenClaw — on its own mechanism; that one
+is [OpenClaw channel source manifests](#openclaw-channel-source-manifests).
 
 ## The three repos, each with one job
 
@@ -194,6 +196,130 @@ preemptively.
 - Dev state lives in `.dev/paseo-home` inside the checkout; the packaged
   app's `~/.paseo` (port 6767) is never touched. Dev daemon: 6768; Expo: 8081. Use `npm run cli -- ...` for the dev daemon, not the global binary.
   See `docs/development.md`.
+
+## OpenClaw channel source manifests
+
+Everything above is about Paseo. The packages under `packages/channels/*` also
+track OpenClaw source (`~/projects/openclaw-private`), which is a different
+problem: we copy files out of it rather than merge branches. Each package owns
+`upstream-sync.json` and `scripts/channel-upstream-sync.mjs` reads it.
+
+```bash
+npm run channels:sync:check                                   # manifest vs tree, exit 1 on failure
+npm run channels:sync:report                                  # what moved upstream since the baseline
+node scripts/channel-upstream-sync.mjs check --pkg slack --strict
+node scripts/channel-upstream-sync.mjs report --pkg telegram --to <commit> --json
+node scripts/channel-upstream-sync.mjs apply --pkg slack --to <commit> --dry-run
+node scripts/channel-upstream-sync.mjs sync-md --pkg slack    # regenerate SYNC.md's manifest section
+node scripts/channel-upstream-sync.mjs restore --pkg slack [--file src/x.ts]  # rebuild a verbatim file that a formatter reflowed: upstream line shape back, local header + specifiers kept
+node --test scripts/channel-upstream-sync.test.mjs       # the script's own tests
+```
+
+The upstream checkout is `$OPENCLAW_UPSTREAM_DIR` (default
+`~/projects/openclaw-private`). It is read through `git`, so it can sit on any
+branch — every lookup names an explicit commit.
+
+Manifest fields:
+
+| Field               | Meaning                                                                                                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baselineCommit`    | The OpenClaw commit every `upstream` path in this manifest was read at. `apply` bumps it after a fully clean run; by hand, bump it only together with a re-read of the changed files.                                                             |
+| `roots`             | `upstream` directory → `local` directory. Relative paths under a root stay identical to upstream. A root with no `upstream` is a local-only tree (a fusion-owned package).                                                                        |
+| `files[].status`    | `verbatim` (byte-identical modulo the allowances below), `adapted` (upstream file, edited), `reimplemented` (written locally, usually gathering several upstream files), `fusion-owned` (no upstream source — must not carry an `upstream` path). |
+| `files[].deviation` | A deviation id, or a list of them. Required for `adapted` and `reimplemented`.                                                                                                                                                                    |
+| `omitted[]`         | Upstream files or directories we deliberately do not port, with the reason. A directory entry covers everything beneath it.                                                                                                                       |
+| `deviations[]`      | `id`, `file`, `reason`, optional `tests`. The reason belongs here or in `DEVIATIONS.md`; the id must be referenced by at least one file entry.                                                                                                    |
+
+What `check` fails on: a local production `.ts` under a mapped root with no
+entry; an entry whose local file is gone or whose upstream path does not exist
+at the baseline; a `verbatim` entry that really differs; `adapted`/
+`reimplemented` without a deviation; duplicate or unreferenced deviation ids;
+a deviation naming a test file that does not exist. Test files (`*.test.ts`,
+`*.test-*.ts`) need no entry and are counted separately. Upstream files under a
+mapped root that are neither mapped nor omitted are a warning — the remaining
+port backlog — and a failure under `--strict`.
+
+A `verbatim` comparison normalizes only three things on both sides: a line-1
+`// upstream: <path>@<sha>` header, module specifiers (so import rewrites are
+invisible), and trailing whitespace plus repeated blank lines. Renamed symbols,
+reordered code and edited comments all fail — that is the point. Anything that
+cannot survive it is `adapted`, not `verbatim`.
+
+### Following a delta with `apply`
+
+`apply --from <old> --to <new>` replays an upstream range onto the ported files.
+It merges rather than overwrites, because the port carries two edits the copy
+must keep: the line-1 header and the rewritten module specifiers. Both upstream
+revisions are first moved into _local_ specifier space — the rewrite map is
+derived by zipping the local file's specifiers against upstream@`--from` — and
+then `git merge-file --diff3` runs with the local file as "current". The base
+therefore equals the local file except where the port really drifted, which is
+where a conflict is the right answer.
+
+`--from` defaults to the manifest's own `baselineCommit`. `verbatim` entries are
+the candidates; `--include-adapted` adds the `adapted` ones. Every candidate
+reports `clean | conflict | unchanged | skipped(reason)`, and the run also lists
+upstream files added and deleted under the mapped roots. `--dry-run` writes
+nothing; without it, conflict markers land in the file. A run where every
+candidate is `clean` or `unchanged` and no _mapped_ upstream file was deleted
+bumps `baselineCommit` and retargets the `// upstream:` headers; `--force-baseline`
+does it anyway.
+
+An import the delta introduces is rewritten only from evidence already in the
+package, never guessed: a relative import whose target the manifest maps to a
+local file (the local layout is flatter than upstream's), or a bare specifier
+that some other file in the package already rewrites the same way. Evidence
+that disagrees, and an upstream file two local entries both claim, are reported
+instead of resolved. What is left — `new upstream import "x"`, `unported import
+<path>` — is the hand work, and it is why a conflict-free apply can still fail
+to typecheck.
+
+Run it per package, in dependency order, and finish one package before starting
+the next: the manifest holds one baseline for the whole package, so a
+half-synced package fails `check` (verbatim files at the new commit, baseline
+still at the old one) until the `adapted` files are merged too.
+
+### The 2026-09-07 rehearsal (one real week of upstream)
+
+Rehearsed on `e54cb3cb857` → `5d8067a4483` (2026-08-30 → 2026-09-06, 163
+changed production files under the channel roots) in a copy at
+`/tmp/sync-rehearsal`, with the five packages rewound to the older commit so
+`check` passed there first. Numbers for the `verbatim` pass:
+
+| Package         | Mapped files changed | clean | conflict | new upstream | deleted |
+| --------------- | -------------------- | ----- | -------- | ------------ | ------- |
+| `markdown-core` | 25 / 54              | 25    | 0        | 4            | 0       |
+| `telegram`      | 26 / 140             | 20    | 0        | 0            | 2       |
+| `slack`         | 30 / 96              | 19    | 0        | 3            | 0       |
+| `core`          | 104 / 327            | 56    | 0        | 633          | 72      |
+
+120 files merged, zero conflicts, about 90 s of tool time. 118 of the 120 came
+out byte-identical to the hand port at the same commit; the other two needed one
+import line each, both named in the run's notes. Hand work: those two lines, and
+15 upstream files added inside the range (3 `markdown-core`, 3 `slack`,
+9 `core`) which have to be ported and listed — roughly 40 minutes. Afterwards
+all five packages typechecked and their suites passed (`markdown-core` 654,
+`core` 214, `slack` 886, `telegram` 865 of 866 — the one failure pre-exists in
+the working tree — `shared` 35).
+
+`--include-adapted` is the expensive half: 50 of the changed `adapted` files
+conflicted (`core` 45, `telegram` 3, `slack` 2) because an adapted file differs
+from the base in the same region the delta touches. Budget a hand resolution per
+adapted file that upstream moved, and keep `adapted` for files that genuinely
+need it.
+
+Upstream also added 13 test files inside the range and 12 of them have no local
+counterpart. `apply` does not surface that: test files are excluded from the
+manifest and from the added/deleted lists, so upstream's new coverage has to be
+swept separately.
+
+Three things the run does not do. `core` cherry-picks files out of shared
+upstream directories, so its added/deleted lists are those whole directories
+(633 and 72) rather than a port backlog — the `unported import` notes are the
+targeted version of the same fact. A rename arrives as one added and one deleted
+file, never as a rename. And one upstream file (`fs-safe-advanced.ts`) holds a
+literal NUL inside a regex class, which `git merge-file` refuses as binary; that
+file reports `skipped (merge refused: …)` and the rest of the package continues.
 
 ## Paseo v0.7.2 merge (2026-09-06)
 

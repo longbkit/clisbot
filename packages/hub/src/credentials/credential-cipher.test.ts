@@ -81,6 +81,72 @@ describe("credential cipher", () => {
     assert.equal(cipher.decrypt("owner", cipher.encrypt("owner", 42)), 42);
   });
 
+  it("reads with the previous key while writing with the current one", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hub-credential-rotate-"));
+    roots.push(root);
+    const retired = Buffer.alloc(32, 9);
+    const currentFile = join(root, "current-key");
+    const previousFile = join(root, "previous-key");
+    await writeFile(currentFile, `${key.toString("base64")}\n`);
+    await writeFile(previousFile, `${retired.toString("base64")}\n`);
+
+    const before = createCredentialCipher({ keyId: "primary", masterKey: retired });
+    const sealed = before.encrypt("owner", { token: "canary" });
+
+    const rotated = await readCredentialCipherEnvironment({
+      PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+      PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
+    });
+    assert.deepEqual(rotated.decrypt("owner", sealed), { token: "canary" });
+    // The re-seal is a plain write, and it lands under the current key alone.
+    const resealed = rotated.encrypt("owner", { token: "canary" });
+    const currentOnly = createCredentialCipher({ keyId: "primary", masterKey: key });
+    assert.deepEqual(currentOnly.decrypt("owner", resealed), { token: "canary" });
+    assert.throws(() => currentOnly.decrypt("owner", sealed), CredentialCipherError);
+    // Retiring the previous key retires the rows nobody rewrote.
+    const currentAlone = await readCredentialCipherEnvironment({
+      PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+    });
+    assert.throws(() => currentAlone.decrypt("owner", sealed), CredentialCipherError);
+  });
+
+  // A read only tries keys whose id matches the envelope's, so the retired key's
+  // id has to be the id the OLD rows carry. Defaulting it to the current key's
+  // id meant a rotation that renamed the key never tried the retired material —
+  // silently, at read time, one row at a time.
+  it("keeps a named rotation readable and refuses one that cannot be", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hub-credential-named-"));
+    roots.push(root);
+    const retired = Buffer.alloc(32, 7);
+    const currentFile = join(root, "current-key");
+    const previousFile = join(root, "previous-key");
+    await writeFile(currentFile, key.toString("base64"));
+    await writeFile(previousFile, retired.toString("base64"));
+    const sealed = createCredentialCipher({ keyId: "2026-08", masterKey: retired }).encrypt(
+      "owner",
+      { token: "canary" },
+    );
+
+    await assert.rejects(
+      readCredentialCipherEnvironment({
+        PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+        PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
+        PASEO_HUB_CREDENTIAL_KEY_ID: "2026-09",
+      }),
+      CredentialCipherError,
+      "a named current key with no named retired key is a boot failure, not a read failure",
+    );
+
+    const named = await readCredentialCipherEnvironment({
+      PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE: currentFile,
+      PASEO_HUB_CREDENTIAL_MASTER_KEY_PREVIOUS_FILE: previousFile,
+      PASEO_HUB_CREDENTIAL_KEY_ID: "2026-09",
+      PASEO_HUB_CREDENTIAL_KEY_ID_PREVIOUS: "2026-08",
+    });
+    assert.deepEqual(named.decrypt("owner", sealed), { token: "canary" });
+    assert.equal(named.keyId, "2026-09");
+  });
+
   it("fails closed for missing, ambiguous, malformed, or data-directory key material", async () => {
     const root = await mkdtemp(join(tmpdir(), "hub-credential-key-"));
     roots.push(root);

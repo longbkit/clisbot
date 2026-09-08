@@ -4,7 +4,7 @@ import type { Socket } from "node:net";
 import { once } from "node:events";
 import type { Duplex } from "node:stream";
 import { describe, it } from "vitest";
-import { stopProductionServer } from "./index.js";
+import { createHttpAdmission, stopProductionServer } from "./index.js";
 import { createFetchServer } from "./http/node-server.js";
 
 /**
@@ -134,6 +134,35 @@ describe("stopProductionServer", () => {
     } finally {
       client.destroy();
     }
+  });
+});
+
+/**
+ * The first shutdown step. Disposing the runtime while the listener was still
+ * accepting meant a request that arrived during the teardown reached a
+ * half-disposed database or supervisor (D-W4-05).
+ */
+describe("createHttpAdmission", () => {
+  it("answers 503 and refuses upgrades once closed, and finishes what is in flight", async () => {
+    let release = (): void => {};
+    const inFlight = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const admission = createHttpAdmission(async (request) => {
+      if (new URL(request.url).pathname === "/slow") await inFlight;
+      return new Response("ok");
+    });
+
+    const slow = admission.fetch(new Request("https://hub.test/slow"));
+    assert.equal(admission.open, true);
+    admission.close();
+    assert.equal(admission.open, false, "the upgrade handler reads this before accepting");
+
+    const refused = await admission.fetch(new Request("https://hub.test/api/v1/anything"));
+    assert.equal(refused.status, 503);
+    assert.equal(refused.headers.get("retry-after"), "5");
+    release();
+    assert.equal((await slow).status, 200, "a request already inside the handler still answers");
   });
 });
 

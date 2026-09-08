@@ -23,6 +23,103 @@ import type {
   InboundLedgerSink,
 } from "./host.js";
 
+/**
+ * The inbound FAMILY one event belongs to. The Hub's routing policy decides
+ * per family whether the event may start an agent turn (`inbound-kinds.ts`),
+ * so a reaction or a join never reaches an always-reply agent as user text.
+ *
+ * Absent means `message`: a vertical written before this field existed keeps
+ * its old behaviour with no shim on either side.
+ */
+export type ChannelInboundKind =
+  | "message"
+  | "command"
+  | "callback"
+  | "edit"
+  | "delete"
+  | "reaction"
+  | "member"
+  | "channel"
+  | "pin"
+  | "topic"
+  | "poll_answer"
+  | "interactive";
+
+/** `kind: "command"` — a native slash command or a leading `/verb` line. */
+export interface ChannelInboundCommandFacts {
+  /** The verb WITHOUT its leading slash, lowercased (`"status"`). */
+  name: string;
+  /** Everything after the verb, trimmed; empty when the command was bare. */
+  args: string;
+}
+
+/** `kind: "callback" | "interactive"` — a button, select, or modal submit. */
+export interface ChannelInboundCallbackFacts {
+  /** Slack `action_id` / modal `callback_id`; Telegram's decoded command. */
+  actionId: string;
+  /** The element's opaque value (button value, selection, modal metadata). */
+  value?: string;
+  /** The clicking user's native id — the callback's authority fact. */
+  actorId: string;
+  /** The card's own message id (the in-place-update target). */
+  messageId?: string;
+}
+
+/** `kind: "reaction"` — an emoji added to or removed from a message. */
+export interface ChannelInboundReactionFacts {
+  /** The emoji NAME (Slack `+1`) or character (Telegram `👍`). */
+  emoji: string;
+  /** True for an add, false for a remove/clear. */
+  added: boolean;
+  /** The message the reaction sits on. */
+  messageId: string;
+  /** The reacting user's native id. */
+  actorId: string;
+}
+
+/** `kind: "edit" | "delete" | "pin"` — the message the event acts on. The
+ * event's own `externalMessageId` is its dedupe identity, which for these
+ * families is the notification, not the subject. */
+export interface ChannelInboundTargetFacts {
+  messageId: string;
+}
+
+/** `kind: "member"` — a join or a leave. */
+export interface ChannelInboundMemberFacts {
+  userId: string;
+  joined: boolean;
+}
+
+/** `kind: "poll_answer"` — one voter's selection. */
+export interface ChannelInboundPollAnswerFacts {
+  pollId: string;
+  optionIds: number[];
+  voterId: string;
+}
+
+/** `kind: "topic"` — a forum topic / thread lifecycle event. */
+export interface ChannelInboundTopicFacts {
+  /** The topic's own thread id, when the platform carries one. */
+  threadId?: string;
+  /** The topic name, when the event names it. */
+  name?: string;
+  /** The lifecycle verb (`created`, `renamed`, `closed`, …). */
+  event: string;
+}
+
+/** The structured facts one non-message inbound event carries. Every member is
+ * optional and only the ones matching `kind` are populated; the Hub reads them
+ * by kind and falls back to `body` (the human-readable rendering) for the rest. */
+export interface ChannelInboundFacts {
+  command?: ChannelInboundCommandFacts;
+  callback?: ChannelInboundCallbackFacts;
+  reaction?: ChannelInboundReactionFacts;
+  target?: ChannelInboundTargetFacts;
+  member?: ChannelInboundMemberFacts;
+  pollAnswer?: ChannelInboundPollAnswerFacts;
+  topic?: ChannelInboundTopicFacts;
+}
+
 /** The native facts one inbound channel event carries, normalized by the L2
  * transport from its raw event (a Telegram `update.message`, a Slack
  * `message` event payload). Ids are the channel-native ones — no prefixing,
@@ -59,6 +156,10 @@ export interface ChannelInboundEvent {
   conversationLabel?: string;
   /** Pre-filter fact: true when the event is the channel's own bot message. */
   isOwnMessage?: boolean;
+  /** The inbound family. Absent = `message`. */
+  kind?: ChannelInboundKind;
+  /** The structured facts for `kind`; absent = `body` is all there is. */
+  facts?: ChannelInboundFacts;
 }
 
 /** The flat ctxPayload the Hub plane's normalizer reads
@@ -90,6 +191,14 @@ export function buildInboundCtxPayload(
   if (event.senderName !== undefined) payload["SenderName"] = event.senderName;
   if (event.senderUsername !== undefined) payload["SenderUsername"] = event.senderUsername;
   if (event.conversationLabel !== undefined) payload["ConversationLabel"] = event.conversationLabel;
+  // The inbound family + its structured facts. `EventKind` is flat like every
+  // other routing fact; the per-kind facts ride in ONE nested key rather than a
+  // dozen flat ones, because the Hub reads them as a unit after it has branched
+  // on the kind (`plane/inbound-kinds.ts`).
+  payload["EventKind"] = event.kind ?? "message";
+  if (event.facts !== undefined && Object.keys(event.facts).length > 0) {
+    payload["EventFacts"] = event.facts;
+  }
   return payload;
 }
 
@@ -122,6 +231,10 @@ class SeenEventIds {
       if (oldest !== undefined) this.ids.delete(oldest);
     }
     return true;
+  }
+
+  forget(id: string): void {
+    this.ids.delete(id);
   }
 
   get size(): number {
@@ -162,24 +275,61 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
   const logger = options.logger;
 
   async function process(event: ChannelInboundEvent): Promise<InboundEventDecision> {
-    // In-flight transport redelivery (same run): drop silently.
-    if (!seen.remember(event.externalEventId)) {
+    if (!seen.remember(event.externalEventId))
       return { dispatched: false, reason: "in-flight duplicate" };
-    }
-    // Own-bot message: the bot must never answer itself (loop guard).
     if (
       event.isOwnMessage === true ||
       (options.botId !== undefined && event.senderId === options.botId)
-    ) {
+    )
       return { dispatched: false, reason: "own message" };
+    if (event.body.trim() === "") return { dispatched: false, reason: "empty body" };
+
+    // Queue admission is the ACK/offset boundary. Persist the complete normalized
+    // event before invoking the Hub so a crash can be drained after restart.
+    const queue = hostRuntime.inboundQueue;
+    if (queue !== undefined) {
+      let admitted: Awaited<ReturnType<typeof queue.enqueue>>;
+      try {
+        admitted = await queue.enqueue({
+          channel,
+          accountId,
+          externalEventId: event.externalEventId,
+          externalMessageId: event.externalMessageId,
+          externalConversationId: event.externalConversationId,
+          ...(event.messageThreadId === undefined
+            ? {}
+            : { externalThreadId: event.messageThreadId }),
+          laneKey: `${channel}:${accountId}:${event.externalConversationId}:${event.messageThreadId ?? "root"}`,
+          payload: {
+            channel,
+            accountId,
+            ctxPayload: buildInboundCtxPayload(event, accountId),
+          },
+        });
+      } catch (error) {
+        // The provider must retry when durable admission fails. Do not let the
+        // in-process seen set turn that retry into a false replay.
+        seen.forget(event.externalEventId);
+        throw error;
+      }
+      if (!admitted.created) return { dispatched: false, reason: "queue replay" };
+      // Keep the existing ledger as an audit join, but never use it as the queue
+      // admission gate (the queue owns payload durability and replay).
+      if (sink !== undefined) {
+        await sink.record({
+          channel,
+          accountId,
+          externalConversationId: event.externalConversationId,
+          externalMessageId: event.externalMessageId,
+          ...(event.senderId !== "" ? { senderIdentity: event.senderId } : {}),
+        });
+      }
+      // The supervisor-owned drain claims and dispatches the payload. Returning
+      // after admission is the provider ACK/offset boundary.
+      return { dispatched: true, reason: "queued" };
     }
-    // Empty body: nothing to dispatch.
-    if (event.body.trim() === "") {
-      return { dispatched: false, reason: "empty body" };
-    }
-    // Durable dedupe (blueprint §2.4): record BEFORE the handoff. A restart
-    // replay or a transport replay of a known message id must not dispatch a
-    // second time.
+
+    // Compatibility path for unit fixtures and hosts that have no queue yet.
     if (sink !== undefined) {
       const recorded = await sink.record({
         channel,
@@ -188,24 +338,26 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
         externalMessageId: event.externalMessageId,
         ...(event.senderId !== "" ? { senderIdentity: event.senderId } : {}),
       });
-      if (!recorded.created) {
-        logger?.debug?.("inbound ledger replay: dropping known message", {
-          channel,
-          accountId,
-          externalMessageId: event.externalMessageId,
-        });
-        return { dispatched: false, reason: "ledger replay" };
-      }
+      if (!recorded.created) return { dispatched: false, reason: "ledger replay" };
     }
-    // Handoff to the Hub (the plane owns the policy decision). A handoff fault
-    // must never kill the transport loop: log + keep polling (P13).
-    let result;
     try {
-      result = await hostRuntime.onInboundReply({
+      const result = await hostRuntime.onInboundReply({
         channel,
         accountId,
         ctxPayload: buildInboundCtxPayload(event, accountId),
       });
+      if (result.dispatched && sink !== undefined)
+        await sink.consume({
+          channel,
+          accountId,
+          externalConversationId: event.externalConversationId,
+          externalMessageId: event.externalMessageId,
+          turnId: inboundTurnId(event),
+        });
+      return {
+        dispatched: result.dispatched,
+        ...(result.dispatched ? {} : { reason: "plane declined" }),
+      };
     } catch (error) {
       logger?.warn("inbound handoff fault (kept polling)", {
         channel,
@@ -215,22 +367,6 @@ export function createInboundEventProcessor(options: InboundEventProcessorOption
       });
       return { dispatched: false, reason: "handoff fault" };
     }
-    // Consume-mark when the dispatch settled (the plane accepted the event).
-    // An ignored inbound stays `recorded` in the ledger (audit: the event
-    // arrived; the plane declined it).
-    if (result.dispatched && sink !== undefined) {
-      await sink.consume({
-        channel,
-        accountId,
-        externalConversationId: event.externalConversationId,
-        externalMessageId: event.externalMessageId,
-        turnId: inboundTurnId(event),
-      });
-    }
-    return {
-      dispatched: result.dispatched,
-      ...(result.dispatched ? {} : { reason: "plane declined" }),
-    };
   }
 
   return {

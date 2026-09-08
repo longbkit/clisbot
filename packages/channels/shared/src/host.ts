@@ -123,6 +123,66 @@ export interface InboundLedgerSink {
 
 /** The host runtime the loader hands the channel via its setter. Exposes the
  * seam surface only. */
+/** Hub-owned durable inbound queue. Admission retains the normalized payload;
+ * claims provide per-lane serialization and crash fencing. */
+/** One durably admitted event, leased to a single drain worker. */
+export interface InboundQueueClaim {
+  id: string;
+  claimToken: string;
+  payload: unknown;
+  /** Per-conversation serialization key the claim holds while the lease lives. */
+  laneKey: string;
+  /** Attempts consumed, including this claim. */
+  attempts: number;
+  /** Durable admission time — the retry policy's dead-letter age clock. */
+  receivedAt: Date;
+}
+
+export interface InboundQueueSink {
+  enqueue(params: {
+    channel: string;
+    accountId: string;
+    externalEventId: string;
+    externalMessageId: string;
+    externalConversationId: string;
+    externalThreadId?: string | null;
+    laneKey: string;
+    payload: unknown;
+  }): Promise<{ created: boolean; id: string }>;
+  claim(params: {
+    organizationId: string;
+    workerId: string;
+    leaseMs: number;
+    channel: string;
+    accountId: string;
+  }): Promise<InboundQueueClaim | undefined>;
+  complete(params: { id: string; workerId: string; claimToken: string }): Promise<void>;
+  refresh?(params: {
+    id: string;
+    workerId: string;
+    claimToken: string;
+    leaseMs: number;
+  }): Promise<boolean>;
+  /** Settle a claim that did not deliver. The drain owns the decision (the
+   * ported upstream ingress retry policy for `retry`/`dead-letter`, the plane's
+   * back-pressure for `release`); the sink only writes it. `release` returns
+   * the row unattempted, so back-pressure never spends retry budget. */
+  fail(params: {
+    id: string;
+    workerId: string;
+    claimToken: string;
+    error: string;
+    disposition: "retry" | "dead-letter" | "release";
+    reason?: string;
+    retryAt?: Date;
+  }): Promise<void>;
+  recover?(params: {
+    organizationId: string;
+    channel?: string;
+    accountId?: string;
+  }): Promise<number>;
+}
+
 export interface HostRuntime {
   /** The channel's normalized inbound event reached the Hub. The Hub returns
    * once the agent + relay have accepted the event. Never throws into the
@@ -141,6 +201,8 @@ export interface HostRuntime {
   channel: Record<string, Record<string, unknown>>;
   /** The inbound ledger sink (Hub-owned; absent outside a Hub). */
   inboundLedger?: InboundLedgerSink | undefined;
+  /** Durable payload queue; when present it is preferred over ledger-only admission. */
+  inboundQueue?: InboundQueueSink | undefined;
 }
 
 /** The runtime env a channel account's monitor receives. `exit` is present so

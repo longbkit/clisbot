@@ -46,13 +46,10 @@ import {
 import type { JsonValue } from "../config/compiler.js";
 import { compileJsonSchema, formatJsonSchemaErrors } from "../workflows/json-schema.js";
 import type { Logger } from "pino";
-import {
-  CHANNEL_REPLY_FILE_TOOL_NAME,
-  CHANNEL_REPLY_MCP_SERVER_NAME,
-  CHANNEL_REPLY_TOOL_NAME,
-} from "../channels/plane/types.js";
+import { CHANNEL_REPLY_MCP_SERVER_NAME, CHANNEL_REPLY_TOOL_NAME } from "../channels/plane/types.js";
 import type { ChannelReplyCapabilityService } from "../channels/channel-reply-capabilities.js";
 import { composeMessageToolPrompt } from "../channels/outbound-template.js";
+import { isSupportedChannel } from "../channels/catalog.js";
 import { isHubFinishExecutionToolName } from "../hub/protocol.js";
 
 export interface DaemonDispatchResult {
@@ -2172,15 +2169,6 @@ async function buildCreateAgentOptions(
                 server: "channel_reply" as const,
                 tool: CHANNEL_REPLY_TOOL_NAME,
               },
-              ...(channelTool.canSendFiles
-                ? [
-                    {
-                      kind: "mcp" as const,
-                      server: "channel_reply" as const,
-                      tool: CHANNEL_REPLY_FILE_TOOL_NAME,
-                    },
-                  ]
-                : []),
             ]),
       ],
     },
@@ -2215,7 +2203,7 @@ function workflowChannelTool(
   if (context === undefined) return undefined;
   const { channel, outbound } = context;
   const name = Reflect.get(channel, "name");
-  if (name !== "slack" && name !== "telegram") return undefined;
+  if (typeof name !== "string" || !isSupportedChannel(name)) return undefined;
   const output = intent.allowOutputs.find((item) => item.type === `${name}.reply`);
   if (output === undefined) return undefined;
   const accountId = Reflect.get(channel, "account_id");
@@ -2312,7 +2300,7 @@ function allowsChannelReply(execution: AgentExecutionRecord): boolean {
     return false;
   }
   const name = Reflect.get(channel, "name");
-  if (name !== "slack" && name !== "telegram") return false;
+  if (typeof name !== "string" || !isSupportedChannel(name)) return false;
   return (
     execution.launchIntent?.allowOutputs.some((output) => output.type === `${name}.reply`) === true
   );

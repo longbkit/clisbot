@@ -35,13 +35,9 @@ import {
   parseTelegramTarget,
   wrapTelegramChatNotFoundError,
 } from "../leaves/coerce.js";
-import {
-  buildTelegramReplyParams,
-  buildTelegramThreadParams,
-  splitTelegramPlainTextChunks,
-} from "../leaves/rich-message.js";
-import { markdownToTelegramHtml } from "../format.js";
-import { splitTelegramHtmlChunks } from "../telegram-html-chunk.js";
+import { resolveTelegramOutboundClientTimeoutFloorSeconds } from "../client-fetch.js";
+import { mergeTelegramAccountConfig } from "../accounts.js";
+import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
 
 /** The plane's config record (`ctx.cfg`) — `channels.telegram.accounts.<id>`
  * carries the token strings the outbound path reads (start-account.md). */
@@ -55,6 +51,16 @@ export interface TelegramAccountConfig {
    * 2026-08-29): an explicit `config.richMessages: false` opts an account
    * back to plain text. */
   richMessages: boolean;
+  /** Slice 20 (webhook receive mode). Set `webhookUrl` to switch the account off
+   * polling; the other fields tune the owned listener
+   * (`fusion/webhook-session.ts`). Upstream's equivalents live on the same
+   * account config (`monitor.types.ts` `webhookPath`/`webhookPort`/
+   * `webhookSecret`/`webhookHost`). */
+  webhookUrl?: string;
+  webhookPort?: number;
+  webhookPath?: string;
+  webhookSecret?: string;
+  webhookHost?: string;
 }
 
 export interface TelegramBotInfo {
@@ -152,6 +158,25 @@ export interface TelegramApi {
     file: unknown,
     params?: Record<string, unknown>,
   ): Promise<{ message_id: number; chat?: { id: number } }>;
+  /** Slice 20: the inbound long poll. grammY's `Api.getUpdates` — the vertical
+   * no longer builds the `getUpdates` URL itself (`transport/poll.ts` is
+   * retired), so the SDK owns the request, the retry-after parse and the
+   * `GrammyError` classification `network-errors.ts` reads. */
+  getUpdates(params: {
+    offset?: number;
+    limit?: number;
+    timeout?: number;
+    allowed_updates?: readonly string[];
+  }): Promise<unknown[]>;
+  /** Slice 20: the callback-query ack. Silent (no text/alert): it clears the
+   * client spinner; the card update is the user-visible outcome. */
+  answerCallbackQuery(params: { callback_query_id: string }): Promise<unknown>;
+  /** Slice 20: polling must clear a stale webhook first, exactly as upstream's
+   * `TelegramPollingSession.#ensureWebhookCleanup` does. */
+  deleteWebhook(params?: { drop_pending_updates?: boolean }): Promise<unknown>;
+  /** Slice 20: webhook receive mode registers the public URL here. Optional
+   * because the fake APIs the unit tests inject only implement what they drive. */
+  setWebhook?(url: string, params?: Record<string, unknown>): Promise<unknown>;
 }
 
 const BOT_INFO_CACHE_TTL_MS = 86_400_000;
@@ -168,41 +193,43 @@ function resolveAccountToken(
   return typeof flatToken === "string" ? flatToken.trim() : "";
 }
 
-/** Resolve the drive-time account: token from `ctx.account` (flat carrier)
- * falling back to `cfg.channels.telegram.accounts.<id>.botToken` (the token
- * source per start-account.md), config from the same cfg entry. */
+/** The L1's narrow view of the merged account block. The block is upstream's
+ * own flat shape, so every key is read off the entry itself — the same place
+ * `accounts.ts` reads it (D-TG-056). */
+function narrowAccountConfig(entry: Record<string, unknown>): TelegramAccountConfig {
+  // Rich (markdown → Bot API HTML) is the default (D-003, amended 2026-08-29):
+  // plain text only when the account explicitly sets `richMessages: false`.
+  const config: TelegramAccountConfig = { richMessages: entry["richMessages"] !== false };
+  if (typeof entry["timeoutSeconds"] === "number") config.timeoutSeconds = entry["timeoutSeconds"];
+  if (typeof entry["apiRoot"] === "string") config.apiRoot = entry["apiRoot"];
+  if (typeof entry["linkPreview"] === "boolean") config.linkPreview = entry["linkPreview"];
+  if (typeof entry["webhookUrl"] === "string") config.webhookUrl = entry["webhookUrl"];
+  if (typeof entry["webhookPort"] === "number") config.webhookPort = entry["webhookPort"];
+  if (typeof entry["webhookPath"] === "string") config.webhookPath = entry["webhookPath"];
+  if (typeof entry["webhookSecret"] === "string") config.webhookSecret = entry["webhookSecret"];
+  if (typeof entry["webhookHost"] === "string") config.webhookHost = entry["webhookHost"];
+  return config;
+}
+
+/** Resolve the drive-time account: config from the merged
+ * `cfg.channels.telegram[.accounts.<id>]` block (`mergeTelegramAccountConfig`
+ * — channel-level keys inherited, the account's own keys winning), token from
+ * that block's `botToken` falling back to `ctx.account.token` (the flat
+ * carrier). One account reader for the whole vertical: this used to read a
+ * nested `config` sub-object that no other reader wrote (D-TG-056). */
 export function resolveTelegramAccount(
   cfg: TelegramCfg,
   accountId: string,
   flatAccount?: Record<string, unknown>,
 ): ResolvedTelegramAccount {
-  const channels = cfg["channels"] as Record<string, unknown> | undefined;
-  const telegram = channels?.["telegram"] as Record<string, unknown> | undefined;
-  const accounts = telegram?.["accounts"] as Record<string, Record<string, unknown>> | undefined;
-  const entry = accounts?.[accountId] ?? {};
+  const entry = mergeTelegramAccountConfig(cfg as OpenClawConfig, accountId);
   const token = resolveAccountToken(entry, flatAccount);
   if (token === "") {
     throw new Error(
       `Telegram bot token missing for account "${accountId}" (set channels.telegram.accounts.${accountId}.botToken).`,
     );
   }
-  // Rich (markdown → Bot API HTML) is the default (D-003, amended 2026-08-29):
-  // plain text only when the account explicitly sets `richMessages: false`.
-  const config: TelegramAccountConfig = { richMessages: true };
-  const rawConfig = entry["config"] as Record<string, unknown> | undefined;
-  if (rawConfig !== undefined) {
-    if (typeof rawConfig["timeoutSeconds"] === "number") {
-      config.timeoutSeconds = rawConfig["timeoutSeconds"];
-    }
-    if (typeof rawConfig["apiRoot"] === "string") config.apiRoot = rawConfig["apiRoot"];
-    if (typeof rawConfig["linkPreview"] === "boolean") {
-      config.linkPreview = rawConfig["linkPreview"];
-    }
-    if (typeof rawConfig["richMessages"] === "boolean") {
-      config.richMessages = rawConfig["richMessages"];
-    }
-  }
-  return { accountId, token, config };
+  return { accountId, token, config: narrowAccountConfig(entry) };
 }
 
 /** The Bot API root: the account's `apiRoot` config when present, else the
@@ -223,7 +250,16 @@ export interface TelegramClientOptions {
 // A Bot API request must never be allowed to hold the account's per-chat
 // throttler forever. The throttler serializes group sends, so one fetch with
 // no deadline also blocks every later assistant/progress post for that chat.
-const DEFAULT_TELEGRAM_API_TIMEOUT_SECONDS = 30;
+/** The client-wide request cap floor. `leaves/telegram-policy.ts` applies ONE
+ * flat timeout to every Bot API call, so it has to clear the longest call the
+ * client makes: `getUpdates` is held open for the long-poll window (up to 40s,
+ * `resolveTelegramLongPollTimeoutSeconds`) and its request budget is 45s.
+ * Upstream floors the client timeout at the outbound send budget
+ * (`resolveTelegramOutboundClientTimeoutFloorSeconds`, 60s) for the same
+ * reason. The port used 30s, which aborted every idle long poll and drove the
+ * restart backoff to its 600s max (live 2026-09-07). */
+const DEFAULT_TELEGRAM_API_TIMEOUT_SECONDS =
+  resolveTelegramOutboundClientTimeoutFloorSeconds(undefined) ?? 60;
 
 /** Build the client options (injected fetch + per-method timeouts + apiRoot)
  * — the pinned `resolveTelegramClientOptions` at its L1 boundary. */
@@ -232,10 +268,8 @@ export function buildTelegramClientOptions(
   transport?: TelegramTransport,
 ): TelegramClientOptions {
   const timeoutSeconds =
-    typeof account.config.timeoutSeconds === "number" &&
-    Number.isFinite(account.config.timeoutSeconds)
-      ? Math.max(1, Math.floor(account.config.timeoutSeconds))
-      : DEFAULT_TELEGRAM_API_TIMEOUT_SECONDS;
+    resolveTelegramOutboundClientTimeoutFloorSeconds(account.config.timeoutSeconds) ??
+    DEFAULT_TELEGRAM_API_TIMEOUT_SECONDS;
   const fetchImpl = createTelegramClientFetch({
     timeoutSeconds,
     ...(transport?.fetch !== undefined ? { transport } : {}),
@@ -247,15 +281,19 @@ export function buildTelegramClientOptions(
   };
 }
 
-/** Build the default factory options grammy wants (fetch + timeout +
- * apiRoot) — `undefined` when the account matches the public-API defaults. */
+/** Build the default factory options grammy wants (fetch + apiRoot) —
+ * `undefined` when the account matches the public-API defaults.
+ *
+ * `timeoutSeconds` is deliberately NOT handed to grammY (upstream `bot-core.ts`
+ * passes `value: undefined` to `resolveTelegramClientTimeoutSeconds`, so it
+ * never sets one either). Requests are bounded per method inside the injected
+ * fetch (`client-fetch.ts` → `resolveTelegramRequestTimeoutMs`), which knows
+ * that `getUpdates` needs 45s. A global client timeout of 30s aborted every
+ * idle long poll instead (live 2026-09-07). */
 function resolveClientOptions(options: TelegramClientOptions): Record<string, unknown> | undefined {
-  return options.fetchImpl !== undefined ||
-    options.timeoutSeconds !== undefined ||
-    options.apiRoot !== "https://api.telegram.org"
+  return options.fetchImpl !== undefined || options.apiRoot !== "https://api.telegram.org"
     ? {
         ...(options.fetchImpl !== undefined ? { fetch: options.fetchImpl } : {}),
-        ...(options.timeoutSeconds !== undefined ? { timeoutSeconds: options.timeoutSeconds } : {}),
         ...(options.apiRoot !== "https://api.telegram.org" ? { apiRoot: options.apiRoot } : {}),
       }
     : undefined;
@@ -476,152 +514,13 @@ export function parseOutboundTarget(to: string): { chatId: string; messageThread
   };
 }
 
-const TELEGRAM_TEXT_CHUNK_LIMIT = 4000;
-
-/** The per-chunk request params. `threadParams` (`message_thread_id` +
- * silent — from the shared `buildTelegramThreadParams`) ride on EVERY
- * chunk: a continuation chunk that drops `message_thread_id` lands in the
- * forum's General (root) instead of the topic. `firstChunkParams`
- * (`reply_parameters` + the card's `reply_markup` — from the shared
- * `buildTelegramReplyParams`) ride on chunk 0 only (the Bot API's single
- * reply-target rule). The `parse_mode: HTML` flag is a per-message Bot API
- * param and applies to every chunk when the rich-HTML path is active.
- * Both builders are shared with the media post, so the plain and rich sends
- * derive their params from ONE source — a topic send can never drop
- * `message_thread_id` on one path only (F-07). */
-function buildChunkParams(
-  index: number,
-  rich: boolean,
-  threadParams: Record<string, unknown>,
-  firstChunkParams: Record<string, unknown>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(threadParams)) out[key] = value;
-  if (index === 0) {
-    for (const [key, value] of Object.entries(firstChunkParams)) out[key] = value;
-  }
-  if (rich) out["parse_mode"] = "HTML";
-  return out;
-}
-
-/** Send text through the pinned chunk's text path. Plain by default: chunk at
- * 4000 and post as-is. When `rich` (the account's `richMessages`, on by
- * default per D-003) the text is converted markdown → Bot API HTML (C5
- * front-end, reused — not a new
- * converter) and chunked tag-balance-aware, then posted with
- * `parse_mode: HTML` on every chunk (OpenClaw legacy `send-message-text.ts`:
- * the non-rich-blocks HTML path chunks at 4000). Thread params from the topic
- * id, reply-to when given, record the sent message in the seam after each
- * chunk. */
-export async function sendTelegramText(
-  params: {
-    api: TelegramApi;
-    chatId: number;
-    text: string;
-    log?: (message: string) => void;
-  } & Pick<SendTextOptions, "replyToMessageId" | "messageThreadId" | "silent"> & {
-      /** Post as Bot API `parse_mode: HTML` (the account's `richMessages`). */
-      rich?: boolean;
-      recordSent?: (chatId: number, messageId: number) => Promise<void>;
-      /** COMPAT(clisbot-control-plane): the native card's inline keyboard
-       * (`reply_markup`) — rides on chunk 0 only (merged into the chunk-0
-       * first-chunk params, so the one `buildChunkParams` builder is the
-       * single place chunk-0 params are chosen — the F-07 invariant). */
-      replyMarkup?: Record<string, unknown>;
-      /** COMPAT(clisbot-control-plane): true when the post carried the native
-       * card markup (the approval card's in-place-update target). */
-      cardPosted?: boolean;
-    },
-): Promise<SendTextResult> {
-  const { api, chatId, text } = params;
-  if (!text.trim()) throw new Error("Message must be non-empty for Telegram sends");
-  const rich = params.rich === true;
-  const chunks = rich
-    ? splitTelegramHtmlChunks(markdownToTelegramHtml(text), TELEGRAM_TEXT_CHUNK_LIMIT)
-    : splitTelegramPlainTextChunks(text, TELEGRAM_TEXT_CHUNK_LIMIT);
-  const threadParams = buildTelegramThreadParams({
-    messageThreadId: params.messageThreadId,
-    silent: params.silent,
-  });
-  // `reply_parameters` and the native card's inline keyboard ride on chunk 0
-  // ONLY (a card on a later chunk would mint a second, orphaned keyboard).
-  // `buildChunkParams` stays the single place chunk-0 params are chosen.
-  const firstChunkParams = buildTelegramReplyParams({
-    replyToMessageId: params.replyToMessageId,
-  });
-  if (params.replyMarkup !== undefined) firstChunkParams["reply_markup"] = params.replyMarkup;
-  let lastMessageId = "";
-  let lastChatId = String(chatId);
-  const log = params.log ?? (() => {});
-  for (let index = 0; index < chunks.length; index += 1) {
-    const chunk = chunks[index];
-    if (chunk === undefined || chunk === "") continue;
-    const requestParams = buildChunkParams(index, rich, threadParams, firstChunkParams);
-    const result = await withTelegramSendRetry(
-      () =>
-        Object.keys(requestParams).length > 0
-          ? api.sendMessage(chatId, chunk, requestParams)
-          : api.sendMessage(chatId, chunk),
-      `sendMessage chunk ${index + 1}/${chunks.length}`,
-      log,
-    );
-    if (!Number.isFinite(result.message_id)) {
-      throw new Error("Telegram sendMessage returned no message_id");
-    }
-    lastMessageId = String(result.message_id);
-    lastChatId = String(result.chat?.id ?? chatId);
-    await params.recordSent?.(chatId, result.message_id);
-  }
-  if (lastMessageId === "") throw new Error("Telegram sendMessage produced no message");
-  log(`telegram outbound send ok chatId=${lastChatId} messageId=${lastMessageId}`);
-  return {
-    messageId: lastMessageId,
-    chatId: lastChatId,
-    ...(params.cardPosted !== undefined ? { cardPosted: params.cardPosted } : {}),
-  };
-}
-
-/**
- * COMPAT(clisbot-control-plane): the in-place text update (`editMessageText`)
- * — the approval card's decided state ("Approved by <sender>" / "Denied" /
- * "Answered: <option>"). `clearCard` strips the card's inline keyboard (an
- * EMPTY keyboard removes the buttons — omitting `reply_markup` would keep the
- * stale card live; a stale click is inert either way — the hub's exactly-once
- * resolver has no open prompt left — but the removed markup is the honest
- * state). The Bot API's 400 "message is not modified" (a byte-identical edit
- * is refused) is NOT a failure: the target text is already there. No chunking
- * (the decided one-liner is far under the 4096 cap; a longer text fails
- * loudly at the Bot API, which is the right signal for this path).
- */
-export async function editTelegramMessageText(params: {
-  api: TelegramApi;
-  chatId: number;
-  messageId: number;
-  text: string;
-  clearCard?: boolean;
-  rich?: boolean;
-  log?: (message: string) => void;
-}): Promise<void> {
-  const { api, chatId, messageId, text } = params;
-  if (!text.trim()) throw new Error("Message must be non-empty for Telegram edits");
-  const other: Record<string, unknown> = {};
-  if (params.rich === true) other["parse_mode"] = "HTML";
-  if (params.clearCard === true) other["reply_markup"] = { inline_keyboard: [] };
-  const target = params.rich === true ? markdownToTelegramHtml(text) : text;
-  try {
-    await withTelegramSendRetry(
-      () =>
-        Object.keys(other).length > 0
-          ? api.editMessageText(chatId, messageId, target, other)
-          : api.editMessageText(chatId, messageId, target),
-      "editMessageText",
-      params.log ?? (() => {}),
-    );
-  } catch (err) {
-    if (isTelegramMessageNotModifiedError(err)) return; // already the target text
-    throw err;
-  }
-}
+// D-TG-026: `sendTelegramText` and `editTelegramMessageText` lived here as the
+// local reimplementation of the OpenClaw text send/edit. They are superseded by
+// the ported source (`../send-message.ts`, `../send-edit.ts`) and were deleted
+// with slice 9. What remains in this module is the inbound/lifecycle half the
+// Hub still drives: account + api-root resolution, the grammy client factory,
+// the update-offset / sent-message seam stores, chat-id resolution and the
+// retry/error helpers those use.
 
 /** The send-error classification re-exported for the Hub's PostFn. */
 export type { GrammyErrorType, HttpErrorType, InputFileType };

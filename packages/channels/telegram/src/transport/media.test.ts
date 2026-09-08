@@ -2,17 +2,18 @@
 // module — extraction (photo-largest, multi-carrier order), download (the
 // getFile + file-stream happy path, failure-skip with logger capture).
 
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { TELEGRAM_MAX_INBOUND_MEDIA_BYTES } from "@getpaseo/channels-shared";
 import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
-import type { TelegramMessageShape } from "./poll.js";
 import {
   downloadTelegramAttachment,
   extractTelegramAttachments,
   foldInboundTelegramMedia,
   type TelegramAttachment,
+  type TelegramMessageShape,
   type TelegramMediaDownloadContext,
 } from "./media.js";
 
@@ -253,6 +254,36 @@ describe("foldInboundTelegramMedia", () => {
       `still here\n\n[Attached files]\n1. audio (audio, 8 bytes) → ${join(dir, "22-2-audio.mp3")}`,
     );
     await stat(join(dir, "22-2-audio.mp3"));
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // Slice 25 (security): `getFile` refuses anything over 20 MB, so a larger
+  // declared length is a lie or a redirected host. An uncapped stream-to-disk
+  // is a disk-fill any group member can drive.
+  it("skips an attachment past the inbound ceiling without writing it", async () => {
+    const dir = await makeDir();
+    const errors: string[] = [];
+    const logger: HostChildLogger = { warn: () => {}, error: (m) => void errors.push(m) };
+    const oversized = (async (url: string | URL | Request) => {
+      if (String(url).includes("/getFile")) {
+        return new Response(JSON.stringify({ ok: true, result: { file_path: "f/1" } }), {
+          status: 200,
+        });
+      }
+      return new Response("x", {
+        status: 200,
+        headers: { "content-length": String(TELEGRAM_MAX_INBOUND_MEDIA_BYTES + 1) },
+      });
+    }) as unknown as typeof globalThis.fetch;
+    const ctx = makeContext({ downloadDir: dir, fetchImpl: oversized, logger });
+    const message: TelegramMessageShape = {
+      message_id: 24,
+      document: { file_id: "huge", file_name: "huge.bin" },
+    };
+    const folded = await foldInboundTelegramMedia(ctx, message, makeEvent("here"));
+    expect(folded!.body).toBe("here");
+    expect(errors[0]).toMatch(/download failed/);
+    await expect(readdir(dir)).resolves.toEqual([]);
     await rm(dir, { recursive: true, force: true });
   });
 

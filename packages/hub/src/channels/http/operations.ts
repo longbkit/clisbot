@@ -63,11 +63,18 @@ import { isChannelsEnabled } from "../loader/channel-gate.js";
 import type { ChannelReplyServer } from "../channel-reply.js";
 import { assignmentCoversPrincipal } from "../policy.js";
 import type { ChannelSupervisor } from "../supervisor/types.js";
+import type { SupportedChannelName } from "../catalog.js";
+import { configureDiscordConnection } from "../connections/discord.js";
+import { configureFeishuConnection } from "../connections/feishu.js";
+import { configureGoogleChatConnection } from "../connections/googlechat.js";
+import { ChannelCredentialProbeError } from "../connections/probe.js";
+import { configureZaloConnection } from "../connections/zalo.js";
 
-/** The eight ops: one per CLI verb plus the tool-path channel-reply MCP
+/** The nine ops: one per CLI verb plus the tool-path channel-reply MCP
  * endpoint (E4). Responses are JSON, RFC 7807 problems, or MCP payloads. */
 export interface ChannelControlPlaneOps {
   addChannel(request: Request): Promise<Response>;
+  removeChannel(request: Request): Promise<Response>;
   listChannels(request: Request): Promise<Response>;
   channelStatus(request: Request): Promise<Response>;
   listUsers(request: Request): Promise<Response>;
@@ -88,10 +95,19 @@ export interface ChannelControlPlaneOpsOptions {
   channelReplyServer: ChannelReplyServer | null;
 }
 
-/** The P0 channels the control plane drives, and each one's default mode. */
-const P0_TRANSPORT_MODE: Record<string, string> = {
+/** Every supported channel's default transport mode for a freshly added account. */
+const DEFAULT_TRANSPORT_MODE: Record<SupportedChannelName, string> = {
   slack: "socket",
   telegram: "polling",
+  discord: "gateway",
+  // Google Chat has no other delivery model; the operator fronts the account's
+  // listener with a reverse proxy (packages/channels/googlechat/HUB-WIRING.md).
+  googlechat: "webhook",
+  // The long connection and the long poll need no public URL, so they lead.
+  feishu: "websocket",
+  zalo: "polling",
+  // Zalo Personal has one mode; the account is linked afterwards by a QR scan.
+  zalouser: "qr",
 };
 
 const channelAddBodySchema = z.discriminatedUnion("channel", [
@@ -114,7 +130,71 @@ const channelAddBodySchema = z.discriminatedUnion("channel", [
       setup: ChannelOnboardingSchema.optional(),
     })
     .strict(),
+  z
+    .object({
+      channel: z.literal("discord"),
+      account: z.string().min(1).max(128),
+      botToken: z.string().min(1).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal("zalo"),
+      account: z.string().min(1).max(128),
+      botToken: z.string().min(1).optional(),
+      /** Webhook mode only; Zalo echoes it in `x-bot-api-secret-token`. */
+      webhookSecret: z.string().min(8).max(256).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal("feishu"),
+      account: z.string().min(1).max(128),
+      appId: z.string().min(1).optional(),
+      appSecret: z.string().min(1).optional(),
+      verificationToken: z.string().min(1).optional(),
+      encryptKey: z.string().min(1).optional(),
+      domain: z.enum(["feishu", "lark"]).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal("zalouser"),
+      account: z.string().min(1).max(128),
+      /** The non-secret label the QR session is stored under; defaults to the
+       * account id. There is NO credential to supply here — the account is
+       * linked afterwards through the channel-accounts QR login. */
+      profile: z.string().min(1).max(128).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      channel: z.literal("googlechat"),
+      account: z.string().min(1).max(128),
+      /** The service-account JSON document, verbatim. */
+      serviceAccount: z.string().min(1).optional(),
+      /** Or its absolute path on the daemon host, for a secret mount. */
+      serviceAccountFile: z.string().min(1).optional(),
+      connectionId: z.string().uuid().optional(),
+      setup: ChannelOnboardingSchema.optional(),
+    })
+    .strict(),
 ]);
+
+/** `channels rm`: the account to uninstall. The credential Connection it used
+ * is left in place — it can be shared with another account, and removing a
+ * credential is the Connections surface's job. */
+const channelRemoveBodySchema = z
+  .object({ channel: z.string().min(1), account: z.string().min(1).max(128) })
+  .strict();
 
 const userAddBodySchema = z
   .object({
@@ -137,6 +217,8 @@ export function createChannelControlPlaneOps(
   return {
     addChannel: (request) =>
       gate(options, request, (database) => handleAddChannel(database, request, options)),
+    removeChannel: (request) =>
+      gate(options, request, (database) => handleRemoveChannel(database, request, options)),
     listChannels: (request) =>
       gate(options, request, (database) => handleListChannels(database, options.supervisor)),
     channelStatus: (request) =>
@@ -307,6 +389,51 @@ async function channelInstallationResponse(
   );
 }
 
+/**
+ * Uninstall an account: drop its file from the active revision, deploy, then
+ * reconcile so the supervisor stops the transport it no longer has a
+ * configuration for. The Connection stays; `connectionId` is reported so the
+ * operator can retire it through the Connections surface if nothing else uses
+ * it.
+ */
+async function handleRemoveChannel(
+  database: Database,
+  request: Request,
+  options: ChannelControlPlaneOpsOptions,
+): Promise<Response> {
+  const body = await parseJsonBody(request, channelRemoveBodySchema);
+  const snapshot = await loadSnapshot(database);
+  const account = snapshot.controlPlane.accounts.find(
+    (candidate) => candidate.channel === body.channel && candidate.accountId === body.account,
+  );
+  if (account === undefined) {
+    throw new ControlPlaneHttpError(
+      404,
+      "channel_account_unavailable",
+      "Not found",
+      `no ${body.channel} account "${body.account}" is installed`,
+    );
+  }
+  const path = `.paseo/channels/${body.channel}/${body.account}.yml`;
+  await deployRevision(
+    database,
+    snapshot,
+    snapshot.files.filter((file) => file.path !== path),
+    { expectedRevisionId: snapshot.revision?.id ?? null },
+  );
+  await options.supervisor?.reconcile();
+  return Response.json(
+    {
+      channel: body.channel,
+      account: body.account,
+      removed: true,
+      revision: true,
+      connectionId: account.connectionId,
+    },
+    { status: 200 },
+  );
+}
+
 async function resolveOnboardingConnection(
   database: Database,
   request: Request,
@@ -314,18 +441,7 @@ async function resolveOnboardingConnection(
   organizationId: string,
   body: z.infer<typeof channelAddBodySchema>,
 ): Promise<string> {
-  if (body.channel === "telegram") {
-    if (body.connectionId && !body.botToken) return body.connectionId;
-    if (!body.botToken || body.connectionId)
-      throw invalidRequest("Supply a Telegram token or Connection ID");
-    return (
-      await database.configureTelegramConnection({
-        organizationId,
-        accountId: body.account,
-        botToken: body.botToken,
-      })
-    ).connectionId;
-  }
+  if (body.channel !== "slack") return probeAndStoreConnection(database, organizationId, body);
   if (body.connectionId && !body.botToken && !body.appToken) return body.connectionId;
   if (!body.connectionId && body.botToken && body.appToken && options.onboarding) {
     return configureOnboardingSlack(database, options.onboarding, request, organizationId, {
@@ -336,6 +452,145 @@ async function resolveOnboardingConnection(
   }
   throw invalidRequest("Supply a Slack Connection ID or both app token and bot token");
 }
+
+/** One channel's credential, as `POST /api/v1/channels` carries it. */
+type ChannelConnectionBody = Exclude<z.infer<typeof channelAddBodySchema>, { channel: "slack" }>;
+
+/**
+ * The channels whose credential the Hub owns: probe it, then store it. A
+ * credential the provider rejects fails the request instead of installing an
+ * account that can never start. Either an existing Connection id or a fresh
+ * credential, never both — "both" means the caller does not know which one wins.
+ */
+async function probeAndStoreConnection(
+  database: Database,
+  organizationId: string,
+  body: ChannelConnectionBody,
+): Promise<string> {
+  const owner = CHANNEL_CONNECTION_STORES[body.channel];
+  const supplied = owner.credential(body);
+  if (body.connectionId) {
+    if (supplied) throw invalidRequest(`Supply a ${owner.label} credential or Connection ID`);
+    return body.connectionId;
+  }
+  if (!supplied) throw invalidRequest(`Supply a ${owner.label} credential or Connection ID`);
+  try {
+    return await owner.configure(database, organizationId, body);
+  } catch (error) {
+    if (error instanceof ChannelCredentialProbeError) throw invalidRequest(error.message);
+    throw error;
+  }
+}
+
+/** Per-channel: does the body carry a credential, and how is it stored. */
+interface ChannelConnectionStore<Body extends ChannelConnectionBody> {
+  label: string;
+  credential(body: Body): boolean;
+  configure(database: Database, organizationId: string, body: Body): Promise<string>;
+}
+
+function store<Channel extends ChannelConnectionBody["channel"]>(
+  entry: ChannelConnectionStore<Extract<ChannelConnectionBody, { channel: Channel }>>,
+): ChannelConnectionStore<ChannelConnectionBody> {
+  return entry as ChannelConnectionStore<ChannelConnectionBody>;
+}
+
+const CHANNEL_CONNECTION_STORES: Record<
+  ChannelConnectionBody["channel"],
+  ChannelConnectionStore<ChannelConnectionBody>
+> = {
+  // Telegram is the one channel with no Hub-side probe: its credential path
+  // predates the probe boundary and the vertical calls `getMe` at start anyway.
+  telegram: store<"telegram">({
+    label: "Telegram",
+    credential: (body) => Boolean(body.botToken),
+    configure: async (database, organizationId, body) =>
+      (
+        await database.configureChannelConnection({
+          organizationId,
+          channel: "telegram",
+          accountId: body.account,
+          credentials: { botToken: body.botToken ?? "" },
+        })
+      ).connectionId,
+  }),
+  discord: store<"discord">({
+    label: "Discord",
+    credential: (body) => Boolean(body.botToken),
+    configure: async (database, organizationId, body) =>
+      (
+        await configureDiscordConnection(database, {
+          organizationId,
+          accountId: body.account,
+          botToken: body.botToken ?? "",
+        })
+      ).connectionId,
+  }),
+  zalo: store<"zalo">({
+    label: "Zalo",
+    credential: (body) => Boolean(body.botToken),
+    configure: async (database, organizationId, body) =>
+      (
+        await configureZaloConnection(database, {
+          organizationId,
+          accountId: body.account,
+          botToken: body.botToken ?? "",
+          webhookSecret: body.webhookSecret,
+        })
+      ).connectionId,
+  }),
+  // Zalo Personal stores no operator secret: the Connection row is a label plus
+  // the profile, and the credential that matters is created later by the QR
+  // scan (packages/channels/zalouser/HUB-WIRING.md §5). So there is nothing to
+  // probe and nothing the operator can get wrong here.
+  zalouser: store<"zalouser">({
+    label: "Zalo Personal profile",
+    // Nothing to supply, so "a credential was supplied" is simply "no existing
+    // Connection was named" — which keeps the shared supplied/connectionId
+    // guard above meaningful for this channel too.
+    credential: (body) => body.connectionId === undefined,
+    configure: async (database, organizationId, body) =>
+      (
+        await database.configureChannelConnection({
+          organizationId,
+          channel: "zalouser",
+          accountId: body.account,
+          credentials: { profile: body.profile ?? body.account },
+        })
+      ).connectionId,
+  }),
+  feishu: store<"feishu">({
+    label: "Feishu app id + app secret",
+    credential: (body) => Boolean(body.appId && body.appSecret),
+    configure: async (database, organizationId, body) =>
+      (
+        await configureFeishuConnection(database, {
+          organizationId,
+          accountId: body.account,
+          credential: {
+            appId: body.appId ?? "",
+            appSecret: body.appSecret ?? "",
+            verificationToken: body.verificationToken,
+            encryptKey: body.encryptKey,
+            domain: body.domain,
+          },
+        })
+      ).connectionId,
+  }),
+  googlechat: store<"googlechat">({
+    label: "Google Chat service account",
+    credential: (body) => Boolean(body.serviceAccount || body.serviceAccountFile),
+    configure: async (database, organizationId, body) =>
+      (
+        await configureGoogleChatConnection(database, {
+          organizationId,
+          accountId: body.account,
+          serviceAccount: body.serviceAccount,
+          serviceAccountFile: body.serviceAccountFile,
+        })
+      ).connectionId,
+  }),
+};
 
 async function handleListChannels(
   database: Database,
@@ -500,7 +755,7 @@ async function loadSnapshot(database: Database): Promise<ChannelControlPlaneSnap
 /** Write/replace the account file into a copy of the active revision's files. */
 function upsertAccountFile(
   snapshot: ChannelControlPlaneSnapshot,
-  channel: string,
+  channel: SupportedChannelName,
   account: string,
   connectionId: string,
 ): HubBundleFile[] {
@@ -514,7 +769,7 @@ function upsertAccountFile(
       accountId: account,
       enabled: true,
       connectionId,
-      transport: retained["transport"] ?? { mode: P0_TRANSPORT_MODE[channel] },
+      transport: retained["transport"] ?? { mode: DEFAULT_TRANSPORT_MODE[channel] },
       fallback: retained["fallback"] ?? { deny: true },
     },
     { lineWidth: -1 },

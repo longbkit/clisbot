@@ -27,6 +27,8 @@ const OUTCOMES: Record<ActivityEntry["outcome"], string> = {
   steered: "Sent to existing Agent",
   workflow: "Automation invoked",
   ignored: "Ignored",
+  // The access plane refused the sender before any turn (`access:` in slice 23).
+  denied: "Sender not allowed",
   error: "Failed",
 };
 const ALL = "all";
@@ -497,10 +499,14 @@ function routeLabel(entry: ActivityEntry): string {
 function outcomeLabel(entry: ActivityEntry): string {
   return entry.limitDecision === "denied" ? "Blocked by Route limits" : OUTCOMES[entry.outcome];
 }
+/** The Hub owns the supported channel set, so an unrecognized name is labelled
+ * from its id rather than as a generic "Channel". */
 function providerLabel(channel: string | undefined): string {
   if (channel === "slack") return "Slack";
   if (channel === "telegram") return "Telegram";
-  return "Channel";
+  if (channel === "discord") return "Discord";
+  if (channel === undefined || channel.length === 0) return "Channel";
+  return channel[0]!.toUpperCase() + channel.slice(1);
 }
 const styles = StyleSheet.create((theme) => ({
   filters: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing[3] },

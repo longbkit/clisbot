@@ -1,0 +1,77 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/host.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/media-fetch.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/media-policy.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/media.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/monitor.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/subsystem-log.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/sim/discord.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/sim/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/sim/server.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/sim/slack.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/sim/telegram.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/sim/webhook.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/upstream-differential.ts",
+      "status": "fusion-owned"
+    }
+  ],
+  "omitted": [],
+  "deviations": []
+}

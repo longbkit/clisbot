@@ -1,0 +1,366 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "packages/markdown-core/src",
+      "local": "src"
+    },
+    {
+      "upstream": "packages/normalization-core/src",
+      "local": "src/normalization-core"
+    },
+    {
+      "upstream": "packages/terminal-core/src",
+      "local": "src/terminal-core"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/assistant-transcript-headers.ts",
+      "upstream": "packages/markdown-core/src/assistant-transcript-headers.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/assistant-transcript.test.ts",
+      "upstream": "packages/markdown-core/src/assistant-transcript.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/assistant-transcript.ts",
+      "upstream": "packages/markdown-core/src/assistant-transcript.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-003"]
+    },
+    {
+      "local": "src/chunk-text.test.ts",
+      "upstream": "packages/markdown-core/src/chunk-text.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/chunk-text.ts",
+      "upstream": "packages/markdown-core/src/chunk-text.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-002", "D-MC-003"]
+    },
+    {
+      "local": "src/code-spans.test.ts",
+      "upstream": "packages/markdown-core/src/code-spans.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/code-spans.ts",
+      "upstream": "packages/markdown-core/src/code-spans.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/construct-fallbacks.test.ts",
+      "upstream": "packages/markdown-core/src/construct-fallbacks.test.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/construct-fallbacks.ts",
+      "upstream": "packages/markdown-core/src/construct-fallbacks.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-003"]
+    },
+    {
+      "local": "src/fences.test.ts",
+      "upstream": "packages/markdown-core/src/fences.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/fences.ts",
+      "upstream": "packages/markdown-core/src/fences.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/format-capabilities.ts",
+      "upstream": "packages/markdown-core/src/format-capabilities.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/frontmatter.test.ts",
+      "upstream": "packages/markdown-core/src/frontmatter.test.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-002"]
+    },
+    {
+      "local": "src/frontmatter.ts",
+      "upstream": "packages/markdown-core/src/frontmatter.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-002", "D-MC-003"]
+    },
+    {
+      "local": "src/html-tags.test.ts",
+      "upstream": "packages/markdown-core/src/html-tags.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/html-tags.ts",
+      "upstream": "packages/markdown-core/src/html-tags.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/image-spans.ts",
+      "upstream": "packages/markdown-core/src/image-spans.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-002", "D-MC-003"]
+    },
+    {
+      "local": "src/index.ts",
+      "upstream": "packages/markdown-core/src/index.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir-annotations.ts",
+      "upstream": "packages/markdown-core/src/ir-annotations.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/ir-source-spacing.ts",
+      "upstream": "packages/markdown-core/src/ir-source-spacing.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/ir-spans.ts",
+      "upstream": "packages/markdown-core/src/ir-spans.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/ir.block-metadata.test.ts",
+      "upstream": "packages/markdown-core/src/ir.block-metadata.test.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/ir.blockquote-spacing.test.ts",
+      "upstream": "packages/markdown-core/src/ir.blockquote-spacing.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.chunking.test.ts",
+      "upstream": "packages/markdown-core/src/ir.chunking.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.dunder-identifiers.test.ts",
+      "upstream": "packages/markdown-core/src/ir.dunder-identifiers.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.emphasis-cjk.test.ts",
+      "upstream": "packages/markdown-core/src/ir.emphasis-cjk.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.hr-spacing.test.ts",
+      "upstream": "packages/markdown-core/src/ir.hr-spacing.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.links.test.ts",
+      "upstream": "packages/markdown-core/src/ir.links.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.nested-lists.test.ts",
+      "upstream": "packages/markdown-core/src/ir.nested-lists.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.raw-html.test.ts",
+      "upstream": "packages/markdown-core/src/ir.raw-html.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.table-block.test.ts",
+      "upstream": "packages/markdown-core/src/ir.table-block.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.table-bullets.test.ts",
+      "upstream": "packages/markdown-core/src/ir.table-bullets.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.table-code.test.ts",
+      "upstream": "packages/markdown-core/src/ir.table-code.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.test.ts",
+      "upstream": "packages/markdown-core/src/ir.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ir.ts",
+      "upstream": "packages/markdown-core/src/ir.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-002", "D-MC-003"]
+    },
+    {
+      "local": "src/ir.underline.test.ts",
+      "upstream": "packages/markdown-core/src/ir.underline.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/link-spans.ts",
+      "upstream": "packages/markdown-core/src/link-spans.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-003"]
+    },
+    {
+      "local": "src/reasoning-tag-parser.ts",
+      "upstream": "packages/markdown-core/src/reasoning-tag-parser.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-002", "D-MC-003"]
+    },
+    {
+      "local": "src/reasoning-tags.ts",
+      "upstream": "packages/markdown-core/src/reasoning-tags.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-003"]
+    },
+    {
+      "local": "src/render-attributed.ts",
+      "upstream": "packages/markdown-core/src/render-attributed.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/render-aware-chunking.test.ts",
+      "upstream": "packages/markdown-core/src/render-aware-chunking.test.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/render-aware-chunking.ts",
+      "upstream": "packages/markdown-core/src/render-aware-chunking.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-002", "D-MC-003"]
+    },
+    {
+      "local": "src/render.annotations.test.ts",
+      "upstream": "packages/markdown-core/src/render.annotations.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/render.crossing.test.ts",
+      "upstream": "packages/markdown-core/src/render.crossing.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/render.ts",
+      "upstream": "packages/markdown-core/src/render.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/table-layout.ts",
+      "upstream": "packages/markdown-core/src/table-layout.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-002"]
+    },
+    {
+      "local": "src/tables.test.ts",
+      "upstream": "packages/markdown-core/src/tables.test.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/tables.ts",
+      "upstream": "packages/markdown-core/src/tables.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-002"]
+    },
+    {
+      "local": "src/types.ts",
+      "upstream": "packages/markdown-core/src/types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/error-coercion.ts",
+      "upstream": "packages/normalization-core/src/error-coercion.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001", "D-MC-003"]
+    },
+    {
+      "local": "src/normalization-core/expect.ts",
+      "upstream": "packages/normalization-core/src/expect.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/number-coercion.ts",
+      "upstream": "packages/normalization-core/src/number-coercion.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-001"]
+    },
+    {
+      "local": "src/normalization-core/record-coerce.ts",
+      "upstream": "packages/normalization-core/src/record-coerce.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/string-coerce.ts",
+      "upstream": "packages/normalization-core/src/string-coerce.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/utf16-slice.ts",
+      "upstream": "packages/normalization-core/src/utf16-slice.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/terminal-core/ansi-sequences.ts",
+      "upstream": "packages/terminal-core/src/ansi-sequences.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    },
+    {
+      "local": "src/terminal-core/ansi.ts",
+      "upstream": "packages/terminal-core/src/ansi.ts",
+      "status": "verbatim",
+      "deviation": ["D-MC-003"]
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "packages/normalization-core/src",
+      "reason": "Only the modules the markdown-core sources import are carried under src/normalization-core (expect, record-coerce, number-coercion, string-coerce, error-coercion, utf16-slice). The rest of the package (agent-id, libphonenumber-backed phone-presentation, json-schema/typebox, result, stable-*, the index barrel, and the package's own tests) would add third-party dependencies with no consumer in the ported closure. Bare `@openclaw/normalization-core` imports are rewritten to the specific module instead of the barrel."
+    },
+    {
+      "upstream": "packages/terminal-core/src",
+      "reason": "Only `ansi.ts` + `ansi-sequences.ts` are carried under src/terminal-core; `table-layout.ts` imports `visibleWidth` from them. The rest of terminal-core is CLI rendering with no consumer here."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-MC-001",
+      "file": "tsconfig.json",
+      "reason": "`exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off in this package so the upstream source compiles unedited. OpenClaw's own tsconfig sets neither flag; turning them on would mean editing ported lines. `noUncheckedIndexedAccess` stays on, matching upstream.",
+      "tests": ["src/ir.test.ts", "src/render.ts"]
+    },
+    {
+      "id": "D-MC-002",
+      "file": "package.json",
+      "reason": "Fusion cannot add `packages/normalization-core` and `packages/terminal-core` as workspaces without editing the root package.json, so the modules the markdown-core sources need live under `src/normalization-core` and `src/terminal-core` in this package. Relative paths and file names below each upstream root are unchanged; the import rewrites are `@openclaw/normalization-core/<mod>` -> `./normalization-core/<mod>.js` and `../../terminal-core/src/<mod>.js` -> `./terminal-core/<mod>.js`.",
+      "tests": ["src/tables.test.ts", "src/chunk-text.test.ts"]
+    },
+    {
+      "id": "D-MC-003",
+      "file": ".oxlintrc.json",
+      "reason": "Nested oxlint override turning off `typescript/consistent-type-definitions`, `no-nested-ternary`, `complexity`, `max-depth`, `max-nested-callbacks` and `no-control-regex` for this package. They are stylistic, OpenClaw's lint config does not apply them, and enforcing them would mean editing every ported file. Correctness, suspicious and perf rules from the root config still apply.",
+      "tests": []
+    }
+  ]
+}

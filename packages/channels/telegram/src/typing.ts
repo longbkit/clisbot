@@ -25,14 +25,12 @@
 // include message_thread_id"). Dropping it for General would silently type into
 // the wrong place.
 
-import {
-  buildTelegramClientOptions,
-  createTelegramApi,
-  parseOutboundTarget,
-  resolveChatId,
-  resolveTelegramAccount,
-  type TelegramCfg,
-} from "./client/bot-api.js";
+import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
+import { installTelegramRuntime } from "./fusion/runtime.js";
+import { getHostRuntime } from "./runtime-store.js";
+import { withTelegramAccount } from "./runtime.js";
+import { sendTypingTelegram } from "./send-actions.js";
+import { parseTelegramTarget } from "./targets.js";
 
 /** The Bot API action this surface uses. */
 export const TELEGRAM_TYPING_ACTION = "typing";
@@ -53,6 +51,10 @@ export interface TelegramTypingArgs {
   threadId?: string | undefined;
   messageId?: string | undefined;
   reactionEmoji?: string | undefined;
+  /** Test seam: an injected Bot API override, forwarded to the ported sender. */
+  api?: unknown;
+  /** The Hub's runtime, when the caller drives the vertical directly. */
+  hostRuntime?: unknown;
 }
 
 /**
@@ -83,8 +85,12 @@ export function clearTelegramTypingTimersForTest(): void {
 }
 
 async function sendTyping(args: TelegramTypingArgs): Promise<void> {
-  const account = resolveTelegramAccount(args.cfg as unknown as TelegramCfg, args.accountId);
-  const target = parseOutboundTarget(String(args.to));
+  // Same per-account install as the send path (`outbound.ts`): one Hub process
+  // drives many accounts, so the ported runtime is keyed by account and the
+  // account is made current for the call.
+  const accountId = String(args.accountId ?? "");
+  installTelegramRuntime((args.hostRuntime as never) ?? getHostRuntime(), accountId);
+  const target = parseTelegramTarget(String(args.to));
   const messageThreadId = resolveTypingThreadId(target, args.threadId);
   if (
     messageThreadId !== undefined &&
@@ -92,18 +98,22 @@ async function sendTyping(args: TelegramTypingArgs): Promise<void> {
   ) {
     throw new Error(`invalid Telegram topic id "${String(args.threadId)}"`);
   }
-  const api = await createTelegramApi(account.token, buildTelegramClientOptions(account));
-  const chatId = await resolveChatId(target.chatId, api);
-  const params = typingThreadParams(messageThreadId);
-  if (Object.keys(params).length > 0) {
-    await api.sendChatAction(chatId, TELEGRAM_TYPING_ACTION, params);
-    return;
-  }
-  await api.sendChatAction(chatId, TELEGRAM_TYPING_ACTION);
+  // The ported action sender owns the wire: chat-id resolution, the throttler,
+  // retry/diagnostic wrapping and the forum thread params.
+  await withTelegramAccount(
+    accountId,
+    async () =>
+      await sendTypingTelegram(String(args.to), {
+        cfg: args.cfg as OpenClawConfig,
+        accountId: args.accountId,
+        ...(messageThreadId !== undefined ? { messageThreadId } : {}),
+        ...(args.api ? { api: args.api as never } : {}),
+      }),
+  );
 }
 
 function timerKey(args: TelegramTypingArgs): string {
-  const target = parseOutboundTarget(String(args.to));
+  const target = parseTelegramTarget(String(args.to));
   const threadId = resolveTypingThreadId(target, args.threadId);
   return `${args.accountId}:${target.chatId}:${threadId ?? ""}`;
 }

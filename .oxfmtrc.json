@@ -11,5 +11,31 @@
   "arrowParens": "always",
   "bracketSameLine": false,
   "bracketSpacing": true,
-  "ignorePatterns": ["*.lock", "**/*.gen.ts", "**/*.gen.tsx"]
+  "ignorePatterns": [
+    "**/*.gen.ts",
+    "**/*.gen.tsx",
+    "packages/channels/*/src/__fixtures__/upstream-differential.json",
+    "*.lock",
+    "packages/channels/core/src/**",
+    "packages/channels/markdown-core/src/**",
+    "packages/channels/discord/src/**",
+    "packages/channels/googlechat/src/**",
+    "packages/channels/feishu/src/**",
+    "packages/channels/zalo/src/**",
+    "packages/channels/zalouser/src/**",
+    "packages/channels/slack/src/format.ts",
+    "packages/channels/slack/src/monitor/provider-support.ts",
+    "packages/channels/slack/src/monitor/types.ts",
+    "packages/channels/telegram/src/account-throttler.ts",
+    "packages/channels/telegram/src/action-runtime.test.ts",
+    "packages/channels/telegram/src/channel-actions.ts",
+    "packages/channels/telegram/src/poll-registry.ts",
+    "packages/channels/telegram/src/send-context.ts",
+    "packages/channels/telegram/src/send-message-types.ts",
+    "packages/channels/telegram/src/status-reaction-variants.ts",
+    "packages/channels/telegram/src/telegram-text-delivery.ts",
+    "packages/channels/telegram/src/draft-stream.ts",
+    "packages/channels/slack/src/**",
+    "packages/channels/telegram/src/**"
+  ]
 }

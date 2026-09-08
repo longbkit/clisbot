@@ -2,11 +2,19 @@
   #paseo-hub-onboarding {
     color-scheme: light dark;
     width: 100%;
-    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
     color: light-dark(#24252a, #f4f4f5);
   }
 
-  #paseo-hub-onboarding * { box-sizing: border-box; }
+  #paseo-hub-onboarding * {
+    box-sizing: border-box;
+  }
 
   #paseo-hub-onboarding .flow-choice {
     display: flex;
@@ -65,9 +73,15 @@
     background: #c9c9ce;
   }
 
-  #paseo-hub-onboarding .window-dot:first-child { background: #ff6259; }
-  #paseo-hub-onboarding .window-dot:nth-child(2) { background: #ffbf2f; }
-  #paseo-hub-onboarding .window-dot:nth-child(3) { background: #2acb42; }
+  #paseo-hub-onboarding .window-dot:first-child {
+    background: #ff6259;
+  }
+  #paseo-hub-onboarding .window-dot:nth-child(2) {
+    background: #ffbf2f;
+  }
+  #paseo-hub-onboarding .window-dot:nth-child(3) {
+    background: #2acb42;
+  }
 
   #paseo-hub-onboarding .app-shell {
     display: grid;
@@ -177,8 +191,13 @@
     background: light-dark(#dadade, #414147);
   }
 
-  #paseo-hub-onboarding .journey-step:first-child::before { left: 50%; width: 50%; }
-  #paseo-hub-onboarding .journey-step:last-child::before { width: 50%; }
+  #paseo-hub-onboarding .journey-step:first-child::before {
+    left: 50%;
+    width: 50%;
+  }
+  #paseo-hub-onboarding .journey-step:last-child::before {
+    width: 50%;
+  }
 
   #paseo-hub-onboarding .step-number {
     position: relative;
@@ -195,7 +214,9 @@
     font-weight: 700;
   }
 
-  #paseo-hub-onboarding .journey-step.current { color: light-dark(#24252a, #ffffff); }
+  #paseo-hub-onboarding .journey-step.current {
+    color: light-dark(#24252a, #ffffff);
+  }
   #paseo-hub-onboarding .journey-step.current .step-number,
   #paseo-hub-onboarding .journey-step.done .step-number {
     border-color: #397d4c;
@@ -211,8 +232,12 @@
     font-size: 11px;
   }
 
-  #paseo-hub-onboarding .screen-view { display: none; }
-  #paseo-hub-onboarding .screen-view.visible { display: block; }
+  #paseo-hub-onboarding .screen-view {
+    display: none;
+  }
+  #paseo-hub-onboarding .screen-view.visible {
+    display: block;
+  }
 
   #paseo-hub-onboarding .section-copy {
     max-width: 560px;
@@ -243,8 +268,12 @@
     background: light-dark(#fbfbfc, #202023);
   }
 
-  #paseo-hub-onboarding .field-group { margin-bottom: 16px; }
-  #paseo-hub-onboarding .field-group:last-of-type { margin-bottom: 20px; }
+  #paseo-hub-onboarding .field-group {
+    margin-bottom: 16px;
+  }
+  #paseo-hub-onboarding .field-group:last-of-type {
+    margin-bottom: 20px;
+  }
 
   #paseo-hub-onboarding label {
     display: block;
@@ -361,9 +390,15 @@
     font-size: 13px;
   }
 
-  #paseo-hub-onboarding .summary-row:last-child { border-bottom: 0; }
-  #paseo-hub-onboarding .summary-name { color: light-dark(#74757c, #a2a2aa); }
-  #paseo-hub-onboarding .summary-value { font-weight: 600; }
+  #paseo-hub-onboarding .summary-row:last-child {
+    border-bottom: 0;
+  }
+  #paseo-hub-onboarding .summary-name {
+    color: light-dark(#74757c, #a2a2aa);
+  }
+  #paseo-hub-onboarding .summary-value {
+    font-weight: 600;
+  }
 
   #paseo-hub-onboarding .status-chip {
     padding: 3px 8px;
@@ -408,9 +443,19 @@
     font-weight: 750;
   }
 
-  #paseo-hub-onboarding .person-name { font-size: 13px; font-weight: 650; }
-  #paseo-hub-onboarding .person-email { margin-top: 2px; color: light-dark(#7a7b82, #9797a0); font-size: 12px; }
-  #paseo-hub-onboarding .person-role { color: light-dark(#595a61, #c4c4ca); font-size: 12px; }
+  #paseo-hub-onboarding .person-name {
+    font-size: 13px;
+    font-weight: 650;
+  }
+  #paseo-hub-onboarding .person-email {
+    margin-top: 2px;
+    color: light-dark(#7a7b82, #9797a0);
+    font-size: 12px;
+  }
+  #paseo-hub-onboarding .person-role {
+    color: light-dark(#595a61, #c4c4ca);
+    font-size: 12px;
+  }
 
   #paseo-hub-onboarding .invitation-panel {
     width: min(520px, 100%);
@@ -444,35 +489,70 @@
     font-size: 13px;
   }
 
-  #paseo-hub-onboarding .invitation-meta span:nth-child(odd) { color: light-dark(#77787f, #9b9ba4); }
+  #paseo-hub-onboarding .invitation-meta span:nth-child(odd) {
+    color: light-dark(#77787f, #9b9ba4);
+  }
 
   @media (max-width: 720px) {
-    #paseo-hub-onboarding .paseo-window { height: 700px; border-radius: 14px; }
-    #paseo-hub-onboarding .app-shell { grid-template-columns: 1fr; }
-    #paseo-hub-onboarding .settings-nav { display: none; }
-    #paseo-hub-onboarding .detail-title { padding: 0 17px; }
-    #paseo-hub-onboarding .detail-title::before { content: "‹"; font-size: 25px; font-weight: 400; }
-    #paseo-hub-onboarding .detail-body { padding: 24px 17px 34px; }
-    #paseo-hub-onboarding .journey-strip { margin-bottom: 25px; }
-    #paseo-hub-onboarding .step-label { display: none; }
+    #paseo-hub-onboarding .paseo-window {
+      height: 700px;
+      border-radius: 14px;
+    }
+    #paseo-hub-onboarding .app-shell {
+      grid-template-columns: 1fr;
+    }
+    #paseo-hub-onboarding .settings-nav {
+      display: none;
+    }
+    #paseo-hub-onboarding .detail-title {
+      padding: 0 17px;
+    }
+    #paseo-hub-onboarding .detail-title::before {
+      content: "‹";
+      font-size: 25px;
+      font-weight: 400;
+    }
+    #paseo-hub-onboarding .detail-body {
+      padding: 24px 17px 34px;
+    }
+    #paseo-hub-onboarding .journey-strip {
+      margin-bottom: 25px;
+    }
+    #paseo-hub-onboarding .step-label {
+      display: none;
+    }
     #paseo-hub-onboarding .setup-panel,
-    #paseo-hub-onboarding .invitation-panel { padding: 18px; }
-    #paseo-hub-onboarding .team-toolbar { grid-template-columns: 1fr 105px; }
-    #paseo-hub-onboarding .team-toolbar .primary-action { grid-column: 1 / -1; }
-    #paseo-hub-onboarding .summary-row { grid-template-columns: 100px 1fr; }
-    #paseo-hub-onboarding .summary-row .status-chip { grid-column: 2; width: fit-content; }
+    #paseo-hub-onboarding .invitation-panel {
+      padding: 18px;
+    }
+    #paseo-hub-onboarding .team-toolbar {
+      grid-template-columns: 1fr 105px;
+    }
+    #paseo-hub-onboarding .team-toolbar .primary-action {
+      grid-column: 1 / -1;
+    }
+    #paseo-hub-onboarding .summary-row {
+      grid-template-columns: 100px 1fr;
+    }
+    #paseo-hub-onboarding .summary-row .status-chip {
+      grid-column: 2;
+      width: fit-content;
+    }
   }
 </style>
 
 <div id="paseo-hub-onboarding">
   <div class="flow-choice" role="tablist" aria-label="Onboarding flow">
     <button type="button" role="tab" aria-selected="true" data-flow="owner">First owner</button>
-    <button type="button" role="tab" aria-selected="false" data-flow="member">Invited member</button>
+    <button type="button" role="tab" aria-selected="false" data-flow="member">
+      Invited member
+    </button>
   </div>
 
   <div class="paseo-window">
     <div class="window-bar" aria-hidden="true">
-      <span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span>
+      <span class="window-dot"></span><span class="window-dot"></span
+      ><span class="window-dot"></span>
     </div>
     <div class="app-shell">
       <aside class="settings-nav" aria-label="Settings navigation">
@@ -494,7 +574,9 @@
       </aside>
 
       <main class="settings-main">
-        <div class="detail-title"><span aria-hidden="true">◉</span><span id="detail-title-text">Hub account</span></div>
+        <div class="detail-title">
+          <span aria-hidden="true">◉</span><span id="detail-title-text">Hub account</span>
+        </div>
         <div class="detail-body">
           <div class="journey-strip" id="journey-strip" aria-label="Onboarding steps"></div>
 
@@ -503,31 +585,65 @@
               <h2>Set up your Hub</h2>
               <p>This Hub has no account yet. Create the first account to start managing it.</p>
             </div>
-            <div class="role-note"><span aria-hidden="true">✓</span><span>The first account becomes <strong>Owner</strong> and automatically has full access to every connected Host and Project.</span></div>
+            <div class="role-note">
+              <span aria-hidden="true">✓</span
+              ><span
+                >The first account becomes <strong>Owner</strong> and automatically has full access
+                to every connected Host and Project.</span
+              >
+            </div>
             <button class="primary-action" type="button" data-next>Set up Hub</button>
           </section>
 
           <section class="screen-view" data-screen="owner-1">
             <div class="section-copy">
               <h2>Create owner account</h2>
-              <p>Use this account to manage the Hub, its organization, and all connected resources.</p>
+              <p>
+                Use this account to manage the Hub, its organization, and all connected resources.
+              </p>
             </div>
-            <form class="setup-panel" onsubmit="return false">
-              <div class="field-group"><label for="owner-email">Email</label><input id="owner-email" type="email" value="owner@acme.example"></div>
-              <div class="field-group"><label for="owner-password">Password</label><input id="owner-password" type="password" value="strongpassword"><span class="field-help">At least 12 characters.</span></div>
-              <div class="field-group"><label for="owner-confirm">Confirm password</label><input id="owner-confirm" type="password" value="strongpassword"></div>
-              <div class="action-row"><button class="primary-action" type="button" data-next>Create owner account</button><button class="link-action" type="button" data-back>Back</button></div>
+            <form class="setup-panel" onsubmit="return false;">
+              <div class="field-group">
+                <label for="owner-email">Email</label
+                ><input id="owner-email" type="email" value="owner@acme.example" />
+              </div>
+              <div class="field-group">
+                <label for="owner-password">Password</label
+                ><input id="owner-password" type="password" value="strongpassword" /><span
+                  class="field-help"
+                  >At least 12 characters.</span
+                >
+              </div>
+              <div class="field-group">
+                <label for="owner-confirm">Confirm password</label
+                ><input id="owner-confirm" type="password" value="strongpassword" />
+              </div>
+              <div class="action-row">
+                <button class="primary-action" type="button" data-next>Create owner account</button
+                ><button class="link-action" type="button" data-back>Back</button>
+              </div>
             </form>
           </section>
 
           <section class="screen-view" data-screen="owner-2">
             <div class="section-copy">
               <h2>Create your organization</h2>
-              <p>The organization groups your members, Channel accounts, Automations, and Access rules.</p>
+              <p>
+                The organization groups your members, Channel accounts, Automations, and Access
+                rules.
+              </p>
             </div>
-            <form class="setup-panel" onsubmit="return false">
-              <div class="field-group"><label for="org-name">Organization name</label><input id="org-name" value="Acme"><span class="field-help">You can change this later in Hub settings.</span></div>
-              <div class="action-row"><button class="primary-action" type="button" data-next>Create organization</button><button class="link-action" type="button" data-back>Back</button></div>
+            <form class="setup-panel" onsubmit="return false;">
+              <div class="field-group">
+                <label for="org-name">Organization name</label
+                ><input id="org-name" value="Acme" /><span class="field-help"
+                  >You can change this later in Hub settings.</span
+                >
+              </div>
+              <div class="action-row">
+                <button class="primary-action" type="button" data-next>Create organization</button
+                ><button class="link-action" type="button" data-back>Back</button>
+              </div>
             </form>
           </section>
 
@@ -537,26 +653,58 @@
               <p>Your owner account and organization have been created.</p>
             </div>
             <div class="summary-list">
-              <div class="summary-row"><span class="summary-name">Account</span><span class="summary-value">owner@acme.example</span><span class="status-chip">Owner</span></div>
-              <div class="summary-row"><span class="summary-name">Organization</span><span class="summary-value">Acme</span><span></span></div>
-              <div class="summary-row"><span class="summary-name">Access</span><span class="summary-value">All Hosts and Projects</span><span class="status-chip">Full access</span></div>
+              <div class="summary-row">
+                <span class="summary-name">Account</span
+                ><span class="summary-value">owner@acme.example</span
+                ><span class="status-chip">Owner</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-name">Organization</span><span class="summary-value">Acme</span
+                ><span></span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-name">Access</span
+                ><span class="summary-value">All Hosts and Projects</span
+                ><span class="status-chip">Full access</span>
+              </div>
             </div>
-            <div class="action-row"><button class="primary-action" type="button">Connect a Host</button><button class="secondary-action" type="button">Set up a Channel</button></div>
+            <div class="action-row">
+              <button class="primary-action" type="button">Connect a Host</button
+              ><button class="secondary-action" type="button">Set up a Channel</button>
+            </div>
           </section>
 
           <section class="screen-view" data-screen="member-0">
             <div class="section-copy">
               <h2>Team</h2>
-              <p>Invite people to Acme. Organization membership does not grant access to Projects or Channels.</p>
+              <p>
+                Invite people to Acme. Organization membership does not grant access to Projects or
+                Channels.
+              </p>
             </div>
             <div class="team-toolbar">
-              <input aria-label="Email" type="email" value="alex@acme.example">
-              <select aria-label="Organization role"><option>Member</option><option>Admin</option></select>
+              <input aria-label="Email" type="email" value="alex@acme.example" />
+              <select aria-label="Organization role">
+                <option>Member</option>
+                <option>Admin</option>
+              </select>
               <button class="primary-action" type="button" data-next>Send invitation</button>
             </div>
             <div class="people-list">
-              <div class="person-row"><span class="avatar">YO</span><span><div class="person-name">You</div><div class="person-email">owner@acme.example</div></span><span class="person-role">Owner</span></div>
-              <div class="person-row"><span class="avatar" style="background:#8b6bb0">AL</span><span><div class="person-name">alex@acme.example</div><div class="person-email">Invitation expires in 48 hours</div></span><span class="person-role">Pending · Member</span></div>
+              <div class="person-row">
+                <span class="avatar">YO</span
+                ><span
+                  ><div class="person-name">You</div>
+                  <div class="person-email">owner@acme.example</div></span
+                ><span class="person-role">Owner</span>
+              </div>
+              <div class="person-row">
+                <span class="avatar" style="background: #8b6bb0">AL</span
+                ><span
+                  ><div class="person-name">alex@acme.example</div>
+                  <div class="person-email">Invitation expires in 48 hours</div></span
+                ><span class="person-role">Pending · Member</span>
+              </div>
             </div>
           </section>
 
@@ -565,11 +713,25 @@
               <h2>Join Acme</h2>
               <p>Owner invited you to join as a Member.</p>
             </div>
-            <form class="setup-panel" onsubmit="return false">
-              <div class="field-group"><label for="member-name">Name</label><input id="member-name" value="Alex Nguyen"></div>
-              <div class="field-group"><label for="member-email">Email</label><input id="member-email" type="email" value="alex@acme.example" readonly><span class="field-help">This invitation is bound to this email address.</span></div>
-              <div class="field-group"><label for="member-password">Password</label><input id="member-password" type="password" value="strongpassword"></div>
-              <div class="action-row"><button class="primary-action" type="button" data-next>Create account</button><button class="link-action" type="button">Already have an account? Sign in</button></div>
+            <form class="setup-panel" onsubmit="return false;">
+              <div class="field-group">
+                <label for="member-name">Name</label><input id="member-name" value="Alex Nguyen" />
+              </div>
+              <div class="field-group">
+                <label for="member-email">Email</label
+                ><input id="member-email" type="email" value="alex@acme.example" readonly /><span
+                  class="field-help"
+                  >This invitation is bound to this email address.</span
+                >
+              </div>
+              <div class="field-group">
+                <label for="member-password">Password</label
+                ><input id="member-password" type="password" value="strongpassword" />
+              </div>
+              <div class="action-row">
+                <button class="primary-action" type="button" data-next>Create account</button
+                ><button class="link-action" type="button">Already have an account? Sign in</button>
+              </div>
             </form>
           </section>
 
@@ -578,23 +740,54 @@
               <div class="invitation-mark" aria-hidden="true">↗</div>
               <h2>Join Acme</h2>
               <p class="muted-copy">Review the invitation before joining this organization.</p>
-              <div class="invitation-meta"><span>Invited by</span><strong>Owner</strong><span>Email</span><strong>alex@acme.example</strong><span>Role</span><strong>Member</strong></div>
-              <div class="access-note"><span aria-hidden="true">i</span><span>Joining does not automatically grant access to any Host, Project, Channel, or Automation. An owner or admin assigns that separately.</span></div>
-              <div class="action-row"><button class="primary-action" type="button" data-next>Accept invitation</button><button class="secondary-action" type="button">Sign out</button></div>
+              <div class="invitation-meta">
+                <span>Invited by</span><strong>Owner</strong><span>Email</span
+                ><strong>alex@acme.example</strong><span>Role</span><strong>Member</strong>
+              </div>
+              <div class="access-note">
+                <span aria-hidden="true">i</span
+                ><span
+                  >Joining does not automatically grant access to any Host, Project, Channel, or
+                  Automation. An owner or admin assigns that separately.</span
+                >
+              </div>
+              <div class="action-row">
+                <button class="primary-action" type="button" data-next>Accept invitation</button
+                ><button class="secondary-action" type="button">Sign out</button>
+              </div>
             </div>
           </section>
 
           <section class="screen-view" data-screen="member-3">
             <div class="section-copy">
               <h2>You joined Acme</h2>
-              <p>Your account is active. Resources appear here after an owner or admin grants Access directly or through a Team.</p>
+              <p>
+                Your account is active. Resources appear here after an owner or admin grants Access
+                directly or through a Team.
+              </p>
             </div>
             <div class="summary-list">
-              <div class="summary-row"><span class="summary-name">Account</span><span class="summary-value">alex@acme.example</span><span class="status-chip">Member</span></div>
-              <div class="summary-row"><span class="summary-name">Organization</span><span class="summary-value">Acme</span><span></span></div>
-              <div class="summary-row"><span class="summary-name">Resource access</span><span class="summary-value">No access assigned</span><span></span></div>
+              <div class="summary-row">
+                <span class="summary-name">Account</span
+                ><span class="summary-value">alex@acme.example</span
+                ><span class="status-chip">Member</span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-name">Organization</span><span class="summary-value">Acme</span
+                ><span></span>
+              </div>
+              <div class="summary-row">
+                <span class="summary-name">Resource access</span
+                ><span class="summary-value">No access assigned</span><span></span>
+              </div>
             </div>
-            <div class="access-note"><span aria-hidden="true">i</span><span>You can sign in and belong to the organization, but cannot discover or open its Hosts, Projects, Channels, or Automations yet.</span></div>
+            <div class="access-note">
+              <span aria-hidden="true">i</span
+              ><span
+                >You can sign in and belong to the organization, but cannot discover or open its
+                Hosts, Projects, Channels, or Automations yet.</span
+              >
+            </div>
             <button class="primary-action" type="button">Done</button>
           </section>
         </div>
@@ -607,7 +800,11 @@
   (() => {
     const root = document.getElementById("paseo-hub-onboarding");
     const flows = {
-      owner: { labels: ["Welcome", "Owner account", "Organization", "Ready"], index: 0, title: "Hub account" },
+      owner: {
+        labels: ["Welcome", "Owner account", "Organization", "Ready"],
+        index: 0,
+        title: "Hub account",
+      },
       member: { labels: ["Invite", "Account", "Review", "Joined"], index: 0, title: "Team" },
     };
     let activeFlow = "owner";
@@ -622,21 +819,23 @@
       });
       root.querySelector("#detail-title-text").textContent = flow.title;
       const strip = root.querySelector("#journey-strip");
-      strip.replaceChildren(...flow.labels.map((label, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = `journey-step${index === flow.index ? " current" : ""}${index < flow.index ? " done" : ""}`;
-        button.dataset.step = String(index);
-        button.setAttribute("aria-current", index === flow.index ? "step" : "false");
-        const number = document.createElement("span");
-        number.className = "step-number";
-        number.textContent = index < flow.index ? "✓" : String(index + 1);
-        const text = document.createElement("span");
-        text.className = "step-label";
-        text.textContent = label;
-        button.append(number, text);
-        return button;
-      }));
+      strip.replaceChildren(
+        ...flow.labels.map((label, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `journey-step${index === flow.index ? " current" : ""}${index < flow.index ? " done" : ""}`;
+          button.dataset.step = String(index);
+          button.setAttribute("aria-current", index === flow.index ? "step" : "false");
+          const number = document.createElement("span");
+          number.className = "step-number";
+          number.textContent = index < flow.index ? "✓" : String(index + 1);
+          const text = document.createElement("span");
+          text.className = "step-label";
+          text.textContent = label;
+          button.append(number, text);
+          return button;
+        }),
+      );
     }
 
     root.addEventListener("click", (event) => {
@@ -653,7 +852,10 @@
         return;
       }
       if (target.hasAttribute("data-next")) {
-        flows[activeFlow].index = Math.min(flows[activeFlow].labels.length - 1, flows[activeFlow].index + 1);
+        flows[activeFlow].index = Math.min(
+          flows[activeFlow].labels.length - 1,
+          flows[activeFlow].index + 1,
+        );
         render();
         return;
       }

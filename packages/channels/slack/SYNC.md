@@ -1,39 +1,189 @@
-# packages/channels/slack SYNC (reference: @openclaw/slack@2026.7.1, OpenClaw source `extensions/slack/src/`)
+# packages/channels/slack SYNC
 
-Sync reference is the OpenClaw **TypeScript source** (the pinned compiled dist
-under `~/.clisbot-dev/channels/work/` is a secondary reference only). The two
-pinned npm deps are kept as pinned deps of the in-repo package — the tarball's
-bundled `node_modules` (~80 packages) are NOT vendored (blueprint §6.5,
-decisions §7.1).
+The machine-readable record is `upstream-sync.json`; the section below is
+generated from it. Reasons for each deviation id live in `DEVIATIONS.md`.
 
-## npm deps (pinned in package.json — do NOT vendor)
+```bash
+node scripts/channel-upstream-sync.mjs check --pkg slack     # manifest vs tree
+node scripts/channel-upstream-sync.mjs report --pkg slack    # what moved upstream
+node scripts/channel-upstream-sync.mjs sync-md --pkg slack   # regenerate below
+```
 
-- `@slack/web-api` `7.18.0` — L1 Web API client (read + write paths).
-- `@slack/socket-mode` `2.0.7` — L2 Socket Mode client (the socket loop's
-  transport).
+Dependency drift against upstream (SDK versions, added or dropped packages) is
+part of `report` output — do not maintain a second list here.
 
-## Module → OpenClaw source manifest
+## Scope
 
-| In-repo module                         | OpenClaw source (extensions/slack/src)                                                                                                                                                                                                                                                                                                      |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/client/web-api.ts`                | `client.ts` / `client-options.ts` (client options, write-client LRU cache, `SLACK_TEXT_LIMIT`, retry policies) + `probe.ts` (auth.test probe, user-token warning) + `token.ts` (`formatSlackBotTokenIdentityWarning`) + `errors.ts` (error shaping) + `limits.ts` (`SLACK_TEXT_LIMIT`)                                                      | G7–G11 (D-008): the `WebClientInstance` type gained the `files` surface — `files.getUploadURLExternal({filename, length})` and `files.completeUploadExternal({files, channel_id, thread_ts?, initial_comment?})` — the two Web API methods the 3-step external upload (outbound-media.ts) drives. `registerSlackWriteClientForTest` / `clearSlackWriteClientCacheForTest` are the token-keyed test seam.                                                                                                                                                                                                   |
-| `src/transport/socket-mode.ts`         | `monitor/provider.ts` (socket branch: handler wiring, ack-first dispatch, im/mpim app_mention dedup) + `monitor/provider-support.ts` (SocketModeClient wrapper: autoReconnect, ping timeout, socket logger)                                                                                                                                 | F-06/G5+G6 (2026-08-28): when `options.media` is set, `handleEnvelope` folds a message's `files[]` into the inbound body via `transport/media.ts` BEFORE the L3 handoff (the body must be final before dedupe/record); all-files-failed → body trims to `""` → the event is dropped (TG parity).                                                                                                                                                                                                                                                                                                           |
-| `src/transport/media.ts`               | `monitor/media.ts` (the `files[].url_private_download` → `url_private` download URL, the Bearer-token `createSlackAuthHeaders`, the `assertSlackFileUrl` Slack-host allowlist) + `types.ts` (`SlackFile` fields) + shared `downloadMediaFile` / `buildAttachedFilesManifest` / `foldAttachedFilesIntoBody` (DRY with the Telegram vertical) | The P0 inbound-media fold (D-007): `extractSlackFileAttachments` (download-URL preference, mime→kind, external/host skips), `downloadSlackFile` (shared stream-to-disk, Bearer token, the shared 10-min floor), `foldInboundSlackMedia` (skip-logs, ordered download, manifest fold, all-failed → null). OpenClaw's audio preflight / fresh-URL refetch / concurrency pool / `maxBytes` cap are NOT ported (out of the P0 fold's concern).                                                                                                                                                                 |
-| `src/transport/socket-reconnect.ts`    | `monitor/reconnect-policy.ts` (backoff policy, auth-error classifier, disconnect waiter) + `monitor/provider.ts` (the reconnect loop)                                                                                                                                                                                                       |
-| `src/transport/socket-event-filter.ts` | `monitor/channel-type.ts` (`inferSlackChannelType` / `normalizeSlackChannelType` / `resolveSlackChatType`) + `monitor/events/messages.ts` (ts→ms, mention fact, own-message, payload → inbound event, the `to` fact = `channel:${channelId}`)                                                                                               |
-| `src/lifecycle/start-account.ts`       | `channel.ts` (`startAccount`, flat account read) + `probe.ts` (auth.test) + `accounts.ts` / `accounts.runtime.ts` (token source, duplicate-token guard) + `token.ts`                                                                                                                                                                        |
-| `src/mrkdwn.ts`                        | `monitor/mrkdwn.ts` (`escapeSlackMrkdwn`)                                                                                                                                                                                                                                                                                                   | The C5 outbound mrkdwn renderer (`renderSlackMrkdwn`, markdown-it token walk, D-005): emits mrkdwn for code spans / fenced blocks, links, bold/italic/strikethrough, blockquote, lists; escapes only `&` `<` `>` in text leaves; literal backslashes pass through. The old verbatim `escapeSlackMrkdwn` port is retired (it escaped the backtick delimiter itself, killing legitimate code spans — see D-005). OpenClaw's full `format.ts` front-end (angle-token preservation, table conversion) remains out of scope — the P0 relay posts one `text` field, not blocks.                                  |
-| `src/outbound.ts`                      | `outbound-adapter.ts` (`sendText` subset: post text + thread, `NO_REPLY` silent token) + `send.ts` (write client) + `sent-thread-cache.ts` (`recordSlackSentMessage` → keyed-store seam, D-001)                                                                                                                                             | `sendSlackText` renders and posts text through `renderSlackMrkdwn` (C5, D-005); reply-text media paths are not auto-attached (D-006). The explicit Hub `send_file` MCP tool routes to `sendMedia` (G7–G11, D-008), which runs the shared G11 gate FIRST and hands accepted files to `uploadSlackFile` + `recordSlackSentMessage`.                                                                                                                                                                                                                                                                          |
-| `src/outbound-media.ts`                | `client-delivery.ts` (`uploadSlackFile` — the 3-step external upload: `files.getUploadURLExternal` → `POST` bytes to `upload_url` → `files.completeUploadExternal`) + `errors.ts` (DNS-request retry wrapper shape)                                                                                                                         | The one-file upload (`uploadSlackFile`): `readFileSync` → the 3-step external upload, a verbatim mirror of OpenClaw `client-delivery.ts` `uploadSlackFile` (2026.7.1). `isSlackUploadUrl` is the Slack-host allowlist (`https://` + `slack.com`/`slack-edge` suffix) — the bytes are POSTed only to an allowlisted host; `postUploadBytes` carries the raw bytes with the file's `Content-Type` (injected `fetchImpl` in tests). OpenClaw's legacy `files.upload` single-call path, DNS-retry wrapper, and upload-URL redaction log are NOT the P0 fold's concern. `threadTs` targets a thread when given. |
-| `src/plugin.ts`                        | `channel.ts` (`startAccount` + `outbound.sendText` + `outbound.sendMedia` drive surface) — pinned export name `slackPlugin`                                                                                                                                                                                                                 | The G7–G11 native-media seam (`outbound.sendMedia`, D-008).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `src/entry.ts`                         | the `defineBundledChannelEntry`-shaped entry (id `slack`, name `Slack`)                                                                                                                                                                                                                                                                     |
-| `src/runtime.ts`                       | the `setSlackChannelRuntime` runtime sidecar (HostRuntime store)                                                                                                                                                                                                                                                                            |
-| `src/index.ts`                         | package entry (default = entry, named `slackPlugin`)                                                                                                                                                                                                                                                                                        |
+Ported: Socket Mode transport, Web API client (`client.ts` / `client-options.ts`),
+the upstream send family (`send.ts`, `send-results.ts`, `post-message-identity.ts`,
+`sent-thread-cache.ts`, `client-delivery.ts`), the message-action surface
+(`message-actions.ts`, `message-action-dispatch.ts`, `channel-actions.ts`,
+`message-tool-api.ts`, `action-runtime.ts`, `actions.ts`, `conversation-open.ts`,
+`edit-text.ts`), block rendering (`blocks-render.ts`, `reply-blocks.ts`,
+`approval-actions.ts`, `question-actions.ts` encode/decode), account/token/probe/
+scopes, threading tool context, channel/user resolvers, Slack group policy,
+enterprise-install guards, inbound media fold, approval card, typing.
 
-## OUT OF SCOPE (group E)
+`slackPlugin.actions` is upstream's own `ChannelMessageActionAdapter`
+(`createSlackActions`), so the Hub's `message` tool dispatches react / edit /
+delete / pin / unpin / read / upload-file / download-file / conversation-open /
+member-info / emoji-list into `action-runtime.ts`. `slackPlugin.outbound` exposes
+the upstream send primitives under their upstream names alongside the Fusion
+drive verbs.
 
-pairing, exec-approvals, thread-bindings, doctor, security-audit, directory,
-setup-wizard, interactive-dispatch, allow-from, secret contracts, the Bolt
-`App`/HTTP receiver path (in-repo is Socket Mode only), presentation/blocks
-rendering. (Inbound `files[]` fold is in — D-007; native OUTBOUND media
-delivery is in — D-008.)
+Not ported: the Bolt `App` / HTTP receiver path, upstream's inbound dispatch
+pipeline (routing, sessions, streaming, progress cards), the outbound adapter,
+progress/streaming blocks, interactive dispatch, pairing, exec-approvals,
+thread-bindings, doctor, security-audit, directory, setup wizard, secret
+contracts. The `omitted` list in the manifest carries the file- and
+directory-level reasons; everything else upstream shows up as an "unmapped
+upstream" warning from `check`, which is the remaining port backlog (goal slices
+18, 21, 22).
+
+## Source manifest
+
+Generated by `node scripts/channel-upstream-sync.mjs sync-md`. Do not edit by hand;
+edit `upstream-sync.json` and regenerate. Reasons live in `DEVIATIONS.md`.
+
+Upstream `openclaw-private` at `5d8067a4483`. Roots: `extensions/slack/src` → `src`.
+
+| Status        | Files |
+| ------------- | ----- |
+| verbatim      | 80    |
+| adapted       | 9     |
+| reimplemented | 10    |
+| fusion-owned  | 15    |
+
+| Local                                             | Upstream                                                            | Status        | Deviation                         |
+| ------------------------------------------------- | ------------------------------------------------------------------- | ------------- | --------------------------------- |
+| `src/account-configured.ts`                       | `extensions/slack/src/account-configured.ts`                        | verbatim      | —                                 |
+| `src/account-inspect.ts`                          | `extensions/slack/src/account-inspect.ts`                           | verbatim      | —                                 |
+| `src/account-reply-mode.ts`                       | `extensions/slack/src/account-reply-mode.ts`                        | verbatim      | —                                 |
+| `src/account-surface-fields.ts`                   | `extensions/slack/src/account-surface-fields.ts`                    | verbatim      | —                                 |
+| `src/accounts.runtime.ts`                         | `extensions/slack/src/accounts.runtime.ts`                          | verbatim      | —                                 |
+| `src/accounts.ts`                                 | `extensions/slack/src/accounts.ts`                                  | verbatim      | —                                 |
+| `src/action-runtime.runtime.ts`                   | `extensions/slack/src/action-runtime.runtime.ts`                    | verbatim      | —                                 |
+| `src/action-runtime.ts`                           | `extensions/slack/src/action-runtime.ts`                            | verbatim      | —                                 |
+| `src/action-threading.ts`                         | `extensions/slack/src/action-threading.ts`                          | verbatim      | —                                 |
+| `src/actions.ts`                                  | `extensions/slack/src/actions.ts`                                   | adapted       | D-034                             |
+| `src/agent-context.ts`                            | `extensions/slack/src/agent-context.ts`                             | verbatim      | —                                 |
+| `src/approval-actions.ts`                         | `extensions/slack/src/approval-actions.ts`                          | verbatim      | —                                 |
+| `src/authored-text.ts`                            | `extensions/slack/src/authored-text.ts`                             | verbatim      | —                                 |
+| `src/blocks-fallback.ts`                          | `extensions/slack/src/blocks-fallback.ts`                           | verbatim      | —                                 |
+| `src/blocks-input.ts`                             | `extensions/slack/src/blocks-input.ts`                              | verbatim      | —                                 |
+| `src/blocks-render.ts`                            | `extensions/slack/src/blocks-render.ts`                             | verbatim      | —                                 |
+| `src/channel-actions.ts`                          | `extensions/slack/src/channel-actions.ts`                           | verbatim      | —                                 |
+| `src/channel-type.ts`                             | `extensions/slack/src/channel-type.ts`                              | verbatim      | —                                 |
+| `src/client-delivery.ts`                          | `extensions/slack/src/client-delivery.ts`                           | adapted       | D-030                             |
+| `src/client-options.ts`                           | `extensions/slack/src/client-options.ts`                            | adapted       | D-030                             |
+| `src/client.ts`                                   | `extensions/slack/src/client.ts`                                    | verbatim      | —                                 |
+| `src/client/web-api.ts`                           | `extensions/slack/src/client.ts`                                    | reimplemented | D-011, D-002, D-004               |
+| `src/conversation-metadata.ts`                    | —                                                                   | fusion-owned  | —                                 |
+| `src/conversation-open.ts`                        | `extensions/slack/src/conversation-open.ts`                         | verbatim      | —                                 |
+| `src/cursor-pages.ts`                             | `extensions/slack/src/cursor-pages.ts`                              | verbatim      | —                                 |
+| `src/data-table.ts`                               | `extensions/slack/src/data-table.ts`                                | verbatim      | —                                 |
+| `src/data-visualization.ts`                       | `extensions/slack/src/data-visualization.ts`                        | verbatim      | —                                 |
+| `src/detached-target-admission.ts`                | `extensions/slack/src/detached-target-admission.ts`                 | verbatim      | —                                 |
+| `src/edit-text.ts`                                | `extensions/slack/src/edit-text.ts`                                 | verbatim      | —                                 |
+| `src/entry.ts`                                    | —                                                                   | fusion-owned  | —                                 |
+| `src/errors.ts`                                   | `extensions/slack/src/errors.ts`                                    | verbatim      | —                                 |
+| `src/file-reference.ts`                           | `extensions/slack/src/file-reference.ts`                            | verbatim      | —                                 |
+| `src/format.ts`                                   | `extensions/slack/src/format.ts`                                    | verbatim      | D-023, D-025                      |
+| `src/fusion/fetch.ts`                             | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/fetch.types.ts`                       | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/media-runtime.ts`                     | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/plugin-config.ts`                     | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/question-gateway.ts`                  | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/runtime-env.ts`                       | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/runtime.ts`                           | —                                                                   | fusion-owned  | —                                 |
+| `src/fusion/slack-entities.ts`                    | —                                                                   | fusion-owned  | —                                 |
+| `src/group-policy.ts`                             | `extensions/slack/src/group-policy.ts`                              | verbatim      | D-037                             |
+| `src/index.ts`                                    | —                                                                   | fusion-owned  | —                                 |
+| `src/installation-identity-state.ts`              | `extensions/slack/src/installation-identity-state.ts`               | verbatim      | —                                 |
+| `src/lifecycle/start-account.ts`                  | `extensions/slack/src/channel.ts`                                   | reimplemented | D-012                             |
+| `src/limits.ts`                                   | `extensions/slack/src/limits.ts`                                    | verbatim      | —                                 |
+| `src/message-action-dispatch.ts`                  | `extensions/slack/src/message-action-dispatch.ts`                   | verbatim      | —                                 |
+| `src/message-actions.ts`                          | `extensions/slack/src/message-actions.ts`                           | verbatim      | —                                 |
+| `src/message-tool-api.ts`                         | `extensions/slack/src/message-tool-api.ts`                          | verbatim      | —                                 |
+| `src/modal-metadata.ts`                           | `extensions/slack/src/modal-metadata.ts`                            | verbatim      | —                                 |
+| `src/monitor/allow-list.ts`                       | `extensions/slack/src/monitor/allow-list.ts`                        | verbatim      | —                                 |
+| `src/monitor/block-text.ts`                       | `extensions/slack/src/monitor/block-text.ts`                        | verbatim      | —                                 |
+| `src/monitor/channel-config.ts`                   | `extensions/slack/src/monitor/channel-config.ts`                    | verbatim      | —                                 |
+| `src/monitor/enterprise-install.ts`               | `extensions/slack/src/monitor/enterprise-install.ts`                | verbatim      | —                                 |
+| `src/monitor/event-scope.ts`                      | `extensions/slack/src/monitor/event-scope.ts`                       | verbatim      | —                                 |
+| `src/monitor/events/interactions.ts`              | —                                                                   | fusion-owned  | D-041                             |
+| `src/monitor/events/message-subtype-handlers.ts`  | `extensions/slack/src/monitor/events/message-subtype-handlers.ts`   | verbatim      | —                                 |
+| `src/monitor/events/modal-input-summary.ts`       | `extensions/slack/src/monitor/events/modal-input-summary.ts`        | verbatim      | —                                 |
+| `src/monitor/events/system-events.ts`             | —                                                                   | fusion-owned  | D-040                             |
+| `src/monitor/ingress.ts`                          | `extensions/slack/src/monitor/ingress.ts`                           | reimplemented | D-039                             |
+| `src/monitor/media-types.ts`                      | `extensions/slack/src/monitor/media-types.ts`                       | verbatim      | —                                 |
+| `src/monitor/media.runtime.ts`                    | `extensions/slack/src/monitor/media.runtime.ts`                     | adapted       | D-031                             |
+| `src/monitor/media.ts`                            | `extensions/slack/src/monitor/media.ts`                             | verbatim      | —                                 |
+| `src/monitor/message-handler/preview-finalize.ts` | `extensions/slack/src/monitor/message-handler/preview-finalize.ts`  | verbatim      | —                                 |
+| `src/monitor/mrkdwn.ts`                           | `extensions/slack/src/monitor/mrkdwn.ts`                            | verbatim      | —                                 |
+| `src/monitor/policy.ts`                           | `extensions/slack/src/monitor/policy.ts`                            | verbatim      | —                                 |
+| `src/monitor/provider-support.ts`                 | `extensions/slack/src/monitor/provider-support.ts`                  | verbatim      | —                                 |
+| `src/monitor/provider.ts`                         | `extensions/slack/src/monitor/provider.ts`                          | adapted       | D-038                             |
+| `src/monitor/reconnect-policy.ts`                 | `extensions/slack/src/monitor/reconnect-policy.ts`                  | verbatim      | —                                 |
+| `src/monitor/slack-client-kind.ts`                | `extensions/slack/src/monitor/slack-client-kind.ts`                 | verbatim      | —                                 |
+| `src/monitor/thread.runtime.ts`                   | `extensions/slack/src/monitor/thread.runtime.ts`                    | verbatim      | —                                 |
+| `src/monitor/thread.ts`                           | `extensions/slack/src/monitor/thread.ts`                            | verbatim      | —                                 |
+| `src/monitor/types.ts`                            | `extensions/slack/src/monitor/types.ts`                             | verbatim      | —                                 |
+| `src/native-data-blocks.ts`                       | `extensions/slack/src/native-data-blocks.ts`                        | verbatim      | —                                 |
+| `src/native-data-fallback.ts`                     | `extensions/slack/src/native-data-fallback.ts`                      | verbatim      | —                                 |
+| `src/outbound-media.ts`                           | `extensions/slack/src/client-delivery.ts`                           | reimplemented | D-015, D-008                      |
+| `src/outbound.ts`                                 | `extensions/slack/src/outbound-adapter.ts`                          | reimplemented | D-014, D-001, D-006, D-026, D-035 |
+| `src/plugin.ts`                                   | `extensions/slack/src/channel.ts`                                   | reimplemented | D-016                             |
+| `src/post-message-identity.ts`                    | `extensions/slack/src/post-message-identity.ts`                     | verbatim      | —                                 |
+| `src/post-message-payload.ts`                     | `extensions/slack/src/post-message-payload.ts`                      | verbatim      | —                                 |
+| `src/presentation-fallback.ts`                    | `extensions/slack/src/presentation-fallback.ts`                     | verbatim      | —                                 |
+| `src/presentation.ts`                             | `extensions/slack/src/presentation.ts`                              | verbatim      | —                                 |
+| `src/probe.ts`                                    | `extensions/slack/src/probe.ts`                                     | verbatim      | —                                 |
+| `src/progress-blocks.ts`                          | `extensions/slack/src/progress-blocks.ts`                           | verbatim      | —                                 |
+| `src/question-actions.ts`                         | `extensions/slack/src/question-actions.ts`                          | adapted       | D-032                             |
+| `src/reply-action-ids.ts`                         | `extensions/slack/src/reply-action-ids.ts`                          | verbatim      | —                                 |
+| `src/reply-blocks.ts`                             | `extensions/slack/src/reply-blocks.ts`                              | verbatim      | —                                 |
+| `src/resolve-channels.ts`                         | `extensions/slack/src/resolve-channels.ts`                          | verbatim      | —                                 |
+| `src/resolve-users.ts`                            | `extensions/slack/src/resolve-users.ts`                             | verbatim      | —                                 |
+| `src/rich-text.ts`                                | `extensions/slack/src/rich-text.ts`                                 | verbatim      | —                                 |
+| `src/runtime-store.ts`                            | —                                                                   | fusion-owned  | —                                 |
+| `src/runtime.ts`                                  | `extensions/slack/src/runtime.ts`                                   | adapted       | D-036                             |
+| `src/runtime.types.ts`                            | —                                                                   | fusion-owned  | —                                 |
+| `src/scopes.ts`                                   | `extensions/slack/src/scopes.ts`                                    | verbatim      | —                                 |
+| `src/send-results.ts`                             | `extensions/slack/src/send-results.ts`                              | verbatim      | —                                 |
+| `src/send.runtime.ts`                             | `extensions/slack/src/send.runtime.ts`                              | verbatim      | —                                 |
+| `src/send.ts`                                     | `extensions/slack/src/send.ts`                                      | adapted       | D-034                             |
+| `src/sent-thread-cache.ts`                        | `extensions/slack/src/sent-thread-cache.ts`                         | verbatim      | —                                 |
+| `src/session-status.ts`                           | `extensions/slack/src/session-status.ts`                            | adapted       | D-033                             |
+| `src/stream-mode.ts`                              | `extensions/slack/src/stream-mode.ts`                               | verbatim      | —                                 |
+| `src/streaming-compat.ts`                         | `extensions/slack/src/streaming-compat.ts`                          | verbatim      | —                                 |
+| `src/streaming.ts`                                | `extensions/slack/src/streaming.ts`                                 | verbatim      | —                                 |
+| `src/target-parsing.ts`                           | `extensions/slack/src/target-parsing.ts`                            | verbatim      | —                                 |
+| `src/targets.ts`                                  | `extensions/slack/src/targets.ts`                                   | verbatim      | —                                 |
+| `src/thread-ts.ts`                                | `extensions/slack/src/thread-ts.ts`                                 | verbatim      | —                                 |
+| `src/threading-tool-context.ts`                   | `extensions/slack/src/threading-tool-context.ts`                    | verbatim      | —                                 |
+| `src/threading.ts`                                | `extensions/slack/src/threading.ts`                                 | verbatim      | —                                 |
+| `src/token.ts`                                    | `extensions/slack/src/token.ts`                                     | verbatim      | —                                 |
+| `src/transport/approval-card.ts`                  | `extensions/slack/src/monitor/events/interactions.block-actions.ts` | reimplemented | D-010                             |
+| `src/transport/media.ts`                          | `extensions/slack/src/monitor/media.ts`                             | reimplemented | D-017, D-007                      |
+| `src/transport/socket-event-filter.ts`            | `extensions/slack/src/monitor/events/messages.ts`                   | reimplemented | D-018, D-024                      |
+| `src/truncate.ts`                                 | `extensions/slack/src/truncate.ts`                                  | verbatim      | —                                 |
+| `src/types.ts`                                    | `extensions/slack/src/types.ts`                                     | verbatim      | —                                 |
+| `src/typing.ts`                                   | `extensions/slack/src/session-status.ts`                            | reimplemented | D-022, D-009                      |
+
+| Omitted upstream                                             | Reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `extensions/slack/src/__traces__`                            | Upstream delivery-pipeline trace fixtures; the Fusion vertical has no draft/streaming pipeline to replay.                                                                                                                                                                                                                                                                                                                                                                                  |
+| `extensions/slack/src/monitor/message-handler`               | Upstream's own inbound dispatch pipeline (routing, sessions, progress cards, streaming). The Hub owns admission, routing and turns; the vertical stops at the inbound event.                                                                                                                                                                                                                                                                                                               |
+| `extensions/slack/src/outbound-adapter.ts`                   | Upstream's `ChannelOutboundAdapter` implementation (sendText/sendMedia/sendPayload/presentation over OpenClaw's reply-payload send helpers and the question gateway). Fusion's Hub owns outbound delivery and drives `plugin.outbound` directly (D-035); the upstream send primitives it wraps are ported and exposed there instead. Lands with the streaming/presentation slice (goal ledger slice 22).                                                                                   |
+| `extensions/slack/src/progress-blocks.ts`                    | Slack progress-card/compact-draft block builder. Needs the progress-draft compositor closure from `src/channels/streaming.ts` (~1130 lines: plan checklists, draft lines, diffstat) which core does not carry. Lands with the streaming/progress slice (goal ledger slice 22).                                                                                                                                                                                                             |
+| `extensions/slack/src/streaming.ts`                          | Slack native chat-stream driver (`@slack/web-api` `ChatStreamer`, listener write clients, per-stream pruning). The Hub does not stream partial answers into a channel yet; lands with the streaming/progress slice (goal ledger slice 22).                                                                                                                                                                                                                                                 |
+| `extensions/slack/src/interactive-dispatch.ts`               | Registers Slack interactive handlers on OpenClaw's plugin interactive registry (`openclaw/plugin-sdk/plugin-runtime` `createChannelInteractiveDispatcher`, conversation-binding requests). The Hub owns interactive callbacks and bindings; lands with the Slack inbound-parity slice (goal ledger slice 21).                                                                                                                                                                              |
+| `extensions/slack/src/monitor/suggested-prompts.ts`          | Assistant suggested-prompt publisher, written against a Bolt `App`. The vertical is Socket Mode only (D-003) and has no Bolt app object.                                                                                                                                                                                                                                                                                                                                                   |
+| `extensions/slack/src/secret-contract.ts`                    | Slack's secret-target registry, built on `openclaw/plugin-sdk/channel-secret-basic-runtime` (`src/secrets/*`, ~900 lines wired to OpenClaw's secret providers and config writer). Its only consumer is `shared.ts`. Fusion's Hub owns credentials.                                                                                                                                                                                                                                         |
+| `extensions/slack/src/shared.ts`                             | The OpenClaw plugin definition surface: setup plugin, doctor, config adapter, security adapter, secret contract and account snapshot. Pulls `channel.setup.ts`, `setup-core.ts`, `setup-shared.ts`, `doctor.ts`, `doctor-contract.ts`, `config-schema.ts`, `config-ui-hints.ts`, `security.ts` and their setup/zod SDK subpaths. Fusion's Hub is the plugin host and owns setup UX; lands with the setup/capability UI slice (goal ledger slice 18).                                       |
+| `extensions/slack/src/sent-thread-cache.test.ts`             | Needs OpenClaw's SQLite plugin-state test harness (`plugin-state-test-runtime`, `test-state`, `importFreshModule`). `sent-thread-cache.ts` itself is ported verbatim over the injected Hub store (D-036).                                                                                                                                                                                                                                                                                  |
+| `extensions/slack/src/send.upload.test.ts`                   | Also `send.upload-rate-limit.test.ts` and `send.enterprise.test.ts`'s upload case: they assert the pinned-DNS/SSRF guard behaviour (RFC2544 fake-IP policy, GovSlack host pinning, hostname resolution mocking) that the Fusion fetch boundary does not implement (D-030).                                                                                                                                                                                                                 |
+| `extensions/slack/src/action-runtime.download-image.test.ts` | Asserts downscaled image dimensions from OpenClaw's image-sanitization pipeline (`src/agents/tool-images.runtime.ts`), which Fusion has no equivalent for (D-CORE-253); the adapter returns the image unsanitized.                                                                                                                                                                                                                                                                         |
+| `extensions/slack/src/message-action-dispatch.test.ts`       | Also `actions.blocks.test.ts`, `outbound-payload.test.ts`, `client.rate-limit.test.ts`, `monitor/media.test.ts`, `send.identity-fallback.test.ts`, `blocks.test.ts` modal cases: each needs an omitted module (`channel.setup.ts`, `channel.ts`, `streaming.ts`, `monitor/message-handler/*`) or an unported test barrel (`channel-test-helpers`, `channel-contract-testing`). `message-action-dispatch.ts` itself is ported verbatim and covered by `action-runtime.test.ts` (111 cases). |
+| `extensions/slack/src/http`                                  | Bolt HTTP receiver routes + plugin HTTP surfaces. The vertical is Socket Mode only; the ported `createSlackBoltApp` keeps the `http` branch but no account selects it.                                                                                                                                                                                                                                                                                                                     |

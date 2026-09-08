@@ -225,6 +225,7 @@ class RuntimeAuth implements AuthServer {
         manageMembers: this.role === "owner",
         manageOwners: this.role === "owner",
         manageResources: this.role === "owner",
+        manageChannels: this.role === "owner",
       },
     });
   }

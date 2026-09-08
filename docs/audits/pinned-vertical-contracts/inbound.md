@@ -21,6 +21,8 @@ From `MsgContext` / the builder (names are exact; `main/dist/templating--GHupcKJ
 - `NativeChannelId` — the native channel id.
 - `CommandAuthorized` — always a boolean (default-deny false).
 - `AccountId`, `AgentId`, `SessionKey`, `OriginatingChannel`, `OriginatingTo` — context, not decision inputs.
+- `EventKind` — **Fusion-owned addition** (slice 23a), always present. The inbound FAMILY: `message | command | callback | edit | delete | reaction | member | channel | pin | topic | poll_answer | interactive`. Upstream carries a coarser `InboundEventKind` (`user_request | room_event`, `src/channels/inbound-event/classification.ts`); Fusion keeps the platform family and derives the wake/no-wake split from it. An event with no key reads as `message`, so a vertical written before the field existed is unchanged.
+- `EventFacts` — **Fusion-owned addition**, present only when the family carries structured facts. One nested object, not flat keys: the Hub reads it as a unit after branching on `EventKind`. Members (all optional): `command {name, args}`, `callback {actionId, value?, actorId, messageId?}`, `reaction {emoji, added, messageId, actorId}`, `target {messageId}` (the message an edit/delete/pin acts on — the event's own `MessageSid` is its dedupe identity, not its subject), `member {userId, joined}`, `pollAnswer {pollId, optionIds, voterId}`, `topic {threadId?, name?, event}`. The shapes live on `ChannelInboundEvent` in `packages/channels/shared/src/monitor.ts`.
 
 ## Native conversation kinds
 
@@ -49,3 +51,28 @@ The plane's `InboundConversationDetail` (`plane/types.ts`) is `{kind, id, rootCo
 - `match: {kind: thread, ids: [C0THREAD]}` (declared AFTER the channel routes) must still win for that thread (L527; mirrors OpenClaw's "the thread key is more specific" session-key model, §4.3.4).
 
 So: match the **thread/topic-level descriptor first** (for a threaded message: `{kind: thread|topic, id: threadId}`), then the **root descriptor** (`{kind: dm|channel|group, id: rootConversationId}`); first hit in declaration order wins. The binding row stores the **matched-level descriptor** so re-attach re-matches at the same level (a thread that matched at thread level must not re-fall through to a root route; `routeForBinding`). `deriveBindingKey` is unaffected — it reads `threadId` / `rootConversationId`, not the route descriptor.
+
+## What each family is allowed to do (`plane/inbound-kinds.ts`)
+
+The family, not the text, decides whether an event may start a turn. Without this a route with `requireMention: false` forwarded "Slack reaction added: :+1: …" and "[Joined] Ann" to the agent as user text.
+
+| `EventKind`                                                              | plane behaviour                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message`                                                                | The normal path: identity link, approval command, session command, route match, binding, agent turn.                                                                                                                                                                                                                                                    |
+| `command`                                                                | The shared session commands (`commands.ts`): `/status`, `/stop`, `/new`, `/help`, `/approve`, `/deny`. `EventFacts.command.name` names the verb, so a Slack native slash command (whose text carries no `/`) and a Telegram `/verb` line reach the same alias table. A verb this Hub does not own is forwarded as text only when the bot was addressed. |
+| `callback`, `interactive`                                                | The value decodes as an approval card → the one exactly-once approval resolver (the same entry a native card click takes, both authority checks included). Else the action id decodes as a session command → run it. Else ignored with a log.                                                                                                           |
+| `edit`                                                                   | Room activity by default; `defaults.inbound.editNotifications: all` re-runs the edited message as a message.                                                                                                                                                                                                                                            |
+| `delete`, `reaction`, `member`, `channel`, `pin`, `topic`, `poll_answer` | Never start a turn. Recorded in channel inbound activity against the route that owns the conversation. `reaction` is recorded only when `defaults.inbound.reactionNotifications` is not `off`.                                                                                                                                                          |
+
+The table is code, not config: which families may wake an agent is a product fact. `ChannelInboundKind` is exhaustive over the table, so adding a family without stating its disposition is a type error.
+
+### The two operator knobs
+
+`defaults.inbound` folds through org < account < route like every other defaults leaf.
+
+- `reactionNotifications: off | own | all` — upstream's name and values (`buildChannelReactionShape` in each channel's `config-schema.ts`), so an account authored for OpenClaw compiles unchanged. Fusion never wakes an agent on a reaction, so the leaf only gates recording; `own` and `all` behave alike until the Hub can tell whose message was reacted to. Floor: `off`.
+- `editNotifications: off | all` — upstream has no leaf for inbound edits; the name follows upstream's `*Notifications` family. Floor: `off`.
+
+### `/new`
+
+The daemon has no session-reset RPC and does not need one: the plane owns the conversation → agent map. `/new` cancels the bound agent's turn, deletes the thread binding row (`ChannelStore.releaseThreadBinding`) and detaches the agent's stream, so the next message mints a fresh session through the ordinary first-mention path. The old agent stays in the app. `abandoned` is not used — that status permanently holds the key, which is the opposite of what `/new` asks for.

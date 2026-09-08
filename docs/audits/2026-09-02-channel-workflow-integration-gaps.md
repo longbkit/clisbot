@@ -4,6 +4,11 @@ Date: 2026-09-02
 
 Status: implemented; Slack and Telegram live E2E accepted
 
+The direct-vs-automation route model here is the basis for how channel slash
+commands scope their surface (steer/queue/config are direct-only; automation gets
+`/stop`/`/status`/`/cowork`). See
+[Channel slash commands](../features/slash-commands/README.md#route-kind-decides-the-surface).
+
 ## Decision
 
 - Hub owns Provider Applications, Connections, Channel drivers, Triggers, Workflows, policy, and

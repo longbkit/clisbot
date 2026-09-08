@@ -29,6 +29,8 @@ filters:
 
 Use `from_users` on external triggers. Pin GitHub to `repo`, Slack to `workspace` and `channels`, and Discord to `guild` and `channels`. Allowlists reduce exposure but do not make a permitted account or its text trustworthy.
 
+A [Channel](/docs/hub/channels) Route is the same kind of boundary from the other direction: anyone who can post in a conversation the Route matches can send text to the agent behind it. Scope Routes to named conversations before you point one at a working directory.
+
 Keep the triggering text explicit and delimited:
 
 ```yaml
@@ -41,6 +43,12 @@ prompt:
 ```
 
 `${{ paseo.prompt }}` contains normalized request text. Hub does not automatically add provider event context. A step that needs it must author `${{ paseo.context }}` in prompt text; that opt-in materializes provider context as JSON.
+
+## Channel ingress
+
+A channel account that receives over a webhook publishes an endpoint on the public internet, and an accepted request runs an agent turn under whatever identity its body claims. Every webhook channel therefore requires its shared secret before Hub will start the account — Telegram (`webhookSecret`, echoed in `X-Telegram-Bot-Api-Secret-Token`), Zalo (`webhookSecret`), Feishu (encrypt key), Google Chat (bearer JWT). Hub will not serve an unauthenticated endpoint, so a start that fails for a missing secret is the guard, not a bug. Prefer polling or a long connection where the channel offers one; it needs no public URL at all.
+
+Inbound attachments are downloaded to a per-account directory under Hub's data directory and handed to the agent as absolute paths, so the sender chooses both the bytes and the size. Downloads stop at the channel's ceiling and the partial file is removed. Treat that directory as untrusted content the agent can read: keep it outside any `cwd` you point a workflow at.
 
 ## Protect configuration authority
 

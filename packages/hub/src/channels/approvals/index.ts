@@ -640,6 +640,7 @@ export function catchAllRoute(fallback: CompiledFallback): CompiledRoute {
     defaults: fallback.defaults ?? accountlessDefaults(),
     approval: fallback.approval ?? [],
     ...(fallback.limits === undefined ? {} : { limits: fallback.limits }),
+    ...(fallback.selectable === undefined ? {} : { selectable: fallback.selectable }),
   };
 }
 
@@ -652,6 +653,7 @@ function accountlessDefaults() {
     bindingKey: "thread" as const,
     replyAnchor: "thread" as const,
     outbound: { path: "relay" as const, template: null },
+    inbound: { reactionNotifications: "off" as const, editNotifications: "off" as const },
     sync: {
       finalAnswers: true,
       progress: {

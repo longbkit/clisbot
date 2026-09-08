@@ -40,7 +40,6 @@ import { TriggerDocumentError } from "../triggers/configuration/index.js";
 import {
   CHANNEL_REPLY_MCP_SERVER_NAME,
   CHANNEL_REPLY_TOOL_NAME,
-  CHANNEL_REPLY_FILE_TOOL_NAME,
   type ChannelReplyAgentCapability,
   type ChannelReplyBindingRef,
 } from "./plane/types.js";
@@ -407,13 +406,14 @@ export function createChannelAgentSpecResolver(
   defaults: EffectiveDefaults,
   bindingRef: ChannelReplyBindingRef,
   capability?: ChannelReplyAgentCapability | undefined,
+  overrides?: { model?: string | undefined } | undefined,
 ) => CreateAgentConfig {
   const environments = new Map(
     bundle.configuration.environments.map(
       (environment) => [environment.name, environment] as const,
     ),
   );
-  return (target, defaults, _bindingRef, capability) => {
+  return (target, defaults, _bindingRef, capability, overrides) => {
     const agent = bundle.agents[target.agent];
     if (agent === undefined) {
       throw new ChannelAgentSpecError(`unknown agent "${target.agent}"`);
@@ -424,6 +424,10 @@ export function createChannelAgentSpecResolver(
         `route target environment "${target.environment}" is not a daemon environment`,
       );
     }
+    // `/model` wins over the agent definition's model: it is the
+    // conversation's explicit choice from the route's own menu
+    // (`policy/selection.ts`), made by an owner or admin — never free text.
+    const model = overrides?.model ?? agent.model;
     const config: CreateAgentConfig = {
       provider: agent.provider,
       cwd: environment.cwd,
@@ -431,7 +435,7 @@ export function createChannelAgentSpecResolver(
       ...(environment.worktree === undefined
         ? {}
         : { worktree: createAgentWorktree(environment.worktree) }),
-      ...(agent.model === undefined ? {} : { model: agent.model }),
+      ...(model === undefined ? {} : { model }),
       ...(agent.mode === undefined ? {} : { modeId: agent.mode }),
       ...(agent.thinkingOptionId === undefined ? {} : { thinkingOptionId: agent.thinkingOptionId }),
       ...(agent.featureValues === undefined
@@ -458,15 +462,6 @@ export function createChannelAgentSpecResolver(
             server: CHANNEL_REPLY_MCP_SERVER_NAME,
             tool: CHANNEL_REPLY_TOOL_NAME,
           },
-          ...(capability.canSendFiles
-            ? [
-                {
-                  kind: "mcp" as const,
-                  server: CHANNEL_REPLY_MCP_SERVER_NAME,
-                  tool: CHANNEL_REPLY_FILE_TOOL_NAME,
-                },
-              ]
-            : []),
         ],
       },
       systemPrompt: composeMessageToolPrompt(defaults.outbound.template, {

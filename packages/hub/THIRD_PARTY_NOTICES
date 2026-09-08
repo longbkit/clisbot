@@ -218,3 +218,77 @@ zod@4.4.3
 ### MPL-2.0 (1)
 
 web-push@3.6.7
+
+## Discord (@openclaw/discord@2026.9.2, in-repo vertical)
+
+Discord is pulled in-repo (`packages/channels/discord`). Its bundled-dep surface
+is the third-party set the vertical declares directly, at the versions
+`@openclaw/discord@2026.9.2` pins. The Activities and voice SDKs
+(`@discord/embedded-app-sdk`, `@discordjs/voice`, `libopus-wasm`) are not carried
+— those surfaces are omitted (`packages/channels/discord/upstream-sync.json`).
+
+### Apache-2.0 (1)
+
+discord-api-types@0.38.54
+
+### MIT (4)
+
+mdast-util-from-markdown@2.0.3
+typebox@1.3.18
+undici@8.10.2
+ws@8.21.3
+
+## Google Chat (@openclaw/googlechat@2026.9.2, in-repo vertical)
+
+Google Chat is pulled in-repo (`packages/channels/googlechat`). Its bundled-dep
+surface is the third-party set the vertical declares directly, at the versions
+`@openclaw/googlechat@2026.9.2` pins. The Chat REST client is hand-rolled
+upstream, so no Google API client library is carried beyond the auth library.
+
+### Apache-2.0 (1)
+
+google-auth-library@11.0.2
+
+### MIT (1)
+
+undici@8.10.2
+
+## Feishu / Lark (@openclaw/feishu@2026.9.2, in-repo vertical)
+
+Feishu is pulled in-repo (`packages/channels/feishu`). Its bundled-dep surface is
+the third-party set the vertical declares directly, at the versions
+`@openclaw/feishu@2026.9.2` pins. Media upload/download, the streaming card and
+the doc-comment dispatcher are omitted
+(`packages/channels/feishu/upstream-sync.json`).
+
+### MIT (6)
+
+@larksuiteoapi/node-sdk@1.73.0
+mdast-util-from-markdown@2.0.3
+mdast-util-gfm-table@2.0.0
+micromark-extension-gfm-table@2.1.1
+typebox@1.3.18
+zod@4.4.3
+
+## Zalo Official Bot (@openclaw/zalo@2026.9.2, in-repo vertical)
+
+Zalo is pulled in-repo (`packages/channels/zalo`). Zalo ships no SDK; upstream
+hand-rolls the Bot API client over `fetch`, so the bundled-dep surface is the
+webhook envelope validator and the proxy agent.
+
+### MIT (2)
+
+undici@8.10.2
+zod@4.4.3
+
+## Zalo Personal (@openclaw/zalouser@2026.9.2, in-repo vertical)
+
+Zalo Personal is pulled in-repo (`packages/channels/zalouser`). Upstream's SDK
+is zca-js, at upstream's version; the bundled-dep surface is that client plus
+the schema validators the tool and webhook envelopes use.
+
+### MIT (3)
+
+typebox@1.3.18
+zca-js@2.1.2
+zod@4.4.3

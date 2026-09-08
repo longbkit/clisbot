@@ -1,0 +1,3 @@
+DROP INDEX "channel_conversation_selections_key_unique";--> statement-breakpoint
+ALTER TABLE "channel_ingress_queue" ADD COLUMN "resubmitted_at" timestamp with time zone;--> statement-breakpoint
+CREATE UNIQUE INDEX "channel_conversation_selections_key_unique" ON "channel_conversation_selections" USING btree ("organization_id","channel","account_id","external_conversation_id",coalesce("external_thread_id", ''));

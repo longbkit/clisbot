@@ -169,4 +169,26 @@ describe("parseChannelTextCommand", () => {
     expect(parseChannelTextCommand("hello @longluong3bot")).toBeNull();
     expect(parseChannelTextCommand("")).toBeNull();
   });
+
+  it("carries an argument for /agent and /model only", () => {
+    assert.deepEqual(parseChannelTextCommand("/model gpt-5.6-luna"), {
+      name: "model",
+      value: "gpt-5.6-luna",
+    });
+    assert.deepEqual(parseChannelTextCommand("@longluong3bot /agent reviewer"), {
+      name: "agent",
+      value: "reviewer",
+    });
+    assert.deepEqual(parseChannelTextCommand("\\model  claude sonnet "), {
+      name: "model",
+      value: "claude sonnet",
+    });
+    assert.deepEqual(parseChannelTextCommand("/model"), { name: "model" });
+  });
+
+  it("keeps a no-argument verb whole-message, so prose stays prose", () => {
+    expect(parseChannelTextCommand("stop doing that")).toBeNull();
+    expect(parseChannelTextCommand("/new session please")).toBeNull();
+    expect(parseChannelTextCommand("help me with this")).toBeNull();
+  });
 });

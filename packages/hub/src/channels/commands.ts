@@ -43,27 +43,56 @@ export interface ApprovalCommand {
   answer?: string;
 }
 
-/** The shared text commands a channel can carry in plain text. */
-export type ChannelTextCommand =
-  | { name: "status" }
-  | { name: "stop" }
-  | { name: "new" }
-  | { name: "help" };
+/** Metadata owns parsing, discovery, route applicability and Access gating. */
+export const CHANNEL_COMMANDS = [
+  { name: "status", aliases: ["state"], args: false, privilege: "agent.interact", directOnly: false, usage: "/status", description: "agent, session, context and access" },
+  { name: "stop", aliases: ["cancel"], args: false, privilege: "agent.interact", directOnly: false, usage: "/stop", description: "stop the turn or active automation runs" },
+  { name: "new", aliases: ["reset"], args: true, privilege: "agent.create", directOnly: true, usage: "/new [message]", description: "start fresh in this conversation" },
+  { name: "help", aliases: [], args: false, privilege: null, directOnly: false, usage: "/help", description: "this list" },
+  { name: "me", aliases: [], args: false, privilege: null, directOnly: false, usage: "/me", description: "your channel identity and access" },
+  { name: "cowork", aliases: ["open", "app"], args: false, privilege: "agent.interact", directOnly: false, usage: "/cowork", description: "open this session in Paseo" },
+  { name: "resume", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/resume <id>", description: "continue an existing session here" },
+  { name: "steer", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/steer <message>", description: "send into the running turn" },
+  { name: "queue", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/queue <message>", description: "send after the current turn ends" },
+  { name: "agent", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/agent [list|search <text>|name]", description: "list or apply an agent profile" },
+  { name: "provider", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/provider [list|search <text>|id]", description: "list or switch provider" },
+  { name: "model", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/model [list|search <text>|id]", description: "list or set this provider's model" },
+  { name: "effort", aliases: ["thinking"], args: true, privilege: "agent.interact", directOnly: true, usage: "/effort [list|id]", description: "list or set this model's thinking option" },
+  { name: "permission", aliases: ["mode"], args: true, privilege: "agent.interact", directOnly: true, usage: "/permission [mode]", description: "list or set the provider's mode" },
+  { name: "skill", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/skill [list|search <text>|name]", description: "find or invoke an agent skill" },
+  { name: "command", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/command [list|search <text>|name|add <name> <prompt>|remove <name>]", description: "find, invoke or manage account commands" },
+  { name: "fork", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/fork [message]", description: "copy context and continue here" },
+  { name: "side", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/side <message>", description: "one-off question with this context" },
+  { name: "quick", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/quick <message>", description: "one-off question in a fresh session" },
+] as const;
 
-/** The session-command verbs + the aliases users reach for (case-insensitive). */
-const COMMAND_ALIASES: Record<string, ChannelTextCommand["name"]> = {
-  status: "status",
-  state: "status",
-  stop: "stop",
-  cancel: "stop",
-  new: "new",
-  reset: "new",
-  help: "help",
-};
+export type ChannelCommandName = (typeof CHANNEL_COMMANDS)[number]["name"];
+export type ChannelTextCommand = {
+  [Name in ChannelCommandName]: { name: Name; value?: string }
+}[ChannelCommandName];
 
-/** Every verb the normalizer may glue a mention to (approval + session
- * commands, aliases included). */
-const COMMAND_VERB_SOURCE = "approve|deny|status|state|stop|cancel|new|reset|help";
+export function channelCommandSpec(name: ChannelCommandName) {
+  return CHANNEL_COMMANDS.find((command) => command.name === name)!;
+}
+
+export function channelCommandPrivilege(command: ChannelTextCommand) {
+  if (command.name === "command" && /^(add|remove)(?:\s|$)/iu.test(command.value ?? "")) {
+    return "approval.config" as const;
+  }
+  return channelCommandSpec(command.name).privilege;
+}
+
+const COMMAND_ALIASES = new Map<string, ChannelCommandName>(
+  CHANNEL_COMMANDS.flatMap((command) => [command.name, ...command.aliases].map(
+    (name): [string, ChannelCommandName] => [name, command.name],
+  )),
+);
+
+export function isReservedChannelCommand(name: string): boolean {
+  return COMMAND_ALIASES.has(name.toLowerCase()) || /^(approve|deny|paseo|link)$/iu.test(name);
+}
+
+const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "paseo"].join("|");
 
 /**
  * Normalize the mention/gluing forms a channel client can prepend or attach
@@ -97,11 +126,11 @@ const MENTION_AFTER_VERB = new RegExp(`^[/\\\\]?(${COMMAND_VERB_SOURCE})@\\w{3,3
 /** A Slack native user/bot mention token (`<@U…>`, `<@!B…>`) — Slack's
  * equivalent of Telegram's `@botname` addressing. Rewritten to the `@handle`
  * form so the mention regexes below match it unchanged. */
-const SLACK_MENTION_TOKEN = /<@!?[A-Z][A-Z0-9]{2,31}>/giu;
+const SLACK_MENTION_TOKEN = /<@!?[A-Z0-9][A-Z0-9]{2,31}>/giu;
 
 function stripMentions(text: string): string {
   // Slack first: `<@U8Z…> /approve` is how a Slack user addresses the bot.
-  let normalized = text.replace(SLACK_MENTION_TOKEN, (token) => `@${token.slice(2, -1)}`);
+  let normalized = text.replace(SLACK_MENTION_TOKEN, (token) => `@${token.slice(2, -1).replace(/^!/, "")}`);
   // Up to two leading mentions ("@bot @bot /approve" is the realistic max).
   for (let i = 0; i < 2; i += 1) {
     const match = MENTION_BEFORE_COMMAND.exec(normalized);
@@ -130,13 +159,13 @@ function stripMentions(text: string): string {
  * the id.
  */
 export function parseApprovalCommand(text: string): ApprovalCommand | null {
-  const normalized = stripMentions(text);
+  const normalized = normalizeChannelCommandText(text);
   const match =
     /^\s*(?:[/\\]+)?(approve|deny)\b(?:\s+([A-Za-z0-9][A-Za-z0-9._-]*))?(?:\s+(.*))?$/is.exec(
       normalized,
     );
   if (match === null) return null;
-  const decision = match[1] === "approve" ? "allow" : "deny";
+  const decision = match[1]?.toLowerCase() === "approve" ? "allow" : "deny";
   let requestId = match[2] !== undefined ? match[2].replace(/[.,!]+$/u, "") : undefined;
   if (requestId === "") requestId = undefined;
   const answer = (match[3] ?? "").trim();
@@ -165,22 +194,32 @@ export function parseApprovalCommand(text: string): ApprovalCommand | null {
  * word.
  */
 export function parseChannelTextCommand(text: string): ChannelTextCommand | null {
-  const normalized = stripMentions(text);
-  const match = /^\s*[/\\]?\s*([a-z]+)\s*$/i.exec(normalized);
+  const normalized = normalizeChannelCommandText(text);
+  const match = /^\s*[/\\]?\s*([a-z]+)(?:\s+([\s\S]*\S))?\s*$/i.exec(normalized);
   if (match === null || match[1] === undefined) return null;
-  const name = COMMAND_ALIASES[match[1].toLowerCase()];
-  return name !== undefined ? { name } : null;
+  const name = COMMAND_ALIASES.get(match[1].toLowerCase());
+  if (name === undefined) return null;
+  const argument = match[2]?.trim();
+  if (argument === undefined || argument === "") return { name };
+  // An argument on a no-argument verb is prose ("stop doing that"), not a
+  // command; only `/agent` and `/model` carry one.
+  if (!channelCommandSpec(name).args) return null;
+  return { name, value: argument };
 }
 
-/** The help text a channel posts for /help: the shared command list. */
-export function textCommandHelpText(): string {
+/** The help text is generated from the same registry as parsing and gating. */
+export function textCommandHelpText(routeKind?: "agent" | "workflow"): string {
   return [
     "Commands:",
-    "- `/status` — agent + session state",
-    "- `/stop` — stop the running turn",
-    "- `/new` — start a fresh session in this conversation",
-    "- `/help` — this list",
-    "Approvals: `/approve` or `/deny` answers the newest prompt; `/approve <id>` names one.",
-    "Slack: if `/…` collides with a native command, use the backslash form — `\\approve`, `\\status`.",
+    ...CHANNEL_COMMANDS.filter((command) => routeKind !== "workflow" || !command.directOnly)
+      .map((command) => `- \`${command.usage}\` — ${command.description}`),
+    "Approvals: `/approve [id] [answer]` or `/deny [id]` answers an open prompt.",
+    "Slack: use the backslash form (\\status) if / collides with a native command.",
   ].join("\n");
+}
+
+/** Normalize addressing and the single native umbrella before either parser. */
+export function normalizeChannelCommandText(text: string): string {
+  const normalized = stripMentions(text);
+  return normalized.replace(/^\s*[/\\]paseo(?:\s+|$)/iu, "/").replace(/^\/\s*$/u, "/help");
 }

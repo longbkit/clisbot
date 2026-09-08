@@ -9,6 +9,8 @@ export const Route = createFileRoute("/api/v1/channels")({
       GET: async ({ request }) => (await getApplication()).operations.handleChannelList(request),
       PUT: async ({ request }) => (await getApplication()).operations.handleChannelAdd(request),
       POST: async ({ request }) => (await getApplication()).operations.handleChannelAdd(request),
+      DELETE: async ({ request }) =>
+        (await getApplication()).operations.handleChannelRemove(request),
     },
   },
 });

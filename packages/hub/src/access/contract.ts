@@ -37,7 +37,9 @@ export const APPROVAL_PRIVILEGES = [
   "approval.channel",
 ] as const satisfies readonly AccessPrivilege[];
 
-export const ACCESS_SUBJECT_KINDS = ["member", "team"] as const;
+export const ACCESS_SUBJECT_KINDS = ["member", "team", "guest"] as const;
+/** The organization-scoped group for channel senders without a linked Member. */
+export const GUEST_ACCESS_SUBJECT_ID = "guest";
 export const AccessSubjectKindSchema = z.enum(ACCESS_SUBJECT_KINDS);
 export type AccessSubjectKind = z.infer<typeof AccessSubjectKindSchema>;
 

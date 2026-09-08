@@ -14,11 +14,26 @@ import { statSync } from "node:fs";
 import type { HostRuntime, SendMediaFn, SendTextFn } from "@getpaseo/channels-shared";
 import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
 import { getSlackWriteClient, isSilentReplyText } from "./client/web-api.js";
+import { sendMessageSlack } from "./send.js";
+import { resolveSlackOutboundPresentationMessages } from "./presentation-outbound.js";
+import type { MessagePresentationBlockNote } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import type { SlackReplyDeliveryMessage } from "./reply-blocks.js";
+import { rememberSlackDriveConfig } from "./fusion/plugin-config.js";
+import type { OpenClawConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
 import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
 import { refreshSlackTypingAfterPost } from "./typing.js";
-import { getSlackRuntime } from "./runtime.js";
-import { renderSlackMrkdwn } from "./mrkdwn.js";
+import { getSlackHostRuntime } from "./runtime-store.js";
+import { normalizeSlackOutboundText } from "./format.js";
 import { uploadSlackFile } from "./outbound-media.js";
+
+/** The upstream send's config and block argument types, named locally so the
+ * shared plugin record's open `Record<string, unknown>` args can be narrowed at
+ * the one call site (D-035). */
+type SlackSendCfg = OpenClawConfig;
+type SlackSendOptions = Parameters<typeof sendMessageSlack>[2];
+type SlackSendResult = Awaited<ReturnType<typeof sendMessageSlack>>;
+type SlackSendBlocks = NonNullable<SlackSendOptions["blocks"]>;
+type SlackSendClient = NonNullable<Parameters<typeof sendMessageSlack>[2]["client"]>;
 
 /** The pinned `sent-messages` record: "the bot sent message N in chat C." */
 export interface SlackSentMessageRecord {
@@ -47,7 +62,9 @@ export async function recordSlackSentMessage(params: {
   ts: string;
   hostRuntime?: HostRuntime;
 }): Promise<void> {
-  const runtime = params.hostRuntime ?? getSlackRuntime();
+  // Named account first: the unkeyed slot belongs to whichever account the
+  // entry was driven with last, and this record IS per-account state.
+  const runtime = params.hostRuntime ?? getSlackHostRuntime(params.accountId);
   if (runtime === undefined) return;
   const { accountId, conversationId, ts } = params;
   if (accountId === "" || conversationId === "" || ts === "") return;
@@ -82,7 +99,7 @@ function cardBlocksOf(args: Parameters<SendTextFn>[0]): Record<string, unknown>[
 }
 
 /** Render one block's `mrkdwn` text fields (section-ish shapes) through
- * `renderSlackMrkdwn`; anything else (actions, dividers, context) passes
+ * `normalizeSlackOutboundText`; anything else (actions, dividers, context) passes
  * through untouched. */
 function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...block };
@@ -94,7 +111,7 @@ function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unkno
     typeof (text as Record<string, unknown>)["text"] === "string"
   ) {
     const t = text as Record<string, unknown>;
-    out["text"] = { ...t, text: renderSlackMrkdwn(String(t["text"])) };
+    out["text"] = { ...t, text: normalizeSlackOutboundText(String(t["text"])) };
   }
   const fields = block["fields"];
   if (Array.isArray(fields)) {
@@ -107,7 +124,7 @@ function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unkno
       ) {
         const f = field as Record<string, unknown>;
         return Object.assign({}, f, {
-          text: renderSlackMrkdwn(String(f["text"])),
+          text: normalizeSlackOutboundText(String(f["text"])),
         });
       }
       return field;
@@ -117,9 +134,9 @@ function renderBlockMrkdwn(block: Record<string, unknown>): Record<string, unkno
 }
 
 /** COMPAT(clisbot-control-plane): Post one text message to a conversation
- * (optionally a thread) and record it. Media is posted only through the Hub's
- * explicit `send_file` MCP tool, which routes into this vertical's
- * `sendMedia`; G7–G11 semantics remain unchanged. When `args.blocks`
+ * (optionally a thread) and record it. Media is posted only through the
+ * `message` tool's media params (`media`/`attachments`/`buffer`), which route
+ * into this vertical's `sendMedia`; G7–G11 semantics remain unchanged. When `args.blocks`
  * carries the native approval card (COMPAT(clisbot-control-plane)), the card
  * posts with the escaped text as its fallback rendering (Slack requires a
  * `text` fallback for block posts); `cardPosted` tells the plane the post
@@ -131,45 +148,119 @@ export async function sendSlackText(args: Parameters<SendTextFn>[0]): Promise<{
 }> {
   const { cfg, accountId, to, text, threadId } = args;
   const hostRuntime = args["hostRuntime"] as HostRuntime | undefined;
-  const botToken = resolveOutboundBotToken(cfg, accountId);
-  if (botToken === undefined) {
-    throw new Error(
-      `Slack sendText for account "${accountId}" found no cfg.channels.slack.accounts.${accountId}.botToken`,
-    );
-  }
+  rememberSlackDriveConfig(cfg);
   if (isSilentReplyText(text)) {
     // NO_REPLY is the silent-answer token; post nothing.
     return { messageId: "" };
   }
-  const client = await getSlackWriteClient(botToken);
-  const blocks = cardBlocksOf(args);
-  // `chat.postMessage` is the Slack Web API method (L1), not the browser
-  // `window.postMessage` — the target-origin rule is a name-based false
-  // positive (the error is reported at the call's closing paren).
-  // Render the agent markdown to mrkdwn at the outbound boundary (C5):
-  // legitimate markup (code spans, fenced blocks, links, emphasis) renders;
-  // `&`/`<`/`>` in text leaves are XML-escaped.
-  /* eslint-disable eslint-plugin-unicorn/require-post-message-target-origin */
-  const result = await client.chat.postMessage({
-    channel: to,
-    text: renderSlackMrkdwn(text),
-    ...(blocks !== undefined ? { blocks } : {}),
-    ...(threadId !== undefined && threadId !== "" ? { thread_ts: threadId } : {}),
-  });
-  /* eslint-enable eslint-plugin-unicorn/require-post-message-target-origin */
-  const messageId = result.ts ?? "";
+  const { result, cardPosted } = await deliverSlackText(args);
   await refreshSlackTypingAfterPost({ accountId, to, threadId });
   void recordSlackSentMessage({
     accountId,
-    conversationId: to,
-    ts: messageId,
+    conversationId: result.channelId || to,
+    ts: result.messageId,
     ...(hostRuntime === undefined ? {} : { hostRuntime }),
   });
   return {
-    messageId,
-    channel: result.channel,
-    ...(blocks !== undefined ? { cardPosted: true } : {}),
+    messageId: result.messageId,
+    channel: result.channelId,
+    ...(cardPosted ? { cardPosted: true } : {}),
   };
+}
+
+/**
+ * Posts what one `sendText` call carries: the compiled presentation when it has
+ * one (D-W6-01), otherwise the text plus any native card blocks. `cardPosted`
+ * is the plane's fact that the post carries markup it can update in place.
+ */
+async function deliverSlackText(
+  args: Parameters<SendTextFn>[0],
+): Promise<{ result: SlackSendResult; cardPosted: boolean }> {
+  const { cfg, accountId, to, text, threadId } = args;
+  const blocks = cardBlocksOf(args);
+  // Upstream's own client injection point (`SlackSendOpts.client`), surfaced on
+  // the open drive-surface args so a test can post through a fake WebClient
+  // without reaching into the write-client cache.
+  const client = args["client"] as SlackSendClient | undefined;
+  const post = (message: string, opts: Partial<SlackSendOptions>) =>
+    sendMessageSlack(to, message, {
+      cfg: cfg as unknown as SlackSendCfg,
+      accountId,
+      ...(client === undefined ? {} : { client }),
+      ...(threadId !== undefined && threadId !== "" ? { threadTs: threadId } : {}),
+      ...opts,
+    });
+  // A portable `presentation` posts as native Block Kit — charts, tables and
+  // controls — instead of core's flattened fallback text.
+  const presented = resolveSlackOutboundPresentationMessages({
+    text,
+    presentation: args["presentation"],
+  });
+  logPresentationAdmission({
+    accountId,
+    notes: presented.notes,
+    hostRuntime: args["hostRuntime"] as HostRuntime | undefined,
+  });
+  if (presented.messages.length === 0) {
+    const result = await post(
+      text,
+      blocks === undefined ? {} : { blocks: blocks as unknown as SlackSendBlocks },
+    );
+    return { result, cardPosted: blocks !== undefined };
+  }
+  return {
+    result: await postPresentationMessages(presented.messages, post),
+    cardPosted: presented.messages.some((message) => (message.blocks?.length ?? 0) > 0),
+  };
+}
+
+/** D-W6-02: what admission repaired or refused is an operator fact — the tool
+ * result the model reads is the Hub's to write, but the account's log must not
+ * be the one place a dropped block is invisible. */
+function logPresentationAdmission(params: {
+  accountId: string;
+  notes: readonly MessagePresentationBlockNote[];
+  hostRuntime?: HostRuntime | undefined;
+}): void {
+  if (params.notes.length === 0) return;
+  const runtime = params.hostRuntime ?? getSlackHostRuntime(params.accountId);
+  runtime?.logging
+    .getChildLogger({ channel: "slack", accountId: params.accountId })
+    .warn("slack presentation admission", { notes: params.notes });
+}
+
+/**
+ * Posts the compiled presentation messages in order and reports the first one.
+ *
+ * A presentation can compile into more than one Slack message (native data
+ * blocks cap at `SLACK_MAX_BLOCKS`, and authored text outside the blocks is its
+ * own message). The Hub's delivery ledger records one row per seam call, so the
+ * first platform message is the id the reply is addressed and confirmed by.
+ */
+async function postPresentationMessages(
+  messages: readonly SlackReplyDeliveryMessage[],
+  post: (text: string, opts: Partial<SlackSendOptions>) => Promise<SlackSendResult>,
+): Promise<SlackSendResult> {
+  const results: SlackSendResult[] = [];
+  for (const message of messages) {
+    results.push(
+      await post(message.text, {
+        ...(message.blocks ? { blocks: message.blocks as SlackSendBlocks } : {}),
+        ...(message.authoredTextPlacement
+          ? { authoredTextPlacement: message.authoredTextPlacement }
+          : {}),
+        ...(Object.hasOwn(message, "nativeDataFallbackBaseText")
+          ? { nativeDataFallbackBaseText: message.nativeDataFallbackBaseText }
+          : {}),
+        ...(message.textIsSlackPlainText ? { textIsSlackPlainText: true } : {}),
+      }),
+    );
+  }
+  const first = results[0];
+  if (first === undefined) {
+    throw new Error("Slack presentation send produced no message");
+  }
+  return first;
 }
 
 /**
@@ -204,7 +295,7 @@ export async function updateSlackText(
   const result = await client.chat.update({
     channel: to,
     ts: externalMessageId,
-    text: renderSlackMrkdwn(finalText),
+    text: normalizeSlackOutboundText(finalText),
     // Strip the card's buttons (the prompt is decided — a stale click must
     // have no live markup; thread_ts is irrelevant to an update in place).
     ...(clearCard !== false ? { blocks: [] } : {}),

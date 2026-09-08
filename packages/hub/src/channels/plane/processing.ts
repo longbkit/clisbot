@@ -18,14 +18,14 @@
 // lease on the surface is gone.
 import type { EffectiveDefaults } from "../config/compile.js";
 import { MESSAGE_REACTION_OFF } from "../config/enums.js";
-import type { P0ChannelName, PlaneLogger, TypingFn } from "./types.js";
+import type { SupportedChannelName, PlaneLogger, TypingFn } from "./types.js";
 
 /** No stream event for this long = the turn is gone; release the surface. */
 export const PROCESSING_TTL_MS = 60_000;
 
 /** The surface one turn signals on, resolved from the accepted inbound. */
 export interface ProcessingSurface {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   /** The conversation the turn runs in. */
   to: string;
@@ -117,7 +117,7 @@ const defaultSchedule = (tick: () => void, intervalMs: number): (() => void) => 
  * marker mints under `reply.anchor: thread`).
  */
 export function processingSurfaceFor(params: {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   accountId: string;
   sync: EffectiveDefaults["sync"];
   to: string;

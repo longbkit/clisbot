@@ -677,6 +677,7 @@ class RegistrationAuth implements AuthServer {
         manageMembers: true,
         manageOwners: true,
         manageResources: true,
+        manageChannels: true,
       },
     });
   }

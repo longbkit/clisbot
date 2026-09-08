@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
+import type { SupportedChannelName } from "./catalog.js";
 /** One owner for the management test preview and the actual text post. */
 export const CHANNEL_TEST_MESSAGE = "Paseo Channel test — the Connection can send messages.";
 
 export function channelTestMessage(input: {
-  channel: "slack" | "telegram";
+  channel: SupportedChannelName;
   accountId: string;
   conversationId: string;
   threadId?: string | undefined;

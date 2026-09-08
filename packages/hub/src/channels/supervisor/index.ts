@@ -1,3 +1,4 @@
+import { registerChannelDriveConfig } from "../message-actions.js";
 import { createConversationMetadataResolver } from "../conversation-metadata.js";
 import type { ChannelConversationMetadata } from "@getpaseo/channels-shared";
 import { channelTestMessage } from "../test-message.js";
@@ -24,17 +25,20 @@ import { channelTestMessage } from "../test-message.js";
 // a safe no-op returning the deferred/empty shape — no pins read, no install
 // dir touched, no vertical loaded, no daemon socket opened.
 
-import { join } from "node:path";
+import { mkdir, rename } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadChannelControlPlane, type ChannelControlPlaneSnapshot } from "../control-plane.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import { ChannelStore } from "../../db/channels.js";
+import { ChannelReplyCapabilityStore } from "../../db/channel-reply-capabilities.js";
 import {
   connectChannelDaemon,
   type ChannelDaemonClientOptions,
   type DaemonConnection,
 } from "../daemon/client.js";
 import { createChannelPlane, type ChannelPlane } from "../execution.js";
+import { awaitMonitorExit, MONITOR_STOP_GRACE_MS } from "./monitor-stop.js";
 import {
   ensureChannelInstalled,
   InstallError,
@@ -44,32 +48,74 @@ import { ProvisionError } from "../install/provision-main.js";
 import { loadChannelPins, type ChannelPinEntry } from "../install/pins.js";
 import { isChannelsEnabled } from "../loader/channel-gate.js";
 import {
+  createChannelIngressDrain,
+  type ChannelIngressDeferral,
+  type ChannelIngressDrain,
+  type ChannelIngressDrainLog,
+} from "../ingress/drain.js";
+import { resolveHubIngressNonRetryableFailure } from "../ingress/non-retryable.js";
+import {
+  createChannelIngressRetentionSweep,
+  type ChannelIngressRetentionSweep,
+} from "../ingress/retention.js";
+import { createChannelIngressQueueSink } from "../ingress/queue-sink.js";
+import {
   createHostRuntime,
   type HostRuntime,
   type InboundLedgerSink,
+  type InboundQueueSink,
   type InboundReplyParams,
   type InboundReplyResult,
   type StartAccountContext,
 } from "../loader/host.js";
 import { loadChannelVertical, type LoadedChannelVertical } from "../loader/load-channel.js";
+import { runAsChannelAccount } from "../loader/hooks.js";
 import { setChannelSeamLogger } from "../loader/seam-logger.js";
+import { createStreamingDriver } from "../streaming/index.js";
 import { isEnabled } from "../policy.js";
+import { isSupportedChannel } from "../catalog.js";
+import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import { buildAccountCarriers } from "./account-carriers.js";
 import type {
   ApprovalCallbackParams,
   ChannelReplyBindingRef,
   InboundMessage,
-  MediaPostFn,
+  MediaPostParams,
   MediaPostResult,
   OutboundPostResult,
   PlaneInboundResult,
   PlaneLogger,
   PostFn,
-  P0ChannelName,
+  SupportedChannelName,
   UpdateFn,
   TypingFn,
 } from "../plane/types.js";
+import { planeInboundDeferral } from "../plane/types.js";
+import type { StagedChannelMedia } from "../media/outbound-stager.js";
+
+/**
+ * The account's native-media post, widened with the facts a staged `message`
+ * attachment carries (slice 11b). Every extra field is optional, so this stays
+ * assignable to the plane's `MediaPostFn` and the relay's one-file path is
+ * unchanged.
+ */
+type ChannelMediaPostFn = (
+  params: MediaPostParams & {
+    fileName?: string | undefined;
+    mimeType?: string | undefined;
+    asVoice?: boolean | undefined;
+  },
+) => Promise<MediaPostResult>;
 import { resolveHome } from "../daemon/discovery.js";
-import { createHostKeyedStoreRoot } from "../state/keyed-store.js";
+import {
+  createHostKeyedStoreRoot,
+  type HostKeyedStoreRoot,
+  type KeyedStoreBackend,
+} from "../state/keyed-store.js";
+import { encryptedStateNamespaces } from "../state/encrypted-namespaces.js";
+import { isSettledTransport, monitorFailureTransport } from "./needs-login.js";
+import { runQrLoginVerb, type QrLoginResult, type QrLoginVerb } from "./qr-login.js";
+import { openChannelSecretStateBackend } from "../state/secret-backend.js";
 import { ChannelReplyCapabilityRegistry } from "../channel-reply-capabilities.js";
 import type {
   ChannelAccountStartResult,
@@ -98,8 +144,7 @@ type InboundReplyHandler = (params: InboundReplyParams) => Promise<InboundReplyR
 export function flatInboundNormalizer(params: InboundReplyParams): InboundMessage | null {
   const ctx = params.ctxPayload;
   const accountId = confirmedString(params.accountId) ?? confirmedString(ctx["AccountId"]);
-  if ((params.channel !== "slack" && params.channel !== "telegram") || accountId === null)
-    return null;
+  if (!isSupportedChannel(params.channel) || accountId === null) return null;
   const text = confirmedString(ctx["Body"]);
   if (text === null) return null;
   const chatType = confirmedString(ctx["ChatType"]);
@@ -183,6 +228,14 @@ function planeKindFor(
     if (chatType === "group") return threadId !== null ? "topic" : "group";
     return null;
   }
+  // A Discord thread IS a channel (the thread id is the channel the message
+  // arrived in), so the guild mapping matches Slack's; the vertical emits only
+  // `direct` and `channel` (transport/gateway.ts `resolveChatType`).
+  if (channel === "discord") {
+    if (chatType === "direct") return "dm";
+    if (chatType === "channel") return threadId !== null ? "thread" : "channel";
+    return null;
+  }
   return null;
 }
 
@@ -224,6 +277,12 @@ function postFor(
         // stays the fallback rendering on both verticals).
         ...(params.blocks !== undefined ? { blocks: params.blocks } : {}),
         ...(params.replyMarkup !== undefined ? { replyMarkup: params.replyMarkup } : {}),
+        // The portable presentation, for a vertical that compiles it into
+        // native blocks (Slack's `sendSlackText`). The Hub only passes one to a
+        // vertical that declares it renders them
+        // (`readPluginPresentationOutbound`), so a vertical that ignores the arg
+        // is never handed a message whose content lives only in the blocks.
+        ...(params.presentation !== undefined ? { presentation: params.presentation } : {}),
         // Telegram only: disable the native config write-back (admin-scope
         // check fails) — P0 posts numeric chat ids, no legacy rewrite (outbound.md).
         ...(handle.channel === "telegram" ? { gatewayClientScopes: [] } : {}),
@@ -266,7 +325,7 @@ function mediaPostFor(
   cfg: Record<string, unknown>,
   hostRuntime: HostRuntime,
   logger: PlaneLogger,
-): MediaPostFn | undefined {
+): ChannelMediaPostFn | undefined {
   const send = handle.vertical?.plugin?.outbound?.["sendMedia"];
   if (typeof send !== "function") return undefined;
   return async (params) => {
@@ -283,6 +342,13 @@ function mediaPostFor(
         filePath: params.filePath,
         accountId: handle.accountId,
         ...(params.threadId !== undefined ? { threadId: params.threadId } : {}),
+        // The staged facts a `message` attachment carries. The relay's one-file
+        // path leaves them undefined and the vertical falls back to the path,
+        // as before; a `message` send names the file the model asked for and
+        // can ask Telegram for a voice note.
+        ...(params.fileName === undefined ? {} : { fileName: params.fileName }),
+        ...(params.mimeType === undefined ? {} : { mimeType: params.mimeType }),
+        ...(params.asVoice === undefined ? {} : { asVoice: params.asVoice }),
       });
       if (typeof result.messageId !== "string" && typeof result.messageId !== "number") {
         throw new Error("channel outbound.sendMedia returned no messageId");
@@ -394,8 +460,8 @@ function typingFor(
  * (`ctx.account`) + the `cfg` the vertical's outbound + account resolution
  * read tokens from. Tokens come from the encrypted provider connection selected
  * by `compiled.connectionId` — never process env. `cfg.channels.<ch>
- * .accounts` holds EXACTLY ONE entry (Telegram's `findTelegramTokenOwnerAccountId`
- * throws on a duplicate token).
+ * .accounts` holds EXACTLY ONE entry (every vertical's duplicate-token guard
+ * throws on a second account carrying the same token).
  */
 async function accountAndCfg(
   resolveConnection: import("../../db/types.js").Database["resolveChannelConnection"],
@@ -407,52 +473,39 @@ async function accountAndCfg(
   cfg: Record<string, unknown>;
   providerApplicationId?: string;
 }> {
+  const channel = supportedChannel(compiled.channel);
   const credentials = await resolveConnection({
     organizationId,
-    channel: compiled.channel === "slack" ? "slack" : "telegram",
+    channel,
     connectionId: compiled.connectionId,
   });
   if (credentials === undefined) throw new Error("the channel connection is unavailable");
-  const { botToken, appToken, providerApplicationId } = credentials;
-  if (compiled.channel === "slack" && appToken === undefined) {
-    throw new Error("the Slack connection requires a Socket Mode Provider Application");
-  }
-  const account: Record<string, unknown> =
-    compiled.channel === "slack"
-      ? {
-          accountId,
-          botToken,
-          ...(appToken !== undefined ? { appToken } : {}),
-          config: {},
-          // The compiled transport record rides the flat carrier so the
-          // vertical's start-account can read channel-behavior knobs it owns
-          // (e.g. `slashCommand` — the native slash-command alias the L2
-          // rewrites; commands.ts). Tokens still come only from the carrier +
-          // connection metadata; this carries no secret.
-          transport: compiled.transport,
-        }
-      : { accountId, token: botToken, config: {} };
-  // The vertical-owned `config` block rides the cfg entry so the vertical's
-  // account resolution reads its own knobs (e.g. Telegram `richMessages` —
-  // D-003) from the compiled revision instead of a hardcoded default.
-  const cfgAccount: Record<string, unknown> =
-    compiled.channel === "slack"
-      ? {
-          botToken,
-          config: compiled.config,
-          ...(appToken !== undefined ? { appToken } : {}),
-        }
-      : { botToken, gatewayClientScopes: [], config: compiled.config };
+  // Every credential field the Connection carries, not just the two token ones:
+  // the Feishu, Google Chat and Zalo Personal builders read their own names off
+  // this carrier (`account-carriers.ts`).
+  const { providerApplicationId } = credentials;
+  const { account, cfgAccount } = buildAccountCarriers(channel, {
+    ...credentials,
+    accountId,
+    compiled,
+  });
   return {
     account,
-    cfg: {
-      channels: {
-        [compiled.channel]: { accounts: { [accountId]: cfgAccount } },
-      },
-    },
+    cfg: { channels: { [channel]: { accounts: { [accountId]: cfgAccount } } } },
     ...(providerApplicationId === undefined ? {} : { providerApplicationId }),
   };
 }
+
+/** The compiled account's channel as a supported name. The compiler rejects any
+ * other channel (`compile-support.ts`), so reaching this with one is a bug —
+ * fail the account loudly instead of silently driving it as another channel. */
+function supportedChannel(channel: string): SupportedChannelName {
+  if (!isSupportedChannel(channel)) {
+    throw new Error(`channel ${channel} has no in-repo vertical`);
+  }
+  return channel;
+}
+
 interface AccountHandle {
   channel: string;
   accountId: string;
@@ -478,7 +531,7 @@ interface AccountHandle {
   /** The account's outbound post (the plugin's `sendText`), built with the
    * plane and kept for the tool-path MCP endpoint (`channelReplyPost`). */
   post?: PostFn;
-  media?: MediaPostFn | undefined;
+  media?: ChannelMediaPostFn | undefined;
   releaseSlackInbound?: (() => Promise<void>) | undefined;
   /** Observed gateway lifetime; teardown waits for it so a replacement never
    * overlaps the old account's socket/poll handlers. */
@@ -509,19 +562,43 @@ function confirmedString(value: unknown): string | null {
 }
 
 class ChannelSupervisorImpl implements ChannelSupervisor {
-  readonly channelReplyCapabilities = new ChannelReplyCapabilityRegistry();
+  readonly channelReplyCapabilities: ChannelReplyCapabilityRegistry;
   private readonly options: ChannelSupervisorOptions;
   private readonly env: NodeJS.ProcessEnv;
   private readonly logger: PlaneLogger;
   private readonly store: ChannelStore;
   private readonly pinsPath: string;
   private readonly handles = new Map<string, AccountHandle>();
+  /** One durable ingress drain per started account, keyed like `handles`. */
+  private readonly drains = new Map<string, ChannelIngressDrain>();
+  /** Verticals loaded for a QR login on an account that is not started, keyed
+   * like `handles`. Disposed when that account starts or the Hub stops. */
+  private readonly setupSessions = new Map<string, LoadedChannelVertical>();
+  /** Each loaded account's keyed-store root, keyed like `handles`; the QR link
+   * path awaits its `flush` before answering (`rememberAccountState`). */
+  private readonly accountState = new Map<string, HostKeyedStoreRoot>();
+  /** Hub-wide retention for the durable queue; one timer, every organization. */
+  private readonly retentionSweep: ChannelIngressRetentionSweep;
 
   constructor(options: ChannelSupervisorOptions) {
     this.options = options;
     this.env = options.env ?? process.env;
     this.logger = options.logger ?? NO_OP_LOGGER;
     this.store = new ChannelStore(options.databaseRuntime);
+    this.channelReplyCapabilities = new ChannelReplyCapabilityRegistry({
+      store: new ChannelReplyCapabilityStore(options.databaseRuntime),
+      logger: this.logger,
+    });
+    this.retentionSweep = createChannelIngressRetentionSweep({
+      store: this.store,
+      log: {
+        swept: (detail) => this.logger.info?.("channel ingress queue pruned", detail),
+        faulted: (error) =>
+          this.logger.warn("channel ingress retention sweep failed", {
+            error: errorMessage(error),
+          }),
+      },
+    });
     this.pinsPath =
       options.pinsPath ?? fileURLToPath(new URL("../../../channel-pins.json", import.meta.url));
     // The bound seam module (a separate compilation, drive-time) reports its
@@ -532,6 +609,18 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
 
   async startAll(): Promise<void> {
     if (!this.enabled()) return;
+    // Retention is queue state, not account state: it runs even when no
+    // account starts, so a decommissioned account's rows still age out.
+    this.retentionSweep.start();
+    // Agents outlive the Hub process: adopt the reply capabilities the daemon
+    // still holds MCP URLs for before any of them is steered (D-W4-01).
+    try {
+      await this.channelReplyCapabilities.hydrate();
+    } catch (error) {
+      this.logger.warn("channel reply capabilities could not be restored", {
+        error: errorMessage(error),
+      });
+    }
     let snapshot: ChannelControlPlaneSnapshot;
     try {
       snapshot = await loadChannelControlPlane(
@@ -592,20 +681,25 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       if (pinEntry === undefined) {
         throw new InstallError(`unknown channel: ${channel}`, { channel });
       }
+      // A QR login may have loaded this vertical already; the account's own
+      // start takes the load over, so release the setup-only one first.
+      this.disposeSetupSession(channel, accountId);
       const install = await ensureChannelInstalled(pins, channel, accountId, this.options.dataDir);
       handle.install = install;
       handle.integrity = "ok";
       handle.pin = `${pins.main.package}@${pins.main.version}`;
-      const loaded = await this.loadVertical(
-        channel,
-        accountId,
-        install,
-        pinEntry,
-        snapshot.organizationId,
+      // Both steps run as this account (loader/hooks.ts): a vertical finishes
+      // importing its SDK after `startAccount` resolves, and `startAll` starts
+      // the next account meanwhile — the scope is what keeps those late modules
+      // out of the neighbour's load trace.
+      const loaded = await runAsChannelAccount(channel, accountId, () =>
+        this.loadVertical(channel, accountId, install, pinEntry, snapshot.organizationId),
       );
       handle.vertical = loaded.vertical;
       handle.loadTrace = "ok";
-      await this.startTransport(handle, snapshot, compiled, loaded);
+      await runAsChannelAccount(channel, accountId, () =>
+        this.startTransport(handle, snapshot, compiled, loaded),
+      );
       handle.revisionId = snapshot.revision?.id ?? null;
       handle.transport = "started";
       delete handle.detail;
@@ -661,12 +755,22 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         .filter((account) => isEnabled(this.enabled(), snapshot.controlPlane, account))
         .map((account) => handleKey(account.channel, account.accountId)),
     );
+    // Configured at all, enabled or not: a DISABLED account keeps its stored
+    // credentials, a REMOVED one must not (a QR session outliving its account
+    // is a live impersonation credential nobody owns any more).
+    const configured = new Set(
+      snapshot.controlPlane.accounts.map((account) =>
+        handleKey(account.channel, account.accountId),
+      ),
+    );
     const stopped: { channel: string; account: string }[] = [];
     // A Map iterator tolerates deleting the entry it is on; no snapshot needed.
     for (const [key, handle] of this.handles) {
       if (desired.has(key)) continue;
       this.handles.delete(key);
-      await this.stopHandle(handle, { cancelActive: true });
+      this.disposeSetupSession(handle.channel, handle.accountId);
+      await this.stopHandle(handle, { cancelActive: true, retireCapabilities: true });
+      if (!configured.has(key)) await this.forgetAccountSecrets(handle);
       stopped.push({ channel: handle.channel, account: handle.accountId });
     }
     const accounts: ChannelAccountStartResult[] = [];
@@ -674,10 +778,14 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       const key = handleKey(account.channel, account.accountId);
       const handle = this.handles.get(key);
       const activeRevisionId = snapshot.revision?.id ?? null;
+      // An account already running this revision needs nothing. Neither does one
+      // parked in `needs-login`: restarting it just re-runs the same failed
+      // session probe, and the only thing that clears it is a human QR scan (a
+      // new revision, or the QR login's own restart, does re-drive it).
       if (
         !desired.has(key) ||
         (handle !== undefined &&
-          handle.transport === "started" &&
+          isSettledTransport(handle.transport) &&
           handle.revisionId === activeRevisionId)
       ) {
         continue;
@@ -708,6 +816,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
 
   async stopAll(): Promise<void> {
     if (!this.enabled()) return;
+    await this.retentionSweep.stop();
+    for (const [key, session] of this.setupSessions) {
+      this.setupSessions.delete(key);
+      session.dispose();
+    }
     const handles = [...this.handles.values()];
     this.handles.clear();
     for (const handle of handles) await this.stopHandle(handle);
@@ -721,7 +834,11 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * records a failed delivery. This is the SAME `sendText` seam the relay's
    * post path uses, so a tool-path post and a relay post land identically.
    */
-  async channelReplyPost(ref: ChannelReplyBindingRef, text: string): Promise<OutboundPostResult> {
+  async channelReplyPost(
+    ref: ChannelReplyBindingRef,
+    text: string,
+    options?: { presentation?: MessagePresentation | undefined },
+  ): Promise<OutboundPostResult> {
     const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
     const post = handle?.post;
     if (handle === undefined || post === undefined || handle.transport !== "started") {
@@ -736,12 +853,13 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       to: ref.externalConversationId,
       ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
       text,
+      ...(options?.presentation === undefined ? {} : { presentation: options.presentation }),
     });
   }
 
   async channelReplyMediaPost(
     ref: ChannelReplyBindingRef,
-    filePath: string,
+    file: StagedChannelMedia,
   ): Promise<MediaPostResult> {
     const handle = this.handles.get(handleKey(ref.channel, ref.accountId));
     const media = handle?.media;
@@ -756,13 +874,16 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       accountId: ref.accountId,
       to: ref.externalConversationId,
       ...(ref.externalThreadId !== null ? { threadId: ref.externalThreadId } : {}),
-      filePath,
+      filePath: file.filePath,
+      fileName: file.fileName,
+      ...(file.mimeType === undefined ? {} : { mimeType: file.mimeType }),
+      ...(file.asVoice === undefined ? {} : { asVoice: file.asVoice }),
     });
   }
 
   async resolveConversation(input: {
     organizationId: string;
-    channel: P0ChannelName;
+    channel: SupportedChannelName;
     accountId: string;
     connectionId: string;
     conversationId: string;
@@ -784,7 +905,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
   }
 
   async postTestMessage(input: {
-    channel: P0ChannelName;
+    channel: SupportedChannelName;
     accountId: string;
     conversationId: string;
     threadId?: string | undefined;
@@ -813,6 +934,86 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       ...(preview.threadId === null ? {} : { threadId: preview.threadId }),
       text: preview.text,
     });
+  }
+
+  /**
+   * One QR-login verb for a QR-auth account. The vertical is LOADED (installed
+   * + imported + its host runtime injected, including the encrypted state
+   * backing) but not started: linking has to work before a start can succeed.
+   * A started or `needs-login` account reuses its live load; anything else gets
+   * a setup session that later start disposes.
+   */
+  async qrLogin(input: {
+    organizationId: string;
+    channel: SupportedChannelName;
+    accountId: string;
+    compiled: CompiledChannelAccount;
+    verb: QrLoginVerb;
+  }): Promise<QrLoginResult> {
+    const vertical = await this.setupVertical(input.channel, input.accountId, input.organizationId);
+    const resolveConnection =
+      this.options.resolveConnection ??
+      this.options.database.resolveChannelConnection.bind(this.options.database);
+    const credentials = await resolveConnection({
+      organizationId: input.organizationId,
+      channel: input.channel,
+      connectionId: input.compiled.connectionId,
+    });
+    const { account } = buildAccountCarriers(input.channel, {
+      ...credentials,
+      accountId: input.accountId,
+      compiled: input.compiled,
+    });
+    const profile = typeof account["profile"] === "string" ? account["profile"] : input.accountId;
+    const state = this.accountState.get(handleKey(input.channel, input.accountId));
+    return runQrLoginVerb({
+      plugin: vertical.plugin,
+      accountId: input.accountId,
+      profile,
+      verb: input.verb,
+      ...(state === undefined ? {} : { flushState: () => state.flush() }),
+    });
+  }
+
+  /**
+   * The loaded vertical a setup verb runs against. A started account (and an
+   * account parked in `needs-login`, whose load survived its failed transport)
+   * already has one; otherwise install + load it once and keep it for the next
+   * verb in the same login.
+   */
+  private async setupVertical(
+    channel: SupportedChannelName,
+    accountId: string,
+    organizationId: string,
+  ): Promise<LoadedChannelVertical> {
+    const key = handleKey(channel, accountId);
+    const handle = this.handles.get(key);
+    if (
+      handle?.vertical !== undefined &&
+      (handle.transport === "started" || handle.transport === "needs-login")
+    ) {
+      return handle.vertical;
+    }
+    const existing = this.setupSessions.get(key);
+    if (existing !== undefined) return existing;
+    const pins = loadChannelPins(this.pinsPath);
+    const pinEntry = pins.channels[channel];
+    if (pinEntry === undefined) throw new InstallError(`unknown channel: ${channel}`, { channel });
+    const install = await ensureChannelInstalled(pins, channel, accountId, this.options.dataDir);
+    const loaded = await this.loadVertical(channel, accountId, install, pinEntry, organizationId);
+    this.setupSessions.set(key, loaded.vertical);
+    return loaded.vertical;
+  }
+
+  /** Release a setup-only load. The account's own start owns the vertical from
+   * then on; two live loads of one account would fight over the vertical's
+   * module-level session store. */
+  private disposeSetupSession(channel: string, accountId: string): void {
+    const key = handleKey(channel, accountId);
+    const session = this.setupSessions.get(key);
+    if (session === undefined) return;
+    this.setupSessions.delete(key);
+    session.dispose();
   }
 
   async workflowStreamEvent(input: {
@@ -880,8 +1081,17 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const hostRuntime = createHostRuntime({
       onInboundReply: (params) => inbound(params),
       // The account's stable on-disk state dir: poll offsets + dedupe caches
-      // survive a Hub restart (state/keyed-store.ts).
-      state: createHostKeyedStoreRoot({ dir: this.stateDir(accountId) }),
+      // survive a Hub restart (state/keyed-store.ts). The namespaces holding
+      // credential material go to the encrypted database backing instead
+      // (state/encrypted-namespaces.ts).
+      state: this.rememberAccountState(
+        channel,
+        accountId,
+        createHostKeyedStoreRoot({
+          dir: await this.adoptLegacyAccountDir({ organizationId, channel, accountId }, "state"),
+          ...(await this.secretState(channel, accountId, organizationId)),
+        }),
+      ),
       // The vertical's structured log, routed into the Hub log tagged with the
       // account (host.ts's default is silent on every level; without this the
       // vertical's `ctx.log?.info(...)` lines vanish from hub.log).
@@ -909,10 +1119,12 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       // the channel event ledger via the account's orgId. Without it the L3
       // silently skips the ledger steps (blueprint §6 item 7).
       inboundLedger: this.inboundLedgerSink(organizationId, channel, accountId),
+      inboundQueue: this.inboundQueueSink(organizationId, channel, accountId),
     });
     const vertical = await loadChannelVertical({
       channel,
       accountId,
+      organizationId,
       installDir: install.installDir,
       mainInstallDir: install.mainInstallDir,
       channelInstallDir: install.channelInstallDir,
@@ -957,6 +1169,14 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       handle.accountId,
     );
     handle.connectionId = compiled.connectionId;
+    registerChannelDriveConfig(
+      {
+        organizationId: snapshot.organizationId,
+        channel: handle.channel,
+        accountId: handle.accountId,
+      },
+      cfg,
+    );
     const lookup = loaded.vertical.plugin.directory?.resolveConversation;
     if (lookup !== undefined) {
       handle.resolveConversation = createConversationMetadataResolver({
@@ -990,11 +1210,22 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     // The turn-lifecycle surface (the plugin's optional outbound.typing);
     // undefined leaves the seam unmounted — an absent capability, not a fault.
     const planeTyping = typingFor(handle, cfg, loaded.hostRuntime);
+    // The account's streaming surface (slice 22b), feature-detected off the
+    // vertical's own `plugin.outbound`; undefined leaves the relay's
+    // final-only post path exactly as it was.
+    const planeStreaming = createStreamingDriver({
+      channel: supportedChannel(compiled.channel),
+      accountId: handle.accountId,
+      cfg,
+      hostRuntime: loaded.hostRuntime,
+      outbound: loaded.vertical.plugin.outbound,
+      logger: this.logger,
+    });
     const plane = createChannelPlane({
       organizationId: snapshot.organizationId,
       channelRevisionId: snapshot.revision?.id ?? null,
       accountScope: {
-        channel: compiled.channel === "slack" ? "slack" : "telegram",
+        channel: supportedChannel(compiled.channel),
         accountId: compiled.accountId,
       },
       normalizeInbound: flatInboundNormalizer,
@@ -1020,6 +1251,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       // outbound.updateText; absent plugins fail closed per update).
       update: updateFor(handle, cfg, loaded.hostRuntime, this.logger),
       ...(planeTyping !== undefined ? { typing: planeTyping } : {}),
+      ...(planeStreaming !== undefined ? { streaming: planeStreaming } : {}),
       resolveAgentSpec: snapshot.resolveAgentSpec,
       replyCapabilities: this.channelReplyCapabilities,
       resolveAgentAccessTarget: snapshot.resolveAgentAccessTarget,
@@ -1095,6 +1327,10 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const daemon = connectChannelDaemon(daemonOptions);
     handle.daemon = daemon;
     await plane.start(daemon, this.store);
+    // Drain payloads admitted before a previous process stopped. The drain is
+    // account-scoped and uses transactional claim leases from ChannelStore;
+    // start it only after the plane is ready to receive events.
+    this.startInboundDrain(handle, loaded.hostRuntime);
     this.drive(handle, { account, cfg }, loaded.hostRuntime);
   }
 
@@ -1235,12 +1471,23 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
         });
       }
     } catch (error) {
-      handle.transport = "failed";
-      handle.detail = errorMessage(error);
+      const detail = errorMessage(error);
+      handle.detail = detail;
+      // A QR-auth account with no live session is not broken, it is unlinked:
+      // the operator's next step is the QR login, not a retry (needs-login.ts).
+      handle.transport = monitorFailureTransport(handle.channel, detail);
+      if (handle.transport === "needs-login") {
+        this.logger.warn("channel account needs a QR login", {
+          channel: handle.channel,
+          account: handle.accountId,
+          detail,
+        });
+        return;
+      }
       this.logger.error?.("channel account monitor failed", {
         channel: handle.channel,
         account: handle.accountId,
-        error: errorMessage(error),
+        error: detail,
       });
     }
   }
@@ -1292,7 +1539,16 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       // Group G: the account's inbound-media download dir (the L2 transport
       // streams Bot API files here; the `[Attached files]` manifest points
       // the agent at absolute paths under it).
-      mediaDownloadDir: join(this.options.dataDir, "channels", handle.accountId, "downloads"),
+      mediaDownloadDir: this.accountDir(
+        {
+          // A started handle always carries its organization; the fallback only
+          // keeps the path total for a handle still being reconciled.
+          organizationId: handle.organizationId ?? "unscoped",
+          channel: handle.channel,
+          accountId: handle.accountId,
+        },
+        "downloads",
+      ),
       // COMPAT(clisbot-control-plane): the native approval card's
       // button-click seam. The vertical's L2 transport (Slack Socket Mode
       // `interactive` events; Telegram `callback_query` — the poll loop's
@@ -1336,12 +1592,18 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     };
   }
 
-  /** Stop one account; a policy replacement also revokes Route-owned work. */
+  /** Stop one account; a policy replacement also revokes Route-owned work.
+   *
+   * `retireCapabilities` is the account going away for good (reconcile removed
+   * it, or a replacement is about to re-create it), NOT any stop: a Hub
+   * shutdown, a monitor fault and a failed start all leave the durable reply
+   * capabilities in place, because the Agents holding those MCP URLs outlive
+   * the process and must still be able to answer (D-W4-01). */
   private async stopHandle(
     handle: AccountHandle,
-    options: { cancelActive?: boolean } = {},
+    options: { cancelActive?: boolean; retireCapabilities?: boolean } = {},
   ): Promise<void> {
-    if (handle.organizationId !== undefined) {
+    if (handle.organizationId !== undefined && options.retireCapabilities === true) {
       this.channelReplyCapabilities.revokeAccount(
         handle.organizationId,
         handle.channel,
@@ -1349,9 +1611,24 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       );
     }
     handle.abortController.abort();
+    const drain = this.drains.get(handleKey(handle.channel, handle.accountId));
+    if (drain !== undefined) {
+      this.drains.delete(handleKey(handle.channel, handle.accountId));
+      await drain.stop();
+    }
     if (handle.plane !== undefined) await handle.plane.stop(options);
     else if (handle.daemon !== undefined) handle.daemon.stop();
-    await handle.monitor;
+    // Bounded: a gateway that ignores its abort must not spend the process's
+    // whole shutdown budget (`monitor-stop.ts`).
+    await awaitMonitorExit(handle.monitor, {
+      onLingering: () => {
+        this.logger.warn("channel account monitor did not exit within the stop grace", {
+          channel: handle.channel,
+          account: handle.accountId,
+          graceMs: MONITOR_STOP_GRACE_MS,
+        });
+      },
+    });
     handle.vertical?.dispose();
     const release = handle.releaseSlackInbound;
     handle.releaseSlackInbound = undefined;
@@ -1359,15 +1636,260 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     handle.transport = "stopped";
   }
 
+  /**
+   * Drop every encrypted keyed-store namespace an account owned. Called when
+   * the account leaves the configuration, never when it is merely disabled or
+   * restarted: unlinking is `logout`'s job and deliberately leaves the
+   * vertical's revocation marker instead
+   * (`packages/channels/zalouser/HUB-WIRING.md` §6).
+   */
+  private async forgetAccountSecrets(handle: AccountHandle): Promise<void> {
+    const { channel, accountId, organizationId } = handle;
+    if (organizationId === undefined || !isSupportedChannel(channel)) return;
+    if (encryptedStateNamespaces(channel).length === 0) return;
+    try {
+      await this.options.database.deleteChannelStateSecrets({
+        organizationId,
+        channel,
+        accountId,
+      });
+    } catch (error) {
+      // P13: a store fault is logged, never thrown out of reconcile.
+      this.logger.error?.("channel account secret state could not be removed", {
+        channel,
+        account: accountId,
+        error: errorMessage(error),
+      });
+    }
+  }
+
   /** Stop + forget one handle (reconcile removes, replacement re-creates). */
   private async teardown(handle: AccountHandle | undefined): Promise<void> {
     if (handle === undefined) return;
     this.handles.delete(handleKey(handle.channel, handle.accountId));
-    await this.stopHandle(handle, { cancelActive: true });
+    this.accountState.delete(handleKey(handle.channel, handle.accountId));
+    await this.stopHandle(handle, { cancelActive: true, retireCapabilities: true });
   }
 
-  private stateDir(accountId: string): string {
-    return join(this.options.dataDir, "channels", accountId, "state");
+  /** Keep the account's keyed-store root: the QR link path awaits its `flush`
+   * before it answers, and only the load knows which root the vertical got. */
+  private rememberAccountState(
+    channel: string,
+    accountId: string,
+    state: HostKeyedStoreRoot,
+  ): HostKeyedStoreRoot {
+    this.accountState.set(handleKey(channel, accountId), state);
+    return state;
+  }
+
+  /**
+   * The encrypted keyed-store backing for one account, or nothing when the
+   * channel keeps no credential material in its keyed store. Opened before the
+   * root because the store seam is synchronous: the snapshot has to be in hand
+   * by the time the vertical first reads a credential.
+   */
+  private async secretState(
+    channel: string,
+    accountId: string,
+    organizationId: string,
+  ): Promise<{ secret?: { namespaces: readonly string[]; backend: KeyedStoreBackend } }> {
+    const namespaces = encryptedStateNamespaces(channel);
+    if (namespaces.length === 0 || !isSupportedChannel(channel)) return {};
+    const backend = await openChannelSecretStateBackend({
+      database: this.options.database,
+      scope: { organizationId, channel, accountId },
+    });
+    return { secret: { namespaces, backend } };
+  }
+
+  /**
+   * One account's on-disk root, scoped by organization and channel.
+   *
+   * An account id is only unique inside one organization's channel: two tenants
+   * that both name their workspace `support`, or one tenant running `support`
+   * on Slack and on Telegram, would otherwise share a poll offset, a dedupe
+   * cache and a downloads dir — one account reading another's inbound state.
+   */
+  private accountDir(
+    scope: { organizationId: string; channel: string; accountId: string },
+    leaf: string,
+  ): string {
+    return join(
+      this.options.dataDir,
+      "channels",
+      scope.organizationId,
+      scope.channel,
+      scope.accountId,
+      leaf,
+    );
+  }
+
+  /**
+   * COMPAT(clisbot-channel-account-dir): before the scope was in the path, this
+   * was `channels/<accountId>/<leaf>`. Move the old directory into place the
+   * first time the account starts so a Hub restart keeps its poll offset
+   * instead of replaying the backlog. Remove once no deployment predates it.
+   */
+  private async adoptLegacyAccountDir(
+    scope: { organizationId: string; channel: string; accountId: string },
+    leaf: string,
+  ): Promise<string> {
+    const scoped = this.accountDir(scope, leaf);
+    const legacy = join(this.options.dataDir, "channels", scope.accountId, leaf);
+    try {
+      await mkdir(dirname(scoped), { recursive: true });
+      await rename(legacy, scoped);
+      this.logger.info?.("adopted a pre-scope channel account directory", {
+        channel: scope.channel,
+        account: scope.accountId,
+        leaf,
+      });
+    } catch {
+      // Already migrated, never existed, or the scoped dir is in use: either
+      // way the scoped path below is the one the account runs on.
+    }
+    return scoped;
+  }
+
+  /**
+   * Start the account's durable ingress drain. It runs one pass immediately
+   * (the restart drain for payloads admitted before this process), then on its
+   * own timer for retry-due and recovered rows; `inboundQueueSink.enqueue`
+   * wakes it so a live event does not wait for the next tick.
+   */
+  private startInboundDrain(handle: AccountHandle, hostRuntime: HostRuntime): void {
+    const queue = hostRuntime.inboundQueue;
+    const organizationId = handle.organizationId;
+    if (queue === undefined || organizationId === undefined) return;
+    const drain = createChannelIngressDrain({
+      queue,
+      organizationId,
+      channel: handle.channel,
+      accountId: handle.accountId,
+      workerId: `${handle.channel}:${handle.accountId}:drain`,
+      abortSignal: handle.abortController.signal,
+      resolveNonRetryableFailure: resolveHubIngressNonRetryableFailure,
+      dispatch: (payload) => this.dispatchInbound(handle, hostRuntime, payload),
+      log: this.inboundDrainLog(handle),
+    });
+    this.drains.set(handleKey(handle.channel, handle.accountId), drain);
+    drain.start();
+  }
+
+  /**
+   * Hand one claimed payload to the plane. A throw here is the drain's failure
+   * signal. `dispatched: false` is terminal — the plane decided to drop the
+   * event — and completes the claim, unless the plane also returned a deferral:
+   * that is back-pressure, and the drain releases the row so the message comes
+   * back instead of disappearing.
+   */
+  private async dispatchInbound(
+    handle: AccountHandle,
+    hostRuntime: HostRuntime,
+    payload: unknown,
+  ): Promise<ChannelIngressDeferral | undefined> {
+    const params = payload as InboundReplyParams;
+    const result = await hostRuntime.onInboundReply(params);
+    if (!result.dispatched) {
+      const deferral = planeInboundDeferral(result);
+      if (deferral !== undefined) return { kind: "deferred", ...deferral };
+    }
+    if (!result.dispatched || hostRuntime.inboundLedger === undefined) return undefined;
+    const context = params.ctxPayload;
+    const conversationId = context?.["ChatId"];
+    const messageId = context?.["MessageSid"];
+    if (typeof conversationId !== "string" || typeof messageId !== "string") return undefined;
+    await hostRuntime.inboundLedger.consume({
+      channel: handle.channel,
+      accountId: handle.accountId,
+      externalConversationId: conversationId,
+      externalMessageId: messageId,
+      turnId: `${handle.channel}:${messageId}`,
+    });
+    return undefined;
+  }
+
+  /**
+   * Operator-visible drain outcomes: dead-letters are loud, retries and lost
+   * claims are warnings, a plane deferral is routine back-pressure.
+   */
+  private inboundDrainLog(handle: AccountHandle): ChannelIngressDrainLog {
+    const base = { channel: handle.channel, account: handle.accountId };
+    return {
+      drained: (claim) => {
+        this.logger.info?.("channel inbound queue drained", { ...base, event: claim.id });
+      },
+      retried: (claim, detail) => {
+        this.logger.warn("channel inbound drain failed; retry scheduled", {
+          ...base,
+          event: claim.id,
+          attempts: claim.attempts,
+          retryAt: detail.retryAt.toISOString(),
+          error: detail.message,
+        });
+      },
+      deferred: (claim, detail) => {
+        this.logger.info?.("channel inbound event deferred by the plane", {
+          ...base,
+          event: claim.id,
+          retryAt: detail.retryAt.toISOString(),
+          reason: detail.reason,
+        });
+      },
+      abandoned: (claim, detail) => {
+        this.logger.warn("channel inbound claim abandoned; another worker owns it", {
+          ...base,
+          event: claim.id,
+          attempts: claim.attempts,
+          reason: detail.reason,
+        });
+      },
+      deadLettered: (claim, detail) => {
+        this.logger.error?.("channel inbound event dead-lettered", {
+          ...base,
+          event: claim.id,
+          attempts: claim.attempts,
+          reason: detail.reason,
+          error: detail.message,
+        });
+      },
+      faulted: (error) => {
+        this.logger.warn("channel inbound queue drain unavailable", {
+          ...base,
+          error: errorMessage(error),
+        });
+      },
+    };
+  }
+
+  /**
+   * The account's durable ingress boundary (`ingress/queue-sink.ts`). Admission
+   * wakes the account's drain so a live message does not wait for the timer.
+   */
+  private inboundQueueSink(
+    organizationId: string,
+    channel: string,
+    accountId: string,
+  ): InboundQueueSink {
+    return createChannelIngressQueueSink({
+      store: this.store,
+      organizationId,
+      channel,
+      accountId,
+      onAdmitted: () => this.drains.get(handleKey(channel, accountId))?.requestDrain(),
+      // A release that ended the row is not back-pressure any more, it is a
+      // stuck message an operator has to resubmit or drop.
+      onReleaseBudgetExhausted: (record) => {
+        this.logger.error?.("channel inbound event released past its budget", {
+          channel,
+          account: accountId,
+          event: record.id,
+          releases: record.releases,
+          reason: record.failedReason,
+          error: record.lastError,
+        });
+      },
+    });
   }
 
   /**
@@ -1384,7 +1906,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     accountId: string,
   ): InboundLedgerSink {
     const store = this.store;
-    const channelKey = channel as "slack" | "telegram";
+    const channelKey = supportedChannel(channel);
     return {
       record: async (params) => {
         const { created } = await store.recordInbound({

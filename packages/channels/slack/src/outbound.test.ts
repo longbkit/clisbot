@@ -12,7 +12,7 @@ import {
   slackWebClientStubForTest,
   type WebClient,
 } from "./client/web-api.js";
-import { renderSlackMrkdwn } from "./mrkdwn.js";
+import { normalizeSlackOutboundText } from "./format.js";
 import { sendMedia, sendSlackText, updateSlackText } from "./outbound.js";
 
 const CFG = {
@@ -75,15 +75,28 @@ function fakeWriteClient(
   } as WebClient;
 }
 
+/** The fake the ported send path is handed through `SlackSendOpts.client`.
+ * Slice 10b moved `sendSlackText` onto upstream `send.ts`, which builds its
+ * write client through the ported `client.ts` cache; upstream's own injection
+ * point is the `client` option, so the fake is passed in per call instead of
+ * being registered in the cache. `registerSlackWriteClientForTest` still backs
+ * the paths that have not moved yet (`updateText`, `sendMedia`). */
+let installedFakeClient: WebClient | undefined;
+
 function installFakeClient(
   posts: RecordedPost[],
   updates?: RecordedUpdate[],
   updateResult?: Record<string, unknown>,
 ): void {
-  registerSlackWriteClientForTest(
-    "xoxb-test-outbound",
-    fakeWriteClient(posts, updates, updateResult),
-  );
+  const client = fakeWriteClient(posts, updates, updateResult);
+  installedFakeClient = client;
+  installedFakeClient = client;
+  registerSlackWriteClientForTest("xoxb-test-outbound", client);
+}
+
+/** `sendSlackText` with the installed fake client injected. */
+function postText(args: Record<string, unknown>) {
+  return sendSlackText({ ...args, client: installedFakeClient } as never);
 }
 
 interface UploadCalls {
@@ -107,14 +120,15 @@ function installFakeClientWithUploads(posts: RecordedPost[], uploads: UploadCall
       return { ok: true } as never;
     },
   };
+  installedFakeClient = client;
   registerSlackWriteClientForTest("xoxb-test-outbound", client);
 }
 
-describe("sendSlackText — mrkdwn escape (C5)", () => {
+describe("sendSlackText — upstream mrkdwn render (format.ts)", () => {
   it("renders code spans, emphasis, and links as mrkdwn; escapes only & < >", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    await sendSlackText({
+    await postText({
       cfg: CFG,
       accountId: "work",
       to: "C1",
@@ -125,7 +139,7 @@ describe("sendSlackText — mrkdwn escape (C5)", () => {
     // C5 markdown-aware render: the code span / emphasis markup survives (no
     // backslash-escaping of delimiters), a CommonMark link becomes Slack's
     // `<url|label>` form; only the XML-unsafe `&`/`<` in text leaves are
-    // entity-escaped (`>` is inert in mrkdwn).
+    // entity-escaped.
     expect(posts[0]?.args.text).toBe(
       "run `npm test` — a &amp; b &lt; c\n*bold* _em_ <https://example.com|x>",
     );
@@ -134,23 +148,24 @@ describe("sendSlackText — mrkdwn escape (C5)", () => {
   it("keeps the posted text a string with no unescaped entity chars", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    await sendSlackText({
+    await postText({
       cfg: CFG,
       accountId: "work",
       to: "C1",
       text: "1 < 2 & 3 > 0",
     });
     const text = posts[0]?.args.text ?? "";
-    // Every `&` must belong to an entity (`&amp;`/`&lt;`), and no raw `<`
-    // survives (`>` needs no escaping in mrkdwn — Slack renders it literal).
-    expect(text.replace(/&amp;|&lt;/g, "")).not.toMatch(/[&<]/);
-    expect(text).toBe("1 &lt; 2 &amp; 3 > 0");
+    // Every `&` must belong to an entity and no raw `<`/`>` survives. The
+    // upstream renderer (`format.ts` `escapeSlackMrkdwnText`) escapes all three
+    // XML-unsafe characters; the retired local renderer left `>` literal.
+    expect(text.replace(/&amp;|&lt;|&gt;/g, "")).not.toMatch(/[&<>]/);
+    expect(text).toBe("1 &lt; 2 &amp; 3 &gt; 0");
   });
 
   it("still threads replies via thread_ts", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    await sendSlackText({
+    await postText({
       cfg: CFG,
       accountId: "work",
       to: "C1",
@@ -184,17 +199,109 @@ const CARD_BLOCKS: Record<string, unknown>[] = [
   },
 ];
 
+/**
+ * The Hub posts plain markdown (`postFor` passes the agent's answer through
+ * untouched), so the drive surface owns the whole mrkdwn render.
+ */
+const MARKDOWN_SHOWCASE = [
+  "# Heading one",
+  "",
+  "## Heading two",
+  "",
+  "**bold** and *italic* and [a link](https://example.com)",
+  "",
+  "- bullet one",
+  "- bullet two",
+  "",
+  "1. first",
+  "2. second",
+  "",
+  "> quoted line",
+  "",
+  "Inline `code` here.",
+  "",
+  "```js",
+  "const x = 1;",
+  "```",
+  "",
+  "| A | B | C |",
+  "| --- | --- | --- |",
+  "| 1 | 2 | 3 |",
+  "| 4 | 5 | 6 |",
+  "",
+].join("\n");
+
+describe("sendSlackText — markdown showcase", () => {
+  it("renders every construct as mrkdwn, with the table as a code block", async () => {
+    const posts: RecordedPost[] = [];
+    installFakeClient(posts);
+    await postText({ cfg: CFG, accountId: "work", to: "C1", text: MARKDOWN_SHOWCASE });
+    // Slack mrkdwn has no heading, so upstream's renderer (`headingStyle:
+    // "rich"`) emits bold; the table rides the channel's default table mode
+    // ("code" — Slack declares no plugin default), NOT raw pipes.
+    expect(posts[0]?.args.text).toBe(
+      [
+        "*Heading one*",
+        "",
+        "*Heading two*",
+        "",
+        "*bold* and _italic_ and <https://example.com|a link>",
+        "",
+        "• bullet one",
+        "• bullet two",
+        "",
+        "1. first",
+        "2. second",
+        "",
+        "> quoted line",
+        "",
+        "Inline `code` here.",
+        "",
+        "```",
+        "const x = 1;",
+        "```",
+        "```",
+        "| A | B | C |",
+        "| --- | --- | --- |",
+        "| 1 | 2 | 3 |",
+        "| 4 | 5 | 6 |",
+        "```",
+      ].join("\n"),
+    );
+  });
+
+  it("honours an authored table mode over the channel default", async () => {
+    const posts: RecordedPost[] = [];
+    installFakeClient(posts);
+    const cfg = {
+      channels: {
+        slack: {
+          markdown: { tables: "off" },
+          accounts: { work: { botToken: "xoxb-test-outbound" } },
+        },
+      },
+    } as unknown as Record<string, unknown>;
+    await postText({
+      cfg,
+      accountId: "work",
+      to: "C1",
+      text: "| A | B |\n| --- | --- |\n| 1 | 2 |\n",
+    });
+    expect(posts[0]?.args.text).not.toContain("```");
+  });
+});
+
 describe("sendSlackText — native card (E1)", () => {
   it("posts the card blocks alongside the escaped text and reports cardPosted", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    const result = await sendSlackText({
+    const result = await postText({
       cfg: CFG,
       accountId: "work",
       to: "C1",
       text: "prompt text",
       blocks: CARD_BLOCKS,
-    } as never);
+    });
     expect(posts.length).toBe(1);
     // The blocks ride the same mrkdwn render (the Hub mints CommonMark text;
     // posting it verbatim would show literal `**`/`[x](url)` in the card).
@@ -203,7 +310,7 @@ describe("sendSlackText — native card (E1)", () => {
         const text = block["text"] as Record<string, unknown> | undefined;
         return text?.["type"] === "mrkdwn" && typeof text["text"] === "string"
           ? Object.assign({}, block, {
-              text: Object.assign({}, text, { text: renderSlackMrkdwn(text["text"]) }),
+              text: Object.assign({}, text, { text: normalizeSlackOutboundText(text["text"]) }),
             })
           : block;
       }),
@@ -216,7 +323,7 @@ describe("sendSlackText — native card (E1)", () => {
   it("posts plain text (no blocks, no cardPosted) when the arg is absent", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    const result = await sendSlackText({
+    const result = await postText({
       cfg: CFG,
       accountId: "work",
       to: "C1",
@@ -287,7 +394,7 @@ describe("sendSlackText — local-file links remain text-only", () => {
   it("does not upload a local file linked in the text", async () => {
     const posts: RecordedPost[] = [];
     installFakeClient(posts);
-    await sendSlackText({
+    await postText({
       cfg: CFG,
       accountId: "work",
       to: "C1",
@@ -339,5 +446,118 @@ describe("sendMedia — the G11 gate (notice instead of a silent drop)", () => {
       } as never),
     ).rejects.toThrow(/not found/);
     expect(posts.length).toBe(0);
+  });
+});
+
+// --- the portable presentation (D-W6-01) -------------------------------------
+//
+// The Hub's `send` reaches Slack through `plugin.outbound.sendText`, so this is
+// the production surface for a native chart/table — `presentation-send.test.ts`
+// covers the same presentation on the `message` tool's `handleAction` path.
+
+const CHART_AND_TABLE = {
+  blocks: [
+    {
+      type: "chart",
+      chartType: "bar",
+      title: "Weekly runs",
+      categories: ["Mon", "Tue", "Wed"],
+      series: [{ name: "runs", values: [3, 5, 4] }],
+      xLabel: "Day",
+      yLabel: "Runs",
+    },
+    {
+      type: "table",
+      caption: "Totals",
+      headers: ["A", "B", "C"],
+      rows: [
+        [1, 2, 3],
+        [4, 5, 6],
+      ],
+    },
+  ],
+};
+
+describe("sendSlackText — native presentation", () => {
+  it("posts the chart and the table as native Block Kit blocks", async () => {
+    const posts: RecordedPost[] = [];
+    installFakeClient(posts);
+    const result = await postText({
+      cfg: CFG,
+      accountId: "work",
+      to: "C1",
+      text: "W6CHART-OK",
+      presentation: CHART_AND_TABLE,
+    });
+    const blocks = posts.flatMap((post) => post.args.blocks ?? []);
+    expect(blocks.find((block) => block["type"] === "data_visualization")).toMatchObject({
+      type: "data_visualization",
+      title: "Weekly runs",
+      chart: {
+        type: "bar",
+        axis_config: { categories: ["Mon", "Tue", "Wed"], x_label: "Day", y_label: "Runs" },
+      },
+    });
+    expect(blocks.find((block) => block["type"] === "data_table")).toMatchObject({
+      type: "data_table",
+      caption: "Totals",
+    });
+    // Every native post keeps a text fallback: unsupported clients and the
+    // notification preview still carry the answer.
+    expect(posts.some((post) => (post.args.text ?? "").includes("W6CHART-OK"))).toBe(true);
+    // The card flag is what the plane reads to decide a post carries native
+    // markup; the ledger confirms the send on the first message's id.
+    expect(result.cardPosted).toBe(true);
+    expect(result.messageId).toBe("123.456");
+  });
+
+  it("posts a table the model wrote without a caption (D-W6-02)", async () => {
+    const posts: RecordedPost[] = [];
+    installFakeClient(posts);
+    await postText({
+      cfg: CFG,
+      accountId: "work",
+      to: "C1",
+      text: "W6TABLE-OK",
+      presentation: {
+        blocks: [{ type: "table", headers: ["X", "Y"], rows: [[1, 2]] }],
+      },
+    });
+    const blocks = posts.flatMap((post) => post.args.blocks ?? []);
+    // Core's normalizer refuses a caption-less table; admission fills the
+    // caption from the first header instead of dropping the data.
+    expect(blocks.find((block) => block["type"] === "data_table")).toMatchObject({
+      type: "data_table",
+      caption: "X",
+    });
+  });
+
+  it("posts plain text when the presentation carries no renderable block", async () => {
+    const posts: RecordedPost[] = [];
+    installFakeClient(posts);
+    await postText({
+      cfg: CFG,
+      accountId: "work",
+      to: "C1",
+      text: "W6TEXT-ONLY",
+      // Duplicate categories break the portable contract, so core drops the
+      // whole presentation at normalization.
+      presentation: {
+        blocks: [
+          {
+            type: "chart",
+            chartType: "bar",
+            title: "Weekly runs",
+            categories: ["Mon", "Mon"],
+            series: [{ name: "runs", values: [1, 2] }],
+          },
+        ],
+      },
+    });
+    expect(posts.length).toBe(1);
+    expect(posts[0]?.args.blocks?.some((block) => block["type"] === "data_visualization")).not.toBe(
+      true,
+    );
+    expect(posts[0]?.args.text).toBe("W6TEXT-ONLY");
   });
 });

@@ -144,6 +144,58 @@ Run it locally with the same command owned by the Ubuntu `desktop-tests` require
 npm run test:e2e:browser-tabs --workspace=@getpaseo/desktop
 ```
 
+## Channel platform
+
+The channel verticals in `packages/channels/*` are ports of OpenClaw code talking to
+third-party chat platforms. Three tiers, in the order you should reach for them.
+
+**Differential fixture corpus.** Every pure function ported verbatim — formatting,
+chunking, mentions, targets, error classification — has a recorded corpus at
+`packages/channels/<channel>/src/__fixtures__/upstream-differential.json`. Inputs are
+harvested from the upstream test file each case names; outputs are what the local
+function produces. `upstream-differential.test.ts` replays them, so a port that changes
+behaviour fails a test even when nobody touched its `*.test.ts`.
+
+```bash
+node --import tsx scripts/channel-differential-fixtures.mjs generate --pkg slack
+node --import tsx scripts/channel-differential-fixtures.mjs check          # CI form
+```
+
+Add cases to `src/__fixtures__/upstream-differential.cases.ts` and regenerate; never
+edit the JSON. The corpus records local behaviour, not upstream behaviour — running
+upstream functions would need a built OpenClaw checkout per commit. Regeneration at a
+new baseline therefore diffs local-then against local-now. Byte fidelity against
+upstream stays `npm run channels:sync:check`.
+
+**Simulated platforms.** `@getpaseo/channels-shared/sim` boots loopback servers that
+speak each platform's real wire shape: Slack Web API + Socket Mode, the Telegram Bot
+API with a real long poll, Discord REST + gateway, and signed webhook requests for the
+webhook family. Every sim records each request and injects faults (`rate-limit` with
+the platform's own retry-after shape, `unauthorized`, `server-error`, `socket-drop`), so
+the SDK's own retry and reconnect paths execute. Point a vertical at one with
+`SLACK_API_URL` (Slack) or the account's `config.apiRoot` (Telegram).
+
+Each sim is proven against the SDK the vertical actually loads, in
+`packages/channels/<channel>/src/sim/sim.interop.test.ts`. A sim that has drifted from
+its SDK is worse than no sim, so change one and rerun its interop file first.
+
+`packages/hub/src/channels/supervisor/sim-boot.integration.test.ts` is the real-both-sides
+tier: the real supervisor, loader, verticals' `dist/`, ingress queue and plane, against
+the sims and a `FakeDaemon`. It needs no credentials. It boots a real Hub per file, so it
+is gated:
+
+```bash
+RUN_CHANNEL_SIM_BOOT=1 npx vitest run src/channels/supervisor/sim-boot.integration.test.ts \
+  --maxWorkers=1 --no-file-parallelism            # from packages/hub
+```
+
+**When live is still required.** A sim cannot prove platform behaviour you did not
+already know. Anything whose answer is "what does Slack/Telegram actually do" — scope
+and permission errors, formatting the platform renders, rate limits under real load,
+media pipelines, forum-topic addressing — needs a live run against the surfaces in
+`.env`, recorded in `docs/tests/channels/p0-live-scenarios.md`. The sim's job is to
+make every live wave start from a plane that already works, not to replace the wave.
+
 ## Test organization
 
 - Collocate tests with implementation: `thing.ts` + `thing.test.ts`

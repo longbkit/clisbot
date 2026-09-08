@@ -23,6 +23,7 @@ import { INVITATION_ROLES, ORGANIZATION_ROLES } from "../auth/organization-contr
 import { API_KEY_SCOPES } from "../auth/api-key-contract.js";
 import type { CredentialEnvelope } from "../credentials/credential-cipher.js";
 import type { HubBundleFile } from "../config/bundle-contract.js";
+import { SUPPORTED_CHANNEL_NAMES, type SupportedChannelName } from "../channels/catalog.js";
 
 export { INVITATION_ROLES, ORGANIZATION_ROLES };
 
@@ -713,7 +714,7 @@ export const accessAssignments = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    subjectKind: text("subject_kind").$type<"member" | "team">().notNull(),
+    subjectKind: text("subject_kind").$type<"member" | "team" | "guest">().notNull(),
     subjectId: text("subject_id").notNull(),
     resourceKind: text("resource_kind")
       .$type<"organization" | "daemon" | "project" | "channel_account" | "automation">()
@@ -740,7 +741,7 @@ export const accessAssignments = pgTable(
       table.resourceKind,
       table.resourceId,
     ),
-    check("access_assignments_subject_kind_check", sql`${table.subjectKind} in ('member', 'team')`),
+    check("access_assignments_subject_kind_check", sql`${table.subjectKind} in ('member', 'team', 'guest')`),
     check(
       "access_assignments_resource_kind_check",
       sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'channel_account', 'automation')`,
@@ -1791,7 +1792,7 @@ export const billingPlanPrices = pgTable(
 // from the subscription's price at webhook time — never dereferenced by enforcement, which reads
 // only `organization_entitlements`. `status` carries Stripe's own vocabulary verbatim, so no
 // check constraint drifts against it. Self-hosted instances never write here.
-// --- Channel control plane (P0: Slack + Telegram) -------------------------------------
+// --- Channel control plane (the SUPPORTED_CHANNEL_NAMES verticals) ---------------------
 //
 // COMPAT(clisbot-channels): fork-owned channel control plane (plan P3/P4/P5,
 // implementation doc §3.1/§4.2/§4.3.4). Additive tables only: channel accounts,
@@ -1799,18 +1800,252 @@ export const billingPlanPrices = pgTable(
 // upstream Hub ignores these tables entirely; deleting this block plus its
 // migration returns the schema to its upstream state.
 
-export const CHANNEL_NAMES = ["slack", "telegram"] as const;
+/** `<column> in ('slack', 'telegram', …)` over the supported channel names —
+ * one derivation for every channel check constraint in this schema. */
+function channelNameCheck(column: AnyPgColumn) {
+  return sql`${column} in ${sql.raw(`(${SUPPORTED_CHANNEL_NAMES.map((name) => `'${name}'`).join(", ")})`)}`;
+}
+
+/**
+ * Encrypted per-account channel state: the durable backing for the keyed-store
+ * namespaces a vertical uses for CREDENTIAL material rather than protocol
+ * bookkeeping (`channels/state/encrypted-namespaces.ts` names them).
+ *
+ * Ordinary namespaces — Telegram's poll offset, the send-dedupe caches — stay
+ * plain JSON files under the account's state dir: they are protocol state, they
+ * are hot, and losing one costs a replay. A QR-login session is the opposite: it
+ * IS the account, so it rests here, one envelope per namespace, sealed by the
+ * same cipher and key custody the Connection envelopes use, and bound by AAD to
+ * the organization, account and namespace that own it.
+ */
+export const channelStateSecrets = pgTable(
+  "channel_state_secrets",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().notNull(),
+    accountId: text("account_id").notNull(),
+    namespace: text().notNull(),
+    stateEnvelope: jsonb("state_envelope").$type<CredentialEnvelope>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_state_secrets_namespace_unique").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.namespace,
+    ),
+    check("channel_state_secrets_channel_check", channelNameCheck(table.channel)),
+  ],
+);
+
+/**
+ * Durable Channel reply capabilities: the routing and authorization facts
+ * behind the opaque token in an Agent's `channel_reply` MCP URL.
+ *
+ * The daemon keeps that URL for the Agent's whole life, so the Hub has to
+ * answer the same token after a restart — a process-memory registry made every
+ * steered turn call a dead capability (D-W4-01). Only the token's SHA-256
+ * verifier rests here, the same shape access tickets use: a lifted row cannot
+ * be replayed as a bearer token, and every fact stays server-owned.
+ */
+export const channelReplyCapabilities = pgTable(
+  "channel_reply_capabilities",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    // Soft reference to the revision that authorized the capability, stored as
+    // text and never dereferenced: a replaced revision must not delete a
+    // capability a live turn still holds.
+    channelRevisionId: text("channel_revision_id"),
+    /** The Route's position, `fallback` for the fallback Route. */
+    routePosition: text("route_position").notNull(),
+    routeFingerprint: text("route_fingerprint").notNull(),
+    channel: text().notNull(),
+    accountId: text("account_id").notNull(),
+    externalConversationId: text("external_conversation_id").notNull(),
+    externalThreadId: text("external_thread_id"),
+    projectRoot: text("project_root"),
+    /** The native id of the sender whose message opened the thread. Persisted
+     * so a capability restored after a restart keeps its requester: the ported
+     * executors' channel-local trust check and the command buttons minted for
+     * that actor both fail closed without it. */
+    requesterSenderId: text("requester_sender_id"),
+    outputBudget: jsonb("output_budget").$type<{
+      executionId: string;
+      type: string;
+      max?: number | undefined;
+    }>(),
+    /** Null until the create RPC returns the Agent this capability belongs to. */
+    agentId: text("agent_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("channel_reply_capabilities_account_idx").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+    ),
+    index("channel_reply_capabilities_expires_at_idx").on(table.expiresAt),
+    check("channel_reply_capabilities_channel_check", channelNameCheck(table.channel)),
+  ],
+);
+
+export const CHANNEL_PAIRING_STATUSES = ["pending", "approved", "denied"] as const;
+export type ChannelPairingStatus = (typeof CHANNEL_PAIRING_STATUSES)[number];
+
+/**
+ * One unknown DM sender's pairing request under `access.dmPolicy: pairing`.
+ *
+ * Upstream keeps the paired senders in its own SQLite pairing store and merges
+ * them into `allowFrom` at admission (`mergeDmAllowFromSources`). The Hub owns
+ * that store here, per organization, so an operator can see and revoke it and
+ * so one organization's approvals never reach another's.
+ *
+ * The row IS the code: the request is created once per (account, sender) and a
+ * repeat DM from the same sender re-reads it instead of minting a second code,
+ * which is what makes the flow replay-safe under the durable ingress queue.
+ */
+export const channelPairings = pgTable(
+  "channel_pairings",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<SupportedChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    /** The channel identity that asked (`<channel>:<provider-id>`). */
+    senderIdentity: text("sender_identity").notNull(),
+    /** Display name when the vertical carried one; diagnostics only. */
+    senderName: text("sender_name"),
+    /** The short code the sender was shown, so an operator can match them up. */
+    code: text().notNull(),
+    status: text().$type<ChannelPairingStatus>().notNull(),
+    /** Where the request arrived, so an operator can find the conversation. */
+    externalConversationId: text("external_conversation_id").notNull(),
+    decidedByUserId: text("decided_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_pairings_account_sender_unique").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.senderIdentity,
+    ),
+    index("channel_pairings_account_status_idx").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.status,
+    ),
+    check("channel_pairings_channel_check", channelNameCheck(table.channel)),
+    check(
+      "channel_pairings_status_check",
+      sql`${table.status} in ('pending', 'approved', 'denied')`,
+    ),
+  ],
+);
+
+/**
+ * The agent/model a conversation was switched to with `/agent` or `/model`.
+ *
+ * It cannot live on `thread_bindings`: a selection is made BEFORE the first
+ * turn as often as after one, and `/new` deletes the binding row. So the
+ * selection is keyed on the conversation, outlives every session in it, and is
+ * read when the next agent is created.
+ */
+export const channelConversationSelections = pgTable(
+  "channel_conversation_selections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<SupportedChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    externalConversationId: text("external_conversation_id").notNull(),
+    externalThreadId: text("external_thread_id"),
+    /** The `hub.yml` agent name; null keeps the route's own target. */
+    selectedAgent: text("selected_agent"),
+    /** The provider model id; null keeps the agent definition's model. */
+    selectedModel: text("selected_model"),
+    selectedProvider: text("selected_provider"),
+    selectedThinkingOption: text("selected_thinking_option"),
+    selectedMode: text("selected_mode"),
+    selectedProfile: text("selected_profile"),
+    /** Who switched, for the activity trail. */
+    selectedBy: text("selected_by").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_conversation_selections_key_unique").on(
+      table.organizationId,
+      // The channel belongs in the key: `support` on Slack and `support` on
+      // Telegram are two accounts, and their conversation ids do not collide by
+      // accident so much as by construction (numeric Telegram chat ids).
+      table.channel,
+      table.accountId,
+      table.externalConversationId,
+      sql`coalesce(${table.externalThreadId}, '')`,
+    ),
+    check("channel_conversation_selections_channel_check", channelNameCheck(table.channel)),
+  ],
+);
+
+/** Shared prompt commands, owned by one organization and channel account. */
+export const channelCommands = pgTable(
+  "channel_commands",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id").notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<SupportedChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    name: text().notNull(),
+    prompt: text().notNull(),
+    updatedBy: text("updated_by").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_commands_account_name_unique").on(
+      table.organizationId, table.channel, table.accountId, table.name,
+    ),
+    check("channel_commands_channel_check", channelNameCheck(table.channel)),
+    check("channel_commands_name_check", sql`${table.name} ~ '^[a-z][a-z0-9_-]{0,63}$'`),
+    check("channel_commands_prompt_check", sql`length(trim(${table.prompt})) > 0`),
+  ],
+);
+
 export const THREAD_BINDING_STATUSES = ["pending", "bound", "abandoned"] as const;
 export const DELIVERY_LEDGER_STATUSES = ["recorded", "posted", "failed", "consumed"] as const;
 export const CHANNEL_LEDGER_DIRECTIONS = ["in", "out"] as const;
+export const CHANNEL_INGRESS_QUEUE_STATUSES = [
+  "pending",
+  "claimed",
+  "completed",
+  "failed",
+  "dead_letter",
+] as const;
 
-export type ChannelName = (typeof CHANNEL_NAMES)[number];
 export type ThreadBindingStatus = (typeof THREAD_BINDING_STATUSES)[number];
 export type DeliveryLedgerStatus = (typeof DELIVERY_LEDGER_STATUSES)[number];
 /** The ledger's direction (blueprint §2.4): `out` rows are the outbound relay's
  * record-before-post; `in` rows are the shared L3 monitor's inbound
  * record-before-handoff (status flow `recorded → consumed`). */
 export type ChannelLedgerDirection = (typeof CHANNEL_LEDGER_DIRECTIONS)[number];
+export type ChannelIngressQueueStatus = (typeof CHANNEL_INGRESS_QUEUE_STATUSES)[number];
 
 /** Immutable, organization-owned Channel configuration revisions. Channel
  * authoring deliberately does not use the legacy user-facing Project model. */
@@ -1863,7 +2098,10 @@ export const organizationChannelConfigurations = pgTable(
   ],
 );
 
-/** Telegram installation credentials. Slack reuses the upstream-owned Slack connection table. */
+/**
+ * Telegram installation credentials. Slack reuses the upstream-owned Slack
+ * connection table; Discord gets `discordBotConnections` below.
+ */
 export const telegramConnections = pgTable(
   "telegram_connections",
   {
@@ -1886,6 +2124,153 @@ export const telegramConnections = pgTable(
 );
 
 /**
+ * Discord bot-token installation credentials — the Channel plane's Discord
+ * Connection owner, with the same columns as `telegram_connections` so both
+ * share one credential path (`configureChannelBotConnection`).
+ *
+ * Deliberately NOT the upstream `discord_connections` table: that one is the
+ * trigger provider's per-guild link (`guild_id` unique, one row per guild, no
+ * credential, created and deleted by the OAuth bot-invite flow and resolved by
+ * guild id). A channel account is keyed by `(organization, accountId)`, owns a
+ * bot token, and drives every guild the bot is in — a different identity and a
+ * different lifecycle. Extending the guild table would leave every upstream row
+ * with a null envelope and force channel resolution to guess which guild row
+ * holds the account credential. The 2026-09-01 credential-gaps audit sanctions
+ * this: a token-native provider keeps a provider-specific Connection owner on
+ * the shared encrypted envelope service.
+ */
+export const discordBotConnections = pgTable(
+  "discord_bot_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    credentialEnvelope: jsonb("credential_envelope").$type<CredentialEnvelope>().notNull(),
+    externalIdentity: jsonb("external_identity"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("discord_bot_connections_organization_account_unique").on(
+      table.organizationId,
+      table.accountId,
+    ),
+  ],
+);
+
+/**
+ * Zalo Official Bot credentials — the same columns again, so the shared
+ * credential path serves it unchanged. The envelope carries the Bot API token
+ * and, in webhook mode, the `x-bot-api-secret-token` value Zalo echoes.
+ */
+export const zaloConnections = pgTable(
+  "zalo_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    credentialEnvelope: jsonb("credential_envelope").$type<CredentialEnvelope>().notNull(),
+    externalIdentity: jsonb("external_identity"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("zalo_connections_organization_account_unique").on(
+      table.organizationId,
+      table.accountId,
+    ),
+  ],
+);
+
+/**
+ * Zalo Personal (`zalouser`) account rows. Identical columns, but the envelope
+ * holds NO secret: this channel has no operator credential — the account is
+ * linked by a human QR scan and the resulting session rests in
+ * `channel_state_secrets`. What the envelope carries is the non-secret
+ * `profile` label that names that session, sealed anyway so every channel
+ * Connection travels one path (`db/channel-connections.ts`).
+ */
+export const zalouserConnections = pgTable(
+  "zalouser_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    credentialEnvelope: jsonb("credential_envelope").$type<CredentialEnvelope>().notNull(),
+    externalIdentity: jsonb("external_identity"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("zalouser_connections_organization_account_unique").on(
+      table.organizationId,
+      table.accountId,
+    ),
+  ],
+);
+
+/**
+ * Feishu/Lark custom-app credentials. The envelope holds FOUR fields — app id,
+ * app secret, and the event-subscription verification token + encrypt key —
+ * rather than one token, which is the only thing that separates it from the
+ * tables above; the columns are identical so the shared credential path,
+ * listing and delete all serve it unchanged.
+ */
+export const feishuConnections = pgTable(
+  "feishu_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    credentialEnvelope: jsonb("credential_envelope").$type<CredentialEnvelope>().notNull(),
+    externalIdentity: jsonb("external_identity"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("feishu_connections_organization_account_unique").on(
+      table.organizationId,
+      table.accountId,
+    ),
+  ],
+);
+
+/**
+ * Google Chat service-account credentials. There is no token: the envelope
+ * stores the service-account JSON document verbatim (or the absolute path to it
+ * for secret-mount deployments), and the Chat client mints its own OAuth tokens
+ * from it on every call.
+ */
+export const googlechatConnections = pgTable(
+  "googlechat_connections",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    credentialEnvelope: jsonb("credential_envelope").$type<CredentialEnvelope>().notNull(),
+    externalIdentity: jsonb("external_identity"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("googlechat_connections_organization_account_unique").on(
+      table.organizationId,
+      table.accountId,
+    ),
+  ],
+);
+
+/**
  * Durable external-thread ↔ agent-session binding (plan P3, §4.3.4). One row per
  * (account, external thread key); it survives Hub and daemon restarts so a follow-up
  * message resumes the bound session instead of creating a new one.
@@ -1897,7 +2282,7 @@ export const threadBindings = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    channel: text().$type<ChannelName>().notNull(),
+    channel: text().$type<SupportedChannelName>().notNull(),
     accountId: text("account_id").notNull(),
     // The channel-assigned conversation id (blueprint §2.4.4 vendor-id rename:
     // the channel assigns it, so it is `external_`).
@@ -1935,7 +2320,7 @@ export const threadBindings = pgTable(
       "thread_bindings_status_check",
       sql`${table.status} in ('pending', 'bound', 'abandoned')`,
     ),
-    check("thread_bindings_channel_check", sql`${table.channel} in ('slack', 'telegram')`),
+    check("thread_bindings_channel_check", channelNameCheck(table.channel)),
     check(
       "thread_bindings_shape_check",
       sql`(${table.status} = 'bound' and ${table.agentId} is not null and ${table.pendingExecutionId} is null and ${table.resolvedAt} is not null)
@@ -1973,7 +2358,7 @@ export const deliveryLedger = pgTable(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    channel: text().$type<ChannelName>().notNull(),
+    channel: text().$type<SupportedChannelName>().notNull(),
     accountId: text("account_id").notNull(),
     /** `in` = inbound event (L3 monitor), `out` = outbound post (relay). */
     direction: text().$type<ChannelLedgerDirection>().notNull(),
@@ -2033,7 +2418,7 @@ export const deliveryLedger = pgTable(
       sql`${table.status} in ('recorded', 'posted', 'failed', 'consumed')`,
     ),
     check("delivery_ledger_direction_check", sql`${table.direction} in ('in', 'out')`),
-    check("delivery_ledger_channel_check", sql`${table.channel} in ('slack', 'telegram')`),
+    check("delivery_ledger_channel_check", channelNameCheck(table.channel)),
     check("delivery_ledger_sequence_check", sql`${table.sequence} >= 0`),
     check("delivery_ledger_attempts_check", sql`${table.attempts} >= 1`),
     // Inbound rows are shape-pinned: constant out-keys, message id present.
@@ -2049,6 +2434,73 @@ export const deliveryLedger = pgTable(
         or (${table.direction} = 'out'
         and ${table.status} in ('recorded', 'posted', 'failed'))`,
     ),
+  ],
+);
+
+/** Durable channel ingress envelope. Unlike delivery_ledger, this table keeps
+ * the normalized payload and worker custody state so a process restart can
+ * drain an event that was admitted but not handed to the Hub plane. */
+export const channelIngressQueue = pgTable(
+  "channel_ingress_queue",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().notNull(),
+    accountId: text("account_id").notNull(),
+    externalEventId: text("external_event_id").notNull(),
+    externalMessageId: text("external_message_id").notNull(),
+    externalConversationId: text("external_conversation_id").notNull(),
+    externalThreadId: text("external_thread_id"),
+    laneKey: text("lane_key").notNull(),
+    payload: jsonb().notNull(),
+    status: text().$type<ChannelIngressQueueStatus>().notNull(),
+    attempts: integer().notNull().default(0),
+    /** Releases (plane back-pressure) this row has spent. `attempts` is given
+     * back on a release, so without a separate non-resetting counter a
+     * permanently deferred row would never age out of the queue. */
+    releases: integer().notNull().default(0),
+    availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+    claimedBy: text("claimed_by"),
+    claimToken: text("claim_token"),
+    leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    /** Upstream `failed_reason`: the disposition that ended the retry budget
+     * (`retry-limit-exceeded`, `invalid-event`, ...). `last_error` stays the
+     * raw operator message. */
+    failedReason: text("failed_reason"),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    /** When an operator reopened a dead-lettered row. `created_at` is arrival
+     * order and the lane's FIFO reads it, so a resubmit must not restamp it;
+     * the retention sweep reads this instead, which is what restarts the row's
+     * age budget. */
+    resubmittedAt: timestamp("resubmitted_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("channel_ingress_queue_event_unique").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.externalEventId,
+    ),
+    index("channel_ingress_queue_claim_idx").on(table.status, table.availableAt, table.createdAt),
+    index("channel_ingress_queue_lane_idx").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.laneKey,
+      table.createdAt,
+    ),
+    check(
+      "channel_ingress_queue_status_check",
+      sql`${table.status} in ('pending', 'claimed', 'completed', 'failed', 'dead_letter')`,
+    ),
+    check("channel_ingress_queue_attempts_check", sql`${table.attempts} >= 0`),
+    check("channel_ingress_queue_releases_check", sql`${table.releases} >= 0`),
   ],
 );
 

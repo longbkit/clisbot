@@ -517,7 +517,13 @@ class RegistrationAuth implements AuthServer {
       account: { id: "user", name: "User", email: "user@example.test" },
       organization: { id: "org", name: "Org" },
       membership: { id: "membership", role: "owner" },
-      capabilities: { view: true, manageMembers: true, manageOwners: true, manageResources: true },
+      capabilities: {
+        view: true,
+        manageMembers: true,
+        manageOwners: true,
+        manageResources: true,
+        manageChannels: true,
+      },
     });
   }
   async resolveAccount() {

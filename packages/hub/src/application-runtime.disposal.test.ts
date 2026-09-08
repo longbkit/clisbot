@@ -144,6 +144,7 @@ class RuntimeAuth implements AuthServer {
         manageMembers: true,
         manageOwners: true,
         manageResources: true,
+        manageChannels: true,
       },
     });
   }

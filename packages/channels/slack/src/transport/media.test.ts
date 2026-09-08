@@ -4,10 +4,11 @@
 // media-only admit, all-failed drop, external skip). Mirrors the Telegram
 // vertical's media.test.ts (same admission semantics, the F-06/G5+G6 parity).
 
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SLACK_MAX_MEDIA_BYTES } from "@getpaseo/channels-shared";
 import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-shared";
 import type { SlackMessageEvent } from "./socket-event-filter.js";
 import {
@@ -20,6 +21,7 @@ import {
 
 const BOT_TOKEN = "xoxb-slack-token";
 const DL_DIR = join(tmpdir(), "slack-media-test-dl");
+const SLACK_URL = "https://files.slack.com/files-pri/T1-F1/huge.bin";
 
 async function makeDir(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "slack-media-test-"));
@@ -337,6 +339,34 @@ describe("foldInboundSlackMedia", () => {
     expect(folded).toBeNull();
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toMatch(/skipped file/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // Slice 25 (security): the uploader decides the size, so an uncapped download
+  // is a disk-fill any channel member can drive. The fold reports it as a
+  // per-file skip, exactly like a transport failure.
+  it("skips a file whose declared size is past the inbound ceiling, writing nothing", async () => {
+    const dir = await makeDir();
+    const errors: string[] = [];
+    const logger: HostChildLogger = {
+      warn: () => {},
+      error: (m) => {
+        errors.push(m);
+      },
+    };
+    const oversized = (async () =>
+      new Response("x", {
+        status: 200,
+        headers: { "content-length": String(SLACK_MAX_MEDIA_BYTES + 1) },
+      })) as unknown as typeof globalThis.fetch;
+    const ctx = makeContext({ downloadDir: dir, fetchImpl: oversized, logger });
+    const event = eventWithFiles("look", [
+      { name: "huge.bin", mimetype: "application/octet-stream", url_private: SLACK_URL },
+    ]);
+    const folded = await foldInboundSlackMedia(ctx, event, makeEvent("look"));
+    expect(folded!.body).toBe("look");
+    expect(errors[0]).toMatch(/download failed/);
+    await expect(readdir(dir)).resolves.toEqual([]);
     await rm(dir, { recursive: true, force: true });
   });
 });

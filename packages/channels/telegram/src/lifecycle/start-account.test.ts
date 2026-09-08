@@ -39,6 +39,17 @@ describe("duplicate-token guard", () => {
     });
     expect(() => assertNoDuplicateTelegramTokens(cfg, "c")).toThrow(/duplicate Telegram bot token/);
   });
+
+  it("throws when the shared token is not the first account's", () => {
+    // `a=X, b=Y, c=Y`: a scan that only remembers the FIRST account with a
+    // token walks straight past the b/c collision.
+    const cfg = cfgWithAccounts({
+      a: { botToken: "111:AAA" },
+      b: { botToken: "222:BBB" },
+      c: { botToken: "222:BBB" },
+    });
+    expect(() => assertNoDuplicateTelegramTokens(cfg, "a")).toThrow(/"b" and "c"/);
+  });
 });
 
 describe("live poller ownership", () => {

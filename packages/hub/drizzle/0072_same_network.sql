@@ -1,0 +1,2 @@
+ALTER TABLE "channel_ingress_queue" ADD COLUMN "releases" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "channel_ingress_queue" ADD CONSTRAINT "channel_ingress_queue_releases_check" CHECK ("channel_ingress_queue"."releases" >= 0);

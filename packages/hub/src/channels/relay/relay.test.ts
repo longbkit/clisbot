@@ -20,7 +20,7 @@ import type {
   MediaPostFn,
   OutboundPostParams,
   OutboundPostResult,
-  P0ChannelName,
+  SupportedChannelName,
   PlaneLogger,
   StreamContext,
   TypingParams,
@@ -51,6 +51,7 @@ function defaults(overrides: Partial<EffectiveDefaults> = {}): EffectiveDefaults
     bindingKey: "thread",
     replyAnchor: "thread",
     outbound: { path: "relay", template: null },
+    inbound: { reactionNotifications: "off", editNotifications: "off" },
     sync: {
       finalAnswers: true,
       progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },
@@ -65,7 +66,7 @@ function defaults(overrides: Partial<EffectiveDefaults> = {}): EffectiveDefaults
 function context(
   overrides: {
     agentId?: string;
-    channel?: P0ChannelName;
+    channel?: SupportedChannelName;
     route?: CompiledRoute;
     externalConversationId?: string;
     externalThreadId?: string | null;

@@ -13,6 +13,7 @@ const defaults: EffectiveDefaults = {
   bindingKey: "thread",
   replyAnchor: "thread",
   outbound: { path: "relay", template: null },
+  inbound: { reactionNotifications: "off", editNotifications: "off" },
   sync: {
     finalAnswers: true,
     progress: {
@@ -159,6 +160,57 @@ describe("RouteExecutionLimiter", () => {
     assert.equal(routeLimited.allowed, false);
     if (routeLimited.allowed) return;
     assert.match(routeLimited.reason, /rate limit/u);
+  });
+
+  it("tells back-pressure apart from a refusal that will never clear", () => {
+    const f = fixture();
+    const tooLong = f.limiter.admit({
+      account: f.account,
+      route: f.route,
+      senderIdentity: "slack:alice",
+      text: "123456789",
+    });
+    assert.equal(tooLong.allowed, false);
+    // The message is over the Route's size ceiling: waiting changes nothing, so
+    // it carries no retry hint and a durable ingress must not hold it.
+    if (!tooLong.allowed) assert.equal(tooLong.retryAfterMs, undefined);
+
+    const running = f.limiter.admit({
+      account: f.account,
+      route: f.route,
+      senderIdentity: "slack:alice",
+      text: "one",
+    });
+    assert.equal(running.allowed, true);
+    const concurrent = f.limiter.admit({
+      account: f.account,
+      route: f.route,
+      senderIdentity: "slack:bob",
+      text: "two",
+    });
+    assert.equal(concurrent.allowed, false);
+    if (!concurrent.allowed) assert.ok((concurrent.retryAfterMs ?? 0) > 0);
+
+    f.limiter.complete(running.allowed ? running.lease : undefined);
+    const second = f.limiter.admit({
+      account: f.account,
+      route: f.route,
+      senderIdentity: "slack:alice",
+      text: "two",
+    });
+    assert.equal(second.allowed, true);
+    f.limiter.complete(second.allowed ? second.lease : undefined);
+    // Two messages from Alice inside the window; the third waits out the rest
+    // of the window the first one opened.
+    f.advance(15_000);
+    const senderLimited = f.limiter.admit({
+      account: f.account,
+      route: f.route,
+      senderIdentity: "slack:alice",
+      text: "three",
+    });
+    assert.equal(senderLimited.allowed, false);
+    if (!senderLimited.allowed) assert.equal(senderLimited.retryAfterMs, 45_000);
   });
 
   it("releases concurrency on completion and cancels at the runtime limit", async () => {

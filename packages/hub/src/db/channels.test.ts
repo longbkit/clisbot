@@ -527,3 +527,664 @@ describe("delivery_ledger inbound (direction = 'in')", () => {
     );
   });
 });
+
+describe("channel_ingress_queue", () => {
+  it("admits idempotently, claims with a lease, and completes with a token", async () => {
+    const input = {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: SLACK_ACCOUNT,
+      externalEventId: "queue-event-1",
+      externalMessageId: "queue-message-1",
+      externalConversationId: SLACK_CONVERSATION,
+      externalThreadId: SLACK_THREAD,
+      laneKey: "slack/work/C0APP/1720000000.000000",
+      payload: { text: "durable hello", sender: "U0ALICE" },
+    } as const;
+    const first = await store.enqueueChannelIngress(input);
+    assert.equal(first.created, true);
+    const replay = await store.enqueueChannelIngress(input);
+    assert.equal(replay.created, false);
+    assert.equal(replay.record.id, first.record.id);
+
+    const claimed = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-a",
+      leaseMs: 30_000,
+    });
+    assert.ok(claimed);
+    assert.equal(claimed.attempts, 1);
+    assert.equal(claimed.status, "claimed");
+    assert.equal(
+      await store.refreshChannelIngress({
+        id: claimed.id,
+        workerId: "worker-a",
+        claimToken: claimed.claimToken!,
+        leaseMs: 60_000,
+      }),
+      true,
+    );
+    // Nothing else is claimable: this is the only queued event, and it is
+    // already leased. (The lane rule itself is covered below, where a lane
+    // actually has more than one row.)
+    const nothingLeft = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-b",
+      leaseMs: 30_000,
+    });
+    assert.equal(nothingLeft, undefined);
+    const completed = await store.completeChannelIngress({
+      id: claimed.id,
+      workerId: "worker-a",
+      claimToken: claimed.claimToken!,
+    });
+    assert.equal(completed.status, "completed");
+  });
+
+  it("writes the caller's retry/dead-letter disposition", async () => {
+    const enqueued = await store.enqueueChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      channel: "telegram",
+      accountId: TELEGRAM_ACCOUNT,
+      externalEventId: "queue-event-retry",
+      externalMessageId: "queue-message-retry",
+      externalConversationId: TELEGRAM_CONVERSATION,
+      laneKey: "telegram/personal/-1001234567890/42",
+      payload: { text: "retry me" },
+    });
+    let row = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-retry",
+      leaseMs: 30_000,
+    });
+    assert.ok(row);
+    row = await store.failChannelIngress({
+      id: row.id,
+      workerId: "worker-retry",
+      claimToken: row.claimToken!,
+      error: "temporary",
+      disposition: "retry",
+    });
+    assert.equal(row.status, "failed");
+    row = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-retry",
+      leaseMs: 30_000,
+    });
+    assert.ok(row);
+    row = await store.failChannelIngress({
+      id: row.id,
+      workerId: "worker-retry",
+      claimToken: row.claimToken!,
+      error: "permanent",
+      disposition: "dead_letter",
+      reason: "retry-limit-exceeded",
+    });
+    assert.equal(row.status, "dead_letter");
+    assert.equal(row.lastError, "permanent");
+    assert.equal(row.failedReason, "retry-limit-exceeded");
+    assert.ok(row.failedAt);
+    assert.equal(enqueued.created, true);
+  });
+
+  it("resubmits dead-lettered events and prunes terminal rows", async () => {
+    const stamp = new Date("2026-09-01T00:00:00.000Z");
+    await store.enqueueChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      channel: "telegram",
+      accountId: TELEGRAM_ACCOUNT,
+      externalEventId: "queue-event-operator",
+      externalMessageId: "queue-message-operator",
+      externalConversationId: TELEGRAM_CONVERSATION,
+      laneKey: "telegram/personal/-1001234567890/operator",
+      payload: { text: "operator recovery" },
+      availableAt: stamp,
+    });
+    const claimed = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-operator",
+      leaseMs: 30_000,
+      accountId: TELEGRAM_ACCOUNT,
+      now: stamp,
+    });
+    assert.ok(claimed);
+    const dead = await store.failChannelIngress({
+      id: claimed.id,
+      workerId: "worker-operator",
+      claimToken: claimed.claimToken!,
+      error: "invalid event",
+      disposition: "dead_letter",
+      reason: "invalid-event",
+      now: stamp,
+    });
+    assert.equal(dead.status, "dead_letter");
+
+    // A pending row must be left alone: resubmission is a dead-letter verb.
+    const noop = await store.resubmitChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      ids: ["00000000-0000-0000-0000-000000000000"],
+    });
+    assert.equal(noop.length, 0);
+
+    const [resubmitted] = await store.resubmitChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      ids: [dead.id],
+    });
+    assert.ok(resubmitted);
+    assert.equal(resubmitted.status, "pending");
+    assert.equal(resubmitted.attempts, 0);
+    assert.equal(resubmitted.failedReason, null);
+    assert.equal(resubmitted.failedAt, null);
+    assert.equal(resubmitted.lastError, null);
+
+    // Prune only touches terminal rows past their cutoff.
+    const reclaimed = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-operator",
+      leaseMs: 30_000,
+      accountId: TELEGRAM_ACCOUNT,
+    });
+    assert.ok(reclaimed);
+    const completed = await store.completeChannelIngress({
+      id: reclaimed.id,
+      workerId: "worker-operator",
+      claimToken: reclaimed.claimToken!,
+      completedAt: stamp,
+    });
+    assert.equal(completed.status, "completed");
+    assert.equal(
+      await store.pruneChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        completedOlderThan: stamp,
+      }),
+      0,
+    );
+    assert.equal(
+      await store.pruneChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        completedOlderThan: new Date(stamp.getTime() + 1),
+      }),
+      1,
+    );
+    const remaining = await store.listChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      accountId: TELEGRAM_ACCOUNT,
+      statuses: ["completed"],
+    });
+    assert.equal(
+      remaining.some((row) => row.externalEventId === "queue-event-operator"),
+      false,
+    );
+  });
+
+  // Resubmission restarts the retry budget, not the row's place in its lane:
+  // stamping `created_at` moved a recovered event behind everything that
+  // arrived while it sat in the dead letter, so the conversation was answered
+  // out of order.
+  it("keeps a resubmitted row's place in its lane and restarts its age budget", async () => {
+    const accountId = "resubmit-fifo";
+    const base = new Date("2026-09-07T02:00:00.000Z");
+    const first = await admitLaneEvent(accountId, "resubmit-1", base);
+    const second = await admitLaneEvent(accountId, "resubmit-2", new Date(base.getTime() + 1_000));
+    const claim = (at: Date) =>
+      store.claimChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        workerId: "worker-resubmit",
+        leaseMs: 30_000,
+        accountId,
+        now: at,
+      });
+    const head = await claim(new Date(base.getTime() + 2_000));
+    assert.equal(head?.id, first);
+    await store.failChannelIngress({
+      id: first,
+      workerId: "worker-resubmit",
+      claimToken: head!.claimToken!,
+      error: "invalid event",
+      disposition: "dead_letter",
+      reason: "invalid-event",
+      now: new Date(base.getTime() + 2_000),
+    });
+    // The lane moves on while the head is dead-lettered.
+    const next = await claim(new Date(base.getTime() + 3_000));
+    assert.equal(next?.id, second);
+    await store.failChannelIngress({
+      id: second,
+      workerId: "worker-resubmit",
+      claimToken: next!.claimToken!,
+      error: "transient",
+      disposition: "retry",
+      retryAt: new Date(base.getTime() + 300_000),
+      now: new Date(base.getTime() + 3_000),
+    });
+
+    const resubmitAt = new Date(base.getTime() + 10_000);
+    const [reopened] = await store.resubmitChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      ids: [first],
+      now: resubmitAt,
+    });
+    assert.ok(reopened);
+    assert.equal(reopened.createdAt.getTime(), base.getTime(), "arrival order is untouched");
+    assert.equal(reopened.resubmittedAt?.getTime(), resubmitAt.getTime());
+    // The retention sweep reads the resubmit, so the recovered row survives a
+    // cutoff its original arrival would have failed — the row that was never
+    // resubmitted does not.
+    assert.equal(
+      await store.pruneChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        pendingOlderThan: new Date(base.getTime() + 5_000),
+      }),
+      1,
+    );
+    // It is the lane's head again, ahead of the row that arrived after it.
+    const reclaimed = await claim(new Date(base.getTime() + 11_000));
+    assert.equal(reclaimed?.id, first);
+  });
+
+  it("recovers an expired claim for restart drain", async () => {
+    const now = new Date("2026-09-06T00:00:00.000Z");
+    await store.enqueueChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: SLACK_ACCOUNT,
+      externalEventId: "queue-event-stale",
+      externalMessageId: "queue-message-stale",
+      externalConversationId: "CSTALE",
+      laneKey: "slack/work/CSTALE",
+      payload: { text: "stale" },
+      availableAt: now,
+    });
+    const claimed = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-crash",
+      leaseMs: 1,
+      now,
+    });
+    assert.ok(claimed);
+    const recovered = await store.recoverStaleChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      now: new Date(now.getTime() + 2),
+    });
+    assert.equal(recovered, 1);
+    const drained = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-restart",
+      leaseMs: 30_000,
+      now: new Date(now.getTime() + 2),
+    });
+    assert.ok(drained);
+    assert.equal(drained.id, claimed.id);
+  });
+
+  it("holds a lane in arrival order while its oldest row waits out a backoff", async () => {
+    const accountId = "fifo";
+    const base = new Date("2026-09-07T00:00:00.000Z");
+    const first = await admitLaneEvent(accountId, "fifo-1", base);
+    const second = await admitLaneEvent(accountId, "fifo-2", new Date(base.getTime() + 1_000));
+    const claim = (at: Date) =>
+      store.claimChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        workerId: "worker-fifo",
+        leaseMs: 30_000,
+        accountId,
+        now: at,
+      });
+
+    const head = await claim(new Date(base.getTime() + 2_000));
+    assert.equal(head?.id, first);
+    await store.failChannelIngress({
+      id: first,
+      workerId: "worker-fifo",
+      claimToken: head!.claimToken!,
+      error: "transient",
+      disposition: "retry",
+      retryAt: new Date(base.getTime() + 62_000),
+      now: new Date(base.getTime() + 2_000),
+    });
+
+    // The younger row is due and unblocked by lease — but its lane's head is
+    // sitting in a backoff window, so taking it would answer out of order.
+    assert.equal(await claim(new Date(base.getTime() + 3_000)), undefined);
+
+    const retried = await claim(new Date(base.getTime() + 63_000));
+    assert.equal(retried?.id, first);
+    assert.equal(retried?.attempts, 2);
+    await store.completeChannelIngress({
+      id: first,
+      workerId: "worker-fifo",
+      claimToken: retried!.claimToken!,
+    });
+    const next = await claim(new Date(base.getTime() + 64_000));
+    assert.equal(next?.id, second);
+    await store.completeChannelIngress({
+      id: second,
+      workerId: "worker-fifo",
+      claimToken: next!.claimToken!,
+    });
+  });
+
+  it("gives one lane to exactly one of two workers claiming at once", async () => {
+    const accountId = "race";
+    const base = new Date("2026-09-07T01:00:00.000Z");
+    const first = await admitLaneEvent(accountId, "race-1", base);
+    await admitLaneEvent(accountId, "race-2", new Date(base.getTime() + 1_000));
+    const now = new Date(base.getTime() + 2_000);
+    const claimAs = (workerId: string) =>
+      store.claimChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        workerId,
+        leaseMs: 30_000,
+        accountId,
+        now,
+      });
+
+    const claims = (await Promise.all([claimAs("race-a"), claimAs("race-b")])).filter(
+      (row) => row !== undefined,
+    );
+
+    // Two rows are due in one lane; a lane runs one at a time, so the loser
+    // gets nothing rather than the second row. (The embedded runtime serializes
+    // transactions, so this reads the committed claim rather than the
+    // `skip locked` path a real Postgres would take — the invariant is the
+    // same one the `not exists` candidate predicate holds either way.)
+    assert.equal(claims.length, 1);
+    assert.equal(claims[0]!.id, first);
+  });
+
+  it("releases a deferred claim unattempted and keeps its lane at the head", async () => {
+    const accountId = "deferred";
+    const base = new Date("2026-09-07T02:00:00.000Z");
+    const first = await admitLaneEvent(accountId, "deferred-1", base);
+    const second = await admitLaneEvent(accountId, "deferred-2", new Date(base.getTime() + 1_000));
+    const claim = (at: Date) =>
+      store.claimChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        workerId: "worker-deferred",
+        leaseMs: 30_000,
+        accountId,
+        now: at,
+      });
+
+    const head = await claim(new Date(base.getTime() + 2_000));
+    assert.equal(head?.id, first);
+    assert.equal(head?.attempts, 1);
+    const released = await store.failChannelIngress({
+      id: first,
+      workerId: "worker-deferred",
+      claimToken: head!.claimToken!,
+      error: "Route concurrency limit exceeded",
+      disposition: "release",
+      retryAt: new Date(base.getTime() + 7_000),
+      now: new Date(base.getTime() + 2_000),
+    });
+    // Back-pressure is not a failed attempt: the retry budget is untouched and
+    // the row is pending again, not `failed`.
+    assert.equal(released.status, "pending");
+    assert.equal(released.attempts, 0);
+    assert.equal(released.failedReason, null);
+    assert.equal(released.availableAt.getTime(), base.getTime() + 7_000);
+
+    assert.equal(await claim(new Date(base.getTime() + 3_000)), undefined);
+    const redue = await claim(new Date(base.getTime() + 8_000));
+    assert.equal(redue?.id, first);
+    assert.equal(redue?.attempts, 1);
+    await store.completeChannelIngress({
+      id: first,
+      workerId: "worker-deferred",
+      claimToken: redue!.claimToken!,
+    });
+    const next = await claim(new Date(base.getTime() + 9_000));
+    assert.equal(next?.id, second);
+    await store.completeChannelIngress({
+      id: second,
+      workerId: "worker-deferred",
+      claimToken: next!.claimToken!,
+    });
+  });
+
+  /**
+   * A release gives the attempt back, so the retry budget never ends a row the
+   * plane keeps deferring. The release budget is the only thing that does.
+   */
+  it("dead-letters a release once the release budget or the pending TTL is spent", async () => {
+    const budget = { maxReleases: 3, pendingTtlMs: 60 * 60 * 1_000 };
+    const base = new Date("2026-09-07T04:00:00.000Z");
+    const id = await admitLaneEvent("budget", "budget-1", base);
+    const releaseOnce = async (at: Date) => {
+      const claim = await store.claimChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        workerId: "worker-budget",
+        leaseMs: 30_000,
+        accountId: "budget",
+        now: at,
+      });
+      assert.equal(claim?.id, id);
+      return await store.failChannelIngress({
+        id,
+        workerId: "worker-budget",
+        claimToken: claim!.claimToken!,
+        error: "Route concurrency limit exceeded",
+        disposition: "release",
+        retryAt: at,
+        budget,
+        now: at,
+      });
+    };
+
+    const first = await releaseOnce(new Date(base.getTime() + 1_000));
+    assert.equal(first.status, "pending");
+    assert.equal(first.releases, 1);
+    assert.equal(first.attempts, 0);
+    const second = await releaseOnce(new Date(base.getTime() + 2_000));
+    assert.equal(second.status, "pending");
+    assert.equal(second.releases, 2);
+    // The third release is the one that spends the budget.
+    const spent = await releaseOnce(new Date(base.getTime() + 3_000));
+    assert.equal(spent.status, "dead_letter");
+    assert.equal(spent.releases, 3);
+    assert.equal(spent.failedReason, "release-budget-exhausted");
+    assert.equal(spent.failedAt?.getTime(), base.getTime() + 3_000);
+    // Terminal: the drain cannot claim it again, and the lane is free.
+    assert.equal(
+      await store.claimChannelIngress({
+        organizationId: ORGANIZATION_ID,
+        workerId: "worker-budget",
+        leaseMs: 30_000,
+        accountId: "budget",
+        now: new Date(base.getTime() + 4_000),
+      }),
+      undefined,
+    );
+
+    // Age alone ends a row that has barely been released at all.
+    const agedBase = new Date("2026-09-07T05:00:00.000Z");
+    const aged = await admitLaneEvent("budget-age", "budget-age-1", agedBase);
+    const claim = await store.claimChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      workerId: "worker-budget",
+      leaseMs: 30_000,
+      accountId: "budget-age",
+      now: new Date(agedBase.getTime() + 1_000),
+    });
+    const expired = await store.failChannelIngress({
+      id: aged,
+      workerId: "worker-budget",
+      claimToken: claim!.claimToken!,
+      error: "Route concurrency limit exceeded",
+      disposition: "release",
+      budget,
+      now: new Date(agedBase.getTime() + budget.pendingTtlMs + 1),
+    });
+    assert.equal(expired.status, "dead_letter");
+    assert.equal(expired.releases, 1);
+    assert.equal(expired.failedReason, "release-budget-exhausted");
+  });
+
+  /** The floor under a row no drain can reach: the retention sweep's cutoff. */
+  it("prunes non-terminal rows admitted before the pending cutoff", async () => {
+    const base = new Date("2026-09-07T06:00:00.000Z");
+    const stale = await admitLaneEvent("unreachable", "unreachable-1", base);
+    const fresh = await admitLaneEvent(
+      "unreachable",
+      "unreachable-2",
+      new Date(base.getTime() + 60_000),
+    );
+    const pending = async () =>
+      (
+        await store.listChannelIngress({
+          organizationId: ORGANIZATION_ID,
+          accountId: "unreachable",
+          statuses: ["pending"],
+        })
+      ).map((row) => row.id);
+
+    // The cutoff is exclusive: a row admitted exactly at it stays.
+    await store.pruneChannelIngress({ organizationId: ORGANIZATION_ID, pendingOlderThan: base });
+    assert.deepEqual((await pending()).sort(), [stale, fresh].sort());
+    await store.pruneChannelIngress({
+      organizationId: ORGANIZATION_ID,
+      pendingOlderThan: new Date(base.getTime() + 1),
+    });
+    assert.deepEqual(await pending(), [fresh]);
+  });
+});
+
+/**
+ * The `/agent` and `/model` choice. One row per conversation, and two commands
+ * in the same conversation land on it at once.
+ */
+describe("channel_conversation_selections", () => {
+  const CONVERSATION = "C0SELECT";
+  const key = (channel: "slack" | "telegram") => ({
+    organizationId: ORGANIZATION_ID,
+    channel,
+    accountId: "support",
+    externalConversationId: CONVERSATION,
+    externalThreadId: null,
+  });
+
+  // Both commands write the same row. Reading it first and writing the merge
+  // back lost whichever field the slower writer had merged in.
+  it("keeps a concurrent /agent and /model choice on one row", async () => {
+    await Promise.all([
+      store.access.setConversationSelection(key("slack"), {
+        selectedAgent: "reviewer",
+        selectedBy: "slack:U0ALICE",
+      }),
+      store.access.setConversationSelection(key("slack"), {
+        selectedModel: "gpt-5.6-luna",
+        selectedBy: "slack:U0BOB",
+      }),
+    ]);
+    const stored = await store.access.findConversationSelection(key("slack"));
+    assert.equal(stored?.selectedAgent, "reviewer");
+    assert.equal(stored?.selectedModel, "gpt-5.6-luna");
+  });
+
+  // An account id is only unique inside its channel: `support` on Slack and
+  // `support` on Telegram are two accounts, and the row was keyed without the
+  // channel, so one channel's `/model` answered for the other's conversation.
+  it("scopes a selection to its channel", async () => {
+    await store.access.setConversationSelection(key("telegram"), {
+      selectedModel: "gpt-5.6-mini",
+      selectedBy: "telegram:1001",
+    });
+    assert.equal(
+      (await store.access.findConversationSelection(key("telegram")))?.selectedModel,
+      "gpt-5.6-mini",
+    );
+    assert.equal(
+      (await store.access.findConversationSelection(key("slack")))?.selectedModel,
+      "gpt-5.6-luna",
+      "the slack conversation keeps its own choice",
+    );
+  });
+
+  it("clears both fields when the caller sets two nulls", async () => {
+    const cleared = await store.access.setConversationSelection(key("slack"), {
+      selectedAgent: null,
+      selectedModel: null,
+      selectedBy: "slack:U0ALICE",
+    });
+    assert.equal(cleared.selectedAgent, null);
+    assert.equal(cleared.selectedModel, null);
+    assert.equal((await store.access.findConversationSelection(key("slack")))?.selectedModel, null);
+  });
+});
+
+/**
+ * The stored channel name is a closed set (`schema.ts` `channelNameCheck`,
+ * derived from `SUPPORTED_CHANNEL_NAMES`): a channel the supervisor can start
+ * must also be storable, and one it cannot start must not reach the tables.
+ */
+describe("supported channel names", () => {
+  const DISCORD_ACCOUNT = "guild";
+  const DISCORD_CONVERSATION = "1180000000000000001";
+  const DISCORD_THREAD = "1180000000000000002";
+
+  it("accepts a discord binding and delivery row", async () => {
+    const pending = await store.recordPendingThreadBinding({
+      organizationId: ORGANIZATION_ID,
+      channel: "discord",
+      accountId: DISCORD_ACCOUNT,
+      externalConversationId: DISCORD_CONVERSATION,
+      externalThreadId: DISCORD_THREAD,
+      pendingExecutionId: "discord-execution-1",
+      initiator: "discord:U0DISCORD",
+      route: ROUTE,
+    });
+    assert.equal(pending.channel, "discord");
+
+    const delivery = await store.recordDelivery({
+      organizationId: ORGANIZATION_ID,
+      channel: "discord",
+      accountId: DISCORD_ACCOUNT,
+      externalConversationId: DISCORD_CONVERSATION,
+      externalThreadId: DISCORD_THREAD,
+      eventTurnId: "discord-turn-1",
+      sequence: 0,
+    });
+    assert.equal(delivery.created, true);
+    assert.equal(delivery.record.channel, "discord");
+  });
+
+  it("rejects a channel outside the supported set", async () => {
+    // A channel outside `SUPPORTED_CHANNEL_NAMES` is one the supervisor cannot
+    // start, so the check constraint keeps its rows out of the tables too.
+    await assert.rejects(
+      bundle.runtime.query(
+        `insert into thread_bindings
+           (organization_id, channel, account_id, external_conversation_id, status,
+            pending_execution_id, initiator, route)
+         values ($1, 'matrix', 'planned', 'C0PLANNED', 'pending', 'execution-planned', $2, '{}')`,
+        [ORGANIZATION_ID, INITIATOR],
+      ),
+      /thread_bindings_channel_check/u,
+    );
+  });
+});
+
+/**
+ * Admit one event onto a per-account lane with an explicit arrival time. The
+ * lane rule reads `created_at`, which the table stamps itself, so the tests
+ * that care about arrival order set it rather than racing the clock.
+ */
+async function admitLaneEvent(accountId: string, eventId: string, arrivedAt: Date) {
+  const { record } = await store.enqueueChannelIngress({
+    organizationId: ORGANIZATION_ID,
+    channel: "slack",
+    accountId,
+    externalEventId: eventId,
+    externalMessageId: eventId,
+    externalConversationId: `C0${accountId.toUpperCase()}`,
+    laneKey: `slack/${accountId}/lane`,
+    payload: { event: eventId },
+    availableAt: arrivedAt,
+  });
+  await bundle.runtime.query(`update channel_ingress_queue set created_at = $2 where id = $1`, [
+    record.id,
+    arrivedAt.toISOString(),
+  ]);
+  return record.id;
+}

@@ -1,0 +1,824 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "roots": [
+    {
+      "upstream": "extensions/feishu/src",
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/accounts.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/accounts.ts"
+    },
+    {
+      "local": "src/api-response.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/api-response.ts"
+    },
+    {
+      "local": "src/async.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/async.ts"
+    },
+    {
+      "local": "src/bitable.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/bitable.ts"
+    },
+    {
+      "local": "src/bot-content.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/bot-content.ts"
+    },
+    {
+      "local": "src/bot-identity-cache.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/bot-identity-cache.ts"
+    },
+    {
+      "local": "src/card-interaction.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/card-interaction.ts"
+    },
+    {
+      "local": "src/channel-actions.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-021"]
+    },
+    {
+      "local": "src/chat-schema.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/chat-schema.ts"
+    },
+    {
+      "local": "src/chat-type.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/chat-type.ts"
+    },
+    {
+      "local": "src/chat.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/chat.ts"
+    },
+    {
+      "local": "src/client-timeout.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/client-timeout.ts"
+    },
+    {
+      "local": "src/client.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/client.ts"
+    },
+    {
+      "local": "src/comment-reaction.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/comment-reaction.ts"
+    },
+    {
+      "local": "src/comment-shared.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/comment-shared.ts"
+    },
+    {
+      "local": "src/comment-target.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/comment-target.ts"
+    },
+    {
+      "local": "src/config-schema.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/config-schema.ts"
+    },
+    {
+      "local": "src/conversation-id.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/conversation-id.ts"
+    },
+    {
+      "local": "src/dedupe-key.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/dedupe-key.ts"
+    },
+    {
+      "local": "src/directory.static.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/directory.static.ts"
+    },
+    {
+      "local": "src/directory.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/directory.ts"
+    },
+    {
+      "local": "src/doc-schema.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/doc-schema.ts"
+    },
+    {
+      "local": "src/docx-batch-insert.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx-batch-insert.ts"
+    },
+    {
+      "local": "src/docx-color-text.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx-color-text.ts"
+    },
+    {
+      "local": "src/docx-markdown.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx-markdown.ts"
+    },
+    {
+      "local": "src/docx-table-ops.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx-table-ops.ts"
+    },
+    {
+      "local": "src/docx-types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx-types.ts"
+    },
+    {
+      "local": "src/docx-upload-input.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx-upload-input.ts"
+    },
+    {
+      "local": "src/docx.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/docx.ts"
+    },
+    {
+      "local": "src/drive-schema.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/drive-schema.ts"
+    },
+    {
+      "local": "src/drive.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/drive.ts"
+    },
+    {
+      "local": "src/entry.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/event-types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/event-types.ts"
+    },
+    {
+      "local": "src/external-keys.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/external-keys.ts"
+    },
+    {
+      "local": "src/fusion/account-config.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-012"]
+    },
+    {
+      "local": "src/fusion/admission.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-015"]
+    },
+    {
+      "local": "src/fusion/inbound-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-014"]
+    },
+    {
+      "local": "src/fusion/media-resource.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-005"]
+    },
+    {
+      "local": "src/fusion/runtime-api.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-002"]
+    },
+    {
+      "local": "src/fusion/runtime.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-013"]
+    },
+    {
+      "local": "src/fusion/ssrf-fetch.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-011"]
+    },
+    {
+      "local": "src/fusion/status-sink.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-003"]
+    },
+    {
+      "local": "src/fusion/test-config.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/fusion/tools.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-018"]
+    },
+    {
+      "local": "src/fusion/webhook-invoker.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-004"]
+    },
+    {
+      "local": "src/fusion/webhook-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-017"]
+    },
+    {
+      "local": "src/fusion/ws-session.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-016"]
+    },
+    {
+      "local": "src/identity-header.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/identity-header.ts"
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/interactive-message-content.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/interactive-message-content.ts"
+    },
+    {
+      "local": "src/lifecycle/start-account.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-019"]
+    },
+    {
+      "local": "src/markdown.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/markdown.ts"
+    },
+    {
+      "local": "src/mention-target.types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/mention-target.types.ts"
+    },
+    {
+      "local": "src/mention.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/mention.ts"
+    },
+    {
+      "local": "src/message-action-contract.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/message-action-contract.ts"
+    },
+    {
+      "local": "src/monitor-defaults.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor-defaults.ts"
+    },
+    {
+      "local": "src/monitor-rate-limit-key.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor-rate-limit-key.ts"
+    },
+    {
+      "local": "src/monitor-startup-timeout.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor-startup-timeout.ts"
+    },
+    {
+      "local": "src/monitor-state-runtime-api.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor-state-runtime-api.ts"
+    },
+    {
+      "local": "src/monitor-transport-runtime-api.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor-transport-runtime-api.ts"
+    },
+    {
+      "local": "src/monitor.startup.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor.startup.ts"
+    },
+    {
+      "local": "src/monitor.state.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor.state.ts"
+    },
+    {
+      "local": "src/monitor.transport.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/monitor.transport.ts"
+    },
+    {
+      "local": "src/native-card.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/native-card.ts"
+    },
+    {
+      "local": "src/outbound.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-020"]
+    },
+    {
+      "local": "src/perm-schema.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/perm-schema.ts"
+    },
+    {
+      "local": "src/perm.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/perm.ts"
+    },
+    {
+      "local": "src/pins.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/pins.ts"
+    },
+    {
+      "local": "src/plugin.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/policy.ts",
+      "status": "adapted",
+      "upstream": "extensions/feishu/src/policy.ts",
+      "deviation": ["D-FS-010"]
+    },
+    {
+      "local": "src/post.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/post.ts"
+    },
+    {
+      "local": "src/presentation-card.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/presentation-card.ts"
+    },
+    {
+      "local": "src/probe.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/probe.ts"
+    },
+    {
+      "local": "src/reactions.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/reactions.ts"
+    },
+    {
+      "local": "src/read-policy.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/read-policy.ts"
+    },
+    {
+      "local": "src/runtime-store.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/runtime.ts",
+      "status": "adapted",
+      "upstream": "extensions/feishu/src/runtime.ts",
+      "deviation": ["D-FS-006", "D-FS-007"]
+    },
+    {
+      "local": "src/secret-input.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/secret-input.ts"
+    },
+    {
+      "local": "src/send-rate-limit.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/send-rate-limit.ts"
+    },
+    {
+      "local": "src/send-result.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/send-result.ts"
+    },
+    {
+      "local": "src/send-target.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/send-target.ts"
+    },
+    {
+      "local": "src/send.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/send.ts"
+    },
+    {
+      "local": "src/sticker-catalog.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/sticker-catalog.ts"
+    },
+    {
+      "local": "src/targets.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/targets.ts"
+    },
+    {
+      "local": "src/tool-account.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/tool-account.ts"
+    },
+    {
+      "local": "src/tool-result.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/tool-result.ts"
+    },
+    {
+      "local": "src/tools-config.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/tools-config.ts"
+    },
+    {
+      "local": "src/types.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/types.ts"
+    },
+    {
+      "local": "src/webhook-path.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/webhook-path.ts"
+    },
+    {
+      "local": "src/wiki-schema.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/wiki-schema.ts"
+    },
+    {
+      "local": "src/wiki.ts",
+      "status": "verbatim",
+      "upstream": "extensions/feishu/src/wiki.ts"
+    },
+    {
+      "local": "tsconfig.json",
+      "status": "fusion-owned",
+      "deviation": ["D-FS-001"]
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "extensions/feishu/src/channel.ts",
+      "reason": "OpenClaw plugin declaration: setup wizard, pairing adapter, doctor contract, config adapter and the outbound delivery adapter. The Hub owns every one of those; the portable parts (describeMessageTool action set, the action gate, the per-action argument names) live in src/channel-actions.ts (D-FS-021)."
+    },
+    {
+      "upstream": "extensions/feishu/src/channel.runtime.ts",
+      "reason": "Lazy loader for the OpenClaw channel runtime object channel.ts builds."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.ts",
+      "reason": "OpenClaw multi-account monitor driver: it fans out over every enabled account in the process config and runs the passive account lifecycle. The Hub supervisor owns account lifecycle; src/lifecycle/start-account.ts is the seam (D-FS-019)."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.account.ts",
+      "reason": "The per-account agent reply engine (bot.ts, reply-dispatcher.ts, streaming card). The Hub owns agent routing, the turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.message-handler.ts",
+      "reason": "Turns a verified event into an OpenClaw agent turn (session route, access policy, ctxPayload, reply dispatch). src/fusion/inbound-adapter.ts + admission.ts do the part the Hub cannot (D-FS-014, D-FS-015)."
+    },
+    {
+      "upstream": "extensions/feishu/src/feishu-ingress.ts",
+      "reason": "OpenClaw SQLite-backed ingress queue and its own drain. The Hub owns channel_ingress_queue and one drain per account; the invoker contract survives in src/fusion/webhook-invoker.ts (D-FS-004)."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot.ts",
+      "reason": "The OpenClaw agent reply engine for this channel."
+    },
+    {
+      "upstream": "extensions/feishu/src/reply-dispatcher.ts",
+      "reason": "OpenClaw reply dispatch and delivery state."
+    },
+    {
+      "upstream": "extensions/feishu/src/streaming-card.ts",
+      "reason": "Streaming-card driver over the OpenClaw turn stream; the Hub streaming producer (goal slice 22b) owns the drive side."
+    },
+    {
+      "upstream": "extensions/feishu/src/media.ts",
+      "reason": "OpenClaw media store, private temp workspace and ffmpeg voice transcoding. The download half survives as src/fusion/media-resource.ts (D-FS-005); the upload half lands with the Hub media slice."
+    },
+    {
+      "upstream": "extensions/feishu/src/setup-core.ts",
+      "reason": "OpenClaw setup adapter (config writer)."
+    },
+    {
+      "upstream": "extensions/feishu/src/setup-surface.ts",
+      "reason": "Clack-based terminal setup wizard; Fusion has the app setup UI (goal slice 18)."
+    },
+    {
+      "upstream": "extensions/feishu/src/doctor.ts",
+      "reason": "OpenClaw doctor contract and config repair."
+    },
+    {
+      "upstream": "extensions/feishu/src/doctor-contract.ts",
+      "reason": "OpenClaw doctor contract declaration."
+    },
+    {
+      "upstream": "extensions/feishu/src/thread-bindings.ts",
+      "reason": "Thread-to-session bindings in the OpenClaw session store; the Hub owns bindings."
+    },
+    {
+      "upstream": "extensions/feishu/src/session-route.ts",
+      "reason": "OpenClaw session-key routing."
+    },
+    {
+      "upstream": "extensions/feishu/src/session-conversation.ts",
+      "reason": "OpenClaw session conversation state."
+    },
+    {
+      "upstream": "extensions/feishu/src/dynamic-agent.ts",
+      "reason": "Creates OpenClaw agents for DM users; agent lifecycle is Paseo/Hub-owned."
+    },
+    {
+      "upstream": "extensions/feishu/src/subagent-hooks.ts",
+      "reason": "OpenClaw subagent delivery hooks."
+    },
+    {
+      "upstream": "extensions/feishu/src/security-audit.ts",
+      "reason": "OpenClaw config security audit surface."
+    },
+    {
+      "upstream": "extensions/feishu/src/typing.ts",
+      "reason": "Typing indicator driven from the OpenClaw turn; the Hub streaming producer owns it."
+    },
+    {
+      "upstream": "extensions/feishu/src/card-action.ts",
+      "reason": "OpenClaw card-action handler over its approval runtime; the Hub routes callbacks (inbound kind callback)."
+    },
+    {
+      "upstream": "extensions/feishu/src/comment-handler.ts",
+      "reason": "Doc-comment agent handler over the OpenClaw reply engine."
+    },
+    {
+      "upstream": "extensions/feishu/src/comment-dispatcher.ts",
+      "reason": "Doc-comment polling dispatcher over the OpenClaw runtime."
+    },
+    {
+      "upstream": "extensions/feishu/src/dedup.ts",
+      "reason": "OpenClaw in-process dedupe store; the Hub ingress queue is the dedupe owner."
+    },
+    {
+      "upstream": "extensions/feishu/src/app-registration.ts",
+      "reason": "OpenClaw app-registration flow."
+    },
+    {
+      "upstream": "extensions/feishu/src/approval-auth.ts",
+      "reason": "OpenClaw approval authority; the Hub owns callback authority (goal slice 25)."
+    },
+    {
+      "upstream": "extensions/feishu/src/qr-terminal.ts",
+      "reason": "Terminal QR rendering for the CLI setup wizard."
+    },
+    {
+      "upstream": "extensions/feishu/src/agent-config.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/audio-preflight.runtime.ts",
+      "reason": "ffmpeg voice preflight from the omitted media.ts; the Hub media slice owns transcoding."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot-agent-body.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot-broadcast.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot-group-name-state.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot-group-name.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot-name.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/bot-sender-name.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/card-action-state.ts",
+      "reason": "OpenClaw card UX over its approval/launcher runtime; the Hub owns approval authority and the interactive callback route (goal slices 23a/25)."
+    },
+    {
+      "upstream": "extensions/feishu/src/card-test-helpers.ts",
+      "reason": "Test helper for the omitted card UX modules."
+    },
+    {
+      "upstream": "extensions/feishu/src/card-ux-approval.ts",
+      "reason": "OpenClaw card UX over its approval/launcher runtime; the Hub owns approval authority and the interactive callback route (goal slices 23a/25)."
+    },
+    {
+      "upstream": "extensions/feishu/src/card-ux-launcher.ts",
+      "reason": "OpenClaw card UX over its approval/launcher runtime; the Hub owns approval authority and the interactive callback route (goal slices 23a/25)."
+    },
+    {
+      "upstream": "extensions/feishu/src/card-ux-shared.ts",
+      "reason": "OpenClaw card UX over its approval/launcher runtime; the Hub owns approval authority and the interactive callback route (goal slices 23a/25)."
+    },
+    {
+      "upstream": "extensions/feishu/src/dedup-state.ts",
+      "reason": "State for the omitted in-process dedup.ts; the Hub ingress queue is the dedupe owner."
+    },
+    {
+      "upstream": "extensions/feishu/src/json-response.ts",
+      "reason": "HTTP JSON helper for the omitted OpenClaw gateway route registration."
+    },
+    {
+      "upstream": "extensions/feishu/src/media-chunk-idle.ts",
+      "reason": "Chunked-media idle policy from the omitted media.ts."
+    },
+    {
+      "upstream": "extensions/feishu/src/media-fallback.ts",
+      "reason": "Media fallback text from the omitted media.ts upload path."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.bot-identity.ts",
+      "reason": "Part of the omitted OpenClaw monitor tree (monitor.ts / monitor.message-handler.ts). The Hub owns account lifecycle and inbound routing; src/fusion/* is the seam."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.bot-menu-handler.ts",
+      "reason": "Part of the omitted OpenClaw monitor tree (monitor.ts / monitor.message-handler.ts). The Hub owns account lifecycle and inbound routing; src/fusion/* is the seam."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.comment-notice-handler.ts",
+      "reason": "Doc-comment notice handler for the omitted comment-handler.ts."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.comment.ts",
+      "reason": "Doc-comment monitor for the omitted comment-dispatcher.ts."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.synthetic-error.ts",
+      "reason": "Part of the omitted OpenClaw monitor tree (monitor.ts / monitor.message-handler.ts). The Hub owns account lifecycle and inbound routing; src/fusion/* is the seam."
+    },
+    {
+      "upstream": "extensions/feishu/src/monitor.vc-meeting-invited-handler.ts",
+      "reason": "VC meeting auto-join handler over the omitted reply engine."
+    },
+    {
+      "upstream": "extensions/feishu/src/outbound.ts",
+      "reason": "The OpenClaw ChannelOutboundAdapter (media upload, payload delivery, presentation fallback) built on host media services. The local src/outbound.ts is a Fusion-owned bridge onto the ported send.ts with the same file name but a different role (D-FS-020); the upstream adapter lands with the Hub media slice."
+    },
+    {
+      "upstream": "extensions/feishu/src/reasoning-preview.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/reply-delivery-result.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/reply-dispatcher-state.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/secret-contract.ts",
+      "reason": "OpenClaw setup/doctor surface (config writer, secret contract, terminal prompts). Fusion has the app setup UI (goal slice 18)."
+    },
+    {
+      "upstream": "extensions/feishu/src/security-audit-shared.ts",
+      "reason": "Shared helpers for the omitted security-audit.ts."
+    },
+    {
+      "upstream": "extensions/feishu/src/sequential-key.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/sequential-queue.ts",
+      "reason": "Part of the omitted OpenClaw reply engine (bot.ts / reply-dispatcher.ts / monitor.account.ts). The Hub owns the agent turn and the reply."
+    },
+    {
+      "upstream": "extensions/feishu/src/streaming-card-send-mode.ts",
+      "reason": "Send-mode selection for the omitted streaming-card.ts; the Hub streaming producer owns the drive side (goal slice 22b)."
+    },
+    {
+      "upstream": "extensions/feishu/src/synthetic-event-target.ts",
+      "reason": "Part of the omitted OpenClaw monitor tree (monitor.ts / monitor.message-handler.ts). The Hub owns account lifecycle and inbound routing; src/fusion/* is the seam."
+    },
+    {
+      "upstream": "extensions/feishu/src/test-support/lifecycle-test-support.ts",
+      "reason": "Test support for the omitted monitor lifecycle."
+    },
+    {
+      "upstream": "extensions/feishu/src/tool-factory-test-harness.ts",
+      "reason": "Upstream tool-factory test harness bound to the OpenClaw plugin host; src/fusion/tools.test.ts drives the same entry points through the Fusion registrar."
+    },
+    {
+      "upstream": "extensions/feishu/src/typing-backoff.ts",
+      "reason": "Backoff for the omitted typing.ts indicator."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-FS-001",
+      "file": "tsconfig.json",
+      "reason": "exactOptionalPropertyTypes and noPropertyAccessFromIndexSignature are off so the upstream Feishu source compiles verbatim: OpenClaw own tsconfig sets neither flag."
+    },
+    {
+      "id": "D-FS-002",
+      "file": "src/fusion/runtime-api.ts",
+      "reason": "The extension private runtime barrel re-exports ~30 members of the OpenClaw plugin host. Only the members the ported files read are declared, sourced from @getpaseo/channels-core."
+    },
+    {
+      "id": "D-FS-003",
+      "file": "src/fusion/status-sink.ts",
+      "reason": "The status-sink contract upstream declares inside the omitted monitor.ts."
+    },
+    {
+      "id": "D-FS-004",
+      "file": "src/fusion/webhook-invoker.ts",
+      "reason": "The durable-invoker contract upstream declares inside the omitted feishu-ingress.ts; the Hub owns the durable queue."
+    },
+    {
+      "id": "D-FS-005",
+      "file": "src/fusion/media-resource.ts",
+      "reason": "The inbound download half of the omitted media.ts, with upstream function name, parameters and response-shape ladder, over a Hub-supplied per-account download directory instead of the OpenClaw media store."
+    },
+    {
+      "id": "D-FS-006",
+      "file": "src/runtime.ts",
+      "reason": "Upstream stores the plugin runtime in OpenClaw global plugin runtime store; the Hub injects it through src/fusion/runtime.ts. Accessor names and the throw-on-unset contract are unchanged."
+    },
+    {
+      "id": "D-FS-007",
+      "file": "src/runtime.ts",
+      "reason": "Upstream runs one account per process, so one slot holds the runtime. The Hub runs every account of every organization in one process, so the runtime is keyed by account id and the account travels in AsyncLocalStorage."
+    },
+    {
+      "id": "D-FS-010",
+      "file": "src/policy.ts",
+      "reason": "Partial port: the three resolveFeishu*IngressAccess resolvers and their ingress identity/subject helpers are omitted because they run OpenClaw channel-ingress-runtime (the src/channels/message-access admission subsystem). The Hub owns inbound admission, DM/group policy and allowlists (goal slice 23). Everything the read policy and reply policy need is kept line for line."
+    },
+    {
+      "id": "D-FS-011",
+      "file": "src/fusion/ssrf-fetch.ts",
+      "reason": "Upstream fetchWithSsrFGuard sits on OpenClaw pinned-dispatcher stack. This keeps the call contract plus the hostname-suffix allowlist and the private-address block; per-hop redirect re-validation, DNS pinning and proxy dispatcher policies are not carried."
+    },
+    {
+      "id": "D-FS-012",
+      "file": "src/fusion/account-config.ts",
+      "reason": "Upstream resolves an account from OpenClaw process-wide config.json plus FEISHU_* env fallbacks. The Hub compiles the config revision and passes two carriers; the env fallbacks are deliberately not carried because a Hub process serves every organization."
+    },
+    {
+      "id": "D-FS-013",
+      "file": "src/fusion/runtime.ts",
+      "reason": "Installs the ported FeishuPluginRuntime over HostRuntime keyed stores, the vertical SSRF-guarded fetch and a per-account media directory, replacing OpenClaw SQLite state dir and host media services."
+    },
+    {
+      "id": "D-FS-014",
+      "file": "src/fusion/inbound-adapter.ts",
+      "reason": "Normalizes a Lark event into the shared ChannelInboundEvent instead of running the omitted monitor.message-handler turn pipeline. Content, mention and chat-type decisions come from the ported source."
+    },
+    {
+      "id": "D-FS-015",
+      "file": "src/fusion/admission.ts",
+      "reason": "Registers the Lark EventDispatcher handlers over the shared inbound processor and rebuilds upstream durable/non-durable invoker contract on top of the Hub queue."
+    },
+    {
+      "id": "D-FS-016",
+      "file": "src/fusion/ws-session.ts",
+      "reason": "Seam that builds the dispatcher and runs the ported monitorWebSocket; the reconnect loop itself is upstream."
+    },
+    {
+      "id": "D-FS-017",
+      "file": "src/fusion/webhook-session.ts",
+      "reason": "Seam that builds the dispatcher and runs the ported monitorWebhook with the durable invoker; signature verification, challenge handling and the guards are upstream."
+    },
+    {
+      "id": "D-FS-018",
+      "file": "src/fusion/tools.ts",
+      "reason": "Upstream registers the six feishu_* tool families through the OpenClaw plugin host registerFull(api). Fusion has no plugin host, so this builds the slice of that API the entry points touch over a Fusion registrar; schemas, descriptions and executors are untouched."
+    },
+    {
+      "id": "D-FS-019",
+      "file": "src/lifecycle/start-account.ts",
+      "reason": "The startAccount seam replacing the omitted monitor.ts fan-out: resolve account, install runtime, probe identity, register the inbound processor, run the configured transport until abort."
+    },
+    {
+      "id": "D-FS-020",
+      "file": "src/outbound.ts",
+      "reason": "Bridges the Hub plugin.outbound contract onto the ported send entry points; all wire decisions stay in send.ts."
+    },
+    {
+      "id": "D-FS-021",
+      "file": "src/channel-actions.ts",
+      "reason": "Upstream declares the message-action adapter inline in the omitted channel.ts. The action set, target aliases, action gate and per-action argument names are kept over the ported API functions; actions that need the OpenClaw outbound delivery adapter (upload-file, sticker, presentation fallback) are refused rather than advertised."
+    }
+  ]
+}

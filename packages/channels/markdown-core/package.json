@@ -1,0 +1,41 @@
+{
+  "name": "@getpaseo/channels-markdown-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenClaw markdown-core ported for the in-repo channel verticals; mirrors upstream packages/markdown-core/src under src (docs/audits/2026-09-07-openclaw-channel-port-goal.md). Manifest: upstream-sync.json",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "scripts": {
+    "build": "tsgo -p tsconfig.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "markdown-it": "15.0.1",
+    "markdown-it-cjk-friendly": "3.0.0",
+    "mdast-util-from-markdown": "2.0.3",
+    "mdast-util-gfm-table": "2.0.0",
+    "micromark-extension-gfm-table": "2.1.1",
+    "string-width": "8.2.2",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.13.10",
+    "@typescript/native-preview": "7.0.0-dev.20260423.1",
+    "json5": "2.2.3",
+    "vitest": "^3.2.4"
+  }
+}

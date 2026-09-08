@@ -9,7 +9,16 @@ import type { z } from "zod";
 import { CHANNEL_POLICY_PATH, type HubBundleFile } from "../../config/bundle-contract.js";
 import {
   SlackTransportSchema,
+  DiscordTransportSchema,
+  FeishuAccountConfigSchema,
+  FeishuTransportSchema,
+  GoogleChatAccountConfigSchema,
+  GoogleChatTransportSchema,
   TelegramTransportSchema,
+  ZaloAccountConfigSchema,
+  ZaloTransportSchema,
+  ZalouserAccountConfigSchema,
+  ZalouserTransportSchema,
   type RoleAssignment,
   type UserRecord,
 } from "./schema.js";
@@ -157,24 +166,58 @@ export function validateAssignments(
   }
 }
 
+/** One transport schema per channel with an in-repo vertical (§4.3.3). */
+const TRANSPORT_SCHEMAS = {
+  slack: SlackTransportSchema,
+  telegram: TelegramTransportSchema,
+  discord: DiscordTransportSchema,
+  googlechat: GoogleChatTransportSchema,
+  feishu: FeishuTransportSchema,
+  zalouser: ZalouserTransportSchema,
+  zalo: ZaloTransportSchema,
+} as const;
+
+/**
+ * The transport mode the Hub can actually receive events on, per channel. A
+ * mode the vertical implements but the Hub cannot drive is refused at compile
+ * rather than started into silence:
+ *
+ *  * Slack `webhook`, Telegram `webhook`, Feishu `webhook` and Zalo `webhook`
+ *    all need a public HTTPS URL the Hub does not publish; each has a mode that
+ *    needs none (socket / polling / long connection), so that mode is the only
+ *    one offered.
+ *  * Zalo Personal has one mode: the QR-linked session's push socket. It needs
+ *    no public URL, so there is nothing to refuse.
+ *  * Google Chat has no such alternative — HTTP POST is its only delivery
+ *    model — so `webhook` is admitted and the operator supplies the reverse
+ *    proxy (`packages/channels/googlechat/HUB-WIRING.md` §6).
+ */
+const DRIVABLE_TRANSPORT_MODES: Record<keyof typeof TRANSPORT_SCHEMAS, string> = {
+  slack: "socket",
+  telegram: "polling",
+  discord: "gateway",
+  googlechat: "webhook",
+  feishu: "websocket",
+  zalouser: "qr",
+  zalo: "polling",
+};
+
+function isTransportChannel(channel: string): channel is keyof typeof TRANSPORT_SCHEMAS {
+  return channel in TRANSPORT_SCHEMAS;
+}
+
 export function compileTransport(
   file: string,
   channel: string,
   authored: unknown,
 ): Record<string, unknown> {
-  // P0 supports two channels; the transport block is channel-native (§4.3.3).
-  let schema: typeof SlackTransportSchema | typeof TelegramTransportSchema | null;
-  if (channel === "slack") {
-    schema = SlackTransportSchema;
-  } else if (channel === "telegram") {
-    schema = TelegramTransportSchema;
-  } else {
-    schema = null;
+  if (!isTransportChannel(channel)) {
+    issue(
+      [file, "transport"],
+      `channel ${channel} has no in-repo vertical (${Object.keys(TRANSPORT_SCHEMAS).join(", ")})`,
+    );
   }
-  if (schema === null) {
-    issue([file, "transport"], `channel ${channel} is not supported at P0 (slack, telegram)`);
-  }
-  const result = schema.safeParse(authored);
+  const result = TRANSPORT_SCHEMAS[channel].safeParse(authored);
   if (!result.success) {
     const [first] = result.error.issues;
     issue(
@@ -182,14 +225,75 @@ export function compileTransport(
       first?.message ?? "invalid transport block",
     );
   }
-  if (
-    (channel === "slack" && result.data.mode !== "socket") ||
-    (channel === "telegram" && result.data.mode !== "polling")
-  ) {
+  const mode = String(result.data.mode);
+  if (mode !== DRIVABLE_TRANSPORT_MODES[channel]) {
     issue(
       [file, "transport", "mode"],
-      `${channel} ${String(result.data.mode)} transport is not implemented; refusing a configuration that cannot receive events`,
+      `${channel} ${mode} transport is not implemented; refusing a configuration that cannot receive events`,
     );
   }
   return result.data;
+}
+
+/**
+ * The vertical-owned `config` block. It is passed through verbatim (each
+ * vertical type-checks its own keys on read), but the channels wired in slices
+ * 14b/15b/16b get their drive-path keys type-checked here so a wrong-typed knob
+ * fails at deploy instead of at start. The shapes are loose: an upstream account
+ * file carries knobs this Hub never reads.
+ */
+const ACCOUNT_CONFIG_SCHEMAS: Record<string, z.ZodType> = {
+  googlechat: GoogleChatAccountConfigSchema,
+  feishu: FeishuAccountConfigSchema,
+  zalo: ZaloAccountConfigSchema,
+  zalouser: ZalouserAccountConfigSchema,
+};
+
+/**
+ * Fusion's product defaults for that same block: a key the Hub fills in when
+ * the author left it out. Deliberately per-channel and never a floor across
+ * channels — a compiled `config` is otherwise the author's text, so every entry
+ * here changes what already-deployed revisions do and has to earn it.
+ *
+ * `telegram.richMessages` is the one entry: upstream's Telegram HTML path has
+ * no heading tag and flattens `#` headings (its `format.test.ts` pins that),
+ * while the native rich-blocks path renders headings, lists, blockquotes and
+ * tables as Telegram blocks. Fusion wants the native rendering by default
+ * (`packages/channels/telegram/DEVIATIONS.md` D-003), so the default lives
+ * here rather than in the vertical's `richMessages === true` read, which stays
+ * byte-identical to upstream. An authored `false` still wins.
+ */
+const ACCOUNT_CONFIG_DEFAULTS: Record<string, Record<string, unknown>> = {
+  telegram: { richMessages: true },
+};
+
+export function compileAccountConfig(
+  file: string,
+  channel: string,
+  authored: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const config = authored ?? {};
+  const schema = ACCOUNT_CONFIG_SCHEMAS[channel];
+  if (schema !== undefined) {
+    const result = schema.safeParse(config);
+    if (!result.success) {
+      const [first] = result.error.issues;
+      issue(
+        [file, "config", ...(first?.path ?? []).map(String)],
+        first?.message ?? "invalid account configuration",
+      );
+    }
+  }
+  return withAccountConfigDefaults(channel, config);
+}
+
+/** Fill the channel's absent Fusion defaults; authored keys are untouched. */
+function withAccountConfigDefaults(
+  channel: string,
+  config: Record<string, unknown>,
+): Record<string, unknown> {
+  const defaults = ACCOUNT_CONFIG_DEFAULTS[channel];
+  if (defaults === undefined) return config;
+  const absent = Object.entries(defaults).filter(([key]) => !Object.hasOwn(config, key));
+  return absent.length === 0 ? config : { ...config, ...Object.fromEntries(absent) };
 }

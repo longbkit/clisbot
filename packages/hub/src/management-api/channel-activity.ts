@@ -1,10 +1,17 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ProductRequestError } from "../auth/organization-access.js";
+import { requireChannelPlane } from "./channel-plane-gate.js";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import { auditEvents } from "../db/schema.js";
+import type { SupportedChannelName } from "../channels/catalog.js";
+import { SupportedChannelNameSchema } from "../channels/config/enums.js";
 
-const outcomeSchema = z.enum(["bound", "steered", "workflow", "ignored", "error"]);
+// `denied` is the access gate's own outcome (`access.dmPolicy` / `groupPolicy`
+// / `allowFrom`): a sender refused before any turn, with the upstream reason
+// code in `outcomeDetail`. It is distinct from `ignored`, which means the plane
+// had nothing to do with the event.
+const outcomeSchema = z.enum(["bound", "steered", "workflow", "ignored", "denied", "error"]);
 const routeSchema = z.union([z.number().int().nonnegative(), z.literal("fallback")]);
 const activityEvidence = z.object({
   routePosition: routeSchema,
@@ -18,7 +25,7 @@ const activityEvidence = z.object({
 });
 const querySchema = z
   .object({
-    channel: z.enum(["slack", "telegram"]).optional(),
+    channel: SupportedChannelNameSchema.optional(),
     accountId: z.string().min(1).max(512).optional(),
     routePosition: z
       .union([
@@ -59,11 +66,14 @@ function readCursor(query: ChannelActivityQuery, scope: string) {
   }
 }
 
+/** One page of channel activity. Gated: with the kill-switch off this Hub has
+ * no channel plane, so the resource does not exist. */
 export async function channelActivityPage(
   runtime: DatabaseRuntime,
   organizationId: string,
   query: ChannelActivityQuery,
 ) {
+  requireChannelPlane();
   const scope = JSON.stringify([
     organizationId,
     query.channel,
@@ -113,7 +123,7 @@ export async function channelActivityPage(
     activity: page.flatMap((row) => {
       const evidence = activityEvidence.safeParse(row.evidence);
       const separator = row.subjectId.indexOf("/");
-      const channel = z.enum(["slack", "telegram"]).safeParse(row.subjectId.slice(0, separator));
+      const channel = SupportedChannelNameSchema.safeParse(row.subjectId.slice(0, separator));
       const accountId = row.subjectId.slice(separator + 1);
       return evidence.success && channel.success && accountId.length > 0
         ? [
@@ -140,7 +150,7 @@ export async function channelActivityPage(
 export function channelActivityView(
   runtime: DatabaseRuntime,
   organizationId: string,
-  channel: "slack" | "telegram",
+  channel: SupportedChannelName,
   accountId: string,
 ) {
   return channelActivityPage(runtime, organizationId, { channel, accountId, limit: 50 });

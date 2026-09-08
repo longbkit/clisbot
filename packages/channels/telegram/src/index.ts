@@ -6,12 +6,18 @@
 
 export { default } from "./entry.js";
 export { entry } from "./entry.js";
-export { telegramPlugin, sendText, startTelegramAccount } from "./plugin.js";
+export { telegramPlugin, sendText, sendMedia, updateText, startTelegramAccount } from "./plugin.js";
+export { installTelegramRuntime } from "./fusion/runtime.js";
+export * from "./send.js";
+export { telegramMessageActions } from "./channel-actions.js";
 export { setChannelHostRuntime, getHostRuntime, registerAccountInbound } from "./runtime-store.js";
 export * from "./client/bot-api.js";
-export * from "./client/sent-messages.js";
-export * from "./transport/poll.js";
 export * from "./transport/media.js";
+export * from "./fusion/inbound-adapter.js";
+export * from "./fusion/polling-session.js";
+export * from "./fusion/webhook-session.js";
+export * from "./fusion/admission.js";
+export { createTelegramMessageCache } from "./message-cache.js";
 export {
   readBotInfoCache,
   writeBotInfoCache,
@@ -23,3 +29,7 @@ export {
 export * from "./leaves/telegram-policy.js";
 export * from "./leaves/coerce.js";
 export * from "./leaves/rich-message.js";
+export { createTelegramDraftStream } from "./draft-stream.js";
+export { resolveTelegramDraftStreamingChunking } from "./draft-chunking.js";
+export * from "./telegram-text-delivery.js";
+export * from "./status-reaction-variants.js";

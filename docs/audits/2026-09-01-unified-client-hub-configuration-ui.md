@@ -740,6 +740,14 @@ explicit accessible names. `Who can use this?` reveals existing access and neutr
 identities` navigation; provider Connection details describe the connected credential, not a Member
 grant or proof that the current user has linked an identity.
 
+`Who can use this?` is also where `access.dmPolicy: pairing` is decided. The queue behind
+`GET channel-accounts/:channel/:account/pairing` is a decision list, not a notification feed: a
+stranger who direct-messages a paired account is shown a short code and parked, and an operator
+approving them is what grants access. So the code leads every row — it is the only way to tell one
+waiting stranger from another — waiting rows sort first, and a decided row keeps its decision and
+offers no action, because a denial is final on the Hub. A 404 reads as "this Hub has no pairing
+queue" rather than "nobody is waiting".
+
 Provider Connection creation is opened explicitly from account setup when needed. It reuses the
 existing Connection form and preserves the surrounding account draft. A second always-open
 `Add Connection` form is not part of the Channels overview. `Advanced YAML` starts collapsed and is
@@ -793,9 +801,10 @@ identity in Account and the Channel account's existing access in Manage access. 
 does not grant new privileges, and `Only you` does not bypass identity verification. Use inbound
 Activity to verify admission; a successful outbound test reply does not prove sender eligibility.
 
-Channels separates `Accounts` configuration from `Activity`. Activity shows up to 25 inbound events
-per page, with account, Route position, and outcome filters, explicit Older/Newer navigation, and
-Refresh. Opening one event reveals its Conversation, sender, admission result, and recovery actions;
+Channels separates four views. `Accounts` is the canonical Route editor; `Catalog` is setup and
+capability discovery; `Operations` is the durable ingress queue; `Activity` is inbound admission.
+Activity shows up to 25 inbound events per page, with account, Route position, and outcome filters,
+explicit Older/Newer navigation, and Refresh. Opening one event reveals its Conversation, sender, admission result, and recovery actions;
 the list does not repeat full warning panels. Returning from details preserves the filters and page.
 The Hub uses an organization-scoped timestamp/ID cursor and indexed audit queries rather than loading
 the full event history. Failed page requests retain the last loaded page with an explicit retry state.
@@ -827,6 +836,105 @@ These additive HTTP fields remain optional for older Hub responses; unknown Team
 empty Team or proof of a sole owner. Password, organization-selection, and invitation gates remain
 enforced. Regression coverage includes a setup-pending owner with an existing Slack Connection,
 the real Account-to-identity form, pending invitations, and legacy responses without the new facts.
+
+### Catalog and capabilities
+
+`Channels → Catalog` lists every channel the build knows, whether or not an account exists for it:
+its prerequisites, its transports and what each one requires, its channel-specific tools, the health
+of each configured account, and its capability matrix.
+
+The Hub owns the catalog (`packages/hub/src/channels/catalog.ts`) and publishes it at
+`GET channel-catalog` behind `channel.manage`. `packages/app/src/clisbot/hub/channel-catalog.ts` is
+the client model over that read and carries no catalog of its own: the load state the setup surfaces
+render, and the derivations that need one served entry and nothing else. Every channel surface reads
+it through `useChannelCatalog`, which holds one cache entry for five minutes because the catalog
+changes only when the Hub is upgraded.
+
+Three answers, three states. Pending is `loading`. The management API's unknown-route 404 is
+`unavailable` — "the catalog is not available on this Hub, update it" — and never an empty catalog,
+which would read as "no channels exist". Anything else is `error` carrying the Hub's own message.
+The contract keeps channel ids, capability names and tool names open strings so a newer Hub's
+vocabulary cannot fail the page's parse; `channel-catalog.fixture.ts` is a captured response the
+contract tests parse, not a mirror to drift from.
+
+A channel whose `status` is `planned` is shown as coming and cannot be connected. A channel with
+accounts that the catalog does not carry is listed after the catalog, with its accounts and queue
+intact and no setup guidance — neither an unavailable catalog nor a channel the Hub runs without
+publishing makes its own accounts invisible.
+
+Account health joins three reads: the authored account, its `channel-accounts/status` row
+(transport state, `detail`, and the per-account `ingress` counts), and the `connections` entry the
+account references, which is where the provider identity lives. The status row carries no identity,
+so an account whose Connection cannot be resolved reports that rather than guessing.
+
+The capability matrix reports five states: Available, Needs setup, Restricted, Unsupported, and Not
+verified. The inputs are the catalog's capability list, the catalog's own narrowing notes, and the
+account's transport state. There is no per-capability evidence anywhere in the Hub contract, so a
+running account's capability is `Not verified`, never `Available`: the catalog is a claim, and a
+claim rendered as a green check is a UI that lies. `Available` is reachable only from a `verified`
+set the derivation already accepts and no Hub sends yet. `Restricted` restates a catalog note —
+Google Chat and Feishu receive card clicks but render no card, Zalo's media is inbound images only,
+Discord's slash commands and interaction callbacks are not wired.
+
+### Connecting a channel
+
+`Connect` opens the catalog-driven credential form. Two contracts meet in it and they are not the
+same list: the catalog names a channel's credential and explains it, while `POST connections` is
+`.strict()` about which keys it accepts. Telegram's catalog entry carries `webhookUrl` and
+`webhookSecret`; its Connection credential is a bot token alone. Discord's config key is `token` and
+its Connection field is `botToken`. So `CONNECTION_SHAPES` in
+`channel-connection-form.ts` is the request contract — the credential shape and the fields per
+channel — and the served catalog entry supplies each field's label, help and transports.
+
+This is the app's only Add-connection surface. `AddChannelConnection` picks the channel and mounts
+the same form, and the Channels accounts editor, the Catalog view and Hub Configuration settings all
+go through it. A channel becomes connectable everywhere at once the moment the Hub's catalog carries
+it and `CONNECTION_SHAPES` knows its body. Slack Socket Mode is created from a Provider Application,
+which only an instance operator administers, so it is offered only to one; the accounts editor is
+otherwise open to every channel the Hub runs.
+
+Four credential shapes and one login: a single secret (Telegram, Discord, Zalo Official Bot), a
+field set (Feishu: app id, app secret, and the verification token and encrypt key its webhook
+transport requires), a service-account document pasted or named as a path on the daemon host
+(Google Chat), the existing Slack Socket Mode pair, and a QR login (Zalo Personal). Transport choice
+drives which fields are required rather than adding fields the Hub would reject; the account's
+transport itself is authored on the account, not the Connection.
+
+Guided validation restates the rules the Hub enforces — the `xapp-`/`xoxb-` prefixes, the Zalo
+webhook secret's 8–256 bounds, the 128-character account name, and that a pasted service account is
+JSON whose `type` is `service_account`. The Hub remains authoritative; these only save a round trip.
+Its answers become guidance: `connection_unavailable` at 422 is "the provider rejected this
+credential", at 502 "the provider could not be reached, the credential may be fine, try again". A
+404 is "this Hub does not ship this channel". Secret values never reach rendered state — the form
+model publishes `filled`, not the value, and only the request builder reads them.
+
+Zalo Personal is the only QR channel today, and the path
+(`channel-accounts/:channel/:accountId/qr/:verb`) is not shaped around it. Its five verbs
+(`packages/channels/zalouser/HUB-WIRING.md` §7) are non-blocking and the app polls: start or relink
+shows a code, a poll answers pending, linked or failed, and the code expires after about three
+minutes. A `failed` whose message is about expiry means generate a new one, and relink is routine
+rather than an error — a personal session dies for ordinary reasons.
+
+The panel learns what the Hub can do from the answers, not from a build-time flag. A 404 settles it
+in the terminal `unavailable` phase, which offers no action because upgrading the Hub is the only
+fix. A 503 is the channel runtime being down right now, so it settles as an ordinary failure and
+leaves `Show QR code` on offer. `needs-login` on a `channel-accounts/status` row is the only signal
+that an account is waiting to be linked, so that row's `Link with QR` action is where an operator
+starts — the Catalog view is for discovery, the account row is where the work is.
+
+### Ingress operations
+
+`Channels → Operations` is the durable queue's operator surface over `channel-ingress`: depth per
+account with the oldest pending age and blocked-lane count, the dead-letter list, resubmit, prune,
+and refresh. Dead letters are the Hub's redacted rows — ids, counts, timestamps and failure text,
+never the payload — and the app names the fields a row may render so a later contract addition
+cannot leak a message body into the list.
+
+Resubmit only ever sends dead-lettered ids, because that is all the Hub reopens; sending a completed
+row's id is a request that does nothing, which reads as a broken button. Prune confirms
+destructively and states what it deletes: completed and dead-lettered rows past the Hub's retention
+window, never pending or in-flight work. Both operations need the `channel.manage` authority, and a
+404 from the endpoint is rendered as "not available on this Hub" rather than an error.
 
 ### Routes
 

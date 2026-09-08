@@ -1,6 +1,6 @@
 {
   "registry": "https://registry.npmjs.org/",
-  "note": "Pinned OpenClaw supply for the Hub channel verticals (plan §14.4: public npm, no mirror; the integrity pin is the trust boundary for pinned supply). Each channel pins the shared main package + its own channel package. Integrity is the tarball `dist.integrity` (npm `sha512-…`); the channel packages additionally pin `gitHead` (the main package does not record one on the registry). Telegram is inlined in the main package's dist (no separate channel package), so its `channel` pins the main package itself (file:// URL, no alias surface — plan §7 / table-top finding #0). Slack and Telegram are pulled IN-REPO (blueprint docs/audits/2026-08-26-in-repo-channel-verticals.md §6.5): their loadMode is `in-repo` and the Hub drives the built workspace package (`inRepoPackage`) — trusted first-party, no tarball fetch, no integrity gate at load; the `channel` pins stay as the UPSTREAM SYNC REFERENCES (integrity + gitHead intact) for the re-sync loop.",
+  "note": "Pinned OpenClaw supply for the Hub channel verticals (plan \u00a714.4: public npm, no mirror; the integrity pin is the trust boundary for pinned supply). Each channel pins the shared main package + its own channel package. Integrity is the tarball `dist.integrity` (npm `sha512-\u2026`); the channel packages additionally pin `gitHead` (the main package does not record one on the registry). Telegram is inlined in the main package's dist (no separate channel package), so its `channel` pins the main package itself (file:// URL, no alias surface \u2014 plan \u00a77 / table-top finding #0). Slack, Telegram and Discord are pulled IN-REPO (blueprint docs/audits/2026-08-26-in-repo-channel-verticals.md \u00a76.5): their loadMode is `in-repo` and the Hub drives the built workspace package (`inRepoPackage`) \u2014 trusted first-party, no tarball fetch, no integrity gate at load; the `channel` pins stay as the UPSTREAM SYNC REFERENCES (integrity + gitHead intact) for the re-sync loop.",
   "main": {
     "package": "openclaw",
     "version": "2026.7.1-2",
@@ -43,6 +43,91 @@
         "exportName": "telegramPlugin"
       },
       "notices": "telegram"
+    },
+    "discord": {
+      "channel": {
+        "package": "@openclaw/discord",
+        "version": "2026.9.2",
+        "dist": {
+          "integrity": "sha512-j+fSHxbXA+DSxwbL8SvtsDNL6tvBX4+RmH+EerVW6dCbeIwSconXj6J/+AaN/mhzZI4g0jPPj30TUhdCRRbc2w=="
+        }
+      },
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-discord",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/plugin.js",
+        "exportName": "discordPlugin"
+      },
+      "notices": "discord"
+    },
+    "googlechat": {
+      "channel": {
+        "package": "@openclaw/googlechat",
+        "version": "2026.9.2",
+        "dist": {
+          "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-googlechat",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/plugin.js",
+        "exportName": "googlechatPlugin"
+      },
+      "notices": "googlechat"
+    },
+    "feishu": {
+      "channel": {
+        "package": "@openclaw/feishu",
+        "version": "2026.9.2",
+        "dist": {
+          "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-feishu",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/plugin.js",
+        "exportName": "feishuPlugin"
+      },
+      "notices": "feishu"
+    },
+    "zalouser": {
+      "channel": {
+        "package": "@openclaw/zalouser",
+        "version": "2026.9.2",
+        "dist": {
+          "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-zalouser",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/plugin.js",
+        "exportName": "zalouserPlugin"
+      },
+      "notices": "zalouser"
+    },
+    "zalo": {
+      "channel": {
+        "package": "@openclaw/zalo",
+        "version": "2026.9.2",
+        "dist": {
+          "integrity": "sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "loadMode": "in-repo",
+      "inRepoPackage": "@getpaseo/channels-zalo",
+      "entry": "./dist/index.js",
+      "plugin": {
+        "specifier": "./dist/plugin.js",
+        "exportName": "zaloPlugin"
+      },
+      "notices": "zalo"
     }
   }
 }

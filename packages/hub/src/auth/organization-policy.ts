@@ -15,18 +15,21 @@ const ROLE_CAPABILITIES = {
     manageMembers: true,
     manageOwners: true,
     manageResources: true,
+    manageChannels: true,
   },
   admin: {
     view: true,
     manageMembers: true,
     manageOwners: false,
     manageResources: true,
+    manageChannels: true,
   },
   member: {
     view: true,
     manageMembers: false,
     manageOwners: false,
     manageResources: false,
+    manageChannels: false,
   },
 } as const satisfies Record<OrganizationRole, OrganizationCapabilities>;
 

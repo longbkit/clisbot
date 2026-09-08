@@ -16,7 +16,7 @@ import {
   localHubMasterKeyPath,
   readDaemonPasswordFile,
   readHubStateFile,
-  readOrCreateLocalHubMasterKey,
+  resolveLocalHubMasterKeyFile,
   resolveHubPort,
   resolveLocalHubHome,
   resolveLocalHubState,
@@ -212,11 +212,12 @@ describe("local Hub credential master key", () => {
     const home = await createHome();
     const keyPath = localHubMasterKeyPath(home);
 
-    const first = readOrCreateLocalHubMasterKey(home);
-    const second = readOrCreateLocalHubMasterKey(home);
+    const first = resolveLocalHubMasterKeyFile(home, { initialize: true });
+    const second = resolveLocalHubMasterKeyFile(home);
 
-    expect(first).toBe(second);
-    expect(Buffer.from(first, "base64")).toHaveLength(32);
+    expect(first).toBe(keyPath);
+    expect(second).toBe(keyPath);
+    expect(Buffer.from(fs.readFileSync(keyPath, "utf8").trim(), "base64")).toHaveLength(32);
     expect(path.dirname(keyPath)).toBe(path.dirname(home));
     expect(keyPath.startsWith(`${home}${path.sep}`)).toBe(false);
     if (process.platform !== "win32") {
@@ -224,10 +225,16 @@ describe("local Hub credential master key", () => {
     }
   });
 
+  test("refuses to mint a replacement key without --init-master-key", async () => {
+    const home = await createHome();
+    expect(() => resolveLocalHubMasterKeyFile(home)).toThrow(/--init-master-key/);
+    expect(fs.existsSync(localHubMasterKeyPath(home))).toBe(false);
+  });
+
   test("rejects a malformed existing key", async () => {
     const home = await createHome();
     writeFileSync(localHubMasterKeyPath(home), "not-a-key\n");
-    expect(() => readOrCreateLocalHubMasterKey(home)).toThrow(/malformed/);
+    expect(() => resolveLocalHubMasterKeyFile(home, { initialize: true })).toThrow(/malformed/);
   });
 
   test("places the key outside an explicit Hub data directory", async () => {
@@ -243,7 +250,10 @@ describe("startLocalHubDetached", () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
     const selectPort = vi.fn().mockResolvedValue(7123);
-    const result = await startLocalHubDetached({ home }, Object.assign(runtime, { selectPort }));
+    const result = await startLocalHubDetached(
+      { home, initMasterKey: true },
+      Object.assign(runtime, { selectPort }),
+    );
     expect(selectPort).toHaveBeenCalledWith(6868, true);
     expect(result.url).toBe("http://127.0.0.1:7123");
     const recorded = readHubStateFile(home);
@@ -270,7 +280,10 @@ describe("startLocalHubDetached", () => {
     expect(readHubStateFile(home)?.port).toBe(7123);
     const runtime = new FakeHubRuntime();
     const selectPort = vi.fn().mockResolvedValue(7123);
-    await startLocalHubDetached({ home }, Object.assign(runtime, { selectPort }));
+    await startLocalHubDetached(
+      { home, initMasterKey: true },
+      Object.assign(runtime, { selectPort }),
+    );
     expect(selectPort).toHaveBeenCalledWith(7123, false);
     expect(readHubStateFile(home)?.stoppedAt).toBeUndefined();
   });
@@ -279,18 +292,40 @@ describe("startLocalHubDetached", () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
     const selectPort = vi.fn();
-    await startLocalHubDetached({ home }, Object.assign(runtime, { selectPort }), {
-      CLISBOT_ONBOARDING_ENABLED: "0",
-    });
+    await startLocalHubDetached(
+      { home, initMasterKey: true },
+      Object.assign(runtime, { selectPort }),
+      {
+        CLISBOT_ONBOARDING_ENABLED: "0",
+      },
+    );
     expect(selectPort).not.toHaveBeenCalled();
     expect(readHubStateFile(home)?.instanceId).toBeUndefined();
+  });
+
+  test("hands the child the master key file path, never the key itself", async () => {
+    const home = await createHome();
+    const runtime = new FakeHubRuntime();
+    await startLocalHubDetached({ home, initMasterKey: true }, runtime);
+    const child = runtime.lastDetached?.options.env as NodeJS.ProcessEnv;
+    const keyPath = localHubMasterKeyPath(home);
+    expect(child.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE).toBe(keyPath);
+    expect(child.PASEO_HUB_CREDENTIAL_MASTER_KEY).toBeUndefined();
+    expect(JSON.stringify(child)).not.toContain(fs.readFileSync(keyPath, "utf8").trim());
+  });
+
+  test("refuses to start when the master key is gone and the flag is absent", async () => {
+    const home = await createHome();
+    const runtime = new FakeHubRuntime();
+    await expect(startLocalHubDetached({ home }, runtime)).rejects.toThrow(/--init-master-key/);
+    expect(runtime.lastDetached).toBeUndefined();
   });
 
   test("does not turn bare token input variables into a legacy environment Application", async () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
     const inherited = { SLACK_APP_TOKEN: "xapp-input", SLACK_BOT_TOKEN: "xoxb-input" };
-    await startLocalHubDetached({ home }, runtime, inherited);
+    await startLocalHubDetached({ home, initMasterKey: true }, runtime, inherited);
     const child = runtime.lastDetached?.options.env as NodeJS.ProcessEnv;
     expect(child.SLACK_APP_TOKEN).toBeUndefined();
     expect(child.SLACK_BOT_TOKEN).toBeUndefined();
@@ -301,7 +336,7 @@ describe("startLocalHubDetached", () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
 
-    const result = await startLocalHubDetached({ home }, runtime);
+    const result = await startLocalHubDetached({ home, initMasterKey: true }, runtime);
 
     expect(result.url).toBe("http://127.0.0.1:6868");
     expect(result.pid).toBe(4242);
@@ -313,12 +348,9 @@ describe("startLocalHubDetached", () => {
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PORT).toBe("6868");
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_APP_URL).toBe(result.url);
     expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_BIND).toBe("127.0.0.1");
-    expect(
-      Buffer.from(
-        (launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_CREDENTIAL_MASTER_KEY ?? "",
-        "base64",
-      ),
-    ).toHaveLength(32);
+    expect((launch?.options?.env as NodeJS.ProcessEnv)?.PASEO_HUB_CREDENTIAL_MASTER_KEY_FILE).toBe(
+      localHubMasterKeyPath(home),
+    );
 
     expect(readHubStateFile(home)).toMatchObject({
       url: "http://127.0.0.1:6868",
@@ -331,7 +363,10 @@ describe("startLocalHubDetached", () => {
     const home = await createHome();
     const runtime = new FakeHubRuntime();
 
-    const result = await startLocalHubDetached({ home, port: "7100" }, runtime);
+    const result = await startLocalHubDetached(
+      { home, port: "7100", initMasterKey: true },
+      runtime,
+    );
 
     expect(result.url).toBe("http://127.0.0.1:7100");
     expect(readHubStateFile(home)?.port).toBe(7100);
@@ -342,7 +377,7 @@ describe("startLocalHubDetached", () => {
     writeFileSync(path.join(home, ".daemon-password"), "PASEO_PASSWORD=secret789\n");
     const runtime = new FakeHubRuntime();
 
-    await startLocalHubDetached({ home }, runtime);
+    await startLocalHubDetached({ home, initMasterKey: true }, runtime);
 
     expect((runtime.lastDetached?.options?.env as NodeJS.ProcessEnv)?.PASEO_PASSWORD).toBe(
       "secret789",
@@ -355,7 +390,9 @@ describe("startLocalHubDetached", () => {
     writeHubState(home, process.pid);
     const runtime = new FakeHubRuntime();
 
-    await expect(startLocalHubDetached({ home }, runtime)).rejects.toThrow(AlreadyRunningError);
+    await expect(startLocalHubDetached({ home, initMasterKey: true }, runtime)).rejects.toThrow(
+      AlreadyRunningError,
+    );
     expect(existsSync(path.join(home, "hub-local.json"))).toBe(true);
   });
 
@@ -369,7 +406,7 @@ describe("startLocalHubDetached", () => {
       return result;
     };
 
-    await expect(startLocalHubDetached({ home }, runtime)).rejects.toThrow(
+    await expect(startLocalHubDetached({ home, initMasterKey: true }, runtime)).rejects.toThrow(
       /Hub failed to start in background/,
     );
     expect(readHubStateFile(home)).toBeNull();
@@ -382,7 +419,7 @@ describe("startLocalHubForeground", () => {
     const runtime = new FakeHubRuntime();
     runtime.foregroundStatus = 0;
 
-    expect(startLocalHubForeground({ home }, runtime)).toBe(0);
+    expect(startLocalHubForeground({ home, initMasterKey: true }, runtime)).toBe(0);
   });
 });
 

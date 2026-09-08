@@ -125,6 +125,7 @@ describe("loadChannelVertical (native ESM loader)", () => {
     const options: LoadChannelVerticalOptions = {
       channel: "fake",
       accountId: "acc1",
+      organizationId: "org",
       installDir: base,
       mainInstallDir: mainDir,
       channelInstallDir: channelDir,
@@ -176,6 +177,7 @@ describe("loadChannelVertical (native ESM loader)", () => {
         loadChannelVertical({
           channel: "fake",
           accountId: "acc2",
+          organizationId: "org",
           installDir: base,
           mainInstallDir: mainDir,
           channelInstallDir: channelDir,
@@ -207,6 +209,7 @@ describe("loadChannelVertical (native ESM loader)", () => {
       loadChannelVertical({
         channel: "fake",
         accountId: "acc3",
+        organizationId: "org",
         installDir: base,
         mainInstallDir: mainDir,
         channelInstallDir: channelDir,
@@ -221,6 +224,69 @@ describe("loadChannelVertical (native ESM loader)", () => {
     await assert.rejects(load, isRogueMiss);
   });
 
+  // The load-trace window is a time window, but a vertical's imports are not:
+  // both pinned verticals finish importing their SDK after `startAccount`
+  // resolves. `startAll` starts accounts back to back, so those late modules
+  // used to land in the NEXT account's window and fail its allowlist. Here A
+  // imports a module of its own while B's window is open; B must not see it.
+  it("keeps a neighbour's late import out of the next account's load trace", async () => {
+    const base = join(workDir, "race");
+    const a = writeTree(join(base, "a"));
+    const b = writeTree(join(base, "b"));
+    writeFileSync(join(a.channelDir, "dist", "late.js"), "export const late = 'A-LATE';\n");
+    writeFileSync(
+      join(a.channelDir, "dist", "index.js"),
+      ENTRY.replace(
+        "export default entry;",
+        "entry.loadLate = () => import('./late.js');\nexport default entry;",
+      ),
+    );
+    // B's entry blocks on a gate the test releases, so its load window stays
+    // open while A imports late — the race, made deterministic.
+    writeFileSync(join(b.channelDir, "dist", "index.js"), `await globalThis.__gate;\n${ENTRY}`);
+    const options = (
+      name: string,
+      tree: { mainDir: string; channelDir: string; hostBaseDir: string },
+    ): LoadChannelVerticalOptions => ({
+      channel: name,
+      accountId: name,
+      organizationId: "org",
+      installDir: join(base, name),
+      mainInstallDir: tree.mainDir,
+      channelInstallDir: tree.channelDir,
+      entry: "dist/index.js",
+      plugin: { specifier: "dist/__hub__plugin.js", exportName: "fakePlugin" },
+      loadMode: "published",
+      hostRuntime: hostRuntime(),
+      hostBaseDir: tree.hostBaseDir,
+    });
+
+    let release = (): void => undefined;
+    (globalThis as Record<string, unknown>)["__gate"] = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const loadedA = await loadChannelVertical(options("a", a));
+    // B's window opens synchronously; its entry then parks on the gate.
+    const loadingB = loadChannelVertical(options("b", b));
+    const late = (await (
+      loadedA.entry["loadLate"] as () => Promise<Record<string, unknown>>
+    )()) as {
+      late: string;
+    };
+    release();
+    const loadedB = await loadingB;
+
+    assert.equal(late.late, "A-LATE");
+    assert.ok(loadedB.loadedModules.some((url) => url.endsWith("b/channel/dist/index.js")));
+    assert.deepEqual(
+      loadedB.loadedModules.filter((url) => url.includes("/a/channel/")),
+      [],
+    );
+    loadedA.dispose();
+    loadedB.dispose();
+    delete (globalThis as Record<string, unknown>)["__gate"];
+  });
+
   it("refuses to load any vertical while the kill-switch is off", async () => {
     const base = join(workDir, "gate");
     const { mainDir, channelDir, hostBaseDir } = writeTree(base);
@@ -232,6 +298,7 @@ describe("loadChannelVertical (native ESM loader)", () => {
           loadChannelVertical({
             channel: "fake",
             accountId: "acc4",
+            organizationId: "org",
             installDir: base,
             mainInstallDir: mainDir,
             channelInstallDir: channelDir,
@@ -259,6 +326,7 @@ describe("loadChannelVertical (native ESM loader)", () => {
         loadChannelVertical({
           channel: "fake",
           accountId: "acc5",
+          organizationId: "org",
           installDir: base,
           mainInstallDir: mainDir,
           channelInstallDir: channelDir,
@@ -282,6 +350,7 @@ describe("loadChannelVertical (native ESM loader)", () => {
         loadChannelVertical({
           channel: "fake",
           accountId: "acc6",
+          organizationId: "org",
           installDir: base,
           mainInstallDir: mainDir,
           channelInstallDir: channelDir,

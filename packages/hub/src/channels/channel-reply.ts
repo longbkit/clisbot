@@ -23,29 +23,67 @@ import {
   ListToolsRequestSchema,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { randomUUID } from "node:crypto";
-import { realpathSync, statSync } from "node:fs";
-import path from "node:path";
-import { evaluateOutboundMedia, mediaFileName } from "@getpaseo/channels-shared";
 import { ChannelStore } from "../db/channels.js";
 import type { Database } from "../db/types.js";
 import { registerResponseLifecycle } from "../http/response-lifecycle.js";
 import { reportFailure } from "../failures/index.js";
 import {
   CHANNEL_REPLY_TOOL_NAME,
-  CHANNEL_REPLY_FILE_TOOL_NAME,
   type ChannelReplyBindingRef,
-  type ChannelReplyFilePostFn,
+  type MediaPostResult,
   type OutboundPostResult,
 } from "./plane/types.js";
-import type { ChannelReplyCapability } from "./channel-reply-capabilities.js";
+import type { StagedChannelMedia } from "./media/outbound-stager.js";
+import type { MessagePresentation } from "@getpaseo/channels-core/plugin-sdk/interactive-runtime";
+import { executeChannelSend, type ChannelReplyOutputAttempt } from "./channel-reply-send.js";
+import { errorText, toolFailure, unsupportedAction } from "./channel-reply-results.js";
+import {
+  accountScope,
+  type ChannelReplyCapability,
+  type ChannelReplyTurnOutput,
+} from "./channel-reply-capabilities.js";
+import {
+  agentToolContext,
+  channelToolCall,
+  isChannelAgentTool,
+  listChannelAgentTools,
+} from "./channel-agent-tools.js";
+import {
+  buildChannelMessageToolDescription,
+  buildChannelMessageToolSchema,
+  isExecutableMessageAction,
+  listChannelMessageToolActions,
+  readHostOnlyMessageToolFields,
+} from "./channel-message-tool.js";
+import {
+  runChannelMessageAction,
+  type ChannelAccountScope,
+  type ChannelMessageActionOutcome,
+} from "./message-actions.js";
+
+/** What one post carries besides its text. `text` stays the message's fallback
+ * rendering on every channel; a vertical that declares presentation support
+ * renders the blocks instead (Slack Block Kit charts and tables). */
+export interface ChannelReplyPostOptions {
+  presentation?: MessagePresentation | undefined;
+}
 
 /** The seam the supervisor threads: the account's outbound post, addressed by
  * the capability's server-owned binding ref (the vertical's `sendText` through `postFor`). */
 export type ChannelReplyPost = (
   ref: ChannelReplyBindingRef,
   text: string,
+  options?: ChannelReplyPostOptions,
 ) => Promise<OutboundPostResult>;
+
+/** The account's native-media post: one staged file per call, addressed by the
+ * server-owned binding ref (the vertical's `outbound.sendMedia` through the
+ * supervisor). `mediaPosted: false` means the vertical refused the file and
+ * posted its oversize notice through the text path instead. */
+export type ChannelReplyMediaPost = (
+  ref: ChannelReplyBindingRef,
+  file: StagedChannelMedia,
+) => Promise<MediaPostResult>;
 
 /** Everything one `message` call needs: the org-scoped ledger + the post. */
 export interface ChannelReplyMcp {
@@ -56,12 +94,23 @@ export interface ChannelReplyMcp {
     "beginAgentExecutionOutput" | "completeAgentExecutionOutput" | "failAgentExecutionOutput"
   >;
   post: ChannelReplyPost;
-  mediaPost?: ChannelReplyFilePostFn;
+  mediaPost?: ChannelReplyMediaPost;
   resolveCapability(token: string): ChannelReplyCapability | undefined;
+  /** The per-turn output ceiling for a capability with no durable budget (the
+   * channel binding path). Absent = that path posts unbounded. */
+  reserveTurnOutput?(token: string): ChannelReplyTurnOutput | undefined;
+  /** Operator surface for a capability the Hub cannot answer. A dead
+   * capability used to be silent on both verbs, so a whole Agent could talk to
+   * nobody without a single line in `hub.log` (D-W4-01). */
+  log?: ChannelReplyLogger;
+}
+
+export interface ChannelReplyLogger {
+  warn(message: string, detail?: Record<string, unknown>): void;
 }
 
 export interface ChannelReplyServer {
-  /** True only for a currently bound, unexpired server-side capability. */
+  /** True for a known, unexpired server-side capability (bound or pending). */
   accepts?(token: string): boolean;
   /** One MCP request against `/mcp/channel/<opaque-capability>`. */
   handle(request: Request, token: string): Promise<Response>;
@@ -77,25 +126,41 @@ export function createChannelReplyServer(mcp: ChannelReplyMcp): ChannelReplyServ
       );
       server.setRequestHandler(ListToolsRequestSchema, () => {
         const capability = mcp.resolveCapability(token);
+        if (capability === undefined) {
+          mcp.log?.warn("channel reply capability unknown", { verb: "tools/list" });
+        }
         return {
           tools:
             capability === undefined
               ? []
-              : [messageTool(), ...(capability.projectRoot === undefined ? [] : [fileTool()])],
+              : [
+                  messageTool(capability),
+                  // Files ride the `message` tool's `attachments` exactly as
+                  // upstream; there is no separate file tool.
+                  // The vertical's own tools (Feishu's `feishu_*` families).
+                  // Resolved on every list from the account's live config, so a
+                  // family the operator turns off stops being advertised.
+                  ...listChannelAgentTools(agentToolContext(capability)),
+                ],
         };
       });
       server.setRequestHandler(CallToolRequestSchema, async (call) => {
         const capability = mcp.resolveCapability(token);
         if (capability === undefined) {
+          mcp.log?.warn("channel reply capability unknown", {
+            verb: "tools/call",
+            tool: call.params.name,
+          });
           return toolFailure("unknown, expired, or revoked channel reply capability");
         }
-        if (call.params.name === CHANNEL_REPLY_FILE_TOOL_NAME) {
-          return fileCall(mcp, capability, call.params.arguments ?? {});
-        }
         if (call.params.name !== CHANNEL_REPLY_TOOL_NAME) {
-          return toolFailure(`Tool ${call.params.name} not found`);
+          const context = agentToolContext(capability);
+          if (!isChannelAgentTool(context, call.params.name)) {
+            return toolFailure(`Tool ${call.params.name} not found`);
+          }
+          return channelToolCall(context, call.params.name, call.params.arguments ?? {});
         }
-        return messageCall(mcp, capability, call.params.arguments ?? {});
+        return messageCall(mcp, capability, token, call.params.arguments ?? {});
       });
       const transport = new WebStandardStreamableHTTPServerTransport({
         // Omitting sessionIdGenerator is the SDK's stateless-mode setting.
@@ -126,320 +191,218 @@ export function createChannelReplyServer(mcp: ChannelReplyMcp): ChannelReplyServ
   };
 }
 
-/** The `message` tool's input schema: `action: "send"` (the only action),
- * `text` (non-empty), `final` (optional; false = progress, true/omitted =
- * the completed reply — the OpenClaw message-tool-only contract). */
-function messageTool() {
+/** The `message` tool, scoped to the capability's channel.
+ *
+ * The schema comes from the ported OpenClaw message-tool builders (see
+ * `channel-message-tool.ts`): the channel's advertised actions and capabilities
+ * decide which property groups appear, host and cross-destination fields are
+ * removed, and Fusion's `text`/`idempotencyKey`/`final` contracts are merged in.
+ * Only `send` executes today; see `messageCall`. */
+function messageTool(capability: ChannelReplyCapability) {
+  const scope = accountScope(capability);
   return {
     name: CHANNEL_REPLY_TOOL_NAME,
-    description:
-      "Post a message into the channel thread this session was created from. " +
-      "Set final=false for progress; set final=true, or omit it, for the completed reply.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["send"] },
-        text: { type: "string", minLength: 1 },
-        final: { type: "boolean" },
-      },
-      required: ["text"],
-      additionalProperties: false,
-    },
+    description: buildChannelMessageToolDescription(capability.ref.channel, scope),
+    inputSchema: buildChannelMessageToolSchema(capability.ref.channel, scope),
+  };
+}
+
+/**
+ * Gates one action name. `send` goes through the outbound seam; every other
+ * executable action goes through the ported runner to the vertical's
+ * `handleAction`. Anything else is refused loudly, never dropped silently.
+ */
+function checkMessageAction(
+  scope: ChannelAccountScope,
+  action: unknown,
+): CallToolResult | undefined {
+  if (typeof action !== "string") {
+    return unsupportedAction(String(action), "`action` must be one of the advertised action names");
+  }
+  const channel = scope.channel as ChannelReplyBindingRef["channel"];
+  if (isExecutableMessageAction(action, channel, scope)) return undefined;
+  return unsupportedAction(
+    action,
+    listChannelMessageToolActions(channel, scope).includes(action)
+      ? `${channel} advertises this action but the Hub outbound seam does not execute it yet`
+      : `${channel} does not advertise this action`,
+  );
+}
+
+/**
+ * Refuses a call that carries a key only the Hub may set.
+ *
+ * The generated schema drops them, but a schema is a description: the model can
+ * still write `dryRun: true` or a `target` of its own, and both used to reach
+ * core's runner through the params spread — `dryRun` made the Hub record a
+ * delivery, answer "posted" and post nothing.
+ */
+function checkHostOnlyFields(args: Record<string, unknown>): CallToolResult | undefined {
+  const present = readHostOnlyMessageToolFields(args);
+  if (present.length === 0) return undefined;
+  const reason = `${present.join(", ")} ${present.length === 1 ? "is" : "are"} set by the Hub; this capability is bound to one conversation`;
+  return {
+    content: [{ type: "text" as const, text: `rejected: ${reason}` }],
+    structuredContent: { ok: false, status: "host_only_field", fields: present, reason },
+    isError: true,
   };
 }
 
 async function messageCall(
   mcp: ChannelReplyMcp,
   capability: ChannelReplyCapability,
+  token: string,
+  args: Record<string, unknown>,
+): Promise<CallToolResult> {
+  const hostOnlyError = checkHostOnlyFields(args);
+  if (hostOnlyError !== undefined) return hostOnlyError;
+  const action = "action" in args ? args["action"] : "send";
+  const actionError = checkMessageAction(accountScope(capability), action);
+  if (actionError !== undefined) return actionError;
+  if (action !== "send") {
+    return await channelActionCall(mcp, capability, token, action as string, args);
+  }
+  return await executeChannelSend({
+    mcp,
+    capability,
+    args,
+    reserveOutput: () => reserveOutput(mcp, capability, token),
+  });
+}
+
+/**
+ * A non-send action: the ported runner normalizes the params, resolves the
+ * target/thread against the capability's bound conversation, and
+ * `dispatchChannelMessageAction` hands the call to the vertical's
+ * `handleAction`. The delivery ledger stays out of it — only `send` posts a new
+ * message; `react`/`edit`/`delete` and the rest act on messages that already
+ * exist, so recording a delivery row for them would invent a message the channel
+ * never received. A delivering action reports its native message id through
+ * `structuredContent.messageId` instead.
+ */
+async function channelActionCall(
+  mcp: ChannelReplyMcp,
+  capability: ChannelReplyCapability,
+  token: string,
+  action: string,
   args: Record<string, unknown>,
 ): Promise<CallToolResult> {
   const ref = capability.ref;
-  const action = "action" in args ? args["action"] : "send";
-  if (action !== "send") return toolFailure(`unsupported action ${String(action)}`);
-  const text = args["text"];
-  if (typeof text !== "string" || text.trim() === "") {
-    return toolFailure("`text` must be a non-empty string");
-  }
-  const attemptId = await beginOutput(mcp, capability);
-  if (attemptId === undefined) return toolFailure("Channel reply output limit reached");
-  // Record-before-post: the ledger row lands before the channel post; a
-  // fresh UUID per call so retries of the same logical reply are new posts
-  // (the agent drives them), while a replayed row (never, in this shape)
-  // would dedupe by event/turn id + sequence.
-  const eventTurnId = `channel-reply:${randomUUID()}`;
-  const recorded = await mcp.store.recordDelivery({
-    organizationId: mcp.organizationId,
-    channel: ref.channel,
-    accountId: ref.accountId,
-    externalConversationId: ref.externalConversationId,
-    externalThreadId: ref.externalThreadId,
-    eventTurnId,
-    sequence: 0,
-  });
-  if (!recorded.created) {
-    await failOutput(mcp, capability, attemptId);
-    return toolFailure("delivery already recorded; not re-posting");
-  }
-  const result = await mcp.post(ref, text);
-  if (!result.ok) {
-    await mcp.store.failDelivery({
-      organizationId: mcp.organizationId,
-      accountId: ref.accountId,
-      externalConversationId: ref.externalConversationId,
-      externalThreadId: ref.externalThreadId,
-      eventTurnId,
-      sequence: 0,
-      failureReason: result.error ?? "the channel post failed",
-    });
-    await failOutput(mcp, capability, attemptId);
-    return toolFailure(`message post failed: ${result.error ?? "the channel post failed"}`);
-  }
-  await mcp.store.confirmDelivery({
-    organizationId: mcp.organizationId,
-    accountId: ref.accountId,
-    externalConversationId: ref.externalConversationId,
-    externalThreadId: ref.externalThreadId,
-    eventTurnId,
-    sequence: 0,
-    externalMessageId: result.externalMessageId ?? "",
-    postedAt: new Date(),
-  });
-  await completeOutput(mcp, capability, attemptId);
-  return toolSuccess("message posted");
-}
-
-function fileTool() {
-  return {
-    name: CHANNEL_REPLY_FILE_TOOL_NAME,
-    description:
-      "Send a local file to the user in this channel thread. Use it whenever you share an artifact (report, screenshot, video, voice note, document). Always pass an absolute path. Do NOT write file paths as links inside message text — the user cannot open them.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        path: {
-          type: "string",
-          minLength: 1,
-          description:
-            "Absolute path of the local file to send (document, image, video, or voice). Must live under this session's Project root.",
-        },
-        caption: { type: "string", description: "Optional short text posted after the file." },
+  const attempt = await reserveOutput(mcp, capability, token);
+  if (attempt === undefined) return toolFailure("Channel reply output limit reached");
+  let outcome: ChannelMessageActionOutcome;
+  try {
+    outcome = await runChannelMessageAction({
+      ...accountScope(capability),
+      action,
+      params: { ...args },
+      conversation: {
+        to: ref.externalConversationId,
+        ...(ref.externalThreadId === null ? {} : { threadId: ref.externalThreadId }),
       },
-      required: ["path"],
-      additionalProperties: false,
-    },
+      // The turn's requester, so a ported executor that enforces channel-local
+      // trust reads the inbound sender the capability was issued for.
+      ...(capability.requesterSenderId === undefined
+        ? {}
+        : { requesterSenderId: capability.requesterSenderId }),
+      // Only `send` reaches this seam; a non-send action that asks core for a
+      // durable send is a vertical bug, and failing loudly is the honest answer.
+      send: async (params) => await mcp.post(ref, params.text),
+      ...(capability.outputBudget === undefined
+        ? {}
+        : { sessionId: capability.outputBudget.executionId }),
+    });
+  } catch (error) {
+    await attempt.fail();
+    return toolFailure(`message ${action} failed: ${errorText(error)}`);
+  }
+  if (!outcome.ok) {
+    await attempt.fail();
+    return {
+      content: [{ type: "text" as const, text: outcome.toolText ?? `message ${action} failed` }],
+      structuredContent: actionStructuredContent(ref, outcome),
+      isError: true,
+    };
+  }
+  await attempt.complete();
+  return {
+    content: [{ type: "text" as const, text: outcome.toolText ?? `message ${action} ok` }],
+    structuredContent: actionStructuredContent(ref, outcome),
   };
 }
 
-// eslint-disable-next-line complexity -- one transaction owns validation, delivery, and rollback.
-async function fileCall(
-  mcp: ChannelReplyMcp,
-  capability: ChannelReplyCapability,
-  args: Record<string, unknown>,
-): Promise<CallToolResult> {
-  const ref = capability.ref;
-  const filePath = args["path"];
-  if (typeof filePath !== "string" || filePath.trim() === "")
-    return toolFailure("`path` must be a non-empty string");
-  if (!path.isAbsolute(filePath))
-    return toolFailure("path must be an absolute path (e.g. /home/.../report.md)");
-  // The capability carries the fixed target Project root. Absence never means
-  // unrestricted file access, and a token cannot supply or alter this value.
-  if (capability.projectRoot === undefined) {
-    return toolFailure(
-      "file sending is unavailable for this session: no Project root is configured",
-    );
-  }
-  // Containment is checked AFTER symlink resolution on both sides: a lexical
-  // check would let a link inside the home escape to a target outside it
-  // (statSync follows symlinks). The canonical path is what gets uploaded.
-  let projectRoot: string;
-  try {
-    projectRoot = realpathSync(capability.projectRoot);
-  } catch {
-    return toolFailure(
-      "file sending is unavailable for this session: the Project root does not exist",
-    );
-  }
-  let target: string;
-  try {
-    target = realpathSync(filePath);
-  } catch {
-    return toolFailure(`file not found: ${filePath}`);
-  }
-  if (target !== projectRoot && !target.startsWith(`${projectRoot}${path.sep}`)) {
-    return toolFailure("path is outside the allowed Project root");
-  }
-  let sizeBytes: number;
-  try {
-    const stat = statSync(target);
-    if (!stat.isFile()) return toolFailure("not a regular file");
-    sizeBytes = stat.size;
-  } catch {
-    return toolFailure(`file not found: ${filePath}`);
-  }
-  const decision = evaluateOutboundMedia({
-    sizeBytes,
-    channel: ref.channel,
-    fileName: mediaFileName(target),
-  });
-  if (!decision.ok) return toolFailure(decision.notice);
-  const attemptId = await beginOutput(mcp, capability);
-  if (attemptId === undefined) return toolFailure("Channel reply output limit reached");
-  const eventTurnId = `channel-reply-file:${randomUUID()}`;
-  const recorded = await mcp.store.recordDelivery({
-    organizationId: mcp.organizationId,
+/** Upstream's outcome, projected onto the tool's structured content. */
+function actionStructuredContent(
+  ref: ChannelReplyBindingRef,
+  outcome: ChannelMessageActionOutcome,
+): Record<string, unknown> {
+  return {
+    ok: outcome.ok,
+    action: outcome.action,
+    handledBy: outcome.handledBy,
     channel: ref.channel,
     accountId: ref.accountId,
-    externalConversationId: ref.externalConversationId,
-    externalThreadId: ref.externalThreadId,
-    eventTurnId,
-    sequence: 0,
-  });
-  if (!recorded.created) {
-    await failOutput(mcp, capability, attemptId);
-    return toolFailure("delivery already recorded; not re-posting");
-  }
-  if (mcp.mediaPost === undefined) {
-    await mcp.store.failDelivery({
-      organizationId: mcp.organizationId,
-      accountId: ref.accountId,
-      externalConversationId: ref.externalConversationId,
-      externalThreadId: ref.externalThreadId,
-      eventTurnId,
-      sequence: 0,
-      failureReason: "this channel does not support file sending",
-    });
-    await failOutput(mcp, capability, attemptId);
-    return toolFailure("this channel does not support file sending");
-  }
-  const result = await mcp.mediaPost(ref, target);
-  if (!result.ok) {
-    await mcp.store.failDelivery({
-      organizationId: mcp.organizationId,
-      accountId: ref.accountId,
-      externalConversationId: ref.externalConversationId,
-      externalThreadId: ref.externalThreadId,
-      eventTurnId,
-      sequence: 0,
-      failureReason: result.error ?? "the file post failed",
-    });
-    await failOutput(mcp, capability, attemptId);
-    return toolFailure(result.error ?? "the file post failed");
-  }
-  await mcp.store.confirmDelivery({
-    organizationId: mcp.organizationId,
-    accountId: ref.accountId,
-    externalConversationId: ref.externalConversationId,
-    externalThreadId: ref.externalThreadId,
-    eventTurnId,
-    sequence: 0,
-    externalMessageId: result.externalMessageId ?? "",
-    postedAt: new Date(),
-  });
-  await completeOutput(mcp, capability, attemptId);
-  let success =
-    result.mediaPosted === false
-      ? "file was too large for the channel; posted an in-channel notice instead"
-      : `file posted (${result.externalMessageId ?? ""})`;
-  const caption = args["caption"];
-  if (typeof caption === "string" && caption.trim() !== "") {
-    const captionAttemptId = await beginOutput(mcp, capability);
-    if (captionAttemptId === undefined) {
-      return toolSuccess(`${success} (caption not sent: Channel reply output limit reached)`);
-    }
-    const captionTurnId = `channel-reply:${randomUUID()}`;
-    const captionRecorded = await mcp.store.recordDelivery({
-      organizationId: mcp.organizationId,
-      channel: ref.channel,
-      accountId: ref.accountId,
-      externalConversationId: ref.externalConversationId,
-      externalThreadId: ref.externalThreadId,
-      eventTurnId: captionTurnId,
-      sequence: 0,
-    });
-    if (!captionRecorded.created) {
-      await failOutput(mcp, capability, captionAttemptId);
-      success += " (caption failed: delivery already recorded; not re-posting)";
-    } else {
-      const captionResult = await mcp.post(ref, caption);
-      if (!captionResult.ok) {
-        await mcp.store.failDelivery({
-          organizationId: mcp.organizationId,
-          accountId: ref.accountId,
-          externalConversationId: ref.externalConversationId,
-          externalThreadId: ref.externalThreadId,
-          eventTurnId: captionTurnId,
-          sequence: 0,
-          failureReason: captionResult.error ?? "the caption post failed",
-        });
-        await failOutput(mcp, capability, captionAttemptId);
-        success += ` (caption failed: ${captionResult.error ?? "the caption post failed"})`;
-      } else {
-        await mcp.store.confirmDelivery({
-          organizationId: mcp.organizationId,
-          accountId: ref.accountId,
-          externalConversationId: ref.externalConversationId,
-          externalThreadId: ref.externalThreadId,
-          eventTurnId: captionTurnId,
-          sequence: 0,
-          externalMessageId: captionResult.externalMessageId ?? "",
-          postedAt: new Date(),
-        });
-        await completeOutput(mcp, capability, captionAttemptId);
-      }
-    }
-  }
-  return toolSuccess(success);
+    to: ref.externalConversationId,
+    ...(ref.externalThreadId === null ? {} : { threadId: ref.externalThreadId }),
+    ...(outcome.messageId === undefined ? {} : { messageId: outcome.messageId }),
+    ...(outcome.sentBeforeError === true ? { sentBeforeError: true } : {}),
+    ...(outcome.error === undefined ? {} : { error: outcome.error }),
+    ...(outcome.payload === undefined ? {} : { result: outcome.payload }),
+  };
 }
 
-function toolSuccess(text: string) {
-  return { content: [{ type: "text" as const, text }] };
-}
-
-function toolFailure(text: string) {
-  return { content: [{ type: "text" as const, text }], isError: true };
-}
-
-/** Reserve before any external send; pending attempts count against the same
+/**
+ * Reserve before any external send; pending attempts count against the same
  * durable budget as Hub output tools and relay delivery. An ambiguous failure
- * retains its pending delivery lease, matching the existing output admission. */
-async function beginOutput(
+ * retains its pending delivery lease, matching the existing output admission.
+ *
+ * `undefined` means the budget is spent. A capability issued without a durable
+ * budget — the channel binding path, whose turns own no `agent_executions` row
+ * — spends the registry's per-turn ceiling instead, so both paths have one
+ * shape and neither posts without a reservation.
+ */
+async function reserveOutput(
   mcp: ChannelReplyMcp,
   capability: ChannelReplyCapability,
-): Promise<string | null | undefined> {
+  token: string,
+): Promise<ChannelReplyOutputAttempt | undefined> {
   const budget = capability.outputBudget;
-  if (budget === undefined) return null;
+  if (budget === undefined) return turnOutputAttempt(mcp, token);
   const attempt = await mcp.outputStore?.beginAgentExecutionOutput(
     budget.executionId,
     budget.type,
     budget.max,
     new Date(),
   );
-  return attempt?.id;
+  const attemptId = attempt?.id;
+  if (attemptId === undefined) return undefined;
+  return {
+    complete: async () => {
+      await mcp.outputStore?.completeAgentExecutionOutput(
+        budget.executionId,
+        attemptId,
+        new Date(),
+      );
+    },
+    fail: async () => {
+      await mcp.outputStore?.failAgentExecutionOutput(budget.executionId, attemptId, new Date());
+    },
+  };
 }
 
-async function completeOutput(
+/** The channel path's ceiling, as one output attempt. No registry seam means no
+ * ceiling — the call proceeds, as it did before the ceiling existed. */
+function turnOutputAttempt(
   mcp: ChannelReplyMcp,
-  capability: ChannelReplyCapability,
-  attemptId: string | null,
-): Promise<void> {
-  if (attemptId === null || capability.outputBudget === undefined) return;
-  await mcp.outputStore?.completeAgentExecutionOutput(
-    capability.outputBudget.executionId,
-    attemptId,
-    new Date(),
-  );
-}
-
-async function failOutput(
-  mcp: ChannelReplyMcp,
-  capability: ChannelReplyCapability,
-  attemptId: string | null,
-): Promise<void> {
-  if (attemptId === null || capability.outputBudget === undefined) return;
-  await mcp.outputStore?.failAgentExecutionOutput(
-    capability.outputBudget.executionId,
-    attemptId,
-    new Date(),
-  );
+  token: string,
+): ChannelReplyOutputAttempt | undefined {
+  if (mcp.reserveTurnOutput === undefined) {
+    return { complete: async () => {}, fail: async () => {} };
+  }
+  const reserved = mcp.reserveTurnOutput(token);
+  if (reserved === undefined) return undefined;
+  return {
+    complete: async () => reserved.complete(),
+    fail: async () => reserved.fail(),
+  };
 }

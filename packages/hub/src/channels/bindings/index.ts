@@ -19,10 +19,14 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import type { DaemonConnection } from "../daemon/client.js";
-import { externalParticipantMayTrigger, mayTrigger, type InboundConversation } from "../policy.js";
+import type { InboundConversation } from "../policy.js";
+import { mayUseChannelRoute } from "../policy/gate.js";
 import type { ProcessingController } from "../plane/processing.js";
 import { processingSurfaceFor } from "../plane/processing.js";
-import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
+import {
+  nativeSenderId,
+  type ChannelReplyCapabilityService,
+} from "../channel-reply-capabilities.js";
 import {
   SLACK_THREAD_TS_PATTERN,
   type InboundConversationDetail,
@@ -30,7 +34,7 @@ import {
   type InboundOutcome,
   type ChannelAgentAccessTarget,
   type ChannelUseAuthorizer,
-  type P0ChannelName,
+  type SupportedChannelName,
   type PlaneClock,
   type PlaneLogger,
 } from "../plane/types.js";
@@ -96,12 +100,7 @@ interface BindingEngineContext {
    * The route's effective defaults select the outbound path (E4/E6); on a
    * `tool` path the `bindingRef` names the thread the attached MCP tool
    * posts into (the account + the thread key being created). */
-  resolveAgentSpec: (
-    target: Extract<CompiledRoute["target"], { kind: "agent" }>,
-    defaults: EffectiveDefaults,
-    bindingRef: import("../plane/types.js").ChannelReplyBindingRef,
-    capability?: import("../plane/types.js").ChannelReplyAgentCapability | undefined,
-  ) => import("../daemon/types.js").CreateAgentConfig;
+  resolveAgentSpec: import("../plane/types.js").AgentSpecResolver;
   resolveAgentAccessTarget?:
     | ((target: Extract<CompiledRoute["target"], { kind: "agent" }>) => ChannelAgentAccessTarget)
     | undefined;
@@ -223,7 +222,7 @@ export class BindingEngine {
    * later inbound (or a later restart) re-checks it.
    */
   async recoverOrphans(scope?: {
-    channel: "slack" | "telegram";
+    channel: SupportedChannelName;
     accountId: string;
   }): Promise<{ rebound: number; leftPending: number }> {
     const pending = await this.context.store.listPendingThreadBindings(
@@ -285,7 +284,7 @@ export class BindingEngine {
     try {
       await this.context.store.recordPendingThreadBinding({
         organizationId: this.context.organizationId,
-        channel: account.channel as P0ChannelName,
+        channel: account.channel as SupportedChannelName,
         accountId: account.accountId,
         externalConversationId: key.externalConversationId,
         externalThreadId: key.externalThreadId,
@@ -321,7 +320,7 @@ export class BindingEngine {
     }
     let created;
     try {
-      created = await this.createAgent(account, route, key, executionId);
+      created = await this.createAgent(account, route, key, executionId, message);
     } catch (error) {
       // Leave the marker pending: the create may have timed out rather than
       // failed, so a later inbound (or restart) can rebind the surviving
@@ -467,6 +466,9 @@ export class BindingEngine {
     const leaseId = randomUUID();
     this.openSurface(leaseId, message, account, route, deriveBindingKey(message, route));
     this.context.processing?.bind(leaseId, agentId);
+    // The session's reply capability now answers for THIS turn: its delivery
+    // keys and its per-turn output ceiling both reset here.
+    this.context.replyCapabilities?.noteTurn(agentId, leaseId);
     await subscribe?.(agentId);
     try {
       await this.context.daemon.sendAgentMessage(agentId, message.text, {
@@ -506,16 +508,17 @@ export class BindingEngine {
     account: CompiledChannelAccount,
     route: CompiledRoute,
   ): ReturnType<ChannelUseAuthorizer> {
-    if (externalParticipantMayTrigger(message, route)) return { allowed: true };
-    if (mayTrigger(message.senderIdentity, this.context.controlPlane, account, route))
-      return { allowed: true };
-    return (
-      (await this.context.authorizeChannelUse?.({
-        organizationId: this.context.organizationId,
-        account,
-        message,
-      })) ?? { allowed: false, reason: "sender may not trigger this route" }
-    );
+    return await mayUseChannelRoute({
+      store: this.context.store.access,
+      organizationId: this.context.organizationId,
+      controlPlane: this.context.controlPlane,
+      account,
+      route,
+      message,
+      ...(this.context.authorizeChannelUse === undefined
+        ? {}
+        : { authorizeChannelUse: this.context.authorizeChannelUse }),
+    });
   }
 
   /**
@@ -529,17 +532,27 @@ export class BindingEngine {
     route: CompiledRoute,
     key: ThreadKey,
     executionId: string,
+    requester: InboundMessage,
   ): Promise<{ agentId: string }> {
-    const target = route.target;
-    if (target.kind !== "agent") {
-      throw new ChannelWorkflowTargetError(target.workflow);
+    const routeTarget = route.target;
+    if (routeTarget.kind !== "agent") {
+      throw new ChannelWorkflowTargetError(routeTarget.workflow);
     }
     const ref = {
-      channel: account.channel as P0ChannelName,
+      channel: account.channel as SupportedChannelName,
       accountId: account.accountId,
       externalConversationId: key.externalConversationId,
       externalThreadId: key.externalThreadId,
     };
+    // `/agent` and `/model` are conversation-scoped and outlive every session
+    // in it, so they are read here — at the one place a session is minted —
+    // rather than carried on the binding row that `/new` deletes.
+    const chosen = await this.context.store.access.findConversationSelection({
+      organizationId: this.context.organizationId,
+      ...ref,
+    });
+    const target =
+      chosen?.selectedAgent == null ? routeTarget : { ...routeTarget, agent: chosen.selectedAgent };
     let capabilityToken: string | undefined;
     let canSendFiles = false;
     if (route.defaults.outbound.path === "tool") {
@@ -554,6 +567,15 @@ export class BindingEngine {
         routePosition: routePosition(account, route),
         routeFingerprint: routeFingerprint(route),
         ref,
+        // The turn that is minting the session. Every later turn restamps it
+        // (`noteTurn` in `followUp`): the tool's idempotency keys and its
+        // output ceiling are scoped by the turn, and the model reuses
+        // "reply-1" in every one of them.
+        turnId: executionId,
+        // The turn's requester, in the native form the platform reports back:
+        // the ported channel tools authorize against it, and a command button
+        // this Agent posts is clickable only by them.
+        requesterSenderId: nativeSenderId(account.channel, requester.senderIdentity),
         ...(accessTarget.projectRoot === undefined
           ? {}
           : { projectRoot: accessTarget.projectRoot }),
@@ -571,6 +593,7 @@ export class BindingEngine {
               token: capabilityToken,
               canSendFiles,
             },
+        chosen?.selectedModel == null ? undefined : { model: chosen.selectedModel },
       );
       const created = await this.context.daemon.createAgent(config, {
         title: executionMarker(executionId),
@@ -613,7 +636,7 @@ export class BindingEngine {
     const processing = this.context.processing;
     if (processing === undefined) return;
     const surface = processingSurfaceFor({
-      channel: account.channel as P0ChannelName,
+      channel: account.channel as SupportedChannelName,
       accountId: account.accountId,
       sync: route.defaults.sync,
       to: key.externalConversationId,

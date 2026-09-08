@@ -13,11 +13,13 @@
 // host allowlist) — trimmed to the P0 fold (no audio preflight, no
 // fresh-URL refetch, no concurrency pool: one download per file, in order).
 
+import { formatErrorMessage } from "@getpaseo/channels-core/plugin-sdk/error-runtime";
 import type { HostChildLogger, InboundAttachedFile } from "@getpaseo/channels-shared";
 import {
   buildAttachedFilesManifest,
   downloadMediaFile,
   foldAttachedFilesIntoBody,
+  mediaInboundMaxBytesForChannel,
   MEDIA_DOWNLOAD_TIMEOUT_MS,
   type ChannelInboundEvent,
 } from "@getpaseo/channels-shared";
@@ -196,6 +198,8 @@ export async function downloadSlackFile(
     url: attachment.url,
     dir: ctx.downloadDir,
     fileName,
+    // The uploader picks the size; without a ceiling one message fills the disk.
+    maxBytes: mediaInboundMaxBytesForChannel("slack"),
     headers: { Authorization: `Bearer ${ctx.botToken}` },
     ...(ctx.fetchImpl !== undefined ? { fetchImpl: ctx.fetchImpl } : {}),
     signal,
@@ -234,7 +238,7 @@ export async function foldInboundSlackMedia(
       ctx.logger?.error?.("slack inbound media download failed (skipping file)", {
         accountId: ctx.accountId,
         fileName: attachment.fileName,
-        error: error instanceof Error ? error.message : String(error),
+        error: formatErrorMessage(error),
       });
     }
   }

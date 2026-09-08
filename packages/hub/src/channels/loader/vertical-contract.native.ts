@@ -10,8 +10,8 @@
 //      load-trace must admit the in-repo package dir + the shared contract
 //      package + the hoisted root node_modules, and NO channel-inbound seam may
 //      be exercised: the in-repo verticals import no `openclaw/*` subpath, so
-//      the seam + alias-route now serve zalouser-only (zalouser is not in this
-//      hub's channel-pins.json).
+//      the seam + alias-route serve only a future pin that declares a
+//      published/bundled load — no channel in this hub's manifest does.
 //   2. PUBLISHED/BUNDLED REGRESSION — the pinned OpenClaw supply under
 //      OPENCLAW_SCOUT still loads through the unchanged published/bundled
 //      paths: the alias route resolves its `openclaw/plugin-sdk/*` passthrough
@@ -58,7 +58,42 @@ function inRepoPackageDir(packageName: string): string {
 
 const SLACK_IN_REPO = inRepoPackageDir("@getpaseo/channels-slack");
 const TELEGRAM_IN_REPO = inRepoPackageDir("@getpaseo/channels-telegram");
+const DISCORD_IN_REPO = inRepoPackageDir("@getpaseo/channels-discord");
 const SHARED_IN_REPO = inRepoPackageDir("@getpaseo/channels-shared");
+/** The verticals wired in slices 14b/15b/16b, with the drive verbs each one
+ * actually publishes. They share one case body: the contract is identical and
+ * only the surface differs, so a fourth copy of the Slack case would only be a
+ * fourth place to forget an assertion. */
+const LATER_IN_REPO_CHANNELS = [
+  {
+    channel: "googlechat",
+    dir: inRepoPackageDir("@getpaseo/channels-googlechat"),
+    exportName: "googlechatPlugin",
+    // No `typing`: Google Chat has no typing-indicator API.
+    outbound: ["sendText", "updateText"],
+  },
+  {
+    channel: "feishu",
+    dir: inRepoPackageDir("@getpaseo/channels-feishu"),
+    exportName: "feishuPlugin",
+    outbound: ["sendText", "updateText"],
+  },
+  {
+    channel: "zalo",
+    dir: inRepoPackageDir("@getpaseo/channels-zalo"),
+    exportName: "zaloPlugin",
+    // The Zalo Bot API has no edit endpoint, so there is no `updateText`.
+    outbound: ["sendText"],
+  },
+  {
+    channel: "zalouser",
+    dir: inRepoPackageDir("@getpaseo/channels-zalouser"),
+    exportName: "zalouserPlugin",
+    // Zalo Personal has no edit endpoint either; `sendMedia` is its native
+    // outbound file upload.
+    outbound: ["sendText", "sendMedia"],
+  },
+] as const;
 const HOISTED_DEPS = join(REPO_ROOT, "node_modules");
 
 function inRepoSupplyPresent(): boolean {
@@ -67,7 +102,14 @@ function inRepoSupplyPresent(): boolean {
     existsSync(join(SLACK_IN_REPO, "dist", "plugin.js")) &&
     existsSync(join(TELEGRAM_IN_REPO, "dist", "index.js")) &&
     existsSync(join(TELEGRAM_IN_REPO, "dist", "plugin.js")) &&
-    existsSync(join(SHARED_IN_REPO, "dist", "index.js"))
+    existsSync(join(DISCORD_IN_REPO, "dist", "index.js")) &&
+    existsSync(join(DISCORD_IN_REPO, "dist", "plugin.js")) &&
+    existsSync(join(SHARED_IN_REPO, "dist", "index.js")) &&
+    LATER_IN_REPO_CHANNELS.every(
+      (entry) =>
+        existsSync(join(entry.dir, "dist", "index.js")) &&
+        existsSync(join(entry.dir, "dist", "plugin.js")),
+    )
   );
 }
 
@@ -85,7 +127,7 @@ function scoutSupplyPresent(): boolean {
 
 const SKIP_IN_REPO = inRepoSupplyPresent()
   ? false
-  : "the in-repo channel verticals are not built (@getpaseo/channels-{slack,telegram,shared} dist missing)";
+  : "the in-repo channel verticals are not built (@getpaseo/channels-{slack,telegram,discord,googlechat,feishu,zalo,zalouser,shared} dist missing)";
 const SKIP_SCOUT = scoutSupplyPresent()
   ? false
   : `pinned OpenClaw supply not extracted under ${SCOUT} (OPENCLAW_SCOUT); the live E2E covers the published/bundled regression via the registry`;
@@ -112,11 +154,20 @@ describe("pinned vertical contract (import + drive surface)", () => {
     clearAllChannelRuntimes();
   });
 
-  it("the pin manifest carries both verticals' in-repo pins, sync references intact", () => {
+  it("the pin manifest carries every vertical's in-repo pin, sync references intact", () => {
     const slack = pins.channels["slack"];
     const telegram = pins.channels["telegram"];
+    const discord = pins.channels["discord"];
     assert.ok(slack !== undefined, "slack pin entry");
     assert.ok(telegram !== undefined, "telegram pin entry");
+    assert.ok(discord !== undefined, "discord pin entry");
+    assert.equal(discord.loadMode, "in-repo");
+    assert.equal(discord.inRepoPackage, "@getpaseo/channels-discord");
+    assert.equal(discord.entry, "./dist/index.js");
+    assert.equal(discord.plugin.specifier, "./dist/plugin.js");
+    assert.equal(discord.plugin.exportName, "discordPlugin");
+    assert.equal(discord.channel.package, "@openclaw/discord");
+    assert.match(discord.channel.dist.integrity, /^sha512-/u);
     // In-repo pull (blueprint §6.5): the Hub drives its OWN workspace packages
     // — no tarball fetch, no integrity gate at load.
     assert.equal(slack.loadMode, "in-repo");
@@ -139,7 +190,87 @@ describe("pinned vertical contract (import + drive surface)", () => {
     assert.equal(telegram.channel.package, pins.main.package);
     assert.equal(telegram.channel.version, pins.main.version);
     assert.equal(telegram.channel.dist.integrity, pins.main.dist.integrity);
+    // The later in-repo verticals carry the same pin shape.
+    for (const entry of LATER_IN_REPO_CHANNELS) {
+      const pin = pins.channels[entry.channel];
+      assert.ok(pin !== undefined, `${entry.channel} pin entry`);
+      assert.equal(pin.loadMode, "in-repo");
+      assert.equal(pin.inRepoPackage, `@getpaseo/channels-${entry.channel}`);
+      assert.equal(pin.entry, "./dist/index.js");
+      assert.equal(pin.plugin.specifier, "./dist/plugin.js");
+      assert.equal(pin.plugin.exportName, entry.exportName);
+      assert.equal(pin.channel.package, `@openclaw/${entry.channel}`);
+      assert.equal(pin.notices, entry.channel);
+    }
   });
+
+  for (const entry of LATER_IN_REPO_CHANNELS) {
+    it(
+      `loads the in-repo ${entry.channel} vertical seam-free: drive surface under the pinned export name`,
+      { skip: SKIP_IN_REPO },
+      async () => {
+        const pin = pins.channels[entry.channel];
+        assert.ok(pin !== undefined, `${entry.channel} pin entry`);
+        hostBaseDir = writeFakeHost(
+          hostBaseDir ?? mkdtempSync(join(tmpdir(), "hub-contract-host-")),
+        );
+        const runtime = createHostRuntime({
+          onInboundReply: recordingInboundHandler(() => undefined),
+        });
+        const loaded: LoadedChannelVertical = await loadChannelVertical({
+          channel: entry.channel,
+          accountId: "contract-inrepo",
+          organizationId: "org",
+          installDir: entry.dir,
+          mainInstallDir: entry.dir,
+          channelInstallDir: entry.dir,
+          entry: pin.entry,
+          plugin: pin.plugin,
+          loadMode: pin.loadMode,
+          hostRuntime: runtime,
+          hostBaseDir,
+        });
+        assert.equal(
+          typeof loaded.plugin.gateway?.startAccount,
+          "function",
+          `plugin.gateway.startAccount (${entry.exportName})`,
+        );
+        for (const verb of entry.outbound) {
+          assert.equal(
+            typeof loaded.plugin.outbound?.[verb],
+            "function",
+            `plugin.outbound.${verb} (${entry.exportName})`,
+          );
+        }
+        // The channel-owned action adapter behind the shared `message` tool.
+        assert.equal(
+          typeof (loaded.plugin["actions"] as { handleAction?: unknown } | undefined)?.handleAction,
+          "function",
+          `plugin.actions.handleAction (${entry.exportName})`,
+        );
+        assert.equal(loaded.entry["gateway"], undefined, "the entry is not the plugin");
+        for (const root of [entry.dir, SHARED_IN_REPO, HOISTED_DEPS]) {
+          assert.ok(
+            loaded.loadedModules.some((url) =>
+              url.startsWith(`${pathToFileURL(root).toString()}/`),
+            ),
+            `${root} was admitted by the load-trace`,
+          );
+        }
+        assert.ok(
+          !loaded.loadedModules.some((url) => url.includes("__hub__/")),
+          "no channel-inbound seam in the in-repo load-trace",
+        );
+        assert.ok(
+          !loaded.loadedModules.some((url) => url.includes("openclaw")),
+          "no openclaw supply in the in-repo load-trace",
+        );
+        assert.equal(getChannelRuntime(entry.channel, "contract-inrepo"), runtime);
+        loaded.dispose();
+        assert.equal(getChannelRuntime(entry.channel, "contract-inrepo"), undefined);
+      },
+    );
+  }
 
   it(
     "loads the in-repo Slack vertical seam-free: drive surface under the pinned export name",
@@ -156,6 +287,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       const loaded: LoadedChannelVertical = await loadChannelVertical({
         channel: "slack",
         accountId: "contract-inrepo",
+        organizationId: "org",
         // In-repo: the entry path + the loader's allowlist resolve against the
         // workspace package dir (all three install dirs are that dir here; the
         // supervisor passes the account root as `installDir` — routing-only).
@@ -216,7 +348,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       );
       // Seam-free: the in-repo verticals import no `openclaw/*` subpath, so the
       // bound channel-inbound seam (and its alias route) is never in the
-      // load-time trace — the seam + alias-route now serve zalouser-only.
+      // load-time trace.
       assert.ok(
         !loaded.loadedModules.some((url) => url.includes("__hub__/")),
         "no channel-inbound seam in the in-repo load-trace",
@@ -248,6 +380,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       const loaded: LoadedChannelVertical = await loadChannelVertical({
         channel: "telegram",
         accountId: "contract-inrepo",
+        organizationId: "org",
         installDir: TELEGRAM_IN_REPO,
         mainInstallDir: TELEGRAM_IN_REPO,
         channelInstallDir: TELEGRAM_IN_REPO,
@@ -307,6 +440,91 @@ describe("pinned vertical contract (import + drive surface)", () => {
   );
 
   it(
+    "loads the in-repo Discord vertical seam-free: drive surface under the pinned export name",
+    {
+      skip: SKIP_IN_REPO,
+    },
+    async () => {
+      const pin = pins.channels["discord"];
+      assert.ok(pin !== undefined, "discord pin entry");
+      hostBaseDir = writeFakeHost(hostBaseDir ?? mkdtempSync(join(tmpdir(), "hub-contract-host-")));
+      const runtime = createHostRuntime({
+        onInboundReply: recordingInboundHandler(() => undefined),
+      });
+      const loaded: LoadedChannelVertical = await loadChannelVertical({
+        channel: "discord",
+        accountId: "contract-inrepo",
+        organizationId: "org",
+        installDir: DISCORD_IN_REPO,
+        mainInstallDir: DISCORD_IN_REPO,
+        channelInstallDir: DISCORD_IN_REPO,
+        entry: pin.entry,
+        plugin: pin.plugin,
+        loadMode: pin.loadMode,
+        hostRuntime: runtime,
+        hostBaseDir,
+      });
+      assert.equal(pin.loadMode, "in-repo", "the manifest drives the in-repo loadMode");
+      assert.equal(
+        typeof loaded.plugin.gateway?.startAccount,
+        "function",
+        "plugin.gateway.startAccount (discordPlugin)",
+      );
+      assert.equal(
+        typeof loaded.plugin.outbound?.["sendText"],
+        "function",
+        "plugin.outbound.sendText (discordPlugin)",
+      );
+      assert.equal(
+        typeof loaded.plugin.outbound?.["sendMedia"],
+        "function",
+        "plugin.outbound.sendMedia (discordPlugin)",
+      );
+      assert.equal(
+        typeof loaded.plugin.outbound?.["typing"],
+        "function",
+        "plugin.outbound.typing (discordPlugin)",
+      );
+      // The channel-owned action adapter for the shared `message` tool.
+      assert.equal(
+        typeof (loaded.plugin["actions"] as { handleAction?: unknown } | undefined)?.handleAction,
+        "function",
+        "plugin.actions.handleAction (discordPlugin)",
+      );
+      assert.equal(loaded.entry["gateway"], undefined, "the entry is not the plugin");
+      assert.ok(
+        loaded.loadedModules.some((url) =>
+          url.startsWith(`${pathToFileURL(DISCORD_IN_REPO).toString()}/`),
+        ),
+        "the in-repo package dir was admitted by the load-trace",
+      );
+      assert.ok(
+        loaded.loadedModules.some((url) =>
+          url.startsWith(`${pathToFileURL(SHARED_IN_REPO).toString()}/`),
+        ),
+        "the shared in-repo contract package was admitted by the load-trace",
+      );
+      assert.ok(
+        loaded.loadedModules.some((url) =>
+          url.startsWith(`${pathToFileURL(HOISTED_DEPS).toString()}/`),
+        ),
+        "the hoisted npm deps were admitted by the load-trace",
+      );
+      assert.ok(
+        !loaded.loadedModules.some((url) => url.includes("__hub__/")),
+        "no channel-inbound seam in the in-repo load-trace",
+      );
+      assert.ok(
+        !loaded.loadedModules.some((url) => url.includes("openclaw")),
+        "no openclaw supply in the in-repo load-trace",
+      );
+      assert.equal(getChannelRuntime("discord", "contract-inrepo"), runtime);
+      loaded.dispose();
+      assert.equal(getChannelRuntime("discord", "contract-inrepo"), undefined);
+    },
+  );
+
+  it(
     "regression: the published load path still drives the pinned OpenClaw Slack supply",
     {
       skip: SKIP_SCOUT,
@@ -315,7 +533,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       // The manifest now pulls Slack in-repo; the published shape below is the
       // PINNED SUPPLY's shape (the upstream sync reference) — the loader's
       // published path + alias route must stay intact for a pin that declares
-      // it (zalouser, not in this hub's channel-pins.json).
+      // it; every channel in this hub's manifest is now in-repo.
       hostBaseDir = writeFakeHost(mkdtempSync(join(tmpdir(), "hub-contract-host-")));
       const runtime = createHostRuntime({
         onInboundReply: recordingInboundHandler(() => undefined),
@@ -323,6 +541,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       const loaded: LoadedChannelVertical = await loadChannelVertical({
         channel: "slack",
         accountId: "contract-published",
+        organizationId: "org",
         // Routing root: every module of this account nests under the scout root
         // (main + slack package dirs both live under it).
         installDir: SCOUT,
@@ -384,6 +603,7 @@ describe("pinned vertical contract (import + drive surface)", () => {
       const loaded: LoadedChannelVertical = await loadChannelVertical({
         channel: "telegram",
         accountId: "contract-bundled",
+        organizationId: "org",
         // Bundled: the entry + plugin chunk live inside the main dist, so the
         // channel dir IS the main dir; the routing root is the main dir's parent.
         installDir: join(SCOUT, "main"),

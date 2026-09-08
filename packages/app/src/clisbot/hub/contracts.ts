@@ -655,14 +655,43 @@ export const HubChannelConfigurationSchema = z
   })
   .passthrough();
 
+/**
+ * One account's durable-ingress depth, as `channel-ingress` and the per-account
+ * `ingress` field on `channel-accounts/status` report it. Counts and ages only:
+ * a queued payload is the user's message and never leaves the queue.
+ */
+export const HubChannelIngressCountsSchema = z.object({
+  pending: z.number().int().nonnegative(),
+  claimed: z.number().int().nonnegative(),
+  /** Rows with a scheduled retry: still backlog, not yet dead-lettered. */
+  retrying: z.number().int().nonnegative(),
+  deadLettered: z.number().int().nonnegative(),
+  oldestPendingAgeMs: z.number().nonnegative().nullable(),
+  lanesBlocked: z.number().int().nonnegative(),
+});
+
 const HubChannelRuntimeAccountSchema = z.object({
   channel: z.string(),
   account: z.string(),
   pin: z.string().optional(),
   integrity: z.enum(["ok", "failed", "not-checked"]),
   loadTrace: z.enum(["ok", "failed", "not-loaded"]),
-  transport: z.enum(["starting", "started", "deferred", "stopped", "failed", "disabled"]),
+  // COMPAT(channelNeedsLogin): `needs-login` added in v0.8.0 for QR-auth accounts
+  // whose profile has no live session. New states are additive; an app that does
+  // not know one must still parse the row.
+  transport: z.enum([
+    "starting",
+    "started",
+    "deferred",
+    "stopped",
+    "failed",
+    "needs-login",
+    "disabled",
+  ]),
   detail: z.string().optional(),
+  // COMPAT(channelIngressHealth): added in v0.8.0; older Hubs answer
+  // `channel-accounts/status` without queue depth. Absence is unknown, not zero.
+  ingress: HubChannelIngressCountsSchema.optional(),
 });
 
 export const HubChannelRuntimeStatusSchema = z.object({
@@ -704,19 +733,27 @@ export const HubObservedChannelConversationsSchema = z.object({
 
 export type HubObservedChannelConversation = z.infer<typeof HubObservedChannelConversationSchema>;
 
+/**
+ * A channel name as the Hub reports it. Open on purpose: the Hub owns the
+ * supported set (`packages/hub/src/channels/catalog.ts`), and a Hub that
+ * supports a newer channel than this app build must not fail the whole response
+ * parse. Unknown names are labelled from the id.
+ */
+export const HubChannelNameSchema = z.string().min(1);
+
 export const HubChannelActivitySchema = z.object({
   nextCursor: z.string().nullable().optional(),
   activity: z.array(
     z.object({
       id: z.string(),
-      channel: z.enum(["slack", "telegram"]).optional(),
+      channel: HubChannelNameSchema.optional(),
       accountId: z.string().optional(),
       createdAt: z.string(),
       routePosition: z.union([z.number().int().nonnegative(), z.literal("fallback")]),
       conversationId: z.string(),
       threadId: z.string().nullable(),
       providerSenderId: z.string(),
-      outcome: z.enum(["bound", "steered", "workflow", "ignored", "error"]),
+      outcome: z.enum(["bound", "steered", "workflow", "ignored", "denied", "error"]),
       outcomeDetail: z.string().optional(),
       limitDecision: z.enum(["not_evaluated", "allowed", "denied"]),
       limitReason: z.string().optional(),
@@ -726,7 +763,7 @@ export const HubChannelActivitySchema = z.object({
 
 export const HubChannelTestPreviewSchema = z.object({
   previewId: z.string(),
-  channel: z.enum(["slack", "telegram"]),
+  channel: HubChannelNameSchema,
   accountId: z.string(),
   conversationId: z.string(),
   threadId: z.string().nullable(),
@@ -738,3 +775,158 @@ export const HubChannelTestPreviewSchema = z.object({
   label: z.string().nullable().optional(),
   threadLabel: z.string().nullable().optional(),
 });
+
+export const HubChannelIngressAccountSchema = HubChannelIngressCountsSchema.extend({
+  channel: HubChannelNameSchema,
+  accountId: z.string(),
+  completed: z.number().int().nonnegative(),
+});
+
+export const HubChannelIngressStatusSchema = z.object({
+  accounts: z.array(HubChannelIngressAccountSchema),
+  totals: HubChannelIngressCountsSchema.extend({
+    completed: z.number().int().nonnegative(),
+  }),
+});
+
+/**
+ * One queue row as an operator sees it. The Hub redacts the payload before this
+ * ever leaves the store, so every field here is routing fact or failure text.
+ * `status` stays an open string: the queue's status set is the Hub's, and a Hub
+ * that adds one must not fail this whole page's parse.
+ */
+export const HubChannelIngressEventSchema = z.object({
+  id: z.string(),
+  channel: HubChannelNameSchema,
+  accountId: z.string(),
+  status: z.string(),
+  attempts: z.number().int().nonnegative(),
+  laneKey: z.string(),
+  externalEventId: z.string(),
+  externalMessageId: z.string(),
+  externalConversationId: z.string(),
+  externalThreadId: z.string().nullable(),
+  availableAt: z.string(),
+  createdAt: z.string(),
+  lastAttemptAt: z.string().nullable(),
+  lastError: z.string().nullable(),
+  failedReason: z.string().nullable(),
+  failedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+});
+
+export const HubChannelIngressEventsSchema = z.object({
+  events: z.array(HubChannelIngressEventSchema),
+  /** Offset of the next page, or null when this page is the last one. */
+  nextOffset: z.number().int().nonnegative().nullable(),
+});
+
+export const HubChannelIngressResubmitSchema = z.object({
+  resubmitted: z.array(HubChannelIngressEventSchema),
+});
+
+export const HubChannelIngressPruneSchema = z.object({
+  deleted: z.number().int().nonnegative(),
+});
+
+export type HubChannelIngressCounts = z.infer<typeof HubChannelIngressCountsSchema>;
+export type HubChannelIngressStatus = z.infer<typeof HubChannelIngressStatusSchema>;
+export type HubChannelIngressEvent = z.infer<typeof HubChannelIngressEventSchema>;
+
+/**
+ * The Zalo Personal QR verbs (`channels/zalouser/HUB-WIRING.md` §7). No Hub
+ * serves them yet — slice 17b wires them — so every caller of these schemas has
+ * to render a "not available on this Hub" state for a 404.
+ */
+export const HubChannelQrStartSchema = z.object({
+  status: z.enum(["pending", "linked", "failed"]),
+  qrDataUrl: z.string().optional(),
+  qrFilePath: z.string().optional(),
+  message: z.string(),
+});
+
+export const HubChannelQrPollSchema = z.object({
+  status: z.enum(["pending", "linked", "failed"]),
+  message: z.string(),
+  user: z.object({ userId: z.string(), displayName: z.string().nullable().optional() }).optional(),
+});
+
+export const HubChannelQrCancelSchema = z.object({
+  cancelled: z.boolean(),
+  message: z.string(),
+});
+
+export const HubChannelQrLogoutSchema = z.object({
+  cleared: z.boolean(),
+  message: z.string(),
+});
+
+/**
+ * `GET channel-catalog` — the Hub's own channel catalog, the metadata a setup or
+ * capability surface renders: what a channel is called, how it authenticates,
+ * what each transport requires, what the vertical claims it can do.
+ *
+ * Every list stays open (`z.string()`, not an enum) because a newer Hub adds
+ * channels, capabilities and tools this app build has never heard of, and a name
+ * it cannot label must not fail the page's parse. `auth` is the exception: the
+ * Hub defaults it, and the two kinds drive different setup flows.
+ *
+ * A Hub older than this endpoint answers the management API's unknown-route 404;
+ * `channel-catalog.ts` turns that into the "not available on this Hub" state.
+ */
+export const HubChannelCatalogEntrySchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  status: z.enum(["in-repo", "planned"]),
+  auth: z.enum(["token", "qr"]),
+  transports: z.array(
+    z.object({
+      id: z.string().min(1),
+      label: z.string(),
+      requiredConfig: z.array(z.string()),
+      setup: z.string(),
+    }),
+  ),
+  credentials: z.array(
+    z.object({
+      key: z.string().min(1),
+      label: z.string(),
+      secret: z.boolean(),
+      required: z.boolean(),
+      help: z.string(),
+    }),
+  ),
+  capabilities: z.array(z.string()),
+  extraTools: z.array(z.string()),
+  notes: z.array(z.string()),
+});
+
+export const HubChannelCatalogSchema = z.object({
+  channels: z.array(HubChannelCatalogEntrySchema),
+});
+
+export type HubChannelCatalogEntry = z.infer<typeof HubChannelCatalogEntrySchema>;
+
+/**
+ * One row of `GET channel-accounts/<channel>/<account>/pairing`: a sender who
+ * asked to use a `dmPolicy: pairing` account and is waiting on an operator.
+ * `code` is the short code the sender was shown, so the operator can match the
+ * request to the person who is looking at it.
+ */
+export const HubChannelPairingSchema = z.object({
+  channel: z.string().min(1),
+  accountId: z.string(),
+  senderIdentity: z.string(),
+  senderName: z.string().nullable(),
+  code: z.string(),
+  status: z.enum(["pending", "approved", "denied"]),
+  externalConversationId: z.string(),
+  decidedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export const HubChannelPairingsSchema = z.object({
+  pairings: z.array(HubChannelPairingSchema),
+});
+
+export type HubChannelPairing = z.infer<typeof HubChannelPairingSchema>;

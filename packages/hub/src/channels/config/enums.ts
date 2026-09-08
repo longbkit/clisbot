@@ -4,6 +4,14 @@
 // grant.
 
 import { z } from "zod";
+import { SUPPORTED_CHANNEL_NAMES } from "../catalog.js";
+
+// --- Channel identity ---------------------------------------------------------
+
+/** The channel names the Hub compiles, starts and routes, as a request/query
+ * enum. Derived from the catalog (`catalog.ts`) so a new in-repo vertical is
+ * admitted everywhere at once instead of one hand-widened enum at a time. */
+export const SupportedChannelNameSchema = z.enum(SUPPORTED_CHANNEL_NAMES);
 
 // --- Session mapping (§4.3.4) -------------------------------------------------
 
@@ -30,6 +38,23 @@ export type FollowUpMode = z.infer<typeof FollowUpModeSchema>;
 /** `sync.threadLink` — which link (if any) opens the session in a client. */
 export const ThreadLinkSchema = z.enum(["full", "final-only", "none"]);
 export type ThreadLink = z.infer<typeof ThreadLinkSchema>;
+
+/**
+ * `sync.streaming.mode` — how much of a running turn the channel shows before
+ * the answer is final. Upstream's value set (`extensions/slack/src/
+ * streaming-compat.ts` `StreamingMode`), kept verbatim so a channel account
+ * authored for OpenClaw compiles here:
+ *
+ *  * `off` — nothing streams; the turn's final answer is one post (the floor).
+ *  * `partial` — the answer streams as a live draft (Slack's native
+ *    `chat.startStream` transport when the vertical exposes it, else an
+ *    edit-in-place draft message).
+ *  * `block` — the same draft, edit-in-place only, never native.
+ *  * `progress` — no answer draft; one progress message shows the running
+ *    tool activity and is edited in place for the length of the turn.
+ */
+export const StreamingModeSchema = z.enum(["off", "partial", "block", "progress"]);
+export type StreamingMode = z.infer<typeof StreamingModeSchema>;
 
 /** `sync.progress.messageReaction` — the reserved "never react" value. */
 export const MESSAGE_REACTION_OFF = "off";
@@ -68,6 +93,29 @@ export type MessageReaction = z.infer<typeof MessageReactionSchema>;
 export const OutboundPathSchema = z.enum(["relay", "tool"]);
 export type OutboundPath = z.infer<typeof OutboundPathSchema>;
 
+/**
+ * `defaults.inbound.reactionNotifications` — upstream's channel reaction
+ * notification mode, reused verbatim from
+ * each channel's `config-schema.ts` (`buildChannelReactionShape({
+ * notificationModes })`), so an account authored for OpenClaw compiles here
+ * unchanged. Fusion never wakes an agent on a reaction, so the leaf gates
+ * whether the event is RECORDED in channel activity: `off` drops it, `own` and
+ * `all` both record it (the Hub cannot yet tell whose message was reacted to,
+ * so the two upstream modes behave alike).
+ */
+export const ReactionNotificationsSchema = z.enum(["off", "own", "all"]);
+export type ReactionNotifications = z.infer<typeof ReactionNotificationsSchema>;
+
+/**
+ * `defaults.inbound.editNotifications` — an inbound message EDIT. Upstream has
+ * no config leaf for edits (it routes `message_changed` through its system-event
+ * bus unconditionally); the name follows upstream's `*Notifications` family.
+ * `off` (the floor) records the edit and stops there; `all` re-runs the edited
+ * message as if it had just arrived.
+ */
+export const EditNotificationsSchema = z.enum(["off", "all"]);
+export type EditNotifications = z.infer<typeof EditNotificationsSchema>;
+
 // --- Routes (§4.3.6) ----------------------------------------------------------
 
 /** `routes[].match.kind` — the conversation kind a route matches. */
@@ -80,6 +128,49 @@ export const SlackTransportModeSchema = z.enum(["socket", "webhook"]);
 export type SlackTransportMode = z.infer<typeof SlackTransportModeSchema>;
 export const TelegramTransportModeSchema = z.enum(["polling", "webhook"]);
 export type TelegramTransportMode = z.infer<typeof TelegramTransportModeSchema>;
+/** Discord has one inbound transport: the persistent gateway WebSocket. The
+ * HTTP interactions endpoint is a second one upstream supports; it needs a
+ * public URL the Hub does not expose yet, so it is not offered. */
+export const DiscordTransportModeSchema = z.enum(["gateway"]);
+export type DiscordTransportMode = z.infer<typeof DiscordTransportModeSchema>;
+/** Google Chat delivers only by HTTP POST to a public HTTPS URL — there is no
+ * polling and no socket mode. The Hub publishes no endpoint of its own, so the
+ * operator puts a reverse proxy in front of the account's own listener
+ * (`packages/channels/googlechat/HUB-WIRING.md` §6). */
+export const GoogleChatTransportModeSchema = z.enum(["webhook"]);
+export type GoogleChatTransportMode = z.infer<typeof GoogleChatTransportModeSchema>;
+/** Feishu's two upstream modes, under upstream's own `connectionMode` names.
+ * `websocket` (the long connection) needs no public URL and is the default. */
+export const FeishuTransportModeSchema = z.enum(["websocket", "webhook"]);
+export type FeishuTransportMode = z.infer<typeof FeishuTransportModeSchema>;
+/** Zalo Personal has one inbound transport and it is not a credential the
+ * operator can paste: the account is linked by a QR scan and the resulting
+ * session drives a push socket. The mode name is the linking method because
+ * that is the only choice the operator makes. */
+export const ZalouserTransportModeSchema = z.enum(["qr"]);
+export type ZalouserTransportMode = z.infer<typeof ZalouserTransportModeSchema>;
+/** Zalo's two upstream modes. `polling` is a plain outbound long poll and needs
+ * no public URL; `webhook` additionally needs the signing secret Zalo echoes in
+ * `x-bot-api-secret-token`. */
+export const ZaloTransportModeSchema = z.enum(["polling", "webhook"]);
+export type ZaloTransportMode = z.infer<typeof ZaloTransportModeSchema>;
+
+// --- Access policy (upstream `channels.<channel>.accounts.<id>` names) ---------
+//
+// `dmPolicy`, `groupPolicy`, `allowFrom` and `groupAllowFrom` keep OpenClaw's
+// spelling and semantics (`extensions/*/src/config-schema*.ts`,
+// `src/config/types.base.ts`) so an account authored for OpenClaw compiles
+// unchanged. The decision itself is upstream's too — the Hub calls the ported
+// `resolveDmGroupAccessWithLists` (`@getpaseo/channels-core/security/dm-policy-shared`)
+// rather than re-deriving it.
+
+/** `dmPolicy` — who may open a direct conversation with the bot. */
+export const DmPolicySchema = z.enum(["open", "pairing", "allowlist", "disabled"]);
+export type DmPolicy = z.infer<typeof DmPolicySchema>;
+
+/** `groupPolicy` — who may address the bot in a group/channel conversation. */
+export const GroupPolicySchema = z.enum(["open", "allowlist", "disabled"]);
+export type GroupPolicy = z.infer<typeof GroupPolicySchema>;
 
 /** Delivery-error surfacing. */
 export const ErrorPolicySchema = z.enum(["always", "once", "silent"]);

@@ -36,8 +36,12 @@ import {
   endChannelLoad,
   forgetChannel,
   registerChannelLoader,
+  runAsChannelAccount,
 } from "./hooks.js";
 import { clearChannelRuntime, setChannelRuntime } from "./runtime-store.js";
+import { clearChannelMessageActions, registerChannelMessageActions } from "../message-actions.js";
+import { clearChannelAgentTools, registerChannelAgentTools } from "../channel-agent-tools.js";
+import { forgetChannelMessageToolCatalog } from "../channel-message-tool.js";
 
 /** The loaded channel entry object: a `defineBundledChannelEntry` result. We keep
  * it loose (the seam only needs `setChannelRuntime` + a register surface); the
@@ -57,6 +61,9 @@ export interface ChannelEntry {
 export interface LoadChannelVerticalOptions {
   channel: string;
   accountId: string;
+  /** The account's owner. Process-global registries are keyed by it, so two
+   * organizations that name an account the same never share a registration. */
+  organizationId: string;
   installDir: string;
   /** The pinned main package's install dir. */
   mainInstallDir: string;
@@ -77,6 +84,9 @@ export interface LoadChannelVerticalOptions {
  * reads `outbound` (§4.8 D1/D3); unknown keys stay open. */
 export interface ChannelPlugin {
   directory?: { resolveConversation?: ResolveConversationFn | undefined };
+  /** Per-account teardown the vertical opts into (`@getpaseo/channels-shared`
+   * declares it on the drive surface); called from `dispose()`. */
+  disposeAccount?: ((accountId: string) => void) | undefined;
   gateway?: { startAccount?: (ctx: unknown) => unknown };
   outbound?: Record<string, unknown>;
   [key: string]: unknown;
@@ -137,26 +147,39 @@ function allowlistRoots(options: LoadChannelVerticalOptions): string[] {
   return roots;
 }
 
+/** The workspace packages every in-repo vertical is allowed to import: the drive
+ * contract (`shared`), the ported OpenClaw core the verticals compile against
+ * (`core`) and its markdown tree (`markdown-core`). They are workspace-linked, so
+ * their module URLs are the symlink's REALPATH — outside both the channel install
+ * dir and the repo's root `node_modules`. This list is closed on purpose: a
+ * vertical may not reach a sibling channel's package. */
+const IN_REPO_CONTRACT_PACKAGES = [
+  "@getpaseo/channels-shared",
+  "@getpaseo/channels-core",
+  "@getpaseo/channels-markdown-core",
+] as const;
+
 /** The in-repo dependency roots:
- * (a) the shared in-repo contract package's dir — `require.resolve` from this
- * hub file resolves the workspace link; `realpathSync` normalizes it to the
- * real package dir, where shared's module URLs actually land;
- * (b) the repo's root `node_modules` — the hoisted npm deps (grammy,
- * @slack/*) live there, OUTSIDE the channel package dir.
+ * (a) each in-repo contract package's dir — `require.resolve` from this hub file
+ * resolves the workspace link; `realpathSync` normalizes it to the real package
+ * dir, where those modules' URLs actually land;
+ * (b) the repo's root `node_modules` — the hoisted npm deps (grammy, @slack/*,
+ * discord-api-types, ws) live there, OUTSIDE the channel package dir.
  * Both are derived from this file's own location: this file sits at
  * `<root>/packages/hub/{src,dist}/channels/loader/`, so six `dirname` calls
  * on its URL path land on the repo root — the layout math holds in source/dev
- * runs (tsx, vitest) and in the compiled `dist/` run alike. A missing shared
+ * runs (tsx, vitest) and in the compiled `dist/` run alike. A missing contract
  * package throws — the vertical cannot be admitted to an unknown supply tree
  * (fail closed at load, like every other load-trace miss). */
 function inRepoDependencyRoots(): string[] {
   const require = createRequire(import.meta.url);
-  const sharedPackageJson = require.resolve("@getpaseo/channels-shared/package.json");
-  const sharedDir = realpathSync(dirname(sharedPackageJson));
+  const packageDirs = IN_REPO_CONTRACT_PACKAGES.map((name) =>
+    realpathSync(dirname(require.resolve(`${name}/package.json`))),
+  );
   const repoRoot = dirname(
     dirname(dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url)))))),
   );
-  return [sharedDir, join(repoRoot, "node_modules")];
+  return [...packageDirs, join(repoRoot, "node_modules")];
 }
 
 /** Node builtins are trusted stdlib, not third-party supply: a channel may import
@@ -272,8 +295,25 @@ export async function loadChannelVertical(
   // bound seam (hosts/channel-inbound.ts) reads a SEPARATE store keyed by
   // channel:accountId to find `onInboundReply`, so populate that one too — same
   // runtime object, so both surfaces see the identical HostRuntime.
-  set(options.hostRuntime);
+  runAsChannelAccount(options.channel, options.accountId, () => set(options.hostRuntime));
   setChannelRuntime(options.channel, options.accountId, options.hostRuntime);
+  // Every per-account Hub registry is keyed by the organization too: one process
+  // serves every tenant, and two of them can name an account the same.
+  const accountScope = {
+    organizationId: options.organizationId,
+    channel: options.channel,
+    accountId: options.accountId,
+  };
+  // The vertical's message-action adapter is part of the drive surface: register
+  // it for this account so the `message` tool discovers and dispatches through
+  // the ported OpenClaw runner (`channels/message-actions.ts`). A vertical that
+  // ships none leaves the tool send-only for that account.
+  registerChannelMessageActions(accountScope, plugin);
+  // The vertical's own agent tools (`plugin.agentTools`), e.g. Feishu's six
+  // `feishu_*` families. Registered from the LOADED plugin so Hub production
+  // code never imports a vertical.
+  registerChannelAgentTools(accountScope, plugin);
+  forgetChannelMessageToolCatalog(accountScope);
 
   return {
     channel: options.channel,
@@ -282,13 +322,28 @@ export async function loadChannelVertical(
     plugin,
     loadedModules: loaded,
     dispose(): void {
+      disposeVerticalAccount(plugin, options.accountId);
       clearChannelRuntime(options.channel, options.accountId);
+      clearChannelMessageActions(accountScope);
+      clearChannelAgentTools(accountScope);
+      forgetChannelMessageToolCatalog(accountScope);
       // Forget the lifetime routing registration so this account's drive-time
       // imports no longer resolve through the seam (the account is stopped).
       forgetChannel(options.channel, options.accountId);
       dispose();
     },
   };
+}
+
+/**
+ * A vertical's own per-account teardown, when it ships one. A vertical keeps
+ * process state per account that the loader's registries know nothing about —
+ * the Telegram port installs a keyed-store runtime and a log sink per account —
+ * so unloading has to tell the vertical, not just forget it here.
+ */
+function disposeVerticalAccount(plugin: ChannelPlugin, accountId: string): void {
+  const dispose = plugin["disposeAccount"];
+  if (typeof dispose === "function") (dispose as (id: string) => void)(accountId);
 }
 
 /** Import an installed module (the entry or the plugin chunk) by its
@@ -300,7 +355,13 @@ async function importInstalledModule(
   specifier: string,
 ): Promise<Record<string, unknown>> {
   const url = pathToFileURL(`${options.channelInstallDir}/${normalizeEntry(specifier)}`).toString();
-  return (await import(url)) as Record<string, unknown>;
+  // Under this account's scope: everything the imported graph pulls in — now or
+  // from a timer it schedules — is attributed to this account (hooks.ts).
+  return (await runAsChannelAccount(
+    options.channel,
+    options.accountId,
+    async () => (await import(url)) as Record<string, unknown>,
+  )) as Record<string, unknown>;
 }
 
 function normalizeEntry(entry: string): string {

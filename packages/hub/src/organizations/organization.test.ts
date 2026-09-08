@@ -14,18 +14,21 @@ describe("organization role policy", () => {
       manageMembers: true,
       manageOwners: true,
       manageResources: true,
+      manageChannels: true,
     });
     assert.deepEqual(capabilitiesFor("admin"), {
       view: true,
       manageMembers: true,
       manageOwners: false,
       manageResources: true,
+      manageChannels: true,
     });
     assert.deepEqual(capabilitiesFor("member"), {
       view: true,
       manageMembers: false,
       manageOwners: false,
       manageResources: false,
+      manageChannels: false,
     });
   });
 

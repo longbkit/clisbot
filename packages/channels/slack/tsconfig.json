@@ -1,4 +1,7 @@
 {
+  // `exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off so
+  // the upstream Slack source compiles verbatim: OpenClaw's own tsconfig sets
+  // neither flag. See upstream-sync.json D-023 (mirrors the Telegram D-TG-001).
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023"],
@@ -8,9 +11,9 @@
     "noImplicitAny": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "noImplicitReturns": true,
-    "noPropertyAccessFromIndexSignature": true,
+    "noPropertyAccessFromIndexSignature": false,
     "useUnknownInCatchVariables": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

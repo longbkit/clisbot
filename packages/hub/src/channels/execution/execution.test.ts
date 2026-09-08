@@ -34,9 +34,13 @@ import type {
   PlaneLogger,
   TypingParams,
 } from "../plane/types.js";
+import { planeInboundDeferral } from "../plane/types.js";
 import { ManualClock } from "../plane/clock.js";
 import { executionMarker, parseStoredRouteSelection, routeFingerprint } from "../bindings/index.js";
+import { buttonValue, cardIdFor } from "../approvals/card.js";
+import { mintChannelCommandButton } from "../command-buttons.js";
 import { ApprovalPostureError } from "../policy.js";
+import { textCommandHelpText } from "../commands.js";
 import { createChannelPlane } from "../execution.js";
 
 const ORGANIZATION_ID = "channel-org";
@@ -52,6 +56,7 @@ const DEFAULTS: EffectiveDefaults = {
   bindingKey: "thread",
   replyAnchor: "thread",
   outbound: { path: "relay", template: null },
+  inbound: { reactionNotifications: "off", editNotifications: "off" },
   sync: {
     finalAnswers: true,
     progress: {
@@ -235,6 +240,8 @@ interface FacadeHarness {
   posted: string[];
   /** The `threadId` of every outbound post (undefined = conversation root). */
   postedThreads: (string | undefined)[];
+  /** Flip `ok` to false to make the vertical's outbound refuse every post. */
+  postOutcome: { ok: boolean; error?: string };
   mediaPosted: string[];
   next: { message: InboundMessage | null };
   /** Every liveness drive, in wire order. */
@@ -285,6 +292,7 @@ function makeHarness(
   });
   const posted: string[] = [];
   const postedThreads: (string | undefined)[] = [];
+  const postOutcome: { ok: boolean; error?: string } = { ok: true };
   const mediaPosted: string[] = [];
   const workflowDispatches: Parameters<ChannelPlaneDeps["dispatchWorkflow"]>[0][] = [];
   const activity: RecordChannelInboundActivityInput[] = [];
@@ -329,6 +337,7 @@ function makeHarness(
     post: async (p) => {
       posted.push(p.text);
       postedThreads.push(p.threadId);
+      if (!postOutcome.ok) return { ok: false, error: postOutcome.error ?? "channel refused" };
       return { ok: true, externalMessageId: "1720000000.000001" };
     },
     // COMPAT(clisbot-control-plane): the native-media post (G7–G11). The
@@ -359,6 +368,7 @@ function makeHarness(
     fake,
     posted,
     postedThreads,
+    postOutcome,
     mediaPosted,
     next,
     driven,
@@ -366,6 +376,71 @@ function makeHarness(
     clock,
     workflowDispatches,
     activity,
+  };
+}
+
+/** One running Workflow execution, in the shape `onWorkflowStreamEvent` reads:
+ * the captured Channel location plus the route the Hub selected for it. */
+function workflowExecution(input: {
+  id: string;
+  conversationId: string;
+  route: CompiledRoute;
+}): AgentExecutionRecord {
+  const bindingKey = JSON.stringify(["slack", ACCOUNT_ID, input.conversationId, null]);
+  return {
+    id: input.id,
+    organizationId: ORGANIZATION_ID,
+    workflowId: "6dd62fdf-b621-4743-b027-101d9fd93be3",
+    machineId: null,
+    status: "running",
+    startedAt: new Date(),
+    completedAt: null,
+    completedByAgentAt: null,
+    deadlineAt: null,
+    idleDeadlineAt: null,
+    result: null,
+    triggerContext: {},
+    outputContext: {
+      provider: "channel",
+      channel: {
+        name: "slack",
+        account_id: ACCOUNT_ID,
+        binding_key: bindingKey,
+        external_conversation_id: input.conversationId,
+        external_thread_id: null,
+        sender_identity: INITIATOR,
+        root_kind: "channel",
+        trigger_thread_id: null,
+        route: {
+          defaultRoles: input.route.defaultRoles,
+          assignments: input.route.assignments,
+          defaults: input.route.defaults,
+          approval: input.route.approval,
+        },
+      },
+    },
+    reactionState: null,
+    configurationRevisionId: "50ca1f39-87eb-4348-b9b4-eb76081f95cd",
+    completionTokenHash: null,
+    replyClaimedAt: null,
+    replyClaimCount: 0,
+    outputEmissions: {},
+    outputDeliveryAttempts: {},
+    launchIntent: {
+      triggerName: "engineering-assistant",
+      allowOutputs: [],
+    } as unknown as AgentExecutionRecord["launchIntent"],
+    daemonId: null,
+    daemonAgentId: "workflow-agent",
+    workflowStepRunId: null,
+    hubAction: null,
+    hubActionCompletedAt: null,
+    hubActionReadyAt: null,
+    hubActionAcknowledgements: {
+      terminalAt: null,
+      idleAt: null,
+      finishExecutionCall: null,
+    },
   };
 }
 
@@ -869,6 +944,10 @@ describe("selected-conversation audience", () => {
       oversized.outcome?.kind === "ignored" ? oversized.outcome.reason : "",
       /size limit/u,
     );
+    // Over the size ceiling for good: no deferral, so the durable ingress
+    // completes the row instead of bringing the message back forever.
+    assert.equal(oversized.deferred, undefined);
+    assert.equal(planeInboundDeferral(oversized), undefined);
 
     for (let index = 0; index < 10; index += 1) {
       harness.next.message = message({ ...external, text: `request ${index}` });
@@ -892,6 +971,10 @@ describe("selected-conversation audience", () => {
     });
     assert.equal(limited.outcome?.kind, "ignored");
     assert.match(limited.outcome?.kind === "ignored" ? limited.outcome.reason : "", /rate limit/u);
+    // A rate ceiling clears with time: the refusal is back-pressure, and it
+    // survives the untyped host boundary the supervisor reads it across.
+    assert.ok((limited.deferred?.retryAfterMs ?? 0) > 0);
+    assert.deepEqual(planeInboundDeferral(limited), limited.deferred);
   });
 
   it("cancels active public Route work when its configuration is replaced", async () => {
@@ -1540,6 +1623,66 @@ describe("channel session commands", () => {
     assert.equal(stopped.outcome?.kind === "command" ? stopped.outcome.handled : true, false);
   });
 
+  // The captured-Workflow command branch runs a session command without ever
+  // reaching the route selection, so it has to run the route's `access:` gate
+  // itself: it used to hand `/help` (and `/stop`) to a sender the route refuses.
+  it("refuses a session command from a sender the Workflow route's access block denies", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+      defaults: {
+        ...DEFAULTS,
+        access: { groupPolicy: "allowlist", allowFrom: ["U0ALICE"] },
+      },
+    };
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const execution = workflowExecution({
+      id: "0f5f2b3f-77c2-4a54-9f3a-4e5d7f2c1a90",
+      conversationId: "C0WFACCESS",
+      route,
+    });
+    await harness.plane.onWorkflowStreamEvent({
+      execution,
+      agentId: "workflow-agent",
+      event: { type: "turn_started", provider: "codex", turnId: "workflow-turn" },
+    });
+
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0WFACCESS",
+      rootConversationId: "C0WFACCESS",
+      threadId: null,
+    };
+    // The allowlisted sender proves this is the captured-Workflow branch.
+    harness.next.message = message({ text: "/help", conversation });
+    const allowed = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(allowed.outcome?.kind, "command");
+    assert.deepEqual(harness.posted, [textCommandHelpText()]);
+
+    harness.next.message = message({
+      text: "/help",
+      senderIdentity: "slack:U0STRANGER",
+      conversation,
+    });
+    const refused = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(refused.outcome?.kind, "ignored");
+    assert.deepEqual(
+      harness.posted,
+      [textCommandHelpText()],
+      "a refused sender is answered with silence, not /help",
+    );
+  });
+
   it("uses captured Workflow context for approval callbacks and /stop", async () => {
     const route: CompiledRoute = {
       ...makeRoute(),
@@ -1548,62 +1691,11 @@ describe("channel session commands", () => {
     };
     const harness = makeHarness({ account: makeAccount(route) });
     await harness.plane.start(harness.fake.daemon, store);
-    const bindingKey = JSON.stringify(["slack", ACCOUNT_ID, "C0WFSTOP", null]);
-    const execution: AgentExecutionRecord = {
+    const execution = workflowExecution({
       id: "8cf44c32-8cde-4f3e-94a1-d3bf861cb716",
-      organizationId: ORGANIZATION_ID,
-      workflowId: "6dd62fdf-b621-4743-b027-101d9fd93be3",
-      machineId: null,
-      status: "running",
-      startedAt: new Date(),
-      completedAt: null,
-      completedByAgentAt: null,
-      deadlineAt: null,
-      idleDeadlineAt: null,
-      result: null,
-      triggerContext: {},
-      outputContext: {
-        provider: "channel",
-        channel: {
-          name: "slack",
-          account_id: ACCOUNT_ID,
-          binding_key: bindingKey,
-          external_conversation_id: "C0WFSTOP",
-          external_thread_id: null,
-          sender_identity: INITIATOR,
-          root_kind: "channel",
-          trigger_thread_id: null,
-          route: {
-            defaultRoles: route.defaultRoles,
-            assignments: route.assignments,
-            defaults: route.defaults,
-            approval: route.approval,
-          },
-        },
-      },
-      reactionState: null,
-      configurationRevisionId: "50ca1f39-87eb-4348-b9b4-eb76081f95cd",
-      completionTokenHash: null,
-      replyClaimedAt: null,
-      replyClaimCount: 0,
-      outputEmissions: {},
-      outputDeliveryAttempts: {},
-      launchIntent: {
-        triggerName: "engineering-assistant",
-        allowOutputs: [],
-      } as unknown as AgentExecutionRecord["launchIntent"],
-      daemonId: null,
-      daemonAgentId: "workflow-agent",
-      workflowStepRunId: null,
-      hubAction: null,
-      hubActionCompletedAt: null,
-      hubActionReadyAt: null,
-      hubActionAcknowledgements: {
-        terminalAt: null,
-        idleAt: null,
-        finishExecutionCall: null,
-      },
-    };
+      conversationId: "C0WFSTOP",
+      route,
+    });
     await harness.plane.onWorkflowStreamEvent({
       execution,
       agentId: "workflow-agent",
@@ -2120,5 +2212,533 @@ describe("processing lease (accepted inbound opens it)", () => {
       harness.driven.map((d) => d.action),
       ["start", "stop"],
     );
+  });
+});
+
+// --- Inbound families (slice 23a) ------------------------------------------
+
+describe("inbound event kinds", () => {
+  /** An always-reply route: no mention needed, so nothing but the family
+   * itself can keep a system event away from the agent. */
+  function alwaysReplyHarness() {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      defaults: { ...DEFAULTS, requireMention: false },
+    };
+    const account = makeAccount(route);
+    return makeHarness({ account, controlPlane: makeControlPlane(account) });
+  }
+
+  const ROOM_EVENTS = [
+    { kind: "reaction", body: "Slack reaction added: :+1: by U0ALICE in C0ROOM msg 1.2" },
+    { kind: "member", body: "Slack: U0ALICE joined C0ROOM." },
+    { kind: "channel", body: "Slack channel renamed: #room." },
+    { kind: "pin", body: "Slack: U0ALICE pinned a message in C0ROOM." },
+    { kind: "delete", body: "Slack: a message was deleted in C0ROOM." },
+    { kind: "topic", body: '[Topic] created "deploys"' },
+    { kind: "poll_answer", body: "[Poll answer] poll p1 options [0]" },
+    { kind: "edit", body: "[Edited] start the build" },
+  ] as const;
+
+  for (const room of ROOM_EVENTS) {
+    it(`never starts a turn for a ${room.kind} event, even in always-reply mode`, async () => {
+      const harness = alwaysReplyHarness();
+      await harness.plane.start(harness.fake.daemon, store);
+      harness.next.message = message({
+        text: room.body,
+        mentionedBot: false,
+        conversation: {
+          kind: "channel",
+          id: `C0ROOM-${room.kind}`,
+          rootConversationId: `C0ROOM-${room.kind}`,
+          threadId: null,
+        },
+      });
+      const result = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: { EventKind: room.kind },
+      });
+      assert.equal(result.dispatched, false);
+      assert.equal(result.outcome?.kind, "ignored");
+      assert.equal(harness.fake.created.length, 0);
+      assert.equal(harness.fake.messages.length, 0);
+      assert.equal(harness.posted.length, 0);
+    });
+  }
+
+  it("records a room event against the route that owns the conversation", async () => {
+    const harness = alwaysReplyHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "Slack: U0ALICE joined C0LEDGER.",
+      mentionedBot: false,
+      conversation: {
+        kind: "channel",
+        id: "C0LEDGER",
+        rootConversationId: "C0LEDGER",
+        threadId: null,
+      },
+    });
+    await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "member" },
+    });
+    const recorded = harness.activity.at(-1);
+    assert.equal(recorded?.outcome, "ignored");
+    assert.equal(recorded?.outcomeDetail, "channel member event does not start an agent turn");
+  });
+
+  it("keeps a reaction out of the ledger at the org floor", async () => {
+    const harness = alwaysReplyHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "Slack reaction added: :+1: by U0ALICE in C0QUIET msg 1.2",
+      mentionedBot: false,
+      conversation: {
+        kind: "channel",
+        id: "C0QUIET",
+        rootConversationId: "C0QUIET",
+        threadId: null,
+      },
+    });
+    await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "reaction" },
+    });
+    assert.equal(harness.activity.length, 0);
+  });
+
+  it("re-runs an edited message as a message when the route asks for it", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      defaults: {
+        ...DEFAULTS,
+        inbound: { reactionNotifications: "off", editNotifications: "all" },
+      },
+    };
+    const account = makeAccount(route);
+    const harness = makeHarness({ account, controlPlane: makeControlPlane(account) });
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "[Edited] start the build",
+      conversation: {
+        kind: "channel",
+        id: "C0EDIT",
+        rootConversationId: "C0EDIT",
+        threadId: null,
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "edit" },
+    });
+    assert.equal(result.outcome?.kind, "bound");
+    assert.equal(harness.fake.created.length, 1);
+  });
+
+  it("runs a native slash command through the shared command handler", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    // Slack's slash body carries no leading `/` — the verb is a structured fact.
+    harness.next.message = message({
+      text: "<@U0ALICE> help",
+      conversation: {
+        kind: "channel",
+        id: "C0SLASH",
+        rootConversationId: "C0SLASH",
+        threadId: null,
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {
+        EventKind: "command",
+        EventFacts: { command: { name: "help", args: "" } },
+      },
+    });
+    assert.equal(result.outcome?.kind, "command");
+    assert.equal((result.outcome as { detail?: string }).detail, "help");
+    assert.match(harness.posted[0] ?? "", /\/status/u);
+    assert.equal(harness.fake.created.length, 0);
+  });
+
+  // D-W4-04: `/help` reported `handled: true` whatever the outbound did, so a
+  // reply that never reached the channel was indistinguishable in hub.log from
+  // a delivered one. The proof is the POST, not the outcome flag.
+  it("posts the /help text into the conversation that asked for it", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "/help",
+      conversation: {
+        kind: "thread",
+        id: "1712000000.000900",
+        rootConversationId: "C0HELP",
+        threadId: "1712000000.000900",
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(result.dispatched, true);
+    assert.equal(result.outcome?.kind, "command");
+    assert.equal((result.outcome as { detail?: string }).detail, "help");
+    assert.deepEqual(harness.posted, [textCommandHelpText()]);
+    assert.match(harness.posted[0] ?? "", /\/status/u);
+    assert.match(harness.posted[0] ?? "", /\/new/u);
+    // Commands answer where they were asked, never at the conversation root.
+    assert.deepEqual(harness.postedThreads, ["1712000000.000900"]);
+    assert.equal(harness.fake.created.length, 0);
+  });
+
+  it("reports /help as unhandled when the reply never reached the channel", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.postOutcome.ok = false;
+    harness.next.message = message({
+      text: "/help",
+      conversation: {
+        kind: "channel",
+        id: "C0HELPFAIL",
+        rootConversationId: "C0HELPFAIL",
+        threadId: null,
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(result.dispatched, false);
+    assert.equal(result.outcome?.kind === "command" ? result.outcome.handled : true, false);
+    assert.equal(
+      (result.outcome as { detail?: string }).detail,
+      "help reply not delivered",
+      "an undelivered answer must not be logged as handled",
+    );
+    assert.deepEqual(harness.posted, [textCommandHelpText()]);
+  });
+
+  it("posts the /status snapshot of the bound agent to the channel", async () => {
+    // The fake daemon mints ids in order, so the first bind is `agent-0`.
+    const harness = makeHarness({ daemonAgents: [snapshotOf("agent-0", "Nightly build")] });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0STATUSPOST",
+      rootConversationId: "C0STATUSPOST",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal((bound.outcome as { agentId: string }).agentId, "agent-0");
+    const postsBefore = harness.posted.length;
+
+    harness.next.message = message({ text: "/status", conversation });
+    const status = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "command", EventFacts: { command: { name: "status", args: "" } } },
+    });
+    assert.equal((status.outcome as { detail?: string }).detail, "status");
+    const answer = harness.posted[postsBefore] ?? "";
+    assert.match(answer, /Agent: Nightly build \(codex\)/u);
+    assert.match(answer, /Status: idle/u);
+    assert.match(answer, /Working directory: \/tmp\/repo/u);
+    assert.deepEqual(harness.postedThreads[postsBefore], undefined);
+  });
+
+  it("reports /status as unhandled when the reply never reached the channel", async () => {
+    const harness = makeHarness({ daemonAgents: [snapshotOf("agent-0", "Nightly build")] });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0STATUSFAIL",
+      rootConversationId: "C0STATUSFAIL",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    harness.postOutcome.ok = false;
+    harness.next.message = message({ text: "/status", conversation });
+    const status = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "command", EventFacts: { command: { name: "status", args: "" } } },
+    });
+    assert.equal(status.dispatched, false);
+    assert.equal(
+      (status.outcome as { detail?: string }).detail,
+      "status reply not delivered",
+      "an undelivered snapshot must not be logged as handled",
+    );
+  });
+
+  it("ignores an unknown command that did not address the bot", async () => {
+    const harness = alwaysReplyHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "/deploy staging",
+      mentionedBot: false,
+      conversation: {
+        kind: "channel",
+        id: "C0UNKNOWN",
+        rootConversationId: "C0UNKNOWN",
+        threadId: null,
+      },
+    });
+    const result = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {
+        EventKind: "command",
+        EventFacts: { command: { name: "deploy", args: "staging" } },
+      },
+    });
+    assert.equal(result.dispatched, false);
+    assert.equal(harness.fake.created.length, 0);
+  });
+
+  it("stops the running turn on /stop and releases the session on /new", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0SESSION",
+      rootConversationId: "C0SESSION",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(bound.outcome?.kind, "bound");
+    const agentId = (bound.outcome as { agentId: string }).agentId;
+
+    harness.next.message = message({ text: "/stop", conversation });
+    const stopped = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "command", EventFacts: { command: { name: "stop", args: "" } } },
+    });
+    assert.equal(stopped.outcome?.kind, "command");
+    assert.deepEqual(harness.fake.cancelled, [agentId]);
+    // The binding survives a stop: the conversation still belongs to the agent.
+    assert.notEqual(
+      await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0SESSION", null),
+      undefined,
+    );
+
+    harness.next.message = message({ text: "/new", conversation });
+    const reset = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: { EventKind: "command", EventFacts: { command: { name: "new", args: "" } } },
+    });
+    assert.equal(reset.dispatched, true);
+    assert.equal(
+      await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0SESSION", null),
+      undefined,
+    );
+
+    // The next message mints a new session rather than steering the old one.
+    harness.next.message = message({ conversation });
+    const fresh = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(fresh.outcome?.kind, "bound");
+    assert.notEqual((fresh.outcome as { agentId: string }).agentId, agentId);
+  });
+
+  it("routes an approval-card callback to the approval seam", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0CARD",
+      rootConversationId: "C0CARD",
+      threadId: null,
+    };
+    harness.next.message = message({ text: "edit the config", conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    const agentId = (bound.outcome as { agentId: string }).agentId;
+    const request: AgentPermissionRequest = {
+      id: "req-card",
+      provider: "codex",
+      name: "Bash",
+      kind: "tool",
+      input: { command: "ls -la" },
+    };
+    await harness.plane.onStreamEvent(agentId, {
+      type: "permission_requested",
+      provider: "codex",
+      request,
+    });
+    const cardId = cardIdFor(request);
+    harness.next.message = message({
+      text: "Slack action: approval value allow by U0ALICE on msg 1.2",
+      conversation,
+    });
+    const clicked = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {
+        EventKind: "callback",
+        EventFacts: {
+          callback: {
+            actionId: "approval",
+            value: buttonValue("allow", cardId),
+            actorId: "U0ALICE",
+            messageId: "1.2",
+          },
+        },
+      },
+    });
+    assert.equal(clicked.outcome?.kind, "command");
+    assert.equal((clicked.outcome as { handled: boolean }).handled, true);
+    assert.equal(harness.fake.responses.length, 1);
+    assert.equal(harness.fake.responses[0]?.requestId, "req-card");
+  });
+
+  it("ignores an injected command button this Hub never minted", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0INJECT",
+      rootConversationId: "C0INJECT",
+      threadId: null,
+    };
+    harness.next.message = message({ text: "bind me", conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    const agentId = (bound.outcome as { agentId: string }).agentId;
+    // A `message` tool call can put any text in a button. `/new` arriving as a
+    // callback action id must never reach the session commands.
+    harness.next.message = message({ text: "Slack action: /new by U0MALLORY", conversation });
+    const clicked = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {
+        EventKind: "callback",
+        EventFacts: { callback: { actionId: "/new", actorId: "U0MALLORY" } },
+      },
+    });
+    assert.equal(clicked.dispatched, false);
+    assert.equal((clicked.outcome as { handled: boolean }).handled, false);
+    assert.equal(
+      (clicked.outcome as { detail?: string }).detail?.includes("unknown"),
+      true,
+      (clicked.outcome as { detail?: string }).detail,
+    );
+    // The session survived: nothing was reset.
+    harness.next.message = message({ text: "still here", conversation });
+    const after = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal((after.outcome as { agentId: string }).agentId, agentId);
+  });
+
+  it("runs a minted command button for its issuing actor, once", async () => {
+    const harness = makeHarness({ daemonAgents: [snapshotOf("agent-0", "Nightly build")] });
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0MINTED",
+      rootConversationId: "C0MINTED",
+      threadId: null,
+    };
+    harness.next.message = message({ text: "bind me", conversation });
+    const bound = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    const token = mintChannelCommandButton("/status", {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      agentId: (bound.outcome as { agentId: string }).agentId,
+      conversationId: "C0MINTED",
+      allowedActorIds: ["U0ALICE"],
+    });
+    const click = async (actorId: string) => {
+      harness.next.message = message({ text: `Slack action: button by ${actorId}`, conversation });
+      return await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {
+          EventKind: "callback",
+          EventFacts: { callback: { actionId: token, actorId } },
+        },
+      });
+    };
+    const foreign = await click("U0MALLORY");
+    assert.equal((foreign.outcome as { handled: boolean }).handled, false);
+    assert.equal((foreign.outcome as { detail?: string }).detail?.includes("foreign-actor"), true);
+    const owned = await click("U0ALICE");
+    assert.equal((owned.outcome as { kind: string }).kind, "command");
+    assert.equal((owned.outcome as { detail?: string }).detail, "status");
+    const replayed = await click("U0ALICE");
+    assert.equal((replayed.outcome as { handled: boolean }).handled, false);
+    assert.equal((replayed.outcome as { detail?: string }).detail?.includes("unknown"), true);
+  });
+
+  it("ignores a callback whose action this Hub never posted", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "Slack action: some_other_app_button by U0ALICE on msg 1.2",
+      conversation: {
+        kind: "channel",
+        id: "C0FOREIGN",
+        rootConversationId: "C0FOREIGN",
+        threadId: null,
+      },
+    });
+    const clicked = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {
+        EventKind: "callback",
+        EventFacts: {
+          callback: {
+            actionId: "some_other_app_button",
+            value: "not-a-card-value",
+            actorId: "U0ALICE",
+          },
+        },
+      },
+    });
+    assert.equal(clicked.dispatched, false);
+    assert.equal(
+      (clicked.outcome as { detail?: string }).detail?.includes("unknown callback"),
+      true,
+    );
+    assert.equal(harness.fake.created.length, 0);
   });
 });

@@ -1,0 +1,2971 @@
+{
+  "upstreamRepo": "openclaw-private",
+  "baselineCommit": "5d8067a4483",
+  "note": "RECONSTRUCTED 2026-09-07 after the slice-9 agent deleted this package's untracked source with `git clean`. Entries were rebuilt from the compiled dist headers plus the upstream baseline; deviation prose for D-CORE-005..009 could not be recovered verbatim and is restated from the code comments that survived in the ported files.",
+  "roots": [
+    {
+      "local": "src"
+    }
+  ],
+  "files": [
+    {
+      "local": "src/agents/agent-scope.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-021"]
+    },
+    {
+      "local": "src/agents/channel-tools.ts",
+      "upstream": "src/agents/channel-tools.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-005"]
+    },
+    {
+      "local": "src/agents/date-time.ts",
+      "upstream": "src/agents/date-time.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/identity.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-022"]
+    },
+    {
+      "local": "src/agents/internal-runtime-context.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-023"]
+    },
+    {
+      "local": "src/agents/runtime/index.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-019"]
+    },
+    {
+      "local": "src/agents/sandbox-paths.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-024"]
+    },
+    {
+      "local": "src/agents/schema/string-enum.ts",
+      "upstream": "src/agents/schema/string-enum.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/schema/typebox.ts",
+      "upstream": "src/agents/schema/typebox.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tool-input-error.ts",
+      "upstream": "src/agents/tool-input-error.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/common.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-029"]
+    },
+    {
+      "local": "src/agents/tools/gateway-caller-context.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-025"]
+    },
+    {
+      "local": "src/agents/tools/gateway-schema.ts",
+      "upstream": "src/agents/tools/gateway-schema.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/image-result.host-adapter.ts",
+      "upstream": "src/agents/tools/common.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-253"]
+    },
+    {
+      "local": "src/agents/tools/message-tool-decision.ts",
+      "upstream": "src/agents/tools/message-tool-decision.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/message-tool-description.ts",
+      "upstream": "src/agents/tools/message-tool-description.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/message-tool-discovery.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/agents/tools/message-tool-discovery.ts",
+      "upstream": "src/agents/tools/message-tool-discovery.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-017"]
+    },
+    {
+      "local": "src/agents/tools/message-tool-explicit-target.ts",
+      "upstream": "src/agents/tools/message-tool-explicit-target.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/message-tool-idempotency.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/agents/tools/message-tool-idempotency.ts",
+      "upstream": "src/agents/tools/message-tool-idempotency.ts",
+      "status": "verbatim",
+      "deviation": ["D-CORE-015"]
+    },
+    {
+      "local": "src/agents/tools/message-tool-schema-scoping.ts",
+      "upstream": "src/agents/tools/message-tool-schema-scoping.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/message-tool-schema.ts",
+      "upstream": "src/agents/tools/message-tool-schema.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/message-tool-source-policy.ts",
+      "upstream": "src/agents/tools/message-tool-source-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/message-tool-visible-content.ts",
+      "upstream": "src/agents/tools/message-tool-visible-content.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/poll-vote-echo.ts",
+      "upstream": "src/agents/tools/poll-vote-echo.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/agents/tools/tool-results.ts",
+      "upstream": "src/agents/tools/tool-results.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ai/internal/retry-after.ts",
+      "upstream": "packages/ai/src/internal/retry-after.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/ai/utils/retryable-network-errors.ts",
+      "upstream": "packages/ai/src/utils/retryable-network-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/audit/execution-identity-admission.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-027"]
+    },
+    {
+      "local": "src/audit/message-action-decision.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-026"]
+    },
+    {
+      "local": "src/auto-reply/chunk.ts",
+      "upstream": "src/auto-reply/chunk.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/get-reply-options.types.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-028"]
+    },
+    {
+      "local": "src/auto-reply/reply-payload.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-063"]
+    },
+    {
+      "local": "src/auto-reply/reply/reply-directives.ts",
+      "upstream": "src/auto-reply/reply/reply-directives.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/reply/reply-media-paths.runtime.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-052"]
+    },
+    {
+      "local": "src/auto-reply/reply/reply-reference.ts",
+      "upstream": "src/auto-reply/reply/reply-reference.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/reply/response-prefix-template.ts",
+      "upstream": "src/auto-reply/reply/response-prefix-template.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/reply/strip-inbound-meta.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-051"]
+    },
+    {
+      "local": "src/auto-reply/source-reply-delivery-mode.types.ts",
+      "upstream": "src/auto-reply/source-reply-delivery-mode.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/auto-reply/templating.ts",
+      "upstream": "src/auto-reply/templating.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-502"]
+    },
+    {
+      "local": "src/auto-reply/tokens.ts",
+      "upstream": "src/auto-reply/tokens.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/account-snapshot-fields.ts",
+      "upstream": "src/channels/account-snapshot-fields.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-302"]
+    },
+    {
+      "local": "src/channels/allow-from.ts",
+      "upstream": "src/channels/allow-from.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/allowlist-match.ts",
+      "upstream": "src/channels/allowlist-match.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/channel-config.ts",
+      "upstream": "src/channels/channel-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/chat-type.ts",
+      "upstream": "src/channels/chat-type.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/draft-stream-controls.ts",
+      "upstream": "src/channels/draft-stream-controls.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/draft-stream-loop.ts",
+      "upstream": "src/channels/draft-stream-loop.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/draft-streaming-chunking.ts",
+      "upstream": "src/channels/draft-streaming-chunking.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/ids.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-204"]
+    },
+    {
+      "local": "src/channels/inbound-event/kind.ts",
+      "upstream": "src/channels/inbound-event/kind.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/inbound-event/media.ts",
+      "upstream": "src/channels/inbound-event/media.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-501"]
+    },
+    {
+      "local": "src/channels/location.ts",
+      "upstream": "src/channels/location.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message-access/effective-allow-from.ts",
+      "upstream": "src/channels/message-access/effective-allow-from.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message/ingress-errors.ts",
+      "upstream": "src/channels/message/ingress-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message/ingress-retry-policy.ts",
+      "upstream": "src/channels/message/ingress-retry-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message/outbound-echo-state.ts",
+      "upstream": "src/channels/message/outbound-echo-state.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message/outbound-echo.ts",
+      "upstream": "src/channels/message/outbound-echo.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message/receipt.ts",
+      "upstream": "src/channels/message/receipt.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/message/types.ts",
+      "upstream": "src/channels/message/types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/account-action-gate.ts",
+      "upstream": "src/channels/plugins/account-action-gate.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/account-helpers.ts",
+      "upstream": "src/channels/plugins/account-helpers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/account-snapshot.types.ts",
+      "upstream": "src/channels/plugins/types.core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-241"]
+    },
+    {
+      "local": "src/channels/plugins/actions/reaction-message-id.ts",
+      "upstream": "src/channels/plugins/actions/reaction-message-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/actions/shared.ts",
+      "upstream": "src/channels/plugins/actions/shared.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/channel-contract.host-adapter.ts",
+      "upstream": "src/channels/plugins/types.core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-252"]
+    },
+    {
+      "local": "src/channels/plugins/channel-id.types.ts",
+      "upstream": "src/channels/plugins/channel-id.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/channel-runtime-surface.types.ts",
+      "upstream": "src/channels/plugins/channel-runtime-surface.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/config-schema.ts",
+      "status": "adapted",
+      "upstream": "src/channels/plugins/config-schema.ts",
+      "deviation": ["D-CORE-339"]
+    },
+    {
+      "local": "src/channels/plugins/conversation-read-origin.ts",
+      "upstream": "src/channels/plugins/conversation-read-origin.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/directory-config-helpers.ts",
+      "status": "verbatim",
+      "upstream": "src/channels/plugins/directory-config-helpers.ts"
+    },
+    {
+      "local": "src/channels/plugins/directory-types.ts",
+      "upstream": "src/channels/plugins/directory-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/helpers.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-044"]
+    },
+    {
+      "local": "src/channels/plugins/index.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-011"]
+    },
+    {
+      "local": "src/channels/plugins/message-action-discovery.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/channels/plugins/message-action-discovery.ts",
+      "upstream": "src/channels/plugins/message-action-discovery.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-011"]
+    },
+    {
+      "local": "src/channels/plugins/message-action-dispatch.registry.test.ts",
+      "upstream": "src/channels/plugins/message-action-dispatch.registry.test.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-011"]
+    },
+    {
+      "local": "src/channels/plugins/message-action-dispatch.ts",
+      "upstream": "src/channels/plugins/message-action-dispatch.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/message-action-names.ts",
+      "upstream": "src/channels/plugins/message-action-names.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/message-actions.test.ts",
+      "upstream": "src/channels/plugins/message-actions.test.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-011"]
+    },
+    {
+      "local": "src/channels/plugins/message-capabilities.ts",
+      "upstream": "src/channels/plugins/message-capabilities.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/message-capability-matrix.test.ts",
+      "upstream": "src/channels/plugins/message-capability-matrix.test.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-011"]
+    },
+    {
+      "local": "src/channels/plugins/message-tool-api.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/channels/plugins/message-tool-api.ts",
+      "upstream": "src/channels/plugins/message-tool-api.ts",
+      "status": "verbatim",
+      "deviation": ["D-CORE-012"]
+    },
+    {
+      "local": "src/channels/plugins/outbound.types.ts",
+      "upstream": "src/channels/plugins/outbound.types.ts",
+      "status": "adapted",
+      "deviation": "D-CORE-030"
+    },
+    {
+      "local": "src/channels/plugins/outbound/interactive.ts",
+      "upstream": "src/channels/plugins/outbound/interactive.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/outbound/presentation-delivery.ts",
+      "status": "adapted",
+      "upstream": "src/channels/plugins/outbound/presentation-delivery.ts",
+      "deviation": ["D-CORE-341"]
+    },
+    {
+      "local": "src/channels/plugins/outbound/presentation-limits.ts",
+      "upstream": "src/channels/plugins/outbound/presentation-limits.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/plugins/registry.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-020"]
+    },
+    {
+      "local": "src/channels/plugins/types.config.ts",
+      "status": "verbatim",
+      "upstream": "src/channels/plugins/types.config.ts"
+    },
+    {
+      "local": "src/channels/plugins/types.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-010"]
+    },
+    {
+      "local": "src/channels/plugins/types.public.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/channels/plugins/types.public.ts",
+      "upstream": "src/channels/plugins/types.public.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-010"]
+    },
+    {
+      "local": "src/channels/progress-draft-compositor.ts",
+      "upstream": "src/channels/progress-draft-compositor.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-403"]
+    },
+    {
+      "local": "src/channels/progress-draft-diffstat.ts",
+      "upstream": "src/channels/progress-draft-diffstat.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-402"]
+    },
+    {
+      "local": "src/channels/status-reactions.ts",
+      "upstream": "src/channels/status-reactions.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-216"]
+    },
+    {
+      "local": "src/channels/streaming-config-readers.ts",
+      "upstream": "src/channels/streaming-config-readers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/streaming.ts",
+      "upstream": "src/channels/streaming.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-231"]
+    },
+    {
+      "local": "src/channels/targets.ts",
+      "upstream": "src/channels/targets.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/threading-tool-context-internal.ts",
+      "upstream": "src/channels/threading-tool-context-internal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/turn/delivery-result.ts",
+      "upstream": "src/channels/turn/delivery-result.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/channels/turn/types.ts",
+      "upstream": "src/channels/turn/types.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-206"]
+    },
+    {
+      "local": "src/config/channel-account-config.ts",
+      "upstream": "src/config/channel-account-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/config/dangerous-name-matching.ts",
+      "upstream": "src/config/dangerous-name-matching.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/config/group-scope-tree.ts",
+      "upstream": "src/config/group-scope-tree.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-222"]
+    },
+    {
+      "local": "src/config/markdown-tables.ts",
+      "upstream": "src/config/markdown-tables.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-223"]
+    },
+    {
+      "local": "src/config/runtime-group-policy.ts",
+      "upstream": "src/config/runtime-group-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/config/sessions.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-047"]
+    },
+    {
+      "local": "src/config/sessions/session-accessor.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-047"]
+    },
+    {
+      "local": "src/config/sessions/transcript-write-context.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-047"]
+    },
+    {
+      "local": "src/config/sessions/transcript.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-047"]
+    },
+    {
+      "local": "src/config/sessions/work-start-error.ts",
+      "upstream": "src/config/sessions/work-start-error.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/config/types.base.ts",
+      "upstream": "src/config/types.base.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-003"]
+    },
+    {
+      "local": "src/config/types.discord.ts",
+      "upstream": "src/config/types.discord.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-301"]
+    },
+    {
+      "local": "src/config/types.googlechat.ts",
+      "upstream": "src/config/types.googlechat.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-324"]
+    },
+    {
+      "local": "src/config/types.openclaw.channels.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-239"]
+    },
+    {
+      "local": "src/config/types.openclaw.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-205"]
+    },
+    {
+      "local": "src/config/types.secrets.host-adapter.ts",
+      "upstream": "src/config/types.secrets.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-257"]
+    },
+    {
+      "local": "src/config/types.slack.ts",
+      "upstream": "src/config/types.slack.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-238"]
+    },
+    {
+      "local": "src/config/types.telegram.ts",
+      "upstream": "src/config/types.telegram.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-202"]
+    },
+    {
+      "local": "src/config/types.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-205"]
+    },
+    {
+      "local": "src/config/types.tts.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-048"]
+    },
+    {
+      "local": "src/config/zod-schema.agent-runtime.ts",
+      "status": "adapted",
+      "upstream": "src/config/zod-schema.agent-runtime.ts",
+      "deviation": ["D-CORE-338"]
+    },
+    {
+      "local": "src/config/zod-schema.core.ts",
+      "status": "adapted",
+      "upstream": "src/config/zod-schema.core.ts",
+      "deviation": ["D-CORE-337"]
+    },
+    {
+      "local": "src/config/zod-schema.sensitive.ts",
+      "status": "adapted",
+      "upstream": "src/config/zod-schema.sensitive.ts",
+      "deviation": ["D-CORE-336"]
+    },
+    {
+      "local": "src/gateway-client/timeouts.ts",
+      "upstream": "packages/gateway-client/src/timeouts.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-254"]
+    },
+    {
+      "local": "src/gateway-protocol/client-info.ts",
+      "upstream": "packages/gateway-protocol/src/client-info.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/gateway-protocol/gateway-error-details.ts",
+      "upstream": "packages/gateway-protocol/src/gateway-error-details.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/gateway-protocol/protocol-value-normalization.ts",
+      "upstream": "packages/gateway-protocol/src/protocol-value-normalization.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/gateway-protocol/schema/approval-id.ts",
+      "upstream": "packages/gateway-protocol/src/schema/approval-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/gateway-protocol/schema/error-codes.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-058"]
+    },
+    {
+      "local": "src/gateway/boot-echo-guard.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-049"]
+    },
+    {
+      "local": "src/gateway/channel-status-patches.ts",
+      "upstream": "src/gateway/channel-status-patches.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/gateway/internal-source-reply-persistence.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-040"]
+    },
+    {
+      "local": "src/gateway/message-action-turn-capability.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-050"]
+    },
+    {
+      "local": "src/gateway/security-path.ts",
+      "upstream": "src/gateway/security-path.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/globals.ts",
+      "upstream": "src/globals.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-232"]
+    },
+    {
+      "local": "src/index.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/infra/abort-signal.ts",
+      "upstream": "src/infra/abort-signal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/approval-resolution-ref.ts",
+      "upstream": "src/infra/approval-resolution-ref.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/approval-types.ts",
+      "upstream": "src/infra/approval-types.ts",
+      "status": "adapted",
+      "deviation": "D-CORE-031"
+    },
+    {
+      "local": "src/infra/backoff.ts",
+      "upstream": "src/infra/backoff.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/channel-activity.ts",
+      "upstream": "src/infra/channel-activity.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/crypto-digest.ts",
+      "upstream": "src/infra/crypto-digest.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/dedupe.ts",
+      "upstream": "src/infra/dedupe.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/diagnostic-flags.ts",
+      "upstream": "src/infra/diagnostic-flags.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-205"]
+    },
+    {
+      "local": "src/infra/env.ts",
+      "upstream": "src/infra/env.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-234"]
+    },
+    {
+      "local": "src/infra/errno.ts",
+      "upstream": "src/infra/errno.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/errors.ts",
+      "upstream": "src/infra/errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/exec-approval-reply.host-adapter.ts",
+      "upstream": "src/infra/exec-approval-reply.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-258"]
+    },
+    {
+      "local": "src/infra/fetch-headers.ts",
+      "upstream": "src/infra/fetch-headers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/fetch.ts",
+      "upstream": "src/infra/fetch.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/format-time/format-duration-internal.ts",
+      "upstream": "src/infra/format-time/format-duration-internal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/format-time/format-duration.ts",
+      "upstream": "src/infra/format-time/format-duration.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/fs-safe-advanced.host-adapter.ts",
+      "upstream": "src/infra/fs-safe-advanced.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-255"]
+    },
+    {
+      "local": "src/infra/fs-safe.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-059"]
+    },
+    {
+      "local": "src/infra/http-body.ts",
+      "upstream": "src/infra/http-body.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/http-request-lifecycle.ts",
+      "upstream": "src/infra/http-request-lifecycle.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/http-response-body-timeout.ts",
+      "upstream": "src/infra/http-response-body-timeout.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/http-response-body.ts",
+      "upstream": "src/infra/http-response-body.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/local-file-access.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-059"]
+    },
+    {
+      "local": "src/infra/map-size.ts",
+      "upstream": "src/infra/map-size.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/net/guarded-body-stream.ts",
+      "upstream": "src/infra/net/guarded-body-stream.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/net/hostname.ts",
+      "upstream": "src/infra/net/hostname.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/abort.ts",
+      "upstream": "src/infra/outbound/abort.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/channel-selection.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-035"]
+    },
+    {
+      "local": "src/infra/outbound/channel-target.ts",
+      "upstream": "src/infra/outbound/channel-target.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/deliver-types.ts",
+      "upstream": "src/infra/outbound/deliver-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/deliver.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-030"]
+    },
+    {
+      "local": "src/infra/outbound/delivery-completion.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-031"]
+    },
+    {
+      "local": "src/infra/outbound/durable-batch.host-adapter.ts",
+      "upstream": "src/channels/message/send.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-260"]
+    },
+    {
+      "local": "src/infra/outbound/formatting.ts",
+      "upstream": "src/infra/outbound/formatting.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-208"]
+    },
+    {
+      "local": "src/infra/outbound/identity-types.ts",
+      "upstream": "src/infra/outbound/identity-types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/internal-source-reply.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-040"]
+    },
+    {
+      "local": "src/infra/outbound/markdown-details.ts",
+      "upstream": "src/infra/outbound/markdown-details.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-account-selection.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-037"]
+    },
+    {
+      "local": "src/infra/outbound/message-action-contracts.ts",
+      "upstream": "src/infra/outbound/message-action-contracts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-denial.ts",
+      "upstream": "src/infra/outbound/message-action-denial.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-execution.ts",
+      "upstream": "src/infra/outbound/message-action-execution.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-gateway-media.ts",
+      "upstream": "src/infra/outbound/message-action-gateway-media.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-normalization.test.ts",
+      "upstream": "src/infra/outbound/message-action-normalization.test.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-062"]
+    },
+    {
+      "local": "src/infra/outbound/message-action-normalization.ts",
+      "upstream": "src/infra/outbound/message-action-normalization.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-param-keys.ts",
+      "upstream": "src/infra/outbound/message-action-param-keys.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-params.ts",
+      "upstream": "src/infra/outbound/message-action-params.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-routing.ts",
+      "upstream": "src/infra/outbound/message-action-routing.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-runner.test-support.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-011"]
+    },
+    {
+      "local": "src/infra/outbound/message-action-runner.ts",
+      "upstream": "src/infra/outbound/message-action-runner.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-send-payload.ts",
+      "upstream": "src/infra/outbound/message-action-send-payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-send.ts",
+      "upstream": "src/infra/outbound/message-action-send.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-spec.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/infra/outbound/message-action-spec.test.ts",
+      "upstream": "src/infra/outbound/message-action-spec.test.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-016"]
+    },
+    {
+      "local": "src/infra/outbound/message-action-spec.ts",
+      "upstream": "src/infra/outbound/message-action-spec.ts",
+      "status": "verbatim",
+      "deviation": ["D-CORE-016"]
+    },
+    {
+      "local": "src/infra/outbound/message-action-threading.ts",
+      "upstream": "src/infra/outbound/message-action-threading.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-action-tts.ts",
+      "upstream": "src/infra/outbound/message-action-tts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message-gateway-options.ts",
+      "upstream": "src/infra/outbound/message-gateway-options.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/message.gateway.runtime.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-043"]
+    },
+    {
+      "local": "src/infra/outbound/message.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-032"]
+    },
+    {
+      "local": "src/infra/outbound/mirror.ts",
+      "upstream": "src/infra/outbound/mirror.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/outbound-policy.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-038"]
+    },
+    {
+      "local": "src/infra/outbound/outbound-send-service.ts",
+      "upstream": "src/infra/outbound/outbound-send-service.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/outbound-session.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-039"]
+    },
+    {
+      "local": "src/infra/outbound/protocol-scaffolding.ts",
+      "upstream": "src/infra/outbound/protocol-scaffolding.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/reply-payload-parts.ts",
+      "upstream": "src/infra/outbound/reply-payload-parts.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/reply-policy.ts",
+      "upstream": "src/infra/outbound/reply-policy.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-307"]
+    },
+    {
+      "local": "src/infra/outbound/runtime-visible-channels.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-036"]
+    },
+    {
+      "local": "src/infra/outbound/sanitize-text.ts",
+      "upstream": "src/infra/outbound/sanitize-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/send-deps.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-207"]
+    },
+    {
+      "local": "src/infra/outbound/source-delivery-plan.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-042"]
+    },
+    {
+      "local": "src/infra/outbound/source-reply-mirror.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-041"]
+    },
+    {
+      "local": "src/infra/outbound/target-errors.ts",
+      "upstream": "src/infra/outbound/target-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/outbound/target-normalization.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-034"]
+    },
+    {
+      "local": "src/infra/outbound/target-resolver.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-033"]
+    },
+    {
+      "local": "src/infra/path-guards.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-059"]
+    },
+    {
+      "local": "src/infra/prototype-keys.ts",
+      "upstream": "src/infra/prototype-keys.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/retry-after.ts",
+      "upstream": "src/infra/retry-after.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/retry-attempt-errors.ts",
+      "upstream": "src/infra/retry-attempt-errors.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/retry-policy.ts",
+      "upstream": "src/infra/retry-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/retry.ts",
+      "upstream": "src/infra/retry.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/retryable-network-errors.ts",
+      "upstream": "src/infra/retryable-network-errors.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-236"]
+    },
+    {
+      "local": "src/infra/secure-random.ts",
+      "upstream": "src/infra/secure-random.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/infra/wsl.ts",
+      "upstream": "src/infra/wsl.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/interactive/payload.ts",
+      "upstream": "src/interactive/payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/interactive/presentation-admission.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-343"]
+    },
+    {
+      "local": "src/llm/types.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-060"]
+    },
+    {
+      "local": "src/logging/redact-identifier.ts",
+      "upstream": "src/logging/redact-identifier.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/logging/redact.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-002"]
+    },
+    {
+      "local": "src/logging/subsystem.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-203"]
+    },
+    {
+      "local": "src/media-core/base64.ts",
+      "upstream": "packages/media-core/src/base64.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media-core/constants.ts",
+      "upstream": "packages/media-core/src/constants.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media-core/content-length.ts",
+      "upstream": "packages/media-core/src/content-length.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media-core/file-name.ts",
+      "upstream": "packages/media-core/src/file-name.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media-core/media-source-url.ts",
+      "upstream": "packages/media-core/src/media-source-url.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media-core/mime.ts",
+      "upstream": "packages/media-core/src/mime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media-core/read-byte-stream-with-limit.ts",
+      "upstream": "packages/media-core/src/read-byte-stream-with-limit.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/audio.ts",
+      "upstream": "src/media/audio.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/bounded-read-file.ts",
+      "upstream": "src/media/bounded-read-file.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/configured-max-bytes.ts",
+      "upstream": "src/media/configured-max-bytes.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/fetch-error.ts",
+      "upstream": "src/media/fetch.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-325"]
+    },
+    {
+      "local": "src/media/load-options.ts",
+      "upstream": "src/media/load-options.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/local-media-path.ts",
+      "upstream": "src/media/local-media-path.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/media-facts.ts",
+      "upstream": "src/media/media-facts.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-500"]
+    },
+    {
+      "local": "src/media/media-services.ts",
+      "upstream": "src/media/media-services.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-225"]
+    },
+    {
+      "local": "src/media/outbound-attachment.ts",
+      "upstream": "src/media/outbound-attachment.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/parse.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-053"]
+    },
+    {
+      "local": "src/media/png-encode.ts",
+      "upstream": "src/media/png-encode.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/media/read-capability.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-054"]
+    },
+    {
+      "local": "src/media/store.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-055"]
+    },
+    {
+      "local": "src/media/web-media.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-056", "D-CORE-237"]
+    },
+    {
+      "local": "src/media/web-media.ts",
+      "upstream": "src/media/web-media.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-224"]
+    },
+    {
+      "local": "src/net-policy/redact-sensitive-url.ts",
+      "upstream": "packages/net-policy/src/redact-sensitive-url.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/boolean-coercion.ts",
+      "upstream": "packages/normalization-core/src/boolean-coercion.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/error-coercion.ts",
+      "upstream": "packages/normalization-core/src/error-coercion.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/expect.ts",
+      "upstream": "packages/normalization-core/src/expect.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/number-coercion.ts",
+      "upstream": "packages/normalization-core/src/number-coercion.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/record-coerce.ts",
+      "upstream": "packages/normalization-core/src/record-coerce.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/result.ts",
+      "upstream": "packages/normalization-core/src/result.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/string-coerce.ts",
+      "upstream": "packages/normalization-core/src/string-coerce.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/string-normalization.ts",
+      "upstream": "packages/normalization-core/src/string-normalization.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/text-decoding.ts",
+      "upstream": "packages/normalization-core/src/text-decoding.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/normalization-core/utf16-slice.ts",
+      "upstream": "packages/normalization-core/src/utf16-slice.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/param-key.ts",
+      "upstream": "src/param-key.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/account-helpers.ts",
+      "upstream": "src/plugin-sdk/account-helpers.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-303"]
+    },
+    {
+      "local": "src/plugin-sdk/account-id.ts",
+      "upstream": "src/plugin-sdk/account-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/account-resolution.ts",
+      "upstream": "src/plugin-sdk/account-resolution.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-240"]
+    },
+    {
+      "local": "src/plugin-sdk/agent-core.ts",
+      "upstream": "src/plugin-sdk/agent-core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-242"]
+    },
+    {
+      "local": "src/plugin-sdk/agent-runtime.ts",
+      "upstream": "src/plugin-sdk/agent-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-305"]
+    },
+    {
+      "local": "src/plugin-sdk/allow-from.ts",
+      "upstream": "src/plugin-sdk/allow-from.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-249"]
+    },
+    {
+      "local": "src/plugin-sdk/approval-reference-runtime.ts",
+      "upstream": "src/plugin-sdk/approval-reference-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/approval-reply-runtime.ts",
+      "upstream": "src/plugin-sdk/approval-reply-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-259"]
+    },
+    {
+      "local": "src/plugin-sdk/blob-runtime.ts",
+      "status": "verbatim",
+      "upstream": "src/plugin-sdk/blob-runtime.ts"
+    },
+    {
+      "local": "src/plugin-sdk/boolean-param.ts",
+      "upstream": "src/plugin-sdk/boolean-param.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/channel-actions.ts",
+      "upstream": "src/plugin-sdk/channel-actions.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-211"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-activity-runtime.ts",
+      "upstream": "src/plugin-sdk/channel-activity-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-236"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-config-helpers.ts",
+      "upstream": "src/plugin-sdk/channel-config-helpers.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-250"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-config-schema.ts",
+      "status": "adapted",
+      "upstream": "src/plugin-sdk/channel-config-schema.ts",
+      "deviation": ["D-CORE-340"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-contract.ts",
+      "upstream": "src/plugin-sdk/channel-contract.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-212", "D-CORE-010"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-core.ts",
+      "upstream": "src/plugin-sdk/channel-core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-248"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-feedback.ts",
+      "upstream": "src/plugin-sdk/channel-feedback.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-216"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-inbound.ts",
+      "upstream": "src/plugin-sdk/channel-inbound.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-229"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-outbound.ts",
+      "upstream": "src/plugin-sdk/channel-outbound.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-230"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-policy.ts",
+      "upstream": "src/plugin-sdk/channel-policy.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-222"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-secret-basic-runtime.ts",
+      "upstream": "src/plugin-sdk/channel-secret-basic-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-323"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-send-result.ts",
+      "upstream": "src/plugin-sdk/channel-send-result.ts",
+      "status": "adapted",
+      "deviation": "D-CORE-034"
+    },
+    {
+      "local": "src/plugin-sdk/channel-status.ts",
+      "upstream": "src/plugin-sdk/channel-status.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-304"]
+    },
+    {
+      "local": "src/plugin-sdk/channel-streaming-config.ts",
+      "upstream": "src/plugin-sdk/channel-streaming-config.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/channel-targets.ts",
+      "upstream": "src/plugin-sdk/channel-targets.ts",
+      "status": "adapted",
+      "deviation": "D-CORE-033"
+    },
+    {
+      "local": "src/plugin-sdk/collection-runtime.ts",
+      "upstream": "src/plugin-sdk/collection-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/concurrency-runtime.ts",
+      "upstream": "src/plugin-sdk/concurrency-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/config-contracts.ts",
+      "upstream": "src/plugin-sdk/config-contracts.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-003"]
+    },
+    {
+      "local": "src/plugin-sdk/core.ts",
+      "status": "adapted",
+      "upstream": "src/plugin-sdk/core.ts",
+      "deviation": ["D-CORE-332"]
+    },
+    {
+      "local": "src/plugin-sdk/dangerous-name-runtime.ts",
+      "upstream": "src/plugin-sdk/dangerous-name-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/dedupe-runtime.ts",
+      "upstream": "src/plugin-sdk/dedupe-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/diagnostic-flags.ts",
+      "upstream": "src/plugin-sdk/diagnostic-flags.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-236"]
+    },
+    {
+      "local": "src/plugin-sdk/directory-runtime.ts",
+      "upstream": "src/plugin-sdk/directory-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-251"]
+    },
+    {
+      "local": "src/plugin-sdk/error-runtime.ts",
+      "upstream": "src/plugin-sdk/error-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-213"]
+    },
+    {
+      "local": "src/plugin-sdk/expect-runtime.ts",
+      "upstream": "src/plugin-sdk/expect-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-236"]
+    },
+    {
+      "local": "src/plugin-sdk/extension-shared.ts",
+      "upstream": "src/plugin-sdk/extension-shared.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-245", "D-CORE-342"]
+    },
+    {
+      "local": "src/plugin-sdk/fetch-runtime.ts",
+      "upstream": "src/plugin-sdk/fetch-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-217"]
+    },
+    {
+      "local": "src/plugin-sdk/gateway-runtime.ts",
+      "upstream": "src/plugin-sdk/gateway-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-401"]
+    },
+    {
+      "local": "src/plugin-sdk/global-singleton.ts",
+      "upstream": "src/plugin-sdk/global-singleton.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-243"]
+    },
+    {
+      "local": "src/plugin-sdk/host-runtime.ts",
+      "upstream": "src/plugin-sdk/host-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-246"]
+    },
+    {
+      "local": "src/plugin-sdk/inbound-event-delivery.ts",
+      "upstream": "src/plugin-sdk/inbound-event-delivery.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/interactive-runtime.ts",
+      "upstream": "src/plugin-sdk/interactive-runtime.ts",
+      "status": "adapted",
+      "deviation": "D-CORE-035"
+    },
+    {
+      "local": "src/plugin-sdk/json-store.ts",
+      "upstream": "src/plugin-sdk/json-store.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-218"]
+    },
+    {
+      "local": "src/plugin-sdk/keyed-async-queue.ts",
+      "upstream": "src/plugin-sdk/keyed-async-queue.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/lazy-runtime.ts",
+      "upstream": "src/plugin-sdk/lazy-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-236"]
+    },
+    {
+      "local": "src/plugin-sdk/logging-core.ts",
+      "upstream": "src/plugin-sdk/logging-core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-214", "D-CORE-002", "D-CORE-203"]
+    },
+    {
+      "local": "src/plugin-sdk/markdown-table-runtime.ts",
+      "upstream": "src/plugin-sdk/markdown-table-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-223"]
+    },
+    {
+      "local": "src/plugin-sdk/media-mime.ts",
+      "upstream": "src/plugin-sdk/media-mime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/media-runtime.ts",
+      "upstream": "src/plugin-sdk/media-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-226"]
+    },
+    {
+      "local": "src/plugin-sdk/number-runtime.ts",
+      "upstream": "src/plugin-sdk/number-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-215"]
+    },
+    {
+      "local": "src/plugin-sdk/outbound-media.ts",
+      "upstream": "src/plugin-sdk/outbound-media.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-255"]
+    },
+    {
+      "local": "src/plugin-sdk/pair-loop-guard-runtime.ts",
+      "upstream": "src/plugin-sdk/pair-loop-guard-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/param-readers.ts",
+      "upstream": "src/plugin-sdk/param-readers.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-029"]
+    },
+    {
+      "local": "src/plugin-sdk/plugin-config-runtime.ts",
+      "upstream": "src/plugin-sdk/plugin-config-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-219"]
+    },
+    {
+      "local": "src/plugin-sdk/plugin-entry.ts",
+      "status": "adapted",
+      "upstream": "src/plugin-sdk/plugin-entry.ts",
+      "deviation": ["D-CORE-331"]
+    },
+    {
+      "local": "src/plugin-sdk/plugin-state-runtime.ts",
+      "upstream": "src/plugin-sdk/plugin-state-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-227"]
+    },
+    {
+      "local": "src/plugin-sdk/provider-auth.ts",
+      "status": "adapted",
+      "upstream": "src/plugin-sdk/provider-auth.ts",
+      "deviation": ["D-CORE-333"]
+    },
+    {
+      "local": "src/plugin-sdk/provider-http.ts",
+      "upstream": "src/plugin-sdk/provider-http.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-036", "D-CORE-602"]
+    },
+    {
+      "local": "src/plugin-sdk/reply-chunking.ts",
+      "upstream": "src/plugin-sdk/reply-chunking.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-236"]
+    },
+    {
+      "local": "src/plugin-sdk/reply-payload.ts",
+      "upstream": "src/plugin-sdk/reply-payload.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-001"]
+    },
+    {
+      "local": "src/plugin-sdk/reply-reference.ts",
+      "upstream": "src/plugin-sdk/reply-reference.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-220"]
+    },
+    {
+      "local": "src/plugin-sdk/reply-runtime.ts",
+      "upstream": "src/plugin-sdk/reply-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-262"]
+    },
+    {
+      "local": "src/plugin-sdk/request-url.ts",
+      "upstream": "src/plugin-sdk/request-url.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-247"]
+    },
+    {
+      "local": "src/plugin-sdk/response-limit-runtime.ts",
+      "upstream": "src/plugin-sdk/response-limit-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/retry-runtime.ts",
+      "upstream": "src/plugin-sdk/retry-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/routing.ts",
+      "upstream": "src/plugin-sdk/routing.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-228"]
+    },
+    {
+      "local": "src/plugin-sdk/runtime-env.ts",
+      "upstream": "src/plugin-sdk/runtime-env.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-235", "D-CORE-203", "D-CORE-232", "D-CORE-233"]
+    },
+    {
+      "local": "src/plugin-sdk/runtime-group-policy.ts",
+      "upstream": "src/plugin-sdk/runtime-group-policy.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/secret-input-schema.ts",
+      "status": "verbatim",
+      "upstream": "src/plugin-sdk/secret-input-schema.ts"
+    },
+    {
+      "local": "src/plugin-sdk/secret-input.ts",
+      "upstream": "src/plugin-sdk/secret-input.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-257"]
+    },
+    {
+      "local": "src/plugin-sdk/secret-ref-readonly.ts",
+      "status": "adapted",
+      "upstream": "src/plugin-sdk/secret-ref-readonly.ts",
+      "deviation": ["D-CORE-334"]
+    },
+    {
+      "local": "src/plugin-sdk/security-runtime.ts",
+      "upstream": "src/plugin-sdk/security-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-244"]
+    },
+    {
+      "local": "src/plugin-sdk/session-store-runtime.ts",
+      "upstream": "src/plugin-sdk/session-store-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-261"]
+    },
+    {
+      "local": "src/plugin-sdk/ssrf-runtime.ts",
+      "upstream": "src/plugin-sdk/ssrf-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-004"]
+    },
+    {
+      "local": "src/plugin-sdk/status-helpers.ts",
+      "upstream": "src/plugin-sdk/status-helpers.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-221"]
+    },
+    {
+      "local": "src/plugin-sdk/string-coerce-runtime.ts",
+      "upstream": "src/plugin-sdk/string-coerce-runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-001"]
+    },
+    {
+      "local": "src/plugin-sdk/string-normalization-runtime.ts",
+      "upstream": "src/plugin-sdk/string-normalization-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/test-env.ts",
+      "upstream": "src/plugin-sdk/test-env.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-271"]
+    },
+    {
+      "local": "src/plugin-sdk/test-fixtures.ts",
+      "upstream": "src/plugin-sdk/test-fixtures.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-270"]
+    },
+    {
+      "local": "src/plugin-sdk/test-helpers/env.ts",
+      "upstream": "src/test-utils/env.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-263"]
+    },
+    {
+      "local": "src/plugin-sdk/test-helpers/http-test-server.ts",
+      "upstream": "src/plugin-sdk/test-helpers/http-test-server.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/test-helpers/image-fixtures.ts",
+      "upstream": "src/plugin-sdk/test-helpers/image-fixtures.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/test-state.ts",
+      "upstream": "src/plugin-sdk/test-state.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-263"]
+    },
+    {
+      "local": "src/plugin-sdk/text-chunking.ts",
+      "upstream": "src/plugin-sdk/text-chunking.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-001"]
+    },
+    {
+      "local": "src/plugin-sdk/text-utility-runtime.ts",
+      "upstream": "src/plugin-sdk/text-utility-runtime.ts",
+      "status": "adapted",
+      "deviation": "D-CORE-032"
+    },
+    {
+      "local": "src/plugin-sdk/tool-payload.ts",
+      "upstream": "src/plugin-sdk/tool-payload.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/tool-results.ts",
+      "status": "verbatim",
+      "upstream": "src/plugin-sdk/tool-results.ts"
+    },
+    {
+      "local": "src/plugin-sdk/tool-send.ts",
+      "upstream": "src/plugin-sdk/tool-send.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/web-media.ts",
+      "upstream": "src/plugin-sdk/web-media.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-224"]
+    },
+    {
+      "local": "src/plugin-sdk/webhook-ingress.ts",
+      "upstream": "src/plugin-sdk/webhook-ingress.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-322"]
+    },
+    {
+      "local": "src/plugin-sdk/webhook-memory-guards.ts",
+      "upstream": "src/plugin-sdk/webhook-memory-guards.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugin-sdk/webhook-request-guards.ts",
+      "upstream": "src/plugin-sdk/webhook-request-guards.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-320"]
+    },
+    {
+      "local": "src/plugin-sdk/webhook-targets.ts",
+      "upstream": "src/plugin-sdk/webhook-targets.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-321"]
+    },
+    {
+      "local": "src/plugin-state/plugin-state-store.types.ts",
+      "upstream": "src/plugin-state/plugin-state-store.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/plugins/tool-types.host-adapter.ts",
+      "status": "adapted",
+      "upstream": "src/plugins/tool-types.ts",
+      "deviation": ["D-CORE-330"]
+    },
+    {
+      "local": "src/poll-params.ts",
+      "upstream": "src/poll-params.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/polls.ts",
+      "upstream": "src/polls.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/retry/index.ts",
+      "upstream": "packages/retry/src/index.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/routing/account-id.ts",
+      "upstream": "src/routing/account-id.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/routing/account-lookup.ts",
+      "upstream": "src/routing/account-lookup.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/routing/bound-account-read.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-045"]
+    },
+    {
+      "local": "src/routing/session-key.ts",
+      "upstream": "src/routing/session-key.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-228"]
+    },
+    {
+      "local": "src/runtime.ts",
+      "upstream": "src/runtime.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-233"]
+    },
+    {
+      "local": "src/secrets/ref-contract.ts",
+      "status": "adapted",
+      "upstream": "src/secrets/ref-contract.ts",
+      "deviation": ["D-CORE-335"]
+    },
+    {
+      "local": "src/security/dm-policy-shared.ts",
+      "upstream": "src/security/dm-policy-shared.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-230"]
+    },
+    {
+      "local": "src/security/external-content-source.ts",
+      "status": "verbatim",
+      "upstream": "src/security/external-content-source.ts"
+    },
+    {
+      "local": "src/security/external-content.ts",
+      "status": "verbatim",
+      "upstream": "src/security/external-content.ts"
+    },
+    {
+      "local": "src/security/secret-equal.ts",
+      "upstream": "src/security/secret-equal.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/sessions/session-key-utils.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-046"]
+    },
+    {
+      "local": "src/shared/config-ui-hints-types.ts",
+      "status": "verbatim",
+      "upstream": "src/shared/config-ui-hints-types.ts"
+    },
+    {
+      "local": "src/shared/deferred.ts",
+      "upstream": "src/shared/deferred.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/global-singleton.ts",
+      "upstream": "src/shared/global-singleton.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/html-escape.ts",
+      "status": "verbatim",
+      "upstream": "src/shared/html-escape.ts"
+    },
+    {
+      "local": "src/shared/json-schema.types.ts",
+      "status": "verbatim",
+      "upstream": "src/shared/json-schema.types.ts"
+    },
+    {
+      "local": "src/shared/lazy-promise.ts",
+      "upstream": "src/shared/lazy-promise.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/lazy-runtime.ts",
+      "upstream": "src/shared/lazy-runtime.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/param-readers.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-210"]
+    },
+    {
+      "local": "src/shared/regexp.ts",
+      "upstream": "src/shared/regexp.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/reply-payload.types.ts",
+      "upstream": "src/shared/reply-payload.types.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text-chunking.ts",
+      "upstream": "src/shared/text-chunking.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text-truncate.ts",
+      "upstream": "src/shared/text-truncate.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/assistant-visible-text.ts",
+      "upstream": "src/shared/text/assistant-visible-text.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/auto-linked-file-ref.ts",
+      "upstream": "src/shared/text/auto-linked-file-ref.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/citation-control-markers.ts",
+      "upstream": "src/shared/text/citation-control-markers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/code-regions.ts",
+      "upstream": "src/shared/text/code-regions.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/final-tags.ts",
+      "upstream": "src/shared/text/final-tags.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/formatted-reasoning-message.ts",
+      "upstream": "src/shared/text/formatted-reasoning-message.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/model-special-tokens.ts",
+      "upstream": "src/shared/text/model-special-tokens.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/reasoning-tags.ts",
+      "upstream": "src/shared/text/reasoning-tags.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/shared/text/text-projection.ts",
+      "upstream": "src/shared/text/text-projection.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/test-utils/chunk-test-helpers.ts",
+      "upstream": "src/test-utils/chunk-test-helpers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/test/helpers/record.ts",
+      "upstream": "test/helpers/record.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/tool-call-repair/grammar.ts",
+      "upstream": "packages/tool-call-repair/src/grammar.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/tool-call-repair/index.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-057"]
+    },
+    {
+      "local": "src/tts/tts-config.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-048"]
+    },
+    {
+      "local": "src/tts/tts.runtime.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-048"]
+    },
+    {
+      "local": "src/utils.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-061"]
+    },
+    {
+      "local": "src/utils/boolean.ts",
+      "upstream": "src/utils/boolean.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/directive-tags.ts",
+      "upstream": "src/utils/directive-tags.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/fetch-timeout.ts",
+      "upstream": "src/utils/fetch-timeout.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/message-channel-constants.ts",
+      "upstream": "src/utils/message-channel-constants.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/message-channel-core.host-adapter.ts",
+      "status": "fusion-owned"
+    },
+    {
+      "local": "src/utils/message-channel-core.ts",
+      "upstream": "src/utils/message-channel-core.ts",
+      "status": "adapted",
+      "deviation": ["D-CORE-014"]
+    },
+    {
+      "local": "src/utils/message-channel.host-adapter.ts",
+      "status": "fusion-owned",
+      "deviation": ["D-CORE-013"]
+    },
+    {
+      "local": "src/utils/reaction-level.ts",
+      "upstream": "src/utils/reaction-level.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/run-with-concurrency.ts",
+      "upstream": "src/utils/run-with-concurrency.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/sleep.ts",
+      "upstream": "src/utils/sleep.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/string-readers.ts",
+      "upstream": "src/utils/string-readers.ts",
+      "status": "verbatim"
+    },
+    {
+      "local": "src/utils/timer-delay.ts",
+      "upstream": "src/utils/timer-delay.ts",
+      "status": "verbatim"
+    }
+  ],
+  "omitted": [
+    {
+      "upstream": "src/channels/message/ingress-queue.ts",
+      "reason": "Written against a single-process SQLite file (Kysely writers, in-memory `blockedLaneKeys`, `pid@boot-id` claim ownership). The Hub owns durable admission in `channel_ingress_queue` and serializes lanes inside the claim statement (2026-09-06 runtime strategy, implementation checkpoint)."
+    },
+    {
+      "upstream": "src/channels/message/ingress-drain.ts",
+      "reason": "Same coupling as `ingress-queue.ts`, plus OpenClaw gateway work admission. The Hub supervisor owns one drain per account (`packages/hub/src/channels/ingress/drain.ts`)."
+    },
+    {
+      "upstream": "src/agents/tools/message-tool-execution.ts",
+      "reason": "The OpenClaw-side shell of the message tool: it reads the ambient runtime config (`src/config/config.ts`), the process prepared-catalog (`src/plugins/prepared-message-tool-catalog.ts`), the per-turn Gateway capability, Gateway call options and the agent-runtime identity token (`src/agents/tools/gateway.ts`), CLI SecretRef resolution over the Gateway (`src/cli/command-secret-*.ts`), OpenClaw session keys and the sandbox fs bridge. Fusion already owns that shell: `packages/hub/src/channels/channel-reply.ts` is the tool surface (authority from the Hub reply capability, schema from `channel-message-tool.ts`), and `packages/hub/src/channels/message-actions.ts` builds the `MessageActionInput` and calls the ported `runMessageAction`. The pieces of the shell that are portable were taken as their own upstream modules: `message-tool-decision.ts`, `message-tool-explicit-target.ts`, `message-tool-source-policy.ts` and `message-tool-visible-content.ts`."
+    },
+    {
+      "upstream": "src/agents/tools/message-tool.test.ts",
+      "reason": "Drives `message-tool-execution.ts` through the OpenClaw agent runtime, the process plugin registry and the Gateway turn capability, none of which the port carries (see the omission above). The execution-relevant contracts are covered on the Fusion production path in `packages/hub/src/channels/channel-reply.test.ts` (adapter dispatch for react/edit/delete, param normalization, thread/target resolution, the send seam + ledger) and in `src/infra/outbound/message-action-normalization.test.ts` / `src/channels/plugins/message-action-dispatch.registry.test.ts`."
+    },
+    {
+      "upstream": "src/infra/outbound/message-action-runner.*.test.ts",
+      "reason": "The runner test suite (broadcast, context, core-send, media, plugin-dispatch, reply-action, send-validation, threading) plus `message-action-send.*.test.ts`, `message-action-routing.*.test.ts`, `message-action-params.*.test.ts` and `message-action-execution.*.test.ts` all build on `message-action-runner.test-helpers.ts`, which installs an OpenClaw plugin registry through `src/plugins/runtime.ts` and `test-utils/channel-plugins.ts` and mocks the config/session/gateway host modules this port replaces with adapters. They are not ported in slice 11; the equivalent production-path coverage is listed in the `message-tool.test.ts` omission above. Porting the helpers is tracked for the slice that lands the Slack/Telegram `channel-actions.ts` verticals."
+    }
+  ],
+  "deviations": [
+    {
+      "id": "D-CORE-001",
+      "reason": "The upstream barrel also re-exports number-coercion, boolean/json coercion and the UTF-16 slice helpers. Carried: the string-coercion group the ported formatters use plus `isRecord`/`asOptionalRecord` from `normalization-core/record-coerce.ts` (added for the ported Slack blocks/presentation closure, same upstream source)."
+    },
+    {
+      "id": "D-CORE-002",
+      "reason": "`src/logging/redact.ts` upstream is a ~1300-line module wired to OpenClawConfig logging settings, a global secret registry, the net-policy package and ACP structured-auth redaction. Fusion carries a small owned redactor with the same contract so `infra/errors.ts` can be verbatim.",
+      "file": "src/logging/redact.ts"
+    },
+    {
+      "id": "D-CORE-003",
+      "reason": "The upstream `config-contracts` barrel re-exports the whole `OpenClawConfig` graph (gateway origin resolver, per-channel account configs, session scopes). Fusion's Hub owns channel configuration, so `src/config/types.base.ts` is trimmed to the scalar/streaming/markdown contracts the ported formatters and streaming-compat readers import (`ReplyMode`..`ChannelDeliveryStreamingConfig`, `MarkdownTableMode`, `MarkdownConfig`), and the barrel re-exports only those."
+    },
+    {
+      "id": "D-CORE-004",
+      "reason": "The `ssrf-runtime` barrel upstream also re-exports the pinned-dispatcher / fetch-guard / private-network-policy surface from `src/infra/net/*` and `src/gateway/net.ts`. Fusion channel transports own their own fetch stack, so only the error formatter is carried."
+    },
+    {
+      "id": "D-CORE-005",
+      "reason": "`src/agents/channel-tools.ts` is narrowed to the two message-action discovery helpers. The rest of the upstream module wires channel agent tools, prompt capabilities, reaction guidance and weakly-attached tool metadata through the OpenClaw plugin registry and `channel-tool-metadata.ts`, which are host surfaces the port stops at.",
+      "file": "src/agents/channel-tools.ts"
+    },
+    {
+      "id": "D-CORE-010",
+      "reason": "`src/channels/plugins/types.public.ts` upstream re-exports the plugin type universe from `types.core.ts` / `types.adapters.ts` / `types.plugin.ts` (setup, pairing, approvals, lifecycle, the fully typed OpenClawConfig). The port stops at that host boundary and takes the message-tool subset from `types.public.host-adapter.ts`."
+    },
+    {
+      "id": "D-CORE-011",
+      "reason": "Discovery reads the ambient OpenClaw plugin registry (`src/channels/plugins/index.ts`, `src/plugins/runtime.ts`, `src/plugins/prepared-message-tool-catalog.ts`, `src/runtime.ts`) and the `test-utils/channel-plugins.ts` registry helper. Fusion has no ambient registry: the Hub installs the plugins it runs through `setChannelMessageToolPlugins` in `message-action-discovery.host-adapter.ts`. Test assertions are unchanged; only registration is.",
+      "tests": [
+        "src/channels/plugins/message-actions.test.ts",
+        "src/channels/plugins/message-capability-matrix.test.ts"
+      ]
+    },
+    {
+      "id": "D-CORE-012",
+      "reason": "`message-tool-api.ts` resolves a bundled plugin's public artifact from the OpenClaw node install layout (`src/plugins/public-surface-loader.ts`). Fusion channel verticals are in-repo packages, so the loader reports \"no bundled artifact\" and discovery falls back to the registered plugin.",
+      "file": "src/channels/plugins/message-tool-api.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-013",
+      "reason": "The `src/utils/message-channel.ts` barrel upstream also carries gateway client-info types and the bundled-channel catalog reader. Only the two normalizers the ported message-tool layer uses are re-exported.",
+      "file": "src/utils/message-channel.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-014",
+      "reason": "`message-channel-core.ts` resolves built-in channel ids from generated bundled-channel metadata (`src/channels/ids.ts`) and plugin aliases from the process registry (`src/channels/registry-normalize.ts`). Fusion resolves both against the channel plugins the Hub registered.",
+      "file": "src/utils/message-channel-core.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-015",
+      "reason": "`message-tool-idempotency.ts` imports `GatewayCallOptions` from `src/agents/tools/gateway.ts`, which pulls the Gateway client, caller identity and session-spawn context. Only the option shape is copied.",
+      "file": "src/agents/tools/message-tool-idempotency.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-016",
+      "reason": "`message-action-spec.ts` reads plugin-declared target aliases from the OpenClaw bootstrap plugin registry. Fusion serves the same lookup from the channel plugins the Hub registered.",
+      "file": "src/infra/outbound/message-action-spec.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-017",
+      "reason": "`message-tool-discovery.ts` reads four host surfaces the port stops at: the process plugin registry, the per-agent message-tool allowlist in OpenClaw config (`src/infra/outbound/outbound-policy.ts`), OpenClaw session keys (`src/routing/session-key.ts`), and the `src/utils/message-channel.ts` barrel. Fusion expresses authority as Hub grants and passes the delivery route explicitly, so the allowlist and session-key hooks are inert.",
+      "file": "src/agents/tools/message-tool-discovery.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-019",
+      "reason": "`src/agents/runtime/index.ts` re-exports the whole `@openclaw/agent-core` runtime (Agent, compaction, session trees, streaming). The ported message-action layer reads one contract from it — the tool result a channel action returns — so the `AgentToolResult`/`AgentToolProgress` definitions are copied from `packages/agent-core/src/types.ts` and the runtime stops at that boundary.",
+      "file": "src/agents/runtime/index.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-020",
+      "reason": "`src/channels/plugins/registry.ts` resolves a registration from the bundled table, the loaded external-plugin table and the active Gateway request scope, and reports its origin. Fusion runs only in-repo verticals installed through `setChannelMessageToolPlugins`, so every registration is first-party (`origin: \"bundled\"`) and the external-delegation branches of the dispatcher are dead by construction.",
+      "file": "src/channels/plugins/registry.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-021",
+      "reason": "`src/agents/agent-scope.ts` resolves the agent id and workspace directory from OpenClaw's session store and agent config tree. The Hub knows both when it builds a message-action input and passes them explicitly, so the lookups stay inert.",
+      "file": "src/agents/agent-scope.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-022",
+      "reason": "`src/agents/identity.ts` derives an agent display identity and a per-channel response prefix from the merged agent/channel/account config. Fusion's Hub owns agent identity and does not prefix channel replies, so both report \"nothing configured\" and the send path keeps its unprefixed text.",
+      "file": "src/agents/identity.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-023",
+      "reason": "`src/agents/internal-runtime-context.ts` strips the `<runtime-context>` preamble OpenClaw injects into a model prompt. The Paseo daemon never injects it, so visible text passes through unchanged.",
+      "file": "src/agents/internal-runtime-context.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-024",
+      "reason": "`src/agents/sandbox-paths.ts` maps container paths back to host paths for an OpenClaw sandbox (container workdir mapping, managed media roots, file: URL rewriting). Fusion agents run on the Paseo daemon's own filesystem and the Hub never sets `sandboxRoot`, so mapping is the identity; the data-URL guard is carried verbatim because it is an input rule.",
+      "file": "src/agents/sandbox-paths.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-025",
+      "reason": "`src/agents/tools/gateway-caller-context.ts` reads the invoking Gateway client's identity from an async-local store. Fusion's caller is the Hub, whose channel-reply capability already carries the authority, so there is no separate caller identity.",
+      "file": "src/agents/tools/gateway-caller-context.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-026",
+      "reason": "`src/audit/message-action-decision.ts` appends allow/deny decisions to OpenClaw's audit log file. Fusion records outbound authority decisions in the Hub, so the core hook is a sink the host installs instead of a second log.",
+      "file": "src/audit/message-action-decision.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-027",
+      "reason": "`src/audit/execution-identity-admission.ts` mints and verifies admission tokens against OpenClaw's audit chain. Only the opaque carrier type crosses into the message-action input; the Hub owns execution records.",
+      "file": "src/audit/execution-identity-admission.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-028",
+      "reason": "`src/auto-reply/get-reply-options.types.ts` describes the whole auto-reply option graph (prompt sources, history, streaming, throttling, session policy). The ported layer reads one member, and that member has its own upstream module, carried verbatim as `src/auto-reply/source-reply-delivery-mode.types.ts`.",
+      "file": "src/auto-reply/get-reply-options.types.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-029",
+      "reason": "`src/agents/tools/common.ts` is the shared agent-tool helper library: param readers plus image sanitization, local-file reading through OpenClaw's fs-safe root, MIME detection and the agent-runtime tool types. Only the param readers are carried, with upstream's function bodies; the file/sanitization surface stops at this boundary.",
+      "file": "src/agents/tools/common.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-030",
+      "file": "src/channels/plugins/outbound.types.ts",
+      "reason": "The upstream module declares the full outbound adapter graph (ReplyPayload, OpenClawConfig, approval types, deliver/formatting/identity/send-dep contracts, media load options). Fusion's Hub owns delivery; only the `ChannelPresentationCapabilities` contract the ported Slack presentation/blocks files read is carried, plus a narrowed `ChannelOutboundAdapter` shell that keeps the upstream `ChannelOutboundAdapter[\"presentationCapabilities\"]` indexed-access spelling working at the ported call sites."
+    },
+    {
+      "id": "D-CORE-031",
+      "file": "src/infra/approval-types.ts",
+      "reason": "The upstream module also declares `ApprovalRequestInput` / `ApprovalRequest` / `NormalizedApprovalRequest` and the request normalizers over OpenClaw's exec, plugin and system-agent approval request shapes, which pull the gateway approval graph. Only the `ChannelApprovalKind` union that the ported `interactive/payload.ts` imports is carried."
+    },
+    {
+      "id": "D-CORE-032",
+      "file": "src/plugin-sdk/text-utility-runtime.ts",
+      "reason": "The upstream barrel also re-exports `runChannelProbe`, the tool-result text budget helpers, the CJK char estimator and the whole `src/utils.ts` surface (config dir/home resolution, fs helpers, timers). Those reach OpenClaw's host filesystem and agent runtime. The two UTF-16 slice helpers the ported Slack truncation/presentation files read are re-exported from the same `normalization-core` source upstream re-exports through `src/utils.ts`."
+    },
+    {
+      "id": "D-CORE-033",
+      "file": "src/plugin-sdk/channel-targets.ts",
+      "reason": "The upstream barrel also re-exports the chat-target-prefix allow matchers, the channel registry id normalizer, the TTS voice delivery resolver and the target resolvers, which hang off OpenClaw's channel registry / plugin host; Fusion's Hub owns registration. The two pure modules the ported Slack target parsing reads (`channels/targets.ts`, `channels/channel-config.ts`) are carried whole and verbatim."
+    },
+    {
+      "id": "D-CORE-034",
+      "file": "src/plugin-sdk/channel-send-result.ts",
+      "reason": "The upstream barrel also carries the legacy raw-send-result adapters (`attachChannelToResult(s)`, `createAttachedChannelResultAdapter`, poll results) over `OutboundDeliveryResult` from OpenClaw's `infra/outbound` delivery graph. Fusion's Hub owns delivery results; only the outbound adapter type the ported Slack presentation contract reads is carried."
+    },
+    {
+      "id": "D-CORE-035",
+      "file": "src/plugin-sdk/interactive-runtime.ts",
+      "reason": "The upstream barrel also re-exports `reduceInteractiveReply`, `renderPresentationForDelivery` and the model-picker capability profile, which pull OpenClaw's outbound delivery graph. The presentation payload module (`interactive/payload.ts`) and its channel capability adapter (`channels/plugins/outbound/interactive.ts` + `presentation-limits.ts`) are carried whole and verbatim."
+    },
+    {
+      "id": "D-CORE-036",
+      "file": "src/plugin-sdk/provider-http.ts",
+      "reason": "`readResponseTextLimited` is reimplemented in the barrel. Upstream delegates to `readResponseTextPrefix` (`src/infra/http-body.ts`), whose closure reaches OpenClaw's gateway config and request-lifecycle graph (~22k lines measured). Fusion carries the bounded-prefix read with the same observable contract the ported channel call sites depend on — byte cap, per-chunk idle timeout (default 10s), overall timeout, and a cancelled + released reader — but without the lifecycle/diagnostic hooks and without upstream's `onIdleTimeout` / `onTimeout` error factories: a stalled read resolves with the prefix read so far instead of throwing. The rest of the upstream barrel (provider error shaping, TLS certificate inspection, binary/JSON readers) is not carried."
+    },
+    {
+      "id": "D-CORE-037",
+      "reason": "`src/infra/outbound/message-account-selection.ts` validates a requested account against OpenClaw's channel account config (enabled flags, secret-owner availability, per-channel defaults) and plans broadcast fan-out. The Hub owns Connections and the capability names one account, so the check reduces to normalization.",
+      "file": "src/infra/outbound/message-account-selection.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-038",
+      "reason": "`src/infra/outbound/outbound-policy.ts` reads `tools.message.*` from OpenClaw's per-agent config: the action allowlist, the broadcast switch, and cross-context egress with its decoration marker. Fusion expresses the same authority as Hub grants issued with the reply capability and checked before the tool is reachable, so these hooks stay inert rather than duplicating policy in two places (continues D-CORE-017).",
+      "file": "src/infra/outbound/outbound-policy.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-039",
+      "reason": "`src/infra/outbound/outbound-session.ts` derives an OpenClaw session key for a destination and writes a session entry so later inbound messages land in the same agent session. Fusion binds conversations to Agents through the Hub's Route/binding tables, so route resolution reports \"no session route\" and the durable write is a no-op the Hub already performed.",
+      "file": "src/infra/outbound/outbound-session.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-040",
+      "reason": "`src/infra/outbound/internal-source-reply.ts` and `src/gateway/internal-source-reply-persistence.ts` route a send back to the current run's internal UI sink (OpenClaw webchat/TUI) and persist it into the session transcript. Fusion's channel reply capability always names a real external conversation, so the internal sink is never selected and the persistence path fails loudly if reached.",
+      "file": "src/infra/outbound/internal-source-reply.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-041",
+      "reason": "`src/infra/outbound/source-reply-mirror.ts` tracks whether the terminal reply for the current inbound turn was already delivered so the auto-reply pipeline and the message tool do not duplicate it. Fusion has no competing auto-reply pipeline: the Hub's delivery ledger is the single writer and dedupes by event/turn id.",
+      "file": "src/infra/outbound/source-reply-mirror.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-042",
+      "reason": "`src/infra/outbound/source-delivery-plan.ts` builds the inbound turn's delivery plan from OpenClaw session keys and route peers. Fusion answers the same question from the capability binding the Hub issued: provider, account and destination must agree and the thread must match or be inherited.",
+      "file": "src/infra/outbound/source-delivery-plan.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-043",
+      "reason": "`src/infra/outbound/message.gateway.runtime.ts` lazily loads the Gateway RPC client so a `gateway`-mode action runs where the live account state is. Fusion runs the account inside the Hub supervisor, so `gateway` mode resolves locally and calling the runtime is a bug, not a fallback; `randomIdempotencyKey` is carried so the key shape is identical.",
+      "file": "src/infra/outbound/message.gateway.runtime.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-044",
+      "reason": "`src/channels/plugins/helpers.ts` reads a channel's configured accounts from `config.json` and returns the default. Fusion's Hub owns Connections and names the account on every call, so \"no configured default\" is the honest answer.",
+      "file": "src/channels/plugins/helpers.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-045",
+      "reason": "`src/routing/bound-account-read.ts` scans OpenClaw's per-agent channel bindings on disk. Fusion keeps bindings in the Hub and resolves the account before the tool runs.",
+      "file": "src/routing/bound-account-read.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-046",
+      "reason": "`src/sessions/session-key-utils.ts` owns OpenClaw's session-key grammar with case-preserved opaque peer spans, a bounded normalization cache, cron run scopes and inventory lookups. The ported normalizer uses one predicate — a session-key-shaped value is not a transport destination — so `parseAgentSessionKey` carries upstream's function body over a plain lowercase fold.",
+      "file": "src/sessions/session-key-utils.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-047",
+      "reason": "`src/config/sessions.ts` and its `sessions/*` helpers own the file-backed session store: store paths, read-only entry access, the transcript writer and its concurrency fence. Fusion's transcripts are Paseo daemon agent sessions written by the daemon, so the channel plane never becomes a second writer: the store path is unavailable, the mirror append reports success without writing, and there is no fence to own.",
+      "file": "src/config/sessions.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-048",
+      "reason": "`src/config/types.tts.ts`, `src/tts/tts-config.ts` and `src/tts/tts.runtime.ts` are OpenClaw's text-to-speech config graph, policy and provider runtime. Fusion ships no TTS engine, so automatic speech is off and the runtime fails loudly if reached; a channel that wants voice sends an audio attachment explicitly.",
+      "file": "src/tts/tts-config.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-049",
+      "reason": "`src/gateway/boot-echo-guard.ts` suppresses the boot banner the Gateway injects into a session from being echoed into a channel. Fusion's Hub injects no boot message.",
+      "file": "src/gateway/boot-echo-guard.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-050",
+      "reason": "`src/gateway/message-action-turn-capability.ts` issues and reads a per-turn capability proving which conversation and sender the running agent turn may act as, through an async-local store. Fusion issues that authority as the Hub's channel reply capability, resolved from the MCP URL before the call reaches core, so the ambient lookup reports \"no ambient turn\".",
+      "file": "src/gateway/message-action-turn-capability.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-051",
+      "reason": "`src/auto-reply/reply/strip-inbound-meta.ts` strips the inbound metadata header OpenClaw prepends to a prompt. The Hub composes its own prompt and uses no such sentinel.",
+      "file": "src/auto-reply/reply/strip-inbound-meta.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-052",
+      "reason": "`src/auto-reply/reply/reply-media-paths.runtime.ts` stages agent-workspace files into OpenClaw's media store before a send. Fusion stages media through the Hub's own outbound media evaluation, and this path is reachable only from the internal source-reply sink Fusion never selects.",
+      "file": "src/auto-reply/reply/reply-media-paths.runtime.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-053",
+      "reason": "`src/media/parse.ts` scans model text for media directives and Markdown images and lifts them out as attachments, with IP/SSRF policy on discovered URLs. Fusion takes media through explicit `message` media params, so text is never rewritten into attachments behind the agent's back.",
+      "file": "src/media/parse.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-054",
+      "reason": "`src/media/read-capability.ts` builds an outbound media grant from OpenClaw's per-agent, per-sender and per-channel media policy. Fusion's Hub already decided the file scope (the capability's Project root, checked in the Hub's media stager), so the default grant adds no local roots and an explicitly supplied grant always wins.",
+      "file": "src/media/read-capability.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-055",
+      "reason": "`src/media/store.ts` owns OpenClaw's on-disk media directory: scoped subdirectories, hashing, retention, download limits and the buffer writer. Fusion's Hub stages outbound media itself, so only the shared size ceiling is carried with upstream's value and staging is refused unless a host stager is installed.",
+      "file": "src/media/store.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-056",
+      "reason": "`src/media/web-media.ts` downloads remote media through OpenClaw's fetch guard (SSRF policy, redirect limits, content-length caps, image optimization) into its media store. Fusion has no media store and its channel transports own their own fetch stack, so remote media is refused instead of fetched by an unguarded path; the result shape is upstream's.",
+      "file": "src/media/web-media.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-057",
+      "reason": "`packages/tool-call-repair/src/index.ts` repairs models that emit tool calls as plain text inside the assistant message, and carries its own grammar and stream normalizer. Paseo providers emit native tool calls, so the port stops at this boundary and text passes through.",
+      "file": "src/tool-call-repair/index.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-058",
+      "reason": "`packages/gateway-protocol/src/schema/error-codes.ts` re-exports the error-code tables and builds the TypeBox frame schemas for the Gateway WebSocket protocol. Fusion does not speak that protocol; the ported action layer reads only the code tables, which come from the carried `gateway-error-details.ts` source module.",
+      "file": "src/gateway-protocol/schema/error-codes.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-059",
+      "reason": "`src/infra/fs-safe.ts`, `src/infra/path-guards.ts` and `src/infra/local-file-access.ts` sit on `@openclaw/fs-safe`: a rooted filesystem with atomic writes, locks, secure temp files, and defaults installed as an import side effect. Fusion's channel plane owns no filesystem root — the Hub checks containment against the reply capability's Project root before a path reaches this layer — so the rooted handle, the containment predicate and the two path helpers are implemented over `node:fs`/`node:path`/`node:url` with the same semantics.",
+      "file": "src/infra/fs-safe.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-060",
+      "reason": "`src/llm/types.ts` re-exports the whole `@openclaw/llm-core` type surface (providers, streams, usage, model refs). The ported send path reads one member: the speech facts a TTS delivery records on the payload.",
+      "file": "src/llm/types.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-061",
+      "reason": "`src/utils.ts` is OpenClaw's general utility barrel (config paths, home resolution, process helpers). The ported media path reads one helper: expanding a leading `~`.",
+      "file": "src/utils.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-062",
+      "reason": "`message-action-normalization.test.ts` mocks the bootstrap plugin registry and the `src/utils/message-channel.ts` barrel. Fusion serves both through the host adapters beside those modules, so only the two `vi.mock` targets change; every assertion is upstream's.",
+      "file": "src/infra/outbound/message-action-normalization.test.ts"
+    },
+    {
+      "id": "D-CORE-063",
+      "reason": "`src/auto-reply/reply-payload.ts` upstream is the agent-engine reply envelope plus a large WeakMap metadata record covering transcript ownership, session-writer authority, compaction and continuation facts that belong to the OpenClaw agent runtime. The payload shape itself lives upstream in `src/shared/reply-payload.types.ts`, which is carried verbatim; this module re-exports it (keeping the open index signature and the per-channel `channelData`/`media` slots Fusion adds) and carries only the speech-facts metadata the ported send/TTS path reads.",
+      "file": "src/auto-reply/reply-payload.ts"
+    },
+    {
+      "id": "D-CORE-202",
+      "reason": "`src/config/types.telegram.ts` — upstream composes `TelegramAccountConfig` from `CommonChannelMessagingConfig`, `ChannelReactionConfig`, `ChannelExecApprovalConfig`, `ProviderCommandsConfig`, `SecretInput`, `SessionThreadBindingsConfig` and the group tool-policy types, i.e. the whole OpenClaw `config.json` type graph. Fusion's Hub owns channel configuration, so this file carries the Telegram shapes the ported channel code reads, structurally compatible with upstream, with an open index signature so unread upstream keys still type. Names, field names and doc comments are upstream's.",
+      "file": "src/config/types.telegram.ts"
+    },
+    {
+      "id": "D-CORE-203",
+      "reason": "`src/logging/subsystem.ts` — upstream's subsystem logger is ~500 lines of tslog wiring bound to OpenClaw's global logging config, log files, diagnostic sinks and the process runtime. The ported channel code needs a named logger with the usual levels; the sink is replaceable at runtime (the Hub installs its child logger) and defaults to console.",
+      "file": "src/logging/subsystem.ts"
+    },
+    {
+      "id": "D-CORE-204",
+      "reason": "`src/channels/ids.ts` — upstream generates the built-in chat-channel id union from bundled-channel config metadata. Fusion resolves channel ids against the plugins the Hub registered, so the union degrades to `string`.",
+      "file": "src/channels/ids.ts"
+    },
+    {
+      "id": "D-CORE-205",
+      "reason": "`src/config/types.ts` / `src/config/types.openclaw.ts` — upstream's config barrels re-export the whole `config.json` type universe rooted at `OpenClawConfig`. Fusion's Hub owns configuration, so the ported code sees the scalar contracts from `types.base.ts`, the narrowed Telegram shapes (D-CORE-202) and the opaque host config declared next to the plugin contract (D-CORE-010). `src/infra/diagnostic-flags.ts` reads `diagnostics.flags` off that opaque config with a local narrowing instead of a typed field.",
+      "file": "src/config/types.ts"
+    },
+    {
+      "id": "D-CORE-206",
+      "reason": "`src/channels/turn/types.ts` — upstream declares the whole channel-turn contract here (turn lifecycle, delivery adapters, durable-final requirements, agent-run terminal outcomes, hook payloads). Fusion's Hub owns the turn lifecycle, so this file carries the delivery-result triple the ported channel senders read, verbatim, with the suppression-reason union inlined instead of imported from `src/infra/outbound/payloads.ts`.",
+      "file": "src/channels/turn/types.ts"
+    },
+    {
+      "id": "D-CORE-207",
+      "reason": "`src/auto-reply/reply-payload.ts` and `src/infra/outbound/send-deps.ts` — upstream's `ReplyPayload` is the agent-engine reply envelope and `OutboundSendDeps` injects the whole outbound send stack. The Hub owns reply construction and outbound dispatch in Fusion, so the ported channel types keep the names with open shapes plus the fields the ported senders actually read.",
+      "file": "src/auto-reply/reply-payload.ts"
+    },
+    {
+      "id": "D-CORE-208",
+      "reason": "`src/infra/outbound/formatting.ts` — `ChunkMode` upstream comes from `src/auto-reply/chunk.ts`; the alias here points at the identical `TextChunkMode` union in `config/types.base.ts` so the file does not force a chunk-module import into type-only consumers.",
+      "file": "src/infra/outbound/formatting.ts"
+    },
+    {
+      "id": "D-CORE-210",
+      "reason": "`src/shared/param-readers.ts` — the string param readers the channel-action helpers call are copied out of `src/agents/tools/common.ts` (564 lines of agent-tool helpers: tool results, sandbox path normalization, gateway argument coercion, media params). Placed under `shared/` rather than `agents/tools/` so the agent-tool port owns that path.",
+      "file": "src/shared/param-readers.ts"
+    },
+    {
+      "id": "D-CORE-211",
+      "reason": "`src/plugin-sdk/channel-actions.ts` — the upstream barrel also re-exports `jsonResult`, the boolean / positive-integer / string-array / reaction param readers, `resolvePollMaxSelections` and the sandbox path helpers from `src/agents/tools/common.ts`, `src/agents/date-time.ts`, `src/agents/sandbox-paths.ts` and `src/polls.ts`. Those are agent-tool-runner surfaces and land with the message-action runner slice.",
+      "file": "src/plugin-sdk/channel-actions.ts"
+    },
+    {
+      "id": "D-CORE-212",
+      "reason": "`src/plugin-sdk/channel-contract.ts` — the upstream barrel also re-exports the channel runtime surface, legacy state-migration and adapter type universe from `channel-runtime-surface.types.ts`, `legacy-state-migration.types.ts` and `types.adapters.ts`, which are host lifecycle contracts the port stops at (D-CORE-010).",
+      "file": "src/plugin-sdk/channel-contract.ts"
+    },
+    {
+      "id": "D-CORE-213",
+      "reason": "`src/plugin-sdk/error-runtime.ts` — the upstream barrel also re-exports the approval error classes (`src/infra/approval-errors.ts`) and the error-diagnostics reporters (`src/infra/error-diagnostics.ts`), which are host surfaces the port stops at.",
+      "file": "src/plugin-sdk/error-runtime.ts"
+    },
+    {
+      "id": "D-CORE-214",
+      "reason": "`src/plugin-sdk/logging-core.ts` — the upstream barrel also re-exports the root logger, the diagnostic log sink and identifier redaction from `src/logger.ts`, `src/logging/diagnostic.ts`, `src/logging/logger.ts` and `src/logging/redact-identifier.ts`. Fusion's Hub owns logging (D-CORE-002, D-CORE-203).",
+      "file": "src/plugin-sdk/logging-core.ts"
+    },
+    {
+      "id": "D-CORE-215",
+      "reason": "`src/plugin-sdk/number-runtime.ts` — the upstream barrel also re-exports the byte/duration formatters (`packages/normalization-core/src/format.ts`) and the TCP port helpers (`src/infra/tcp-port.ts`), which the ported channel closure does not use.",
+      "file": "src/plugin-sdk/number-runtime.ts"
+    },
+    {
+      "id": "D-CORE-216",
+      "reason": "`src/channels/status-reactions.ts` — upstream also owns the status-reaction controller (debounce, stall timers, terminal hold, tool-emoji resolution) which reads OpenClaw's tool-display config and agent identity. Fusion's Hub owns turn status, so this file carries the emoji contract the ported channel code reads, verbatim. The `channel-feedback` barrel is narrowed to match, dropping the ack-reaction resolver, the channel log helpers and the outbound target-error classes.",
+      "file": "src/channels/status-reactions.ts"
+    },
+    {
+      "id": "D-CORE-217",
+      "reason": "`src/plugin-sdk/fetch-runtime.ts` — the upstream barrel re-exports the SSRF fetch guard, the pinned dispatcher pool, the proxy-env resolvers, `makeProxyFetch` and the undici runtime helpers from `src/infra/net/*` (~11k lines wired to OpenClaw's global dispatcher and net policy). Fusion channel transports own their own fetch stack, so only the body-release helper the Telegram client fetch imports is carried.",
+      "file": "src/plugin-sdk/fetch-runtime.ts"
+    },
+    {
+      "id": "D-CORE-218",
+      "reason": "`src/plugin-sdk/json-store.ts` — upstream reads and writes JSON state through OpenClaw's fs-safe package (root policy, owned temp files, atomic replace, restrictive permissions). Fusion channel stores persist through the Hub, so the readers keep upstream's signatures over plain `node:fs` and the atomic writers are not carried.",
+      "file": "src/plugin-sdk/json-store.ts"
+    },
+    {
+      "id": "D-CORE-219",
+      "reason": "`src/plugin-sdk/plugin-config-runtime.ts` — `requireRuntimeConfig` is verbatim; the module's config-state reader/writer (`src/plugins/config-state.ts`) and OpenClaw's deep-merge are not carried, because Fusion's Hub owns channel configuration and plugins never read or write config state.",
+      "file": "src/plugin-sdk/plugin-config-runtime.ts"
+    },
+    {
+      "id": "D-CORE-220",
+      "reason": "`src/plugin-sdk/reply-reference.ts` — the upstream barrel also re-exports the reply-threading planner and `GetReplyOptions`, which belong to the OpenClaw reply pipeline.",
+      "file": "src/plugin-sdk/reply-reference.ts"
+    },
+    {
+      "id": "D-CORE-221",
+      "reason": "`src/plugin-sdk/status-helpers.ts` — the upstream barrel is the channel status-surface universe (account-state issue builders, plugin status adapters, the typed `OpenClawConfig` status sections). The port stops at that host boundary; the Hub owns channel status. Only the reaction-level resolver is carried, from the verbatim `src/utils/reaction-level.ts`.",
+      "file": "src/plugin-sdk/status-helpers.ts"
+    },
+    {
+      "id": "D-CORE-222",
+      "reason": "`src/plugin-sdk/channel-policy.ts` / `src/config/group-scope-tree.ts` — the upstream barrel also exports `resolveChannelGroupPolicy`, `resolveToolsBySender`, the allow-from matchers, group-policy warnings and dangerous-name matching from `src/config/group-policy.ts` (548 lines over OpenClaw's account-lookup and session-key routing). Fusion's Hub resolves the account and the group scope before a send reaches the vertical, so only the scope-tree shape the Telegram group config reader walks is carried.",
+      "file": "src/plugin-sdk/channel-policy.ts"
+    },
+    {
+      "id": "D-CORE-223",
+      "reason": "`src/config/markdown-tables.ts` — upstream resolves the effective table mode by walking the live plugin registry (`listChannelPlugins()` -> `messaging.defaultMarkdownTableMode`) and the routed account. Fusion has no in-process channel registry, so the per-channel defaults are a static map transcribed from the upstream plugin definitions (telegram/matrix \"block\", mattermost \"off\", signal/whatsapp \"bullets\", everything else the registry fallback \"code\") and the section is read off the config the caller already scoped. Precedence (account entry -> channel section -> the channel's default -> \"code\") and the `supportsBlockTables` downgrade to \"code\" match upstream. Corrected 2026-09-07: the first port defaulted to \"off\" and downgraded \"block\" to \"bullets\", so every Slack and Telegram send leaked raw markdown pipes instead of a rendered table.",
+      "file": "src/config/markdown-tables.ts"
+    },
+    {
+      "id": "D-CORE-224",
+      "reason": "`src/media/web-media.ts` — upstream is ~1300 lines wired to OpenClaw's SSRF policy engine, pinned-dispatcher pool, media store, hosted-media resolver, image optimizer (rastermill) and generated-HTML trust boundary. Fusion channel transports own their own fetch stack and the Hub authorizes outbound files before they reach a vertical, so this module keeps upstream's `loadWebMedia` signature and `WebMediaResult` shape over a local-file / HTTP read that honours the caller's `localRoots` / `readFile` boundary. Image optimization is not performed.",
+      "file": "src/media/web-media.ts"
+    },
+    {
+      "id": "D-CORE-225",
+      "reason": "`src/media/media-services.ts` — upstream's barrel re-exports the ffmpeg executor, the rastermill image processor and the media prober (native toolchain dependencies). `getImageMetadata` matters for behavior, not diagnostics: upstream sends an image as a *document* whenever dimensions are unavailable, so PNG/JPEG/GIF/WebP dimensions are parsed from their headers here and an unrecognized container still takes upstream's document fallback. `probeVideoDimensions` has no header-only equivalent and stays unknown.",
+      "file": "src/media/media-services.ts"
+    },
+    {
+      "id": "D-CORE-226",
+      "reason": "`src/plugin-sdk/media-runtime.ts` — the upstream barrel also re-exports the media store, temp files, ffmpeg limits, QR/PNG encoders, the agent media payload builders and the media-understanding model defaults. Those belong to the OpenClaw agent runtime; the Hub owns media authorization in Fusion.",
+      "file": "src/plugin-sdk/media-runtime.ts"
+    },
+    {
+      "id": "D-CORE-227",
+      "reason": "`src/plugin-sdk/plugin-state-runtime.ts` — upstream backs these stores with a per-plugin SQLite database (`src/plugin-state/plugin-state-store.ts` over `sqlite-strict.ts` / `sqlite-wal.ts`) opened from the OpenClaw state directory, and also exposes the blob store and plugin runtime types. Fusion channel state is Hub-owned, so the store *contracts* (`plugin-state-store.types.ts`) are carried verbatim and the backend is injected by the host runtime (`packages/channels/telegram/src/fusion/runtime.ts`, D-TG-014).",
+      "file": "src/plugin-state/plugin-state-store.types.ts"
+    },
+    {
+      "id": "D-CORE-228",
+      "reason": "`src/routing/session-key.ts` — upstream encodes the whole delivery route into an OpenClaw session key (channel, peer kind, peer id, thread, account, ACP scheme) and parses it back. Fusion's Hub passes the route explicitly, so only `normalizeAccountId` (re-exported from the verbatim `routing/account-id.ts`) and the ACP session-key predicate are carried. The `routing` barrel drops the account lookup table, the binding resolver, `resolveAgentRoute`, the default-account warnings and the outbound base-session-key/thread-id helpers.",
+      "file": "src/routing/session-key.ts"
+    },
+    {
+      "id": "D-CORE-229",
+      "reason": "`src/plugin-sdk/channel-inbound.ts` — the upstream barrel is the whole inbound pipeline (envelopes, debounce, mention gating, classification, channel-turn execution, hook types). The Hub owns inbound admission and turn execution in Fusion (goal slices 1-3, 8); only the location contract and the partial-delivery error the ported senders raise are carried.",
+      "file": "src/plugin-sdk/channel-inbound.ts"
+    },
+    {
+      "id": "D-CORE-230",
+      "reason": "`src/plugin-sdk/channel-outbound.ts` — the upstream barrel is the whole outbound engine (draft streaming, durable receive, the ingress queue/drain, reply pipeline, outbound bridge, send deps, session context). Fusion's Hub owns durable delivery (goal slices 1-3, 8); only the receipt normalizer and the formatting options the ported senders build are carried.",
+      "file": "src/plugin-sdk/channel-outbound.ts"
+    },
+    {
+      "id": "D-CORE-231",
+      "reason": "`src/channels/streaming.ts` — upstream is the channel streaming/draft policy engine (preview availability, block streaming, progress cards, per-account compat readers). Fusion's Hub owns turn streaming, so this file carries the chunk-mode reader the outbound chunker calls, over the compat entry readers already ported in `streaming-config-readers.ts`.",
+      "file": "src/channels/streaming.ts"
+    },
+    {
+      "id": "D-CORE-232",
+      "reason": "`src/globals.ts` — upstream binds the verbose/console helpers to the OpenClaw CLI theme, global process state and the root pino logger. Fusion's Hub owns logging, so the verbose sink routes through the subsystem logger and `OPENCLAW_VERBOSE` semantics are preserved through `setVerbose`.",
+      "file": "src/globals.ts"
+    },
+    {
+      "id": "D-CORE-233",
+      "reason": "`src/runtime.ts` — upstream's `RuntimeEnv` is the OpenClaw process runtime (exit, stdio, clock, fs, network, plugin host). Fusion's Hub owns the process, so the ported channel code sees the small sink surface it actually calls.",
+      "file": "src/runtime.ts"
+    },
+    {
+      "id": "D-CORE-234",
+      "reason": "`src/infra/env.ts` — upstream's env module also owns test-runtime detection, the lazy config-dir resolvers and UTF-16 safe env slicing. Only the truthy reader the ported channel code calls is carried, with upstream's semantics.",
+      "file": "src/infra/env.ts"
+    },
+    {
+      "id": "D-CORE-235",
+      "reason": "`src/plugin-sdk/runtime-env.ts` — the upstream barrel also re-exports the root logger accessors (`src/logging.ts`), the duration formatters, the global undici dispatcher installer and the process-level unhandled-rejection handlers. Fusion's Hub owns the process and its logging (D-CORE-203, D-CORE-232, D-CORE-233).",
+      "file": "src/plugin-sdk/runtime-env.ts"
+    },
+    {
+      "id": "D-CORE-236",
+      "reason": "Mechanical plugin-sdk barrel narrowing: the module specifier is repointed at the ported local source and re-exports that the ported closure does not use are dropped. No behavior change; each barrel names the dropped upstream surface in a comment at its foot."
+    },
+    {
+      "id": "D-CORE-237",
+      "reason": "`src/media/web-media.host-adapter.ts` — a local file path is not a download. The Hub authorizes an outbound file before it reaches a vertical and passes an absolute path, so local reads delegate to the ported `./web-media.js` (which enforces the caller's `localRoots` / `readFile` boundary) and only remote URLs stay refused. Without this the ported Telegram media send could not read an authorized local file.",
+      "file": "src/media/web-media.host-adapter.ts"
+    },
+    {
+      "id": "D-CORE-238",
+      "file": "src/config/types.slack.ts",
+      "reason": "Upstream composes `SlackAccountConfig` out of `CommonChannelMessagingConfig`, `ChannelBotInteractionConfig`, `ChannelReactionConfig`, `ChannelExecApprovalConfig`, `ChannelImplicitMentionsConfig`, `ProviderCommandsConfig`, `SecretInput` and the group tool-policy types - the whole OpenClaw `config.json` type graph. Fusion's Hub owns channel configuration, so this file carries the Slack shapes the ported channel code reads, structurally compatible with upstream, plus an open index signature so unread upstream keys still type. Mirrors `types.telegram.ts` (D-CORE-202)."
+    },
+    {
+      "id": "D-CORE-239",
+      "file": "src/config/types.openclaw.channels.ts",
+      "reason": "The channel-typed view of `OpenClawConfig`. The host adapter keeps every channel section opaque (D-CORE-010), which is right for the Hub but leaves a ported vertical unable to read `cfg.channels.<id>` with upstream's types. This file re-declares the host shape with the ported sections (`slack`, `telegram`) typed and everything else opaque, plus the `channels.defaults`, `agents.defaults`, `bindings` and `session` fields the ported readers touch. `plugin-sdk/config-contracts.ts`, `config/types.ts` and `config/types.openclaw.ts` now export `OpenClawConfig` from here."
+    },
+    {
+      "id": "D-CORE-240",
+      "file": "src/plugin-sdk/account-resolution.ts",
+      "reason": "Upstream's barrel also re-exports `normalizeE164`, `resolveMergedAccountConfig` and `resolveUserPath` from `src/routing/account-core.ts`, a host-side account/session-key module the port stops at. The listed helpers live in `channels/plugins/account-helpers.ts` and `routing/account-id.ts` upstream and are re-exported from there."
+    },
+    {
+      "id": "D-CORE-241",
+      "file": "src/channels/plugins/account-snapshot.types.ts",
+      "reason": "`ChannelAccountSnapshot` is declared inside the plugin type universe the port stops at (D-CORE-010). `account-helpers.ts` returns it from `describeAccountSnapshot`, so the shape is carried with upstream's field names and doc comments plus an open index signature for the status fields the Hub does not read."
+    },
+    {
+      "id": "D-CORE-242",
+      "file": "src/plugin-sdk/agent-core.ts",
+      "reason": "Upstream's barrel wires OpenClaw's LLM runtime into `packages/agent-core` (Agent class, agent loop, session context, bash execution). The ported channel code reads exactly one thing from it: `AgentToolResult`, which lives in the host adapter for `src/agents/runtime/index.ts` (D-CORE-006)."
+    },
+    {
+      "id": "D-CORE-243",
+      "file": "src/plugin-sdk/global-singleton.ts",
+      "reason": "Upstream's barrel also re-exports `createScopedExpiringIdCache` from `src/shared/scoped-expiring-id-cache.ts`; no ported file reads it yet."
+    },
+    {
+      "id": "D-CORE-244",
+      "file": "src/plugin-sdk/security-runtime.ts",
+      "reason": "Upstream's barrel is the whole plugin trust-boundary surface: symlink-safe file access, channel metadata builders, supplemental-context visibility, access groups and external-content wrapping. The ported Slack send path reads only `safeEqualSecret`, used to authenticate an interactive callback signature."
+    },
+    {
+      "id": "D-CORE-245",
+      "file": "src/plugin-sdk/extension-shared.ts",
+      "reason": "Upstream's barrel also carries the passive channel lifecycle runner, the logger-backed runtime factory, ambient proxy agents and zod parse helpers - host lifecycle surfaces the port stops at (D-CORE-010). Only `buildTimeoutAbortSignal` (Slack upload) and `createDeferred` (Slack action tests) are carried, both from their upstream source modules."
+    },
+    {
+      "id": "D-CORE-246",
+      "file": "src/plugin-sdk/host-runtime.ts",
+      "reason": "Upstream's barrel also re-exports `normalizeScpRemoteHost` from `src/infra/scp-host.ts`, an SSH host parser no ported channel file reads."
+    },
+    {
+      "id": "D-CORE-247",
+      "file": "src/plugin-sdk/request-url.ts",
+      "reason": "Upstream's barrel also re-exports `isLoopbackHost` from `src/gateway/net.ts`, wired to OpenClaw's gateway network policy. `resolveRequestUrl` is declared in the barrel itself and is carried verbatim."
+    },
+    {
+      "id": "D-CORE-248",
+      "file": "src/plugin-sdk/channel-core.ts",
+      "reason": "Upstream's facade is the plugin-host construction surface: `ChannelPlugin`, `createChatChannelPlugin`, config-schema builders, setup entries, the OpenClaw plugin API. Fusion's Hub is the host (D-CORE-010), so only the `PluginRuntime` runtime-shape name the ported channel runtime stores read is carried; each channel package declares the concrete runtime it needs."
+    },
+    {
+      "id": "D-CORE-249",
+      "file": "src/plugin-sdk/allow-from.ts",
+      "reason": "Upstream's barrel is the whole inbound admission surface (pairing, access groups, allowlist resolution summaries, chat-target prefixes). The Hub owns inbound admission (goal slices 1-3), so only the compiled-allowlist matcher the ported Slack channel-policy reader calls is carried, plus the config-precedence helpers already in `channels/allow-from.ts`."
+    },
+    {
+      "id": "D-CORE-250",
+      "file": "src/plugin-sdk/channel-config-helpers.ts",
+      "reason": "Upstream's barrel owns channel config CRUD adapters, config-write authorization and DM access policy, all wired to OpenClaw's `config.json` writer. Fusion's Hub owns channel configuration and never lets a vertical write it, so only the two pure readers the ported Slack account resolver calls (`mapAllowFromEntries`, `normalizeChannelDmPolicy`) are carried, with upstream's bodies."
+    },
+    {
+      "id": "D-CORE-251",
+      "file": "src/plugin-sdk/directory-runtime.ts",
+      "reason": "Upstream's barrel is the channel directory adapter surface (live adapters, config-derived listers, read-only account inspection). Fusion's Hub owns the conversation directory, so only `resolveDirectoryAllowlistEntries` - declared in the barrel itself, carried verbatim - is kept for the ported Slack channel/user resolvers."
+    },
+    {
+      "id": "D-CORE-252",
+      "file": "src/channels/plugins/channel-contract.host-adapter.ts",
+      "reason": "`BaseProbeResult`, `ChannelGroupContext` and `ChannelOutboundContext` are declared inside the plugin type universe the port stops at (D-CORE-010) and carry the full `OpenClawConfig`, the outbound engine's durable-intent fields and the media load policy. The shapes here keep upstream's names, field names and doc comments for the fields the ported Slack probe / group-policy / outbound code reads, over the opaque host config, plus an open index signature."
+    },
+    {
+      "id": "D-CORE-253",
+      "file": "src/agents/tools/image-result.host-adapter.ts",
+      "reason": "Upstream's `imageResultFromFile` reads through OpenClaw's fs-safe root, sniffs MIME with `@openclaw/media-core`, then hands the result to `src/agents/tool-images.runtime.ts`, which re-encodes and downscales against the host's `ImageSanitizationLimits`. Fusion has no image sanitization pipeline, so the adapter keeps upstream's call signature and result shape over a plain file read and returns the image unsanitized; the limits argument is accepted and ignored. Wire it when the host grows a sanitizer."
+    },
+    {
+      "id": "D-CORE-254",
+      "file": "src/gateway-client/timeouts.ts",
+      "reason": "Upstream's module also owns the Gateway connect/challenge/preauth deadlines and their env overrides - Gateway client policy the port stops at. The two timer-clamp helpers the ported fetch-timeout builder calls are carried with upstream's bodies and doc comments."
+    },
+    {
+      "id": "D-CORE-255",
+      "file": "src/infra/fs-safe-advanced.host-adapter.ts",
+      "reason": "Upstream's module is OpenClaw's symlink-safe filesystem layer (root-scoped opens, atomic replaces, path guards). The ported outbound-media loader (`plugin-sdk/outbound-media.ts`) reads one pure helper from it: the untrusted-filename sanitizer applied to a remote media file name before it becomes an upload title. `outbound-media.ts` itself is otherwise verbatim; only that import specifier moves."
+    },
+    {
+      "id": "D-CORE-257",
+      "file": "src/config/types.secrets.host-adapter.ts",
+      "reason": "Upstream's module is the SecretRef contract plus the resolution state machine that reads env/file/exec/store providers through OpenClaw's secret runtime and its gateway snapshot. Fusion's Hub owns credentials and resolves them before a drive-time `cfg` reaches a vertical, so a channel config field is either a literal string (available) or a still-unresolved reference (absent). The `SecretRef` predicate and the three readers the ported Slack account/token code calls keep upstream's names, signatures and bodies over that rule. Behaviour change: upstream's strict mode throws on a configured-but-unresolved ref; here it reads as absent."
+    },
+    {
+      "id": "D-CORE-258",
+      "file": "src/infra/exec-approval-reply.host-adapter.ts",
+      "reason": "Upstream's module builds the whole exec-approval presentation: action descriptors, pending reply payloads, approver DM notices, decision gating and the approval-store lookups behind them. Fusion's Hub owns approvals, so only the pure `/approve <id> <decision>` command parser the ported Slack block renderer calls is carried, with upstream's body."
+    },
+    {
+      "id": "D-CORE-259",
+      "file": "src/plugin-sdk/approval-reply-runtime.ts",
+      "reason": "Upstream's barrel is the exec/plugin approval reply surface (presentations, pending payloads, decision gating, approver notices). Fusion's Hub owns approvals; only the command-text parser the ported Slack block renderer calls is carried, from the host adapter for the same source module (D-CORE-258)."
+    },
+    {
+      "id": "D-CORE-260",
+      "file": "src/infra/outbound/durable-batch.host-adapter.ts",
+      "reason": "Fusion's Hub owns durable delivery (goal slices 1-3, 8), so upstream's durable batch engine (`src/channels/message/send.ts#sendDurableMessageBatchCore` — batch rendering, the outbound queue, live-preview state, transcript mirroring, suppression classification) and its session-context builder (`src/infra/outbound/session-context.ts#buildOutboundSessionContext`) are replaced by one host adapter. The adapter keeps upstream's `DurableMessageBatchSendResult` union and `OutboundSessionContext` shape verbatim and routes one host send per payload through the installed core outbound sender (`message.host-adapter.ts`); with no sender installed it fails loudly. The session builder keeps upstream's omit-empty contract and its `agent:<id>:` session-key agent derivation; the OpenClaw session-key delivery route it also consults is a host-adapter stub in this port."
+    },
+    {
+      "id": "D-CORE-261",
+      "file": "src/plugin-sdk/session-store-runtime.ts",
+      "reason": "Upstream's barrel is OpenClaw's file-backed session store (path resolution, entry load/write, writer claims, maintenance). The Hub owns sessions and bindings in Fusion, so none of that is carried. The one helper the ported channel code calls is `resolveStorePath`, and only to derive a *cache scope* — the ported Telegram topic-name and message caches key their namespace off the store path so two agents on one host cannot read each other's cached topic names. Fusion returns a stable synthetic path, distinct per agent id, keeping that scoping property without a store on disk. A configured store path still wins, so a host that has one keeps upstream's scoping exactly."
+    },
+    {
+      "id": "D-CORE-262",
+      "file": "src/plugin-sdk/reply-runtime.ts",
+      "reason": "Upstream's barrel is the whole agent reply runtime: inbound dispatch, the reply pipeline, heartbeat/activation/abort commands, chunking and the inbound debouncer. Fusion's Hub owns inbound dispatch and the agent turn, so only the `ReplyPayload` contract the ported channel senders type against is carried, from the same source module upstream re-exports it from."
+    },
+    {
+      "id": "D-CORE-263",
+      "file": "src/plugin-sdk/test-state.ts",
+      "reason": "Upstream's `createOpenClawTestState` builds a whole OpenClaw installation in a temp directory (home/state/workspace layouts, a written `openclaw.json`, agent and session directories, auth profiles, gateway ports, and the env swap that points the process at it). Fusion has no OpenClaw installation to fake: the Hub owns config, sessions and agents, and the ported channel tests use the state directory only as an isolated scratch root. The adapter keeps the constructor name, the options the ported tests pass and the fields they read, and creates one temp directory. `src/plugin-sdk/test-helpers/env.ts` carries upstream's `captureEnv`/`setTestEnvValue`/`deleteTestEnvValue` from `src/test-utils/env.ts` for the same ported tests; the rest of that module (temp homes, frozen time, proxy fixtures, state-dir guards) has no Fusion consumer."
+    },
+    {
+      "id": "D-CORE-270",
+      "file": "src/plugin-sdk/test-fixtures.ts",
+      "reason": "Upstream's barrel is the whole shared test-fixture surface (CLI runtime capture, sandbox contexts, skill writers, agent message fixtures, system events, terminal text). Only the two fixtures the ported Slack tests import - `createRequireRecord` and the PNG image fixtures - are carried, from the same source modules."
+    },
+    {
+      "id": "D-CORE-271",
+      "file": "src/plugin-sdk/test-env.ts",
+      "reason": "Upstream's barrel is the repo-local env/network/filesystem/time fixture surface (temp homes, state-dir guards, proxy fixtures, frozen time, SSRF hostname pinning). Only the local HTTP test server the ported Slack upload tests use is carried, from the same source module."
+    },
+    {
+      "id": "D-CORE-301",
+      "file": "src/config/types.discord.ts",
+      "reason": "`src/config/types.discord.ts` — upstream composes `DiscordAccountConfig` from `CommonChannelMessagingConfig`, `ChannelBotInteractionConfig`, `ChannelReactionConfig`, `ChannelExecApprovalConfig`, `ProviderCommandsConfig`, `SecretInput`, `TtsConfig` and the group tool-policy types, i.e. the whole OpenClaw `config.json` type graph. Fusion's Hub owns channel configuration, so the composed bases are re-declared here with the fields the ported Discord code reads (no index signature: upstream applies `Omit<..., \"groupAllowFrom\">` to the messaging base, and an index signature would erase every named field). Everything from `DiscordStreamMode` down is upstream's file unchanged."
+    },
+    {
+      "id": "D-CORE-302",
+      "file": "src/channels/account-snapshot-fields.ts",
+      "reason": "`src/channels/account-snapshot-fields.ts` — upstream's file is the redaction boundary between runtime account objects and public status snapshots, so it pulls `@openclaw/net-policy`'s URL redactors, `src/utils.ts` and the full `ChannelAccountSnapshot`. Fusion's Hub owns account snapshots; only the credential-status inference the ported Discord `accounts.ts` reads is carried, with upstream's function bodies unchanged."
+    },
+    {
+      "id": "D-CORE-303",
+      "file": "src/plugin-sdk/account-helpers.ts",
+      "reason": "`src/plugin-sdk/account-helpers.ts` — upstream's barrel also re-exports `resolveChannelMediaMaxBytes` from `src/channels/plugins/media-limits.ts`, which resolves the ceiling out of the OpenClaw config graph. Fusion's Hub owns media ceilings, so that member is omitted; everything else is the upstream barrel."
+    },
+    {
+      "id": "D-CORE-304",
+      "file": "src/plugin-sdk/channel-status.ts",
+      "reason": "`src/plugin-sdk/channel-status.ts` — upstream's barrel re-exports the pairing message, the credential-snapshot projection and six channel status-summary builders over the OpenClaw status/config graph. Fusion's Hub owns account status, so only the credential-status inference the ported channel accounts modules read is carried."
+    },
+    {
+      "id": "D-CORE-305",
+      "file": "src/plugin-sdk/agent-runtime.ts",
+      "reason": "`src/plugin-sdk/agent-runtime.ts` — upstream's barrel is the deprecated broad agent surface (model catalog, auth profiles, agent scope, TTS, ingress agent commands). Fusion's daemon owns the agent runtime (D-CORE-010), so only the agent-tool parameter readers the ported Discord action handlers call are carried, from the same upstream module the barrel names."
+    },
+    {
+      "id": "D-CORE-307",
+      "file": "src/infra/outbound/reply-policy.ts",
+      "reason": "`src/infra/outbound/reply-policy.ts` — upstream's module is the outbound reply-policy resolver over OpenClaw's `ReplyPayload` / `OutboundReplyFacts` delivery graph. Fusion's Hub owns reply policy; only the two payload-facing types the ported Discord reply-reference builder reads are carried, verbatim."
+    },
+    {
+      "id": "D-CORE-401",
+      "file": "src/plugin-sdk/gateway-runtime.ts",
+      "reason": "Upstream's barrel re-exports the whole OpenClaw gateway client surface (CLI RPC, node registry, capability tokens, startup auth, the gateway client). Fusion's Hub owns all of it; the only group the ported channel source reads is the channel status-patch factory family, so the barrel keeps just that and drops the rest."
+    },
+    {
+      "id": "D-CORE-402",
+      "file": "src/channels/progress-draft-diffstat.ts",
+      "reason": "The diff-stat shape and its renderer are byte-identical. `createProgressDraftDiffStatTracker` is omitted: it accumulates per-tool file mutations through `agents/file-mutation-args.ts` → `agents/apply-patch-paths.ts` → `agents/path-policy.ts` / the sandbox fs bridge, and Fusion's Hub owns agent turns, so nothing in this repo produces those tool events."
+    },
+    {
+      "id": "D-CORE-403",
+      "file": "src/channels/progress-draft-compositor.ts",
+      "reason": "Only the snapshot shape the channel renderers consume is ported. The compositor factory (event ingestion, line merge, status text, visibility gating, work counter) and its `progress-draft-events` / `progress-draft-lines` / `progress-draft-status-text` / `progress-visibility` / `progress-work-counter` closure are omitted: Fusion's Hub owns agent turns and produces the snapshot itself."
+    },
+    {
+      "id": "D-CORE-500",
+      "reason": "upstream src/media/media-facts.ts is the runtime attachment fact store (prompt-image ordering, symbol-keyed runtime projection, staged hydration, legacy Media* reprojection); the Hub owns attachment staging, so only the MediaFact/MediaFactInput shapes the ported channel inbound types are declared against are carried."
+    },
+    {
+      "id": "D-CORE-501",
+      "reason": "upstream src/channels/inbound-event/media.ts normalizes plugin attachment input into runtime media facts (file probing within a budget, local media path resolution, placeholder text); the Hub owns inbound media staging, so only the ChannelInboundMediaInput/MediaPlaceholderTextFact input contracts the ported Telegram body helpers type against are carried."
+    },
+    {
+      "id": "D-CORE-502",
+      "reason": "upstream src/auto-reply/templating.ts declares the whole inbound prompt context (MsgContext, ~300 members) plus its renderers and pulls media-understanding, plugin hook contexts, session provenance and the command-turn contract; the Hub owns prompt shaping, so only the ReplyChain member the ported Telegram message cache derives its cached-node type from is carried."
+    },
+    {
+      "id": "D-CORE-320",
+      "file": "src/plugin-sdk/webhook-request-guards.ts",
+      "reason": "`runDetachedWebhookWork` upstream reserves a root in OpenClaw's process-wide gateway work-admission store (`src/process/gateway-work-admission.ts`) so a restart drain waits for detached webhook work; the Hub owns drain lifecycle in Fusion (`packages/hub/src/channels/ingress/drain.ts`), so the reservation is dropped and the deferral shape kept. The `resolveAcceptedBrowserOrigin` re-export (OpenClaw gateway origin check) is omitted: no ported caller reads it. Everything else — the body-read profiles, the size/idle guards, the in-flight limiter, the JSON reject path — is upstream's file."
+    },
+    {
+      "id": "D-CORE-321",
+      "file": "src/plugin-sdk/webhook-targets.ts",
+      "reason": "`registerPluginHttpRoute`, `registerWebhookTargetWithPluginRoute` and `RegisterWebhookPluginRouteOptions` are omitted: they bind a path on OpenClaw's process-wide gateway HTTP server (`src/plugins/http-registry.ts`). Fusion has no such server, so an in-repo webhook vertical owns its own `node:http` listener (`packages/channels/googlechat/src/fusion/webhook-session.ts`) and registers its targets in the caller-owned map `registerWebhookTarget` (kept) maintains. Path normalization, target resolution, the single-target auth resolver and the request pipeline are upstream's."
+    },
+    {
+      "id": "D-CORE-322",
+      "file": "src/plugin-sdk/webhook-ingress.ts",
+      "reason": "The upstream barrel also re-exports the OpenClaw gateway auth rate limiter, the ws raw-data coercion, the plugin HTTP path normalizer and `registerPluginHttpRoute` (D-CORE-321). `resolveRequestClientIp` upstream first asks the gateway request scope for the already-validated client ip and only then falls back to `resolveRequestClientIpFromHeaders` in the 575-line `src/gateway/net.ts`; Fusion has no gateway scope, so the header resolver is declared in the barrel with the same trusted-proxy contract."
+    },
+    {
+      "id": "D-CORE-323",
+      "file": "src/plugin-sdk/channel-secret-basic-runtime.ts",
+      "reason": "The upstream barrel re-exports OpenClaw's whole channel secret-contract surface (`src/secrets/channel-secret-basic-runtime.ts`, `src/secrets/runtime-shared.ts`, the secret target registry). Fusion's Hub owns credentials, so a ported vertical never writes a secret contract; only the `isRecord` guard the ported Google Chat webhook/event parsers read is carried, from the same source module upstream re-exports it from."
+    },
+    {
+      "id": "D-CORE-324",
+      "file": "src/config/types.googlechat.ts",
+      "reason": "Upstream composes `GoogleChatAccountConfig` out of `CommonChannelMessagingConfig`, `ChannelBotInteractionConfig`, `ChannelBotLoopProtectionConfig` and `SecretRef` — the whole OpenClaw `config.json` type graph. The composed bases are taken from the sibling `types.discord.ts` copy, which already re-declares them with the fields the ported code reads plus an open index signature (D-CORE-301). Everything from `GoogleChatDmConfig` down is upstream's file unchanged."
+    },
+    {
+      "id": "D-CORE-325",
+      "file": "src/media/fetch-error.ts",
+      "reason": "`MediaFetchError` is declared upstream inside `src/media/fetch.ts`, a 770-line guarded media downloader built on OpenClaw's pinned-dispatcher SSRF stack and retry policy. Fusion's Hub owns media authorization and each vertical owns its own fetch, so only the closed error class — which ported channel code throws and matches on by `code` — is carried, unchanged, in a file named for it."
+    },
+    {
+      "id": "D-CORE-602",
+      "file": "src/plugin-sdk/provider-http.ts",
+      "reason": "Slice 16 (Zalo vertical port): `assertOkOrThrowProviderError`. Upstream's lives in `src/agents/provider-http-errors.ts`, a 519-line module wired to OpenClaw's provider request/transport config, its header-redaction policy and a `ProviderHttpError` carrying the parsed provider `code`/`type`/`request_id`. Fusion carries the contract the ported Zalo API client depends on — a non-OK response throws with `label (status): detail` and the status on the error — over the bounded reader already in this file. The provider-specific error-field extraction is not carried.",
+      "tests": ["../zalo/src/api.test.ts"]
+    },
+    {
+      "id": "D-CORE-330",
+      "file": "src/plugins/tool-types.host-adapter.ts",
+      "reason": "Upstream src/plugins/tool-types.ts is the plugin host tool contract: session tree, auth-profile store, browser bridge, conversation recall, hook registry and the per-turn delivery handle. Fusion has no plugin host, so the context is narrowed to the members the ported channel tool factories read, with upstream field names and comments. The narrowed OpenClawPluginApi (config/logger/registerTool) is declared here too, from upstream src/plugins/plugin-api.types.ts."
+    },
+    {
+      "id": "D-CORE-331",
+      "file": "src/plugin-sdk/plugin-entry.ts",
+      "reason": "Upstream barrel is the plugin host entry surface (definitions, capability catalogs, provider/agent-harness plugins, migrations). Only the tool-factory contract the ported channel tool families read is carried."
+    },
+    {
+      "id": "D-CORE-332",
+      "file": "src/plugin-sdk/core.ts",
+      "reason": "Upstream barrel is ~150 re-exports over the channel plugin registry, the outbound delivery graph, session-key routing and the ACP binding store. Only the config and channel-contract types the ported channel closure reads are carried."
+    },
+    {
+      "id": "D-CORE-333",
+      "file": "src/plugin-sdk/provider-auth.ts",
+      "reason": "Upstream barrel is the provider auth-profile surface (OAuth flows, keychain profile stores, API-key resolution). Only coerceSecretRef is carried, from the same source module upstream re-exports; the Hub owns credentials."
+    },
+    {
+      "id": "D-CORE-334",
+      "file": "src/plugin-sdk/secret-ref-readonly.ts",
+      "reason": "Upstream also exports resolveReadOnlyEnvSecretRef, which reads a credential from process.env once the provider allowlist admits it. Fusion Hub owns credential resolution; only the predicate is carried and it answers false (see config/types.secrets.host-adapter.ts)."
+    },
+    {
+      "id": "D-CORE-335",
+      "file": "src/secrets/ref-contract.ts",
+      "reason": "Partial port: only the id/alias validators the ported secret-input schema references, with upstream bodies and messages. The default-provider resolution the host uses when it reads a credential is Hub-owned."
+    },
+    {
+      "id": "D-CORE-336",
+      "file": "src/config/zod-schema.sensitive.ts",
+      "reason": "Partial port: upstream also exports configUiMetadata, the UI-hint registry the host dashboard reads; Fusion app owns channel config presentation. The sensitive registry itself is upstream so a ported schema keeps its redaction marks."
+    },
+    {
+      "id": "D-CORE-337",
+      "file": "src/config/zod-schema.core.ts",
+      "reason": "Partial port: upstream module is the whole OpenClaw config zod surface (~1000 lines over agents, sessions, gateway, TTS, streaming and every channel knob). Only the policy enums the ported channel config schemas reference are carried, with upstream definitions."
+    },
+    {
+      "id": "D-CORE-338",
+      "file": "src/config/zod-schema.agent-runtime.ts",
+      "reason": "Partial port: only the tool-policy shape the ported channel group schemas embed, with upstream definition and message. The rest is the agent-runtime config surface the Hub owns."
+    },
+    {
+      "id": "D-CORE-339",
+      "file": "src/channels/plugins/config-schema.ts",
+      "reason": "Partial port: buildJsonChannelConfigSchema / safeParseJsonSchema are omitted because they run the OpenClaw plugin manifest validator (TypeBox compile cache, plugin origin cache, terminal-safe text). No in-repo vertical declares its config that way. Everything else is upstream, line for line."
+    },
+    {
+      "id": "D-CORE-340",
+      "file": "src/plugin-sdk/channel-config-schema.ts",
+      "reason": "Upstream barrel re-exports ~40 members: the channel config builders plus the streaming/markdown/TTS/exec-approval schema fragments, the implicit-mention schema and two infra path validators. Only the builders and policy enums the ported channel config schemas reference are carried."
+    },
+    {
+      "id": "D-CORE-341",
+      "file": "src/channels/plugins/outbound/presentation-delivery.ts",
+      "reason": "Carried whole; only the ReplyPayload import moves to the local reply-payload module (upstream imports it from auto-reply/types.ts, which is host-owned)."
+    },
+    {
+      "id": "D-CORE-342",
+      "file": "src/plugin-sdk/extension-shared.ts",
+      "reason": "resolveAmbientNodeProxyAgent builds its agent from @openclaw/proxyline plus the managed-proxy TLS store — an OpenClaw workspace package and a host egress subsystem, neither of which Fusion carries. It always returns undefined; a caller with a managed proxy configured is expected to fail loudly rather than send unproxied traffic, which the ported Feishu client does."
+    },
+    {
+      "id": "D-CORE-343",
+      "file": "src/plugin-sdk/interactive-runtime.ts",
+      "reason": "Also re-exports the Fusion-owned `src/interactive/presentation-admission.ts` (D-W6-02): `normalizeMessagePresentation` requires a table `caption` that the message tool's schema marks optional, so a caption-less table reached the channel as nothing at all. Admission defaults the caption to the table's first header and reports every block the normalizer still refuses; the verbatim normalizer is unchanged."
+    }
+  ]
+}

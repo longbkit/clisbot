@@ -48,30 +48,35 @@ vi.mock("../account-provider", () => ({ useHubAccount: () => hub }));
 vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
-vi.mock("./channel-settings", () => ({
-  ChannelSettings: () => null,
-  ChannelConnectionForm: ({
-    pending,
-    allowSlackSocket,
-    save,
+vi.mock("./channel-settings", () => ({ ChannelSettings: () => null }));
+vi.mock("./channel-connection-add", () => ({
+  AddChannelConnection: ({
+    allowProviderApplications,
+    disabled,
+    create,
   }: {
-    pending: boolean;
-    allowSlackSocket: boolean;
-    save(body: unknown): void;
+    allowProviderApplications: boolean;
+    disabled?: boolean;
+    create(body: Record<string, unknown>): Promise<void>;
   }) => {
-    const submit = React.useCallback(
-      () =>
-        save({
-          provider: "telegram",
-          accountId: "support",
-          credentials: { botToken: "secret-token" },
-        }),
-      [save],
-    );
+    const [error, setError] = React.useState<string | null>(null);
+    const submit = React.useCallback(() => {
+      setError(null);
+      void create({
+        provider: "telegram",
+        accountId: "support",
+        credentials: { botToken: "secret-token" },
+      }).catch((cause: unknown) =>
+        setError(cause instanceof Error ? cause.message : "The request failed."),
+      );
+    }, [create]);
     return (
-      <button type="button" disabled={pending} onClick={submit}>
-        {allowSlackSocket ? "Slack enabled" : "Save Telegram"}
-      </button>
+      <div>
+        {error === null ? null : <div role="alert">{error}</div>}
+        <button type="button" disabled={disabled} onClick={submit}>
+          {allowProviderApplications ? "Slack enabled" : "Save Telegram"}
+        </button>
+      </div>
     );
   },
 }));
@@ -307,11 +312,11 @@ describe("Team invitation review and access navigation", () => {
   });
 });
 
-describe("Configuration Telegram account entry", () => {
-  it("uses the shared Telegram form, retains failed drafts, and closes after saved", async () => {
+describe("Configuration Channel Connection entry", () => {
+  it("uses the shared catalog-driven form, retains failed drafts, and closes after saved", async () => {
     fixtures.post.mockRejectedValueOnce(new Error("Token invalid"));
     render(<HubSettingsContent section="configuration" />);
-    fireEvent.click(screen.getByRole("button", { name: "Add Telegram account" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add Channel Connection" }));
     fireEvent.click(screen.getByRole("button", { name: "Save Telegram" }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Token invalid"));
     expect(screen.getByRole("button", { name: "Save Telegram" })).toBeTruthy();

@@ -4,6 +4,8 @@ import type { AgentExecutionStatus, MachineStatus } from "./schema.js";
 import type { JsonValue } from "../config/compiler.js";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import { linearConnectionRequiresReauthorization } from "../providers/linear/client.js";
+import type { SupportedChannelName } from "../channels/catalog.js";
+import { sealableChannelCredentials } from "./channel-connections.js";
 import type {
   AgentExecutionRecord,
   AgentExecutionOutputAttempt,
@@ -31,6 +33,10 @@ import type {
   BindSlackConnectionInput,
   CompleteLinearProviderApplicationInput,
   CompleteSlackProviderApplicationInput,
+  ChannelConnectionCredentials,
+  ChannelStateSecretRecord,
+  ChannelStateSecretScope,
+  ConfigureChannelConnectionInput,
   ConnectionStartAuthority,
   ConnectionProvider,
   ReadConnectionAttemptInput,
@@ -165,6 +171,12 @@ export function createMemoryDatabase(options: MemoryDatabaseOptions = {}): Datab
   return new MemoryDatabase(options);
 }
 
+/** The account scope as one map key — the memory fake's stand-in for the
+ * `(organization, channel, account)` predicate the real query carries. */
+function channelStateSecretKey(scope: ChannelStateSecretScope): string {
+  return `${scope.organizationId}\u0000${scope.channel}\u0000${scope.accountId}`;
+}
+
 class MemoryDatabase implements Database {
   private readonly providerEventReceipts = new Map<string, ProviderEventReceiptRecord>();
   private readonly workflowAgentReuseBindings = new Map<string, string>();
@@ -223,11 +235,16 @@ class MemoryDatabase implements Database {
   private readonly githubConnections = new Map<number, GitHubConnectionRecord>();
   private readonly discordConnections = new Map<string, DiscordConnectionRecord>();
   private readonly slackConnections = new Map<string, SlackConnectionRecord>();
-  private readonly telegramConnections = new Map<
+  /** The Channel plane's own Connections, keyed by id. */
+  private readonly channelConnections = new Map<
     string,
-    { id: string; organizationId: string; accountId: string; botToken: string }
+    ConfigureChannelConnectionInput & { id: string }
   >();
   private readonly linearConnections = new Map<string, LinearConnectionRecord>();
+  /** Encrypted keyed-store namespaces, by account scope then namespace. In
+   * memory there is nothing to encrypt; the isolation the scope key gives is
+   * the part this fake has to reproduce. */
+  private readonly channelStateSecrets = new Map<string, Map<string, unknown>>();
   private readonly organizationIds: Set<string>;
 
   constructor(private readonly options: MemoryDatabaseOptions = {}) {
@@ -3148,31 +3165,50 @@ class MemoryDatabase implements Database {
     return Promise.resolve(connection?.organizationId === organizationId ? connection : undefined);
   }
 
-  configureTelegramConnection(input: {
-    organizationId: string;
-    accountId: string;
-    botToken: string;
-  }): Promise<{ connectionId: string }> {
-    const existing = [...this.telegramConnections.values()].find(
+  configureChannelConnection(
+    input: ConfigureChannelConnectionInput,
+  ): Promise<{ connectionId: string }> {
+    const existing = [...this.channelConnections.values()].find(
       (connection) =>
         connection.organizationId === input.organizationId &&
+        connection.channel === input.channel &&
         connection.accountId === input.accountId,
     );
     const connectionId = existing?.id ?? randomUUID();
-    this.telegramConnections.set(connectionId, { id: connectionId, ...input });
+    this.channelConnections.set(connectionId, { id: connectionId, ...input });
     return Promise.resolve({ connectionId });
+  }
+
+  loadChannelStateSecrets(input: ChannelStateSecretScope): Promise<ChannelStateSecretRecord[]> {
+    const rows = this.channelStateSecrets.get(channelStateSecretKey(input)) ?? new Map();
+    return Promise.resolve([...rows].map(([namespace, entries]) => ({ namespace, entries })));
+  }
+
+  saveChannelStateSecret(
+    input: ChannelStateSecretScope & { namespace: string; entries: unknown },
+  ): Promise<void> {
+    const key = channelStateSecretKey(input);
+    const rows = this.channelStateSecrets.get(key) ?? new Map<string, unknown>();
+    rows.set(input.namespace, input.entries);
+    this.channelStateSecrets.set(key, rows);
+    return Promise.resolve();
+  }
+
+  deleteChannelStateSecrets(input: ChannelStateSecretScope): Promise<void> {
+    this.channelStateSecrets.delete(channelStateSecretKey(input));
+    return Promise.resolve();
   }
 
   resolveChannelConnection(input: {
     organizationId: string;
-    channel: "slack" | "telegram";
+    channel: SupportedChannelName;
     connectionId: string;
-  }): Promise<{ botToken: string; appToken?: string; providerApplicationId?: string } | undefined> {
-    if (input.channel === "telegram") {
-      const connection = this.telegramConnections.get(input.connectionId);
+  }): Promise<ChannelConnectionCredentials | undefined> {
+    if (input.channel !== "slack") {
+      const connection = this.channelConnections.get(input.connectionId);
       return Promise.resolve(
-        connection?.organizationId === input.organizationId
-          ? { botToken: connection.botToken }
+        connection?.organizationId === input.organizationId && connection.channel === input.channel
+          ? sealableChannelCredentials(connection.credentials)
           : undefined,
       );
     }

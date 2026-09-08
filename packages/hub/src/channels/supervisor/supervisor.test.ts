@@ -238,6 +238,61 @@ describe("createChannelSupervisor", () => {
     });
   });
 
+  describe("supported channels", () => {
+    /** A Discord account in the active configuration (slice 13b). */
+    async function seedDiscord(database: Database): Promise<void> {
+      await enrollTestDaemon(database, ORG_ID);
+      await database.saveChannelConfiguration({
+        organizationId: ORG_ID,
+        files: [
+          { path: ".paseo/hub.yml", content: HUB_YAML },
+          { path: ".paseo/channels/policy.yml", content: POLICY_YAML },
+          {
+            path: ".paseo/channels/discord/guild.yml",
+            content: `
+channel: discord
+accountId: guild
+connectionId: discord:guild
+transport:
+  mode: gateway
+routes:
+  - match:
+      kind: channel
+    agent: codex-safe
+    environment: work
+fallback:
+  deny: true
+`,
+          },
+        ],
+        contentHash: "test-discord-configuration",
+        createdByUserId: null,
+      });
+    }
+
+    it("drives a Discord account to the install step instead of rejecting its name", async () => {
+      const database = memoryDatabase();
+      await seedDiscord(database);
+      const supervisor = supervisorFor({ database });
+      // The pin fixture has no channels, so the account fails AT the install —
+      // which is the point: nothing between the compiled configuration and the
+      // supply gate treats `discord` as an unknown channel.
+      const result = await supervisor.startAccount("discord", "guild");
+      assert.equal(result.transport, "deferred");
+      assert.equal(result.detail, "unknown channel: discord");
+      assert.deepEqual(supervisor.status(), [
+        {
+          channel: "discord",
+          account: "guild",
+          integrity: "failed",
+          loadTrace: "not-loaded",
+          transport: "failed",
+          detail: "unknown channel: discord",
+        },
+      ]);
+    });
+  });
+
   describe("P13 failure isolation (startAll never throws)", () => {
     it("isolates one account's install failure from the others", async () => {
       const database = memoryDatabase();
@@ -343,6 +398,76 @@ describe("flatInboundNormalizer", () => {
     });
     assert.notEqual(message, null);
     assert.equal(message?.externalMessageId, undefined);
+  });
+
+  // Discord admission (slice 13b): the vertical emits `direct` for a DM and
+  // `channel` for every guild message, with the thread id set when the message
+  // sits in a thread (transport/gateway.ts). A channel with no in-repo vertical
+  // is never normalized, whatever its payload looks like.
+  it("maps a Discord guild message to a channel conversation", () => {
+    const message = flatInboundNormalizer({
+      channel: "discord",
+      accountId: "guild",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "1180000000000000001",
+        SenderId: "1190000000000000002",
+        MessageSid: "1200000000000000003",
+        WasMentioned: true,
+      },
+    });
+    assert.equal(message?.channel, "discord");
+    assert.equal(message?.senderIdentity, "discord:1190000000000000002");
+    assert.equal(message?.conversation.kind, "channel");
+    assert.equal(message?.conversation.threadId, null);
+    assert.equal(message?.mentionedBot, true);
+  });
+
+  it("maps a Discord thread message to a thread conversation", () => {
+    const message = flatInboundNormalizer({
+      channel: "discord",
+      accountId: "guild",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "1180000000000000001",
+        SenderId: "1190000000000000002",
+        MessageThreadId: "1180000000000000004",
+        MessageSid: "1200000000000000005",
+      },
+    });
+    assert.equal(message?.conversation.kind, "thread");
+    assert.equal(message?.conversation.id, "1180000000000000004");
+    assert.equal(message?.conversation.rootConversationId, "1180000000000000001");
+  });
+
+  it("maps a Discord DM to a dm conversation", () => {
+    const message = flatInboundNormalizer({
+      channel: "discord",
+      accountId: "guild",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "direct",
+        ChatId: "1180000000000000006",
+        SenderId: "1190000000000000002",
+      },
+    });
+    assert.equal(message?.conversation.kind, "dm");
+  });
+
+  it("drops an inbound message from a channel with no in-repo vertical", () => {
+    const message = flatInboundNormalizer({
+      channel: "googlechat",
+      accountId: "space",
+      ctxPayload: {
+        Body: "hi",
+        ChatType: "channel",
+        ChatId: "spaces/AAAA",
+        SenderId: "users/1",
+      },
+    });
+    assert.equal(message, null);
   });
 
   it("maps MessageThreadId to the marker conversation's threadId", () => {

@@ -34,6 +34,7 @@ const DEFAULTS: EffectiveDefaults = {
   bindingKey: "thread",
   replyAnchor: "thread",
   outbound: { path: "relay", template: null },
+  inbound: { reactionNotifications: "off", editNotifications: "off" },
   sync: {
     finalAnswers: true,
     progress: { progressMessage: false, typingIndicator: false, messageReaction: "off" },

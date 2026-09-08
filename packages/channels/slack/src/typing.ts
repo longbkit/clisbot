@@ -27,7 +27,7 @@
 import { getSlackWriteClient } from "./client/web-api.js";
 import type { HostRuntime } from "@getpaseo/channels-shared";
 import { resolveOutboundBotToken } from "./lifecycle/start-account.js";
-import { getSlackRuntime } from "./runtime.js";
+import { getSlackHostRuntime } from "./runtime-store.js";
 
 /** The status text Slack shows while the turn runs. */
 export const SLACK_TYPING_STATUS = "is typing...";
@@ -129,7 +129,7 @@ function warnMissingScope(args: SlackTypingArgs, scope: string): void {
   const key = `${args.accountId}:${scope}`;
   if (scopeWarnings.has(key)) return;
   scopeWarnings.add(key);
-  const runtime = args.hostRuntime ?? getSlackRuntime();
+  const runtime = args.hostRuntime ?? getSlackHostRuntime();
   if (runtime === undefined) return;
   runtime.logging
     .getChildLogger({ channel: "slack", accountId: args.accountId })
@@ -173,7 +173,7 @@ async function refreshStatus(surface: StatusSurface, afterPost = false): Promise
     clearInterval(surface.timer);
     if (slackErrorCode(error) === "missing_scope")
       warnMissingScope(surface.args, "assistant:write");
-    const runtime = surface.args.hostRuntime ?? getSlackRuntime();
+    const runtime = surface.args.hostRuntime ?? getSlackHostRuntime();
     runtime?.logging
       .getChildLogger({ channel: "slack", accountId: surface.args.accountId })
       .warn("slack typing refresh stopped", {

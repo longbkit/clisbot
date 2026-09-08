@@ -55,6 +55,18 @@ export class ControlPlaneHttpError extends Error {
   }
 }
 
+/** The channel kill-switch, as a thrown problem. The `/api/v1/channels` ops
+ * layer gates itself before it reaches a handler; this is the backstop for the
+ * management contract, which reaches the same configuration writer directly. */
+export function channelPlaneAbsent(): ControlPlaneHttpError {
+  return new ControlPlaneHttpError(
+    404,
+    "not_found",
+    "Not found",
+    "the channel control plane is disabled on this Hub (PASEO_HUB_CHANNELS_ENABLED)",
+  );
+}
+
 export function invalidRequest(detail: string): ControlPlaneHttpError {
   return new ControlPlaneHttpError(400, "invalid_request", "Invalid request", detail);
 }

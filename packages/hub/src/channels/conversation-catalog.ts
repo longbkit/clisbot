@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import type { DatabaseRuntime } from "../db/runtime/index.js";
 import * as schema from "../db/schema.js";
-import type { P0ChannelName } from "./plane/types.js";
+import type { SupportedChannelName } from "./plane/types.js";
 import { ChannelWorkflowPayloadSchema } from "../triggers/channel/provider.js";
 
 export const CHANNEL_CONVERSATION_KINDS = ["dm", "channel", "thread", "group", "topic"] as const;
@@ -25,7 +25,7 @@ export interface ObservedChannelConversation {
 }
 
 interface ConversationFact {
-  channel: P0ChannelName;
+  channel: SupportedChannelName;
   rootConversationId: string;
   threadId: string | null;
   rootKind: "dm" | "channel" | "group";
@@ -46,7 +46,7 @@ export async function listObservedChannelConversations(
   runtime: DatabaseRuntime,
   input: {
     organizationId: string;
-    channel: P0ChannelName;
+    channel: SupportedChannelName;
     accountId: string;
   },
 ): Promise<ObservedChannelConversation[]> {

@@ -72,6 +72,26 @@ fallback:
 
 const ORG_ID = "org-1";
 const SECRET_TOKEN = "xoxb-ops-secret-token";
+const DISCORD_BOT_TOKEN = "MTE4MDAwMDAwMDAwMDAwMDAwOQ.discord.ops-secret-token";
+
+/** Discord's `GET /users/@me`, recording the credential the Hub probed with. */
+function stubDiscordProbe(): { authorizations: Array<string | null>; restore: () => void } {
+  const original = globalThis.fetch;
+  const authorizations: Array<string | null> = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const authorization = new Headers(init?.headers).get("authorization");
+    authorizations.push(authorization);
+    return authorization === `Bot ${DISCORD_BOT_TOKEN}`
+      ? Response.json({ id: "900000000000000001", username: "fusion-bot" })
+      : new Response("{}", { status: 401 });
+  }) as typeof fetch;
+  return {
+    authorizations,
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
+}
 
 function memoryDatabase(): Database {
   return createMemoryDatabase({
@@ -113,8 +133,11 @@ function stubSupervisor(
 ): {
   supervisor: ChannelSupervisor;
   started: { channel: string; account: string }[];
+  /** How many times a deployed revision was reconciled against the runtime. */
+  reconciled: () => number;
 } {
   const started: { channel: string; account: string }[] = [];
+  let reconciled = 0;
   const supervisor: ChannelSupervisor = {
     startAll: async () => {},
     stopAll: async () => {},
@@ -122,7 +145,10 @@ function stubSupervisor(
       started.push({ channel, account });
       return start;
     },
-    reconcile: async () => ({ accounts: [], stopped: [] }),
+    reconcile: async () => {
+      reconciled += 1;
+      return { accounts: [], stopped: [] };
+    },
     status: () => entries,
     channelReplyPost: async () => ({
       ok: false,
@@ -137,7 +163,7 @@ function stubSupervisor(
       error: "no transport started in the stub",
     }),
   };
-  return { supervisor, started };
+  return { supervisor, started, reconciled: () => reconciled };
 }
 
 function buildApp(
@@ -586,6 +612,70 @@ describe("channel control-plane ops", () => {
     assert.match(String(body.detail), /user "ghost"/u);
   });
 
+  it("removes an installed account, reconciles the runtime, and keeps its Connection", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const { supervisor, reconciled } = stubSupervisor([], {
+      channel: "slack",
+      account: "work",
+      installed: true,
+      transport: "started",
+    });
+    const application = buildApp(database, { supervisor });
+    const before = await loadChannelControlPlane(database);
+    const connectionId = before.controlPlane.accounts[0]?.connectionId;
+
+    const response = await application.operations.handleChannelRemove(
+      jsonRequest("/api/v1/channels", {
+        method: "DELETE",
+        body: { channel: "slack", account: "work" },
+      }),
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      channel: "slack",
+      account: "work",
+      removed: true,
+      revision: true,
+      connectionId,
+    });
+    assert.equal(reconciled(), 1);
+    const after = await loadChannelControlPlane(database);
+    assert.notEqual(after.revision!.id, before.revision!.id);
+    assert.deepEqual(after.controlPlane.accounts, []);
+    assert.equal(
+      after.files.some((file) => file.path === ".paseo/channels/slack/work.yml"),
+      false,
+    );
+    // The credential Connection outlives the account — another one can hold it
+    // — so the response names it instead of deleting it.
+    assert.equal(connectionId, "slack-work");
+  });
+
+  it("answers not-found for an account the revision never installed", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const { supervisor, reconciled } = stubSupervisor([], {
+      channel: "slack",
+      account: "work",
+      installed: true,
+      transport: "started",
+    });
+    const application = buildApp(database, { supervisor });
+
+    const response = await application.operations.handleChannelRemove(
+      jsonRequest("/api/v1/channels", {
+        method: "DELETE",
+        body: { channel: "telegram", account: "ghost" },
+      }),
+    );
+
+    assert.equal(response.status, 404);
+    assert.equal((await response.json()).code, "channel_account_unavailable");
+    assert.equal(reconciled(), 0);
+  });
+
   it("adds a channel through an encrypted DB connection and stores no token in the revision", async () => {
     const database = memoryDatabase();
     await withActiveConfiguration(database);
@@ -637,6 +727,99 @@ describe("channel control-plane ops", () => {
       assert.equal(accounts.accounts.length, 2);
     } finally {
       rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("adds a Discord channel behind a probed bot token and starts it on the gateway", async () => {
+    const database = memoryDatabase();
+    await withActiveConfiguration(database);
+    const { supervisor, started } = stubSupervisor(
+      [
+        {
+          channel: "discord",
+          account: "guild",
+          integrity: "ok",
+          loadTrace: "ok",
+          transport: "started",
+        },
+      ],
+      { channel: "discord", account: "guild", installed: true, transport: "started" },
+    );
+    const application = buildApp(database, { supervisor });
+    const probes = stubDiscordProbe();
+    try {
+      const response = await application.operations.handleChannelAdd(
+        jsonRequest("/api/v1/channels", {
+          method: "POST",
+          body: { channel: "discord", account: "guild", botToken: DISCORD_BOT_TOKEN },
+        }),
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {
+        channel: "discord",
+        account: "guild",
+        installed: true,
+        revision: true,
+        transport: "started",
+      });
+      // The token was probed before it was stored, and it never reached a file.
+      assert.deepEqual(probes.authorizations, [`Bot ${DISCORD_BOT_TOKEN}`]);
+      assert.deepEqual(started, [{ channel: "discord", account: "guild" }]);
+
+      const snapshot = await loadChannelControlPlane(database);
+      const account = snapshot.controlPlane.accounts.find(
+        (entry) => entry.channel === "discord" && entry.accountId === "guild",
+      );
+      assert.equal(account?.enabled, true);
+      assert.deepEqual(account?.transport, { mode: "gateway" });
+      for (const file of snapshot.files) {
+        assert.ok(!file.content.includes(DISCORD_BOT_TOKEN), `token leaked into ${file.path}`);
+      }
+      assert.deepEqual(
+        await database.resolveChannelConnection({
+          organizationId: ORG_ID,
+          channel: "discord",
+          connectionId: account?.connectionId ?? "",
+        }),
+        { botToken: DISCORD_BOT_TOKEN },
+      );
+
+      // `channels status` reports the Discord account like any other.
+      const status = await application.operations.handleChannelStatus(
+        jsonRequest("/api/v1/channels/status"),
+      );
+      assert.deepEqual(await status.json(), {
+        accounts: [
+          {
+            channel: "discord",
+            account: "guild",
+            integrity: "ok",
+            loadTrace: "ok",
+            transport: "started",
+          },
+        ],
+      });
+
+      // A token Discord rejects fails the request; no account, no revision.
+      const revisionId = (await loadChannelControlPlane(database)).revision!.id;
+      const rejected = await application.operations.handleChannelAdd(
+        jsonRequest("/api/v1/channels", {
+          method: "POST",
+          body: { channel: "discord", account: "other", botToken: "not-a-discord-token" },
+        }),
+      );
+      assert.equal(rejected.status, 400);
+      const body = (await rejected.json()) as { code: string; detail: string };
+      assert.equal(body.code, "invalid_request");
+      assert.equal(body.detail.includes("not-a-discord-token"), false);
+      const after = await loadChannelControlPlane(database);
+      assert.equal(after.revision!.id, revisionId);
+      assert.equal(
+        after.controlPlane.accounts.some((entry) => entry.accountId === "other"),
+        false,
+      );
+    } finally {
+      probes.restore();
     }
   });
 

@@ -81,6 +81,15 @@ export interface HostSyncKeyedStore<T = unknown> {
   delete(key: string): boolean;
   entries(): HostKeyedStoreEntry<T>[];
   clear(): void;
+  /**
+   * Await the backing's durability for everything written so far.
+   *
+   * The sync surface cannot await its own writes, and the encrypted backing is
+   * write-behind, so a caller that must not report success before the bytes are
+   * durable — the QR link path, answering "linked" with a freshly scanned
+   * session — awaits this. Plain-file namespaces resolve immediately.
+   */
+  flush(): Promise<void>;
 }
 
 /** A keyed-store root: one per account, owning the backing + the open
@@ -89,6 +98,8 @@ export interface HostSyncKeyedStore<T = unknown> {
 export interface HostKeyedStoreRoot {
   openKeyedStore(options: HostKeyedStoreOptions): HostKeyedStore;
   openSyncKeyedStore(options: HostKeyedStoreOptions): HostSyncKeyedStore;
+  /** Await every backing this root writes through (see `HostSyncKeyedStore.flush`). */
+  flush(): Promise<void>;
 }
 
 /** Thrown for store faults. `code` mirrors the native
@@ -243,17 +254,27 @@ function prepareValue(key: string, value: unknown, operation: string): string {
 // --- Backing ------------------------------------------------------------------
 
 /** One persisted entry. `expiresAt` is null when the entry has no TTL. */
-interface StoredEntry {
+export interface StoredEntry {
   key: string;
   value: unknown;
   createdAt: number;
   expiresAt: number | null;
 }
 
-/** Read/write backing for a store root. Writes are atomic (tmp + rename). */
-interface KeyedStoreBackend {
+/**
+ * Read/write backing for a store root. `load`/`save` are SYNCHRONOUS because
+ * the native store is: the ported verticals write credentials from a sync
+ * closure. A backend whose real durability is asynchronous (the encrypted
+ * database backing) therefore loads from a snapshot taken before the root is
+ * built, and writes behind — `flush` is how the async facade waits for those
+ * writes and reports their failure.
+ */
+export interface KeyedStoreBackend {
   load(namespace: string): StoredEntry[];
   save(namespace: string, entries: StoredEntry[]): void;
+  /** Resolves once every `save` issued so far is durable; rejects on the first
+   * failure. Absent on backends whose `save` is already durable. */
+  flush?(): Promise<void>;
 }
 
 function namespaceFile(dir: string, namespace: string): string {
@@ -515,8 +536,11 @@ class NamespaceStore {
 
 // --- Facades + root ------------------------------------------------------------
 
-function syncFacade(store: NamespaceStore): HostSyncKeyedStore {
+function syncFacade(store: NamespaceStore, backend: KeyedStoreBackend): HostSyncKeyedStore {
   return {
+    flush: async () => {
+      await backend.flush?.();
+    },
     register: (key, value, opts) => store.register(key, value, opts?.ttlMs),
     registerIfAbsent: (key, value, opts) => store.registerIfAbsent(key, value, opts?.ttlMs),
     update: (key, updateValue, opts) => store.update(key, updateValue, opts?.ttlMs),
@@ -528,16 +552,24 @@ function syncFacade(store: NamespaceStore): HostSyncKeyedStore {
   };
 }
 
-function asyncFacade(store: NamespaceStore): HostKeyedStore {
+/** The async surface. Every mutation awaits the backend's durability so a
+ * caller that awaited `register` has a persisted entry — which is what lets the
+ * encrypted backing be write-behind without lying to the vertical. */
+function asyncFacade(store: NamespaceStore, backend: KeyedStoreBackend): HostKeyedStore {
+  const durable = async <T>(result: T): Promise<T> => {
+    await backend.flush?.();
+    return result;
+  };
   return {
-    register: async (key, value, opts) => store.register(key, value, opts?.ttlMs),
-    registerIfAbsent: async (key, value, opts) => store.registerIfAbsent(key, value, opts?.ttlMs),
-    update: async (key, updateValue, opts) => store.update(key, updateValue, opts?.ttlMs),
+    register: async (key, value, opts) => durable(store.register(key, value, opts?.ttlMs)),
+    registerIfAbsent: async (key, value, opts) =>
+      durable(store.registerIfAbsent(key, value, opts?.ttlMs)),
+    update: async (key, updateValue, opts) => durable(store.update(key, updateValue, opts?.ttlMs)),
     lookup: async (key) => store.lookup(key),
-    consume: async (key) => store.consume(key),
-    delete: async (key) => store.delete(key),
+    consume: async (key) => durable(store.consume(key)),
+    delete: async (key) => durable(store.delete(key)),
     entries: async () => store.listEntries(),
-    clear: async () => store.clear(),
+    clear: async () => durable(store.clear()),
   };
 }
 
@@ -555,16 +587,33 @@ interface OpenedNamespace {
  * (`channels/<accountId>/state/`); omit it for an in-memory root (load-time
  * fixtures, nothing persists). Reopening a namespace with different
  * `maxEntries` / `overflowPolicy` / `defaultTtlMs` fails (native parity).
+ *
+ * `secret` routes the NAMED namespaces to a second backend instead of the
+ * plain JSON file — the mechanism behind "encrypted keyed-store namespaces"
+ * (`state/encrypted-namespaces.ts` names them, `state/secret-backend.ts`
+ * supplies the backing). Nothing else about the store changes: the vertical
+ * opens the same namespace and cannot tell which backing it got.
  */
 export function createHostKeyedStoreRoot(
-  options: { dir?: string; now?: () => number } = {},
+  options: {
+    dir?: string;
+    now?: () => number;
+    secret?: { namespaces: readonly string[]; backend: KeyedStoreBackend };
+  } = {},
 ): HostKeyedStoreRoot {
-  const backend =
-    options.dir === undefined ? createMemoryBackend() : createFileBackend(options.dir);
+  const plain = options.dir === undefined ? createMemoryBackend() : createFileBackend(options.dir);
+  const secretNamespaces = new Set(options.secret?.namespaces ?? []);
+  const backendFor = (namespace: string): KeyedStoreBackend =>
+    options.secret !== undefined && secretNamespaces.has(namespace)
+      ? options.secret.backend
+      : plain;
   const now = options.now ?? (() => Date.now());
   const opened = new Map<string, OpenedNamespace>();
 
-  function openNamespace(rawOptions: HostKeyedStoreOptions): NamespaceStore {
+  function openNamespace(rawOptions: HostKeyedStoreOptions): {
+    store: NamespaceStore;
+    backend: KeyedStoreBackend;
+  } {
     const namespace = validateNamespace(rawOptions.namespace);
     const signature = {
       maxEntries: validateMaxEntries(rawOptions.maxEntries),
@@ -583,8 +632,9 @@ export function createHostKeyedStoreRoot(
           "open",
         );
       }
-      return existing.store;
+      return { store: existing.store, backend: backendFor(namespace) };
     }
+    const backend = backendFor(namespace);
     const store = new NamespaceStore(
       backend,
       namespace,
@@ -594,11 +644,21 @@ export function createHostKeyedStoreRoot(
       now,
     );
     opened.set(namespace, { store, signature });
-    return store;
+    return { store, backend };
   }
 
   return {
-    openKeyedStore: (rawOptions) => asyncFacade(openNamespace(rawOptions)),
-    openSyncKeyedStore: (rawOptions) => syncFacade(openNamespace(rawOptions)),
+    openKeyedStore: (rawOptions) => {
+      const namespace = openNamespace(rawOptions);
+      return asyncFacade(namespace.store, namespace.backend);
+    },
+    openSyncKeyedStore: (rawOptions) => {
+      const namespace = openNamespace(rawOptions);
+      return syncFacade(namespace.store, namespace.backend);
+    },
+    flush: async () => {
+      await plain.flush?.();
+      await options.secret?.backend.flush?.();
+    },
   };
 }

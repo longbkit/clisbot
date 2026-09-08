@@ -662,8 +662,10 @@ async function createChannelReplyServerAtComposition(
       outputStore: options.database,
       resolveCapability: (token) =>
         supervisor.channelReplyCapabilities?.resolve(token, organizations[0]!.id),
-      post: (ref, text) => supervisor.channelReplyPost(ref, text),
-      mediaPost: (ref, filePath) => supervisor.channelReplyMediaPost(ref, filePath),
+      reserveTurnOutput: (token) => supervisor.channelReplyCapabilities?.reserveTurnOutput(token),
+      log: channelLogger,
+      post: (ref, text, options) => supervisor.channelReplyPost(ref, text, options),
+      mediaPost: (ref, file) => supervisor.channelReplyMediaPost(ref, file),
     });
   } catch (error) {
     reportFailure(error, {

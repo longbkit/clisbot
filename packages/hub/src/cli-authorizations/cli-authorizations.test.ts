@@ -146,6 +146,7 @@ function browserAccess(
         capabilities: {
           view: true as const,
           manageResources: true,
+          manageChannels: true,
           manageMembers: true,
           manageOwners: true,
         },

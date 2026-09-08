@@ -1,15 +1,16 @@
 // The Telegram liveness surface: the action sent on start, kept live by THIS
 // file's refresh timer, and cancelled (not cleared) on stop; the topic id rides
 // on the action — including the forum's General topic, where a SEND must drop
-// it (the pinned asymmetry, typing.ts). The fake Bot API is registered through
-// the L1 test seam.
+// it (the pinned asymmetry, typing.ts).
+//
+// D-TG-025: the fake Bot API is now injected through upstream's own
+// `TelegramSendOpts.api` override (forwarded by `typing.ts`) instead of the
+// deleted `registerTelegramApiForTest` seam on the local L1 client. The
+// assertions are unchanged.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  clearTelegramApiForTest,
-  registerTelegramApiForTest,
-  type TelegramApi,
-} from "./client/bot-api.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { HostKeyedStore, HostRuntime } from "@getpaseo/channels-shared";
+import { setChannelHostRuntime } from "./runtime-store.js";
 import {
   clearTelegramTypingTimersForTest,
   resolveTypingThreadId,
@@ -24,7 +25,7 @@ const CFG = {
 } as unknown as Record<string, unknown>;
 
 interface Action {
-  chatId: number;
+  chatId: string | number;
   action: string;
   params?: Record<string, unknown>;
 }
@@ -51,10 +52,35 @@ function install(succeeds = Number.POSITIVE_INFINITY): Action[] {
       actions.push({ chatId, action, ...(params !== undefined ? { params } : {}) });
       return true;
     },
-  } as unknown as TelegramApi;
-  registerTelegramApiForTest("tg-test-typing-token", api);
+  };
+  installedApi = api;
   return actions;
 }
+
+let installedApi: unknown;
+
+function memoryKeyedStore(): HostKeyedStore {
+  const map = new Map<string, unknown>();
+  return {
+    register: async (key, value) => void map.set(key, value),
+    registerIfAbsent: async (key, value) => (map.has(key) ? false : (map.set(key, value), true)),
+    update: async () => false,
+    lookup: async (key) => map.get(key),
+    consume: async (key) => map.get(key),
+    delete: async (key) => map.delete(key),
+    entries: async () => [],
+    clear: async () => map.clear(),
+  };
+}
+
+const hostRuntime = {
+  state: { openKeyedStore: () => memoryKeyedStore() },
+  logging: { getChildLogger: () => ({ debug() {}, info() {}, warn() {}, error() {} }) },
+} as unknown as HostRuntime;
+
+beforeEach(() => {
+  setChannelHostRuntime(hostRuntime);
+});
 
 function args(overrides: Partial<TelegramTypingArgs> = {}): TelegramTypingArgs {
   return {
@@ -63,13 +89,13 @@ function args(overrides: Partial<TelegramTypingArgs> = {}): TelegramTypingArgs {
     to: "-1001234",
     action: "start",
     indicator: true,
+    ...(installedApi ? { api: installedApi } : {}),
     ...overrides,
   };
 }
 
 afterEach(() => {
   clearTelegramTypingTimersForTest();
-  clearTelegramApiForTest();
   vi.useRealTimers();
 });
 
@@ -77,7 +103,8 @@ describe("telegramTyping", () => {
   it("sends one typing action to the chat", async () => {
     const actions = install();
     await telegramTyping(args());
-    expect(actions).toEqual([{ chatId: -1001234, action: TELEGRAM_TYPING_ACTION }]);
+    // D-TG-025: upstream passes the resolved chat id to the Bot API as a string.
+    expect(actions).toEqual([{ chatId: "-1001234", action: TELEGRAM_TYPING_ACTION }]);
   });
 
   it("re-sends on its own refresh timer while the lease is open", async () => {
@@ -127,7 +154,7 @@ describe("telegramTyping", () => {
     const actions = install();
     await telegramTyping(args({ threadId: "42" }));
     expect(actions[0]).toEqual({
-      chatId: -1001234,
+      chatId: "-1001234",
       action: TELEGRAM_TYPING_ACTION,
       params: { message_thread_id: 42 },
     });

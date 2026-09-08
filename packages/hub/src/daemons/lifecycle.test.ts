@@ -48,13 +48,11 @@ describe("durable Hub action acknowledgement state", () => {
     const executionId = "00000000-0000-4000-8000-0000000000f1";
     await database.insertAgentExecution({
       id: executionId,
-      organizationId: "organization-lifecycle-log",
-      workflowId: "project-lifecycle-log",
       machineId: null,
       daemonId: daemon.id,
       triggerContext: {},
       outputContext: {},
-      configurationRevisionId: "revision-lifecycle-log",
+      ...(await seedWorkflow(database, "organization-lifecycle-log", "lifecycle-log")),
     });
     vi.spyOn(database, "findAgentExecutionById").mockRejectedValueOnce(new Error(canary));
     const stream = new FailureLogStream();
@@ -106,11 +104,10 @@ describe("durable Hub action acknowledgement state", () => {
       connectionForDaemon: () => undefined,
       providers: [provider],
     });
+    const workflow = await seedWorkflow(database, "org-workflow-terminal", "workflow-terminal");
     const run = (
       await database.createAcceptedTriggerRun({
-        organizationId: "org-workflow-terminal",
-        workflowId: "project-workflow-terminal",
-        configurationRevisionId: "revision-workflow-terminal",
+        ...workflow,
         providerEventReceiptId: "receipt-workflow-terminal",
         configuredTriggerName: "terminal",
         prompt: "raw",
@@ -245,17 +242,43 @@ describe("durable Hub action acknowledgement state", () => {
   });
 });
 
+/** An execution belongs to an enabled workflow revision: `insertAgentExecution`
+ * refuses one whose workflow or configuration revision the organization does not
+ * own. Seed that pair first and spread the result into the execution. */
+async function seedWorkflow(
+  database: Awaited<ReturnType<typeof createMemoryDatabase>>,
+  organizationId: string,
+  name: string,
+): Promise<{ organizationId: string; workflowId: string; configurationRevisionId: string }> {
+  const workflow = await database.saveOrganizationTrigger({
+    organizationId,
+    name,
+    enabled: true,
+    format: "single_run",
+    yaml: "",
+    normalizedConfiguration: {},
+    contentHash: `${name}-hash`,
+    sourceKind: "manual",
+    sourceEvidence: { kind: "test" },
+    createdByUserId: null,
+    routes: [],
+  });
+  return {
+    organizationId,
+    workflowId: workflow.id,
+    configurationRevisionId: workflow.activeRevisionId,
+  };
+}
+
 async function acknowledgementFixture() {
   const database = createMemoryDatabase({ now: () => new Date("2026-01-01T00:00:00.000Z") });
   await database.insertAgentExecution({
     id: EXECUTION_ID,
-    organizationId: "org-ack-test",
-    workflowId: "project-ack-test",
     machineId: null,
     daemonId: DAEMON_ID,
     triggerContext: {},
     outputContext: {},
-    configurationRevisionId: "revision-ack-test",
+    ...(await seedWorkflow(database, "org-ack-test", "ack-test")),
   });
   await database.attachAgentToExecution(EXECUTION_ID, DAEMON_ID, AGENT_ID);
   await database.transitionAgentExecution(EXECUTION_ID, "succeeded", {

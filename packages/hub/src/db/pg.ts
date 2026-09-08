@@ -4,6 +4,7 @@ import type { ManagedAccessMode } from "@getpaseo/protocol/managed-access";
 import { and, eq, sql } from "drizzle-orm";
 import type { LaunchMachineIntent } from "../dispatcher/launch-machine-intent.js";
 import type { JsonValue } from "../config/compiler.js";
+import type { SupportedChannelName } from "../channels/catalog.js";
 import { parseInvocationInputs, parseInvocationRejection } from "../triggers/invocation.js";
 import type { ProviderEventDropReasonCode } from "../triggers/drop-reason.js";
 import {
@@ -19,7 +20,11 @@ import {
 import { withApiKeySerialization } from "./api-key-serialization.js";
 import { ConnectionRepository } from "./connections.js";
 import { ProviderEventAcceptanceRepository } from "./trigger-acceptance.js";
-import type { CredentialCipher } from "../credentials/credential-cipher.js";
+import {
+  credentialEnvelopeVersion,
+  type CredentialCipher,
+  type CredentialEnvelopeVersion,
+} from "../credentials/credential-cipher.js";
 import {
   toAgentExecutionRecord,
   toAttachmentRecord,
@@ -31,6 +36,11 @@ import {
 } from "./mappers.js";
 import type { AgentExecutionStatus, MachineSource, MachineStatus } from "./schema.js";
 import * as schema from "./schema.js";
+import {
+  CHANNEL_CONNECTION_TABLES,
+  CHANNEL_CREDENTIAL_FIELDS,
+  sealableChannelCredentials,
+} from "./channel-connections.js";
 import type { DatabaseRuntime, QueryHandle, QueryRow } from "./runtime/index.js";
 import type { Locks } from "./runtime/locks/index.js";
 import type {
@@ -68,6 +78,11 @@ import type {
   BindSlackConnectionInput,
   CompleteLinearProviderApplicationInput,
   CompleteSlackProviderApplicationInput,
+  ChannelConnectionChannel,
+  ChannelConnectionCredentials,
+  ChannelStateSecretRecord,
+  ChannelStateSecretScope,
+  ConfigureChannelConnectionInput,
   ConnectionStartAuthority,
   ConnectionProvider,
   ReadConnectionAttemptInput,
@@ -143,16 +158,65 @@ export function createDatabase(
   return new PgDatabase(runtime, locks, credentialCipher);
 }
 
-function requireChannelBotCredential(value: unknown): { botToken: string } {
-  if (
-    value === null ||
-    typeof value !== "object" ||
-    typeof Reflect.get(value, "botToken") !== "string" ||
-    String(Reflect.get(value, "botToken")) === ""
-  ) {
+/**
+ * The Connection table owning one channel's credential. Every table carries the
+ * same columns, so each query below is written once against any of them.
+ */
+function channelConnectionTable(channel: ChannelConnectionChannel) {
+  return CHANNEL_CONNECTION_TABLES[channel];
+}
+
+/**
+ * The envelope's additional authenticated data: one owner per connection row.
+ * v2 binds the organization as well, so a row lifted into another organization
+ * fails authentication instead of decrypting; v1 is the pre-2026-09-07 form and
+ * is read-only — `configureChannelConnection` always writes v2, which re-seals
+ * a v1 row the next time its credential is written.
+ */
+function channelCredentialOwner(
+  channel: ChannelConnectionChannel,
+  connectionId: string,
+  organizationId: string,
+  version: CredentialEnvelopeVersion,
+): string {
+  return version === 1
+    ? `${channel}-connection:${connectionId}`
+    : `${channel}-connection:${organizationId}:${connectionId}`;
+}
+
+/** The AAD owner of one encrypted keyed-store namespace. Binding the whole
+ * scope means a row lifted into another organization, account or namespace
+ * fails authentication instead of decrypting. */
+function channelStateSecretOwner(scope: ChannelStateSecretScope, namespace: string): string {
+  return `channel-state:${scope.channel}:${scope.organizationId}:${scope.accountId}:${namespace}`;
+}
+
+/** The `(organization, channel, account)` predicate every state-secret query
+ * carries — per-organization isolation stated once. */
+function channelStateSecretScope(scope: ChannelStateSecretScope) {
+  return and(
+    eq(schema.channelStateSecrets.organizationId, scope.organizationId),
+    eq(schema.channelStateSecrets.channel, scope.channel),
+    eq(schema.channelStateSecrets.accountId, scope.accountId),
+  );
+}
+
+/** The decrypted envelope, projected back onto the carrier field names. An
+ * envelope with no usable field is malformed — fail rather than start an
+ * account with no credential at all. */
+function readChannelCredentials(value: unknown): ChannelConnectionCredentials {
+  if (value === null || typeof value !== "object") {
     throw new Error("channel connection credential envelope is malformed");
   }
-  return { botToken: String(Reflect.get(value, "botToken")) };
+  const credentials: Record<string, string> = {};
+  for (const field of CHANNEL_CREDENTIAL_FIELDS) {
+    const entry: unknown = Reflect.get(value, field);
+    if (typeof entry === "string" && entry !== "") credentials[field] = entry;
+  }
+  if (Object.keys(credentials).length === 0) {
+    throw new Error("channel connection credential envelope is malformed");
+  }
+  return credentials;
 }
 
 function requireChannelSlackCredential(value: unknown): { botToken: string } {
@@ -4171,64 +4235,123 @@ class PgDatabase implements Database {
     return this.connections.findDiscordForOrganization(organizationId, guildId);
   }
 
-  async configureTelegramConnection(input: {
-    organizationId: string;
-    accountId: string;
-    botToken: string;
-  }): Promise<{ connectionId: string }> {
+  async configureChannelConnection(
+    input: ConfigureChannelConnectionInput,
+  ): Promise<{ connectionId: string }> {
+    const table = channelConnectionTable(input.channel);
     return this.pool.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
       const [existing] = await transaction
-        .select({ id: schema.telegramConnections.id })
-        .from(schema.telegramConnections)
+        .select({ id: table.id })
+        .from(table)
         .where(
-          and(
-            eq(schema.telegramConnections.organizationId, input.organizationId),
-            eq(schema.telegramConnections.accountId, input.accountId),
-          ),
+          and(eq(table.organizationId, input.organizationId), eq(table.accountId, input.accountId)),
         )
         .for("update");
       const connectionId = existing?.id ?? randomUUID();
       const credentialEnvelope = this.credentialCipher.encrypt(
-        `telegram-connection:${connectionId}`,
-        { botToken: input.botToken },
+        channelCredentialOwner(input.channel, connectionId, input.organizationId, 2),
+        sealableChannelCredentials(input.credentials),
       );
+      const externalIdentity = input.identity ?? null;
       await transaction
-        .insert(schema.telegramConnections)
+        .insert(table)
         .values({
           id: connectionId,
           organizationId: input.organizationId,
           accountId: input.accountId,
           credentialEnvelope,
+          externalIdentity,
         })
         .onConflictDoUpdate({
-          target: [schema.telegramConnections.organizationId, schema.telegramConnections.accountId],
-          set: { credentialEnvelope, updatedAt: sql`clock_timestamp()` },
+          target: [table.organizationId, table.accountId],
+          set: { credentialEnvelope, externalIdentity, updatedAt: sql`clock_timestamp()` },
         });
       return { connectionId };
     });
   }
 
+  async loadChannelStateSecrets(
+    input: ChannelStateSecretScope,
+  ): Promise<ChannelStateSecretRecord[]> {
+    const rows = await this.pool
+      .drizzle()
+      .select({
+        namespace: schema.channelStateSecrets.namespace,
+        stateEnvelope: schema.channelStateSecrets.stateEnvelope,
+      })
+      .from(schema.channelStateSecrets)
+      .where(channelStateSecretScope(input));
+    return rows.map((row) => ({
+      namespace: row.namespace,
+      entries: this.credentialCipher.decrypt(
+        channelStateSecretOwner(input, row.namespace),
+        row.stateEnvelope,
+      ),
+    }));
+  }
+
+  async saveChannelStateSecret(
+    input: ChannelStateSecretScope & { namespace: string; entries: unknown },
+  ): Promise<void> {
+    const stateEnvelope = this.credentialCipher.encrypt(
+      channelStateSecretOwner(input, input.namespace),
+      input.entries,
+    );
+    await this.pool
+      .drizzle()
+      .insert(schema.channelStateSecrets)
+      .values({
+        organizationId: input.organizationId,
+        channel: input.channel,
+        accountId: input.accountId,
+        namespace: input.namespace,
+        stateEnvelope,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.channelStateSecrets.organizationId,
+          schema.channelStateSecrets.channel,
+          schema.channelStateSecrets.accountId,
+          schema.channelStateSecrets.namespace,
+        ],
+        set: { stateEnvelope, updatedAt: sql`clock_timestamp()` },
+      });
+  }
+
+  async deleteChannelStateSecrets(input: ChannelStateSecretScope): Promise<void> {
+    await this.pool
+      .drizzle()
+      .delete(schema.channelStateSecrets)
+      .where(channelStateSecretScope(input));
+  }
+
   async resolveChannelConnection(input: {
     organizationId: string;
-    channel: "slack" | "telegram";
+    channel: SupportedChannelName;
     connectionId: string;
-  }): Promise<{ botToken: string; appToken?: string; providerApplicationId?: string } | undefined> {
+  }): Promise<ChannelConnectionCredentials | undefined> {
     const database = this.pool.drizzle();
-    if (input.channel === "telegram") {
+    if (input.channel !== "slack") {
+      const table = channelConnectionTable(input.channel);
       const [row] = await database
         .select()
-        .from(schema.telegramConnections)
+        .from(table)
         .where(
-          and(
-            eq(schema.telegramConnections.id, input.connectionId),
-            eq(schema.telegramConnections.organizationId, input.organizationId),
-          ),
+          and(eq(table.id, input.connectionId), eq(table.organizationId, input.organizationId)),
         )
         .limit(1);
       if (row === undefined) return undefined;
-      return requireChannelBotCredential(
-        this.credentialCipher.decrypt(`telegram-connection:${row.id}`, row.credentialEnvelope),
+      return readChannelCredentials(
+        this.credentialCipher.decrypt(
+          channelCredentialOwner(
+            input.channel,
+            row.id,
+            input.organizationId,
+            credentialEnvelopeVersion(row.credentialEnvelope),
+          ),
+          row.credentialEnvelope,
+        ),
       );
     }
     const [connection] = await database

@@ -1,8 +1,10 @@
 # packages/channels/slack DEVIATIONS
 
-One entry per behavioral deviation from the OpenClaw source reference
-(`extensions/slack/src/` @ 2026.7.1). Structural re-targets are recorded as
-permanent; no silent drift.
+One entry per behavioral deviation from the OpenClaw source. The upstream
+baseline, the per-file source mapping and the provenance deviations (`D-011`
+and up, "this local file gathers these upstream files") live in
+`upstream-sync.json`; this file carries the behavioral reasoning. Structural
+re-targets are recorded as permanent; no silent drift.
 
 ## D-001 — sent-message write-back targets the plane's keyed-store seam
 
@@ -29,18 +31,76 @@ The pinned vertical resolves its Web API clients through
   pinned npm dep `@slack/web-api@7.18.0` is the client.
 - upstream status: n/a (structural) — permanent.
 
-## D-003 — L2 transport talks to `SocketModeClient` directly
+## D-038/D-039 — the Bolt provider and its ack-after-admission receiver wrapper
 
-The pinned vertical rides on `@slack/bolt`'s `SocketModeReceiver` + its
-patched native-reconnect failure observer (`installSlackNativeReconnectFailureObserver`).
-In-repo the transport (transport/socket-mode.ts + socket-reconnect.ts) drives
-the pinned npm dep `@slack/socket-mode@2.0.7` `SocketModeClient` directly,
-keeping the pinned backoff/abort/auth-error semantics and dropping the Bolt
-`App`/HTTP-receiver surface (Socket Mode only).
+Supersedes the retired D-003 (which described the hand-rolled
+`transport/socket-mode.ts` driving `@slack/socket-mode` directly, plus the
+retired `socket-pool.ts` / `socket-reconnect.ts`, D-020 / D-021). Slice 21
+replaces that transport with upstream's own stack: `@slack/bolt@5.0.0`, the
+verbatim `monitor/provider-support.ts` (`createSlackBoltApp`,
+`startSlackSocketAndWaitForDisconnect`, the socket logger and the native
+reconnect-failure observer) and the verbatim `monitor/reconnect-policy.ts`
+(backoff policy, shared-connection diagnostics, auth-error classification,
+disconnect waiter).
 
-- reason: no `@slack/bolt` dep (out of the pinned two); the socket loop's
-  behavior is ported, not the receiver plumbing.
-- upstream status: n/a (structural) — permanent.
+- **The ack order is the load-bearing fact.** Bolt acks Events API envelopes
+  BEFORE the listener chain runs (`App.js`: "Events API requests are
+  acknowledged right away"). That is ack-before-admission, which the Fusion
+  inbound contract forbids. `monitor/ingress.ts` keeps upstream's own
+  `wrapReceiver` seam — the wrapper swaps the receiver's app for a shim — and
+  the Fusion shim hands Bolt a DEFERRED ack, so the real Socket Mode envelope
+  is acked only after `app.processEvent` resolved, i.e. after the listener's
+  Hub admission returned. A listener fault rejects `processEvent`
+  (`app.error` rethrows), the receiver's `processEventErrorHandler` is the
+  upstream `async () => false`, and the envelope is redelivered. Pinned by
+  `src/monitor/provider.test.ts` ("does not ack until the Hub handoff
+  resolved", "never acks when the Hub handoff fails").
+- **Interactive components and slash commands ack FIRST.** Slack closes their
+  response window after 3s, far below a durable write plus an agent turn.
+  Upstream's wrapper makes the same exception: non-`event_callback` payloads
+  pass straight through to the listener's own `ack()`. This is the documented
+  exception to admission-before-ack (D-041).
+- **Bolt's authorize is the account's probed identity.** Bolt's single-token
+  authorize calls `auth.test` on the first event. The account lifecycle already
+  ran exactly that call (`probeSlackAuth`), so `provider.ts` installs the
+  probed identity instead. `createSlackBoltApp` stays byte-identical.
+- **The cut point.** Everything upstream's provider does after
+  `createSlackBoltApp` — the OpenClaw config graph, `SlackMonitorContext`, the
+  `monitor/message-handler` prepare/dispatch tree — is out: the Hub owns
+  config, authorization, routing and the agent. The Fusion listeners build a
+  `ChannelInboundEvent` and admit it.
+- upstream status: this is now the upstream SDK and the upstream construction;
+  the hand-rolled transport is retired.
+
+## D-040/D-041 — inbound system events and interactive callbacks
+
+Upstream's `monitor/events/{reactions,members,channels,pins}.ts` register on
+the OpenClaw monitor context and publish through `enqueueRoutedSystemEvent`;
+`interactions.block-actions.ts` decodes a payload and then drives OpenClaw's
+approval gates, question finalization and command runner. Fusion has neither
+bus, so the port keeps the part that is protocol truth and cuts the rest:
+
+- `monitor/events/system-events.ts` reproduces the notification TEXT and the
+  dedupe CONTEXT KEY character for character (`Slack reaction added: :x: by U
+in C msg TS from U2`, `Slack: U joined C.`, `Slack channel renamed: #n.`,
+  `Slack: U pinned a message in C.`) and emits a `ChannelInboundEvent` whose
+  `body` is that text, `externalMessageId` is that context key and
+  `wasMentioned` is false — a reaction or a join never addresses the bot, so a
+  mention-gated conversation ignores it and an always-reply conversation sees
+  it, which is what `enqueueRoutedSystemEvent` does once its route resolves.
+- `message_changed` / `message_deleted` go through the VERBATIM
+  `monitor/events/message-subtype-handlers.ts` registry for sender, thread and
+  context key; only `describe()` is rendered locally. Before slice 21 both
+  subtypes produced an empty body and were dropped.
+- `monitor/events/interactions.ts` keeps the decode half only: actor id,
+  action id, element value (button value, selected option(s), date, user),
+  conversation, message ts, thread ts, trigger id. It admits them as an inbound
+  event with `wasMentioned: true` (a click on the bot's own card IS an address
+  to the bot). The native approval seam (`transport/approval-card.ts` →
+  `channelRuntime.approvalAction`, D-010) runs from the same listener,
+  unchanged.
+- upstream status: in-repo decision — permanent while the Hub owns routing and
+  approvals.
 
 ## D-004 — `WebClient` loaded through a dynamic import
 
@@ -53,40 +113,75 @@ pinned dep present at import time.
   are the only sites that touch the dep.
 - upstream status: n/a (structural) — permanent.
 
-## D-005 — outbound text is rendered with a markdown-aware `renderSlackMrkdwn`, not the full markdown front-end
+## D-026 — outbound text renders through the upstream `format.ts`
 
-The OpenClaw outbound pipeline renders agent markdown through the full
-`format.ts` front-end (angle-token preservation, link → `<href|label>`
-conversion, tables, CJK-width-aware bold boundaries). The in-repo P0 relay
-posts one `text` field (Block Kit is out of scope — group E), so
-`sendSlackText` renders the text through `renderSlackMrkdwn` (`src/mrkdwn.ts`):
-a markdown-it parse whose token walk emits Slack mrkdwn for the supported
-constructs (code spans / fenced blocks, links, bold `*…*`, italic `_…_`,
-strikethrough `~…~`, blockquote, lists) and escapes only the XML-unsafe
-chars (`&` `<` `>`) inside text leaves. A literal backslash the agent typed
-is kept.
+`sendSlackText` and the Block Kit `mrkdwn` field render both call
+`normalizeSlackOutboundText` (`src/format.ts`, ported verbatim from
+`extensions/slack/src/format.ts@5d8067a4483`). The in-repo
+`src/mrkdwn.ts` / `renderSlackMrkdwn` markdown-it front end it replaces is
+deleted, together with the earlier D-005 and D-013 entries that described it.
 
-The earlier P0 behavior escaped every `\` `&` `<` `>` `([*_`~])`with
-backslash prefixes (the verbatim port of the pinned`monitor/mrkdwn.ts`
-`escapeSlackMrkdwn`); that also escaped the backtick delimiter itself, so a
-legitimate `` `code` `` span posted as literal `\`code\`` with visible
-backslashes — the markup the agent wanted to render was killed.
+- effect on the wire: one behavior change. Upstream escapes all three
+  XML-unsafe characters in text leaves, so `1 < 2 & 3 > 0` now posts as
+  `1 &lt; 2 &amp; 3 &gt; 0`; the retired renderer left `>` literal. Everything
+  the retired renderer produced for code spans, fenced blocks, links,
+  emphasis, strikethrough, blockquotes and lists is unchanged, and the
+  upstream renderer additionally carries the angle-token preservation
+  (`<@U…>`, `<!here>`, `<#C…|name>`, `<url|label>`), CJK-width-aware bold
+  boundaries, table modes and assistant-transcript role-header protection the
+  in-repo renderer never had.
+- test migration: `src/mrkdwn.test.ts` is deleted. Its two production-path
+  cases moved into `src/outbound.test.ts` (the render-through-`sendSlackText`
+  assertion and the "no unescaped entity chars" assertion, the latter updated
+  for `&gt;`). The remaining unit cases are covered on the new production path
+  by the upstream `src/format.test.ts` (25 cases, ported verbatim); the
+  round-trip case `renderSlackMrkdwn(decodeSlackEntities(wire)) === wire` is
+  dropped because the decode half now lives in `src/fusion/slack-entities.ts`
+  (D-024) and the render half is upstream's, whose own suite pins the
+  angle-token round trip.
+- reason: the goal is the upstream source, not a local equivalent. See
+  `docs/audits/2026-09-07-openclaw-channel-port-goal.md`.
+- upstream status: this is now the upstream implementation; the local one is
+  retired.
 
-- effect: legitimate markdown renders as mrkdwn; a `\` or `&` in prose still
-  cannot start a broken entity/mention.
-- reason: mrkdwn is a strict subset of CommonMark for these constructs, so a
-  shared parse-and-emit walk renders the intended markup while staying
-  entity-safe; the full OpenClaw front-end remains out of scope (tables,
-  angle-token preservation) for the P0 text path.
-- upstream status: n/a (decision) — the walk is a new in-repo renderer;
-  `escapeSlackMrkdwn` is no longer used outbound.
+## D-024 — inbound entity decode stays Fusion-owned
+
+Upstream keeps its mirror of this decode private inside `format.ts`
+(`decodeSlackMrkdwnEntities`, `&amp;`/`&lt;`/`&gt;` only), so there is no
+upstream symbol to import. `src/fusion/slack-entities.ts` keeps the in-repo
+`decodeSlackEntities` — which also decodes `&quot;` and `&#39;`, both of which
+Slack emits in some payloads — for the L2 transport's inbound boundary
+(`transport/socket-event-filter.ts`).
+
+- upstream status: n/a (structural) — permanent until the inbound port
+  (slice 21) brings the upstream inbound normalizer in.
+
+## D-023 — package tsconfig drops two strict flags for the ported source
+
+`exactOptionalPropertyTypes` and `noPropertyAccessFromIndexSignature` are off
+for this package so the ported OpenClaw files compile verbatim; OpenClaw's own
+tsconfig sets neither. Mirrors the Telegram package's D-TG-001.
+
+- upstream status: n/a (build configuration) — permanent while ported source
+  is present.
+
+## D-025 — nested lint override for ported source
+
+`.oxlintrc.json` (copied from `packages/channels/markdown-core/.oxlintrc.json`)
+turns off the stylistic rules the root config enforces but OpenClaw's lint
+config does not. Enforcing them would mean editing every ported file and
+losing the upstream diff. Correctness, suspicious and perf rules still apply.
+
+- upstream status: n/a (lint configuration) — permanent while ported source is
+  present.
 
 ## D-006 — retired reply-text media parsing
 
 The pinned OpenClaw vertical parses reply text for media paths through its
 `reply-media-paths` runtime. The in-repo vertical retires that text parsing:
-media is posted only through the Hub's explicit `send_file` MCP tool, which
-routes into this vertical's `outbound.sendMedia`. `sendSlackText` posts text
+media is posted only through the Hub's `message` MCP tool media params
+(`attachments`/`media`/`buffer`), which route into this vertical's
+`outbound.sendMedia`. `sendSlackText` posts text
 only; G7–G11 semantics remain on `sendMedia`.
 
 - effect: reply text containing a local path stays a text post.
@@ -106,7 +201,9 @@ event, so the shared L3 `buildInboundCtxPayload` defaults
 message ts. (The prior in-repo draft set `replyTo: ts`, which would have made
 `To` a ts; that was removed.) `MessageSid` remains the message ts.
 
-## D-006 — native approval-card seam: `blocks` on send, `updateText` adapter, `block_actions` hand-off
+## D-010 — native approval-card seam: `blocks` on send, `updateText` adapter, `block_actions` hand-off
+
+Renumbered 2026-09-07: this entry was a second `D-006` (duplicate id).
 
 The pinned vertical's outbound surface is one `text` field; the in-repo P0
 adds the native card seam (2026-08-27, COMPAT(clisbot-control-plane)):
@@ -203,6 +300,23 @@ thread_ts?, initial_comment?})`.
   `files.upload` single-call path, `DNS request retry` wrapper, the
   `resolveSlackUploadTimeoutLogUrl` redaction log, audio-video transcode
   preflight) are NOT the P0 fold's concern.
+
+## D-042 — the socket client is flagged shutting-down when the abort fires
+
+`monitor/provider.ts` sets Bolt's `shuttingDown` flag from an `abort` listener
+(`markSlackSocketShuttingDown`, split out of `gracefulStopSlackApp` in the
+otherwise verbatim `monitor/provider-support.ts`) instead of only in the
+`finally` after `startSlackSocketAndWaitForDisconnect` resolves.
+
+Upstream's patched reconnect scheduler reads `shuttingDown` when its timer
+fires. Setting it after the disconnect await left a window where a stopping
+account's socket reconnected and kept consuming events; the account's monitor
+was already gone, so those events had nowhere to land.
+
+- reason: a stop must be a stop — the Hub supervisor's abort is the only stop
+  signal an account gets, and the fix is a two-line reordering, not new
+  behavior.
+- upstream status: candidate for an upstream PR — permanent until then.
 
 ## D-009 — `plugin.outbound.typing`: the `sync.progress` liveness surface
 

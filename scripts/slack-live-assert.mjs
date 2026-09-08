@@ -19,13 +19,13 @@
 import { execFileSync } from "node:child_process";
 import { openSync, readSync, closeSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 
+// Run as a CLI, or imported by scripts/slack-live-assert.test.mjs for the
+// read-back parser. Importing must never argv-check or exit.
+const IS_ENTRYPOINT = process.argv[1] === fileURLToPath(import.meta.url);
 const args = process.argv.slice(2);
 const mode = args[0];
-if (mode !== "post" && mode !== "check") {
-  console.error("usage: slack-live-assert.mjs <post|check> --text/--since ...");
-  process.exit(2);
-}
 const opt = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : fallback;
@@ -33,45 +33,66 @@ const opt = (name, fallback) => {
 const HOME = process.env.CLISBOT_HOME || `${homedir()}/.clisbot-dev`;
 const HUB_LOG = `${HOME}/hub.log`;
 const CHANNEL = opt("channel", process.env.SLACK_TEST_CHANNEL);
-if (!CHANNEL) {
-  console.error("no channel: set SLACK_TEST_CHANNEL or pass --channel");
-  process.exit(2);
-}
 const TIMEOUT_S = Number(opt("timeout", "300"));
 const POLL_MS = 3000;
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 
-function slackCli(flag, ...argv) {
-  // slack-cli prints CSV (header + rows, quoted fields). Return rows as objects.
-  const out = execFileSync("slack-cli", [flag, ...argv], {
-    encoding: "utf8",
-    timeout: 60_000,
-  });
-  const lines = out.trim().split("\n");
-  if (lines.length < 2) return [];
-  const header = lines[0].split(",");
+/**
+ * Parse slack-cli's CSV (header + rows, RFC 4180 quoting) into row objects.
+ *
+ * The record separator is a newline OUTSIDE quotes only. A multi-line Slack
+ * message is one CSV field carrying its own `\n`s, so splitting the output on
+ * `\n` first — which this did until wave 5b — shreds one message into several
+ * rows: the identity check then sees a fragment row with no `UserID` and
+ * reports `identity-mismatch` against the marker's own text. Scan the whole
+ * output once and let the quote state decide where a row ends.
+ *
+ * `--output json` is not a way out: the MCP tool itself returns CSV, so `json`
+ * and `raw` just wrap the same text.
+ */
+export function parseSlackCsv(out) {
   const rows = [];
-  for (const line of lines.slice(1)) {
-    // Minimal CSV parse: fields are quoted when they contain commas.
-    const fields = [];
-    let cur = "";
-    let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') {
-        if (inQ && line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else inQ = !inQ;
-      } else if (c === "," && !inQ) {
-        fields.push(cur);
-        cur = "";
-      } else cur += c;
-    }
+  let fields = [];
+  let cur = "";
+  let inQ = false;
+  const endField = () => {
     fields.push(cur);
-    rows.push(Object.fromEntries(header.map((h, i) => [h, (fields[i] ?? "").trim()])));
+    cur = "";
+  };
+  const endRow = () => {
+    endField();
+    if (!(fields.length === 1 && fields[0] === "")) rows.push(fields);
+    fields = [];
+  };
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i];
+    if (c === '"') {
+      if (inQ && out[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else inQ = !inQ;
+    } else if (c === "," && !inQ) {
+      endField();
+    } else if (c === "\n" && !inQ) {
+      endRow();
+    } else if (c === "\r" && !inQ) {
+      // swallow CRLF
+    } else cur += c;
   }
-  return rows;
+  endRow();
+  if (rows.length < 2) return [];
+  const header = rows[0];
+  // Only the FIELD is trimmed, never the row: a message body keeps its
+  // newlines so `--expect` can match text that spans lines.
+  return rows
+    .slice(1)
+    .map((row) => Object.fromEntries(header.map((h, i) => [h, (row[i] ?? "").trim()])));
+}
+
+function slackCli(flag, ...argv) {
+  return parseSlackCsv(
+    execFileSync("slack-cli", [flag, ...argv], { encoding: "utf8", timeout: 60_000 }),
+  );
 }
 
 function parseLogTime(line) {
@@ -123,6 +144,31 @@ function hubEventsSince(sinceMs) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** `chat.postMessage` with the user credential; the field is `channel`, singular. */
+async function postWithUserToken(text, threadTs, cliError) {
+  const token = process.env.SLACK_MCP_XOXP_TOKEN;
+  if (!token) {
+    console.log(`VERDICT FAIL marker-post-failed: ${cliError.message}`);
+    process.exit(1);
+  }
+  const response = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ channel: CHANNEL, text, ...(threadTs ? { thread_ts: threadTs } : {}) }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!body.ok) {
+    console.log(
+      `VERDICT FAIL marker-post-failed: slack-cli ${cliError.message}; web api ${body.error ?? response.status}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    "[post] slack-cli write unavailable; posted with the user credential over chat.postMessage",
+  );
+  return body.ts;
+}
+
 function readBack(threadTs) {
   const flag = threadTs ? "conversations-replies" : "conversations-history";
   const argv = ["--channel-id", CHANNEL, "--limit", "15"];
@@ -134,11 +180,37 @@ function readBack(threadTs) {
   }
 }
 
+/** The bot under test, from `auth.test`. The token is never printed. */
+async function botIdentity() {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    console.log("VERDICT FAIL identity-unverifiable: SLACK_BOT_TOKEN is not set");
+    process.exit(2);
+  }
+  const response = await fetch("https://slack.com/api/auth.test", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!body.ok) {
+    console.log(`VERDICT FAIL identity-unverifiable: auth.test ${body.error ?? response.status}`);
+    process.exit(2);
+  }
+  return { userId: body.user_id, botId: body.bot_id };
+}
+
 // A "reply" is a row the MARKER POSTER did not author: markers embed the
 // expected PONG string, so matching the marker row (or any earlier marker)
 // would be a false PASS. Find the poster by matching the posted text in the
 // read-back, then require a different UserID.
-function findMatch(rows, expect, postedText) {
+//
+// AND the author must be the bot under test. The channel workspace also
+// carries a user credential and `slack-cli`, so an agent asked to post, react
+// or upload can do it under ANOTHER identity and look like a pass — wave 4
+// scored Slack file-out PASS on messages authored by a different app
+// ("vaiclaude"). A content match under a foreign identity is a FAIL, reported
+// with the identity that actually posted.
+function findMatch(rows, expect, postedText, botUserId) {
   let posterId;
   if (postedText !== undefined) {
     for (const r of rows) {
@@ -148,15 +220,42 @@ function findMatch(rows, expect, postedText) {
       }
     }
   }
+  let mismatch = null;
   for (let i = rows.length - 1; i >= 0; i--) {
     const r = rows[i];
     if (r.UserID !== undefined && posterId !== undefined && r.UserID === posterId) continue;
-    if ((r.Text ?? "").includes(expect)) return r;
+    if (!(r.Text ?? "").includes(expect)) continue;
+    if (botUserId !== undefined && r.UserID !== botUserId) {
+      mismatch ??= r;
+      continue;
+    }
+    return { row: r, mismatch: null };
   }
-  return null;
+  return { row: null, mismatch };
 }
 
-if (mode === "post") {
+/** Author + attachment evidence for the tail of a conversation. */
+function authorTable(rows, botUserId) {
+  return rows
+    .slice(-10)
+    .map(
+      (r) =>
+        `${r.Time ?? "?"} ts=${r.MsgID ?? "?"} user=${r.UserID ?? "?"}${
+          r.UserID === botUserId ? "(bot-under-test)" : ""
+        } files=${r.FileCount ?? "0"} "${(r.Text ?? "").replace(/\s+/g, " ").slice(0, 70)}"`,
+    )
+    .join("\n  ");
+}
+
+if (!IS_ENTRYPOINT) {
+  // Imported for tests: exports only, no argv handling.
+} else if (mode !== "post" && mode !== "check") {
+  console.error("usage: slack-live-assert.mjs <post|check> --text/--since ...");
+  process.exit(2);
+} else if (!CHANNEL) {
+  console.error("no channel: set SLACK_TEST_CHANNEL or pass --channel");
+  process.exit(2);
+} else if (mode === "post") {
   const text = opt("text");
   if (!text) {
     console.error("post requires --text");
@@ -164,6 +263,9 @@ if (mode === "post") {
   }
   const threadTs = opt("thread-ts");
   const expect = opt("expect", "PONG-");
+  const bot = await botIdentity();
+  let identityMismatch = null;
+  let lastRows = [];
   const t0 = Date.now();
   const argv = ["--channel-id", CHANNEL, "--text", text];
   if (threadTs) argv.push("--thread-ts", threadTs);
@@ -178,8 +280,12 @@ if (mode === "post") {
     markerTs = out.match(/ts=([0-9.]+)/)?.[1];
     if (!markerTs) throw new Error(`no ts in output: ${out.slice(0, 120)}`);
   } catch (e) {
-    console.log(`VERDICT FAIL marker-post-failed: ${e.message}`);
-    process.exit(1);
+    // The installed slack-cli intermittently reports `tool
+    // 'conversations_add_message' not found`. CLAUDE.md's fallback: post
+    // through the Web API with the same USER credential slack-cli itself uses
+    // (SLACK_MCP_XOXP_TOKEN) — never SLACK_BOT_TOKEN, which is the bot under
+    // test and cannot drive its own inbound. Read-back stays on slack-cli.
+    markerTs = await postWithUserToken(text, threadTs, e);
   }
   console.log(`[t+0ms] marker posted ts=${markerTs}${threadTs ? ` thread=${threadTs}` : ""}`);
 
@@ -194,7 +300,10 @@ if (mode === "post") {
       // A root marker becomes the thread root for the reply. Reading channel
       // history alone cannot see that threaded response.
       const rows = readBack(threadTs ?? markerTs);
-      reply = findMatch(rows, expect, text);
+      const found = findMatch(rows, expect, text, bot.userId);
+      reply = found.row;
+      identityMismatch = found.mismatch;
+      lastRows = rows;
     }
     if (admission && reply) break;
   }
@@ -207,9 +316,16 @@ if (mode === "post") {
       reply ? `${reply.Time} ts=${reply.MsgID} "${(reply.Text ?? "").slice(0, 120)}"` : "NOT FOUND"
     }`,
   );
+  console.log(`[authors] bot-under-test=${bot.userId}\n  ${authorTable(lastRows, bot.userId)}`);
+  if (identityMismatch !== null) {
+    console.log(
+      `VERDICT FAIL identity-mismatch: ts=${identityMismatch.MsgID} was posted by ${identityMismatch.UserID}, not the bot under test ${bot.userId}`,
+    );
+    process.exit(1);
+  }
   console.log(
     ok
-      ? `VERDICT PASS admission=yes replyTs=${reply.MsgID}`
+      ? `VERDICT PASS admission=yes replyTs=${reply.MsgID} author=${reply.UserID}`
       : `VERDICT FAIL admission=${admission ? "yes" : "no"} reply=${reply ? "yes" : "no"}`,
   );
   process.exit(ok ? 0 : 1);
@@ -222,15 +338,27 @@ if (mode === "post") {
   }
   const threadTs = opt("thread-ts");
   const expect = opt("expect", "PONG-");
+  const bot = await botIdentity();
   const today = new Date();
   today.setHours(Number(sinceHM.slice(0, 2)), Number(sinceHM.slice(3, 5)), 0, 0);
   const rows = readBack(threadTs);
-  const match = findMatch(rows, expect);
+  const { row: match, mismatch } = findMatch(rows, expect, undefined, bot.userId);
   const events = hubEventsSince(today.getTime());
   console.log(
     `[check since ${sinceHM}] hub events: ${events.map((e) => `${e.t} ${e.line.slice(0, 90)}`).join(" | ") || "none"}`,
   );
+  console.log(`[authors] bot-under-test=${bot.userId}\n  ${authorTable(rows, bot.userId)}`);
   console.log(`[check] reply: ${match ? `${match.Time} ts=${match.MsgID}` : "NOT FOUND"}`);
-  console.log(match ? `VERDICT PASS replyTs=${match.MsgID}` : "VERDICT FAIL no reply match");
+  if (mismatch !== null) {
+    console.log(
+      `VERDICT FAIL identity-mismatch: ts=${mismatch.MsgID} was posted by ${mismatch.UserID}, not the bot under test ${bot.userId}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    match
+      ? `VERDICT PASS replyTs=${match.MsgID} author=${match.UserID}`
+      : "VERDICT FAIL no reply match",
+  );
   process.exit(match ? 0 : 1);
 }
