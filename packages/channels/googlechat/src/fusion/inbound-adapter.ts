@@ -117,7 +117,8 @@ function buildMessage(
   }
   // `argumentText` is the text with the leading app mention removed; upstream
   // prefers it so a mention-addressed turn does not carry the mention twice.
-  const body = (message.argumentText ?? message.text ?? "").trim();
+  const nativeCommand = normalizeGoogleChatPaseoCommand(message);
+  const body = nativeCommand ?? (message.argumentText ?? message.text ?? "").trim();
   if (body === "") return { admit: false, reason: "empty-body" };
   const { wasMentioned } = extractMentionInfo(message.annotations ?? [], params.botUser);
   const threadName = isGroup ? message.thread?.name : undefined;
@@ -137,7 +138,7 @@ function buildMessage(
       ...(sender?.displayName ? { senderName: sender.displayName } : {}),
       ...(sender?.email ? { senderUsername: sender.email } : {}),
       body,
-      wasMentioned,
+      wasMentioned: wasMentioned || nativeCommand !== undefined,
       timestampMs,
       ...(space.displayName ? { conversationLabel: space.displayName } : {}),
       ...(isBotSender ? { isOwnMessage: false } : {}),
@@ -236,4 +237,15 @@ function buildRoomEvent(
       facts: { member: { userId: actorId, joined } },
     },
   };
+}
+
+/** Google Chat registration lives in its console; consume only the named umbrella annotation. */
+export function normalizeGoogleChatPaseoCommand(message: NonNullable<GoogleChatEvent["message"]>): string | undefined {
+  const annotation = message.annotations?.find((entry) => entry.type === "SLASH_COMMAND" &&
+    (entry.slashCommand?.["commandName"] === "/paseo" || entry.slashCommand?.["commandName"] === "paseo" ||
+      /^\/paseo(?:\s|$)/iu.test((message.argumentText ?? message.text ?? "").trim())));
+  if (!annotation) return undefined;
+  const text = (message.argumentText ?? message.text ?? "").trim();
+  const args = text.replace(/^\/paseo(?:\s|$)/iu, "").trim().replace(/^[/\\]/u, "");
+  return `/${args || "help"}`;
 }

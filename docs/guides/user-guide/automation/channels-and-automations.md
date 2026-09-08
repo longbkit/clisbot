@@ -25,6 +25,28 @@ Owner/Admin thực hiện:
 
 Connection và Workflow là các cấu hình lưu riêng. Nếu Workflow đã lưu nhưng input thất bại, sửa và lưu lại input trong cùng luồng; kiểm tra bản ghi hiện có trước khi tạo lại để tránh trùng. Không dựa vào draft chưa lưu sau khi reload.
 
+## Điều khiển bằng slash command
+
+Gõ `/help` để xem các lệnh dùng chung. [Hướng dẫn slash command](../../../features/slash-commands/user-guide.md)
+giải thích cách dùng; [bảng quyền và phạm vi](../../../features/slash-commands/README.md)
+là tài liệu tham chiếu đầy đủ.
+
+- Route trực tiếp: `/new <nội dung>`, `/resume <id>`, `/stop`, `/steer`, `/queue`
+  điều khiển phiên Agent; `/agent`, `/provider`, `/model`, `/effort`, `/permission`
+  chỉnh cấu hình trong phạm vi được cấp.
+- `/fork [nội dung]` tiếp tục trong phiên mới có lịch sử; `/side <nội dung>` và
+  `/quick <nội dung>` trả lời riêng một lần mà không thay binding hiện tại.
+- Route Automation: `/status`, `/cowork`, `/stop`, `/me`, `/help` dùng được;
+  các lệnh chỉnh phiên/cấu hình trực tiếp trả lời rõ là không áp dụng.
+- `/cowork`, `/status`, `/me` và kết quả cấu hình gửi DM cho người gọi khi lệnh
+  xuất phát từ conversation công khai. Không gửi được DM thì không đăng thông
+  tin đó trở lại conversation.
+
+Trong **Access**, có thể cấp quyền cho **Guest** để người chưa liên kết Hub
+Member dùng Channel. Guest mặc định không có quyền; Member đã liên kết dùng
+quyền của Member/Team và không tự nhận quyền Guest. Thay đổi provider được lưu
+chờ áp dụng bằng `/new` hoặc `/fork`; tin nhắn thường vẫn đi vào phiên hiện tại.
+
 ## Chỉ dùng app hoặc chỉ dùng Channel
 
 - Muốn mở Project/terminal trong app: cấp **Connect + Project access**.

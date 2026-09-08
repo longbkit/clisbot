@@ -23,6 +23,11 @@ import {
   runDiscordGateway,
 } from "./gateway.js";
 
+vi.mock("../fusion/commands.js", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../fusion/commands.js")>(),
+  registerDiscordPaseoCommand: vi.fn(async () => undefined),
+}));
+
 const BOT_ID = "900000000000000001";
 
 function structureClient(): Client {

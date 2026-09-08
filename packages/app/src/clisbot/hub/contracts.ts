@@ -549,7 +549,7 @@ export const HubAccessAssignmentSchema = z
   .object({
     id: z.string(),
     organizationId: z.string(),
-    subjectKind: z.enum(["member", "team"]),
+    subjectKind: z.enum(["member", "team", "guest"]),
     subjectId: z.string(),
     resourceKind: z.enum(["organization", "daemon", "project", "channel_account", "automation"]),
     resourceId: z.string(),

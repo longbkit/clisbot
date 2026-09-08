@@ -19,6 +19,8 @@ import type {
   EffectiveDefaults,
 } from "../config/compile.js";
 import type { DaemonConnection } from "../daemon/client.js";
+import type { CreateAgentConfig } from "../daemon/types.js";
+import { resolveConversationConfiguration } from "../commands-config.js";
 import type { InboundConversation } from "../policy.js";
 import { mayUseChannelRoute } from "../policy/gate.js";
 import type { ProcessingController } from "../plane/processing.js";
@@ -95,6 +97,14 @@ interface BindingEngineContext {
   store: ChannelStore;
   daemon: DaemonConnection;
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
+  authorizeConfiguration?:
+    | ((input: {
+        message: InboundMessage;
+        account: CompiledChannelAccount;
+        route: CompiledRoute;
+        config: CreateAgentConfig;
+      }) => Promise<{ allowed: boolean; reason?: string }>)
+    | undefined;
   replyCapabilities?: ChannelReplyCapabilityService | undefined;
   /** Resolve a route's agent target into a `create_agent_request` config.
    * The route's effective defaults select the outbound path (E4/E6); on a
@@ -322,19 +332,7 @@ export class BindingEngine {
     try {
       created = await this.createAgent(account, route, key, executionId, message);
     } catch (error) {
-      // Leave the marker pending: the create may have timed out rather than
-      // failed, so a later inbound (or restart) can rebind the surviving
-      // agent. Never re-create here — the marker is the idempotency.
-      this.context.processing?.close(executionId);
-      this.context.logger.warn("agent create failed; the thread marker stays pending", {
-        accountId: account.accountId,
-        executionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
-        kind: "ignored",
-        reason: "agent create in progress; try again shortly",
-      };
+      return this.settleCreationFailure(error, account, key, executionId);
     }
     await this.context.store.resolvePendingThreadBinding({
       organizationId: this.context.organizationId,
@@ -384,6 +382,32 @@ export class BindingEngine {
     };
   }
 
+  /** A definitive authorization refusal releases its marker; uncertain daemon failures retain it for recovery. */
+  private async settleCreationFailure(
+    error: unknown,
+    account: CompiledChannelAccount,
+    key: ThreadKey,
+    executionId: string,
+  ): Promise<InboundOutcome> {
+    this.context.processing?.close(executionId);
+    if (error instanceof ChannelConfigurationDeniedError) {
+      await this.context.store.releaseThreadBinding({
+        organizationId: this.context.organizationId,
+        accountId: account.accountId,
+        ...key,
+      });
+      return { kind: "ignored", reason: error.message };
+    }
+    // The daemon may have created an Agent before the RPC timed out: the
+    // pending marker is the recovery identity, so never recreate or release it.
+    this.context.logger.warn("agent create failed; the thread marker stays pending", {
+      accountId: account.accountId,
+      executionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { kind: "ignored", reason: "agent create in progress; try again shortly" };
+  }
+
   /**
    * A pending marker already exists for this key: rebind when the agent
    * survived the create-then-crash window, otherwise stay pending. This is the
@@ -394,6 +418,7 @@ export class BindingEngine {
    * not pull the thread to a bound state (nor may an unmentioned message under
    * `requireMention`).
    */
+
   private async recoverPending(
     message: InboundMessage,
     account: CompiledChannelAccount,
@@ -551,8 +576,7 @@ export class BindingEngine {
       organizationId: this.context.organizationId,
       ...ref,
     });
-    const target =
-      chosen?.selectedAgent == null ? routeTarget : { ...routeTarget, agent: chosen.selectedAgent };
+    const target = routeTarget;
     let capabilityToken: string | undefined;
     let canSendFiles = false;
     if (route.defaults.outbound.path === "tool") {
@@ -583,7 +607,7 @@ export class BindingEngine {
       canSendFiles = accessTarget.projectRoot !== undefined;
     }
     try {
-      const config = this.context.resolveAgentSpec(
+      const baseConfig = this.context.resolveAgentSpec(
         target,
         route.defaults,
         ref,
@@ -593,8 +617,19 @@ export class BindingEngine {
               token: capabilityToken,
               canSendFiles,
             },
-        chosen?.selectedModel == null ? undefined : { model: chosen.selectedModel },
+        undefined,
       );
+      const config = resolveConversationConfiguration(baseConfig, chosen);
+      const authorization = await this.context.authorizeConfiguration?.({
+        message: requester,
+        account,
+        route,
+        config,
+      });
+      if (authorization?.allowed === false)
+        throw new ChannelConfigurationDeniedError(
+          authorization.reason ?? "Agent configuration is outside your access.",
+        );
       const created = await this.context.daemon.createAgent(config, {
         title: executionMarker(executionId),
       });
@@ -800,3 +835,5 @@ export class ChannelWorkflowTargetError extends Error {
     this.name = "ChannelWorkflowTargetError";
   }
 }
+
+class ChannelConfigurationDeniedError extends Error {}

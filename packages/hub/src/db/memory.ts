@@ -517,7 +517,7 @@ class MemoryDatabase implements Database {
       return { stepRun: step, execution: undefined, created: false };
     }
     if (run.deadlineAt <= startedAt) {
-      this.timeoutWorkflowRun(run.id, startedAt);
+      this.terminateWorkflowRun(run.id, startedAt);
       return {
         stepRun: this.workflowStepRuns.get(step.id) ?? step,
         execution: undefined,
@@ -658,7 +658,7 @@ class MemoryDatabase implements Database {
     if (execution.status === "spawning" || execution.status === "running") {
       const deadlineKind = workflowDeadlineKind(execution, step, run, observedAt);
       if (deadlineKind === "whole_run") {
-        this.timeoutWorkflowRun(run.id, observedAt);
+        this.terminateWorkflowRun(run.id, observedAt);
         const terminalRun = this.triggerRuns.get(run.id);
         return transitionWithTerminalRun(
           {
@@ -806,9 +806,10 @@ class MemoryDatabase implements Database {
     return { execution: updatedExecution, transitioned: true, deadlineKind };
   }
 
-  private timeoutWorkflowRun(
+  private terminateWorkflowRun(
     triggerRunId: string,
     now: Date,
+    reason: "whole_run_timeout" | "channel_stop" = "whole_run_timeout",
   ): WorkflowDeadlineRecovery | undefined {
     const run = this.triggerRuns.get(triggerRunId);
     if (run === undefined || run.outcome !== "accepted" || run.status !== "running") {
@@ -831,7 +832,7 @@ class MemoryDatabase implements Database {
             ...execution,
             status: "failed",
             completedAt: now,
-            result: { status: "failed", reason: "whole_run_timeout" },
+            result: { status: "failed", reason },
             idleDeadlineAt: null,
             hubAction,
             hubActionCompletedAt: null,
@@ -845,18 +846,18 @@ class MemoryDatabase implements Database {
       if (step.status === "pending" || step.status === "running") {
         this.workflowStepRuns.set(step.id, {
           ...step,
-          status: "timed_out",
-          failureReason: "whole_run_timeout",
-          deadlineKind: "whole_run",
+          status: reason === "channel_stop" ? "failed" : "timed_out",
+          failureReason: reason,
+          deadlineKind: reason === "channel_stop" ? null : "whole_run",
           completedAt: now,
         });
       }
     }
     const updatedRun: AcceptedTriggerRunRecord = {
       ...this.pendingTerminalNotification(run, now),
-      status: "timed_out",
-      deadlineKind: "whole_run",
-      failureReason: "whole_run_timeout",
+      status: reason === "channel_stop" ? "failed" : "timed_out",
+      deadlineKind: reason === "channel_stop" ? null : "whole_run",
+      failureReason: reason,
       completedAt: now,
     };
     this.triggerRuns.set(run.id, updatedRun);
@@ -864,12 +865,56 @@ class MemoryDatabase implements Database {
     return { triggerRunId: run.id, executionIds };
   }
 
+  async listActiveChannelWorkflowRuns(input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+  }): Promise<readonly AcceptedTriggerRunRecord[]> {
+    return [...this.triggerRuns.values()].filter(
+      (run): run is AcceptedTriggerRunRecord =>
+        run.organizationId === input.organizationId &&
+        run.outcome === "accepted" &&
+        run.status === "running" &&
+        run.configuredTriggerName === input.workflowName &&
+        isUnknownRecord(run.outputContext) &&
+        run.outputContext["provider"] === "channel" &&
+        channelBindingKeyFromOutput(run.outputContext) === input.bindingKey,
+    );
+  }
+
+  async stopChannelWorkflowRuns(input: {
+    runIds: readonly string[];
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    now?: Date;
+  }): Promise<readonly WorkflowDeadlineRecovery[]> {
+    const authorized = new Set(input.runIds);
+    const recoveries: WorkflowDeadlineRecovery[] = [];
+    for (const run of this.triggerRuns.values()) {
+      if (
+        !authorized.has(run.id) ||
+        run.organizationId !== input.organizationId ||
+        run.outcome !== "accepted" ||
+        run.status !== "running" ||
+        run.configuredTriggerName !== input.workflowName ||
+        !isUnknownRecord(run.outputContext) ||
+        run.outputContext["provider"] !== "channel" ||
+        channelBindingKeyFromOutput(run.outputContext) !== input.bindingKey
+      )
+        continue;
+      const recovery = this.terminateWorkflowRun(run.id, input.now ?? new Date(), "channel_stop");
+      if (recovery !== undefined) recoveries.push(recovery);
+    }
+    return recoveries;
+  }
+
   async recoverWorkflowDeadlines(now: Date): Promise<readonly WorkflowDeadlineRecovery[]> {
     const recoveries: WorkflowDeadlineRecovery[] = [];
     for (const run of this.triggerRuns.values()) {
       if (run.outcome !== "accepted" || run.status !== "running") continue;
       if (run.deadlineAt <= now) {
-        const recovery = this.timeoutWorkflowRun(run.id, now);
+        const recovery = this.terminateWorkflowRun(run.id, now);
         if (recovery !== undefined) recoveries.push(recovery);
         continue;
       }

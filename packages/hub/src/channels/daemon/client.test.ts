@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { WebSocketServer } from "ws";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { connectChannelDaemon, type DaemonConnection } from "./client.js";
+import type { AgentSnapshot } from "./types.js";
 
 // A minimal fake daemon speaking the stock local-client wire: hello ->
 // server_info, then the four trusted-client RPCs plus the selective timeline
@@ -67,7 +68,11 @@ class FakeDaemon {
           type: "session",
           message: {
             type: "status",
-            payload: { status: "server_info", serverId: "fake" },
+            payload: {
+              status: "server_info",
+              serverId: "fake",
+              features: { agentForkContext: true, agentConfigApply: true },
+            },
           },
         }),
       );
@@ -84,6 +89,51 @@ class FakeDaemon {
   }
 
   private respond(client: import("ws").WebSocket, message: RecordedMessage): void {
+    const catalog: Record<string, Record<string, unknown>> = {
+      list_available_providers_request: { providers: [{ provider: "codex", available: true }] },
+      list_provider_models_request: {
+        models: [{ provider: "codex", id: "model", label: "Model" }],
+      },
+      list_provider_modes_request: { modes: [{ id: "default", label: "Default" }] },
+      get_daemon_config_request: {
+        config: { agentProfiles: [{ id: "preset", name: "Preset", provider: "codex" }] },
+      },
+      fetch_workspaces_request: asWorkspacePage(message),
+      list_commands_request: {
+        commands: [{ name: "review", description: "Review", argumentHint: "", kind: "skill" }],
+      },
+      "agent.fork_context.request": {
+        attachment: {
+          type: "text",
+          mimeType: "text/plain",
+          contextKind: "chat_history",
+          text: "Transcript",
+        },
+        itemCount: 3,
+      },
+    };
+    const payload =
+      catalog[message.type] ??
+      (/^(set_agent_(model|thinking|mode)_request|agent\.config\.apply\.request)$/u.test(
+        message.type,
+      )
+        ? {
+            accepted: message["agentId"] !== "rejected",
+            error: message["agentId"] === "rejected" ? "Config denied" : null,
+          }
+        : undefined);
+    if (payload !== undefined) {
+      client.send(
+        JSON.stringify({
+          type: "session",
+          message: {
+            type: "test_response",
+            payload: { ...payload, requestId: message["requestId"] },
+          },
+        }),
+      );
+      return;
+    }
     switch (message["type"]) {
       case "create_agent_request": {
         client.send(
@@ -99,6 +149,12 @@ class FakeDaemon {
                   id: "agent-1",
                   provider: "codex",
                   status: "initializing",
+                  workspaceId: "workspace-channel",
+                  currentModeId: "full-access",
+                  model: null,
+                  thinkingOptionId: null,
+                  features: [{ id: "auto_accept", type: "toggle", value: true }],
+                  lastUsage: { contextWindowUsedTokens: 123, contextWindowMaxTokens: 1000 },
                 },
               },
             },
@@ -202,7 +258,18 @@ class FakeDaemon {
                 requestId: message["requestId"],
                 entries: [
                   {
-                    agent: { id: "agent-1", provider: "codex", status: "idle" },
+                    agent: {
+                      id: "agent-1",
+                      provider: "codex",
+                      status: "idle",
+                      workspaceId: "workspace-channel",
+                      currentModeId: "full-access",
+                      model: null,
+                      thinkingOptionId: "requested",
+                      effectiveThinkingOptionId: "high",
+                      features: [{ id: "auto_accept", type: "toggle", value: true }],
+                      lastUsage: { contextWindowUsedTokens: 123, contextWindowMaxTokens: 1000 },
+                    },
                   },
                   {
                     agent: {
@@ -449,6 +516,119 @@ describe("channel trusted-client daemon connection", () => {
     await assert.rejects(stopped.listAgents(), /not connected/u);
   });
 
+  it("normalizes actual wire mode, features, effective thinking and context on create and list", async () => {
+    const created = await client.createAgent({ provider: "codex", cwd: "/repo" });
+    const listed = (await client.listAgents())[0]!;
+    for (const agent of [created.agent, listed]) {
+      assert.equal(agent.modeId, "full-access");
+      assert.equal(agent.model, undefined);
+      assert.deepEqual(agent.featureValues, { auto_accept: true });
+      assert.equal(agent.contextWindowUsedTokens, 123);
+      assert.equal(agent.contextWindowMaxTokens, 1000);
+    }
+    assert.equal(created.agent.thinkingOptionId, undefined);
+    assert.equal(listed.thinkingOptionId, "high");
+  });
+
+  it("proves Project membership using paginated workspace descriptors", async () => {
+    const agent = (await client.listAgents())[0]!;
+    assert.equal(await client.isAgentInProject(agent, "project-channel"), true);
+    assert.equal(await client.isAgentInProject(agent, "other-project"), false);
+    const { workspaceId: _workspaceId, ...withoutWorkspace } = agent;
+    assert.equal(await client.isAgentInProject(withoutWorkspace, "project-channel"), false);
+    const calls = daemon.messages.filter((message) => message.type === "fetch_workspaces_request");
+    assert.deepEqual(calls[0]?.["filter"], { projectId: "project-channel" });
+    assert.deepEqual(calls[1]?.["page"], { limit: 200, cursor: "next-page" });
+  });
+
+  it("reads daemon catalogs, profiles, commands and fork context over stock RPCs", async () => {
+    assert.equal(client.getServerInfo()?.serverId, "fake");
+    assert.equal((await client.listAvailableProviders())[0]?.provider, "codex");
+    assert.equal((await client.listProviderModels("codex", "/repo"))[0]?.id, "model");
+    assert.equal((await client.listProviderModes("codex"))[0]?.id, "default");
+    assert.equal((await client.listAgentProfiles())[0]?.id, "preset");
+    assert.equal((await client.listCommands("agent-1"))[0]?.kind, "skill");
+    assert.equal(
+      (await client.buildAgentForkContext("agent-1")).attachment?.contextKind,
+      "chat_history",
+    );
+  });
+
+  it("writes live config and rejects negative daemon acknowledgements", async () => {
+    await client.setAgentModel("agent-1", "model");
+    await client.setAgentThinkingOption("agent-1", null);
+    await client.setAgentMode("agent-1", "default");
+    await client.applyAgentConfig("agent-1", { modelId: "model", thinkingOptionId: null });
+    await assert.rejects(client.applyAgentConfig("rejected", {}), /Config denied/u);
+    assert.equal(
+      daemon.messages.findLast((message) => message.type === "set_agent_thinking_request")?.[
+        "thinkingOptionId"
+      ],
+      null,
+    );
+  });
+
+  it("places initial prompt, fork attachments and autoArchive beside create config", async () => {
+    const attachments = [
+      {
+        type: "text" as const,
+        mimeType: "text/plain" as const,
+        contextKind: "chat_history",
+        text: "Transcript",
+      },
+    ];
+    await client.createAgent(
+      { provider: "codex", cwd: "/repo" },
+      { initialPrompt: "Continue", attachments, autoArchive: true },
+    );
+    const message = daemon.messages.findLast((entry) => entry.type === "create_agent_request");
+    assert.equal(message?.["initialPrompt"], "Continue");
+    assert.equal(message?.["autoArchive"], true);
+    assert.deepEqual(message?.["attachments"], attachments);
+    assert.deepEqual(message?.["config"], { provider: "codex", cwd: "/repo" });
+    await client.sendAgentMessage("agent-1", "Side question", { attachments });
+    assert.deepEqual(
+      daemon.messages.findLast((entry) => entry.type === "send_agent_message_request")?.[
+        "attachments"
+      ],
+      attachments,
+    );
+  });
+
+  it("normalizes pushed snapshots and preserves an explicitly unknown current mode", async () => {
+    const updates: AgentSnapshot[] = [];
+    const watching = connectChannelDaemon({
+      host: `127.0.0.1:${daemon.port}`,
+      onAgentUpdate: (agent) => updates.push(agent as AgentSnapshot),
+    });
+    await watching.waitForConnected(5000);
+    daemon.push({
+      type: "agent_update",
+      payload: {
+        agent: {
+          id: "normalized",
+          provider: "codex",
+          currentModeId: null,
+          modeId: "stale",
+          model: null,
+          thinkingOptionId: "stale",
+          effectiveThinkingOptionId: null,
+          featureValues: { auto_accept: true },
+          features: [],
+          lastUsage: { contextWindowUsedTokens: 99, contextWindowMaxTokens: 100 },
+        },
+      },
+    });
+    await waitForCount(updates, 1);
+    assert.equal(updates[0]?.currentModeId, null);
+    assert.equal(updates[0]?.modeId, undefined);
+    assert.equal(updates[0]?.model, undefined);
+    assert.equal(updates[0]?.thinkingOptionId, undefined);
+    assert.deepEqual(updates[0]?.featureValues, {});
+    assert.equal(updates[0]?.contextWindowUsedTokens, 99);
+    watching.stop();
+  });
+
   describe("stream forwarding (agent_stream / agent_update)", () => {
     it("forwards agent_stream frames to onStream, seq only when numeric", async () => {
       const events: { agentId: string; event: unknown; seq?: number }[] = [];
@@ -520,3 +700,19 @@ describe("channel trusted-client daemon connection", () => {
     });
   });
 });
+
+function asWorkspacePage(message: RecordedMessage): Record<string, unknown> {
+  const projectId = (message["filter"] as { projectId?: string } | undefined)?.projectId;
+  const cursor = (message["page"] as { cursor?: string } | undefined)?.cursor;
+  if (projectId !== "project-channel")
+    return { entries: [], pageInfo: { hasMore: false, nextCursor: null } };
+  return cursor === undefined
+    ? {
+        entries: [{ id: "other-workspace", projectId }],
+        pageInfo: { hasMore: true, nextCursor: "next-page" },
+      }
+    : {
+        entries: [{ id: "workspace-channel", projectId }],
+        pageInfo: { hasMore: false, nextCursor: null },
+      };
+}

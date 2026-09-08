@@ -3,7 +3,7 @@ import type { HubAccessAssignmentSchema, HubMemberSchema, HubTeamSchema } from "
 
 export function assignmentsForSubject(
   assignments: z.infer<typeof HubAccessAssignmentSchema>[],
-  subject: { kind: "team" | "member"; id: string } | null,
+  subject: { kind: "team" | "member" | "guest"; id: string } | null,
   members: z.infer<typeof HubMemberSchema>[],
   teams: z.infer<typeof HubTeamSchema>[],
 ) {

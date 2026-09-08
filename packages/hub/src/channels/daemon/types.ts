@@ -6,6 +6,10 @@
 
 export interface AgentSnapshot {
   id: string;
+  projectId?: string;
+  workspaceId?: string;
+  /** Raw wire value: null means the live mode has not been resolved. */
+  currentModeId?: string | null;
   provider: string;
   cwd: string;
   model?: string;

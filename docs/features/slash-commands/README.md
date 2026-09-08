@@ -12,7 +12,7 @@ audit and build plan is [implementation-plan.md](implementation-plan.md).
 
 ## Command reference
 
-Two tables: what ships today, then the proposed additions. Keep both in sync with
+The tables below describe the implemented shared command surface. Keep them in sync with
 `packages/hub/src/channels/commands.ts` and `textCommandHelpText()`. Every command
 matches the **whole message**; anything else falls through to the agent as an
 ordinary prompt (see [Invocation](#invocation-one-parser-every-channel)).
@@ -40,17 +40,17 @@ group:
 
 The per-command **Requires** columns below repeat this at the row level.
 
-### Shipped today
+### Session controls and approvals
 
-| Command                                 | Does                                                                                                                                                                   | Requires                |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `/status`                               | Agent + session state.                                                                                                                                                 | agent.interact          |
-| `/stop`                                 | Stop the running turn.                                                                                                                                                 | agent.interact          |
-| `/new`                                  | Start a fresh session in this conversation.                                                                                                                            | agent.create            |
-| `/agent [<name>]`                       | Switch the conversation's agent. Today: the route's closed menu; this feature reshapes it to apply an **agent profile** ([below](#agent-profiles-and-the-route-menu)). | agent.interact + grant² |
-| `/model [<name>]`                       | Bare: show the model menu. `/model <name>`: switch this conversation's model.                                                                                          | agent.interact + grant² |
-| `/help`                                 | This command list.                                                                                                                                                     | — (public)              |
-| `/approve [id] [answer]` · `/deny [id]` | Answer the newest open approval, or the one named by `<id>`.                                                                                                           | approval authority¹     |
+| Command                                 | Does                                                                                                                                                   | Requires                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
+| `/status`                               | Agent + session state.                                                                                                                                 | agent.interact          |
+| `/stop`                                 | Stop the running turn.                                                                                                                                 | agent.interact          |
+| `/new`                                  | Clear the binding; the next message starts fresh. `/new <message>` starts immediately.                                                                 | agent.create            |
+| `/agent [<name>]`                       | Switch the conversation's agent. Apply an **agent profile** bounded by the caller's configuration grant ([below](#agent-profiles-and-the-route-menu)). | agent.interact + grant² |
+| `/model [<name>]`                       | Bare: show the model menu. `/model <name>`: switch this conversation's model.                                                                          | agent.interact + grant² |
+| `/help`                                 | This command list.                                                                                                                                     | — (public)              |
+| `/approve [id] [answer]` · `/deny [id]` | Answer the newest open approval, or the one named by `<id>`.                                                                                           | approval authority¹     |
 
 Slack: if `/…` collides with a native command, use the backslash form —
 `\approve`, `\status`.
@@ -58,30 +58,33 @@ Slack: if `/…` collides with a native command, use the backslash form —
 ¹ Approvals resolve against the open prompt with the existing two
 approval-authority checks, not a single privilege.
 ² **+ grant** — also bounded by the sender's `AgentConfigurationGrant`; see
-[Provider, model, effort](#provider-model-effort).
+[Provider, model, effort](#provider-model-effort). A configuration with `featureValues.fast_mode: true` also
+requires `agent.fast.use`. This check applies to profile discovery/application,
+live configuration, session creation and `/resume`; ordinary configuration or
+creation privileges do not imply Fast mode access.
 
-### Proposed additions
+### Discovery, configuration, and additional session controls
 
-Not built yet — the plan is [implementation-plan.md](implementation-plan.md).
+Implementation and verification notes are in [implementation-plan.md](implementation-plan.md).
 `•` = applies on that route kind.
 
-| Command                                                         | Does                                                                                                         | Requires                | Direct | Automation |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------- | :----: | :--------: |
-| `/cowork` (`/open`, `/app`)                                     | Reply with a link that opens the bound session in the Paseo app/web; private in public conversations.        | agent.interact          |   •    |     •      |
-| `/me`                                                           | Your channel identity and access here.                                                                       | — (public)              |   •    |     •      |
-| `/resume <id>`                                                  | Bind an existing session `<id>` here, replacing the current binding.                                         | agent.create            |   •    |     —      |
-| `/steer <message>`                                              | Admit `<message>` into the running turn.                                                                     | agent.interact          |   •    |     —      |
-| `/queue <message>`                                              | Hold `<message>` until the current turn ends.                                                                | agent.interact          |   •    |     —      |
-| `/provider [list]` · `/provider search <kw>` · `/provider <id>` | Show/find providers you may use; switch one (resets model+effort to that provider's defaults — new session). | agent.interact + grant² |   •    |     —      |
-| `/model [list]` · `/model search <kw>`                          | Extend the shipped `/model` with list/search of the **current provider's** models.                           | agent.interact + grant² |   •    |     —      |
-| `/effort [list]` · `/effort <id>`                               | List the **current model's** effort levels; set one (live).                                                  | agent.interact + grant² |   •    |     —      |
-| `/permission [<mode>]` (`/mode`)                                | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                | agent.interact          |   •    |     —      |
-| `/skill [list]` · `/skill search <kw>` · `/skill <name>`        | List/search skills; run one on the agent.                                                                    | agent.interact          |   •    |     —      |
-| `/command [list]` · `/command search <kw>`                      | List/search dynamic commands.                                                                                | agent.interact          |   •    |     —      |
-| `/command add <name> <prompt>` · `/command remove <name>`       | Create or remove a dynamic command.                                                                          | approval.config         |   •    |     —      |
-| `/fork [message]`                                               | Fork this conversation into a new session (carries context) and continue here (rebinds).                     | agent.create            |   •    |     —      |
-| `/side <message>`                                               | One-off question in a new session seeded with this conversation's context; binding unchanged.                | agent.create            |   •    |     —      |
-| `/quick <message>`                                              | One-off question in a fresh, unrelated session; binding unchanged.                                           | agent.create            |   •    |     —      |
+| Command                                                         | Does                                                                                                           | Requires                | Direct | Automation |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------- | :----: | :--------: |
+| `/cowork` (`/open`, `/app`)                                     | Reply with a link that opens the bound session in the Paseo app/web; private in public conversations.          | agent.interact          |   •    |     •      |
+| `/me`                                                           | Your channel identity and access here.                                                                         | — (public)              |   •    |     •      |
+| `/resume <id>`                                                  | Bind an existing session `<id>` here, replacing the current binding.                                           | agent.create            |   •    |     —      |
+| `/steer <message>`                                              | Admit `<message>` into the running turn.                                                                       | agent.interact          |   •    |     —      |
+| `/queue <message>`                                              | Hold `<message>` until the current turn ends.                                                                  | agent.interact          |   •    |     —      |
+| `/provider [list]` · `/provider search <kw>` · `/provider <id>` | Show/find providers you may use; stage one (reset model+effort to its defaults; `/new` or `/fork` applies it). | agent.interact + grant² |   •    |     —      |
+| `/model [list]` · `/model search <kw>`                          | Extend the shipped `/model` with list/search of the **current provider's** models.                             | agent.interact + grant² |   •    |     —      |
+| `/effort [list]` · `/effort <id>`                               | List the **current model's** effort levels; set one (live).                                                    | agent.interact + grant² |   •    |     —      |
+| `/permission [<mode>]` (`/mode`)                                | Show / set the provider's mode. An unattended mode needs the matching `approval.*` privilege.                  | agent.interact          |   •    |     —      |
+| `/skill [list]` · `/skill search <kw>` · `/skill <name>`        | List/search skills; run one on the agent.                                                                      | agent.interact          |   •    |     —      |
+| `/command [list]` · `/command search <kw>`                      | List/search dynamic commands.                                                                                  | agent.interact          |   •    |     —      |
+| `/command add <name> <prompt>` · `/command remove <name>`       | Create or remove a dynamic command.                                                                            | approval.config         |   •    |     —      |
+| `/fork [message]`                                               | Fork this conversation into a new session (carries context) and continue here (rebinds).                       | agent.create            |   •    |     —      |
+| `/side <message>`                                               | One-off question in a new session seeded with this conversation's context; binding unchanged.                  | agent.create            |   •    |     —      |
+| `/quick <message>`                                              | One-off question in a fresh, unrelated session; binding unchanged.                                             | agent.create            |   •    |     —      |
 
 On an **automation** route, `/stop` cancels the active run and `/status` reports
 it; the direct-only additions answer "not available on an automation route". See
@@ -101,12 +104,12 @@ subject a public deployment assigns privileges to, exactly like a Team. Grant th
 Guest group, say, `channel.use` (chat) and leave `/help`/`/me` public, and a public
 channel works for anyone; grant it more and guests can do more. Nothing above is
 reachable without the named privilege, so a guest gets only what the Guest group
-holds. The Guest subject is a **new addition to org Access** this feature needs —
+holds. The Guest subject is persisted as `(guest, guest)` in org Access with no default grants; linked Members do not inherit it. See
 see [implementation-plan.md](implementation-plan.md#resolved-decisions).
 
 ## Starting sessions
 
-Five commands (two shipped, three proposed) mint or rebind a session. Two
+Five commands mint or rebind a session. Two
 questions decide which: does it carry this conversation's context, and does it
 take over the binding?
 
@@ -129,6 +132,46 @@ take over the binding?
 - `/fork` is also how you apply a **staged provider** while keeping context: it
   mints the new session with the staged config and continues here.
 
+### Lifecycle boundaries
+
+`/new` without a message clears the binding; the next accepted message creates
+the session. `/new <message>` creates and sends that first prompt immediately.
+`/resume` checks access to the target session and its project/configuration before
+an atomic binding replacement; it rejects a target already bound to another
+conversation. A resumed external session on a tool-output route uses a persisted
+relay override because a channel reply tool cannot be injected into an existing
+session. This override enables final-answer relay, including after restart.
+Resuming the already-bound Agent is a no-op after authorization; it preserves
+the current stream buffer. Fork/resume replacement restores the previous binding
+with compare-and-swap if stream attachment fails; a fork also restores it if the
+first prompt is rejected. The source Agent is canceled and detached only after
+the replacement is ready.
+
+`/queue` holds messages in Hub memory and releases them FIFO at turn boundaries.
+It sends immediately if the session is idle. Access is checked again at release,
+and a newly running turn observed before the send keeps the message held. The
+current daemon wire has no atomic send-only-if-idle operation: another client
+can still start a turn between that check and the send RPC. The RPC uses steer
+so this race does not cancel that independent turn. Rebinding, detaching, or stopping the
+Hub clears the hold; this is not the durable channel ingress queue. `/side` and
+`/quick` also use transient reply associations, removed after terminal output.
+They create `autoArchive` sessions and explicitly enable final-answer relay for
+the one-off, even when ordinary route answer sync is disabled. This override
+does not alter the persisted route or the current binding. Session creation stays idle until stream
+subscription completes, then sends the first message and any fork attachment so
+first-turn output is observable.
+
+### Mutation retries
+
+For an event with a native message ID, the dispatcher records a durable receipt
+before a session/configuration mutation. Redelivery of that same source message
+is consumed without repeating the mutation. A pending receipt is never reclaimed
+automatically: dispatch may already have reached the daemon before a crash or
+connection loss. Inspect the current session before intentionally retrying with
+a new message. An acknowledgement failure does not undo or repeat an accepted
+mutation. This is an at-most-once dispatch guarantee, not a claim that every
+accepted command completed successfully; events without native IDs cannot use it.
+
 ## Naming decisions
 
 Names are the contract users learn; these are chosen against
@@ -137,8 +180,7 @@ Names are the contract users learn; these are chosen against
 - **`/agent [<name>]` = apply an agent profile** — the reusable named bundle
   (**Agent profile** in the glossary: provider + model + mode + thinking), not the
   running session. `/agent list` shows the profiles you may use; `/agent <name>`
-  applies one. Shipped `/agent` today switches among the route's closed `selectable`
-  menu; this feature reshapes it to agent profiles bounded by your access grant. See
+  applies one. The route's former closed `selectable` menu is replaced by agent profiles bounded by your access grant. See
   [Agent profiles and the route menu](#agent-profiles-and-the-route-menu).
 - **`/cowork`** — the point is moving work between the channel and the app in
   both directions, so the verb names co-working across surfaces, not just "open".
@@ -154,7 +196,7 @@ Names are the contract users learn; these are chosen against
 - **`/fork` / `/side` / `/quick`** — the two axes are context (forked vs fresh)
   and whether it takes over the binding; `/fork` = fork + continue here, `/side` =
   fork + one-off, `/quick` = fresh + one-off. See [Starting sessions](#starting-sessions).
-- **Additions this feature specifies** — `/cowork`, `/me`, `/resume`, `/steer`,
+- **Commands covered by this feature** — `/cowork`, `/me`, `/resume`, `/steer`,
   `/queue`, `/provider`, `/effort`, `/permission`, `/skill`, `/command`, `/fork`,
   `/side`, `/quick`, plus `list`/`search` on `/model`. `/status`, `/stop`, `/new`,
   `/agent`, `/model`, `/help`, `/approve`, `/deny` already ship.
@@ -170,10 +212,11 @@ the parser runs.
   `slash_commands`), Discord (`application.commands` scope), and Google Chat
   (console command with a numeric `commandId`) will not deliver an unregistered
   `/word`. Registering ~20 evolving commands per channel is per-channel setup
-  that drifts. Instead each channel registers **one** umbrella command
+  that drifts. Instead each channel uses **one** umbrella command
   (Slack/Google Chat `/paseo <sub>`, Discord one `/paseo` application command)
   whose payload is rewritten to the plain-text form; the vocabulary stays in one
-  place.
+  place. Discord upserts its registration at startup; Google Chat requires
+  the operator to configure `/paseo` in the app console.
 - **Some channels have no slash API at all.** Telegram group messages and Feishu
   are plain text only. There the words above are the whole interface, so the
   parser must accept a bare command with no channel affordance.
@@ -190,7 +233,7 @@ the parser runs.
 
 The platform vocabulary is a **closed, known set** — the tables above. It matches
 only as a whole message, and only the argument-taking verbs (`/agent`, `/model`,
-and the proposed setters) read a trailing value; everything else is whole-message
+and the setters) read a trailing value; everything else is whole-message
 only. Precedence is fixed and needs no guessing:
 
 1. A whole message that is a platform command runs the platform command.
@@ -211,15 +254,17 @@ Commands act on the **binding's execution owner**, and there are two owners.
 - **Direct route** — the conversation is bound to one agent session. `/steer`,
   `/queue`, `/stop`, and the `/provider` / `/model` / `/effort` / `/permission` /
   `/agent` config commands all have one obvious target: that session and its next turn.
-  This is the full surface, and the one to build first.
+  This is the full direct-command surface.
 - **Automation route** — each accepted inbound starts a **new** workflow run
   (channel-workflow-integration audit), so there is no single turn to steer into
   and no single config to set — the automation revision owns each step's agent.
   Steering, queueing, session lifecycle, and config are therefore **direct-only**
   in v1; on an automation route they return "not available on an automation
-  route", not silence. What does apply is run-scoped and read-only: `/stop`
-  cancels the active run(s) for the route, `/status` reports them, `/cowork`
-  links to the running agent, and `/me`/`/help` always work.
+  route", not silence. What does apply is run-scoped: `/stop`
+  cancels the active run(s) for the route after authorizing their execution targets,
+  `/status` reports the authorized run/step summaries, and `/cowork` links each
+  Agent using its own Host identity, including runs spanning multiple Hosts.
+  `/me` and `/help` always work.
 
 This is the deliberately simple answer to "queue/steer per session doesn't fit a
 multi-layer automation": don't force it to. One rule — commands target the
@@ -229,65 +274,39 @@ later, separate design, not a v1 fallback.
 
 ## Where a `/set` lands
 
-**Today, switching agent or model re-mints the session.** `/agent <name>` and
-`/model <name>` persist the choice against the conversation
-(`store.access.setConversationSelection` → `selectedAgent` / `selectedModel`) and
-then end the bound session the way `/new` does (`endBoundSession`), so the next
-message opens a fresh session on the new target. The current code fixes a running
-agent's provider and model at create time, so a model change this way loses the
-current session's history — the cost of the re-mint.
+Same-provider model, thinking, and mode changes apply live through the existing
+`set_agent_model`, `set_agent_thinking`, `set_agent_mode`, and `agent.config.apply`
+RPCs. They preserve the running session and its history.
 
-**The enhancement: same-provider changes go live.** The daemon already supports
-live edits — `set_agent_model_request`, `set_agent_thinking_request`,
-`set_agent_mode_request`, and the bundle `agent.config.apply.request`
-(`packages/protocol/src/messages.ts:1843`) — the same RPCs the Paseo app uses to
-change model/effort/mode between turns. So `/model`, `/effort`, and `/permission`
-should apply **live** on the running session when the provider is unchanged (no
-re-mint, no lost history); the daemon rejects a model or bundle from a different
-provider. Only switching to a `/agent` bundle on a **different provider** still
-re-mints, because there is no `set_agent_provider`.
+A provider-changing `/provider` or `/agent` selection is **staged** in the existing
+conversation selection store. It resets provider-dependent defaults and leaves
+the current binding running. Ordinary messages still reach that bound session.
+`/new [message]` starts fresh with the selection; `/fork [message]` copies the
+current history into a new session with the selection and rebinds here. While a
+different provider is staged, configuration setters update the staged selection
+and do not apply the new provider's model or mode to the old running session.
+Replies identify whether the change is live or staged. When changing a staged
+provider back to the provider of the still-running session, the final live
+configuration preserves that session's mode and feature values unless the
+selection explicitly overrides them. Authorization checks this resulting bundle,
+including any preserved Fast mode or unattended features.
 
-**Zero daemon changes** either way: the live-edit RPCs already exist and the
-daemon already handles them; the channel daemon client just adds facade methods
-that call them (`packages/hub/src/channels/daemon/client.ts`). No new wire.
-
-The per-conversation selection store already exists
-(`store.access.setConversationSelection`); the additions extend it (effort, mode)
-so the choice is sticky and layers over the route default at the next mint. It is
-never written into the Route, whose immutable org-owned revision a channel message
-must not mutate
-([channel-workflow-integration audit](../../audits/2026-09-02-channel-workflow-integration-gaps.md)).
-A staged provider change is explicit in the reply — for example: _"Provider
-staged: openai (gpt-5.6-luna / medium). `/new` starts a fresh session on it;
-`/fork` carries this conversation's context across."_ A live `/model` or `/effort`
-reply, by contrast, confirms the change took effect on the running session now.
+Selections persist across `/new` and layer over the route defaults. They never
+rewrite the immutable, organization-owned Channel revision. The Hub facade reuses
+existing daemon RPCs; this feature introduces no new daemon protocol.
 
 ## Agent profiles and the route menu
 
-Two things named "agent" meet here; keep them straight.
+`/agent list` lists named **Agent profiles** from daemon configuration
+(`get_daemon_config_request`, gated by the host's `agentProfiles` feature).
+`/agent <name>` applies the provider/model/mode/thinking bundle. Same-provider
+changes apply live; a different provider is staged as described above.
 
-- **The route's closed menu** — what shipped `/agent`/`/model` use today.
-  `selectionMenu`/`resolveSelection` (`policy/selection.ts`) offer only the route's
-  own agent plus the `selectable.agents` / `selectable.models` the route author
-  listed in `hub.yml`. It is **closed on purpose**: a command that could name any
-  agent or model would let a participant reach every environment the Hub can run,
-  so anything off the list is refused. It is an allowlist, not a catalog.
-- **Agent profiles** — the reusable named bundles from the app (**Agent profile**
-  in [the glossary](../../glossary.md); `agentProfiles` in daemon config: provider,
-  model, mode, thinking, features, notes; host feature `agentProfiles`). Applying
-  one copies those values onto the agent — the same thing the app's profile picker
-  and the `list_profiles` MCP tool do. They ride in on `server_info`, so the channel
-  reads them with no new RPC.
-
-This feature makes **`/agent` = apply an agent profile**: `/agent list` shows the
-profiles you may use, `/agent <name>` applies one (its model/mode/thinking go live;
-a different provider re-mints, per [Where a `/set` lands](#where-a-set-lands)). The
-**bound is your access grant**: you only see and apply profiles whose
-provider/model fall inside your `AgentConfigurationGrant` (org Access), the same
-bound as `/provider`/`/model`/`/effort`. The route's closed `selectable` list is the
-shipped mechanism this replaces; going forward the per-user grant is the allow rule,
-which is why a public **Guest** may be granted a narrow set while a developer gets
-more.
+Every visible or applicable profile must fit the caller's
+`AgentConfigurationGrant`. The former route `selectable.agents` / `selectable.models`
+menu is no longer the command authorization boundary. An unlinked Guest may be
+given a narrow configuration grant; linking a Member switches to that Member's
+own assignments and team grants.
 
 ## Provider, model, effort
 
@@ -324,8 +343,10 @@ identity. Command **output** is scoped:
   the conversation as usual.
 - Identity, link, and config output — `/cowork`, `/status`, `/me`, and `list` /
   `search` results — is delivered to the **requester privately** when the
-  conversation is public (ephemeral on Slack/Discord, DM on
-  Telegram/Feishu/Google Chat), gated by the sender's privileges. A `/cowork` link
+  conversation is public, gated by the sender's privileges. Ordinary text commands
+  use a requester DM on every channel: they do not carry the interaction tokens
+  required for native ephemeral replies. If private delivery fails, the command
+  does not fall back to publishing that output in the conversation. A `/cowork` link
   never lands where a bystander without `agent.interact` can use it.
 
 ## Maintaining this doc
@@ -335,9 +356,9 @@ identity. Command **output** is scoped:
   **and** `commands.ts` + `textCommandHelpText()` in the same change, gate it on an
   org Access privilege
   (`authorizeChannelPrivilege`), and mirror the user-facing lines in
-  [user-guide.md](user-guide.md). Move a row from Proposed to Shipped when it lands.
+  [user-guide.md](user-guide.md). Keep implementation and verification status in the implementation plan.
 - Privilege names in **Requires** come from `ACCESS_PRIVILEGES`
   (`packages/hub/src/access/contract.ts`). If you cite one here, it must exist there.
 - New product terms (`/cowork`, dynamic command, Guest group) go in
-  [the glossary](../../glossary.md) when they ship; this doc links, it does not
+  [the glossary](../../glossary.md) as they are implemented; this doc links, it does not
   redefine.

@@ -245,6 +245,7 @@ export class ChannelStore {
     accountId: string;
     externalConversationId: string;
     externalThreadId: string | null;
+    expectedAgentId?: string | undefined;
   }): Promise<ThreadBindingRecord | undefined> {
     return this.runtime.transaction(async (runtimeTransaction) => {
       const transaction = runtimeTransaction.drizzle();
@@ -256,43 +257,82 @@ export class ChannelStore {
         input.externalThreadId,
       );
       if (row === undefined) return undefined;
+      if (input.expectedAgentId !== undefined && row.agentId !== input.expectedAgentId) {
+        throw new ChannelThreadBindingConflictError();
+      }
       await transaction.delete(schema.threadBindings).where(eq(schema.threadBindings.id, row.id));
       return toThreadBinding(row);
     });
   }
 
   /** Atomically replace a conversation binding without exposing one Agent in two conversations. */
-  async rebindThreadBinding(input: Omit<PendingThreadBindingInput, "pendingExecutionId"> & {
-    expectedAgentId: string | null;
-    agentId: string;
-    daemonId?: string | null;
-  }): Promise<ThreadBindingRecord> {
+  async rebindThreadBinding(
+    input: Omit<PendingThreadBindingInput, "pendingExecutionId"> & {
+      expectedAgentId: string | null;
+      agentId: string;
+      daemonId?: string | null;
+    },
+  ): Promise<ThreadBindingRecord> {
     return this.runtime.transaction(async (runtimeTransaction) => {
-      await this.runtime.locks.withTxLock(runtimeTransaction, `channel-resume:${input.organizationId}:${input.agentId}`);
+      await runtimeTransaction.query(`select pg_advisory_xact_lock(hashtextextended($1, 0))`, [
+        `channel-resume:${input.agentId}`,
+      ]);
       const transaction = runtimeTransaction.drizzle();
-      const row = await lockThreadBindingRow(transaction, input.organizationId, input.accountId,
-        input.externalConversationId, input.externalThreadId);
-      if ((row?.agentId ?? null) !== input.expectedAgentId || (row !== undefined && row.status !== "bound")) {
+      const row = await lockThreadBindingRow(
+        transaction,
+        input.organizationId,
+        input.accountId,
+        input.externalConversationId,
+        input.externalThreadId,
+      );
+      if (
+        (row?.agentId ?? null) !== input.expectedAgentId ||
+        (row !== undefined && row.status !== "bound")
+      ) {
         throw new ChannelThreadBindingConflictError();
       }
-      const references = await transaction.select({ id: schema.threadBindings.id }).from(schema.threadBindings)
-        .where(and(eq(schema.threadBindings.organizationId, input.organizationId),
-          eq(schema.threadBindings.agentId, input.agentId), eq(schema.threadBindings.status, "bound")));
+      const references = await transaction
+        .select({ id: schema.threadBindings.id })
+        .from(schema.threadBindings)
+        .where(
+          and(
+            eq(schema.threadBindings.agentId, input.agentId),
+            eq(schema.threadBindings.status, "bound"),
+          ),
+        );
       if (references.some((reference) => reference.id !== row?.id)) {
         throw new ChannelThreadBindingConflictError();
       }
-      const fields = { status: "bound" as const, agentId: input.agentId, daemonId: input.daemonId ?? null,
-        pendingExecutionId: null, resolvedAt: new Date(), initiator: input.initiator, route: input.route };
+      const fields = {
+        status: "bound" as const,
+        agentId: input.agentId,
+        daemonId: input.daemonId ?? null,
+        pendingExecutionId: null,
+        resolvedAt: new Date(),
+        initiator: input.initiator,
+        route: input.route,
+      };
       if (row !== undefined) {
-        const [updated] = await transaction.update(schema.threadBindings).set(fields)
-          .where(eq(schema.threadBindings.id, row.id)).returning();
+        const [updated] = await transaction
+          .update(schema.threadBindings)
+          .set(fields)
+          .where(eq(schema.threadBindings.id, row.id))
+          .returning();
         if (updated === undefined) throw new ChannelThreadBindingNotFoundError();
         return toThreadBinding(updated);
       }
-      const [inserted] = await transaction.insert(schema.threadBindings).values({
-        organizationId: input.organizationId, channel: input.channel, accountId: input.accountId,
-        externalConversationId: input.externalConversationId, externalThreadId: input.externalThreadId, ...fields,
-      }).onConflictDoNothing().returning();
+      const [inserted] = await transaction
+        .insert(schema.threadBindings)
+        .values({
+          organizationId: input.organizationId,
+          channel: input.channel,
+          accountId: input.accountId,
+          externalConversationId: input.externalConversationId,
+          externalThreadId: input.externalThreadId,
+          ...fields,
+        })
+        .onConflictDoNothing()
+        .returning();
       if (inserted === undefined) throw new ChannelThreadBindingConflictError();
       return toThreadBinding(inserted);
     });

@@ -230,7 +230,7 @@ export class AccessPolicyError extends Error {
   }
 }
 
-/** Persistence and resolution for additive Team/Member resource grants. */
+/** Persistence and resolution for additive Team, Member and Guest resource grants. */
 export class AccessStore {
   private readonly database: DrizzleHandle;
 
@@ -892,6 +892,11 @@ export class AccessStore {
     input: ChannelPrivilegeRequest,
   ): Promise<ChannelPrivilegeDecision> {
     if (input.privilege !== "channel.use") {
+      const channelAccess = await this.authorizeChannelPrivilege({
+        ...input,
+        privilege: "channel.use",
+      });
+      if (!channelAccess.allowed) return channelAccess;
       const authority = await this.resolveChannelAgentAccess(input);
       return authority.unrestricted || authority.privileges.includes(input.privilege)
         ? { allowed: true }
@@ -900,90 +905,158 @@ export class AccessStore {
     const identity = await this.resolveChannelMember(input);
     if (identity?.role === "owner") return { allowed: true };
     const assignments = await this.channelSubjectAssignments(input, identity);
-    const allowed = assignments.some(({ resourceKind, resourceId, privileges, constraints }) =>
-      resourceKind === "channel_account" &&
-      resourceId === formatChannelAccountResourceId(input.channel, input.accountId) &&
-      privileges.includes(input.privilege) &&
-      conversationCovers(constraints.conversation, input.conversation),
+    const allowed = assignments.some(
+      ({ resourceKind, resourceId, privileges, constraints }) =>
+        resourceKind === "channel_account" &&
+        resourceId === formatChannelAccountResourceId(input.channel, input.accountId) &&
+        privileges.includes(input.privilege) &&
+        conversationCovers(constraints.conversation, input.conversation),
     );
-    return allowed ? { allowed: true } : {
-      allowed: false,
-      reason: identity === undefined
-        ? "sender identity is not linked to a Hub Member on this Connection"
-        : "linked Hub Member does not have access to this conversation",
-    };
+    return allowed
+      ? { allowed: true }
+      : {
+          allowed: false,
+          reason:
+            identity === undefined
+              ? "sender identity is not linked to a Hub Member on this Connection"
+              : "linked Hub Member does not have access to this conversation",
+        };
   }
 
   async resolveChannelAgentConfigurations(input: ChannelPrivilegeRequest): Promise<{
-    unrestricted: boolean; agentConfigurations: AgentConfigurationGrant[];
+    unrestricted: boolean;
+    agentConfigurations: AgentConfigurationGrant[];
   }> {
+    if (!(await this.authorizeChannelPrivilege({ ...input, privilege: "channel.use" })).allowed) {
+      return { unrestricted: false, agentConfigurations: [] };
+    }
     const { unrestricted, agentConfigurations } = await this.resolveChannelAgentAccess(input);
     return { unrestricted, agentConfigurations };
   }
 
   /** Resolves the same Member/Team or Guest assignments for channel Agent control. */
   private async resolveChannelAgentAccess(input: {
-    organizationId: string; connectionId: string; channel: string; senderIdentity: string;
-    daemonReference?: string; projectId?: string;
+    organizationId: string;
+    connectionId: string;
+    channel: string;
+    senderIdentity: string;
+    daemonReference?: string;
+    projectId?: string;
   }): Promise<{
-    unrestricted: boolean; privileges: AccessPrivilege[];
+    unrestricted: boolean;
+    privileges: AccessPrivilege[];
     agentConfigurations: AgentConfigurationGrant[];
   }> {
     const denied = { unrestricted: false, privileges: [], agentConfigurations: [] };
     if (input.daemonReference === undefined) return denied;
     const daemonReference = z.string().uuid().safeParse(input.daemonReference);
-    const [daemon] = await this.database.select({ id: schema.daemons.id }).from(schema.daemons)
-      .where(and(eq(schema.daemons.organizationId, input.organizationId),
-        eq(schema.daemons.status, "active"), daemonReference.success
-          ? eq(schema.daemons.id, daemonReference.data)
-          : eq(schema.daemons.slug, input.daemonReference))).limit(1);
+    const [daemon] = await this.database
+      .select({ id: schema.daemons.id })
+      .from(schema.daemons)
+      .where(
+        and(
+          eq(schema.daemons.organizationId, input.organizationId),
+          eq(schema.daemons.status, "active"),
+          daemonReference.success
+            ? eq(schema.daemons.id, daemonReference.data)
+            : eq(schema.daemons.slug, input.daemonReference),
+        ),
+      )
+      .limit(1);
     if (daemon === undefined) return denied;
     const identity = await this.resolveChannelMember(input);
     if (identity?.role === "owner") return { ...denied, unrestricted: true };
     const assignments = await this.channelSubjectAssignments(input, identity);
-    const inherited = assignments.filter(({ resourceKind, resourceId }) =>
-      resourceKind === "daemon" && resourceId === daemon.id);
+    const inherited = assignments.filter(
+      ({ resourceKind, resourceId }) => resourceKind === "daemon" && resourceId === daemon.id,
+    );
     const inheritedPrivileges = privilegeUnion(inherited);
     if (!inheritedPrivileges.has("daemon.connect")) return denied;
     if (inheritedPrivileges.has("daemon.manage")) return { ...denied, unrestricted: true };
     if (input.projectId === undefined) return denied;
-    const [project] = await this.database.select({ id: schema.daemonProjects.id })
-      .from(schema.daemonProjects).where(and(
-        eq(schema.daemonProjects.organizationId, input.organizationId),
-        eq(schema.daemonProjects.daemonId, daemon.id),
-        eq(schema.daemonProjects.externalProjectId, input.projectId),
-        eq(schema.daemonProjects.available, true))).limit(1);
+    const [project] = await this.database
+      .select({ id: schema.daemonProjects.id })
+      .from(schema.daemonProjects)
+      .where(
+        and(
+          eq(schema.daemonProjects.organizationId, input.organizationId),
+          eq(schema.daemonProjects.daemonId, daemon.id),
+          eq(schema.daemonProjects.externalProjectId, input.projectId),
+          eq(schema.daemonProjects.available, true),
+        ),
+      )
+      .limit(1);
     if (project === undefined) return denied;
-    const applicable = [...inherited, ...assignments.filter(({ resourceKind, resourceId }) =>
-      resourceKind === "project" && resourceId === project.id)];
+    const applicable = [
+      ...inherited,
+      ...assignments.filter(
+        ({ resourceKind, resourceId }) => resourceKind === "project" && resourceId === project.id,
+      ),
+    ];
     const privileges = [...privilegeUnion(applicable)];
-    return privileges.includes("project.use") ? {
-      unrestricted: false, privileges,
-      agentConfigurations: applicable.flatMap(({ constraints }) => constraints.agentConfigurations ?? []),
-    } : denied;
+    return privileges.includes("project.use")
+      ? {
+          unrestricted: false,
+          privileges,
+          agentConfigurations: applicable.flatMap(
+            ({ constraints }) => constraints.agentConfigurations ?? [],
+          ),
+        }
+      : denied;
   }
 
-  private async channelSubjectAssignments(input: { organizationId: string }, identity?: {
-    membershipId: string; userId: string; role: string;
-  }): Promise<AccessAssignmentRecord[]> {
-    const teams = identity === undefined ? [] : await this.database
-      .select({ id: schema.teams.id }).from(schema.teamMembers)
-      .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-      .where(and(eq(schema.teamMembers.userId, identity.userId),
-        eq(schema.teams.organizationId, input.organizationId)));
-    const subject = identity === undefined
-      ? and(eq(schema.accessAssignments.subjectKind, "guest"),
-          eq(schema.accessAssignments.subjectId, GUEST_ACCESS_SUBJECT_ID))
-      : or(and(eq(schema.accessAssignments.subjectKind, "member"),
-          eq(schema.accessAssignments.subjectId, identity.membershipId)),
-          ...(teams.length === 0 ? [] : [and(eq(schema.accessAssignments.subjectKind, "team"),
-            inArray(schema.accessAssignments.subjectId, teams.map(({ id }) => id)))]));
-    const rows = await this.database.select().from(schema.accessAssignments)
+  private async channelSubjectAssignments(
+    input: { organizationId: string },
+    identity?: {
+      membershipId: string;
+      userId: string;
+      role: string;
+    },
+  ): Promise<AccessAssignmentRecord[]> {
+    const teams =
+      identity === undefined
+        ? []
+        : await this.database
+            .select({ id: schema.teams.id })
+            .from(schema.teamMembers)
+            .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
+            .where(
+              and(
+                eq(schema.teamMembers.userId, identity.userId),
+                eq(schema.teams.organizationId, input.organizationId),
+              ),
+            );
+    const subject =
+      identity === undefined
+        ? and(
+            eq(schema.accessAssignments.subjectKind, "guest"),
+            eq(schema.accessAssignments.subjectId, GUEST_ACCESS_SUBJECT_ID),
+          )
+        : or(
+            and(
+              eq(schema.accessAssignments.subjectKind, "member"),
+              eq(schema.accessAssignments.subjectId, identity.membershipId),
+            ),
+            ...(teams.length === 0
+              ? []
+              : [
+                  and(
+                    eq(schema.accessAssignments.subjectKind, "team"),
+                    inArray(
+                      schema.accessAssignments.subjectId,
+                      teams.map(({ id }) => id),
+                    ),
+                  ),
+                ]),
+          );
+    const rows = await this.database
+      .select()
+      .from(schema.accessAssignments)
       .where(and(eq(schema.accessAssignments.organizationId, input.organizationId), subject));
     return rows.map(toAssignment);
   }
 
-  /** Requires both a verified Channel identity and current Project approval authority. */
+  /** Requires current Project approval authority from the linked Member or Guest grants. */
   async allowsChannelApproval(input: ChannelApprovalPrivilegeRequest): Promise<boolean> {
     const authority = await this.resolveChannelAgentAccess(input);
     return authority.unrestricted || authority.privileges.includes(input.privilege);

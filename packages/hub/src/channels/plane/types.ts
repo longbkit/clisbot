@@ -412,6 +412,23 @@ export interface ChannelPlaneDeps {
    * config levels compose it via `policy.isEnabled`. */
   envFlag: boolean;
   controlPlane: ChannelControlPlane;
+  commandAccess?: Pick<
+    import("../../access/store.js").AccessStore,
+    "authorizeChannelPrivilege" | "resolveChannelAgentConfigurations" | "resolveChannelMember"
+  >;
+  appWebUrl?: string;
+  cancelWorkflowRuns?: (input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    authorization: import("../../access/store.js").ChannelPrivilegeRequest;
+  }) => Promise<number>;
+  readWorkflowRuns?: (input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    authorization: import("../../access/store.js").ChannelPrivilegeRequest;
+  }) => Promise<import("../../workflows/channel-status.js").ChannelWorkflowRunSummary[]>;
   authorizeChannelUse?: ChannelUseAuthorizer | undefined;
   authorizeChannelApproval?: ChannelApprovalAuthorizer | undefined;
   consumeChannelIdentityChallenge?: ChannelIdentityChallengeConsumer | undefined;

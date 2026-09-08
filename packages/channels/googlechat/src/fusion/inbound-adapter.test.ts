@@ -241,3 +241,17 @@ describe("extractMentionInfo", () => {
     });
   });
 });
+
+it("normalizes the native /paseo umbrella, including approval commands", () => {
+  for (const text of ["/paseo approve request-1", "/paseo model list", "/paseo"]) {
+    const build = buildGoogleChatInboundEvent(message({ message: {
+      ...message().message, text, argumentText: text,
+      annotations: [{ type: "SLASH_COMMAND", slashCommand: { commandId: 1, commandName: "/paseo" } }],
+    } }), { accountId: "default" });
+    expect(build.admit).toBe(true);
+    if (!build.admit) continue;
+    expect(build.event.body).toBe(text === "/paseo" ? "/help" : text.replace("/paseo ", "/"));
+    expect(build.event.wasMentioned).toBe(true);
+    expect(build.event.kind).toBe("command");
+  }
+});

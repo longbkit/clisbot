@@ -45,30 +45,182 @@ export interface ApprovalCommand {
 
 /** Metadata owns parsing, discovery, route applicability and Access gating. */
 export const CHANNEL_COMMANDS = [
-  { name: "status", aliases: ["state"], args: false, privilege: "agent.interact", directOnly: false, usage: "/status", description: "agent, session, context and access" },
-  { name: "stop", aliases: ["cancel"], args: false, privilege: "agent.interact", directOnly: false, usage: "/stop", description: "stop the turn or active automation runs" },
-  { name: "new", aliases: ["reset"], args: true, privilege: "agent.create", directOnly: true, usage: "/new [message]", description: "start fresh in this conversation" },
-  { name: "help", aliases: [], args: false, privilege: null, directOnly: false, usage: "/help", description: "this list" },
-  { name: "me", aliases: [], args: false, privilege: null, directOnly: false, usage: "/me", description: "your channel identity and access" },
-  { name: "cowork", aliases: ["open", "app"], args: false, privilege: "agent.interact", directOnly: false, usage: "/cowork", description: "open this session in Paseo" },
-  { name: "resume", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/resume <id>", description: "continue an existing session here" },
-  { name: "steer", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/steer <message>", description: "send into the running turn" },
-  { name: "queue", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/queue <message>", description: "send after the current turn ends" },
-  { name: "agent", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/agent [list|search <text>|name]", description: "list or apply an agent profile" },
-  { name: "provider", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/provider [list|search <text>|id]", description: "list or switch provider" },
-  { name: "model", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/model [list|search <text>|id]", description: "list or set this provider's model" },
-  { name: "effort", aliases: ["thinking"], args: true, privilege: "agent.interact", directOnly: true, usage: "/effort [list|id]", description: "list or set this model's thinking option" },
-  { name: "permission", aliases: ["mode"], args: true, privilege: "agent.interact", directOnly: true, usage: "/permission [mode]", description: "list or set the provider's mode" },
-  { name: "skill", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/skill [list|search <text>|name]", description: "find or invoke an agent skill" },
-  { name: "command", aliases: [], args: true, privilege: "agent.interact", directOnly: true, usage: "/command [list|search <text>|name|add <name> <prompt>|remove <name>]", description: "find, invoke or manage account commands" },
-  { name: "fork", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/fork [message]", description: "copy context and continue here" },
-  { name: "side", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/side <message>", description: "one-off question with this context" },
-  { name: "quick", aliases: [], args: true, privilege: "agent.create", directOnly: true, usage: "/quick <message>", description: "one-off question in a fresh session" },
+  {
+    name: "status",
+    aliases: ["state"],
+    args: false,
+    privilege: "agent.interact",
+    directOnly: false,
+    usage: "/status",
+    description: "agent, session, context and access",
+  },
+  {
+    name: "stop",
+    aliases: ["cancel"],
+    args: false,
+    privilege: "agent.interact",
+    directOnly: false,
+    usage: "/stop",
+    description: "stop the turn or active automation runs",
+  },
+  {
+    name: "new",
+    aliases: ["reset"],
+    args: true,
+    privilege: "agent.create",
+    directOnly: true,
+    usage: "/new [message]",
+    description: "start fresh in this conversation",
+  },
+  {
+    name: "help",
+    aliases: [],
+    args: false,
+    privilege: null,
+    directOnly: false,
+    usage: "/help",
+    description: "this list",
+  },
+  {
+    name: "me",
+    aliases: [],
+    args: false,
+    privilege: null,
+    directOnly: false,
+    usage: "/me",
+    description: "your channel identity and access",
+  },
+  {
+    name: "cowork",
+    aliases: ["open", "app"],
+    args: false,
+    privilege: "agent.interact",
+    directOnly: false,
+    usage: "/cowork",
+    description: "open this session in Paseo",
+  },
+  {
+    name: "resume",
+    aliases: [],
+    args: true,
+    privilege: "agent.create",
+    directOnly: true,
+    usage: "/resume <id>",
+    description: "continue an existing session here",
+  },
+  {
+    name: "steer",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/steer <message>",
+    description: "send into the running turn",
+  },
+  {
+    name: "queue",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/queue <message>",
+    description: "send after the current turn ends",
+  },
+  {
+    name: "agent",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/agent [list|search <text>|name]",
+    description: "list or apply an agent profile",
+  },
+  {
+    name: "provider",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/provider [list|search <text>|id]",
+    description: "list or switch provider",
+  },
+  {
+    name: "model",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/model [list|search <text>|id]",
+    description: "list or set this provider's model",
+  },
+  {
+    name: "effort",
+    aliases: ["thinking"],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/effort [list|id]",
+    description: "list or set this model's thinking option",
+  },
+  {
+    name: "permission",
+    aliases: ["mode"],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/permission [mode]",
+    description: "list or set the provider's mode",
+  },
+  {
+    name: "skill",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/skill [list|search <text>|name]",
+    description: "find or invoke an agent skill",
+  },
+  {
+    name: "command",
+    aliases: [],
+    args: true,
+    privilege: "agent.interact",
+    directOnly: true,
+    usage: "/command [list|search <text>|name|add <name> <prompt>|remove <name>]",
+    description: "find, invoke or manage account commands",
+  },
+  {
+    name: "fork",
+    aliases: [],
+    args: true,
+    privilege: "agent.create",
+    directOnly: true,
+    usage: "/fork [message]",
+    description: "copy context and continue here",
+  },
+  {
+    name: "side",
+    aliases: [],
+    args: true,
+    privilege: "agent.create",
+    directOnly: true,
+    usage: "/side <message>",
+    description: "one-off question with this context",
+  },
+  {
+    name: "quick",
+    aliases: [],
+    args: true,
+    privilege: "agent.create",
+    directOnly: true,
+    usage: "/quick <message>",
+    description: "one-off question in a fresh session",
+  },
 ] as const;
 
 export type ChannelCommandName = (typeof CHANNEL_COMMANDS)[number]["name"];
 export type ChannelTextCommand = {
-  [Name in ChannelCommandName]: { name: Name; value?: string }
+  [Name in ChannelCommandName]: { name: Name; value?: string };
 }[ChannelCommandName];
 
 export function channelCommandSpec(name: ChannelCommandName) {
@@ -83,9 +235,12 @@ export function channelCommandPrivilege(command: ChannelTextCommand) {
 }
 
 const COMMAND_ALIASES = new Map<string, ChannelCommandName>(
-  CHANNEL_COMMANDS.flatMap((command) => [command.name, ...command.aliases].map(
-    (name): [string, ChannelCommandName] => [name, command.name],
-  )),
+  CHANNEL_COMMANDS.flatMap((command) =>
+    [command.name, ...command.aliases].map((name): [string, ChannelCommandName] => [
+      name,
+      command.name,
+    ]),
+  ),
 );
 
 export function isReservedChannelCommand(name: string): boolean {
@@ -114,7 +269,7 @@ const COMMAND_VERB_SOURCE = [...COMMAND_ALIASES.keys(), "approve", "deny", "pase
  * match — this function only removes mentions.
  */
 const MENTION_BEFORE_COMMAND = new RegExp(
-  `^(?:[\\s/\\\\.,!@]*@\\w{3,32})+\\s*(?:[/\\\\]+\\s*)?(?=(?:${COMMAND_VERB_SOURCE})\\b)`,
+  `^(?:[\\s/\\\\.,!@]*@\\w{3,32})+\\s*(?=(?:[/\\\\]+\\s*)?(?:${COMMAND_VERB_SOURCE})\\b)`,
   "iu",
 );
 
@@ -128,19 +283,32 @@ const MENTION_AFTER_VERB = new RegExp(`^[/\\\\]?(${COMMAND_VERB_SOURCE})@\\w{3,3
  * form so the mention regexes below match it unchanged. */
 const SLACK_MENTION_TOKEN = /<@!?[A-Z0-9][A-Z0-9]{2,31}>/giu;
 
-function stripMentions(text: string): string {
+function stripMentions(text: string, dynamic = false): string {
+  if (/^\s*@(all|everyone|here)\b/iu.test(text)) return text;
+  const before = dynamic
+    ? new RegExp(
+        MENTION_BEFORE_COMMAND.source.replace(COMMAND_VERB_SOURCE, "[a-z][a-z0-9_-]*"),
+        "iu",
+      )
+    : MENTION_BEFORE_COMMAND;
+  const after = dynamic
+    ? new RegExp(MENTION_AFTER_VERB.source.replace(COMMAND_VERB_SOURCE, "[a-z][a-z0-9_-]*"), "iu")
+    : MENTION_AFTER_VERB;
   // Slack first: `<@U8Z…> /approve` is how a Slack user addresses the bot.
-  let normalized = text.replace(SLACK_MENTION_TOKEN, (token) => `@${token.slice(2, -1).replace(/^!/, "")}`);
+  let normalized = text.replace(
+    SLACK_MENTION_TOKEN,
+    (token) => `@${token.slice(2, -1).replace(/^!/, "")}`,
+  );
   // Up to two leading mentions ("@bot @bot /approve" is the realistic max).
   for (let i = 0; i < 2; i += 1) {
-    const match = MENTION_BEFORE_COMMAND.exec(normalized);
+    const match = before.exec(normalized);
     if (match === null) break;
     normalized = normalized.slice(match[0].length);
   }
   // The glued verb suffix: `/approve@bot` → `/approve` (prefix kept).
   const trimmedStart = normalized.trimStart();
   const lead = normalized.length - trimmedStart.length;
-  const suffix = MENTION_AFTER_VERB.exec(trimmedStart);
+  const suffix = after.exec(trimmedStart);
   if (suffix !== null) {
     // Drop the glued `@username` (everything from the `@` to the match end),
     // keeping the prefix + verb — the autocomplete form; a spaced "@bot"
@@ -211,15 +379,16 @@ export function parseChannelTextCommand(text: string): ChannelTextCommand | null
 export function textCommandHelpText(routeKind?: "agent" | "workflow"): string {
   return [
     "Commands:",
-    ...CHANNEL_COMMANDS.filter((command) => routeKind !== "workflow" || !command.directOnly)
-      .map((command) => `- \`${command.usage}\` — ${command.description}`),
+    ...CHANNEL_COMMANDS.filter((command) => routeKind !== "workflow" || !command.directOnly).map(
+      (command) => `- \`${command.usage}\` — ${command.description}`,
+    ),
     "Approvals: `/approve [id] [answer]` or `/deny [id]` answers an open prompt.",
     "Slack: use the backslash form (\\status) if / collides with a native command.",
   ].join("\n");
 }
 
 /** Normalize addressing and the single native umbrella before either parser. */
-export function normalizeChannelCommandText(text: string): string {
-  const normalized = stripMentions(text);
+export function normalizeChannelCommandText(text: string, dynamic = false): string {
+  const normalized = stripMentions(text, dynamic);
   return normalized.replace(/^\s*[/\\]paseo(?:\s+|$)/iu, "/").replace(/^\/\s*$/u, "/help");
 }

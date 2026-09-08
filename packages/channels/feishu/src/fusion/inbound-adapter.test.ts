@@ -185,3 +185,14 @@ describe("buildFeishuBotMemberEvent", () => {
     expect(build.event.facts?.member).toEqual({ userId: "ou_admin", joined: true });
   });
 });
+
+it("does not treat an @all broadcast before a command as addressing the bot", () => {
+  const build = buildFeishuInboundEvent(messageEvent({
+    content: JSON.stringify({ text: "@_all /status" }),
+    mentions: [{ key: "@_all", id: { open_id: "all" }, name: "all" }],
+  }), { accountId: "default", botOpenId: BOT_OPEN_ID });
+  expect(build.admit).toBe(true);
+  if (!build.admit) return;
+  expect(build.event.wasMentioned).toBe(false);
+  expect(build.event.body).toContain('<at user_id="all">');
+});

@@ -20,6 +20,7 @@ const assignments = [
   { subjectKind: "member", subjectId: "membership", id: "direct" },
   { subjectKind: "team", subjectId: "team", id: "inherited" },
   { subjectKind: "member", subjectId: "someone-else", id: "other" },
+  { subjectKind: "guest", subjectId: "guest", id: "guest-grant" },
 ].map((subject) =>
   HubAccessAssignmentSchema.parse({
     ...subject,
@@ -48,6 +49,14 @@ describe("Access overview projections", () => {
         ({ id }) => id,
       ),
     ).toEqual(["inherited"]);
+  });
+
+  it("shows Guest assignments separately from Member and Team assignments", () => {
+    expect(
+      assignmentsForSubject(assignments, { kind: "guest", id: "guest" }, [member], [team]).map(
+        ({ id }) => id,
+      ),
+    ).toEqual(["guest-grant"]);
   });
 
   it("does not retain inherited access after removal from a Team", () => {

@@ -1231,6 +1231,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       normalizeInbound: flatInboundNormalizer,
       envFlag: this.enabled(),
       controlPlane: snapshot.controlPlane,
+      ...commandPlaneOptions(this.options),
       ...(this.options.authorizeChannelUse === undefined
         ? {}
         : { authorizeChannelUse: this.options.authorizeChannelUse }),
@@ -1939,4 +1940,13 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
  */
 export function createChannelSupervisor(options: ChannelSupervisorOptions): ChannelSupervisor {
   return new ChannelSupervisorImpl(options);
+}
+
+function commandPlaneOptions(options: ChannelSupervisorOptions) {
+  return {
+    ...(options.commandAccess ? { commandAccess: options.commandAccess } : {}),
+    ...(options.readWorkflowRuns ? { readWorkflowRuns: options.readWorkflowRuns } : {}),
+    ...(options.cancelWorkflowRuns ? { cancelWorkflowRuns: options.cancelWorkflowRuns } : {}),
+    ...(options.appWebUrl ? { appWebUrl: options.appWebUrl } : {}),
+  };
 }

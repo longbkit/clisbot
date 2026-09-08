@@ -23,6 +23,7 @@ import type { ChannelInboundEvent, HostChildLogger } from "@getpaseo/channels-sh
 import type { APIMessage } from "discord-api-types/v10";
 import type { DiscordIntentsConfig } from "@getpaseo/channels-core/plugin-sdk/config-contracts";
 import { Client } from "../internal/client.js";
+import { PaseoInteractionListener, registerDiscordPaseoCommand } from "../fusion/commands.js";
 import * as discordGateway from "../internal/gateway.js";
 import type { DiscordMessageDispatchData } from "../internal/listeners.js";
 import { MessageCreateListener } from "../internal/listeners.js";
@@ -230,12 +231,11 @@ export async function runDiscordGateway(
       disableInteractionsRoute: true,
       disableEventsRoute: true,
     },
-    { listeners: [new InboundMessageListener()] },
+    { listeners: [new InboundMessageListener(), new PaseoInteractionListener(params.applicationId, params.onEvent)] },
     [gateway],
   );
-  void client;
-
   try {
+    await registerDiscordPaseoCommand(client);
     return await stopped.outcome;
   } finally {
     stopped.release();

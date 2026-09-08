@@ -741,7 +741,10 @@ export const accessAssignments = pgTable(
       table.resourceKind,
       table.resourceId,
     ),
-    check("access_assignments_subject_kind_check", sql`${table.subjectKind} in ('member', 'team', 'guest')`),
+    check(
+      "access_assignments_subject_kind_check",
+      sql`${table.subjectKind} in ('member', 'team', 'guest')`,
+    ),
     check(
       "access_assignments_resource_kind_check",
       sql`${table.resourceKind} in ('organization', 'daemon', 'project', 'channel_account', 'automation')`,
@@ -1984,7 +1987,7 @@ export const channelConversationSelections = pgTable(
     selectedProvider: text("selected_provider"),
     selectedThinkingOption: text("selected_thinking_option"),
     selectedMode: text("selected_mode"),
-    selectedProfile: text("selected_profile"),
+    selectedFeatureValues: jsonb("selected_feature_values").$type<Record<string, unknown>>(),
     /** Who switched, for the activity trail. */
     selectedBy: text("selected_by").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -2009,7 +2012,8 @@ export const channelCommands = pgTable(
   "channel_commands",
   {
     id: uuid().defaultRandom().primaryKey(),
-    organizationId: text("organization_id").notNull()
+    organizationId: text("organization_id")
+      .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     channel: text().$type<SupportedChannelName>().notNull(),
     accountId: text("account_id").notNull(),
@@ -2020,11 +2024,49 @@ export const channelCommands = pgTable(
   },
   (table) => [
     uniqueIndex("channel_commands_account_name_unique").on(
-      table.organizationId, table.channel, table.accountId, table.name,
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.name,
     ),
     check("channel_commands_channel_check", channelNameCheck(table.channel)),
     check("channel_commands_name_check", sql`${table.name} ~ '^[a-z][a-z0-9_-]{0,63}$'`),
     check("channel_commands_prompt_check", sql`length(trim(${table.prompt})) > 0`),
+  ],
+);
+
+/** At-most-once admission for side-effecting channel commands across ingress retries. */
+export const channelCommandReceipts = pgTable(
+  "channel_command_receipts",
+  {
+    id: uuid().defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    channel: text().$type<SupportedChannelName>().notNull(),
+    accountId: text("account_id").notNull(),
+    externalConversationId: text("external_conversation_id").notNull(),
+    externalMessageId: text("external_message_id").notNull(),
+    command: text().notNull(),
+    status: text().$type<"pending" | "completed">().notNull().default("pending"),
+    handled: boolean(),
+    detail: text(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("channel_command_receipts_message_unique").on(
+      table.organizationId,
+      table.channel,
+      table.accountId,
+      table.externalConversationId,
+      table.externalMessageId,
+    ),
+    check("channel_command_receipts_channel_check", channelNameCheck(table.channel)),
+    check(
+      "channel_command_receipts_status_check",
+      sql`${table.status} in ('pending', 'completed')`,
+    ),
   ],
 );
 

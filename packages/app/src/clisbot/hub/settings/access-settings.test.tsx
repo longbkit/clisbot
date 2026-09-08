@@ -223,10 +223,24 @@ describe("Access assignment editing", () => {
     expect(screen.queryByText("Access unavailable")).toBeNull();
   });
 
+  it("authors a Guest grant using the organization-scoped Guest identity", async () => {
+    renderAccess();
+    const [subject] = await screen.findAllByLabelText("Team, Member or Guest");
+    fireEvent.change(subject!, { target: { value: "guest\0guest" } });
+    fireEvent.change(screen.getByLabelText("Resource"), { target: { value: "daemon\0host" } });
+    fireEvent.change(screen.getByLabelText("Access level"), { target: { value: "connect" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grant access" }));
+    await waitFor(() => expect(adapters.post).toHaveBeenCalled());
+    expect(adapters.post.mock.calls[0]?.[1]).toMatchObject({
+      subjectKind: "guest",
+      subjectId: "guest",
+    });
+  });
+
   it("opens the linked Member, locks identity and updates using the canonical upsert without deleting", async () => {
     renderAccess();
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-    const subjectFields = screen.getAllByLabelText("Team or Member") as HTMLSelectElement[];
+    const subjectFields = screen.getAllByLabelText("Team, Member or Guest") as HTMLSelectElement[];
     expect(subjectFields.every((field) => field.value === "member\0membership")).toBe(true);
     expect(subjectFields.at(-1)?.disabled).toBe(true);
     expect((screen.getByLabelText("Resource") as HTMLSelectElement).disabled).toBe(true);
@@ -407,7 +421,7 @@ describe("Access assignment editing", () => {
 
 describe("Access picker catalog", () => {
   it("shows project parent names to distinguish duplicate names and availability", () => {
-    const resources = [
+    const catalogResources = [
       {
         kind: "daemon" as const,
         id: "a",
@@ -437,12 +451,12 @@ describe("Access picker catalog", () => {
         available: false,
       },
     ];
-    const options = assignmentResourceOptions(resources, false);
+    const options = assignmentResourceOptions(catalogResources, false);
     expect(
       options.filter((option) => option.group === "Projects").map((option) => option.description),
     ).toEqual(["Sandbox", "Production · Unavailable"]);
-    expect(assignmentResourceOptions(resources, true).map((option) => option.value)).not.toContain(
-      "project\0p2",
-    );
+    expect(
+      assignmentResourceOptions(catalogResources, true).map((option) => option.value),
+    ).not.toContain("project\0p2");
   });
 });

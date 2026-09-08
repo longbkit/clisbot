@@ -78,6 +78,10 @@ export interface ChannelSupervisorOptions {
   database: Database;
   /** Canonical Hub URL reachable by local and remote daemon Agents. */
   publicBaseUrl?: string;
+  appWebUrl?: string;
+  commandAccess?: import("../plane/types.js").ChannelPlaneDeps["commandAccess"];
+  cancelWorkflowRuns?: import("../plane/types.js").ChannelPlaneDeps["cancelWorkflowRuns"];
+  readWorkflowRuns?: import("../plane/types.js").ChannelPlaneDeps["readWorkflowRuns"];
   /** The runtime handle: `ChannelStore` (org-scoped channel runtime state). */
   databaseRuntime: DatabaseRuntime;
   /** Test seam; production resolves encrypted credentials through `database`. */

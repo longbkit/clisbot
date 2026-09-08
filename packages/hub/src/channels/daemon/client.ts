@@ -1,8 +1,18 @@
 import { TrustedDaemonClient } from "./ws-client.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
-import type { AgentPermissionResponse, AgentSnapshot, CreateAgentConfig, CreateAgentOptions,
-  DaemonServerInfo, ProviderModel, ProviderMode, AgentProfile, AgentCommand, AgentConfigApply,
-  TextAttachment } from "./types.js";
+import type {
+  AgentPermissionResponse,
+  AgentSnapshot,
+  CreateAgentConfig,
+  CreateAgentOptions,
+  DaemonServerInfo,
+  ProviderModel,
+  ProviderMode,
+  AgentProfile,
+  AgentCommand,
+  AgentConfigApply,
+  TextAttachment,
+} from "./types.js";
 
 // The channel control plane's one code path to a daemon, for both forms
 // (plan §14.7): the embedded form connects over loopback; the team/remote form
@@ -43,7 +53,11 @@ export interface DaemonConnection {
   /** Resolves when the trusted session is established (daemon `server_info` seen). */
   waitForConnected(timeoutMs?: number): Promise<void>;
   createAgent(config: CreateAgentConfig, options?: CreateAgentOptions): Promise<CreateAgentResult>;
-  sendAgentMessage(agentId: string, text: string, options?: { steer?: boolean; attachments?: TextAttachment[] }): Promise<void>;
+  sendAgentMessage(
+    agentId: string,
+    text: string,
+    options?: { steer?: boolean; attachments?: TextAttachment[] },
+  ): Promise<void>;
   /** Interrupt the active turn without creating a replacement turn. */
   cancelAgent(agentId: string): Promise<void>;
   respondToAgentPermission(
@@ -52,6 +66,7 @@ export interface DaemonConnection {
     response: AgentPermissionResponse,
   ): Promise<void>;
   listAgents(): Promise<AgentSnapshot[]>;
+  isAgentInProject(agent: AgentSnapshot, projectId: string): Promise<boolean>;
   getServerInfo(): DaemonServerInfo | undefined;
   listAvailableProviders(): Promise<{ provider: string; available: boolean }[]>;
   listProviderModels(provider: string, cwd?: string): Promise<ProviderModel[]>;
@@ -62,7 +77,9 @@ export interface DaemonConnection {
   setAgentThinkingOption(agentId: string, thinkingOptionId: string | null): Promise<void>;
   setAgentMode(agentId: string, modeId: string): Promise<void>;
   applyAgentConfig(agentId: string, config: AgentConfigApply): Promise<void>;
-  buildAgentForkContext(agentId: string): Promise<{ attachment: TextAttachment | null; itemCount: number }>;
+  buildAgentForkContext(
+    agentId: string,
+  ): Promise<{ attachment: TextAttachment | null; itemCount: number }>;
 
   setTimelineSubscription(agentIds: readonly string[]): Promise<void>;
   /** Stop the socket. In-flight RPCs reject; streams stop. */
@@ -85,7 +102,14 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
     ...(options.rpcTimeoutMs !== undefined ? { rpcTimeoutMs: options.rpcTimeoutMs } : {}),
     ...(options.onStream !== undefined ? { onStream: options.onStream } : {}),
-    ...(options.onAgentUpdate !== undefined ? { onAgentUpdate: options.onAgentUpdate } : {}),
+    ...(options.onAgentUpdate !== undefined
+      ? {
+          onAgentUpdate: (value: unknown) => {
+            const agent = normalizeAgentSnapshot(value);
+            if (agent !== undefined) options.onAgentUpdate?.(agent);
+          },
+        }
+      : {}),
     ...(options.onSubagentUpdate !== undefined
       ? { onSubagentUpdate: options.onSubagentUpdate }
       : {}),
@@ -144,33 +168,52 @@ function createFacade(
         const p = asRecord(payload);
         const entries = Array.isArray(p?.["entries"]) ? p["entries"] : [];
         return entries
-          .map((entry) => (entry as { agent?: unknown })?.agent)
-          .filter((agent): agent is AgentSnapshot => isAgentSnapshot(agent));
+          .map((entry) => normalizeAgentSnapshot(asRecord(entry)?.["agent"]))
+          .filter((agent): agent is AgentSnapshot => agent !== undefined);
       }),
+    isAgentInProject: (agent, projectId) => isAgentInProject(socket, agent, projectId),
     getServerInfo: () => socket.serverInfo as DaemonServerInfo | undefined,
-    listAvailableProviders: () => listField(socket, "list_available_providers_request", {}, "providers"),
-    listProviderModels: (provider, cwd) => listField(socket, "list_provider_models_request", { provider, cwd }, "models"),
-    listProviderModes: (provider, cwd) => listField(socket, "list_provider_modes_request", { provider, cwd }, "modes"),
+    listAvailableProviders: () =>
+      listField(socket, "list_available_providers_request", {}, "providers"),
+    listProviderModels: (provider, cwd) =>
+      listField(socket, "list_provider_models_request", { provider, cwd }, "models"),
+    listProviderModes: (provider, cwd) =>
+      listField(socket, "list_provider_modes_request", { provider, cwd }, "modes"),
     listAgentProfiles: async () => {
       const payload = checkedPayload(await socket.call("get_daemon_config_request", {}));
       const config = asRecord(payload["config"]);
-      return Array.isArray(config?.["agentProfiles"]) ? config["agentProfiles"] as AgentProfile[] : [];
+      return Array.isArray(config?.["agentProfiles"])
+        ? (config["agentProfiles"] as AgentProfile[])
+        : [];
     },
     listCommands: (agentId) => listField(socket, "list_commands_request", { agentId }, "commands"),
-    setAgentModel: (agentId, modelId) => mutate(socket, "set_agent_model_request", { agentId, modelId }),
-    setAgentThinkingOption: (agentId, thinkingOptionId) => mutate(socket, "set_agent_thinking_request", { agentId, thinkingOptionId }),
-    setAgentMode: (agentId, modeId) => mutate(socket, "set_agent_mode_request", { agentId, modeId }),
-    applyAgentConfig: (agentId, config) => mutate(socket, "agent.config.apply.request", { agentId, config }),
+    setAgentModel: (agentId, modelId) =>
+      mutate(socket, "set_agent_model_request", { agentId, modelId }),
+    setAgentThinkingOption: (agentId, thinkingOptionId) =>
+      mutate(socket, "set_agent_thinking_request", { agentId, thinkingOptionId }),
+    setAgentMode: (agentId, modeId) =>
+      mutate(socket, "set_agent_mode_request", { agentId, modeId }),
+    applyAgentConfig: (agentId, config) =>
+      mutate(socket, "agent.config.apply.request", { agentId, config }),
     buildAgentForkContext: async (agentId) => {
-      if (socket.serverInfo?.["features"] === undefined ||
-          asRecord(socket.serverInfo["features"])?.["agentForkContext"] !== true) {
+      if (
+        socket.serverInfo?.["features"] === undefined ||
+        asRecord(socket.serverInfo["features"])?.["agentForkContext"] !== true
+      ) {
         throw new Error("This daemon does not support agent fork context.");
       }
       const payload = checkedPayload(await socket.call("agent.fork_context.request", { agentId }));
       const attachment = payload["attachment"];
-      if (attachment !== null && (asRecord(attachment)?.["type"] !== "text" ||
-          typeof asRecord(attachment)?.["text"] !== "string")) throw new Error("Invalid fork context attachment.");
-      return { attachment: attachment as TextAttachment | null, itemCount: Number(payload["itemCount"]) };
+      if (
+        attachment !== null &&
+        (asRecord(attachment)?.["type"] !== "text" ||
+          typeof asRecord(attachment)?.["text"] !== "string")
+      )
+        throw new Error("Invalid fork context attachment.");
+      return {
+        attachment: attachment as TextAttachment | null,
+        itemCount: Number(payload["itemCount"]),
+      };
     },
     setTimelineSubscription: (agentIds) =>
       socket
@@ -184,7 +227,7 @@ function createFacade(
 
 function mapCreatedAgent(payload: unknown): CreateAgentResult {
   const p = asRecord(payload);
-  const agent = isAgentSnapshot(p?.["agent"]) ? p["agent"] : undefined;
+  const agent = normalizeAgentSnapshot(p?.["agent"]);
   if (agent === undefined) {
     throw new Error("daemon did not report the created agent");
   }
@@ -215,24 +258,101 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return undefined;
 }
 
-function isAgentSnapshot(value: unknown): value is AgentSnapshot {
-  return (
-    typeof value === "object" && value !== null && typeof (value as AgentSnapshot).id === "string"
-  );
+/** Normalize the existing wire snapshot once, for create, list, and push updates. */
+function normalizeAgentSnapshot(value: unknown): AgentSnapshot | undefined {
+  const source = asRecord(value);
+  if (typeof source?.["id"] !== "string") return undefined;
+  const agent = { ...source } as unknown as AgentSnapshot;
+  const mode = "currentModeId" in source ? source["currentModeId"] : source["modeId"];
+  const thinking =
+    "effectiveThinkingOptionId" in source
+      ? source["effectiveThinkingOptionId"]
+      : source["thinkingOptionId"];
+  delete agent.modeId;
+  delete agent.model;
+  delete agent.thinkingOptionId;
+  if (typeof mode === "string") agent.modeId = mode;
+  if (typeof source["model"] === "string") agent.model = source["model"];
+  if (typeof thinking === "string") agent.thinkingOptionId = thinking;
+  if (Array.isArray(source["features"])) {
+    agent.featureValues = Object.fromEntries(
+      source["features"].flatMap((entry: unknown) => {
+        const feature = asRecord(entry);
+        return typeof feature?.["id"] === "string" && "value" in feature
+          ? [[feature["id"], feature["value"]]]
+          : [];
+      }),
+    );
+  }
+  const usage = asRecord(source["lastUsage"]);
+  for (const key of ["contextWindowUsedTokens", "contextWindowMaxTokens"] as const) {
+    const tokens = usage?.[key] ?? source[key];
+    if (typeof tokens === "number" && Number.isFinite(tokens) && tokens >= 0) agent[key] = tokens;
+    else delete agent[key];
+  }
+  return agent;
+}
+
+/** Workspace descriptors, not cwd or a synthetic snapshot projectId, prove Project membership. */
+async function isAgentInProject(
+  socket: TrustedDaemonClient,
+  agent: AgentSnapshot,
+  projectId: string,
+): Promise<boolean> {
+  if (!agent.workspaceId) return false;
+  const cursors = new Set<string>();
+  let cursor: string | undefined;
+  while (true) {
+    const payload = checkedPayload(
+      await socket.call("fetch_workspaces_request", {
+        filter: { projectId },
+        page: { limit: 200, ...(cursor === undefined ? {} : { cursor }) },
+      }),
+    );
+    const entries = Array.isArray(payload["entries"]) ? payload["entries"] : [];
+    if (
+      entries.some((value: unknown) => {
+        const workspace = asRecord(value);
+        return (
+          workspace !== undefined &&
+          workspace["id"] === agent.workspaceId &&
+          workspace["projectId"] === projectId
+        );
+      })
+    )
+      return true;
+    const page = asRecord(payload["pageInfo"]);
+    if (page?.["hasMore"] !== true) return false;
+    const next = page["nextCursor"];
+    if (typeof next !== "string" || next === "" || cursors.has(next))
+      throw new Error("Invalid daemon workspace pagination.");
+    cursors.add(next);
+    cursor = next;
+  }
 }
 
 function checkedPayload(value: unknown): Record<string, unknown> {
   const payload = asRecord(value);
   if (payload === undefined) throw new Error("Invalid daemon response.");
-  if (typeof payload["error"] === "string" && payload["error"] !== "") throw new Error(payload["error"]);
+  if (typeof payload["error"] === "string" && payload["error"] !== "")
+    throw new Error(payload["error"]);
   if (payload["accepted"] === false) throw new Error("Daemon rejected configuration change.");
   return payload;
 }
-async function listField<T>(socket: TrustedDaemonClient, type: string, fields: Record<string, unknown>, key: string): Promise<T[]> {
+async function listField<T>(
+  socket: TrustedDaemonClient,
+  type: string,
+  fields: Record<string, unknown>,
+  key: string,
+): Promise<T[]> {
   const payload = checkedPayload(await socket.call(type, fields, 90_000));
-  return Array.isArray(payload[key]) ? payload[key] as T[] : [];
+  return Array.isArray(payload[key]) ? (payload[key] as T[]) : [];
 }
-async function mutate(socket: TrustedDaemonClient, type: string, fields: Record<string, unknown>): Promise<void> {
+async function mutate(
+  socket: TrustedDaemonClient,
+  type: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
   const payload = checkedPayload(await socket.call(type, fields));
   if (payload["accepted"] !== true) throw new Error("Daemon did not accept configuration change.");
 }

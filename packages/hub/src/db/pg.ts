@@ -887,7 +887,7 @@ class PgDatabase implements Database {
           };
         }
         if (run.deadline_at === null || run.deadline_at.getTime() <= startedAt.getTime()) {
-          await timeoutWorkflowRunOnClient(client, run, startedAt);
+          await terminateWorkflowRunOnClient(client, run, startedAt);
           const stepRows = await client.query<WorkflowStepRunRow>(
             `select * from workflow_step_runs where trigger_run_id = $1 and step_id = $2 and ordinal = $3`,
             [input.triggerRunId, input.stepId, input.ordinal],
@@ -1118,7 +1118,7 @@ class PgDatabase implements Database {
         if (execution.status === "spawning" || execution.status === "running") {
           const deadlineKind = workflowDeadlineKind(execution, step, run, observedAt);
           if (deadlineKind === "whole_run") {
-            const recovery = await timeoutWorkflowRunOnClient(client, run, observedAt);
+            const recovery = await terminateWorkflowRunOnClient(client, run, observedAt);
             const terminalRun = await findTriggerRunOnClient(client, run.id);
             const updatedExecution = await findAgentExecutionOnClient(client, input.executionId);
             return transitionWithTerminalRun(
@@ -1301,6 +1301,62 @@ class PgDatabase implements Database {
     }
   }
 
+  async listActiveChannelWorkflowRuns(input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+  }): Promise<readonly AcceptedTriggerRunRecord[]> {
+    const rows = await query<TriggerRunRow>(
+      this.pool,
+      `select * from trigger_runs where organization_id = $1 and configured_trigger_name = $2
+         and outcome = 'accepted' and status = 'running'
+         and output_context ->> 'provider' = 'channel'
+         and output_context #>> '{channel,binding_key}' = $3 order by id`,
+      [input.organizationId, input.workflowName, input.bindingKey],
+    );
+    return rows.rows.flatMap((row) => {
+      const run = toTriggerRunRecord(row);
+      return run.outcome === "accepted" ? [run] : [];
+    });
+  }
+
+  async stopChannelWorkflowRuns(input: {
+    runIds: readonly string[];
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    now?: Date;
+  }): Promise<readonly WorkflowDeadlineRecovery[]> {
+    if (input.runIds.length === 0) return [];
+    try {
+      return await this.pool.transaction(async (client) => {
+        const runs = await client.query<TriggerRunRow>(
+          `select * from trigger_runs
+           where organization_id = $1 and configured_trigger_name = $2
+             and outcome = 'accepted' and status = 'running'
+             and output_context ->> 'provider' = 'channel'
+             and output_context #>> '{channel,binding_key}' = $3 and id = any($4::uuid[])
+           order by id for update`,
+          [input.organizationId, input.workflowName, input.bindingKey, input.runIds],
+        );
+        const recoveries: WorkflowDeadlineRecovery[] = [];
+        for (const run of runs.rows) {
+          recoveries.push(
+            await terminateWorkflowRunOnClient(
+              client,
+              run,
+              input.now ?? new Date(),
+              "channel_stop",
+            ),
+          );
+        }
+        return recoveries;
+      });
+    } catch (error) {
+      throw toDatabaseError(error);
+    }
+  }
+
   async recoverWorkflowWakeups(now: Date) {
     await query(
       this.pool,
@@ -1403,7 +1459,7 @@ class PgDatabase implements Database {
           [now],
         );
         for (const run of overdueRuns.rows) {
-          recoveries.push(await timeoutWorkflowRunOnClient(client, run, now));
+          recoveries.push(await terminateWorkflowRunOnClient(client, run, now));
         }
 
         const activeRuns = await client.query<TriggerRunRow>(
@@ -5345,15 +5401,18 @@ async function timeoutWorkflowStepOnClient(
   return updated;
 }
 
-async function timeoutWorkflowRunOnClient(
+async function terminateWorkflowRunOnClient(
   client: QueryHandle,
   run: TriggerRunRow,
   observedAt: Date,
+  reason: "whole_run_timeout" | "channel_stop" = "whole_run_timeout",
 ): Promise<WorkflowDeadlineRecovery> {
+  const status = reason === "channel_stop" ? "failed" : "timed_out";
+  const deadlineKind = reason === "channel_stop" ? null : "whole_run";
   const executionRows = await client.query<{ id: string }>(
     `update agent_executions
      set status = 'failed', completed_at = $2,
-         result = jsonb_build_object('status', 'failed', 'reason', 'whole_run_timeout'),
+         result = jsonb_build_object('status', 'failed', 'reason', $3::text),
          idle_deadline_at = null,
          hub_action = case
            when daemon_id is null then null
@@ -5366,23 +5425,23 @@ async function timeoutWorkflowRunOnClient(
      )
        and status in ('spawning', 'running')
      returning id`,
-    [run.id, observedAt],
+    [run.id, observedAt, reason],
   );
   await client.query(
     `update workflow_step_runs
-     set status = 'timed_out', failure_reason = 'whole_run_timeout',
-         deadline_kind = 'whole_run', completed_at = $2
+     set status = $3, failure_reason = $4,
+         deadline_kind = $5, completed_at = $2
      where trigger_run_id = $1 and status in ('pending', 'running')`,
-    [run.id, observedAt],
+    [run.id, observedAt, status, reason, deadlineKind],
   );
   await client.query(
     `update trigger_runs
-     set status = 'timed_out', deadline_kind = 'whole_run',
-         failure_reason = 'whole_run_timeout', completed_at = $2,
+     set status = $3, deadline_kind = $5,
+         failure_reason = $4, completed_at = $2,
          terminal_notification_pending_at = coalesce(terminal_notification_pending_at, $2),
          terminal_notification_lease_expires_at = null
      where id = $1 and status = 'running'`,
-    [run.id, observedAt],
+    [run.id, observedAt, status, reason, deadlineKind],
   );
   await client.query(`delete from workflow_wakeups where trigger_run_id = $1`, [run.id]);
   return {

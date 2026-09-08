@@ -1,8 +1,104 @@
 # Channel slash commands — gap audit & implementation plan
 
 Date: 2026-09-07
-Status: proposed. No code written yet. Behavior spec is [README.md](README.md);
-end-user copy is [user-guide.md](user-guide.md).
+Status: implemented on 2026-09-08. Validation scope and remaining limitations are
+recorded below. Behavior spec is
+[README.md](README.md); end-user copy is [user-guide.md](user-guide.md).
+
+## Implementation status (2026-09-08)
+
+The implementation now includes the registry and generated help, org Access and
+Guest gating, identity/status/cowork output, session lifecycle, direct turn
+control, grant-bounded configuration, skills and per-account dynamic commands.
+Handlers are extracted into `commands-dispatch.ts`, `commands-config*.ts`, and
+`commands-lifecycle*.ts`; the existing `execution.ts` retains orchestration.
+
+| Area                              | Implemented behavior                                                                                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registry and native normalization | Shared command metadata, generated help, aliases and whole-message grammar; adapters normalize into the same parser.                                                                                      |
+| Info and cowork                   | Access-aware private output. `PASEO_HUB_APP_WEB_URL` selects the web app origin; otherwise links use `paseo://`.                                                                                          |
+| Lifecycle                         | `/new <message>`, authorized atomic `/resume`, transcript fork and auto-archived one-offs. Failed fork attachment/send restores the old binding; same-Agent resume preserves the current stream.          |
+| Turn control                      | `/steer` and in-memory FIFO `/queue`, with release-time access and running-state checks.                                                                                                                  |
+| Configuration                     | Grant-bounded catalogs and profiles; same-provider edits apply live, different-provider selections remain staged until `/new` or `/fork`.                                                                 |
+| Access and dynamic commands       | Guest `(guest, guest)`, Guest administration UI, conversation visibility, unattended-mode checks, and account-scoped command persistence.                                                                 |
+| Automation                        | Authorized run/step status and cowork links across the run's Hosts; stop checks each target and settles stopped runs as failed with reason `channel_stop`. Direct-only commands refuse automation routes. |
+| Mutation replay                   | Durable receipts consume duplicate native message IDs. Pending receipts are never reclaimed automatically.                                                                                                |
+
+### Verification evidence
+
+The final focused regression gate passed **144 tests with 1 existing skipped test**
+across `commands.test.ts`, `commands-extension.test.ts`, `commands-config.test.ts`,
+`execution/execution.test.ts`, `bindings/bindings.test.ts`,
+`db/channel-command-selection.test.ts`, and `workflows/channel-stop.test.ts`.
+It covers addressing, configuration authority, multi-Host automation output,
+creation, binding isolation, durable command receipts and workflow stop.
+
+Earlier focused passes also covered lifecycle rollback and acknowledgement failure,
+queue release, Guest isolation, daemon RPCs, native Discord/Google Chat/Feishu
+adapters, and **14 App Access tests**. These overlapping runs are not summed into a
+unique test count. The final execution skip is the existing local-media relay test.
+
+Hub TypeScript checks passed for Node, the Start app and E2E sources. App,
+Discord, Google Chat and Feishu TypeScript checks passed. Targeted lint passed
+on **53 files**. `npm run db:check --workspace=@getpaseo/hub` passed with no schema
+or generated-migration drift, and the final diff passed whitespace checks.
+
+The existing database migration canary
+`src/db/migrations.test.ts` → “a pre-0065 channel database migrates to latest”
+reported a Telegram configuration expectation mismatch: the canary expects nested
+`cfgAccount.config.apiRoot`, while the current adapter emits `cfgAccount.apiRoot`. This unrelated
+baseline failure is not counted as a passing gate or hidden by the focused
+command results.
+
+**No live channel E2E, external native registration, or real-provider session
+loop was run for this implementation.** Unit tests and migrated embedded-store
+checks verify local contracts; they do not establish production transport delivery.
+
+Implementation decisions that resolve earlier contradictory prose:
+
+- **Provider changes stage before minting.** The README's explicit promise that
+  `/fork` carries context into a staged provider takes precedence over the older
+  phase-4 wording that immediately released the binding. Ordinary messages keep
+  driving the existing session until `/new` or `/fork` applies the selection.
+- **Authorize the effective live configuration.** Returning a staged selection to
+  the still-running provider preserves its mode, provider options and feature
+  values where the daemon keeps omitted values. Validation checks that merged
+  configuration. `fast_mode: true` requires the separate `agent.fast.use`
+  privilege for profile discovery/application, live edits, minting and resume;
+  unattended features retain their approval-privilege checks.
+- **Private ordinary-text replies use DMs on all channels.** Slack/Discord
+  ordinary messages do not contain native interaction tokens for ephemeral
+  responses. The private-output invariant is retained; no public fallback.
+- **Subscribe before first prompt.** Fork/one-off creation is idle, stream
+  subscription is awaited, then the first message carries the `chat_history`
+  attachment. Sending `initialPrompt` during creation would race attachment.
+- **Resume is bounded.** Access to the target, project/configuration constraints,
+  atomic compare-and-swap, and refusal of an Agent bound in another conversation
+  prevent rebinding from exposing unrelated session history. A resumed external
+  session on a tool-output route records a relay-output override. The override
+  enables final-answer relay. Same-Agent resume preserves the existing stream;
+  failed replacement attachment/first-prompt delivery rolls the binding back via
+  compare-and-swap without canceling the source Agent. One-offs also enable their
+  explicit answer without changing the route's normal answer-sync policy.
+- **Transient means transient.** Queue holds and one-off reply associations are
+  cleared on detach/Hub stop. They are separate from the durable ingress queue.
+  Queue release rechecks access and current Agent state; the existing wire has
+  no atomic send-only-if-idle operation, so an independent client can still start
+  a turn after that check. The send uses steer to avoid canceling that turn.
+- **Mutation dispatch is at most once per native source message.** A durable
+  receipt is claimed before dispatch and completed with the result. A crash or
+  uncertain RPC can leave it pending; pending receipts are never automatically
+  reclaimed because the mutation may already have reached the daemon. Operators
+  inspect the session before intentionally issuing a new source message. Read-only
+  discovery does not claim mutation receipts; messages without a native message
+  ID cannot use this receipt guarantee.
+- **Existing orchestration size exception.** `execution.ts` already exceeds the
+  file-size guideline. This change extracts command handlers and reduces its
+  command logic; splitting unrelated orchestration is outside this change.
+
+The audit below records the **2026-09-07 baseline**, before this implementation.
+Its line numbers and descriptions of missing code are historical evidence.
+The README and the status above describe the current behavior.
 
 This plan takes the current channel command layer to the full
 vocabulary in the reference table, as **shared platform code** across every
@@ -10,7 +106,23 @@ channel, and answers the specific problems raised: Slack/Discord/Google Chat
 native-command conflicts, Telegram/Feishu addressing quirks, agent-command
 collisions, and steer/queue across the channel→automation layers.
 
-## What exists today (grounded)
+## Native adapter delivery
+
+Discord startup upserts one `/paseo` application command with the optional text
+option `command`; it does not replace other application registrations. The
+interaction listener converts the selected subcommand to `/verb`, admits the
+normalized event durably, then acknowledges the native interaction privately.
+Interaction tokens are not persisted. The Hub's command-output privacy rules
+apply separately from this transport acknowledgement.
+
+Google Chat normalizes native `SLASH_COMMAND` payloads or command annotations,
+including the configured `/paseo` umbrella, into the shared vocabulary and marks
+them addressed. An operator must register the single `/paseo` command in the
+Google Chat console; the adapter does not register it through an API. Feishu's
+native `@all` exclusion is regression-tested. Native adapter tests do not replace
+live registration and delivery checks; no such live checks ran in this change.
+
+## Original baseline (2026-09-07)
 
 - **Shared parser; `/agent` and `/model` already take an argument.**
   `packages/hub/src/channels/commands.ts` parses `status | stop | new | help |
@@ -271,7 +383,7 @@ name)` — shared, listable account config, not transient keyed-store state.
   `set_agent_mode_request`. Setting an `isUnattended` mode requires the matching
   approval privilege (`APPROVAL_PRIVILEGES`), since it can suppress prompts.
 
-## Phased delivery
+## Original phased delivery and acceptance criteria
 
 Each phase is independently shippable behind the existing channel feature gating
 and leaves both the base Paseo experience and unmodified-client pairing intact.
@@ -358,11 +470,10 @@ conversation.
   obey the provider→model→effort hierarchy (scoped lists, qualified names,
   full-triple confirmation), so the two paths never yield an ambiguous config.
 
-## Open items
+## Original open items — resolved during implementation
 
 The big RBAC question is **decided**: converge on org Access (see
-[Resolved decisions](#resolved-decisions)). What remains to settle before building
-gating:
+[Resolved decisions](#resolved-decisions)). The implementation resolves the questions below as `(guest, guest)` assignments, no initiator-owner command gate, and existing identity linking plus Guest grants:
 
 - **Guest subject shape.** Add `guest` to `ACCESS_SUBJECT_KINDS` (a grantable group
   like `member`/`team`) vs a per-resource `guestPrivileges` field. Recommendation: a
@@ -394,3 +505,19 @@ daemon/protocol change, but treat it as its own reviewed change. Upstream Paseo
 files are not renamed, split, or reformatted. With the channel feature gate
 off, the base Paseo experience and unmodified-client pairing are unchanged — verify
 both before calling any phase done.
+
+## Retry and interrupted commands
+
+Side-effecting commands use a durable receipt keyed by organization, channel account,
+source conversation and native event ID. The receipt is recorded before dispatch.
+A completed receipt consumes a transport replay; an unfinished receipt is never
+reclaimed automatically because the daemon may already have accepted the action.
+The reply asks the requester to inspect the session before submitting a new message.
+This is at-most-once dispatch, not exactly-once recovery. Command-button receipts use
+the one-use action identity rather than the containing message ID. Events without a
+native message ID cannot use this durable guard.
+
+Queued messages recheck the requester's current channel participation and
+`agent.interact` grant before release. Mint and resume also validate mode and feature
+values against approval authority, so another Member's persisted unattended selection
+does not transfer that authority to the next requester.

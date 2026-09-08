@@ -1,3 +1,4 @@
+import { configurationDaemonStub } from "../daemon/test-support.js";
 // COMPAT(clisbot-channels): targeted tests for the bindings engine (plan §4-S2).
 // Drives the real ChannelStore (embedded PGlite, the same harness as
 // db/channels.test.ts) against a fake in-memory DaemonConnection: first mention
@@ -51,6 +52,7 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
   const subscriptions: string[][] = [];
   let seq = 0;
   const daemon: DaemonConnection = {
+    ...configurationDaemonStub(),
     discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async (config, options) => {
@@ -943,4 +945,68 @@ describe("orphan recovery (restart / resume)", () => {
     );
     assert.equal(created.length, 0, "the race loser never creates a second agent");
   });
+});
+
+it("mints the persisted provider bundle after a session reset", async () => {
+  const marker = "1700000000.990001";
+  await store.access.setConversationSelection(
+    {
+      organizationId: ORGANIZATION_ID,
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      externalConversationId: CONVERSATION,
+      externalThreadId: marker,
+    },
+    {
+      selectedProvider: "claude",
+      selectedModel: "sonnet",
+      selectedThinkingOption: "high",
+      selectedMode: "default",
+      selectedFeatureValues: { fast: true },
+      selectedBy: INITIATOR,
+    },
+  );
+  const fake = makeFakeDaemon();
+  const engine = makeEngine(store, fake.daemon);
+  const result = await engine.bindOrSteer(
+    message({ externalMessageId: marker }),
+    makeAccount(makeRoute()),
+    makeRoute(),
+  );
+  assert.equal(result.kind, "bound");
+  assert.deepEqual(fake.created[0]?.config, {
+    provider: "claude",
+    cwd: "/tmp/repo",
+    model: "sonnet",
+    thinkingOptionId: "high",
+    modeId: "default",
+    featureValues: { fast: true },
+  });
+});
+
+it("refuses a disallowed sticky configuration without leaving a pending binding", async () => {
+  const marker = "1700000000.990002";
+  const fake = makeFakeDaemon();
+  const account = makeAccount(makeRoute());
+  const engine = new BindingEngine({
+    organizationId: ORGANIZATION_ID,
+    controlPlane: makeControlPlane(account),
+    logger: SILENT,
+    clock: new ManualClock(),
+    store,
+    daemon: fake.daemon,
+    resolveAgentSpec: () => ({ provider: "codex", cwd: "/tmp/repo" }),
+    authorizeConfiguration: async () => ({ allowed: false, reason: "outside grant" }),
+  });
+  const result = await engine.bindOrSteer(
+    message({ externalMessageId: marker }),
+    account,
+    makeRoute(),
+  );
+  assert.deepEqual(result, { kind: "ignored", reason: "outside grant" });
+  assert.equal(fake.created.length, 0);
+  assert.equal(
+    await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, marker),
+    undefined,
+  );
 });

@@ -1,3 +1,5 @@
+import { readChannelWorkflowRuns } from "./workflows/channel-status.js";
+import { stopChannelWorkflowRuns } from "./workflows/channel-stop.js";
 import { createHubApplication } from "./app.js";
 import type { HubRuntimeOptions } from "./app.js";
 import type { AuthServer } from "./auth/server.js";
@@ -109,6 +111,7 @@ async function createOwnedApplicationRuntime(
   let dispatchChannelWorkflow:
     | import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"]
     | undefined;
+  let recoverChannelExecutions: ((ids: readonly string[]) => Promise<void>) | undefined;
   const channelSupervisor = await createChannelSupervisorAtComposition(
     options,
     accessStore,
@@ -117,6 +120,28 @@ async function createOwnedApplicationRuntime(
         return Promise.reject(new Error("channel workflow dispatcher is not started"));
       }
       return dispatchChannelWorkflow(input);
+    },
+    async (input) => {
+      if (!options.database || !recoverChannelExecutions)
+        throw new Error("Workflow cancellation is not started");
+      return stopChannelWorkflowRuns({
+        ...input,
+        database: options.database,
+        recoverExecutions: recoverChannelExecutions,
+        authorizeTarget: async (target) =>
+          (await accessStore?.authorizeChannelPrivilege({ ...input.authorization, ...target }))
+            ?.allowed === true,
+      });
+    },
+    async (input) => {
+      if (!options.database) throw new Error("Workflow status is unavailable");
+      return readChannelWorkflowRuns({
+        ...input,
+        database: options.database,
+        authorizeTarget: async (target) =>
+          (await accessStore?.authorizeChannelPrivilege({ ...input.authorization, ...target }))
+            ?.allowed === true,
+      });
     },
   );
   const channelReplyServer = await createChannelReplyServerAtComposition(
@@ -146,6 +171,10 @@ async function createOwnedApplicationRuntime(
     ),
   );
   dispatchChannelWorkflow = (input) => application.hub.dispatchChannelWorkflow(input);
+  recoverChannelExecutions = async (ids) => {
+    if (!application.hub.daemonModule) throw new Error("Daemon lifecycle is unavailable");
+    await application.hub.daemonModule.lifecycle.recoverWorkflowDeadlineExecutions(ids);
+  };
   // COMPAT(clisbot-control-plane): the channel supervisor's accounts run their
   // own transports (Slack Socket Mode, Telegram getUpdates poll) plus an
   // outbound trusted-client daemon connection each. `startAll` boots them at
@@ -550,6 +579,12 @@ async function createChannelSupervisorAtComposition(
   options: ApplicationCompositionOptions,
   access: AccessStore | null,
   dispatchWorkflow: import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"],
+  cancelWorkflowRuns: NonNullable<
+    import("./channels/plane/types.js").ChannelPlaneDeps["cancelWorkflowRuns"]
+  >,
+  readWorkflowRuns: NonNullable<
+    import("./channels/plane/types.js").ChannelPlaneDeps["readWorkflowRuns"]
+  >,
 ): Promise<import("./channels/supervisor/types.js").ChannelSupervisor | null> {
   if (!isChannelsEnabled()) return null;
   if (
@@ -572,6 +607,12 @@ async function createChannelSupervisorAtComposition(
       pinsPath: runtimeFile("channel-pins.json"),
       logger: channelLogger,
       dispatchWorkflow,
+      cancelWorkflowRuns,
+      readWorkflowRuns,
+      ...(process.env["PASEO_HUB_APP_WEB_URL"]
+        ? { appWebUrl: process.env["PASEO_HUB_APP_WEB_URL"] }
+        : {}),
+      ...(access ? { commandAccess: access } : {}),
       ...(access === null
         ? {}
         : {
@@ -664,7 +705,7 @@ async function createChannelReplyServerAtComposition(
         supervisor.channelReplyCapabilities?.resolve(token, organizations[0]!.id),
       reserveTurnOutput: (token) => supervisor.channelReplyCapabilities?.reserveTurnOutput(token),
       log: channelLogger,
-      post: (ref, text, options) => supervisor.channelReplyPost(ref, text, options),
+      post: (ref, text, postOptions) => supervisor.channelReplyPost(ref, text, postOptions),
       mediaPost: (ref, file) => supervisor.channelReplyMediaPost(ref, file),
     });
   } catch (error) {

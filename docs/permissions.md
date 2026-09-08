@@ -66,3 +66,40 @@ The Hub authenticates as a service principal. Its locally selected grants decide
 Hub user and role identifiers remain opaque external subjects. The Hub may create and revoke linked daemon principals when granted `access.manage`; the daemon does not interpret accounts, organizations, or roles.
 
 Hub enrollment and permission updates exchange these semantic permissions directly. Legacy persisted Hub relationships that contain `hub.execution.*` migrate once to `hub.execute` when the daemon loads them; new relationships never persist or emit transport scopes as authority.
+
+## Channel command access (Hub)
+
+Channel commands use **org Access privileges**, separate from the daemon service
+principal's permissions. The Hub resolves the sender's channel identity through
+`channelIdentities` to a Member, then checks the command's privilege against its
+Channel Connection and authorized daemon/Project. The route's `channel.use` /
+`mayTrigger` admission remains the baseline. The old channel role projection and
+session initiator do not grant command authority.
+
+`/help` and `/me` are public command entry points. `agent.interact` gates session
+status, cowork links, turn controls and configuration; `agent.create` gates
+new/resume/fork/side/quick. Dynamic-command changes need `approval.config`.
+Approvals retain the open prompt's two authority checks; an unattended mode also
+needs the matching `approval.*` privilege. Configuration menus and mutations
+must fit the sender's `AgentConfigurationGrant` and conversation visibility.
+A final configuration with `featureValues.fast_mode: true` additionally requires
+`agent.fast.use`. Profile menus/application, live edits, session creation and
+resume enforce this separately. Validation includes features preserved from a
+running session when a staged provider selection returns to that provider.
+Omitting a feature from a new profile therefore does not bypass its authority
+check when the daemon preserves that live feature.
+
+An unlinked sender uses the first-class **Guest group**, stored as
+`subjectKind: guest`, `subjectId: guest`. Guest receives no grants by default.
+Operators assign its privileges and configuration grants through Access, like
+Member or Team assignments. A linked Member uses their own and their Teams'
+assignments and does not inherit Guest grants. Linking therefore changes the
+subject used for subsequent decisions; it does not merge Guest authority.
+
+`/resume` checks access to the target Agent before changing the conversation
+binding, and rejects an Agent already bound to another conversation. Command
+output containing identity, configuration or session links is sent privately to
+the requester in public conversations. Ordinary text commands use DMs, including
+Slack and Discord; a DM failure never publishes the private output publicly.
+See the [slash-command reference](features/slash-commands/README.md) for the full
+privilege mapping and route-kind restrictions.

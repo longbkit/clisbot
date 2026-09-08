@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import { describe, expect, it } from "vitest";
-import { parseChannelTextCommand } from "./commands.js";
+import { parseChannelTextCommand, CHANNEL_COMMANDS, textCommandHelpText } from "./commands.js";
 import { parseApprovalCommand } from "./approvals/command.js";
 
 describe("parseApprovalCommand", () => {
@@ -188,7 +188,58 @@ describe("parseChannelTextCommand", () => {
 
   it("keeps a no-argument verb whole-message, so prose stays prose", () => {
     expect(parseChannelTextCommand("stop doing that")).toBeNull();
-    expect(parseChannelTextCommand("/new session please")).toBeNull();
+    expect(parseChannelTextCommand("/new session please")).toEqual({
+      name: "new",
+      value: "session please",
+    });
     expect(parseChannelTextCommand("help me with this")).toBeNull();
   });
+});
+
+describe("extended platform registry", () => {
+  it("normalizes umbrella commands, aliases and Discord addressing", () => {
+    expect(parseChannelTextCommand("/paseo model list")).toEqual({ name: "model", value: "list" });
+    expect(parseChannelTextCommand("/paseo")).toEqual({ name: "help" });
+    expect(parseChannelTextCommand("<@!123456789> /thinking high")).toEqual({
+      name: "effort",
+      value: "high",
+    });
+    expect(parseChannelTextCommand("/mode@bot plan")).toEqual({
+      name: "permission",
+      value: "plan",
+    });
+    expect(parseApprovalCommand("/paseo APPROVE req-1")).toEqual({
+      decision: "allow",
+      requestId: "req-1",
+    });
+  });
+  it("preserves multiline prompts and unknown agent commands", () => {
+    expect(parseChannelTextCommand("/queue first\nsecond")).toEqual({
+      name: "queue",
+      value: "first\nsecond",
+    });
+    expect(parseChannelTextCommand("please /queue this")).toBeNull();
+    expect(parseChannelTextCommand("/agent-skill foo")).toBeNull();
+    expect(parseChannelTextCommand("/status extra")).toBeNull();
+  });
+});
+
+it("keeps every registered alias and addressing form in the shared vocabulary", () => {
+  for (const command of CHANNEL_COMMANDS) {
+    for (const name of [command.name, ...command.aliases]) {
+      for (const text of [
+        name,
+        `/${name}`,
+        `\\${name}`,
+        `@bot/${name}`,
+        `/${name}@bot`,
+        `/paseo ${name}`,
+      ]) {
+        expect(parseChannelTextCommand(text)).toEqual({ name: command.name });
+      }
+    }
+    expect(textCommandHelpText()).toContain(command.usage);
+  }
+  expect(parseChannelTextCommand("@all /status")).toBeNull();
+  expect(parseChannelTextCommand("@everyone /status")).toBeNull();
 });

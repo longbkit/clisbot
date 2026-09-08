@@ -1,3 +1,4 @@
+import { configurationDaemonStub } from "../daemon/test-support.js";
 // COMPAT(clisbot-control-plane): the shared engine test harness for the two
 // approval suites (`approvals.test.ts` — the P0 text-mode scenarios — and
 // `approvals-cards.test.ts` — native-card gating, question prompts E5, the
@@ -134,6 +135,7 @@ function makeControlPlane(account: CompiledChannelAccount): ChannelControlPlane 
 function makeFakeDaemon() {
   const responses: { agentId: string; requestId: string; response: AgentPermissionResponse }[] = [];
   const daemon: DaemonConnection = {
+    ...configurationDaemonStub(),
     discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async () => ({

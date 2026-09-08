@@ -1253,6 +1253,19 @@ export interface Database {
     triggerRunId: string,
     reactionState: JsonValue | null,
   ): Promise<AcceptedTriggerRunRecord | undefined>;
+  listActiveChannelWorkflowRuns(input: {
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+  }): Promise<readonly AcceptedTriggerRunRecord[]>;
+  /** Atomically stops only the active channel runs for one route execution owner. */
+  stopChannelWorkflowRuns(input: {
+    runIds: readonly string[];
+    organizationId: string;
+    bindingKey: string;
+    workflowName: string;
+    now?: Date;
+  }): Promise<readonly WorkflowDeadlineRecovery[]>;
   recoverWorkflowDeadlines(now: Date): Promise<readonly WorkflowDeadlineRecovery[]>;
   recoverWorkflowWakeups(now: Date): Promise<void>;
   markProviderEventDropped(

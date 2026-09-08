@@ -83,3 +83,22 @@ Authoritative terminology. UI label wins. Don't invent synonyms; use what's here
 that authorizes resetting an existing Hub account password without the old password.
 It is separate from account passwords and the channel credential encryption key
 `CLISBOT_HUB_CREDENTIAL_MASTER_KEY`. Its absence disables master-password recovery.
+
+### Channel commands (Clisbot)
+
+- **Channel command** — A whole-message control from the shared command registry,
+  acting on the conversation's direct Agent binding or supported Automation run.
+  Slash, backslash, mentions and native `/paseo` forms normalize to one vocabulary.
+  [Reference](features/slash-commands/README.md).
+- **Cowork** — The `/cowork` channel action that opens the bound session in the
+  Paseo app or configured web app. `/open` and `/app` are invocation aliases.
+- **Dynamic command** — A named prompt shortcut stored for an organization,
+  channel and account. `/command add` and `/command remove` manage it;
+  `/command <name>` or `/name` invokes it. Platform reserved words cannot be
+  shadowed. It is distinct from a provider's built-in slash command.
+- **Guest group** — The org Access subject for a channel sender without a linked
+  Hub Member. Its persisted identity is `(guest, guest)`, with no default grants.
+  Linked Members do not inherit Guest grants.
+- **Channel queue** — The in-memory hold created by `/queue`, released one message
+  at a time after a direct Agent turn ends. Distinct from the durable **channel
+  ingress queue**, which admits transport events for processing.

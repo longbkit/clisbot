@@ -16,13 +16,12 @@ you type them in. The full list and what each needs is the
 ## Move between the channel and the app
 
 `/cowork` replies with a link that opens this conversation's agent session in the
-Paseo app (or paseo.sh in a browser). Use it to pick up the same session on your
+Paseo app, or the web app configured by your Hub operator. Use it to pick up the same session on your
 phone or desktop and keep working, then come back to the channel — the session
 is the same on both sides.
 
-In a **public** channel the link is sent to you privately (an ephemeral message
-or a DM), because it opens your dev environment and not everyone in the channel
-should reach it. You need to be a participant in the conversation to get a link.
+In a **public** channel the link is sent to you privately (a DM), because it opens your dev environment and not everyone in the channel
+should reach it. You need `agent.interact` access in this conversation to get a link. Private delivery failures never publish the link back to the public conversation.
 
 ## Start, resume, and stop a session
 
@@ -34,14 +33,16 @@ should reach it. You need to be a participant in the conversation to get a link.
 | To stop the current turn (or cancel a running automation) | `/stop`                         |
 
 `<id>` is the agent id shown by `/status` or in the app's URL. `/resume` replaces
-whatever session was bound here before.
+whatever session was bound here before, after checking your access to the target. A session already bound to another conversation cannot be resumed here. Bare `/new` clears the binding; your next message starts the new session.
 
 ## Guide a running turn
 
 - `/steer <message>` slips a message into the turn the agent is already running —
   a nudge without interrupting.
 - `/queue <message>` holds your message until the current turn finishes, then
-  sends it.
+  sends it. Multiple messages are released in order, one per turn; an idle session
+  starts immediately. Queued messages are held in memory and are cleared when the
+  session is detached or the Hub restarts.
 
 These apply to a directly-bound agent. In a conversation that runs an
 **automation**, use `/stop` to cancel the run and just send a normal message to
@@ -50,16 +51,17 @@ start a new one.
 ## Switch agent, provider, model, effort, and mode
 
 The bot only offers the choices you're allowed — not the whole catalog. Any
-participant can switch; only creating a dynamic command or running an unattended
-mode needs admin.
+participant with `agent.interact` and the required configuration grant can switch.
+Creating a dynamic command needs `approval.config`; unattended modes need the
+matching approval privilege.
 
-| You want                    | Type                                                       |
-| --------------------------- | ---------------------------------------------------------- |
-| Apply an agent profile      | `/agent`, `/agent <name>`                                  |
-| See / switch provider       | `/provider`, `/provider search openai`, `/provider openai` |
-| See / switch model          | `/model`, `/model search sonnet`, `/model <name>`          |
-| See / set effort            | `/effort`, `/effort high`                                  |
-| See / set mode (permission) | `/permission`, `/permission plan`                          |
+| You want                    | Type                                                     |
+| --------------------------- | -------------------------------------------------------- |
+| Apply an agent profile      | `/agent`, `/agent <name>`                                |
+| See / switch provider       | `/provider`, `/provider search codex`, `/provider codex` |
+| See / switch model          | `/model`, `/model search sonnet`, `/model <name>`        |
+| See / set effort            | `/effort`, `/effort high`                                |
+| See / set mode (permission) | `/permission`, `/permission plan`                        |
 
 An **agent profile** is a saved bundle (provider + model + mode + thinking);
 `/agent <name>` applies one in a single step, and `/agent` lists the profiles you
@@ -69,14 +71,20 @@ may use. `/provider`, `/model`, and `/effort` tune one axis at a time, and
 These three nest — a provider has its own models, and each model its own effort
 levels — so the bot keeps them unambiguous: `/model` lists only the current
 provider's models, `/effort` only the current model's levels, look-alike names show
-as `provider/model`, and every change confirms the full setup ("Provider: openai ·
+as `provider/model`, and every change confirms the full setup ("Provider: codex ·
 Model: … · Effort: …"). You can't accidentally pick another provider's model.
 
 Changing model, effort, or mode applies to your running session when the provider
 stays the same. Switching **provider** (or an `/agent` on a different provider)
-starts a fresh session — the bot tells you, and `/fork` carries your context
-across. `/permission` modes (plan / default / full-access …) control how much the
-agent may do without asking; an unattended mode needs approval rights.
+stages the new configuration while the current session continues. Use `/new` for
+a fresh session or `/fork` to carry the current context into the new provider.
+While a different provider is staged, configuration commands edit the staged
+selection; ordinary messages still reach the current session. `/permission` modes (plan / default / full-access …) control how much the
+agent may do without asking; an unattended mode needs approval rights. Fast mode
+requires the separate `agent.fast.use` privilege, including when enabled by an
+agent profile or already active on a session you want to resume. Returning a
+staged provider choice to the running session's provider preserves its active
+mode and feature settings unless your selection explicitly changes them.
 
 ## One-off questions and forking
 
@@ -100,8 +108,8 @@ Quick way to remember it: **continue here** = `/new`, `/resume`, `/fork`;
   skill on the agent.
 - `/command`, `/command search <keyword>` — list or find dynamic commands.
 - `/command add <name> <prompt>` — create a dynamic command from the channel.
-- `/command remove <name>` — delete one. (Creating and removing needs admin
-  rights in the conversation.)
+- `/command remove <name>` — delete one. (Creating and removing needs the
+  privilege `approval.config`.)
 
 A dynamic command is a shortcut you define once and reuse: `/command add standup
 summarize what changed today and what's blocked`, then later just `/standup`.
@@ -110,9 +118,11 @@ summarize what changed today and what's blocked`, then later just `/standup`.
 
 - `/status` — the bound session, its Paseo link, how much context is left, and
   your access in this conversation.
-- `/me` — your public identity and what you're allowed to do here.
+- `/me` — your public identity and what you're allowed to do here. An identity that is not linked to a Hub Member
+  uses the organization's Guest grants; Guest has no permissions by default.
 
-Both reply privately in a public channel.
+Both reply privately in a public channel. On an Automation route, `/status` and
+`/cowork` show the runs and step Agents you may access; links use each Agent's Host.
 
 ## Approvals
 
@@ -121,8 +131,15 @@ When the agent asks permission, answer inline:
 - `/approve` allows the newest request; `/approve <id>` names a specific one.
 - `/deny` refuses it.
 
-For a question prompt, put your answer after the verb: `/approve use the staging
-database`.
+For a question prompt, include the request id before the answer: `/approve <id>
+use the staging database`.
+
+## Retrying after a connection problem
+
+The bot does not execute the same delivered command message twice. If it says an
+earlier attempt is still pending or was interrupted, inspect `/status` or the
+session in the app before sending a new command message. The first attempt may
+already have changed the session even when its acknowledgement did not arrive.
 
 ## Channel quirks (when a command doesn't seem to work)
 
@@ -138,8 +155,10 @@ these fixes works and reaches the same command:
 - **Feishu / Lark** — there are no slash menus; type the command as text and
   @mention the bot in a group so it sees the message. `@everyone` alone does not
   count as addressing the bot.
-- **Discord / Google Chat** — the bot registers a single `/paseo` command;
-  `/paseo status` runs the same commands as everywhere else.
+- **Discord** — the bot registers one `/paseo` command with a text option named
+  `command`; supply `status` there. The interaction is acknowledged privately.
+- **Google Chat** — an operator registers one `/paseo` command in the app
+  console. `/paseo status` is normalized to the shared `status` command.
 
 If a bare word isn't recognized, prefix it with `/` (or `\` on Slack) and send it
 on its own line — commands match the whole message, so extra text around them

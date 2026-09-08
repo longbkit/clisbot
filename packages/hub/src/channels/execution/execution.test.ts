@@ -1,3 +1,4 @@
+import { configurationDaemonStub } from "../daemon/test-support.js";
 // COMPAT(clisbot-channels): targeted tests for the execution plane facade
 // (plan §4-S2). Drives `createChannelPlane` end to end over the real ChannelStore
 // (embedded PGlite) and a fake in-memory DaemonConnection: the kill switch, the
@@ -179,6 +180,7 @@ function makeFakeDaemon(
   const cancelled: string[] = [];
   let seq = 0;
   const daemon: DaemonConnection = {
+    ...configurationDaemonStub(),
     discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async (config, opts) => {
@@ -268,6 +270,8 @@ function makeHarness(
     authorizeChannelApproval?: ChannelPlaneDeps["authorizeChannelApproval"];
     consumeChannelIdentityChallenge?: ChannelPlaneDeps["consumeChannelIdentityChallenge"];
     channelRevisionId?: string;
+    commandAccess?: ChannelPlaneDeps["commandAccess"];
+    readWorkflowRuns?: ChannelPlaneDeps["readWorkflowRuns"];
   } = {},
 ): FacadeHarness {
   const progress: EffectiveDefaults["sync"]["progress"] = {
@@ -316,6 +320,19 @@ function makeHarness(
     normalizeInbound: () => next.message,
     envFlag: opts.envFlag ?? true,
     controlPlane,
+    commandAccess: opts.commandAccess ?? {
+      authorizeChannelPrivilege: async () => ({ allowed: true }),
+      resolveChannelAgentConfigurations: async () => ({
+        unrestricted: true,
+        agentConfigurations: [],
+      }),
+      resolveChannelMember: async () => undefined,
+    },
+    ...(opts.readWorkflowRuns ? { readWorkflowRuns: opts.readWorkflowRuns } : {}),
+    cancelWorkflowRuns: async () => {
+      await fake.daemon.cancelAgent("workflow-agent");
+      return 1;
+    },
     ...(opts.authorizeChannelUse === undefined
       ? {}
       : { authorizeChannelUse: opts.authorizeChannelUse }),
@@ -1662,7 +1679,7 @@ describe("channel session commands", () => {
       ctxPayload: {},
     });
     assert.equal(allowed.outcome?.kind, "command");
-    assert.deepEqual(harness.posted, [textCommandHelpText()]);
+    assert.deepEqual(harness.posted, [textCommandHelpText("workflow")]);
 
     harness.next.message = message({
       text: "/help",
@@ -1675,12 +1692,68 @@ describe("channel session commands", () => {
       ctxPayload: {},
     });
 
-    assert.equal(refused.outcome?.kind, "ignored");
-    assert.deepEqual(
-      harness.posted,
-      [textCommandHelpText()],
-      "a refused sender is answered with silence, not /help",
-    );
+    assert.equal(refused.outcome?.kind, "command");
+    assert.deepEqual(harness.posted, [
+      textCommandHelpText("workflow"),
+      textCommandHelpText("workflow"),
+    ]);
+  });
+
+  it("returns every automation run with actual Host links without consulting the local daemon", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "workflow", workflow: "multi-host" },
+    };
+    const requests: Parameters<NonNullable<ChannelPlaneDeps["readWorkflowRuns"]>>[0][] = [];
+    const harness = makeHarness({
+      account: makeAccount(route),
+      readWorkflowRuns: async (input) => {
+        requests.push(input);
+        return [
+          {
+            id: "run-a",
+            status: "running",
+            steps: [{ id: "build", status: "running", agentId: "agent-a", serverId: "host-a" }],
+          },
+          {
+            id: "run-b",
+            status: "running",
+            steps: [
+              { id: "review", status: "pending" },
+              { id: "test", status: "running", agentId: "agent-b", serverId: "host-b" },
+            ],
+          },
+        ];
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    for (const text of ["/status", "/cowork"]) {
+      harness.next.message = message({
+        text,
+        conversation: {
+          kind: "channel",
+          id: "C0MULTIHOST",
+          rootConversationId: "C0MULTIHOST",
+          threadId: null,
+        },
+      });
+      const result = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {},
+      });
+      assert.equal(result.outcome?.kind, "command", JSON.stringify(result.outcome));
+      assert.match(harness.posted.at(-1)!, /run-a.*running/s);
+      assert.match(harness.posted.at(-1)!, /paseo:\/\/h\/host-a\/agent\/agent-a/);
+      assert.match(harness.posted.at(-1)!, /paseo:\/\/h\/host-b\/agent\/agent-b/);
+      assert.match(harness.posted.at(-1)!, /review: pending/);
+    }
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0]!.workflowName, "multi-host");
+    assert.equal(requests[0]!.authorization.privilege, "agent.interact");
+    assert.equal(requests[0]!.authorization.senderIdentity, INITIATOR);
+    assert.equal(harness.fake.created.length, 0);
+    await harness.plane.stop();
   });
 
   it("uses captured Workflow context for approval callbacks and /stop", async () => {
@@ -2740,5 +2813,190 @@ describe("inbound event kinds", () => {
       true,
     );
     assert.equal(harness.fake.created.length, 0);
+  });
+  it("keeps public discovery available while denying ungranted mutations", async () => {
+    const harness = makeHarness({
+      commandAccess: {
+        authorizeChannelPrivilege: async () => ({ allowed: false, reason: "no grant" }),
+        resolveChannelAgentConfigurations: async () => ({
+          unrestricted: false,
+          agentConfigurations: [],
+        }),
+        resolveChannelMember: async () => undefined,
+      },
+    });
+    await harness.plane.start(harness.fake.daemon, store);
+    for (const text of ["/help", "/me", "/new do work"]) {
+      harness.next.message = message({
+        text,
+        conversation: {
+          kind: "channel",
+          id: "C0PUBLICCOMMANDS",
+          rootConversationId: "C0PUBLICCOMMANDS",
+          threadId: null,
+        },
+      });
+      await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    }
+    assert.match(harness.posted[0]!, /Commands:/);
+    assert.match(harness.posted[1]!, /Guest/);
+    assert.match(harness.posted[2]!, /requires agent.create/);
+    assert.equal(harness.fake.created.length, 0);
+  });
+
+  it("routes a new prompt and a dynamic command through normal agent delivery", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0DYNAMIC",
+      rootConversationId: "C0DYNAMIC",
+      threadId: null,
+    };
+    for (const text of [
+      "/new initial work",
+      "/command add inspect-code Review the code",
+      "/inspect-code carefully",
+    ]) {
+      harness.next.message = message({ text, conversation });
+      const outcome = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {},
+      });
+      assert.equal(outcome.dispatched, true);
+    }
+    assert.equal(harness.fake.created.length, 1);
+    assert.match(harness.fake.messages[0]!.text, /initial work/);
+    assert.match(harness.fake.messages[1]!.text, /Review the code\n\ncarefully/);
+  });
+
+  it("stages a provider change without losing the conversation that can be forked", async () => {
+    const harness = makeHarness({ daemonAgents: [snapshotOf("agent-0", "Context")] });
+    harness.fake.daemon.listProviderModes = async () => [
+      { id: "auto", label: "Auto", isUnattended: false },
+    ];
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0STAGED",
+      rootConversationId: "C0STAGED",
+      threadId: null,
+    };
+    harness.next.message = message({ conversation });
+    await harness.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} });
+    harness.next.message = message({ text: "/provider claude", conversation });
+    const staged = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(staged.dispatched, true);
+    assert.equal(
+      (await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0STAGED", null))?.agentId,
+      "agent-0",
+    );
+    assert.equal(harness.fake.cancelled.length, 0);
+    assert.match(harness.posted.at(-1)!, /Provider staged/);
+    const create = harness.fake.daemon.createAgent;
+    harness.fake.daemon.createAgent = async (config, options) => {
+      const created = await create(config, options);
+      return { agentId: "staged-fork-id", agent: { ...created.agent, id: "staged-fork-id" } };
+    };
+    harness.next.message = message({ text: "/fork keep the context", conversation });
+    const fork = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(fork.dispatched, true, JSON.stringify(fork.outcome));
+    assert.equal(harness.fake.created.at(-1)?.config.provider, "claude");
+    assert.equal(
+      (await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0STAGED", null))?.agentId,
+      "staged-fork-id",
+    );
+  });
+
+  it("consumes a replayed session command without creating or sending twice", async () => {
+    const harness = makeHarness();
+    await harness.plane.start(harness.fake.daemon, store);
+    harness.next.message = message({
+      text: "/new once",
+      externalMessageId: "1720000010.000001",
+      conversation: {
+        kind: "channel",
+        id: "C0RECEIPT",
+        rootConversationId: "C0RECEIPT",
+        threadId: null,
+      },
+    });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const outcome = await harness.plane.onInbound({
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        ctxPayload: {},
+      });
+      assert.equal(outcome.dispatched, true, JSON.stringify(outcome.outcome));
+    }
+    assert.equal(harness.fake.created.length, 1);
+    assert.equal(harness.fake.messages.length, 1);
+  });
+  it("refuses an inherited unattended selection at final session creation", async () => {
+    const harness = makeHarness({
+      commandAccess: {
+        authorizeChannelPrivilege: async (request) =>
+          request.privilege.startsWith("approval.")
+            ? { allowed: false, reason: "Approval authority is required" }
+            : { allowed: true },
+        resolveChannelAgentConfigurations: async () => ({
+          unrestricted: false,
+          agentConfigurations: [{ providerId: "codex", modelIds: "*", thinkingOptionIds: "*" }],
+        }),
+        resolveChannelMember: async () => undefined,
+      },
+    });
+    harness.fake.daemon.listProviderModes = async () => [
+      { id: "default", label: "Default", isUnattended: false },
+      { id: "full-access", label: "Full", isUnattended: true },
+    ];
+    await harness.plane.start(harness.fake.daemon, store);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0UNATTENDED",
+      rootConversationId: "C0UNATTENDED",
+      threadId: null,
+    };
+    await store.access.setConversationSelection(
+      {
+        organizationId: ORGANIZATION_ID,
+        channel: "slack",
+        accountId: ACCOUNT_ID,
+        externalConversationId: conversation.rootConversationId,
+        externalThreadId: null,
+      },
+      {
+        selectedProvider: "codex",
+        selectedModel: "default",
+        selectedMode: "full-access",
+        selectedBy: "another-member",
+      },
+    );
+    harness.next.message = message({ text: "/new work", conversation });
+    const outcome = await harness.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(outcome.dispatched, false);
+    assert.equal(harness.fake.created.length, 0);
+    assert.equal(
+      await store.findThreadBinding(
+        ORGANIZATION_ID,
+        ACCOUNT_ID,
+        conversation.rootConversationId,
+        null,
+      ),
+      undefined,
+    );
   });
 });

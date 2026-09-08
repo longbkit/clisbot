@@ -7,7 +7,6 @@ import { ChannelCommandStore } from "./channel-commands.js";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import * as schema from "./schema.js";
 import type { SupportedChannelName } from "../channels/catalog.js";
-import type { DrizzleHandle } from "./runtime/index.js";
 import type { ChannelPairingStatus } from "./schema.js";
 
 /** One sender's pairing request against one account. */
@@ -31,7 +30,7 @@ export interface ChannelConversationSelectionRecord {
   selectedProvider: string | null;
   selectedThinkingOption: string | null;
   selectedMode: string | null;
-  selectedProfile: string | null;
+  selectedFeatureValues: Record<string, unknown> | null;
   selectedBy: string;
   updatedAt: Date;
 }
@@ -53,8 +52,6 @@ export interface ChannelAccountKey {
 }
 
 export class ChannelAccessStore extends ChannelCommandStore {
-  constructor(private readonly database: DrizzleHandle) { super(database); }
-
   /**
    * The senders an operator approved, in the form upstream's
    * `mergeDmAllowFromSources` expects for `storeAllowFrom`: the native id, not
@@ -224,7 +221,7 @@ export class ChannelAccessStore extends ChannelCommandStore {
         selectedProvider: selection.selectedProvider ?? null,
         selectedThinkingOption: selection.selectedThinkingOption ?? null,
         selectedMode: selection.selectedMode ?? null,
-        selectedProfile: selection.selectedProfile ?? null,
+        selectedFeatureValues: selection.selectedFeatureValues ?? null,
         selectedBy: selection.selectedBy,
         updatedAt,
       })
@@ -252,7 +249,7 @@ function toSelection(
     selectedProvider: row.selectedProvider,
     selectedThinkingOption: row.selectedThinkingOption,
     selectedMode: row.selectedMode,
-    selectedProfile: row.selectedProfile,
+    selectedFeatureValues: row.selectedFeatureValues,
     selectedBy: row.selectedBy,
     updatedAt: row.updatedAt,
   };

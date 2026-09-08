@@ -31,7 +31,7 @@ import { assignmentsForSubject, publicAccessRoutes } from "./access-overview";
 type AccessCatalog = z.infer<typeof HubAccessCatalogSchema>;
 type AccessResource = AccessCatalog["resources"][number];
 type AccessResourceKind = AccessResource["kind"];
-type SubjectKind = "team" | "member";
+type SubjectKind = "team" | "member" | "guest";
 type AccessAssignment = z.infer<typeof HubAccessAssignmentsSchema>["assignments"][number];
 type HubMember = z.infer<typeof HubMembersSchema>["members"][number];
 type HubTeam = z.infer<typeof HubTeamsSchema>["teams"][number];
@@ -73,7 +73,9 @@ export function AccessSettings() {
     subjectId?: string;
   }>();
   const initialSubject =
-    (params.subjectKind === "team" || params.subjectKind === "member") &&
+    (params.subjectKind === "team" ||
+      params.subjectKind === "member" ||
+      params.subjectKind === "guest") &&
     typeof params.subjectId === "string"
       ? subjectKey(params.subjectKind, params.subjectId)
       : null;
@@ -391,7 +393,7 @@ function ManagedAccessContent({
         );
   const viewDisplay = useMemo(
     () => ({
-      label: viewBy === "subject" ? "Team or Member" : "Resource · Who has access",
+      label: viewBy === "subject" ? "Team, Member or Guest" : "Resource · Who has access",
     }),
     [viewBy],
   );
@@ -401,7 +403,7 @@ function ManagedAccessContent({
         <Alert
           variant="info"
           title="Owner access is automatic"
-          description="The owner can use every current and future resource. Invited Members start with no resource access; grant Teams first and use direct Member access for exceptions."
+          description="The owner can use every current and future resource. Members and Guest start with no resource access. Guest grants apply to channel senders without a linked Member."
         />
         <View style={[settingsStyles.card, styles.form]}>
           <SelectField
@@ -410,7 +412,7 @@ function ManagedAccessContent({
             value={viewBy}
             selectedDisplay={viewDisplay}
             options={[
-              { id: "subject", value: "subject", label: "Team or Member" },
+              { id: "subject", value: "subject", label: "Team, Member or Guest" },
               {
                 id: "resource",
                 value: "resource",
@@ -424,17 +426,17 @@ function ManagedAccessContent({
           />
           {viewBy === "subject" ? (
             <SelectField
-              label="Team or Member"
-              title="Team or Member"
+              label="Team, Member or Guest"
+              title="Team, Member or Guest"
               value={selectedSubject}
               selectedDisplay={selectedOptionDisplay(subjectOptions, selectedSubject)}
               options={subjectOptions}
               onChange={changeSubject}
-              placeholder="Choose a Team or Member"
+              placeholder="Choose a Team, Member or Guest"
               emptyText="Invite a Member or create a Team first."
               disabled={pending}
               searchable
-              searchPlaceholder="Search Teams, Members, or email"
+              searchPlaceholder="Search Teams, Members, Guest, or email"
               maxOptionsPerGroup={50}
             />
           ) : (
@@ -579,11 +581,11 @@ function ExplicitAssignments({
             key={assignment.id}
             assignment={assignment}
             resource={resourceByKey.get(`${assignment.resourceKind}\0${assignment.resourceId}`)}
-            subjectName={
-              assignment.subjectKind === "team"
-                ? teamById.get(assignment.subjectId)
-                : memberById.get(assignment.subjectId)
-            }
+            subjectName={assignmentSubjectName(
+              { kind: assignment.subjectKind, id: assignment.subjectId },
+              teamById,
+              memberById,
+            )}
             subjectDetail={
               assignment.subjectKind === "team"
                 ? teamMembersById.get(assignment.subjectId)
@@ -598,6 +600,23 @@ function ExplicitAssignments({
       )}
     </View>
   );
+}
+
+const SUBJECT_ASSIGNMENT_LABELS: Record<SubjectKind, string> = {
+  team: "Team assignment",
+  member: "Direct Member assignment",
+  guest: "Guest assignment",
+};
+
+function assignmentSubjectName(
+  subject: { kind: SubjectKind; id: string },
+  teamById: Map<string, string>,
+  memberById: Map<string, string>,
+): string {
+  if (subject.kind === "guest") return "Guest";
+  return subject.kind === "team"
+    ? (teamById.get(subject.id) ?? "Team")
+    : (memberById.get(subject.id) ?? "Member");
 }
 
 function ExplicitAssignmentRow({
@@ -628,7 +647,7 @@ function ExplicitAssignmentRow({
           {`${subjectName ?? "Unavailable subject"} · ${resource?.name ?? assignment.resourceId}`}
         </Text>
         <Text style={settingsStyles.rowHint}>
-          {`${assignment.subjectKind === "team" ? "Team assignment" : "Direct Member assignment"} · ${resourceKindLabel(assignment.resourceKind)} · ${assignment.privileges.map(privilegeLabel).join(", ")}`}
+          {`${SUBJECT_ASSIGNMENT_LABELS[assignment.subjectKind]} · ${resourceKindLabel(assignment.resourceKind)} · ${assignment.privileges.map(privilegeLabel).join(", ")}`}
           {constraintSummary(assignment.constraints)
             ? ` · ${constraintSummary(assignment.constraints)}`
             : ""}
@@ -836,17 +855,17 @@ function AccessAssignmentForm({
           />
         ) : null}
         <SelectField
-          label="Team or Member"
+          label="Team, Member or Guest"
           value={subjectKeyValue}
           selectedDisplay={selectedOptionDisplay(subjectOptions, subjectKeyValue)}
           options={subjectOptions}
           onChange={setSubjectKeyValue}
-          placeholder="Choose a Team or Member"
+          placeholder="Choose a Team, Member or Guest"
           emptyText="Create a Team or invite a Member first."
           searchable
-          searchPlaceholder="Search Teams, Members, or email"
+          searchPlaceholder="Search Teams, Members, Guest, or email"
           maxOptionsPerGroup={50}
-          title="Team or Member"
+          title="Team, Member or Guest"
           disabled={identityDisabled}
         />
         <SelectField
@@ -905,7 +924,7 @@ function AccessAssignmentForm({
             <Alert
               variant="info"
               title="Allowed Agent configurations"
-              description="Each row is one Provider, Model, and Thinking choice that this Team or Member may start. All available is always explicit."
+              description="Each row is one Provider, Model, and Thinking choice that this Team, Member or Guest may start. All available is always explicit."
             />
             {agentConfigurationCatalog?.providers.length ? (
               <View style={styles.configurationList}>
@@ -1083,7 +1102,11 @@ async function submitAccessAssignment(input: {
   const confirmed = await confirmDialog({
     title: input.editing ? "Save this access?" : "Grant this access?",
     message: grantReviewMessage({
-      subjectName: assignmentSubjectName(selection.subject, input.teams, input.members),
+      subjectName: assignmentSubjectName(
+        selection.subject,
+        new Map(input.teams.map((team) => [team.id, team.name])),
+        new Map(input.members.map((member) => [member.id, member.name])),
+      ),
       resourceName: selection.resource.name,
       accessLevel: accessLevelLabel(input.accessLevel),
       privileges: selection.privileges,
@@ -1162,17 +1185,6 @@ function findSubjectDaemonAssignment(
       candidate.resourceKind === "daemon" &&
       candidate.resourceId === daemonId,
   );
-}
-
-function assignmentSubjectName(
-  subject: { kind: SubjectKind; id: string },
-  teams: HubTeam[],
-  members: HubMember[],
-): string {
-  if (subject.kind === "team") {
-    return teams.find(({ id }) => id === subject.id)?.name ?? "Team";
-  }
-  return members.find(({ id }) => id === subject.id)?.name ?? "Member";
 }
 
 async function persistAccessAssignment(
@@ -1410,6 +1422,13 @@ function assignmentSubjectOptions(
         description: member.email,
         group: "Members",
       })),
+    {
+      id: "guest:guest",
+      value: subjectKey("guest", "guest"),
+      label: "Guest",
+      description: "Channel senders without a linked Member",
+      group: "Guest",
+    },
   ];
 }
 
@@ -1423,6 +1442,7 @@ function parseSubjectKey(value: string | null): { kind: SubjectKind; id: string 
   if (separator < 0) return null;
   const kind = value.slice(0, separator);
   const id = value.slice(separator + 1);
+  if (kind === "guest") return id === "guest" ? { kind, id } : null;
   return (kind === "team" || kind === "member") && id.length > 0 ? { kind, id } : null;
 }
 

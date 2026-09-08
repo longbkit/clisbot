@@ -1,8 +1,8 @@
+import { configurationDaemonStub } from "../daemon/test-support.js";
 // The access plane on the production path: `createChannelPlane` over the real
 // ChannelStore (embedded PGlite) and a fake daemon. Proves the four things a
 // static read cannot — that a refused sender never reaches an agent and lands in
-// channel activity, that pairing survives a replay, that a role gate stops the
-// wrong person switching a conversation's model, and that neither an account nor
+// channel activity, that pairing survives a replay, that org Access gates commands and a same-provider model switch stays live, and that neither an account nor
 // an organization leaks its allowlist to its neighbour.
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -20,7 +20,12 @@ import type {
   EffectiveAccess,
   EffectiveDefaults,
 } from "../config/compile.js";
-import type { InboundMessage, PlaneLogger, SupportedChannelName } from "../plane/types.js";
+import type {
+  ChannelPlaneDeps,
+  InboundMessage,
+  PlaneLogger,
+  SupportedChannelName,
+} from "../plane/types.js";
 import { createChannelPlane } from "../execution.js";
 
 const ORG_A = "org-a";
@@ -137,6 +142,8 @@ function makeHarness(options: {
   organizationId?: string;
   accountId?: string;
   route: CompiledRoute;
+  commandAccess?: ChannelPlaneDeps["commandAccess"];
+  authorizeChannelUse?: ChannelPlaneDeps["authorizeChannelUse"];
 }): Harness {
   const accountId = options.accountId ?? "work";
   const account = makeAccount(accountId, options.route);
@@ -148,6 +155,32 @@ function makeHarness(options: {
   const next: { message: InboundMessage | null } = { message: null };
   let seq = 0;
   const daemon: DaemonConnection = {
+    ...configurationDaemonStub(),
+    listProviderModels: async (provider) => [
+      { provider, id: "gpt-default", label: "Default", isDefault: true },
+      { provider, id: "gpt-5.6-luna", label: "Luna" },
+    ],
+    listProviderModes: async () => [
+      { id: "auto-review", label: "Auto review", isUnattended: false },
+    ],
+    listAgentProfiles: async () => [
+      {
+        id: "reviewer",
+        name: "Reviewer",
+        provider: "codex",
+        model: "gpt-5.6-luna",
+        modeId: "auto-review",
+      },
+    ],
+    applyAgentConfig: async (agentId, config) => {
+      const agent = agents.find((entry) => entry.id === agentId);
+      assert.ok(agent, "live config targets an existing agent");
+      if (config.modelId != null) agent.model = config.modelId;
+      if (config.thinkingOptionId != null) agent.thinkingOptionId = config.thinkingOptionId;
+      if (config.modeId !== undefined) agent.modeId = config.modeId;
+      if (config.featureValues !== undefined)
+        agent.featureValues = { ...agent.featureValues, ...config.featureValues };
+    },
     discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async (config, opts) => {
@@ -155,8 +188,9 @@ function makeHarness(options: {
       const id = `agent-${(seq += 1)}`;
       const snapshot: AgentSnapshot = {
         id,
-        provider: "codex",
-        cwd: "/tmp/repo",
+        provider: config.provider,
+        cwd: config.cwd,
+        modeId: config.modeId ?? "auto-review",
         title: opts?.title ?? null,
         status: "idle",
         createdAt: "2026-09-07T00:00:00Z",
@@ -182,6 +216,17 @@ function makeHarness(options: {
     normalizeInbound: () => next.message,
     envFlag: true,
     controlPlane: makeControlPlane(account),
+    ...(options.authorizeChannelUse === undefined
+      ? {}
+      : { authorizeChannelUse: options.authorizeChannelUse }),
+    commandAccess: options.commandAccess ?? {
+      authorizeChannelPrivilege: async () => ({ allowed: true }),
+      resolveChannelAgentConfigurations: async () => ({
+        unrestricted: true,
+        agentConfigurations: [],
+      }),
+      resolveChannelMember: async () => undefined,
+    },
     recordChannelInboundActivity: async (input) => {
       activity.push(input);
     },
@@ -430,101 +475,129 @@ describe("isolation", () => {
   });
 });
 
-describe("command authority and target switching", () => {
-  const MENU = { agents: ["reviewer"], models: ["gpt-5.6-luna"] };
-
-  async function boundHarness(accountId: string) {
-    const harness = makeHarness({ accountId, route: makeRoute({ selectable: MENU }) });
+describe("org Access command authority and live configuration", () => {
+  function conversationCommand(accountId: string, text: string, senderIdentity = ALICE) {
+    return dm({
+      accountId,
+      text,
+      senderIdentity,
+      conversation: { kind: "group", id: "-200", rootConversationId: "-200", threadId: null },
+    });
+  }
+  async function boundHarness(
+    accountId: string,
+    commandAccess?: ChannelPlaneDeps["commandAccess"],
+  ) {
+    const harness = makeHarness({
+      accountId,
+      // Everyone may use this shared conversation; command privileges remain independently gated.
+      authorizeChannelUse: async () => ({ allowed: true }),
+      route: makeRoute({
+        match: { kind: "group", ids: ["-200"] },
+        selectable: { models: ["legacy-route-model"], agents: [] },
+      }),
+      ...(commandAccess === undefined ? {} : { commandAccess }),
+    });
     await harness.plane.start(harness.daemon, store);
-    // Alice starts the session, so she owns it; Bob is a plain member.
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId }));
+    await deliver(harness, conversationCommand(accountId, "hello"));
     return harness;
   }
 
-  it("refuses /stop and /model from a member who does not own the session", async () => {
-    const harness = await boundHarness("authority");
+  it("allows another participant with agent.interact to control the bound session", async () => {
+    const harness = await boundHarness("participant-control");
+    const agentId = harness.agents[0]!.id;
     const stopped = await deliver(
       harness,
-      dm({ senderIdentity: BOB, accountId: "authority", text: "/stop" }),
-    );
-    assert.equal(stopped.outcome?.kind === "command" && stopped.outcome.handled, false);
-    assert.match(harness.posted.at(-1) ?? "", /needs owner or admin rights/u);
-    assert.equal(harness.cancelled.length, 0);
-
-    const switched = await deliver(
-      harness,
-      dm({ senderIdentity: BOB, accountId: "authority", text: "/model gpt-5.6-luna" }),
-    );
-    assert.equal(switched.outcome?.kind === "command" && switched.outcome.handled, false);
-    await harness.plane.stop();
-  });
-
-  it("lets the session owner stop it", async () => {
-    const harness = await boundHarness("owner-stop");
-    const stopped = await deliver(
-      harness,
-      dm({ senderIdentity: ALICE, accountId: "owner-stop", text: "/stop" }),
+      conversationCommand("participant-control", "/stop", BOB),
     );
     assert.equal(stopped.outcome?.kind === "command" && stopped.outcome.handled, true);
-    assert.equal(harness.cancelled.length, 1);
+    assert.deepEqual(harness.cancelled, [agentId]);
+    await deliver(harness, conversationCommand("participant-control", "/model gpt-5.6-luna", BOB));
+    assert.equal(harness.agents[0]?.model, "gpt-5.6-luna");
+    assert.equal(harness.created.length, 1, "org Access replaces the initiator-owner gate");
     await harness.plane.stop();
   });
 
-  it("applies an admin's /model to the session the next message opens", async () => {
-    const harness = await boundHarness("model-switch");
+  it("refuses restricted Guests even when the route allows their conversation", async () => {
+    const harness = await boundHarness("guest-command", {
+      authorizeChannelPrivilege: async (request) =>
+        request.senderIdentity === STRANGER
+          ? { allowed: false, reason: "missing agent.interact" }
+          : { allowed: true },
+      resolveChannelAgentConfigurations: async () => ({
+        unrestricted: true,
+        agentConfigurations: [],
+      }),
+      resolveChannelMember: async () => undefined,
+    });
+    for (const text of ["/stop", "/model gpt-5.6-luna"]) {
+      const result = await deliver(harness, conversationCommand("guest-command", text, STRANGER));
+      assert.equal(result.outcome?.kind === "command" && result.outcome.handled, false);
+    }
+    assert.equal(harness.cancelled.length, 0);
+    assert.equal(harness.agents[0]?.model, undefined);
+    assert.match(harness.posted.at(-1) ?? "", /agent.interact/u);
+    await harness.plane.stop();
+  });
+
+  it("applies the model live and keeps the concrete choice across /new", async () => {
+    const harness = await boundHarness("live-model");
     const switched = await deliver(
       harness,
-      dm({ senderIdentity: ALICE, accountId: "model-switch", text: "/model gpt-5.6-luna" }),
+      conversationCommand("live-model", "/model gpt-5.6-luna"),
     );
     assert.equal(switched.outcome?.kind === "command" && switched.outcome.handled, true);
-    assert.match(harness.posted.at(-1) ?? "", /Model set to gpt-5\.6-luna/u);
-    assert.equal(harness.cancelled.length, 1, "the running session is ended by the switch");
+    assert.match(harness.posted.at(-1) ?? "", /model: gpt-5\.6-luna/u);
+    assert.equal(harness.cancelled.length, 0);
+    assert.equal(harness.created.length, 1);
+    assert.equal(harness.agents[0]?.model, "gpt-5.6-luna");
     const selection = await store.access.findConversationSelection({
       organizationId: ORG_A,
       channel: "telegram",
-      accountId: "model-switch",
-      externalConversationId: "1001",
+      accountId: "live-model",
+      externalConversationId: "-200",
       externalThreadId: null,
     });
     assert.equal(selection?.selectedModel, "gpt-5.6-luna");
+    assert.equal(selection?.selectedProvider, "codex");
     assert.equal(selection?.selectedBy, ALICE);
-
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId: "model-switch" }));
+    await deliver(harness, conversationCommand("live-model", "/new"));
+    await deliver(harness, conversationCommand("live-model", "continue"));
     assert.equal(harness.created.length, 2);
     assert.equal(harness.created.at(-1)?.config.model, "gpt-5.6-luna");
     await harness.plane.stop();
   });
 
-  it("routes the next session to an /agent choice", async () => {
-    const harness = await boundHarness("agent-switch");
-    await deliver(
-      harness,
-      dm({ senderIdentity: ALICE, accountId: "agent-switch", text: "/agent reviewer" }),
-    );
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId: "agent-switch" }));
-    assert.equal(harness.created.at(-1)?.config.title, "reviewer");
+  it("applies daemon profiles without substituting the route's agent target", async () => {
+    const harness = await boundHarness("profile");
+    await deliver(harness, conversationCommand("profile", "/agent reviewer"));
+    assert.equal(harness.agents[0]?.model, "gpt-5.6-luna");
+    assert.equal(harness.created.length, 1);
+    assert.equal(harness.cancelled.length, 0);
+    await deliver(harness, conversationCommand("profile", "/new"));
+    await deliver(harness, conversationCommand("profile", "continue"));
+    assert.equal(harness.created.at(-1)?.config.title, "worker");
+    assert.equal(harness.created.at(-1)?.config.model, "gpt-5.6-luna");
     await harness.plane.stop();
   });
 
-  it("prints the menu for a bare verb and refuses a name outside it", async () => {
-    const harness = await boundHarness("menu");
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId: "menu", text: "/model" }));
-    assert.equal(harness.posted.at(-1), "Available models: gpt-5.6-luna.");
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId: "menu", text: "/agent nope" }));
-    assert.equal(harness.posted.at(-1), "Unknown agent. Options: worker, reviewer.");
-    assert.equal(harness.created.length, 1, "no switch, no new session");
+  it("lists daemon catalog choices and refuses unknown profiles", async () => {
+    const harness = await boundHarness("catalog-menu");
+    await deliver(harness, conversationCommand("catalog-menu", "/model"));
+    assert.match(harness.posted.at(-1) ?? "", /codex\/gpt-5\.6-luna/u);
+    assert.doesNotMatch(harness.posted.at(-1) ?? "", /legacy-route-model/u);
+    await deliver(harness, conversationCommand("catalog-menu", "/agent nope"));
+    assert.match(harness.posted.at(-1) ?? "", /Unknown or ambiguous agent profile/u);
+    assert.equal(harness.created.length, 1);
     await harness.plane.stop();
   });
 
-  it("shows the conversation's agent in /status", async () => {
-    const harness = await boundHarness("status");
-    await deliver(
-      harness,
-      dm({ senderIdentity: ALICE, accountId: "status", text: "/agent reviewer" }),
-    );
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId: "status" }));
-    await deliver(harness, dm({ senderIdentity: ALICE, accountId: "status", text: "/status" }));
-    assert.match(harness.posted.at(-1) ?? "", /Route agent: reviewer/u);
+  it("status reports the same live session after applying a profile", async () => {
+    const harness = await boundHarness("profile-status");
+    await deliver(harness, conversationCommand("profile-status", "/agent reviewer"));
+    await deliver(harness, conversationCommand("profile-status", "/status"));
+    assert.match(harness.posted.at(-1) ?? "", /Model: gpt-5\.6-luna/u);
+    assert.equal(harness.created.length, 1);
     await harness.plane.stop();
   });
 });
