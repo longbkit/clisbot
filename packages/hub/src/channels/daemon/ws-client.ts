@@ -178,7 +178,12 @@ export class TrustedDaemonClient extends EventEmitter {
     socket.on("open", () => this.onOpen(socket));
     socket.on("message", (data) => this.onMessage(data.toString()));
     socket.on("close", () => this.onClose());
-    socket.on("error", (error: Error) => this.emit("error", error));
+    // WebSocket emits an `error` event for ordinary connection failures such
+    // as ECONNREFUSED. Do not re-emit it as EventEmitter's special `error`
+    // event: an account may start before its daemon has reconnected, and an
+    // unhandled error event would terminate the whole Hub process instead of
+    // allowing this client to use its normal reconnect loop.
+    socket.on("error", () => undefined);
   }
 
   private onOpen(socket: WebSocket): void {
