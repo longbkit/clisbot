@@ -67,7 +67,7 @@ export interface LoadedChannelInfo {
   channel: string;
   accountId: string;
   loadMode: "published" | "bundled" | "in-repo";
-  /** The channel's install root (`<dataDir>/channels/<accountId>`). */
+  /** The channel package root (`<dataDir>/plugins/channels`) or in-repo package root. */
   installRoot: string;
   /** The pinned main package's install dir (shared across channels pinning it). */
   mainDir: string;
@@ -79,7 +79,7 @@ export interface LoadedChannelInfo {
 
 // The lifetime routing registry: `${channel}:${accountId}` -> channel info.
 // Keyed by the account, NOT by the install root: the root
-// (`<dataDir>/channels/<accountId>`) is shared by every channel pinned on the
+// (`<dataDir>/plugins/channels`) is shared by every channel pinned on the
 // same main (slack + telegram live under one root), so a root key would make
 // the second loaded channel's `beginChannelLoad` overwrite the first's entry —
 // and a later `forgetChannel` of one channel would drop routing for the

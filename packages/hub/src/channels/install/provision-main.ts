@@ -21,11 +21,11 @@
 // `@openclaw/slack` tarball has) needs no provisioning; the orchestrator only
 // calls this when `npm-shrinkwrap.json` is present in the extracted main dir.
 //
-// Idempotence: a `node_modules/provision.lock` marker records the main integrity
-// the tree was built for. Same integrity → skip; missing or bumped →
-// (re)provision.
+// Idempotence comes from the shrinkwrap and the installed package tree. The
+// caller already ties `mainDir` to the integrity in the managed root lockfile,
+// so a complete production closure needs no second custom lock file.
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { sha512Integrity } from "./integrity.js";
 import type { MainPin } from "./pins.js";
@@ -52,59 +52,12 @@ interface ShrinkwrapEntry {
   integrity?: string;
 }
 
-/** The `node_modules/provision.lock` marker: the main pin the tree matches. */
-export interface ProvisionLock {
-  main: { package: string; version: string; integrity: string };
-  entries: number;
-  provisionedAt: string;
-}
-
 export interface ProvisionResult {
   /** True when this call fetched + extracted the tree; false when a matching
-   * `provision.lock` made it a no-op. */
+   * shrinkwrap-backed dependency tree made it a no-op. */
   provisioned: boolean;
   /** Lockfile entries in the production closure. */
   entries: number;
-}
-
-function readProvisionLock(mainDir: string): ProvisionLock | undefined {
-  try {
-    return JSON.parse(
-      readFileSync(join(mainDir, "node_modules", "provision.lock"), "utf8"),
-    ) as ProvisionLock;
-  } catch {
-    return undefined;
-  }
-}
-
-function writeProvisionLock(mainDir: string, mainPin: MainPin, entries: number): void {
-  const lock: ProvisionLock = {
-    main: {
-      package: mainPin.package,
-      version: mainPin.version,
-      integrity: mainPin.dist.integrity,
-    },
-    entries,
-    provisionedAt: new Date().toISOString(),
-  };
-  writeFileSync(
-    join(mainDir, "node_modules", "provision.lock"),
-    `${JSON.stringify(lock, null, 2)}\n`,
-    {
-      mode: 0o600,
-    },
-  );
-}
-
-/** True when the main dir's dependency tree was provisioned for the same main
- * pin (package + integrity). */
-export function isProvisioned(mainDir: string, mainPin: MainPin): boolean {
-  const lock = readProvisionLock(mainDir);
-  return (
-    lock !== undefined &&
-    lock.main.package === mainPin.package &&
-    lock.main.integrity === mainPin.dist.integrity
-  );
 }
 
 /**
@@ -151,6 +104,16 @@ export function prodClosure(shrinkwrap: { packages: Record<string, ShrinkwrapEnt
   return [...seen].sort();
 }
 
+/** True when every package in the shrinkwrap's production closure exists. */
+export function isProvisioned(mainDir: string, _mainPin: MainPin): boolean {
+  try {
+    const shrinkwrap = readShrinkwrap(mainDir);
+    return prodClosure(shrinkwrap).every((key) => existsSync(join(mainDir, key, "package.json")));
+  } catch {
+    return false;
+  }
+}
+
 /** Read + validate the main dir's `npm-shrinkwrap.json`. */
 function readShrinkwrap(mainDir: string): { packages: Record<string, ShrinkwrapEntry> } {
   try {
@@ -168,10 +131,10 @@ function readShrinkwrap(mainDir: string): { packages: Record<string, ShrinkwrapE
 
 /**
  * Fetch + verify + extract every production-closure entry into
- * `mainDir/node_modules/…`, then record the provision marker. A lockfile key
+ * `mainDir/node_modules/…`. A lockfile key
  * IS the node_modules-relative target path (`node_modules/typebox` extracts to
- * `<mainDir>/node_modules/typebox`). Refuses — before writing the marker —
- * when any entry's bytes do not match the lockfile-recorded integrity; the
+ * `<mainDir>/node_modules/typebox`). Refuses when any entry's bytes do not
+ * match the lockfile-recorded integrity; the
  * tree is rebuilt from scratch on the next call.
  */
 export async function provisionMainDependencies(
@@ -186,7 +149,6 @@ export async function provisionMainDependencies(
   const shrinkwrap = readShrinkwrap(mainDir);
   const entries = prodClosure(shrinkwrap);
   await fetchAndExtractEntries(mainDir, shrinkwrap, entries, fetchImpl, channel);
-  writeProvisionLock(mainDir, mainPin, entries.length);
   return { provisioned: true, entries: entries.length };
 }
 
@@ -242,9 +204,12 @@ async function fetchAndExtractEntry(
   extractNpmTarball(buffer, join(mainDir, key));
 }
 
-/** True when the main dir carries a provision marker at all (regardless of
- * pin match) — for status surfaces that want to distinguish "tree present"
- * from "marker matches the pin". */
+/** True when the shrinkwrap-backed production dependency tree is complete. */
 export function provisionTreePresent(mainDir: string): boolean {
-  return existsSync(join(mainDir, "node_modules", "provision.lock"));
+  try {
+    const shrinkwrap = readShrinkwrap(mainDir);
+    return prodClosure(shrinkwrap).every((key) => existsSync(join(mainDir, key, "package.json")));
+  } catch {
+    return false;
+  }
 }

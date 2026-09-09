@@ -8,7 +8,7 @@
 // OpenClaw natively backs this seam with a SQLite `plugin_state_entries`
 // table. P0 binds the seam to the Hub host runtime instead, so this module is
 // a JSON-file approximation of that store: one file per namespace under the
-// account's channel dir (`channels/<accountId>/state/<namespace>.json`),
+// account's channel dir (`channels/<organizationId>/<channel>/<accountId>/state/<namespace>.json`),
 // atomic write (tmp + rename), loaded into memory at open, write-through on
 // every mutation. One Hub process per home, so there is no cross-process
 // locking to replicate.
@@ -584,7 +584,7 @@ interface OpenedNamespace {
 
 /**
  * Build the host-runtime keyed-store root. `dir` is the account's state dir
- * (`channels/<accountId>/state/`); omit it for an in-memory root (load-time
+ * (`channels/<organizationId>/<channel>/<accountId>/state/`); omit it for an in-memory root (load-time
  * fixtures, nothing persists). Reopening a namespace with different
  * `maxEntries` / `overflowPolicy` / `defaultTtlMs` fails (native parity).
  *

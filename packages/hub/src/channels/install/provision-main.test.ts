@@ -1,9 +1,10 @@
 // Offline tests for main-package dependency provisioning: the production
-// closure walk over `npm-shrinkwrap.json`, and the fetch + verify + extract +
-// marker path (fake registry, in-test tarballs — no network, no npm).
+// closure walk over `npm-shrinkwrap.json`, and the fetch + verify + extract
+// path (fake registry, in-test tarballs — no network, no npm). Idempotence is
+// the tree's own completeness, not a marker file.
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -189,7 +190,7 @@ describe("provisionMainDependencies", () => {
     return { mainDir, typeboxTarball };
   }
 
-  it("fetches, verifies, extracts, and records the provision marker", async () => {
+  it("fetches, verifies, and extracts the production closure", async () => {
     const root = join(workDir, "p1");
     const { mainDir, typeboxTarball } = seedMainDir(root);
     const calls: string[] = [];
@@ -206,13 +207,12 @@ describe("provisionMainDependencies", () => {
     assert.equal(result.entries, 1);
     assert.deepEqual(calls, ["https://registry.example/deps/typebox-1.3.3.tgz"]);
     assert.ok(existsSync(join(mainDir, "node_modules", "typebox", "index.js")));
-    assert.ok(existsSync(join(mainDir, "node_modules", "provision.lock")));
     assert.equal(isProvisioned(mainDir, MAIN_PIN), true);
-    const lock = JSON.parse(readFileSync(join(mainDir, "node_modules", "provision.lock"), "utf8"));
-    assert.equal(lock.main.integrity, MAIN_PIN.dist.integrity);
+    // No custom marker: idempotence is the tree, not a lock file.
+    assert.ok(!existsSync(join(mainDir, "node_modules", "provision.lock")));
   });
 
-  it("is a no-op when the marker already matches the main pin", async () => {
+  it("is a no-op when the shrinkwrap-backed tree is complete", async () => {
     const root = join(workDir, "p2");
     const { mainDir, typeboxTarball } = seedMainDir(root);
     const tarballs = new Map<string, Uint8Array>([
@@ -230,6 +230,22 @@ describe("provisionMainDependencies", () => {
     assert.equal(calls, 0);
   });
 
+  it("re-provisions when the tree is incomplete", async () => {
+    const root = join(workDir, "p5");
+    const { mainDir, typeboxTarball } = seedMainDir(root);
+    const tarballs = new Map<string, Uint8Array>([
+      ["https://registry.example/deps/typebox-1.3.3.tgz", typeboxTarball],
+    ]);
+    await provisionMainDependencies(mainDir, MAIN_PIN, fakeFetch(tarballs), "telegram");
+    // A package deleted out from under the install is detected by the missing
+    // package.json, and rebuilt on the next call.
+    rmSync(join(mainDir, "node_modules", "typebox"), { recursive: true, force: true });
+    assert.equal(isProvisioned(mainDir, MAIN_PIN), false);
+    await provisionMainDependencies(mainDir, MAIN_PIN, fakeFetch(tarballs), "telegram");
+    assert.ok(existsSync(join(mainDir, "node_modules", "typebox", "package.json")));
+    assert.equal(isProvisioned(mainDir, MAIN_PIN), true);
+  });
+
   it("refuses a dependency whose bytes do not match the lockfile integrity", async () => {
     const root = join(workDir, "p3");
     const { mainDir } = seedMainDir(root);
@@ -242,8 +258,6 @@ describe("provisionMainDependencies", () => {
       (error: unknown) =>
         error instanceof ProvisionError && /integrity mismatch/u.test(error.message),
     );
-    // Refused before the marker: no provision.lock, no extracted entry.
-    assert.ok(!existsSync(join(mainDir, "node_modules", "provision.lock")));
     assert.ok(!existsSync(join(mainDir, "node_modules", "typebox")));
   });
 

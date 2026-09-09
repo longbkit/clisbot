@@ -2,7 +2,7 @@
 //
 // Everything is real except the two things a test cannot own: the chat platform
 // (a `@getpaseo/channels-shared/sim` loopback server) and the daemon (a
-// `FakeDaemon`). The database, the config revision, the installer markers, the
+// `FakeDaemon`). The database, the config revision, the in-repo package,
 // loader, the verticals' built `dist/`, the ingress queue and the plane are the
 // production objects.
 //
@@ -10,15 +10,7 @@
 // rule 2 asks for. `boot.integration.native.ts` is the same shape but needs the
 // live dev home's Slack/Telegram credentials; this one needs none, so it runs
 // in the normal hub vitest set.
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -187,77 +179,6 @@ fallback:
 `;
 }
 
-interface ChannelPins {
-  main: { package: string; version: string; dist: { integrity: string } };
-  channels: Record<
-    string,
-    {
-      loadMode: string;
-      entry: string;
-      inRepoPackage?: string;
-      channel: { package: string; version: string; dist: { integrity: string; gitHead?: string } };
-    }
-  >;
-}
-
-/**
- * Pre-seeds the per-account install markers the way an in-repo
- * `ensureChannelInstalled` run records them, so boot skips straight to the load
- * of the workspace `dist/`. Requires `npm run build --workspace=…` for the
- * verticals; a stale `dist/` is the failure mode the 2026-08-26 lesson opens with.
- */
-function seedInstallMarkers(dataDir: string, channels: readonly string[]): void {
-  const pins = JSON.parse(readFileSync(PINS_PATH, "utf8")) as ChannelPins;
-  const accountRoot = join(dataDir, "channels", SIM_ACCOUNT_ID);
-  mkdirSync(accountRoot, { recursive: true });
-  const main = {
-    package: pins.main.package,
-    version: pins.main.version,
-    integrity: pins.main.dist.integrity,
-  };
-  for (const channel of channels) {
-    const pin = pins.channels[channel];
-    if (pin === undefined || pin.loadMode !== "in-repo") {
-      throw new Error(`channel-pins.json must pull ${channel} in-repo (got ${pin?.loadMode})`);
-    }
-    const packageName = pin.inRepoPackage;
-    if (packageName === undefined)
-      throw new Error(`channel-pins.json: ${channel} has no inRepoPackage`);
-    writeFileSync(
-      join(accountRoot, `install-${channel}.lock`),
-      `${JSON.stringify(
-        {
-          channel,
-          accountId: SIM_ACCOUNT_ID,
-          loadMode: pin.loadMode,
-          main,
-          channelPackage: {
-            package: pin.channel.package,
-            version: pin.channel.version,
-            integrity: pin.channel.dist.integrity,
-            ...(pin.channel.dist.gitHead === undefined
-              ? {}
-              : { gitHead: pin.channel.dist.gitHead }),
-          },
-          entry: pin.entry,
-          inRepoPackageDir: inRepoPackageDir(packageName),
-          installedAt: "2026-09-07T00:00:00.000Z",
-        },
-        null,
-        2,
-      )}\n`,
-      { mode: 0o600 },
-    );
-  }
-}
-
-/** The workspace symlink, real-pathed the way the installer resolves it. */
-function inRepoPackageDir(packageName: string): string {
-  const linked = join(REPO_ROOT, "node_modules", packageName);
-  if (!existsSync(linked)) throw new Error(`workspace package not linked: ${packageName}`);
-  return realpathSync(linked);
-}
-
 export async function startChannelSimBoot(
   options: ChannelSimBootOptions = {},
 ): Promise<ChannelSimBoot> {
@@ -275,8 +196,6 @@ export async function startChannelSimBoot(
   // supervisor's env copy, because the vertical runs in this process.
   const previousSlackApiUrl = process.env["SLACK_API_URL"];
   process.env["SLACK_API_URL"] = slack.apiUrl;
-
-  seedInstallMarkers(dataDir, ["slack", "telegram"]);
 
   const bundle = await embeddedDatabaseRuntime(dbDir);
   await bundle.runtime.migrate();

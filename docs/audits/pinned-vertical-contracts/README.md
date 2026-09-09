@@ -19,7 +19,7 @@ Writer rule: read the topic file before writing the matching loader / supervisor
 | `telegram-monitor.md`       | The bundled-Telegram host-monitor decision (option A) + the native monitor's contract + the host-override read sites                                     |
 | `loader-routing.md`         | The aliased `openclaw/plugin-sdk/*` seam matrix and its process-lifetime routing                                                                         |
 | `seam-and-limits.md`        | No double-post (the seam result shape) + one account per channel per process                                                                             |
-| `install-supply.md`         | The two tarballs are self-contained; install is unchanged                                                                                                |
+| `install-supply.md`         | The two tarballs' supply shape; shrinkwrap-backed main-dir provisioning and its tree-completeness idempotence                                            |
 | `state-store-namespaces.md` | The keyed-store seam's real namespaces: telegram + slack, key/value shapes, TTLs, and the dedup-vs-record split                                          |
 
 Maintain: when a fact changes (re-pin, new seam, a drive-time miss found in live E2E), edit the owning topic file and update its refs — do not append a second copy elsewhere. The implementation doc's §4.8 links here and carries no fact of its own.

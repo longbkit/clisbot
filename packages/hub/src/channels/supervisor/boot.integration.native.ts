@@ -31,7 +31,6 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  writeFileSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
@@ -143,12 +142,18 @@ function configuredVar(name: string): string | undefined {
  */
 const DISCORD_BOT_TOKEN = configuredVar("DISCORD_BOT_TOKEN");
 const DISCORD_TEST_CHANNEL_ID = configuredVar("DISCORD_TEST_CHANNEL_ID");
-const DISCORD_SKIP =
-  DISCORD_BOT_TOKEN === undefined || DISCORD_TEST_CHANNEL_ID === undefined
-    ? "DISCORD_BOT_TOKEN / DISCORD_TEST_CHANNEL_ID are not configured"
-    : existsSync(join(DISCORD_IN_REPO, "dist", "plugin.js"))
-      ? false
-      : "the in-repo Discord vertical is not built (@getpaseo/channels-discord dist missing)";
+
+/** `false` when Discord may join the boot; otherwise the skip reason. */
+function discordSkip(): string | false {
+  if (DISCORD_BOT_TOKEN === undefined || DISCORD_TEST_CHANNEL_ID === undefined) {
+    return "DISCORD_BOT_TOKEN / DISCORD_TEST_CHANNEL_ID are not configured";
+  }
+  if (!existsSync(join(DISCORD_IN_REPO, "dist", "plugin.js"))) {
+    return "the in-repo Discord vertical is not built (@getpaseo/channels-discord dist missing)";
+  }
+  return false;
+}
+const DISCORD_SKIP = discordSkip();
 
 function supplyPresent(): boolean {
   // In-repo (blueprint §6.5): the supply is the Hub's own built workspace
@@ -463,11 +468,9 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     daemon = new FakeDaemon();
     await daemon.listen();
 
-    // 1. The in-repo install (blueprint §6.5): no supply copy — the Hub drives
-    // its OWN built workspace packages. Pre-seed the per-channel markers exactly
-    // as a fresh `ensureChannelInstalled` in-repo run would have recorded them
-    // (sync-reference pin + resolved package dir), so the boot's install step
-    // recognizes the install as pin-matching and skips to the load.
+    // 1. The in-repo install (blueprint §6.5): no supply copy and no mutable
+    // install marker — the Hub resolves and drives its own built workspace
+    // packages directly from the package-manager dependency tree.
     const pins = JSON.parse(readFileSync(PINS_PATH, "utf8")) as {
       main: { package: string; version: string; dist: { integrity: string } };
       channels: Record<
@@ -482,11 +485,6 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
           };
         }
       >;
-    };
-    const mainRef = {
-      package: pins.main.package,
-      version: pins.main.version,
-      integrity: pins.main.dist.integrity,
     };
     const slackPin = pins.channels["slack"];
     const telegramPin = pins.channels["telegram"];
@@ -506,83 +504,6 @@ describe("channel supervisor boot (real supply + fake daemon)", { skip: SKIP }, 
     if (existsSync(liveState)) {
       cpSync(liveState, join(workAccountRoot, "state"), { recursive: true });
     }
-    const installedAt = "2026-08-26T00:00:00.000Z";
-    writeFileSync(
-      join(workAccountRoot, "install-slack.lock"),
-      `${JSON.stringify(
-        {
-          channel: "slack",
-          accountId: "work",
-          loadMode: slackPin.loadMode,
-          main: mainRef,
-          channelPackage: {
-            package: slackPin.channel.package,
-            version: slackPin.channel.version,
-            integrity: slackPin.channel.dist.integrity,
-            gitHead: slackPin.channel.dist.gitHead,
-          },
-          entry: slackPin.entry,
-          inRepoPackageDir: SLACK_IN_REPO,
-          installedAt,
-        },
-        null,
-        2,
-      )}\n`,
-      { mode: 0o600 },
-    );
-    writeFileSync(
-      join(workAccountRoot, "install-telegram.lock"),
-      `${JSON.stringify(
-        {
-          channel: "telegram",
-          accountId: "work",
-          loadMode: telegramPin.loadMode,
-          main: mainRef,
-          channelPackage: {
-            package: telegramPin.channel.package,
-            version: telegramPin.channel.version,
-            integrity: telegramPin.channel.dist.integrity,
-          },
-          entry: telegramPin.entry,
-          inRepoPackageDir: TELEGRAM_IN_REPO,
-          installedAt,
-        },
-        null,
-        2,
-      )}\n`,
-      { mode: 0o600 },
-    );
-
-    if (DISCORD_SKIP === false) {
-      const discordPin = pins.channels["discord"];
-      if (discordPin === undefined || discordPin.loadMode !== "in-repo") {
-        throw new Error("channel-pins.json must pull the Discord vertical in-repo");
-      }
-      writeFileSync(
-        join(workAccountRoot, "install-discord.lock"),
-        `${JSON.stringify(
-          {
-            channel: "discord",
-            accountId: "work",
-            loadMode: discordPin.loadMode,
-            main: mainRef,
-            channelPackage: {
-              package: discordPin.channel.package,
-              version: discordPin.channel.version,
-              integrity: discordPin.channel.dist.integrity,
-              gitHead: discordPin.channel.dist.gitHead,
-            },
-            entry: discordPin.entry,
-            inRepoPackageDir: DISCORD_IN_REPO,
-            installedAt,
-          },
-          null,
-          2,
-        )}\n`,
-        { mode: 0o600 },
-      );
-    }
-
     // 2. Test-only credential fixtures supplied through the resolver seam. `cpSync`
     // copies the file's own mode, so chmod only if the source was wider.
     const slackSecret = join(dataDir, "secrets", "slack-work.json");

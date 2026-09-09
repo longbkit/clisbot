@@ -1,12 +1,13 @@
 // Offline tests for the per-channel install orchestrator (impl doc §4.2, plan §9
 // step 1). Every tarball is a tiny in-test gzip(u) ustar buffer and the registry
 // is a fake `fetch` that serves local bytes, so the whole install path — URL
-// resolution, integrity verification, extraction, notices gate, marker, idempotency
-// — runs with no network and no real npm.
+// resolution, integrity verification, extraction, notices gate, the managed
+// package-lock, and idempotency — runs with no network and no real npm.
 
 import assert from "node:assert/strict";
 import {
   mkdtempSync,
+  mkdirSync,
   rmSync,
   existsSync,
   readFileSync,
@@ -14,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { sha512Integrity } from "./integrity.js";
@@ -213,7 +214,7 @@ describe("ensureChannelInstalled", () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it("installs a published channel: two tarballs, marker, entry, loadMode", async () => {
+  it("installs a published channel into the shared managed project: two tarballs, lockfile, entry, loadMode", async () => {
     const mainTarball = makeTarball(MAIN_FILES);
     const slackTarball = makeTarball(SLACK_FILES);
     const pins = makePins({
@@ -227,17 +228,37 @@ describe("ensureChannelInstalled", () => {
     assert.equal(result.installed, true);
     assert.equal(result.loadMode, "published");
     assert.equal(result.entry, "./dist/index.js");
-    const mainDir = join(dataDir, "channels", "acc1", "openclaw@2026.7.1-2");
-    const channelDir = join(dataDir, "channels", "acc1", "@openclaw/slack@2026.7.1");
+    const root = join(dataDir, "plugins", "channels");
+    const mainDir = join(root, "node_modules", "openclaw");
+    const channelDir = join(root, "node_modules", "@openclaw", "slack");
+    assert.equal(result.installDir, root);
     assert.equal(result.mainInstallDir, mainDir);
     assert.equal(result.channelInstallDir, channelDir);
     assert.ok(existsSync(join(mainDir, "package.json")));
     assert.ok(existsSync(join(channelDir, "dist", "index.js")));
-    const marker = JSON.parse(
-      readFileSync(join(dataDir, "channels", "acc1", "install-slack.lock"), "utf8"),
+    // The shared root is one npm-style managed project: a private manifest and
+    // a lock that records version, integrity, and the resolved artifact URL
+    // for every pinned package.
+    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    assert.equal(manifest.name, "clisbot-channel-plugins");
+    assert.equal(manifest.private, true);
+    assert.deepEqual(manifest.dependencies, {
+      openclaw: "2026.7.1-2",
+      "@openclaw/slack": "2026.7.1",
+    });
+    const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8"));
+    assert.equal(lock.lockfileVersion, 3);
+    assert.equal(lock.packages["node_modules/openclaw"].version, "2026.7.1-2");
+    assert.equal(lock.packages["node_modules/openclaw"].integrity, integrityOf(mainTarball));
+    assert.match(lock.packages["node_modules/openclaw"].resolved, /openclaw-2026\.7\.1-2\.tgz/u);
+    assert.equal(lock.packages["node_modules/@openclaw/slack"].version, "2026.7.1");
+    assert.equal(
+      lock.packages["node_modules/@openclaw/slack"].integrity,
+      integrityOf(slackTarball),
     );
-    assert.equal(marker.channel, "slack");
-    assert.equal(marker.channelPackage.gitHead, "2d2ddc43d0dcf71f31283d780f9fe9ff4cc04fe4");
+    // No custom install marker, and no per-account copy of the package code.
+    assert.ok(!existsSync(join(root, "install-slack.lock")));
+    assert.ok(!existsSync(join(dataDir, "channels", "acc1")));
   });
 
   it("is idempotent: a second run with the same pin skips the fetch", async () => {
@@ -329,10 +350,12 @@ describe("ensureChannelInstalled", () => {
     assert.ok(
       existsSync(join(result.mainInstallDir, "dist", "extensions", "telegram", "index.js")),
     );
-    const marker = JSON.parse(
-      readFileSync(join(dataDir, "channels", "acc5", "install-telegram.lock"), "utf8"),
-    ) as { channelPackage?: unknown };
-    assert.equal(marker.channelPackage, undefined);
+    // Bundled: one tarball, one lock entry — the lock records only the main.
+    const lock = JSON.parse(
+      readFileSync(join(dataDir, "plugins", "channels", "package-lock.json"), "utf8"),
+    );
+    assert.equal(Object.keys(lock.packages).filter((key) => key !== "").length, 1);
+    assert.ok(!existsSync(join(dataDir, "plugins", "channels", "install-telegram.lock")));
   });
 
   it("refuses to install when the channel's THIRD_PARTY_NOTICES section is missing", async () => {
@@ -387,10 +410,9 @@ describe("ensureChannelInstalled", () => {
       fetchImpl,
     });
     assert.equal(result.installed, true);
-    const mainDir = join(dataDir, "channels", "acc7", "openclaw@2026.7.1-2");
+    const mainDir = join(dataDir, "plugins", "channels", "node_modules", "openclaw");
     assert.ok(existsSync(join(mainDir, "node_modules", "typebox", "index.js")));
-    assert.ok(existsSync(join(mainDir, "node_modules", "provision.lock")));
-    // A deleted tree self-heals on the next install (marker gone → re-provision).
+    // A deleted tree self-heals on the next install.
     rmSync(join(mainDir, "node_modules"), { recursive: true, force: true });
     let calls = 0;
     const counting = ((input: string | URL | Request) => {
@@ -403,7 +425,6 @@ describe("ensureChannelInstalled", () => {
     assert.equal(second.installed, false);
     // One dependency tarball fetch, no packument lookups.
     assert.equal(calls, 1);
-    assert.ok(existsSync(join(mainDir, "node_modules", "provision.lock")));
   });
 
   it("leaves a main tarball with its own node_modules alone", async () => {
@@ -426,16 +447,17 @@ describe("ensureChannelInstalled", () => {
     assert.equal(result.installed, true);
     // 4 calls: two packument lookups + two tarballs; no dependency fetches.
     assert.equal(calls, 4);
-    const mainDir = join(dataDir, "channels", "acc8", "openclaw@2026.7.1-2");
-    assert.ok(!existsSync(join(mainDir, "node_modules", "provision.lock")));
+    // No shrinkwrap in the main tarball, so no dependency tree under it.
+    assert.ok(
+      !existsSync(join(dataDir, "plugins", "channels", "node_modules", "openclaw", "node_modules")),
+    );
   });
 
-  it("keeps per-channel markers on a shared account root: both verticals skip, none reinstalls", async () => {
-    // slack (published) and telegram (bundled) pin the same main and share the
-    // account root. With one shared marker the second channel's install
-    // clobbered the first's, so the clobbered channel re-fetched the main +
-    // channel tarballs on every boot. Per-channel markers must keep both
-    // idempotent against each other.
+  it("shares one managed project across channels and accounts: both verticals skip, none reinstalls", async () => {
+    // slack (published) and telegram (bundled) pin the same main, so both
+    // resolve into the ONE shared managed project. The lock must keep both
+    // channels idempotent against each other, and a second account must reuse
+    // the same tree without re-fetching.
     const mainTarball = makeTarball({ ...MAIN_FILES, ...TEL_FILES });
     const slackTarball = makeTarball(SLACK_FILES);
     const pins = makePins({
@@ -457,10 +479,10 @@ describe("ensureChannelInstalled", () => {
     const telegram = await ensureChannelInstalled(pins, "telegram", "acc9", dataDir, {
       fetchImpl: counting,
     });
-    // Bundled: main only, one packument + one tarball.
-    assert.equal(telegram.installed, true);
-    assert.equal(calls, afterSlack + 2);
-    // Simulate the next boot: BOTH markers must match, zero re-fetches.
+    // Bundled Telegram reuses the already-installed main package.
+    assert.equal(telegram.installed, false);
+    assert.equal(calls, afterSlack);
+    // Simulate the next boot: both channels match the shared package lock.
     const slackAgain = await ensureChannelInstalled(pins, "slack", "acc9", dataDir, {
       fetchImpl: counting,
     });
@@ -469,21 +491,33 @@ describe("ensureChannelInstalled", () => {
     });
     assert.equal(slackAgain.installed, false);
     assert.equal(telegramAgain.installed, false);
-    assert.equal(calls, afterSlack + 2);
-    const root = join(dataDir, "channels", "acc9");
-    assert.ok(existsSync(join(root, "install-slack.lock")));
-    assert.ok(existsSync(join(root, "install-telegram.lock")));
-    assert.ok(!existsSync(join(root, "install.lock")));
+    assert.equal(calls, afterSlack);
+    // A different account on the same Hub sees the same shared tree: the pin
+    // matches the managed project, so resolution is a no-op with zero fetches
+    // and no per-account copy.
+    const otherAccount = await ensureChannelInstalled(pins, "slack", "acc9-other", dataDir, {
+      fetchImpl: counting,
+    });
+    assert.equal(otherAccount.installed, false);
+    assert.equal(otherAccount.mainInstallDir, slack.mainInstallDir);
+    assert.equal(calls, afterSlack);
+    assert.ok(!existsSync(join(dataDir, "channels", "acc9-other")));
+    const root = join(dataDir, "plugins", "channels");
+    assert.ok(existsSync(join(root, "package-lock.json")));
+    assert.ok(!existsSync(join(root, "install-slack.lock")));
+    assert.ok(!existsSync(join(root, "install-telegram.lock")));
   });
 
-  it("installs an in-repo channel: resolves the workspace package, marker, no fetch", async () => {
+  it("resolves an in-repo channel from the dependency tree without mutable install state", async () => {
     // in-repo (blueprint §6.5): the Hub drives its OWN workspace package — no
     // tarball fetch, no integrity gate, no main-dir provisioning. The entry
-    // module must already be built; a matching marker makes a re-run a no-op.
+    // module must already be built. Package-manager metadata is authoritative;
+    // the Hub must not create a per-account install marker.
     const mainIntegrity = "sha512-" + "D".repeat(86) + "==";
     const slackIntegrity = "sha512-" + "C".repeat(86) + "==";
     const inRepoPins = makeInRepoPins(mainIntegrity, slackIntegrity);
     const dataDir = join(workDir, "acc-inrepo");
+    rmSync(dataDir, { recursive: true, force: true });
     let calls = 0;
     const counting = ((input: string | URL | Request) => {
       calls += 1;
@@ -504,17 +538,43 @@ describe("ensureChannelInstalled", () => {
       realpathSync(new URL("../../../..", import.meta.url).pathname + join("channels", "shared")),
     );
     assert.equal(calls, 0); // zero registry fetches (no tarball path at all)
-    const marker = JSON.parse(
-      readFileSync(join(dataDir, "channels", "acc-inrepo", "install-slack.lock"), "utf8"),
-    ) as { loadMode: string; inRepoPackageDir?: string };
-    assert.equal(marker.loadMode, "in-repo");
-    assert.equal(marker.inRepoPackageDir, first.inRepoPackageDir);
-    // Matching re-run: idempotent no-op, no second write.
+    // In-repo writes no installation metadata at all: no account dir, no
+    // managed-project entry, no lockfile.
+    assert.ok(!existsSync(join(dataDir, "channels", "acc-inrepo")));
+    assert.ok(!existsSync(join(dataDir, "plugins", "channels", "package-lock.json")));
+    assert.ok(!existsSync(join(dataDir, "plugins", "channels", "node_modules")));
+    // Re-resolution is an idempotent no-op with no fetch or mutable file.
     const second = await ensureChannelInstalled(inRepoPins, "slack", "acc-inrepo", dataDir, {
       fetchImpl: counting,
     });
     assert.equal(second.installed, false);
     assert.equal(calls, 0);
+    assert.ok(!existsSync(join(dataDir, "channels", "acc-inrepo")));
+  });
+
+  it("removes the legacy install-<channel>.lock marker from the account dir", async () => {
+    // Pre-managed-project revisions recorded a per-account
+    // `channels/<accountId>/install-<channel>.lock` even for in-repo channels.
+    // The install path removes that stale marker so the account dir no longer
+    // looks like an install root — nothing else in the account dir is touched.
+    const inRepoPins = makeInRepoPins(
+      "sha512-" + "E".repeat(86) + "==",
+      "sha512-" + "F".repeat(86) + "==",
+    );
+    const dataDir = join(workDir, "acc-legacy");
+    const accountDir = join(dataDir, "channels", "acc-legacy");
+    mkdirSync(accountDir, { recursive: true });
+    const legacyMarker = join(accountDir, "install-slack.lock");
+    writeFileSync(legacyMarker, JSON.stringify({ channel: "slack", installedAt: "1970-01-01" }));
+    const kept = join(accountDir, "state", "offset.json");
+    mkdirSync(dirname(kept), { recursive: true });
+    writeFileSync(kept, JSON.stringify({ offset: 123 }));
+
+    const result = await ensureChannelInstalled(inRepoPins, "slack", "acc-legacy", dataDir, {});
+    assert.equal(result.installed, false);
+    assert.ok(!existsSync(legacyMarker));
+    // Runtime state next to the marker survives.
+    assert.ok(existsSync(kept));
   });
 
   it("resolves the real channel-pins.json manifest clean (trust boundary)", () => {
@@ -534,7 +594,7 @@ describe("ensureChannelInstalled", () => {
   it("resolveInstallDirs keys the channel dir by its own package (published) and reuses main (bundled)", () => {
     const pins = makePins({});
     const published = resolveInstallDirs("/data", "a", pins, "slack");
-    assert.ok(published.channelDir.endsWith("@openclaw/slack@2026.7.1"));
+    assert.ok(published.channelDir.endsWith("node_modules/@openclaw/slack"));
     const bundled = resolveInstallDirs("/data", "b", pins, "telegram");
     assert.equal(bundled.channelDir, bundled.mainDir);
   });

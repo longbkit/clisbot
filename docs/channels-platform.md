@@ -28,6 +28,31 @@ Relative paths and file names under a root stay identical to upstream. Only impo
 
 Two packages have no upstream root at all: `packages/channels/shared` is the contract this repo invented, and both it and `core` are consumed by every vertical.
 
+### Runtime package installation
+
+In-repo verticals (`loadMode: "in-repo"`) resolve their workspace package from
+the Hub's normal dependency tree. They do not copy code into an account
+directory and do not create `install-<channel>.lock` files. A missing built
+entry fails closed; the workspace package manifest and the repository lockfile
+remain the source of truth.
+
+Published or bundled supply (when enabled for a channel) is installed once per
+Hub under the managed project rooted at `CLISBOT_HOME/plugins/channels/`:
+
+```text
+CLISBOT_HOME/plugins/channels/
+├── package.json
+├── package-lock.json
+└── node_modules/
+    ├── openclaw/
+    └── @openclaw/<channel>/
+```
+
+The package manager lockfile records package versions and integrity. Account
+configuration and runtime state remain in the account's scoped
+`CLISBOT_HOME/channels/<organizationId>/<channel>/<accountId>/` dir; package
+code is never duplicated per account.
+
 **Never run the formatter over a ported file.** The local oxfmt reflows constructs upstream's does not, which breaks byte fidelity and fails the sync check. `.oxfmtrc.json` carries the ignore list; add a file there when the check reports a whitespace-only mismatch.
 
 ## The shared contract
