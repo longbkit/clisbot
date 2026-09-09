@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-zalo",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Zalo Official Account (Bot API) channel vertical (goal ledger slice 16). Ported from extensions/zalo/src@5d8067a4483: the Bot API client, token/account resolution, the probe, the send path, the message-tool actions and the webhook request handler with its durable-admission spool parsing. Zalo ships no SDK; upstream hand-rolls the client over fetch and depends only on zod.",
   "type": "module",

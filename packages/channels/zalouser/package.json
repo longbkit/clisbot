@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-zalouser",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Zalo Personal (`zalouser`) channel vertical (goal ledger slice 17). Ported from extensions/zalouser/src@5d8067a4483: the zca-js client boundary, the QR login state machine, the credential/session closure, the markdown text-style compiler, the send path, the message-tool `react` action, the `zalouser` agent tool, the friend/group directory and the probe. Upstream's SDK is zca-js, pinned at upstream's version.",
   "type": "module",

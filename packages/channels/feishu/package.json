@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-feishu",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Feishu/Lark channel vertical (goal ledger slice 15). Ported from extensions/feishu/src@5d8067a4483: the Lark SDK client + tenant-token plumbing, the six feishu_* agent tool families, the WS long-connection / webhook transports, the send + card closure, and the Fusion boundary adapters. Third-party SDK is upstream's: @larksuiteoapi/node-sdk.",
   "type": "module",

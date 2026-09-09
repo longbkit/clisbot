@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-googlechat",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Google Chat channel vertical (goal ledger slice 14). Ported from extensions/googlechat/src@5d8067a4483: the Chat API REST client, the service-account auth + token cache, the markdown→Google Chat renderer, target/space resolution and the webhook request handler. Third-party SDKs are upstream's: google-auth-library.",
   "type": "module",

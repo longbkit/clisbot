@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-discord",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Discord channel vertical (goal ledger slice 13). Ported from extensions/discord/src@5d8067a4483: the hand-rolled Discord REST/gateway client (src/internal), the send/action/component/markdown closure, and the Fusion boundary adapters. Third-party SDKs are upstream's: discord-api-types, ws, typebox, mdast-util-from-markdown.",
   "type": "module",

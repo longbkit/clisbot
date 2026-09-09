@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-slack",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Slack channel vertical. Ported from OpenClaw `extensions/slack/src` at 5d8067a4483 (see upstream-sync.json / SYNC.md); the SDK stack matches upstream (@slack/web-api, @slack/socket-mode, @slack/types).",
   "type": "module",

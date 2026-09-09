@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-core",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "OpenClaw core source ported for the in-repo channel verticals; mirrors upstream src/<path> under src/<path> (docs/audits/2026-09-07-openclaw-channel-port-goal.md)",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@getpaseo/channels-telegram",
-  "version": "0.1.0",
+  "version": "0.7.3-beta.1",
   "private": true,
   "description": "In-repo Telegram channel vertical (blueprint docs/audits/2026-08-26-in-repo-channel-verticals.md §6.5). L1 Bot API (port of the pinned send-* chunk, grammy stack kept) + L2 getUpdates long-poll + L4 lifecycle + outbound. Sync reference: openclaw@2026.7.1-2 dist.",
   "type": "module",

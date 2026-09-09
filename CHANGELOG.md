@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.3-beta.1 - 2026-09-09
+
+- Add Hub-managed direct WebSocket connection candidates for VPN deployments, preserving relay fallback.
+
 ## 0.7.2 - 2026-09-02
 
 ### Added
