@@ -421,6 +421,8 @@ export interface PaseoDaemonConfig {
   relayPublicEndpoint?: string;
   relayUseTls?: boolean;
   relayPublicUseTls?: boolean;
+  directEndpoint?: string;
+  directUseTls?: boolean;
   serviceProxy?: {
     publicBaseUrl: string | null;
     standaloneListen: string | null;
@@ -1312,10 +1314,14 @@ export async function createPaseoDaemon(
       const endpoint = config.relayPublicEndpoint ?? config.relayEndpoint ?? "relay.paseo.sh:443";
       const useTls =
         config.relayPublicUseTls ?? config.relayUseTls ?? endpoint === "relay.paseo.sh:443";
+      const directEndpoint = config.directEndpoint?.trim();
       return createConnectionOfferV2({
         serverId,
         daemonPublicKeyB64: daemonKeyPair.publicKeyB64,
         relay: { endpoint, useTls },
+        ...(directEndpoint
+          ? { direct: { endpoint: directEndpoint, useTls: config.directUseTls ?? true } }
+          : {}),
       });
     },
     getManagedAccessMode: () => daemonConfigStore.get().managedAccess.mode,

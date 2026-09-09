@@ -1924,13 +1924,21 @@ export class HostRuntimeStore {
     const useTls =
       input.offer.relay.useTls ?? shouldUseTlsForDefaultHostedRelay(input.offer.relay.endpoint);
     const relayEndpoint = normalizeHostPort(input.offer.relay.endpoint);
-    const connection: HostConnection = {
+    const relayConnection: HostConnection = {
       id: useTls ? `relay:wss:${relayEndpoint}` : `relay:${relayEndpoint}`,
       type: "relay",
       relayEndpoint,
       useTls,
       daemonPublicKeyB64: input.offer.daemonPublicKeyB64,
     };
+    const directConnection: HostConnection | null = input.offer.direct
+      ? {
+          id: `direct:${input.offer.direct.endpoint}`,
+          type: "directTcp",
+          endpoint: input.offer.direct.endpoint,
+          useTls: input.offer.direct.useTls ?? true,
+        }
+      : null;
     const existingManualHost = this.hosts.find(
       (host) => host.serverId === input.offer.serverId && host.management === undefined,
     );
@@ -1942,16 +1950,26 @@ export class HostRuntimeStore {
     }
     const conflictingHost = this.hosts.find(
       (host) =>
-        (host.serverId === input.offer.serverId || hostHasConnection(host, connection)) &&
+        (host.serverId === input.offer.serverId ||
+          hostHasConnection(host, relayConnection) ||
+          (directConnection !== null && hostHasConnection(host, directConnection))) &&
         !sameHubManagement(host.management, input.management),
     );
     if (conflictingHost) return null;
 
+    if (directConnection !== null) {
+      await this.upsertHostConnection({
+        serverId: input.offer.serverId,
+        label: input.label,
+        management: input.management,
+        connection: directConnection,
+      });
+    }
     return this.upsertHostConnection({
       serverId: input.offer.serverId,
       label: input.label,
       management: input.management,
-      connection,
+      connection: relayConnection,
     });
   }
 

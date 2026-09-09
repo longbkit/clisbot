@@ -283,6 +283,10 @@ export const PersistedConfigSchema = z
           })
           .strict()
           .optional(),
+        direct: z
+          .object({ endpoint: z.string().optional(), useTls: z.boolean().optional() })
+          .strict()
+          .optional(),
         serviceProxy: z
           .object({
             // COMPAT(serviceProxyEnabled): added 2026-06-02, remove after 2026-12-02.

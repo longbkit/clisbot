@@ -581,6 +581,10 @@ export function resolveConfigFromPersisted(
     enabledFallback: relayEnabledFallback,
   });
   const serviceProxy = resolveServiceProxyConfig(env, persisted);
+  const directEndpoint =
+    env.PASEO_DIRECT_ENDPOINT?.trim() || persisted.daemon?.direct?.endpoint?.trim() || undefined;
+  const directUseTls =
+    parseBooleanEnv(env.PASEO_DIRECT_USE_TLS) ?? persisted.daemon?.direct?.useTls ?? true;
   const webUi = resolveWebUiConfig(paseoHome, env, cli, persisted);
 
   const { openai, speech } = resolveSpeechConfig({
@@ -627,6 +631,8 @@ export function resolveConfigFromPersisted(
     relayPublicEndpoint: relay.publicEndpoint,
     relayUseTls: relay.useTls,
     relayPublicUseTls: relay.publicUseTls,
+    directEndpoint,
+    directUseTls,
     serviceProxy,
     webUi,
     appBaseUrl,
@@ -737,6 +743,8 @@ function resolveRelayOverridePaths(
   if (env.PASEO_RELAY_PUBLIC_USE_TLS !== undefined) {
     paths.push("daemon.relay.publicUseTls");
   }
+  if (env.PASEO_DIRECT_ENDPOINT !== undefined) paths.push("daemon.direct.endpoint");
+  if (env.PASEO_DIRECT_USE_TLS !== undefined) paths.push("daemon.direct.useTls");
   return paths;
 }
 

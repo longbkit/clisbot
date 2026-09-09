@@ -100,8 +100,9 @@ function HubHostBinding({
       serverId: offer.serverId,
       daemonPublicKeyB64: offer.daemonPublicKeyB64,
       relay: { endpoint: offer.relay.endpoint, useTls: offer.relay.useTls },
+      ...(offer.direct ? { direct: { endpoint: offer.direct.endpoint, useTls: offer.direct.useTls } } : {}),
     }),
-    [offer.daemonPublicKeyB64, offer.relay.endpoint, offer.relay.useTls, offer.serverId, offer.v],
+    [offer.daemonPublicKeyB64, offer.direct?.endpoint, offer.direct?.useTls, offer.relay.endpoint, offer.relay.useTls, offer.serverId, offer.v],
   );
   const issueAccessTicket = useCallback(
     (clientId: string) =>

@@ -14,6 +14,13 @@ export const ConnectionOfferV2Schema = z.object({
     endpoint: z.string().min(1),
     useTls: z.boolean().optional(),
   }),
+  /** Optional VPN/internal direct WebSocket candidate. */
+  direct: z
+    .object({
+      endpoint: z.string().min(1),
+      useTls: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type ConnectionOfferV2 = z.infer<typeof ConnectionOfferV2Schema>;
