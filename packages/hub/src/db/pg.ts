@@ -3160,7 +3160,12 @@ class PgDatabase implements Database {
                      where organization_id = $1), 1),
            $2, $3, $4
          ) returning *`,
-        [input.organizationId, input.files, input.contentHash, input.createdByUserId],
+        [
+          input.organizationId,
+          JSON.stringify(input.files),
+          input.contentHash,
+          input.createdByUserId,
+        ],
       );
       const revision = inserted.rows[0]!;
       await client.query(
