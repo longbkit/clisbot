@@ -109,6 +109,8 @@ see [implementation-plan.md](implementation-plan.md#resolved-decisions).
 
 ## Starting sessions
 
+Đang cân nhắc: [`/side` và `/fork` tạo session trong cùng workspace](../workspace-organization/README.md#làm-trước--chưa-cần-đổi-yaml).
+
 Five commands mint or rebind a session. Two
 questions decide which: does it carry this conversation's context, and does it
 take over the binding?

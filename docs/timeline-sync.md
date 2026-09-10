@@ -1,5 +1,7 @@
 # Timeline sync
 
+Đang cân nhắc: [giữ thông tin người gửi khi mở lại hội thoại](audits/2026-09-08-workspace-placement-and-session-authorship.md).
+
 Agent chat delivery has two paths:
 
 1. **Live stream** — `agent_stream` WebSocket messages for immediacy. These may be delta-shaped lifecycle updates.

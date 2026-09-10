@@ -1394,6 +1394,9 @@ fixed public/customer Channel flows documented here.
 
 ### 12.1 Channel supervisor admission (open gap)
 
+> Plain-language map of the two authorization paths, the Guest subject, and `/link`:
+> [2026-09-10 Channel vs Paseo app](2026-09-10-channel-vs-app-admission.md).
+
 This design covers the interactive app's host session. It does not cover the channel supervisor's
 own daemon connection, which is a separate, unresolved gap.
 

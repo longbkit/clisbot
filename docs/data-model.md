@@ -1,5 +1,7 @@
 # Data Model
 
+Đang cân nhắc: [thông tin workspace](features/workspace-organization/README.md) và [người tạo/người gửi](audits/2026-09-08-workspace-placement-and-session-authorship.md).
+
 ## Project identity
 
 Projects are allocated for the exact root selected by the caller, normalized lexically with `path.resolve` (never `realpath`). New project IDs are opaque `prj_<16 hex>` values. Existing remote-shaped or path-shaped IDs are retained as readable compatibility records and are never rekeyed. An active exact root is idempotent; archived-only matches do not resurrect an old project. Workspace `projectId` is stable membership: reconciliation may update git-derived kind and branch metadata, but never rehomes a workspace or changes a project's root, ID, or default name.

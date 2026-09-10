@@ -1,5 +1,7 @@
 # Paseo Hub relationship
 
+Đang cân nhắc: [các use case workspace và phạm vi làm trước](features/workspace-organization/README.md).
+
 Paseo Hub is an explicit opt-in connection from one Paseo daemon to one Hub. Running a daemon does
 not register it with a Hub. The relationship begins only when a user runs
 `paseo hub connect [url]` from the daemon machine with an explicit API key or matching stored CLI login. Clisbot assistant onboarding also explicitly enrolls the local daemon when channel credentials are supplied, using the authenticated local operator API and a short-lived enrollment token.
