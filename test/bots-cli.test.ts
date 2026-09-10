@@ -414,4 +414,38 @@ describe("bots cli", () => {
     expect(rawConfig.bots.zaloPersonal.default.directMessages["*"].policy).toBe("disabled");
   });
 
+  test("gets and sets Slack DM session scope", async () => {
+    tempDir = mkdtempSync(join(tmpdir(), "clisbot-bots-cli-"));
+    previousConfigPath = process.env.CLISBOT_CONFIG_PATH;
+    previousHome = process.env.CLISBOT_HOME;
+    process.env.CLISBOT_HOME = tempDir;
+    process.env.CLISBOT_CONFIG_PATH = join(tempDir, "clisbot.json");
+    await seedConfig();
+
+    const output: string[] = [];
+    console.log = (value?: unknown) => {
+      output.push(String(value ?? ""));
+    };
+
+    await runBotsCli([
+      "set-dm-session-scope",
+      "--channel",
+      "slack",
+      "--bot",
+      "default",
+      "--scope",
+      "thread",
+    ]);
+    await runBotsCli([
+      "get-dm-session-scope",
+      "--channel",
+      "slack",
+      "--bot",
+      "default",
+    ]);
+
+    const rawConfig = JSON.parse(readFileSync(process.env.CLISBOT_CONFIG_PATH!, "utf8"));
+    expect(rawConfig.bots.slack.default.dmSessionScope).toBe("thread");
+    expect(output.join("\n")).toContain("slack/default dmSessionScope: thread");
+  });
 });

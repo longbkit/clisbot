@@ -5,6 +5,7 @@ import {
   buildAgentPeerSessionKey,
 } from "../../agents/session/session-key.ts";
 import { resolveProvidedBotId } from "../../config/channels/channel-bot-records.ts";
+import { resolveSlackBotConfig } from "./config.ts";
 
 export type SlackConversationTarget = {
   agentId: string;
@@ -36,18 +37,36 @@ export function resolveSlackConversationTarget(params: {
   const botId = resolveProvidedBotId(params) ?? "default";
 
   if (params.conversationKind === "dm") {
+    const parentSessionKey = buildAgentPeerSessionKey({
+      agentId: params.agentId,
+      mainKey: sessionConfig.mainKey,
+      channel: "slack",
+      botId,
+      peerKind: "dm",
+      peerId: params.userId ?? params.channelId,
+      dmScope: sessionConfig.dmScope,
+      identityLinks: sessionConfig.identityLinks,
+    });
+    const dmSessionScope = resolveSlackBotConfig(
+      params.loadedConfig.raw.bots.slack,
+      botId,
+    ).dmSessionScope;
+    const threadId = (params.threadTs ?? "").trim() ||
+      (params.replyToMode === "thread" ? (params.messageTs ?? "").trim() : "");
+
+    if (dmSessionScope === "thread" && threadId) {
+      return {
+        agentId: params.agentId,
+        sessionKey: appendThreadSessionKey(parentSessionKey, threadId),
+        mainSessionKey,
+        parentSessionKey,
+        threadId,
+      };
+    }
+
     return {
       agentId: params.agentId,
-      sessionKey: buildAgentPeerSessionKey({
-        agentId: params.agentId,
-        mainKey: sessionConfig.mainKey,
-        channel: "slack",
-        botId,
-        peerKind: "dm",
-        peerId: params.userId ?? params.channelId,
-        dmScope: sessionConfig.dmScope,
-        identityLinks: sessionConfig.identityLinks,
-      }),
+      sessionKey: parentSessionKey,
       mainSessionKey,
     };
   }

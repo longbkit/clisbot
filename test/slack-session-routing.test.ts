@@ -105,6 +105,45 @@ describe("Slack conversation target routing", () => {
     expect(target.mainSessionKey).toBe("agent:default:main");
   });
 
+  test("isolates direct messages by root thread when configured", () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.slack.default.dmSessionScope = "thread";
+
+    const target = resolveSlackConversationTarget({
+      loadedConfig,
+      agentId: "default",
+      channelId: "D123",
+      userId: "U123",
+      messageTs: "1775291908.430140",
+      threadTs: "1775291908.430139",
+      conversationKind: "dm",
+      replyToMode: "thread",
+    });
+
+    expect(target.parentSessionKey).toBe("agent:default:slack:dm:u123");
+    expect(target.sessionKey).toBe(
+      "agent:default:slack:dm:u123:thread:1775291908.430139",
+    );
+    expect(target.threadId).toBe("1775291908.430139");
+  });
+
+  test("keeps the peer session when thread scope has no thread id", () => {
+    const loadedConfig = createLoadedConfig();
+    loadedConfig.raw.bots.slack.default.dmSessionScope = "thread";
+
+    const target = resolveSlackConversationTarget({
+      loadedConfig,
+      agentId: "default",
+      channelId: "D123",
+      userId: "U123",
+      conversationKind: "dm",
+      replyToMode: "all",
+    });
+
+    expect(target.sessionKey).toBe("agent:default:slack:dm:u123");
+    expect(target.threadId).toBeUndefined();
+  });
+
   test("resolves shared-route overrides from raw stored ids", () => {
     const resolved = resolveSlackConversationRoute(
       createLoadedConfig(),
