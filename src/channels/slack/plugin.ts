@@ -22,7 +22,10 @@ import { normalizeChannelUserId } from "../integration/channel-surface-contract-
 import { describeSlackStartupFailure } from "./startup-failure.ts";
 import { renderMarkdownReplyStyleHint } from "../message/agent-reply.ts";
 import { slackChannelOperatorInventory } from "./operator-inventory.ts";
-import { renderSlackTargetSyntax } from "./target-normalization.ts";
+import {
+  renderSlackTargetSyntax,
+  resolveSlackAgentReplyTarget,
+} from "./target-normalization.ts";
 
 function resolveSlackReplyTarget(params: {
   loadedConfig: Parameters<ChannelPlugin["resolveMessageReplyTarget"]>[0]["loadedConfig"];
@@ -167,8 +170,7 @@ export const slackChannelPlugin: ChannelPlugin = {
     styleHint: renderMarkdownReplyStyleHint(
       "Keep each paragraph, list, or code block under 2500 chars.",
     ),
-    resolveTarget: (identity) =>
-      identity.channelId ? `channel:${identity.channelId}` : null,
+    resolveTarget: resolveSlackAgentReplyTarget,
     resolveChildSurface: (identity) =>
       identity.threadTs
         ? {

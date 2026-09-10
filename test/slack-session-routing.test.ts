@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { resolveSlackConversationRoute } from "../src/channels/slack/route-config.ts";
 import { resolveSlackConversationTarget } from "../src/channels/slack/session-routing.ts";
-import { normalizeSlackSurfaceTarget } from "../src/channels/slack/target-normalization.ts";
+import {
+  normalizeSlackSurfaceTarget,
+  resolveSlackAgentReplyTarget,
+} from "../src/channels/slack/target-normalization.ts";
 import type { LoadedConfig } from "../src/config/core/load-config.ts";
 import { clisbotConfigSchema } from "../src/config/core/schema.ts";
 import { renderDefaultConfigTemplate } from "../src/config/core/template.ts";
@@ -89,6 +92,26 @@ function createLoadedConfig(): LoadedConfig {
 }
 
 describe("Slack conversation target routing", () => {
+  test("renders direct message reply targets with the sender user id", () => {
+    expect(
+      resolveSlackAgentReplyTarget({
+        conversationKind: "dm",
+        senderId: "U123",
+        channelId: "D123",
+      }),
+    ).toBe("user:U123");
+  });
+
+  test("keeps channel reply targets keyed by channel id", () => {
+    expect(
+      resolveSlackAgentReplyTarget({
+        conversationKind: "channel",
+        senderId: "U123",
+        channelId: "C123",
+      }),
+    ).toBe("channel:C123");
+  });
+
   test("isolates direct messages by peer by default", () => {
     const target = resolveSlackConversationTarget({
       loadedConfig: createLoadedConfig(),

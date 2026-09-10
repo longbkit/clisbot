@@ -21,6 +21,15 @@ describe("slack message helpers", () => {
     ).toBeNull();
   });
 
+  test("allows file_share events through subtype skip detection", () => {
+    expect(
+      getSlackEventSkipReason({
+        subtype: "file_share",
+        user: "U123",
+      }),
+    ).toBeNull();
+  });
+
   test("normalizes message_replied events into the nested reply message", () => {
     expect(
       normalizeSlackMessageEvent({
