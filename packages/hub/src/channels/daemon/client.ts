@@ -30,6 +30,11 @@ export interface ChannelDaemonClientOptions {
    * The supervisor defaults this from the `PASEO_PASSWORD` env var. */
   password?: string;
   clientId?: string;
+  /** Mint the managed-access `accessTicket` for this account's `hello`, called
+   * per (re)connect. Returns `undefined` when the daemon is not in `external`
+   * mode (trusted session, as today). Built by
+   * `createChannelAccessTicketResolver`; absent → never ticketed. */
+  resolveAccessTicket?: () => Promise<string | undefined>;
   rpcTimeoutMs?: number;
   /** Agent stream frames (`agent_stream`): one event per attached agent. */
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
@@ -100,6 +105,9 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
     url: discovery.url,
     ...(options.password !== undefined ? { password: options.password } : {}),
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
+    ...(options.resolveAccessTicket !== undefined
+      ? { resolveAccessTicket: options.resolveAccessTicket }
+      : {}),
     ...(options.rpcTimeoutMs !== undefined ? { rpcTimeoutMs: options.rpcTimeoutMs } : {}),
     ...(options.onStream !== undefined ? { onStream: options.onStream } : {}),
     ...(options.onAgentUpdate !== undefined

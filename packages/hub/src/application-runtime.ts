@@ -115,6 +115,7 @@ async function createOwnedApplicationRuntime(
   const channelSupervisor = await createChannelSupervisorAtComposition(
     options,
     accessStore,
+    accessTickets,
     (input) => {
       if (dispatchChannelWorkflow === undefined) {
         return Promise.reject(new Error("channel workflow dispatcher is not started"));
@@ -578,6 +579,7 @@ function createManagementApi(
 async function createChannelSupervisorAtComposition(
   options: ApplicationCompositionOptions,
   access: AccessStore | null,
+  accessTickets: AccessTicketService | null,
   dispatchWorkflow: import("./channels/plane/types.js").ChannelPlaneDeps["dispatchWorkflow"],
   cancelWorkflowRuns: NonNullable<
     import("./channels/plane/types.js").ChannelPlaneDeps["cancelWorkflowRuns"]
@@ -597,6 +599,14 @@ async function createChannelSupervisorAtComposition(
   const { database, databaseRuntime, hubDataDir } = options;
   try {
     const factory = await import("./channels/supervisor/index.js");
+    // Phase-1 channel admission (docs/audits/2026-09-10): the composition root
+    // owns the access/ticket wiring; the supervisor only supplies each account's
+    // daemon reference + stable clientId. Absent when managed access is unwired
+    // (no tickets) — the trusted (unticketed) session then admits as today.
+    const buildDaemonAccessTicketResolver =
+      access !== null && accessTickets !== null
+        ? await createChannelDaemonAccessTicketFactory(database, access, accessTickets)
+        : undefined;
     return factory.createChannelSupervisor({
       database,
       databaseRuntime,
@@ -674,6 +684,7 @@ async function createChannelSupervisorAtComposition(
       ...(options.claimSlackInbound === undefined
         ? {}
         : { claimSlackInbound: options.claimSlackInbound }),
+      ...(buildDaemonAccessTicketResolver === undefined ? {} : { buildDaemonAccessTicketResolver }),
     });
   } catch (error) {
     reportFailure(error, {
@@ -682,6 +693,51 @@ async function createChannelSupervisorAtComposition(
     });
     return null;
   }
+}
+
+/**
+ * The per-account access-ticket factory (docs/audits/2026-09-10). Resolves the
+ * account's route daemon (reference → active daemon record, UUID-else-slug like
+ * `resolveChannelAgentAccess`), mints under the org owner membership when that
+ * daemon runs `external` mode, and returns undefined (no ticket) for `off`.
+ */
+async function createChannelDaemonAccessTicketFactory(
+  database: Database,
+  access: AccessStore,
+  accessTickets: AccessTicketService,
+): Promise<
+  (
+    target: import("./channels/daemon/access-ticket.js").ChannelAccessTicketTarget,
+  ) => () => Promise<string | undefined>
+> {
+  const { createChannelAccessTicketResolver } = await import("./channels/daemon/access-ticket.js");
+  const isUuid = (value: string): boolean =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
+  const deps = {
+    resolveDaemon: async ({
+      organizationId,
+      daemonReference,
+    }: {
+      organizationId: string;
+      daemonReference: string;
+    }) => {
+      const record = isUuid(daemonReference)
+        ? await database.findDaemonForOrganization(organizationId, daemonReference)
+        : await database.findDaemonBySlugForOrganization(organizationId, daemonReference);
+      return record === undefined || record.status !== "active"
+        ? undefined
+        : { id: record.id, managedAccessMode: record.managedAccessMode };
+    },
+    resolveOwner: (organizationId: string) => access.resolveOrganizationOwner(organizationId),
+    issueTicket: (input: {
+      organizationId: string;
+      daemonId: string;
+      userId: string;
+      membershipId: string;
+      clientId: string;
+    }) => accessTickets.issue(input),
+  };
+  return (target) => createChannelAccessTicketResolver(deps, target);
 }
 
 // COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint

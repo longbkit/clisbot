@@ -552,6 +552,27 @@ function handleKey(channel: string, accountId: string): string {
   return `${channel}:${accountId}`;
 }
 
+/** The daemon reference this account's agent routes target — the account's
+ * single loopback daemon in Phase 1 (docs/audits/2026-09-10). Used to mint the
+ * account's admission ticket under the right daemonId. Undefined for a
+ * workflow-only account (no daemon session to admit); a mis-specified
+ * environment is skipped (fail-closed), never thrown. */
+function accountDaemonReference(
+  account: CompiledChannelAccount,
+  resolveTarget: ChannelControlPlaneSnapshot["resolveAgentAccessTarget"],
+): string | undefined {
+  const targets = [...account.routes.map((route) => route.target), account.fallback.target];
+  for (const target of targets) {
+    if (target?.kind !== "agent") continue;
+    try {
+      return resolveTarget(target).daemonReference;
+    } catch {
+      // A non-daemon / mis-specified environment is not admissible; try the next.
+    }
+  }
+  return undefined;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -1325,6 +1346,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       const password = this.env["PASEO_PASSWORD"]?.trim();
       if (password !== undefined && password !== "") daemonOptions.password = password;
     }
+    this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
     const daemon = connectChannelDaemon(daemonOptions);
     handle.daemon = daemon;
     await plane.start(daemon, this.store);
@@ -1333,6 +1355,31 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     // start it only after the plane is ready to receive events.
     this.startInboundDrain(handle, loaded.hostRuntime);
     this.drive(handle, { account, cfg }, loaded.hostRuntime);
+  }
+
+  /**
+   * Phase-1 channel admission (docs/audits/2026-09-10): present a managed-access
+   * ticket so the account's socket is admitted when its daemon runs `external`
+   * mode. One stable clientId per account → one distinct lease; the resolver
+   * returns undefined (no ticket, trusted session as today) for an `off` daemon
+   * or an account with no daemon route.
+   */
+  private applyChannelAdmissionTicket(
+    daemonOptions: ChannelDaemonClientOptions,
+    handle: AccountHandle,
+    compiled: CompiledChannelAccount,
+    snapshot: ChannelControlPlaneSnapshot,
+  ): void {
+    if (this.options.buildDaemonAccessTicketResolver === undefined) return;
+    const daemonReference = accountDaemonReference(compiled, snapshot.resolveAgentAccessTarget);
+    if (daemonReference === undefined) return;
+    const clientId = handleKey(handle.channel, handle.accountId);
+    daemonOptions.clientId = clientId;
+    daemonOptions.resolveAccessTicket = this.options.buildDaemonAccessTicketResolver({
+      organizationId: snapshot.organizationId,
+      daemonReference,
+      clientId,
+    });
   }
 
   /**

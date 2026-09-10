@@ -1,4 +1,5 @@
 import type { ChannelPrivilegeDecision } from "../access/store.js";
+import { REQUIRED_PRIVILEGE_BY_OPERATION } from "@getpaseo/protocol/managed-access-privileges";
 // The channel execution plane facade (plan §4-S2): the thin object the loader
 // drives. It composes the three engines — bindings (thread + continuous
 // execution), relay (outbound + delivery ledger), approvals (prompt +
@@ -89,6 +90,13 @@ import type {
 } from "./plane/types.js";
 import { isSupportedChannel } from "./catalog.js";
 import { ChannelWorkflowRequestPayloadSchema } from "../triggers/channel/provider.js";
+
+/**
+ * How long a deferred orphan recovery waits for the daemon's first session after
+ * the account started without one. The socket reconnects on its own; this only
+ * bounds the one-time recovery wait (docs/audits/2026-09-10, external boot race).
+ */
+const DEFERRED_RECOVERY_WAIT_MS = 10 * 60_000;
 
 /**
  * The live location of one inbound marker: the native thread it sat in and
@@ -516,6 +524,8 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
           if (!isEnabled(deps.envFlag, deps.controlPlane, context.account)) return false;
           if (!(await mayUseChannel(context.message, context.account, context.route)).allowed)
             return false;
+          // A queued turn is delivered as send_agent_message_request; derive the
+          // required privilege from the shared overlap map by that wire RPC.
           return (
             (
               await deps.commandAccess?.authorizeChannelPrivilege(
@@ -524,7 +534,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
                   context.message,
                   context.account,
                   context.route,
-                  "agent.interact",
+                  REQUIRED_PRIVILEGE_BY_OPERATION.send_agent_message_request,
                 ),
               )
             )?.allowed === true
@@ -627,30 +637,54 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       // The S10 posture invariant, asserted at load (not mid-conversation):
       // every route — and every catch-all fallback — keeps approval-required.
       assertChannelPosture(deps.controlPlane.accounts);
-      await daemonConnection.waitForConnected();
-      // Orphan recovery: rebind a surviving agent instead of re-creating it,
-      // then re-attach the streams of the markers that re-bound so in-flight
-      // turns relay + prompt again.
-      const recovered = await bindings.recoverOrphans(deps.accountScope);
-      const bound = await channelStore.listBoundThreadBindings(
-        deps.organizationId,
-        deps.accountScope.channel,
-        deps.accountScope.accountId,
-      );
-      for (const marker of bound) {
-        await reattachBinding(
-          channelStore,
-          marker.accountId,
-          marker.externalConversationId,
-          marker.externalThreadId,
+      // Orphan recovery needs the daemon session: rebind a surviving agent
+      // instead of re-creating it, then re-attach the streams of the markers
+      // that re-bound so in-flight turns relay + prompt again.
+      const recoverOrphans = async (): Promise<{ rebound: number; leftPending: number }> => {
+        const recovered = await bindingsEngine().recoverOrphans(deps.accountScope);
+        const bound = await channelStore.listBoundThreadBindings(
+          deps.organizationId,
+          deps.accountScope.channel,
+          deps.accountScope.accountId,
         );
+        for (const marker of bound) {
+          await reattachBinding(
+            channelStore,
+            marker.accountId,
+            marker.externalConversationId,
+            marker.externalThreadId,
+          );
+        }
+        if (bound.length > 0) await resubscribe();
+        logger.info?.("channel plane started", {
+          rebound: recovered.rebound,
+          leftPending: recovered.leftPending,
+        });
+        return recovered;
+      };
+      try {
+        await daemonConnection.waitForConnected();
+      } catch (error) {
+        // Only the initial connect timed out — the daemon session is not up yet.
+        // In managed-access `external` mode the Hub relationship that consumes the
+        // admission ticket can lag a cold Hub boot past this window; the socket
+        // keeps reconnecting on its own, so defer orphan recovery to the first
+        // connect instead of failing the account (which would tear the
+        // reconnecting socket down with no retry — docs/audits/2026-09-10,
+        // external boot race). `off` mode is unaffected: the loopback session is
+        // immediate, so this path is not taken. Orphan-recovery errors are NOT
+        // caught here — they propagate from the inline path below exactly as
+        // before this change.
+        logger.warn("channel plane: daemon session not ready at start; deferring orphan recovery", {
+          detail: error instanceof Error ? error.message : String(error),
+        });
+        void daemonConnection
+          .waitForConnected(DEFERRED_RECOVERY_WAIT_MS)
+          .then(() => recoverOrphans())
+          .catch(() => undefined);
+        return { rebound: 0, leftPending: 0 };
       }
-      if (bound.length > 0) await resubscribe();
-      logger.info?.("channel plane started", {
-        rebound: recovered.rebound,
-        leftPending: recovered.leftPending,
-      });
-      return recovered;
+      return await recoverOrphans();
     },
 
     attachStreamFor(binding, route, account, trigger) {

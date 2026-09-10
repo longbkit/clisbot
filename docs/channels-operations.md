@@ -43,6 +43,29 @@ entries. Existing unmigrated homes remain readable through the legacy-layout det
 
 **Never `source` the repo `.env` for a Hub process.** `SLACK_APP_TOKEN` without `SLACK_TRANSPORT=socket` throws at boot. The `.env` is for test drivers, not for the Hub.
 
+### Managed-access `external` mode
+
+The channel plane admits against a daemon in managed-access `external` mode by minting an
+`accessTicket` per account (owner membership → unrestricted lease); see
+[2026-09-10 channel-vs-app-admission](audits/2026-09-10-channel-vs-app-admission.md). To exercise it:
+
+- **Flip the daemon** with a `set_daemon_config` over a trusted `/ws` session:
+  `{ config: { managedAccess: { mode: "external" } } }`. It hot-applies and persists to
+  `config.json` `daemon.managedAccess.mode`. In `off` an unticketed trusted client is admitted;
+  in `external` it is closed with `4401 Managed access ticket required` (the check the channel
+  client's minted ticket passes).
+- **To flip back to `off`** you need an admitted path: either a ticketed client, or — since the
+  daemon listens only on TCP (no unix-socket `local_ipc` exempt leg) — set
+  `daemon.managedAccess.mode: "off"` in `config.json` and relaunch the daemon
+  (`~/.clisbot-dev/start-daemon.sh`, the supervised `paseo daemon start` on 6867).
+- **Boot ordering caveat.** Bring the Hub up in `off`, let it settle (`channel daemon connected`
+  for every account, daemon↔Hub relationship established), **then** flip to `external` — the
+  accounts reconnect and admit with fresh tickets. A _cold Hub boot while the daemon is already
+  `external`_ races the relationship that consumes tickets; `startAccount`'s 15 s connect gate
+  can expire first and tear the account down with no retry. Lease refresh and socket reconnect
+  are otherwise automatic. Shorten the lease with `PASEO_HUB_MANAGED_ACCESS_LEASE_DURATION=1m`
+  (min `1m`) to watch a refresh without a 15-minute wait.
+
 ### Writing a config revision
 
 Live channel configuration lives in the Hub DB's active revision, not on disk. `.hub-revision-write.mjs` is the durable template and `.hub-revision-write12.mjs` is the current-generation copy of it, re-targeted at the organization-scoped store. Keep both; the template is what the next scenario is derived from.

@@ -22,6 +22,7 @@ import {
   requiredPermissionForInbound,
   requiredPermissionForOutbound,
 } from "../authorization/operation-permissions.js";
+import { requiredPrivilegeForOperation } from "@getpaseo/protocol/managed-access-privileges";
 import type { ProjectPrivilege, ResolvedAgentConfigurationGrant } from "./types.js";
 
 interface AgentStorageReader {
@@ -33,37 +34,6 @@ interface AgentStorageReader {
 interface AgentConfigurationSafetyResolver {
   isUnattendedConfiguration(config: AgentSessionConfig): Promise<boolean>;
 }
-
-const TERMINAL_MESSAGES = new Set<SessionInboundMessage["type"]>([
-  "list_terminals_request",
-  "subscribe_terminals_request",
-  "unsubscribe_terminals_request",
-  "create_terminal_request",
-  "subscribe_terminal_request",
-  "unsubscribe_terminal_request",
-  "terminal_input",
-  "kill_terminal_request",
-  "capture_terminal_request",
-  "terminal.rename.request",
-]);
-
-const AGENT_INTERACTION_MESSAGES = new Set<SessionInboundMessage["type"]>([
-  "send_agent_message_request",
-  "cancel_agent_request",
-  "refresh_agent_request",
-  "delete_agent_request",
-  "archive_agent_request",
-  "update_agent_request",
-  "clear_agent_attention",
-  "agent.detach.request",
-  "agent.rewind.request",
-  "set_agent_mode_request",
-  "set_agent_model_request",
-  "set_agent_thinking_request",
-  "set_agent_feature_request",
-  "agent.config.apply.request",
-  "set_voice_mode",
-]);
 
 const LIST_OUTBOUND_MESSAGES = new Set<SessionOutboundMessage["type"]>([
   "fetch_agents_response",
@@ -649,9 +619,11 @@ export class ManagedResourceAuthorizer {
     const workspace = await this.allowsWorkspaceInbound(message);
     if (workspace !== undefined) return workspace;
 
-    const privilege: ProjectPrivilege = AGENT_INTERACTION_MESSAGES.has(message.type)
-      ? "agent.interact"
-      : "project.use";
+    // The shared overlap map returns the product privilege for known agent
+    // interaction ops; anything else falls back to plain project.use. Agent
+    // creation and terminal ops never reach here — earlier branches settle them.
+    const privilege: ProjectPrivilege =
+      requiredPrivilegeForOperation(message.type) ?? "project.use";
     const checks: Array<Promise<boolean> | boolean> = [];
     for (const agentId of agentIdsOf(message)) {
       checks.push(this.allowsAgent(agentId, privilege));
@@ -787,7 +759,9 @@ export class ManagedResourceAuthorizer {
       );
       return agentsAllowed.every(Boolean) && terminalsAllowed.every(Boolean);
     }
-    if (TERMINAL_MESSAGES.has(message.type)) return this.allowsTerminalInbound(message);
+    if (requiredPrivilegeForOperation(message.type) === "terminal.use") {
+      return this.allowsTerminalInbound(message);
+    }
     if (message.type === "client_heartbeat") {
       if (
         message.focusedAgentId !== null &&

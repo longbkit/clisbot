@@ -20,6 +20,8 @@ class FakeDaemon {
   readonly server: Server;
   readonly wss: WebSocketServer;
   readonly messages: RecordedMessage[] = [];
+  /** Every `hello` frame received, in order (one per (re)connect). */
+  readonly hellos: RecordedMessage[] = [];
   clients: Set<import("ws").WebSocket>;
   port = 0;
 
@@ -60,9 +62,15 @@ class FakeDaemon {
     }
   }
 
+  /** Force every live client to reconnect (drop the socket). */
+  dropClients(): void {
+    for (const client of this.clients) client.terminate();
+  }
+
   private onMessage(client: import("ws").WebSocket, raw: string): void {
     const frame = JSON.parse(raw) as { type: string; [key: string]: unknown };
     if (frame.type === "hello") {
+      this.hellos.push(frame as RecordedMessage);
       client.send(
         JSON.stringify({
           type: "session",
@@ -627,6 +635,65 @@ describe("channel trusted-client daemon connection", () => {
     assert.deepEqual(updates[0]?.featureValues, {});
     assert.equal(updates[0]?.contextWindowUsedTokens, 99);
     watching.stop();
+  });
+
+  describe("managed-access admission ticket (hello)", () => {
+    it("sends the minted accessTicket in hello", async () => {
+      const admit = new FakeDaemon();
+      await admit.listen(0);
+      const ticketed = connectChannelDaemon({
+        host: `127.0.0.1:${admit.port}`,
+        clientId: "slack:acct",
+        resolveAccessTicket: async () => "paseo_dat_ticket",
+      });
+      try {
+        await ticketed.waitForConnected(5000);
+        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_ticket");
+        assert.equal(admit.hellos.at(-1)?.["clientId"], "slack:acct");
+      } finally {
+        ticketed.stop();
+        await admit.close();
+      }
+    });
+
+    it("omits accessTicket when the resolver returns undefined (off daemon)", async () => {
+      const admit = new FakeDaemon();
+      await admit.listen(0);
+      const untouched = connectChannelDaemon({
+        host: `127.0.0.1:${admit.port}`,
+        resolveAccessTicket: async () => undefined,
+      });
+      try {
+        await untouched.waitForConnected(5000);
+        assert.equal("accessTicket" in (admit.hellos.at(-1) ?? {}), false);
+      } finally {
+        untouched.stop();
+        await admit.close();
+      }
+    });
+
+    it("re-invokes the resolver on reconnect with a fresh ticket and the same clientId", async () => {
+      const admit = new FakeDaemon();
+      await admit.listen(0);
+      let n = 0;
+      const reconnecting = connectChannelDaemon({
+        host: `127.0.0.1:${admit.port}`,
+        clientId: "slack:acct",
+        resolveAccessTicket: async () => `paseo_dat_${n++}`,
+      });
+      try {
+        await reconnecting.waitForConnected(5000);
+        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_0");
+        admit.dropClients();
+        await waitForCount(admit.hellos, 2);
+        await reconnecting.waitForConnected(5000);
+        assert.equal(admit.hellos.at(-1)?.["accessTicket"], "paseo_dat_1");
+        assert.equal(admit.hellos.at(-1)?.["clientId"], "slack:acct");
+      } finally {
+        reconnecting.stop();
+        await admit.close();
+      }
+    });
   });
 
   describe("stream forwarding (agent_stream / agent_update)", () => {

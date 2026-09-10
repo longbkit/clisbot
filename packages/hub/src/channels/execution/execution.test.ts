@@ -272,6 +272,7 @@ function makeHarness(
     channelRevisionId?: string;
     commandAccess?: ChannelPlaneDeps["commandAccess"];
     readWorkflowRuns?: ChannelPlaneDeps["readWorkflowRuns"];
+    logger?: PlaneLogger;
   } = {},
 ): FacadeHarness {
   const progress: EffectiveDefaults["sync"]["progress"] = {
@@ -345,7 +346,7 @@ function makeHarness(
           consumeChannelIdentityChallenge: opts.consumeChannelIdentityChallenge,
         }),
     clock,
-    logger: SILENT,
+    logger: opts.logger ?? SILENT,
     ...(opts.processingTtlMs !== undefined ? { processingTtlMs: opts.processingTtlMs } : {}),
     typing: async (params) => {
       order.push(`typing:${params.action}`);
@@ -484,6 +485,53 @@ afterAll(async () => {
 });
 
 // --- Tests -----------------------------------------------------------------
+
+describe("plane start (daemon session readiness)", () => {
+  it("defers orphan recovery instead of failing the account when the daemon session is not ready", async () => {
+    // External boot race (docs/audits/2026-09-10): the admission ticket's Hub
+    // relationship can lag a cold boot past the start-time connect window. The
+    // account must not be torn down — the socket keeps reconnecting and recovery
+    // runs on the first connect.
+    const started: string[] = [];
+    const logger: PlaneLogger = {
+      info: (msg: string) => started.push(msg),
+      warn: () => undefined,
+    };
+    const harness = makeHarness({ logger });
+    let connectCalls = 0;
+    let releaseSecond: (() => void) | undefined;
+    const gated: DaemonConnection = {
+      ...harness.fake.daemon,
+      waitForConnected: () => {
+        connectCalls += 1;
+        if (connectCalls === 1) {
+          return Promise.reject(new Error("timed out waiting for daemon connection after 15000ms"));
+        }
+        return new Promise<void>((resolve) => {
+          releaseSecond = resolve;
+        });
+      },
+    };
+    // Start resolves (account not torn down) even though the first connect rejected.
+    const result = await harness.plane.start(gated, store);
+    assert.deepEqual(result, { rebound: 0, leftPending: 0 });
+    assert.equal(connectCalls, 2, "start must register a deferred wait for the next connect");
+    assert.equal(
+      started.includes("channel plane started"),
+      false,
+      "orphan recovery must not complete before the daemon connects",
+    );
+    // The daemon's first connect fires the deferred recovery.
+    releaseSecond?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      started.includes("channel plane started"),
+      true,
+      "orphan recovery runs once the daemon session is established",
+    );
+  });
+});
 
 describe("workflow route", () => {
   it("uses text only for new selection and keeps an existing direct Agent binding", async () => {

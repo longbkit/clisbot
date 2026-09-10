@@ -1046,8 +1046,12 @@ For managed external sessions, a Project must be registered before it can be use
 loopback/`off` flow may continue opening an arbitrary directory and thereby create/register a
 Project as Paseo does today.
 
-Hub-owned Channel and Automation execution uses the separate `hub.execute` service principal. It
-still cannot trust an authored `{ projectId, cwd }` pair: before Agent creation,
+Hub-owned Automation execution — and **Channel routes that hand off to a Workflow** — use the
+separate `hub.execute` service principal. (A Channel **continuous session** does not: it drives the
+daemon over the trusted-client/managed path and so rides a workspace-scoped lease, not `hub.execute`
+— see §12.1 and the plain-language split in
+[2026-09-10 Channel plane admission](2026-09-10-channel-vs-app-admission.md).) The `hub.execute`
+path still cannot trust an authored `{ projectId, cwd }` pair: before Agent creation,
 `DaemonExecutions` asks the daemon-owned registry to resolve the `cwd` or worktree source and
 requires the result to equal `projectId`. Unknown or mismatched placement fails before provider or
 filesystem side effects, including for organization owners and Daemon Administrators.
@@ -1392,7 +1396,13 @@ file privileges, signed offline grants, multi-target Channel fanout/idempotency,
 conversation discovery, and richer access-event reporting. None is required for the owner or the
 fixed public/customer Channel flows documented here.
 
-### 12.1 Channel supervisor admission (open gap)
+### 12.1 Channel supervisor admission (Phase 1 closed 2026-09-10)
+
+> **Closed (Phase 1).** The supervisor now mints an `accessTicket` per channel account (owner
+> membership → unrestricted lease) so the channel plane is admitted in `external` mode; see the
+> "Status" section of [2026-09-10 Channel vs Paseo app](2026-09-10-channel-vs-app-admission.md).
+> Gate-2 narrowing (per-project lease) remains Phase 2. The text below is the original gap
+> analysis, kept for history.
 
 > Plain-language map of the two authorization paths, the Guest subject, and `/link`:
 > [2026-09-10 Channel vs Paseo app](2026-09-10-channel-vs-app-admission.md).

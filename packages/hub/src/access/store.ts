@@ -142,6 +142,9 @@ export interface ResolvedDaemonAccess {
   projects: ResolvedProjectAccess[];
 }
 
+/** The subject whose assignments an access resolution reads: a linked Member or the Guest group. */
+type AccessSubject = { kind: "member"; membershipId: string; userId: string } | { kind: "guest" };
+
 /** One fixed Agent execution that a Hub configuration author wants to delegate. */
 export interface DelegatedAgentExecution {
   daemonReference: string;
@@ -993,19 +996,14 @@ export class AccessStore {
         ({ resourceKind, resourceId }) => resourceKind === "project" && resourceId === project.id,
       ),
     ];
-    const privileges = [...privilegeUnion(applicable)];
-    return privileges.includes("project.use")
-      ? {
-          unrestricted: false,
-          privileges,
-          agentConfigurations: applicable.flatMap(
-            ({ constraints }) => constraints.agentConfigurations ?? [],
-          ),
-        }
+    // The channel path keeps the full privilege union (no PROJECT_PRIVILEGES filter).
+    const { privileges, agentConfigurations } = accumulateProjectGrants(applicable);
+    return privileges.has("project.use")
+      ? { unrestricted: false, privileges: [...privileges], agentConfigurations }
       : denied;
   }
 
-  private async channelSubjectAssignments(
+  private channelSubjectAssignments(
     input: { organizationId: string },
     identity?: {
       membershipId: string;
@@ -1013,21 +1011,39 @@ export class AccessStore {
       role: string;
     },
   ): Promise<AccessAssignmentRecord[]> {
-    const teams =
+    return this.subjectAssignments(
+      input.organizationId,
       identity === undefined
+        ? { kind: "guest" }
+        : { kind: "member", membershipId: identity.membershipId, userId: identity.userId },
+    );
+  }
+
+  /**
+   * The one subject → assignments resolver for both the channel sender path
+   * (member or Guest) and the app membership path. Reproduces the member-OR-team
+   * filter (and the Guest subject) and maps rows to assignment records.
+   */
+  private async subjectAssignments(
+    organizationId: string,
+    subject: AccessSubject,
+    database: DrizzleHandle = this.database,
+  ): Promise<AccessAssignmentRecord[]> {
+    const teams =
+      subject.kind === "guest"
         ? []
-        : await this.database
+        : await database
             .select({ id: schema.teams.id })
             .from(schema.teamMembers)
             .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
             .where(
               and(
-                eq(schema.teamMembers.userId, identity.userId),
-                eq(schema.teams.organizationId, input.organizationId),
+                eq(schema.teamMembers.userId, subject.userId),
+                eq(schema.teams.organizationId, organizationId),
               ),
             );
-    const subject =
-      identity === undefined
+    const filter =
+      subject.kind === "guest"
         ? and(
             eq(schema.accessAssignments.subjectKind, "guest"),
             eq(schema.accessAssignments.subjectId, GUEST_ACCESS_SUBJECT_ID),
@@ -1035,7 +1051,7 @@ export class AccessStore {
         : or(
             and(
               eq(schema.accessAssignments.subjectKind, "member"),
-              eq(schema.accessAssignments.subjectId, identity.membershipId),
+              eq(schema.accessAssignments.subjectId, subject.membershipId),
             ),
             ...(teams.length === 0
               ? []
@@ -1049,10 +1065,10 @@ export class AccessStore {
                   ),
                 ]),
           );
-    const rows = await this.database
+    const rows = await database
       .select()
       .from(schema.accessAssignments)
-      .where(and(eq(schema.accessAssignments.organizationId, input.organizationId), subject));
+      .where(and(eq(schema.accessAssignments.organizationId, organizationId), filter));
     return rows.map(toAssignment);
   }
 
@@ -1092,6 +1108,22 @@ export class AccessStore {
       )
       .limit(1);
     return identity;
+  }
+
+  /** The organization's owner membership — the principal the channel plane's
+   * daemon lease is minted under (Phase 1: owner → unrestricted admission,
+   * docs/audits/2026-09-10). Undefined when the org has no owner row. */
+  async resolveOrganizationOwner(
+    organizationId: string,
+  ): Promise<{ membershipId: string; userId: string } | undefined> {
+    const [owner] = await this.database
+      .select({ membershipId: schema.members.id, userId: schema.members.userId })
+      .from(schema.members)
+      .where(
+        and(eq(schema.members.organizationId, organizationId), eq(schema.members.role, "owner")),
+      )
+      .limit(1);
+    return owner;
   }
 
   /** Atomically applies a daemon-owned catalog snapshot while preserving stable Hub Project ids. */
@@ -1211,36 +1243,11 @@ export class AccessStore {
       };
     }
 
-    const teamRows = await database
-      .select({ id: schema.teams.id })
-      .from(schema.teamMembers)
-      .innerJoin(schema.teams, eq(schema.teamMembers.teamId, schema.teams.id))
-      .where(
-        and(
-          eq(schema.teamMembers.userId, input.userId),
-          eq(schema.teams.organizationId, input.organizationId),
-        ),
-      );
-    const teamIds = teamRows.map(({ id }) => id);
-    const subject = or(
-      and(
-        eq(schema.accessAssignments.subjectKind, "member"),
-        eq(schema.accessAssignments.subjectId, membership.id),
-      ),
-      ...(teamIds.length === 0
-        ? []
-        : [
-            and(
-              eq(schema.accessAssignments.subjectKind, "team"),
-              inArray(schema.accessAssignments.subjectId, teamIds),
-            ),
-          ]),
+    const assignments = await this.subjectAssignments(
+      input.organizationId,
+      { kind: "member", membershipId: membership.id, userId: input.userId },
+      database,
     );
-    const assignmentRows = await database
-      .select()
-      .from(schema.accessAssignments)
-      .where(and(eq(schema.accessAssignments.organizationId, input.organizationId), subject));
-    const assignments = assignmentRows.map(toAssignment);
     const organizationGrants = assignments.filter(
       ({ resourceKind, resourceId }) =>
         resourceKind === "organization" && resourceId === input.organizationId,
@@ -1268,17 +1275,15 @@ export class AccessStore {
         ({ resourceKind, resourceId }) => resourceKind === "project" && resourceId === project.id,
       );
       const applicable = [...inherited, ...exact];
-      const privileges = [...privilegeUnion(applicable)].filter((entry) =>
-        PROJECT_PRIVILEGES.has(entry),
-      );
+      const grants = accumulateProjectGrants(applicable);
+      // The app path narrows to PROJECT_PRIVILEGES before shaping the session.
+      const privileges = [...grants.privileges].filter((entry) => PROJECT_PRIVILEGES.has(entry));
       if (!privileges.includes("project.use")) return [];
       return [
         {
           projectId: project.externalProjectId,
           privileges,
-          agentConfigurations: applicable.flatMap(
-            ({ constraints }) => constraints.agentConfigurations ?? [],
-          ),
+          agentConfigurations: grants.agentConfigurations,
         },
       ];
     });
@@ -1607,6 +1612,19 @@ function channelIdentityChallengeVerifier(value: string): string {
 
 function privilegeUnion(assignments: readonly AccessAssignmentRecord[]): Set<AccessPrivilege> {
   return new Set(assignments.flatMap(({ privileges }) => privileges));
+}
+
+/** Unions the privileges and agent-configuration grants that apply to one Project. */
+function accumulateProjectGrants(applicable: AccessAssignmentRecord[]): {
+  privileges: Set<AccessPrivilege>;
+  agentConfigurations: AgentConfigurationGrant[];
+} {
+  return {
+    privileges: privilegeUnion(applicable),
+    agentConfigurations: applicable.flatMap(
+      ({ constraints }) => constraints.agentConfigurations ?? [],
+    ),
+  };
 }
 
 function agentConfigurationCovers(

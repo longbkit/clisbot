@@ -22,6 +22,7 @@ import type {
   SupportedChannelName,
 } from "../plane/types.js";
 import type { ChannelDaemonClientOptions } from "../daemon/client.js";
+import type { ChannelAccessTicketTarget } from "../daemon/access-ticket.js";
 import type { CompiledChannelAccount } from "../config/compile.js";
 import type { QrLoginResult, QrLoginVerb } from "./qr-login.js";
 import type { ChannelReplyCapabilityService } from "../channel-reply-capabilities.js";
@@ -90,6 +91,15 @@ export interface ChannelSupervisorOptions {
   dataDir: string;
   /** Pass-through for `connectChannelDaemon` (loopback host/home or relay url). */
   daemon?: ChannelDaemonClientOptions;
+  /** Build the per-account `resolveAccessTicket` that admits the account's
+   * trusted-client socket into a managed-access `external` daemon (Phase 1,
+   * docs/audits/2026-09-10). The composition root owns the access/ticket wiring;
+   * the supervisor only supplies the account's daemon reference + stable
+   * clientId. Absent (or the account has no daemon route) → no ticket, the
+   * trusted session admits as today. */
+  buildDaemonAccessTicketResolver?: (
+    target: ChannelAccessTicketTarget,
+  ) => () => Promise<string | undefined>;
   /** The channel-pins path; defaults to the packaged `channel-pins.json`. */
   pinsPath?: string;
   logger?: PlaneLogger;

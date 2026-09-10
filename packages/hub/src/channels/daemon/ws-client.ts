@@ -31,6 +31,13 @@ export interface TrustedDaemonClientOptions {
    * `paseo.bearer.<password>` WS subprotocol. The daemon compares it against
    * its hash; loopback reachability stays the trust boundary. */
   password?: string;
+  /** Mint an `accessTicket` for the `hello`, exactly like the app/CLI daemon
+   * client (`resolveAccessTicket`). Called on every (re)connect so each
+   * admission attempt carries a fresh single-use ticket. Returns `undefined`
+   * when the target daemon is not in managed-access `external` mode — the
+   * trusted (unticketed) session then admits as before. Absent → never
+   * ticketed. */
+  resolveAccessTicket?: () => Promise<string | undefined>;
   rpcTimeoutMs?: number;
   onStateChange?: (state: "connected" | "disconnected") => void;
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
@@ -54,6 +61,11 @@ interface Frame {
  */
 export class TrustedDaemonClient extends EventEmitter {
   private readonly options: TrustedDaemonClientOptions;
+  /** Fixed for this client's lifetime so every reconnect (and its minted
+   * ticket) reuses one `clientId` — the daemon lease is keyed by it, so a
+   * per-hello random id would strand the prior lease and split multi-account
+   * admission. */
+  private readonly clientId: string;
   private readonly pending = new Map<string, RpcCall>();
   private socket: WebSocket | null = null;
   private helloTimer: NodeJS.Timeout | null = null;
@@ -66,6 +78,7 @@ export class TrustedDaemonClient extends EventEmitter {
   constructor(options: TrustedDaemonClientOptions) {
     super();
     this.options = options;
+    this.clientId = options.clientId ?? randomUUID();
     this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
   }
 
@@ -188,20 +201,45 @@ export class TrustedDaemonClient extends EventEmitter {
 
   private onOpen(socket: WebSocket): void {
     this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
-    socket.send(
-      JSON.stringify({
-        type: "hello",
-        clientId: this.options.clientId ?? randomUUID(),
-        clientType: "cli",
-        protocolVersion: WS_PROTOCOL_VERSION,
-        capabilities: { selective_agent_timeline: true, provider_subagents: true },
-      }),
-    );
+    // Arm the hello watchdog before minting the ticket: a hung resolver, like a
+    // daemon that never answers the hello, must still force a reconnect.
     this.helloTimer = setTimeout(() => {
       // The daemon closes after 15s without a valid hello; force a reconnect.
       socket.terminate();
     }, HELLO_TIMEOUT_MS + 5_000);
     this.helloTimer.unref?.();
+    void this.sendHello(socket);
+  }
+
+  private async sendHello(socket: WebSocket): Promise<void> {
+    let accessTicket: string | undefined;
+    try {
+      accessTicket = this.options.resolveAccessTicket
+        ? await this.options.resolveAccessTicket()
+        : undefined;
+    } catch {
+      // A failed mint (e.g. the daemon is `external` but the owner grant was
+      // revoked between reconnects) must not wedge the socket: terminate so the
+      // reconnect loop retries with backoff.
+      socket.terminate();
+      return;
+    }
+    // The socket may have closed while the ticket was minting.
+    if (this.socket !== socket || socket.readyState !== WebSocket.OPEN) return;
+    if (accessTicket !== undefined && accessTicket.length === 0) {
+      socket.terminate();
+      return;
+    }
+    socket.send(
+      JSON.stringify({
+        type: "hello",
+        clientId: this.clientId,
+        clientType: "cli",
+        protocolVersion: WS_PROTOCOL_VERSION,
+        capabilities: { selective_agent_timeline: true, provider_subagents: true },
+        ...(accessTicket === undefined ? {} : { accessTicket }),
+      }),
+    );
   }
 
   private onMessage(raw: string): void {
