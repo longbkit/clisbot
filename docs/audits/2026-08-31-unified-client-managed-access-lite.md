@@ -1392,6 +1392,66 @@ file privileges, signed offline grants, multi-target Channel fanout/idempotency,
 conversation discovery, and richer access-event reporting. None is required for the owner or the
 fixed public/customer Channel flows documented here.
 
+### 12.1 Channel supervisor admission (open gap)
+
+This design covers the interactive app's host session. It does not cover the channel supervisor's
+own daemon connection, which is a separate, unresolved gap.
+
+Two authority axes must not be conflated. A channel **sender's** Member authority is resolved and
+enforced at the Hub, before any daemon RPC: the plane's `senderIdentity` (e.g. `"slack:U123"`) maps
+through `channelIdentities` to a Member (or the Guest subject) and is checked against Access
+assignments — `channel.use` baseline, then `agent.interact` / `agent.create` / `approval.*` /
+Agent-configuration grant, scoped to the `channel_account` resource, the conversation, and the
+target daemon/Project (`packages/hub/src/access/store.ts:891-924`; `permissions.md` §"Channel
+command access"). The daemon never sees the sender. The supervisor's daemon **lease** is the other
+axis: one service principal per channel account, shared by every sender and conversation on that
+account. It is the account's outer ceiling, not where per-sender Member authority is decided.
+Per-member authority cannot move into the lease because one account connection cannot distinguish
+its senders; the two axes share a privilege vocabulary but evaluate different subjects at different
+layers.
+
+The supervisor opens one trusted-client WebSocket **per channel account**
+(`packages/hub/src/channels/supervisor/index.ts:7-9`; connect at `index.ts:1328`), authenticated
+only by the optional daemon password and loopback trust
+(`packages/hub/src/channels/daemon/ws-client.ts:189-199`). Its `hello` carries no `accessTicket`,
+and `ChannelDaemonClientOptions` has no field to add one
+(`packages/hub/src/channels/daemon/client.ts:22-44`). In `external` mode the daemon treats every
+non-`hub`, non-`local_ipc`, non-plugin client as a managed subject — loopback TCP included
+(`packages/server/src/server/websocket-server.ts:1745-1750`) — so the connection is rejected at the
+hello gate (`websocket-server.ts:1759-1763`). The channel plane therefore works only while the
+target daemon is `off`. Commit `7b4e60919` fixes URL targeting for a remote daemon pod; it does not
+make the session admissible.
+
+Kept for now: one connection per account. The failure-isolation reason is sound at small scale, but
+the account is the wrong axis for admission — the natural unit is `(daemon, principal, resolved
+grants)`. Accounts routing to the same project/grants on one daemon produce redundant leases, and
+the "a shared daemon connection would die with the first plane stop" constraint (`index.ts:9`) is
+lifecycle coupling, not a demux barrier (`agent_stream` already carries `agentId`). Before raising
+account count or going multi-daemon/multi-tenant, move to one managed session per admission scope
+with a ref-counted, lifecycle-decoupled socket, and record the change here.
+
+When admission is built, the supervisor's lease must carry more than `daemon.connect`. These are
+three distinct layers, combined with `AND` by two different enforcers:
+
+1. **Semantic permissions** (`ManagedAccessAdmission.permissions`, gated by `SessionAuthorization`):
+   `workspace.read` + `workspace.write`. Create, message, and terminal input all map to
+   `workspace.write` (`packages/server/src/server/authorization/operation-permissions.ts:59,61,161,177`).
+2. **Per-project product privileges** (`ManagedAccessAdmission.projects[pid].privileges`, gated by
+   `ManagedResourceAuthorizer`): `project.use`, `agent.create`, `agent.interact`, `terminal.use`,
+   and the needed `approval.*`, for each project a route targets
+   (`packages/server/src/server/managed-access/types.ts:6-43`; enforced in
+   `managed-access/resource-authorizer.ts`). `resourceMode` must be `"projects"`; when unrestricted
+   this authorizer is pass-through.
+3. **Agent-configuration grant** (`projects[pid].agentConfigurations`): `agent.create` and
+   `agent.interact` re-check the resolved provider/model/thinking against the project's granted
+   configurations (`resource-authorizer.ts:479-541`), so an otherwise-authorized create still fails
+   if the route's provider is not granted.
+
+`daemon.connect` is the Hub gate checked at ticket issue/consume only; it grants no RPC and never
+appears in the lease. Moving the plane from today's full `["*"]` trust to a scoped lease narrows it
+to enumerated projects: a route pointing outside the lease fails at the resource gate even when the
+semantic permission passes.
+
 ## 13. Verification and decision gates
 
 ### Compatibility
