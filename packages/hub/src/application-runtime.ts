@@ -606,6 +606,13 @@ async function createChannelSupervisorAtComposition(
       // bundle `import.meta.url` points into `.output/`, so pin it explicitly.
       pinsPath: runtimeFile("channel-pins.json"),
       logger: channelLogger,
+      // Channel accounts run in the Hub process, while the execution daemon
+      // may live in a separate sandbox pod. An explicit URL is required in
+      // that deployment; otherwise discovery incorrectly targets Hub-local
+      // 127.0.0.1:6767.
+      ...(process.env["PASEO_HUB_CHANNEL_DAEMON_URL"]
+        ? { daemon: { url: process.env["PASEO_HUB_CHANNEL_DAEMON_URL"] } }
+        : {}),
       dispatchWorkflow,
       cancelWorkflowRuns,
       readWorkflowRuns,
