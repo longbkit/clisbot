@@ -87,4 +87,17 @@ describe("channel daemon connection candidates", () => {
     assert.deepEqual([...failure.candidates], [dead1, dead2]);
     assert.ok(failure.attempts >= 2, "a full cycle is at least one attempt per candidate");
   });
+
+  it("does not shout on the first transient reconnect of a single candidate", async () => {
+    const dead = await deadUrl();
+    const failure = await new Promise<{ attempts: number }>((resolve) => {
+      connection = connectChannelDaemon({
+        urls: [dead],
+        onConnectFailure: (info) => resolve(info),
+      });
+    });
+    // A single dead candidate must fail twice before the first loud line, so a
+    // one-off reconnect (a brief daemon restart) stays quiet.
+    assert.ok(failure.attempts >= 2, "single-candidate loud failure needs >= 2 failed connects");
+  });
 });

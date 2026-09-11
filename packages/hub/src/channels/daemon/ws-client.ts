@@ -477,8 +477,10 @@ export class TrustedDaemonClient extends EventEmitter {
     this.connected = false;
     this.wasConnected = false;
     this.rejectAll(new Error("daemon connection closed"));
-    this.options.onStateChange?.("disconnected");
+    // An explicit stop() already fired "disconnected"; don't fire it again from
+    // the socket-close that stop() triggered, and don't schedule a reconnect.
     if (this.stopped) return;
+    this.options.onStateChange?.("disconnected");
     this.advanceCandidate(wasConnected);
     this.reconnectTimer = setTimeout(() => this.openSocket(), this.reconnectDelayMs);
     this.reconnectDelayMs = Math.min(DEFAULT_RECONNECT_MAX_MS, this.reconnectDelayMs * 2);
