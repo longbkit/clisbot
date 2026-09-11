@@ -21,6 +21,18 @@ function toTransportData(data: RawData, isBinary: boolean): string | ArrayBuffer
   ) as ArrayBuffer;
 }
 
+// A direct (non-relay) URL that refuses: claim a port, then free it.
+async function deadDirectUrl(): Promise<string> {
+  const wss = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+  const port = await new Promise<number>((res) => {
+    wss.on("listening", () => res((wss.address() as AddressInfo).port));
+  });
+  await new Promise<void>((res) => {
+    wss.close(() => res());
+  });
+  return `ws://127.0.0.1:${port}/ws`;
+}
+
 // A fake relay+daemon: it accepts the ws, runs the daemon side of the E2EE
 // handshake, and once the tunnel is open answers the trusted-client `hello` with
 // `server_info` — the frame the client needs to reach `connected`. Proves the
@@ -111,5 +123,19 @@ describe("channel daemon relay-E2EE leg", () => {
     });
     await connection.waitForConnected(8000);
     assert.ok(daemon.sawHello(), "daemon should decrypt the client hello over the E2EE tunnel");
+  });
+
+  it("fails over from a dead direct candidate to the relay tunnel", async () => {
+    daemon = await startFakeRelayDaemon();
+    const deadDirect = await deadDirectUrl();
+    connection = connectChannelDaemon({
+      urls: [deadDirect, daemon.url],
+      daemonPublicKeyB64: daemon.daemonPublicKeyB64,
+    });
+    await connection.waitForConnected(9000);
+    assert.ok(
+      daemon.sawHello(),
+      "should fail past the dead direct URL and connect over relay E2EE",
+    );
   });
 });

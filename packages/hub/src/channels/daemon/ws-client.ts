@@ -105,6 +105,9 @@ export class TrustedDaemonClient extends EventEmitter {
   /** The relay E2EE tunnel for the current socket when it is a relay candidate;
    * null for direct/loopback (frames go straight over the socket). */
   private channel: EncryptedChannel | null = null;
+  /** True while the current socket is a relay candidate that MUST tunnel through
+   * `channel`; guards `write()` from ever sending plaintext over a relay socket. */
+  private expectsChannel = false;
   connected = false;
   serverInfo: Record<string, unknown> | undefined;
 
@@ -180,6 +183,12 @@ export class TrustedDaemonClient extends EventEmitter {
    * tunnel when set, else the raw socket. The frame is identical either way. */
   private write(frame: string): Promise<void> {
     if (this.channel !== null) return Promise.resolve(this.channel.send(frame));
+    // Never fall back to a raw send on a relay socket — that would put plaintext
+    // trusted-client frames on the wire. (Unreachable today: the only pre-connect
+    // writer is sendHello, fired from the tunnel `onopen` after `channel` is set.)
+    if (this.expectsChannel) {
+      return Promise.reject(new Error("relay channel is not ready"));
+    }
     return new Promise((resolve, reject) => {
       if (this.socket === null) {
         reject(new Error("daemon client is not connected"));
@@ -231,17 +240,17 @@ export class TrustedDaemonClient extends EventEmitter {
       this.options.daemonPublicKeyB64 !== undefined && isRelayClientWebSocketUrl(url)
         ? this.options.daemonPublicKeyB64
         : undefined;
-    // The daemon password rides the stock `paseo.bearer.<password>` subprotocol
-    // (same mechanism as the app/CLI daemon clients) on the direct leg; the relay
-    // leg authenticates the daemon inside the tunnel, not on the relay upgrade.
+    // The daemon password rides the stock `paseo.bearer.<password>` subprotocol,
+    // exactly like the app/CLI DaemonClient — which sends it for relay URLs too
+    // (packages/client/src/daemon-client.ts). Matching the trusted-client path is
+    // the invariant; E2EE (below) is layered independently on top.
     const password = this.options.password?.trim();
     const subprotocols =
-      relayKey === undefined && password !== undefined && password !== ""
-        ? [`paseo.bearer.${password}`]
-        : undefined;
+      password !== undefined && password !== "" ? [`paseo.bearer.${password}`] : undefined;
     const socket = new WebSocket(url, subprotocols, { handshakeTimeout: HELLO_TIMEOUT_MS });
     this.socket = socket;
     this.channel = null;
+    this.expectsChannel = relayKey !== undefined;
     socket.on("close", () => this.onClose());
     // WebSocket emits an `error` event for ordinary connection failures such as
     // ECONNREFUSED. Do not re-emit it as EventEmitter's special `error` event: an
@@ -260,7 +269,10 @@ export class TrustedDaemonClient extends EventEmitter {
   }
 
   private onOpen(socket: WebSocket, relayKey: string | undefined): void {
-    this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
+    // Backoff resets only on a real session (onServerInfo), not on raw socket
+    // open: a candidate that opens but never completes hello/E2EE (relay up but
+    // daemon down, or a post-hello session rejection) must keep backing off
+    // instead of hammering reconnects at the floor delay.
     // Arm the watchdog before hello/handshake: a daemon (or relay) that never
     // completes it must still force a reconnect.
     this.helloTimer = setTimeout(() => {
@@ -286,6 +298,15 @@ export class TrustedDaemonClient extends EventEmitter {
     };
     socket.on("message", (data: RawData, isBinary: boolean) => {
       transport.onmessage?.({ data: normalizeRawData(data, isBinary), isBinary });
+    });
+    // Feed close/error into the tunnel too, or the EncryptedChannel's handshake
+    // retry interval (createClientChannel) never clears on a failed/closed relay
+    // socket — a leaked timer + channel on every failed relay attempt.
+    socket.on("close", (code: number, reason: Buffer) => {
+      transport.onclose?.(code, reason.toString());
+    });
+    socket.on("error", (error: Error) => {
+      transport.onerror?.(error);
     });
     void (async () => {
       try {
@@ -407,6 +428,7 @@ export class TrustedDaemonClient extends EventEmitter {
     this.connected = true;
     this.wasConnected = true;
     this.failedConnects = 0;
+    this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
     // The hello watchdog exists to force a reconnect when the daemon never
     // answers the hello; once `server_info` has been seen the session is
     // established and the watchdog must be disarmed — leaving it armed
@@ -483,9 +505,12 @@ export class TrustedDaemonClient extends EventEmitter {
   private reportFailedCycle(): void {
     this.failedConnects += 1;
     const cycle = Math.max(1, this.candidates.length);
-    const firstFullCycle = this.failedConnects === cycle;
+    // First loud line once a full candidate cycle has failed, but never on a
+    // single transient reconnect (a brief daemon restart): require >= 2 failed
+    // connects. Then a slow heartbeat so a persistent outage stays visible.
+    const firstReport = this.failedConnects === Math.max(cycle, 2);
     const heartbeat = this.failedConnects % (cycle * 10) === 0;
-    if (!firstFullCycle && !heartbeat) return;
+    if (!firstReport && !heartbeat) return;
     this.options.onConnectFailure?.({
       candidates: this.candidates,
       attempts: this.failedConnects,

@@ -83,3 +83,10 @@ The channel supervisor connects exactly as any other trusted client:
 This stays **fork-local** in `packages/hub/src/channels/**` (dep `@getpaseo/relay`,
 not `@getpaseo/client`) and leaves the daemon **unchanged** — it only dials the
 daemon's existing `/ws`.
+
+**Known limitation:** the candidate list and relay public key are resolved once at
+account start (from the offer then) and held for the client's lifetime. If a daemon
+re-pairs and rotates its `daemonPublicKeyB64` or changes endpoints, the supervisor
+keeps dialing the stale candidates — relay decryption then fails permanently and
+the loud `channel daemon unreachable` line fires, but recovery needs an account
+restart (no auto re-resolution yet).
