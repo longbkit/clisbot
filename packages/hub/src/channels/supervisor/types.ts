@@ -100,6 +100,16 @@ export interface ChannelSupervisorOptions {
   buildDaemonAccessTicketResolver?: (
     target: ChannelAccessTicketTarget,
   ) => () => Promise<string | undefined>;
+  /** Resolve the ordered daemon socket candidates (direct then relay) for an
+   * account's route daemon from that daemon's persisted `ConnectionOffer` — the
+   * same offer any trusted client (app/web) reaches it by, so channels are
+   * multi-daemon by construction. Returns `[]` when the daemon has no offer (or
+   * managed access is unwired); the supervisor then falls back to the global
+   * `daemon` option (env) or loopback discovery. */
+  resolveDaemonTarget?: (target: {
+    organizationId: string;
+    daemonReference: string;
+  }) => Promise<string[]>;
   /** The channel-pins path; defaults to the packaged `channel-pins.json`. */
   pinsPath?: string;
   logger?: PlaneLogger;

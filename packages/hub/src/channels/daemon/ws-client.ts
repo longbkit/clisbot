@@ -25,7 +25,12 @@ interface RpcCall {
 }
 
 export interface TrustedDaemonClientOptions {
+  /** Fallback single target. Used only when `urls` is absent/empty. */
   url: string;
+  /** Ordered daemon socket candidates (direct then relay). When present, the
+   * reconnect loop dials them in order, advancing on a failed connect and
+   * re-preferring the first after an established socket drops. */
+  urls?: readonly string[];
   clientId?: string;
   /** The daemon password, carried exactly like the app/CLI clients: the
    * `paseo.bearer.<password>` WS subprotocol. The daemon compares it against
@@ -40,6 +45,14 @@ export interface TrustedDaemonClientOptions {
   resolveAccessTicket?: () => Promise<string | undefined>;
   rpcTimeoutMs?: number;
   onStateChange?: (state: "connected" | "disconnected") => void;
+  /** Fired when a full candidate cycle fails to connect (first full cycle, then
+   * a slow heartbeat) — the loud, actionable signal that replaces a silent
+   * disconnect loop. The reconnect loop keeps retrying with backoff regardless. */
+  onConnectFailure?: (info: {
+    candidates: readonly string[];
+    attempts: number;
+    lastError?: string;
+  }) => void;
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
   onAgentUpdate?: (agent: unknown) => void;
   /** One `agent.provider_subagents.update` wire frame (the subagent
@@ -72,6 +85,17 @@ export class TrustedDaemonClient extends EventEmitter {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectDelayMs: number;
   private stopped = false;
+  /** Ordered connection candidates; the reconnect loop dials `candidates[candidateIndex]`. */
+  private readonly candidates: readonly string[];
+  private candidateIndex = 0;
+  /** Failed connects since the last successful hello — used to detect a full
+   * failed cycle across every candidate. */
+  private failedConnects = 0;
+  /** Whether the current socket ever reached `server_info`; a drop from a
+   * connected socket re-prefers candidate 0, a never-connected attempt advances. */
+  private wasConnected = false;
+  /** Last transport error, surfaced in `onConnectFailure`. */
+  private lastConnectError: string | undefined;
   connected = false;
   serverInfo: Record<string, unknown> | undefined;
 
@@ -80,6 +104,8 @@ export class TrustedDaemonClient extends EventEmitter {
     this.options = options;
     this.clientId = options.clientId ?? randomUUID();
     this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
+    this.candidates =
+      options.urls !== undefined && options.urls.length > 0 ? [...options.urls] : [options.url];
   }
 
   connect(): void {
@@ -182,11 +208,10 @@ export class TrustedDaemonClient extends EventEmitter {
     // (same mechanism as the app/CLI daemon clients); a password-protected
     // daemon rejects the WS upgrade without it.
     const password = this.options.password?.trim();
-    const socket = new WebSocket(
-      this.options.url,
-      password !== "" ? [`paseo.bearer.${password}`] : undefined,
-      { handshakeTimeout: HELLO_TIMEOUT_MS },
-    );
+    const url = this.candidates[this.candidateIndex] ?? this.candidates[0] ?? this.options.url;
+    const socket = new WebSocket(url, password !== "" ? [`paseo.bearer.${password}`] : undefined, {
+      handshakeTimeout: HELLO_TIMEOUT_MS,
+    });
     this.socket = socket;
     socket.on("open", () => this.onOpen(socket));
     socket.on("message", (data) => this.onMessage(data.toString()));
@@ -195,8 +220,11 @@ export class TrustedDaemonClient extends EventEmitter {
     // as ECONNREFUSED. Do not re-emit it as EventEmitter's special `error`
     // event: an account may start before its daemon has reconnected, and an
     // unhandled error event would terminate the whole Hub process instead of
-    // allowing this client to use its normal reconnect loop.
-    socket.on("error", () => undefined);
+    // allowing this client to use its normal reconnect loop. Capture the reason
+    // so onConnectFailure can report why every candidate failed.
+    socket.on("error", (error: Error) => {
+      this.lastConnectError = error.message;
+    });
   }
 
   private onOpen(socket: WebSocket): void {
@@ -302,6 +330,8 @@ export class TrustedDaemonClient extends EventEmitter {
 
   private onServerInfo(): void {
     this.connected = true;
+    this.wasConnected = true;
+    this.failedConnects = 0;
     // The hello watchdog exists to force a reconnect when the daemon never
     // answers the hello; once `server_info` has been seen the session is
     // established and the watchdog must be disarmed — leaving it armed
@@ -345,13 +375,46 @@ export class TrustedDaemonClient extends EventEmitter {
 
   private onClose(): void {
     this.clearTimers();
+    const wasConnected = this.wasConnected;
     this.connected = false;
+    this.wasConnected = false;
     this.rejectAll(new Error("daemon connection closed"));
     this.options.onStateChange?.("disconnected");
     if (this.stopped) return;
+    this.advanceCandidate(wasConnected);
     this.reconnectTimer = setTimeout(() => this.openSocket(), this.reconnectDelayMs);
     this.reconnectDelayMs = Math.min(DEFAULT_RECONNECT_MAX_MS, this.reconnectDelayMs * 2);
     this.reconnectTimer.unref?.();
+  }
+
+  /** Choose the candidate for the coming reconnect. A drop from an established
+   * socket re-prefers candidate 0 (direct); a never-connected attempt advances
+   * to the next candidate and counts toward the failed-cycle report. */
+  private advanceCandidate(wasConnected: boolean): void {
+    if (wasConnected) {
+      this.candidateIndex = 0;
+      this.failedConnects = 0;
+      return;
+    }
+    if (this.candidates.length > 1) {
+      this.candidateIndex = (this.candidateIndex + 1) % this.candidates.length;
+    }
+    this.reportFailedCycle();
+  }
+
+  /** Fire `onConnectFailure` when the first full candidate cycle fails, then on a
+   * slow heartbeat (~every 10 cycles) — loud once, not a per-attempt spam. */
+  private reportFailedCycle(): void {
+    this.failedConnects += 1;
+    const cycle = Math.max(1, this.candidates.length);
+    const firstFullCycle = this.failedConnects === cycle;
+    const heartbeat = this.failedConnects % (cycle * 10) === 0;
+    if (!firstFullCycle && !heartbeat) return;
+    this.options.onConnectFailure?.({
+      candidates: this.candidates,
+      attempts: this.failedConnects,
+      ...(this.lastConnectError !== undefined ? { lastError: this.lastConnectError } : {}),
+    });
   }
 
   private clearTimers(): void {

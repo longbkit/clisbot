@@ -1347,6 +1347,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       if (password !== undefined && password !== "") daemonOptions.password = password;
     }
     this.applyChannelAdmissionTicket(daemonOptions, handle, compiled, snapshot);
+    await this.applyDaemonTarget(daemonOptions, handle, compiled, snapshot);
     const daemon = connectChannelDaemon(daemonOptions);
     handle.daemon = daemon;
     await plane.start(daemon, this.store);
@@ -1380,6 +1381,52 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       daemonReference,
       clientId,
     });
+  }
+
+  /**
+   * Per-daemon connection target + loud failure. Resolves the account's route
+   * daemon to its persisted `ConnectionOffer` candidates (direct → relay) — the
+   * same path any trusted client (app/web) reaches it by, so channels are
+   * multi-daemon by construction — and installs the loud `onConnectFailure` that
+   * replaces the silent `channel daemon disconnected` loop. No resolver / no
+   * offer → the global `daemon` option (env) or loopback discovery stands.
+   */
+  private async applyDaemonTarget(
+    daemonOptions: ChannelDaemonClientOptions,
+    handle: AccountHandle,
+    compiled: CompiledChannelAccount,
+    snapshot: ChannelControlPlaneSnapshot,
+  ): Promise<void> {
+    daemonOptions.onConnectFailure = (info) => {
+      (this.logger.error ?? this.logger.warn).call(
+        this.logger,
+        "channel daemon unreachable: all candidates failed",
+        {
+          channel: handle.channel,
+          account: handle.accountId,
+          candidates: info.candidates,
+          attempts: info.attempts,
+          ...(info.lastError !== undefined ? { lastError: info.lastError } : {}),
+          hint: "verify the daemon's ConnectionOffer / PASEO_HUB_CHANNEL_DAEMON_URL / daemon reachability",
+        },
+      );
+    };
+    if (this.options.resolveDaemonTarget === undefined) return;
+    const daemonReference = accountDaemonReference(compiled, snapshot.resolveAgentAccessTarget);
+    if (daemonReference === undefined) return;
+    try {
+      const urls = await this.options.resolveDaemonTarget({
+        organizationId: snapshot.organizationId,
+        daemonReference,
+      });
+      if (urls.length > 0) daemonOptions.urls = urls;
+    } catch (error) {
+      this.logger.warn("channel daemon target resolution failed", {
+        channel: handle.channel,
+        account: handle.accountId,
+        error: errorMessage(error),
+      });
+    }
   }
 
   /**

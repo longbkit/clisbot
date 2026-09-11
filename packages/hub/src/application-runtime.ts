@@ -6,6 +6,8 @@ import type { AuthServer } from "./auth/server.js";
 import type { BillingRuntime } from "./billing/index.js";
 import type { ConnectionResolver } from "./config/connections.js";
 import type { Database } from "./db/types.js";
+import { buildDaemonWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import { reportFailure } from "./failures/index.js";
 import { resolveRouteTenant } from "./projects/access.js";
 import { capabilitiesFor } from "./auth/organization-policy.js";
@@ -607,6 +609,7 @@ async function createChannelSupervisorAtComposition(
       access !== null && accessTickets !== null
         ? await createChannelDaemonAccessTicketFactory(database, access, accessTickets)
         : undefined;
+    const resolveDaemonTarget = createChannelDaemonTargetFactory(database, process.env);
     return factory.createChannelSupervisor({
       database,
       databaseRuntime,
@@ -685,6 +688,7 @@ async function createChannelSupervisorAtComposition(
         ? {}
         : { claimSlackInbound: options.claimSlackInbound }),
       ...(buildDaemonAccessTicketResolver === undefined ? {} : { buildDaemonAccessTicketResolver }),
+      resolveDaemonTarget,
     });
   } catch (error) {
     reportFailure(error, {
@@ -738,6 +742,53 @@ async function createChannelDaemonAccessTicketFactory(
     }) => accessTickets.issue(input),
   };
   return (target) => createChannelAccessTicketResolver(deps, target);
+}
+
+/**
+ * Resolve an account's route daemon to ordered socket candidates from that
+ * daemon's persisted `ConnectionOffer` — the same offer any trusted client
+ * (app/web) reaches it by, so channels are multi-daemon by construction
+ * (per-daemon, determined when the daemon connects), not a single global URL.
+ * `PASEO_HUB_CHANNEL_DAEMON_TRANSPORT` (auto|direct|relay|loopback) orders the
+ * candidates. Returns `[]` when the daemon has no offer, so the supervisor falls
+ * back to the global `daemon` env url or loopback discovery.
+ */
+function createChannelDaemonTargetFactory(
+  database: Database,
+  env: NodeJS.ProcessEnv,
+): (target: { organizationId: string; daemonReference: string }) => Promise<string[]> {
+  const isUuid = (value: string): boolean =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
+  const mode = (env["PASEO_HUB_CHANNEL_DAEMON_TRANSPORT"] ?? "auto").toLowerCase();
+  return async ({ organizationId, daemonReference }) => {
+    const record = isUuid(daemonReference)
+      ? await database.findDaemonForOrganization(organizationId, daemonReference)
+      : await database.findDaemonBySlugForOrganization(organizationId, daemonReference);
+    if (record === undefined || record.status !== "active" || record.connectionOffer === null) {
+      return [];
+    }
+    return channelDaemonCandidates(record.connectionOffer, mode);
+  };
+}
+
+/**
+ * Build the ordered candidate URL list from a `ConnectionOffer` per transport
+ * mode. Relay candidates are omitted until the channel client speaks relay-E2EE
+ * — a plain relay URL here would fail the handshake. COMPAT(channel-relay-e2ee):
+ * add relay via `buildRelayWebSocketUrl` once the channel client supports it.
+ */
+function channelDaemonCandidates(offer: ConnectionOffer, mode: string): string[] {
+  const direct =
+    offer.direct !== undefined
+      ? buildDaemonWebSocketUrl(offer.direct.endpoint, { useTls: offer.direct.useTls ?? true })
+      : undefined;
+  switch (mode) {
+    case "loopback":
+    case "relay":
+      return [];
+    default: // "auto" | "direct"
+      return direct !== undefined ? [direct] : [];
+  }
 }
 
 // COMPAT(clisbot-control-plane): the tool-path channel-reply MCP endpoint

@@ -26,6 +26,10 @@ export interface ChannelDaemonClientOptions {
   home?: string;
   /** An explicit trusted-client URL (relay-paired leg). */
   url?: string;
+  /** Ordered daemon socket candidates (direct then relay), resolved per-daemon
+   * from the daemon's ConnectionOffer. Takes precedence over `url` and loopback
+   * discovery; the reconnect loop rotates + fails over across them. */
+  urls?: readonly string[];
   /** The daemon password (carried as the `paseo.bearer.` WS subprotocol).
    * The supervisor defaults this from the `PASEO_PASSWORD` env var. */
   password?: string;
@@ -46,6 +50,13 @@ export interface ChannelDaemonClientOptions {
   /** Observe the trusted session's state. `disconnected` includes an explicit
    * stop; the reconnect loop re-fires `connected` on recovery. */
   onStateChange?: (state: "connected" | "disconnected") => void;
+  /** Fired when a full candidate cycle fails to connect — the loud failure that
+   * replaces the silent `channel daemon disconnected` loop. */
+  onConnectFailure?: (info: {
+    candidates: readonly string[];
+    attempts: number;
+    lastError?: string;
+  }) => void;
 }
 
 export interface CreateAgentResult {
@@ -97,12 +108,24 @@ export interface DaemonConnection {
  * the pid lock / default port.
  */
 export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): DaemonConnection {
-  const discovery: DaemonDiscoveryResult =
-    options.url !== undefined
-      ? { url: options.url, source: "env" }
-      : discoverLocalDaemon({ host: options.host, home: options.home });
+  let discovery: DaemonDiscoveryResult;
+  let candidates: readonly string[];
+  if (options.urls !== undefined && options.urls.length > 0) {
+    candidates = options.urls;
+    discovery = { url: options.urls[0] as string, source: "env" };
+  } else if (options.url !== undefined) {
+    candidates = [options.url];
+    discovery = { url: options.url, source: "env" };
+  } else {
+    discovery = discoverLocalDaemon({ host: options.host, home: options.home });
+    candidates = [discovery.url];
+  }
   const socket = new TrustedDaemonClient({
     url: discovery.url,
+    urls: candidates,
+    ...(options.onConnectFailure !== undefined
+      ? { onConnectFailure: options.onConnectFailure }
+      : {}),
     ...(options.password !== undefined ? { password: options.password } : {}),
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
     ...(options.resolveAccessTicket !== undefined
