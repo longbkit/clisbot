@@ -61,21 +61,25 @@ phone; what makes the Hub the control plane is its own config/RBAC, not the wire
 When the daemon runs managed-access `external`, the client must carry a Hub-issued
 `accessTicket` in the `hello`.
 
-## Direction being implemented (2026-09)
+## How the channel supervisor connects (2026-09)
 
-The channel supervisor is converging on the model above. Landed: it resolves
-**each route's daemon → that daemon's stored `ConnectionOffer`**
-(`application-runtime.ts` `createChannelDaemonTargetFactory`), so the target is
-**per-daemon** (multi-daemon by construction, determined when the daemon
-connects), with the global `PASEO_HUB_CHANNEL_DAEMON_URL` demoted to a fallback
-and `PASEO_HUB_CHANNEL_DAEMON_TRANSPORT` (`auto|direct|relay|loopback`) ordering
-the candidates; the reconnect loop rotates across candidates and emits **one loud
-`channel daemon unreachable`** line per failed cycle instead of a silent
-`channel daemon disconnected` loop (`channels/daemon/ws-client.ts`).
+The channel supervisor connects exactly as any other trusted client:
 
-Remaining: the channel client still uses a plain `new WebSocket` with **no
-relay-E2EE**, so only the **direct** candidate is emitted today (relay is omitted
-— a plain relay URL would fail the handshake; `COMPAT(channel-relay-e2ee)`).
-Adding relay-E2EE to the channel client (via `@getpaseo/relay`) completes the
-direct→relay failover. This stays **fork-local** in `packages/hub/src/channels/**`
-and leaves the daemon **unchanged** (it only dials the daemon's existing `/ws`).
+- **Per-daemon target.** It resolves **each route's daemon → that daemon's stored
+  `ConnectionOffer`** (`application-runtime.ts` `createChannelDaemonTargetFactory`),
+  so the target is per-daemon (multi-daemon by construction, determined when the
+  daemon connects). The global `PASEO_HUB_CHANNEL_DAEMON_URL` is only a fallback;
+  `PASEO_HUB_CHANNEL_DAEMON_TRANSPORT` (`auto|direct|relay|loopback`) orders the
+  candidates (`auto` = direct then relay).
+- **Direct and relay.** `channels/daemon/ws-client.ts` dials a direct candidate
+  straight; for a relay candidate it opens the same **relay-E2EE tunnel** the app
+  uses (`@getpaseo/relay/e2ee` `createClientChannel`, keyed by the offer's
+  `daemonPublicKeyB64`) and rides the trusted-client wire through it.
+- **Failover + loud failure.** The reconnect loop rotates across candidates
+  (re-preferring the top after a connected drop) and emits **one loud
+  `channel daemon unreachable`** line per failed cycle instead of a silent
+  `channel daemon disconnected` loop.
+
+This stays **fork-local** in `packages/hub/src/channels/**` (dep `@getpaseo/relay`,
+not `@getpaseo/client`) and leaves the daemon **unchanged** — it only dials the
+daemon's existing `/ws`.

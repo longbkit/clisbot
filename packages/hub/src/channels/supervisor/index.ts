@@ -1415,11 +1415,16 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     const daemonReference = accountDaemonReference(compiled, snapshot.resolveAgentAccessTarget);
     if (daemonReference === undefined) return;
     try {
-      const urls = await this.options.resolveDaemonTarget({
+      const resolved = await this.options.resolveDaemonTarget({
         organizationId: snapshot.organizationId,
         daemonReference,
       });
-      if (urls.length > 0) daemonOptions.urls = urls;
+      if (resolved.urls.length > 0) {
+        daemonOptions.urls = resolved.urls;
+        if (resolved.daemonPublicKeyB64 !== undefined) {
+          daemonOptions.daemonPublicKeyB64 = resolved.daemonPublicKeyB64;
+        }
+      }
     } catch (error) {
       this.logger.warn("channel daemon target resolution failed", {
         channel: handle.channel,

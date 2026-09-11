@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { WebSocket } from "ws";
+import { WebSocket, type RawData } from "ws";
+import { createClientChannel, type EncryptedChannel, type Transport } from "@getpaseo/relay/e2ee";
+import { isRelayClientWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
 
 // The Hub's trusted-client transport to a Paseo daemon. One connection drives the
 // channel control plane: create agents, steer threads, answer permissions, and
@@ -43,6 +45,10 @@ export interface TrustedDaemonClientOptions {
    * trusted (unticketed) session then admits as before. Absent → never
    * ticketed. */
   resolveAccessTicket?: () => Promise<string | undefined>;
+  /** The daemon's public key (base64), from its ConnectionOffer. Required to open
+   * the relay-E2EE tunnel when a candidate is a relay URL; absent → relay
+   * candidates cannot be tunnelled (direct/loopback only). */
+  daemonPublicKeyB64?: string;
   rpcTimeoutMs?: number;
   onStateChange?: (state: "connected" | "disconnected") => void;
   /** Fired when a full candidate cycle fails to connect (first full cycle, then
@@ -96,6 +102,9 @@ export class TrustedDaemonClient extends EventEmitter {
   private wasConnected = false;
   /** Last transport error, surfaced in `onConnectFailure`. */
   private lastConnectError: string | undefined;
+  /** The relay E2EE tunnel for the current socket when it is a relay candidate;
+   * null for direct/loopback (frames go straight over the socket). */
+  private channel: EncryptedChannel | null = null;
   connected = false;
   serverInfo: Record<string, unknown> | undefined;
 
@@ -164,8 +173,19 @@ export class TrustedDaemonClient extends EventEmitter {
   send(message: Record<string, unknown>): Promise<void> {
     const notConnected = this.notConnectedError();
     if (notConnected !== null) return Promise.reject(notConnected);
+    return this.write(JSON.stringify({ type: "session", message }));
+  }
+
+  /** Write one plaintext JSON frame over the active transport: the relay E2EE
+   * tunnel when set, else the raw socket. The frame is identical either way. */
+  private write(frame: string): Promise<void> {
+    if (this.channel !== null) return Promise.resolve(this.channel.send(frame));
     return new Promise((resolve, reject) => {
-      this.socket!.send(JSON.stringify({ type: "session", message }), (error) => {
+      if (this.socket === null) {
+        reject(new Error("daemon client is not connected"));
+        return;
+      }
+      this.socket.send(frame, (error) => {
         if (error) reject(error);
         else resolve();
       });
@@ -197,46 +217,101 @@ export class TrustedDaemonClient extends EventEmitter {
     timer.unref?.();
     return new Promise((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject, timer });
-      this.socket!.send(
+      void this.write(
         JSON.stringify({ type: "session", message: { type: requestType, requestId, ...fields } }),
       );
     });
   }
 
   private openSocket(): void {
-    // The daemon password rides the stock `paseo.bearer.<password>` subprotocol
-    // (same mechanism as the app/CLI daemon clients); a password-protected
-    // daemon rejects the WS upgrade without it.
-    const password = this.options.password?.trim();
     const url = this.candidates[this.candidateIndex] ?? this.candidates[0] ?? this.options.url;
-    const socket = new WebSocket(url, password !== "" ? [`paseo.bearer.${password}`] : undefined, {
-      handshakeTimeout: HELLO_TIMEOUT_MS,
-    });
+    // A relay candidate reaches the daemon through the relay's E2EE tunnel; a
+    // direct/loopback candidate speaks straight to the daemon's `/ws`.
+    const relayKey =
+      this.options.daemonPublicKeyB64 !== undefined && isRelayClientWebSocketUrl(url)
+        ? this.options.daemonPublicKeyB64
+        : undefined;
+    // The daemon password rides the stock `paseo.bearer.<password>` subprotocol
+    // (same mechanism as the app/CLI daemon clients) on the direct leg; the relay
+    // leg authenticates the daemon inside the tunnel, not on the relay upgrade.
+    const password = this.options.password?.trim();
+    const subprotocols =
+      relayKey === undefined && password !== undefined && password !== ""
+        ? [`paseo.bearer.${password}`]
+        : undefined;
+    const socket = new WebSocket(url, subprotocols, { handshakeTimeout: HELLO_TIMEOUT_MS });
     this.socket = socket;
-    socket.on("open", () => this.onOpen(socket));
-    socket.on("message", (data) => this.onMessage(data.toString()));
+    this.channel = null;
     socket.on("close", () => this.onClose());
-    // WebSocket emits an `error` event for ordinary connection failures such
-    // as ECONNREFUSED. Do not re-emit it as EventEmitter's special `error`
-    // event: an account may start before its daemon has reconnected, and an
+    // WebSocket emits an `error` event for ordinary connection failures such as
+    // ECONNREFUSED. Do not re-emit it as EventEmitter's special `error` event: an
     // unhandled error event would terminate the whole Hub process instead of
-    // allowing this client to use its normal reconnect loop. Capture the reason
-    // so onConnectFailure can report why every candidate failed.
+    // letting this client use its reconnect loop. Capture the reason so
+    // onConnectFailure can report why every candidate failed.
     socket.on("error", (error: Error) => {
       this.lastConnectError = error.message;
     });
+    // Direct frames arrive as plaintext; relay frames are wired to the E2EE
+    // tunnel in startRelayChannel instead.
+    if (relayKey === undefined) {
+      socket.on("message", (data) => this.onMessage(data.toString()));
+    }
+    socket.on("open", () => this.onOpen(socket, relayKey));
   }
 
-  private onOpen(socket: WebSocket): void {
+  private onOpen(socket: WebSocket, relayKey: string | undefined): void {
     this.reconnectDelayMs = DEFAULT_RECONNECT_MIN_MS;
-    // Arm the hello watchdog before minting the ticket: a hung resolver, like a
-    // daemon that never answers the hello, must still force a reconnect.
+    // Arm the watchdog before hello/handshake: a daemon (or relay) that never
+    // completes it must still force a reconnect.
     this.helloTimer = setTimeout(() => {
-      // The daemon closes after 15s without a valid hello; force a reconnect.
       socket.terminate();
     }, HELLO_TIMEOUT_MS + 5_000);
     this.helloTimer.unref?.();
-    void this.sendHello(socket);
+    if (relayKey === undefined) {
+      void this.sendHello(socket);
+      return;
+    }
+    this.startRelayChannel(socket, relayKey);
+  }
+
+  /** Open the relay E2EE tunnel over `socket`, then send `hello` through it once
+   * the handshake completes. Direct/loopback sockets skip this entirely. */
+  private startRelayChannel(socket: WebSocket, daemonPublicKeyB64: string): void {
+    const transport: Transport = {
+      send: (data) => socket.send(data),
+      close: (code, reason) => socket.close(code, reason),
+      onmessage: null,
+      onclose: null,
+      onerror: null,
+    };
+    socket.on("message", (data: RawData, isBinary: boolean) => {
+      transport.onmessage?.({ data: normalizeRawData(data, isBinary), isBinary });
+    });
+    void (async () => {
+      try {
+        const channel = await createClientChannel(transport, daemonPublicKeyB64, {
+          // The tunnel is up (shared key derived); now the trusted-client hello
+          // can ride it. `this.channel` is set on resolve below, before `onopen`.
+          onopen: () => void this.sendHello(socket),
+          onmessage: (data) =>
+            this.onMessage(typeof data === "string" ? data : Buffer.from(data).toString()),
+          onclose: () => {
+            if (socket.readyState === WebSocket.OPEN) socket.close();
+          },
+          onerror: (error) => {
+            this.lastConnectError = error.message;
+            if (socket.readyState === WebSocket.OPEN) socket.close(4001, "E2EE handshake failed");
+          },
+        });
+        // createClientChannel resolves right after sending the E2EE hello, before
+        // `onopen`; capture the channel now so the hello above can encrypt.
+        if (this.socket === socket) this.channel = channel;
+        else channel.close();
+      } catch (error) {
+        this.lastConnectError = error instanceof Error ? error.message : String(error);
+        if (socket.readyState === WebSocket.OPEN) socket.close(4001, "E2EE handshake failed");
+      }
+    })();
   }
 
   private async sendHello(socket: WebSocket): Promise<void> {
@@ -258,7 +333,7 @@ export class TrustedDaemonClient extends EventEmitter {
       socket.terminate();
       return;
     }
-    socket.send(
+    void this.write(
       JSON.stringify({
         type: "hello",
         clientId: this.clientId,
@@ -279,7 +354,7 @@ export class TrustedDaemonClient extends EventEmitter {
     }
     if (frame.type === "pong") return;
     if (frame.type === "ping") {
-      this.socket?.send(JSON.stringify({ type: "pong" }));
+      void this.write(JSON.stringify({ type: "pong" }));
       return;
     }
     const inner = frame["message"];
@@ -375,6 +450,7 @@ export class TrustedDaemonClient extends EventEmitter {
 
   private onClose(): void {
     this.clearTimers();
+    this.channel = null;
     const wasConnected = this.wasConnected;
     this.connected = false;
     this.wasConnected = false;
@@ -438,6 +514,18 @@ export class TrustedDaemonClient extends EventEmitter {
     }
     return null;
   }
+}
+
+/** Normalize a `ws` frame for the relay transport: text → string, binary →
+ * ArrayBuffer (copied out of the pooled Node Buffer). */
+function normalizeRawData(data: RawData, isBinary: boolean): string | ArrayBuffer {
+  if (!isBinary) return data.toString();
+  const buffer = Array.isArray(data) ? Buffer.concat(data) : (data as Buffer | ArrayBuffer);
+  if (buffer instanceof ArrayBuffer) return buffer;
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

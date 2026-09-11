@@ -109,7 +109,7 @@ export interface ChannelSupervisorOptions {
   resolveDaemonTarget?: (target: {
     organizationId: string;
     daemonReference: string;
-  }) => Promise<string[]>;
+  }) => Promise<{ urls: string[]; daemonPublicKeyB64?: string }>;
   /** The channel-pins path; defaults to the packaged `channel-pins.json`. */
   pinsPath?: string;
   logger?: PlaneLogger;

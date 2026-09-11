@@ -6,7 +6,10 @@ import type { AuthServer } from "./auth/server.js";
 import type { BillingRuntime } from "./billing/index.js";
 import type { ConnectionResolver } from "./config/connections.js";
 import type { Database } from "./db/types.js";
-import { buildDaemonWebSocketUrl } from "@getpaseo/protocol/daemon-endpoints";
+import {
+  buildDaemonWebSocketUrl,
+  buildRelayWebSocketUrl,
+} from "@getpaseo/protocol/daemon-endpoints";
 import type { ConnectionOffer } from "@getpaseo/protocol/connection-offer";
 import { reportFailure } from "./failures/index.js";
 import { resolveRouteTenant } from "./projects/access.js";
@@ -756,7 +759,10 @@ async function createChannelDaemonAccessTicketFactory(
 function createChannelDaemonTargetFactory(
   database: Database,
   env: NodeJS.ProcessEnv,
-): (target: { organizationId: string; daemonReference: string }) => Promise<string[]> {
+): (target: {
+  organizationId: string;
+  daemonReference: string;
+}) => Promise<{ urls: string[]; daemonPublicKeyB64?: string }> {
   const isUuid = (value: string): boolean =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
   const mode = (env["PASEO_HUB_CHANNEL_DAEMON_TRANSPORT"] ?? "auto").toLowerCase();
@@ -765,29 +771,41 @@ function createChannelDaemonTargetFactory(
       ? await database.findDaemonForOrganization(organizationId, daemonReference)
       : await database.findDaemonBySlugForOrganization(organizationId, daemonReference);
     if (record === undefined || record.status !== "active" || record.connectionOffer === null) {
-      return [];
+      return { urls: [] };
     }
-    return channelDaemonCandidates(record.connectionOffer, mode);
+    const offer = record.connectionOffer;
+    return {
+      urls: channelDaemonCandidates(offer, mode),
+      daemonPublicKeyB64: offer.daemonPublicKeyB64,
+    };
   };
 }
 
 /**
  * Build the ordered candidate URL list from a `ConnectionOffer` per transport
- * mode. Relay candidates are omitted until the channel client speaks relay-E2EE
- * — a plain relay URL here would fail the handshake. COMPAT(channel-relay-e2ee):
- * add relay via `buildRelayWebSocketUrl` once the channel client supports it.
+ * mode. `auto` prefers direct then relay; the relay candidate is a relay-client
+ * URL the channel client tunnels with E2EE using the offer's `daemonPublicKeyB64`.
  */
 function channelDaemonCandidates(offer: ConnectionOffer, mode: string): string[] {
   const direct =
     offer.direct !== undefined
       ? buildDaemonWebSocketUrl(offer.direct.endpoint, { useTls: offer.direct.useTls ?? true })
       : undefined;
+  const relay = buildRelayWebSocketUrl({
+    endpoint: offer.relay.endpoint,
+    useTls: offer.relay.useTls ?? true,
+    serverId: offer.serverId,
+    role: "client",
+  });
   switch (mode) {
     case "loopback":
-    case "relay":
       return [];
-    default: // "auto" | "direct"
+    case "direct":
       return direct !== undefined ? [direct] : [];
+    case "relay":
+      return [relay];
+    default: // "auto"
+      return direct !== undefined ? [direct, relay] : [relay];
   }
 }
 

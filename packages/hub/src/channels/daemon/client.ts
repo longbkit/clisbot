@@ -39,6 +39,9 @@ export interface ChannelDaemonClientOptions {
    * mode (trusted session, as today). Built by
    * `createChannelAccessTicketResolver`; absent → never ticketed. */
   resolveAccessTicket?: () => Promise<string | undefined>;
+  /** The daemon's public key (base64), from its ConnectionOffer — required to
+   * open the relay-E2EE tunnel for a relay candidate. */
+  daemonPublicKeyB64?: string;
   rpcTimeoutMs?: number;
   /** Agent stream frames (`agent_stream`): one event per attached agent. */
   onStream?: (payload: { agentId: string; event: unknown; seq?: number }) => void;
@@ -130,6 +133,9 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
     ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
     ...(options.resolveAccessTicket !== undefined
       ? { resolveAccessTicket: options.resolveAccessTicket }
+      : {}),
+    ...(options.daemonPublicKeyB64 !== undefined
+      ? { daemonPublicKeyB64: options.daemonPublicKeyB64 }
       : {}),
     ...(options.rpcTimeoutMs !== undefined ? { rpcTimeoutMs: options.rpcTimeoutMs } : {}),
     ...(options.onStream !== undefined ? { onStream: options.onStream } : {}),
