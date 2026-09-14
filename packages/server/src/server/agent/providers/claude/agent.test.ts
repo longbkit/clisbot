@@ -29,6 +29,12 @@ interface TestClaudeSession {
   close(): Promise<void>;
 }
 
+function isLoadingCompactionEvent(event: AgentStreamEvent): boolean {
+  return (
+    event.type === "timeline" && event.item.type === "compaction" && event.item.status === "loading"
+  );
+}
+
 function isPermissionResolvedEvent(
   event: AgentStreamEvent,
 ): event is Extract<AgentStreamEvent, { type: "permission_resolved" }> {
@@ -1554,6 +1560,62 @@ describe("normalizeClaudeAskUserQuestionUpdatedInput", () => {
 });
 
 describe("ClaudeAgentClient.listImportableSessions", () => {
+  test("uses the latest native custom title and leaves fixture mtimes unchanged", async () => {
+    const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-import-"));
+    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
+    process.env.CLAUDE_CONFIG_DIR = tmpConfigDir;
+
+    try {
+      const projectDir = path.join(tmpConfigDir, "projects", "native-title-fixture");
+      await fs.mkdir(projectDir, { recursive: true });
+      const sessionFile = path.join(projectDir, "native-title-session.jsonl");
+      await fs.copyFile(
+        new URL("./test-fixtures/import-session-native-titles.jsonl", import.meta.url),
+        sessionFile,
+      );
+      const olderSessionFile = path.join(projectDir, "older-native-title-session.jsonl");
+      await fs.copyFile(
+        new URL("./test-fixtures/import-session-native-titles.jsonl", import.meta.url),
+        olderSessionFile,
+      );
+      const timestamp = new Date("2026-08-13T01:53:11.000Z");
+      await fs.utimes(sessionFile, timestamp, timestamp);
+      const olderTimestamp = new Date("2026-08-12T01:53:11.000Z");
+      await fs.utimes(olderSessionFile, olderTimestamp, olderTimestamp);
+      const fixtureFiles = [sessionFile, olderSessionFile];
+      const mtimesBefore = await Promise.all(
+        fixtureFiles.map(async (file) => (await fs.stat(file)).mtimeMs),
+      );
+
+      const client = new ClaudeAgentClient({
+        logger: createTestLogger(),
+        resolveBinary: async () => "/test/claude/bin",
+      });
+
+      await expect(client.listImportableSessions({ limit: 1 })).resolves.toEqual([
+        {
+          providerHandleId: "native-title-session",
+          cwd: "/tmp/paseo-claude-native-title",
+          title: "My research session",
+          firstPromptPreview: "Review this project",
+          lastPromptPreview: "Focus on the import flow",
+          lastActivityAt: timestamp,
+        },
+      ]);
+      const mtimesAfter = await Promise.all(
+        fixtureFiles.map(async (file) => (await fs.stat(file)).mtimeMs),
+      );
+      expect(mtimesAfter).toEqual(mtimesBefore);
+    } finally {
+      if (previousConfigDir === undefined) {
+        delete process.env.CLAUDE_CONFIG_DIR;
+      } else {
+        process.env.CLAUDE_CONFIG_DIR = previousConfigDir;
+      }
+      await fs.rm(tmpConfigDir, { recursive: true, force: true });
+    }
+  });
+
   test("scopes candidates to the requested cwd before applying the limit", async () => {
     const tmpConfigDir = await fs.mkdtemp(path.join(os.tmpdir(), "paseo-claude-import-"));
     const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
@@ -1988,6 +2050,15 @@ describe("ClaudeAgentSession context window usage", () => {
       uuid: "compact-boundary-1",
       session_id: "session-1",
       ...overrides,
+    };
+  }
+
+  function createCompactingStatus(): Record<string, unknown> {
+    return {
+      type: "system",
+      subtype: "status",
+      status: "compacting",
+      session_id: "session-1",
     };
   }
 
@@ -2862,6 +2933,110 @@ describe("ClaudeAgentSession context window usage", () => {
             event.type === "turn_completed" && event.usage.contextWindowUsedTokens !== undefined,
         ),
       ).toBe(false);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("repeated compacting statuses open a single compaction marker", async () => {
+    const session = await createSessionForTurns([
+      [
+        createCompactingStatus(),
+        createCompactingStatus(),
+        createCompactingStatus(),
+        createCompactBoundary(),
+        createCompactingStatus(),
+        createCompactingStatus(),
+        createCompactBoundary(),
+        createSuccessResult(),
+      ],
+    ]);
+
+    try {
+      const events = await collectStreamEvents(session, "compact twice");
+      const compactions = events.flatMap((event) =>
+        event.type === "timeline" && event.item.type === "compaction" ? [event.item.status] : [],
+      );
+      expect(compactions).toEqual(["loading", "completed", "loading", "completed"]);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("a compaction abandoned mid-turn does not suppress the next compaction marker", async () => {
+    // The first turn starts compacting and then ends without ever reaching a
+    // compact_boundary, so the marker it opened is never resolved.
+    const session = await createSessionForTurns([
+      [createCompactingStatus(), createSuccessResult()],
+      [createCompactingStatus(), createSuccessResult()],
+    ]);
+
+    try {
+      const abandonedTurn = await collectStreamEvents(session, "abandoned compaction");
+      expect(abandonedTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
+
+      const nextTurn = await collectStreamEvents(session, "next compaction");
+      expect(nextTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("an interrupted compaction does not suppress the next compaction marker", async () => {
+    // The first turn starts compacting and is then interrupted, so it never reaches a
+    // compact_boundary and the marker it opened is never resolved.
+    const session = await createSessionForTurns([
+      [createCompactingStatus()],
+      [createCompactingStatus(), createSuccessResult()],
+    ]);
+
+    try {
+      const interruptedTurn: AgentStreamEvent[] = [];
+      const streaming = (async () => {
+        for await (const event of streamSession(session, "interrupted compaction")) {
+          interruptedTurn.push(event);
+        }
+      })();
+
+      await vi.waitFor(() => {
+        expect(interruptedTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
+      });
+      await session.interrupt();
+      await streaming;
+
+      expect(interruptedTurn).toContainEqual(
+        expect.objectContaining({ type: "turn_canceled", provider: "claude" }),
+      );
+
+      const nextTurn = await collectStreamEvents(session, "next compaction");
+      expect(nextTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("a compaction abandoned in an autonomous turn does not suppress the next marker", async () => {
+    // Trailing output after the foreground result opens an autonomous turn, which starts
+    // compacting and is then ended by the next foreground turn, never reaching a boundary.
+    const session = await createSessionForTurns([
+      [createSuccessResult(), createMessageStartEvent(), createCompactingStatus()],
+      [createCompactingStatus(), createSuccessResult()],
+    ]);
+
+    try {
+      const observed: AgentStreamEvent[] = [];
+      const unsubscribe = session.subscribe((event) => {
+        observed.push(event);
+      });
+
+      await collectStreamEvents(session, "foreground turn");
+      await vi.waitFor(() => {
+        expect(observed.filter(isLoadingCompactionEvent)).toHaveLength(1);
+      });
+      unsubscribe();
+
+      const nextTurn = await collectStreamEvents(session, "next compaction");
+      expect(nextTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
     } finally {
       await session.close();
     }

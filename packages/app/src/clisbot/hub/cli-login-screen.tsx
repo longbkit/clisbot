@@ -9,7 +9,7 @@ import { Field, FormTextInput } from "@/components/ui/form-field";
 import { useFetchQuery } from "@/data/query";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useHostRuntimeIsConnected, useHosts } from "@/runtime/host-runtime";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "./account-provider";

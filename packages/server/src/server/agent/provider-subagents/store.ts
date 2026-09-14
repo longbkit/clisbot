@@ -17,6 +17,8 @@ export type ProviderSubagentStatus = "running" | "completed" | "failed" | "cance
 export interface ProviderSubagentDescriptor {
   id: string;
   parentAgentId: string;
+  /** Direct provider-subagent parent. Null identifies a child of the managed agent. */
+  parentSubagentId: string | null;
   provider: AgentProvider;
   title: string | null;
   description: string | null;
@@ -43,6 +45,7 @@ export type ProviderSubagentInputEvent =
       toolCallId?: string | null;
       cwd?: string | null;
       subtitle?: string | null;
+      parentSubagentId?: string | null;
       timestamp?: string;
     }
   | {
@@ -96,6 +99,7 @@ function makeDescriptor(
     toolCallId: stickyField(event.toolCallId, previous?.toolCallId),
     cwd: stickyField(event.cwd, previous?.cwd),
     subtitle: stickyField(event.subtitle, previous?.subtitle),
+    parentSubagentId: stickyField(event.parentSubagentId, previous?.parentSubagentId),
   };
 }
 
@@ -324,7 +328,7 @@ export class ProviderSubagentStore {
       this.timelines.initialize(key);
     }
     const subagent = makeDescriptor(parentAgentId, provider, event, previous);
-    this.descriptors.set(key, { ...subagent });
+    this.descriptors.set(key, subagent);
     return { type: "upsert", subagent };
   }
   private applyTimeline(

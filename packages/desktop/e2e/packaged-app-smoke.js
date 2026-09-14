@@ -5,6 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { setTimeout: delay } = require("node:timers/promises");
 const { chromium } = require("playwright");
+const { extractFile } = require("@electron/asar");
 
 const EXECUTABLE_NAME = "Paseo";
 const SMOKE_TIMEOUT_MS = 60_000;
@@ -222,7 +223,10 @@ async function waitForFile(filePath, label) {
   const deadline = Date.now() + SMOKE_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, "utf8");
+      const contents = fs.readFileSync(filePath, "utf8");
+      if (contents.trim().length > 0) {
+        return contents;
+      }
     }
     await delay(250);
   }
@@ -802,9 +806,23 @@ async function stopCliDaemon({ appPath, env }) {
   });
 }
 
+function assertLinuxDesktopIdentity(appPath) {
+  if (process.platform === "linux") {
+    const metadata = JSON.parse(
+      extractFile(path.join(appPath, "resources", "app.asar"), "package.json").toString(),
+    );
+    if (metadata.desktopName !== `${EXECUTABLE_NAME}.desktop`) {
+      throw new Error(
+        `Packaged Linux desktop identity ${JSON.stringify(metadata.desktopName)} does not match ${EXECUTABLE_NAME}.desktop`,
+      );
+    }
+  }
+}
+
 async function smokePackagedDesktopApp({ appPath }) {
   const executablePath = getExecutablePath(appPath);
   assertExecutable(executablePath, "Packaged app executable");
+  assertLinuxDesktopIdentity(appPath);
   ensureLinuxSandboxPermissions(appPath);
   await smokeColdCliDaemonStart({ appPath });
 

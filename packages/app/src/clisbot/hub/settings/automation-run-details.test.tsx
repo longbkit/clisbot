@@ -42,7 +42,7 @@ vi.mock("@/components/ui/button", () => ({
     </button>
   ),
 }));
-vi.mock("@/screens/settings/settings-section", () => ({
+vi.mock("@/components/settings/headings/settings-section", () => ({
   SettingsSection: ({
     title,
     trailing,

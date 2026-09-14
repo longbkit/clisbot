@@ -29,7 +29,7 @@ import { SegmentedControl, type SegmentedControlOption } from "@/components/ui/s
 import { Switch } from "@/components/ui/switch";
 import { useLatchedBoolean } from "@/hooks/use-latched-boolean";
 import { useFetchQuery } from "@/data/query";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
 import { hubResourceQueryKey } from "../query-keys";

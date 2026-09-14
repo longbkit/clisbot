@@ -100,6 +100,12 @@ function itemPreview(item: AgentTimelineItem): AgentTimelineItem {
       return { ...item, items: [] };
     case "error":
       return { ...item, message: "" };
+    case "notification":
+      return { ...item, message: "" };
+    // A plugin item's payload is opaque to the daemon, so the preview drops it whole
+    // rather than guessing which of its fields are the heavy ones.
+    case "plugin":
+      return { ...item, data: null };
     case "compaction":
       return {
         type: item.type,

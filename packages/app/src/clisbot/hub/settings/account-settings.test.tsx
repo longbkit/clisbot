@@ -28,7 +28,11 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams: () => navigation.params,
 }));
 vi.mock("../account-provider", () => ({ useHubAccount: () => hub }));
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: () => ({}) },
+  // v0.8.0 moved SettingsSection under components/, which pulls in withUnistyles.
+  withUnistyles: (component: unknown) => component,
+}));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
 vi.mock("./channel-settings", () => ({ ChannelSettings: () => null }));
@@ -82,7 +86,7 @@ vi.mock("@/components/ui/form-field", () => ({
     );
   },
 }));
-vi.mock("@/screens/settings/settings-section", () => ({
+vi.mock("@/components/settings/headings/settings-section", () => ({
   SettingsSection: ({ title, children }: { title: string; children: ReactNode }) => (
     <section>
       <h2>{title}</h2>

@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { useHubAccount } from "../account-provider";
 import { createChannelConnection } from "../channel-api";
 import type { ChannelConnectionProblem } from "../channel-connection-form";

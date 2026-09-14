@@ -1,6 +1,7 @@
 import type { SessionInboundMessage, SessionOutboundMessage } from "../messages.js";
 import { DAEMON_PERMISSIONS, type DaemonPermission } from "@getpaseo/protocol/messages";
 import {
+  type PermissionRequirement,
   requiredPermissionForInbound,
   requiredPermissionForOutbound,
 } from "./operation-permissions.js";
@@ -46,7 +47,7 @@ export class SessionAuthorization {
   allowsOutbound(message: SessionOutboundMessage): boolean {
     return (
       this.hasActiveLease() &&
-      (this.allows(requiredPermissionForOutbound(message.type)) ||
+      (this.allows(requiredPermissionForOutbound(message)) ||
         (message.type === "workspace.create.response" && this.allowsManagedWorkspaceCreation()))
     );
   }
@@ -116,8 +117,10 @@ export class SessionAuthorization {
     return this.hasActiveLease();
   }
 
-  private allows(permission: DaemonPermission | null): boolean {
-    return permission === null || this.permissions.has(permission);
+  private allows(requirement: PermissionRequirement): boolean {
+    if (requirement === null) return true;
+    if (typeof requirement === "string") return this.permissions.has(requirement);
+    return requirement.some((permission) => this.permissions.has(permission));
   }
 
   private hasActiveLease(): boolean {

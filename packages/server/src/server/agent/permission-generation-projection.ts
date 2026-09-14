@@ -104,6 +104,12 @@ export function withoutPermissionGeneration(
         ? message
         : { ...message, payload: { ...message.payload, entries } };
     }
+    case "agent_permission_request": {
+      const request = projectRequest(message.payload.request);
+      return request === message.payload.request
+        ? message
+        : { ...message, payload: { ...message.payload, request } };
+    }
     case "agent_stream":
     case "hub.execution.agent.stream":
       return projectStream(message);

@@ -59,7 +59,11 @@ vi.mock("../provider-application-form", async (importOriginal) => {
     },
   };
 });
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: () => ({}) },
+  // v0.8.0 moved SettingsSection under components/, which pulls in withUnistyles.
+  withUnistyles: (component: unknown) => component,
+}));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: vi.fn() }));
@@ -76,7 +80,7 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
     </div>
   ),
 }));
-vi.mock("@/screens/settings/settings-section", () => ({
+vi.mock("@/components/settings/headings/settings-section", () => ({
   SettingsSection: ({ children }: { children: ReactNode }) => <section>{children}</section>,
 }));
 vi.mock("@/components/ui/alert", () => ({

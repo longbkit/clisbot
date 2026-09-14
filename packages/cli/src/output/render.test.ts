@@ -1,12 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { renderError, toCommandError } from "./render.js";
+import { expect, it } from "vitest";
+import { renderError, toCommandError } from "./index.js";
 
-describe("structured command errors", () => {
-  it("keeps the message of Error subclasses in JSON output", () => {
-    const failure = Object.assign(new Error("The owner must finish Account setup"), {
-      code: "HUB_REQUEST_FAILED",
-    });
-    const result = JSON.parse(renderError(toCommandError(failure), { format: "json" }));
-    expect(result.error).toEqual({ code: "HUB_REQUEST_FAILED", message: failure.message });
+it("preserves the message of an Error with an RPC code in JSON output", () => {
+  const error = Object.assign(new Error("Plugin requires Paseo >=0.8.0. Your daemon is 0.7.2."), {
+    code: "handler_error",
+    requestId: "request-1",
+  });
+  expect(JSON.parse(renderError(toCommandError(error), { format: "json" }))).toEqual({
+    error: {
+      code: "handler_error",
+      requestId: "request-1",
+      message: "Plugin requires Paseo >=0.8.0. Your daemon is 0.7.2.",
+    },
   });
 });

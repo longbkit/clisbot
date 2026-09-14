@@ -5,7 +5,7 @@ import type { z } from "zod";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useFetchQuery } from "@/data/query";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
 import { HubAutomationRunDetailsSchema, type HubAutomationActivitySchema } from "../contracts";

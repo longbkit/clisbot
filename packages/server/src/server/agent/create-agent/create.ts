@@ -65,6 +65,7 @@ export type EnsureWorkspaceForCreate = (
 
 export interface CreateAgentFromSessionInput {
   kind: "session";
+  agentId?: string;
   config: AgentSessionConfig;
   workspaceId: string;
   worktreeName?: string;
@@ -194,7 +195,7 @@ export async function createAgentCommand(
 
   const snapshot = await dependencies.agentManager.createAgent(
     resolved.config,
-    undefined,
+    input.kind === "session" ? input.agentId : undefined,
     resolved.createOptions,
   );
 

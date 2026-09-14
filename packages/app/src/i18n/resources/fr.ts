@@ -10,10 +10,12 @@ export const fr: TranslationResources = {
       cancel: "Annuler",
       close: "Fermer",
       copy: "Copie",
+      copyLine: "Copier la ligne",
       dismiss: "Rejeter",
       retry: "Réessayer",
       search: "Recherche",
       select: "Sélectionner",
+      selectAll: "Tout sélectionner",
     },
     placeholders: {
       search: "Recherche...",
@@ -33,6 +35,7 @@ export const fr: TranslationResources = {
     errors: {
       error: "Erreur",
       unableToSave: "Impossible d'enregistrer",
+      unableToCopy: "Impossible de copier",
       nameRequired: "Le nom est requis",
       daemonUnavailable: "Daemonindisponible",
       daemonClientUnavailable: "ClientDaemonindisponible",
@@ -294,6 +297,7 @@ export const fr: TranslationResources = {
       zoomIn: "Zoomer",
       zoomOut: "Dézoomer",
       resetZoom: "Réinitialiser la vue",
+      fullscreen: "Plein écran",
       viewSource: "Afficher la source",
       viewDiagram: "Afficher le diagramme",
     },
@@ -365,7 +369,13 @@ export const fr: TranslationResources = {
     },
   },
   importSession: {
+    chooseHostTitle: en.importSession.chooseHostTitle,
     title: "Session d'importation",
+    searchPlaceholder: "Rechercher des sessions...",
+    scope: {
+      host: "Sessions sur {{host}}",
+      workspace: "Cet espace de travail",
+    },
     filters: {
       all: "Tous",
     },
@@ -374,12 +384,13 @@ export const fr: TranslationResources = {
       updateHost: "Mettez à jour l'hôte pour importer des sessions.",
       noProviders: "Aucun fournisseur importable n'est activé.",
       loading: "Chargement des sessions récentes...",
-      failedAll: "Impossible de charger les sessions récentes.",
-      failedProviders: "Impossible de charger les sessions pour{{providers}}.",
+      failedProvider: "Impossible de charger les sessions {{provider}}",
       failedImport: "Impossible d'importer la session sélectionnée.",
     },
     actions: {
       refresh: "Sessions de rafraîchissement",
+      showAll: "Tout afficher",
+      loadMore: "Charger plus",
     },
     preview: {
       untitledSession: "Séance sans titre",
@@ -387,6 +398,7 @@ export const fr: TranslationResources = {
     },
     empty: {
       noRecent: "Aucune session récente à importer.",
+      noMatches: "Aucune session ne correspond à votre recherche.",
       alreadyImported: "Toutes les sessions récentes sont déjà importées.",
       noProviderSessions: "Aucune session{{provider}}trouvée.",
     },
@@ -499,14 +511,23 @@ export const fr: TranslationResources = {
         completed: "Configuration terminée",
         failed: "Échec de l'installation",
         workspace: "ConfigurationWorkspace",
+        blocked: "Configuration bloquée",
       },
       status: {
         running: "En cours d'exécution",
         completed: "Complété",
         failed: "Échoué",
         waiting: "En attente de la sortie de configuration",
+        blocked: "Bloqué",
       },
       waiting: "Configuration de l'espace de travail...",
+      blocked: {
+        title: "La configuration n’a pas été exécutée",
+        description:
+          "Cette PR provient de {{repository}}, un dépôt différent. Sa configuration et ses scripts pourraient exécuter du code que vous n’avez pas examiné.",
+        run: "Exécuter la configuration",
+        runFailed: "Échec de la configuration de l’espace de travail",
+      },
       empty: {
         noCommands: "Aucune commande de configuration n'a été exécutée pour cet espace de travail.",
       },
@@ -914,11 +935,8 @@ export const fr: TranslationResources = {
         refresh: "Rafraîchir",
         refreshState: "Actualiser l'état de git et de {{brand}}",
         failedRefresh: "Échec de l'actualisation de l'état git.",
-        emptyHiddenWhitespace: "Aucun changement visible après avoir masqué les espaces",
-        emptyUncommitted: "Aucune modification non validée",
         seeUncommittedChanges: "Voir les modifications non validées",
         seeCommittedChanges: "Voir les modifications validées",
-        emptyAgainstBase: "Aucun changement par rapport à{{baseRef}}",
         checkingRepository: "Vérification du référentiel...",
         notRepository: "Pas un dépôt git",
         diffMode: "Mode différentiel",
@@ -1061,6 +1079,16 @@ export const fr: TranslationResources = {
       updateHost: "Mettez à jour cet hôte pour gérer les étiquettes.",
     },
   },
+  changelog: {
+    title: "Nouveautés",
+    installed: "Installée",
+    showMore: "Afficher plus",
+    openWebsite: "Journal des modifications complet",
+    error: {
+      title: "Impossible de charger le journal des modifications",
+      description: "Vérifiez votre connexion et réessayez.",
+    },
+  },
   sidebar: {
     display: {
       trigger: "Préférences d'affichage",
@@ -1120,7 +1148,6 @@ export const fr: TranslationResources = {
       addProject: "Ajouter un projet",
       newWorkspace: "Nouvel espace de travail",
       hosts: "Hôtes",
-      home: "Maison",
       settings: "Paramètres",
       closeSidebar: "Fermer la barre latérale",
     },
@@ -1137,6 +1164,7 @@ export const fr: TranslationResources = {
     },
     sections: {
       sessions: "Historique",
+      search: "Rechercher",
       schedules: "Planifications",
     },
     worktreeSetup: {
@@ -2106,6 +2134,7 @@ export const fr: TranslationResources = {
     about: {
       title: "À propos",
       appVersion: "Version de l'application",
+      whatsNewHint: "Notes de version pour chaque release",
       thisDevice: "Cet appareil",
       connectedHosts: "Hôtes connectés",
       offline: "Hors ligne",
@@ -2153,6 +2182,12 @@ export const fr: TranslationResources = {
       chatOutline: {
         title: "Plan de la discussion",
         description: "Afficher un plan pour passer d’une requête à l’autre",
+      },
+      sidebar: {
+        title: "Barre latérale",
+        description: "Choisissez les éléments affichés en haut de la barre latérale et leur ordre",
+        moveUp: "Déplacer vers le haut",
+        moveDown: "Déplacer vers le bas",
       },
       fonts: {
         title: "Polices",

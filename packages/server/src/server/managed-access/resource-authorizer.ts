@@ -279,7 +279,7 @@ export class ManagedResourceAuthorizer {
       // Project owner, returning it would disclose names from other Projects.
       return false;
     }
-    if (requiredPermissionForOutbound(message.type) === "daemon.read") {
+    if (requiredPermissionForOutbound(message) === "daemon.read") {
       return this.allowsRestrictedDaemonReadOutbound(message);
     }
     const listProjection = this.allowsOutboundListProjection(message);

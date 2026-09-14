@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { SelectField, type SelectFieldOption } from "@/components/ui/select-field";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useFetchQuery } from "@/data/query";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useHubAccount } from "../account-provider";
 import { HubChannelActivitySchema, HubConnectionsSchema } from "../contracts";

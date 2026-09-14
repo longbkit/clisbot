@@ -47,7 +47,7 @@ import {
   AssistantMessage,
   SpeakMessage,
   UserMessage,
-  ActivityLog,
+  Notification,
   ToolCall,
   TodoListCard,
   CompactionMarker,
@@ -122,7 +122,8 @@ import type { Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
-import { PluginTimelineItemView } from "@/plugins/timeline";
+import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
+import { projectPluginTimelineItems } from "@/plugins/timeline/projection";
 
 // Shared element: AgentFace takes no props, so every response row reuses it.
 const AGENT_FACE = <AgentFace />;
@@ -488,6 +489,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
     // Get serverId (fallback to agent's serverId if not provided)
     const resolvedServerId = serverId ?? context.serverId ?? "";
+    const transformTimelineItem = useInstalledTimelineTransform(resolvedServerId);
 
     const client = useSessionStore((state) => state.sessions[resolvedServerId]?.client ?? null);
     const sessionStreamHead = useSessionStore((state) =>
@@ -661,6 +663,13 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         toolCallDetailLevel,
       ],
     );
+    const projectedPlugins = useMemo(
+      () => ({
+        tail: projectPluginTimelineItems(projectedToolCalls.tail, transformTimelineItem),
+        head: projectPluginTimelineItems(projectedToolCalls.head, transformTimelineItem),
+      }),
+      [projectedToolCalls.head, projectedToolCalls.tail, transformTimelineItem],
+    );
     const {
       start: historyWindowStart,
       hasLocalHistory,
@@ -668,7 +677,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       loadOlder,
     } = useStreamHistoryWindow({
       agentId,
-      items: projectedToolCalls.tail,
+      items: projectedPlugins.tail,
       loadRemoteOlder,
     });
     const isLoadingOlder = remoteIsLoadingOlder;
@@ -679,8 +688,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       return buildAgentStreamRenderModel({
         isTurnActive,
         activeTurnStartedAt: effectiveTurnPresentation.startedAt,
-        tail: projectedToolCalls.tail,
-        head: projectedToolCalls.head,
+        tail: projectedPlugins.tail,
+        head: projectedPlugins.head,
         platform: isWeb ? "web" : "native",
         isMobileBreakpoint: isMobile,
         historyStart: historyWindowStart,
@@ -688,8 +697,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     }, [
       isMobile,
       isTurnActive,
-      projectedToolCalls.head,
-      projectedToolCalls.tail,
+      projectedPlugins.head,
+      projectedPlugins.tail,
       effectiveTurnPresentation.startedAt,
       historyWindowStart,
     ]);
@@ -1060,15 +1069,8 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           case "tool_call":
             return renderToolCallItem(layoutItem, item);
 
-          case "activity_log":
-            return (
-              <ActivityLog
-                type={item.activityType}
-                message={item.message}
-                timestamp={item.timestamp.getTime()}
-                metadata={item.metadata}
-              />
-            );
+          case "notification":
+            return <Notification level={item.level} message={item.message} />;
 
           case "todo_list":
             return <TodoListCard items={item.items} activity={item.activity} />;

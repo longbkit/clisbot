@@ -50,12 +50,8 @@ export function render<T>(
 /** Convert an unknown error to a CommandError */
 export function toCommandError(error: unknown): CommandError {
   if (isCommandError(error)) {
-    // Error subclasses have a non-enumerable message; JSON output still needs it.
-    return {
-      code: error.code,
-      message: error.message,
-      ...(error.details === undefined ? {} : { details: error.details }),
-    };
+    // Error.message and class getters are not enumerable; materialize the output contract.
+    return { ...error, code: error.code, message: error.message, details: error.details };
   }
 
   if (error instanceof Error) {

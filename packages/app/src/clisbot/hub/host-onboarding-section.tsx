@@ -8,7 +8,7 @@ import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-bad
 import { useFetchQuery } from "@/data/query";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useHostRuntimeConnectionStatuses, useHosts } from "@/runtime/host-runtime";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { copyToClipboard } from "@/utils/copy-to-clipboard";
 import { buildHostRootRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";

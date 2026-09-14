@@ -7,7 +7,7 @@ import {
   hostSessionHubManagement,
   subscribeHostSessionAccess,
 } from "@/runtime/host-session-access";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import type { HostProfile } from "@/types/host-connection";
 import { confirmDialog } from "@/utils/confirm-dialog";

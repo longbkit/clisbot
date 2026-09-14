@@ -2,7 +2,7 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { settingsStyles } from "@/styles/settings";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import {
   CHANNEL_CAPABILITY_STATE_LABELS,
   channelCapabilityVariant,

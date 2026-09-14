@@ -12,7 +12,7 @@ import { stringify, parse } from "yaml";
 import { Button } from "@/components/ui/button";
 import { Field, FormTextInput } from "@/components/ui/form-field";
 import { SelectField } from "@/components/ui/select-field";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { Alert } from "@/components/ui/alert";
 import { useIsCompactFormFactor } from "@/constants/layout";

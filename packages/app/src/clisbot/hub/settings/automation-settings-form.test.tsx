@@ -193,7 +193,7 @@ vi.mock("@/components/ui/form-field", () => ({
     />
   ),
 }));
-vi.mock("@/screens/settings/settings-section", () => ({
+vi.mock("@/components/settings/headings/settings-section", () => ({
   SettingsSection: ({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) => (
     <section>
       {trailing}

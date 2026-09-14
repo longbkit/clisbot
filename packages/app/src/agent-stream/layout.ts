@@ -200,7 +200,8 @@ const RESPONSE_GROUP_KINDS = new Set<StreamItem["kind"]>([
   "tool_call",
   "thought",
   "todo_list",
-  "activity_log",
+  // v0.8.0 replaced the activity_log kind with notification.
+  "notification",
 ]);
 
 export function isResponseGroupItem(item: StreamItem | null | undefined): item is StreamItem {

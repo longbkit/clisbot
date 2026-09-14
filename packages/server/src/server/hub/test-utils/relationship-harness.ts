@@ -162,7 +162,9 @@ class MemoryHubSocket extends EventEmitter implements WebSocketLike, HubSocketCo
     if (typeof data !== "string") return;
     const frame = JSON.parse(data) as { type: "session"; message: SessionOutboundMessage };
     this.sent.push(frame.message);
-    this.messageObserved.resolve();
+    const observed = this.messageObserved;
+    this.messageObserved = deferred<void>();
+    observed.resolve();
   }
 
   close(code = 1000): void {
@@ -194,7 +196,6 @@ class MemoryHubSocket extends EventEmitter implements WebSocketLike, HubSocketCo
       );
       if (message) return message;
       await this.messageObserved.promise;
-      this.messageObserved = deferred<void>();
     }
   }
 
@@ -205,7 +206,6 @@ class MemoryHubSocket extends EventEmitter implements WebSocketLike, HubSocketCo
       const message = this.sent.find(predicate);
       if (message) return message;
       await this.messageObserved.promise;
-      this.messageObserved = deferred<void>();
     }
   }
 }
@@ -755,6 +755,16 @@ export class HubRelationshipHarness {
     if (!socket) throw new Error(`Socket ${index} does not exist`);
     socket.events.closed(code);
     socket.socket.close(code);
+  }
+
+  async requestOrdinary(message: {
+    type: string;
+    requestId: string;
+    [key: string]: unknown;
+  }): Promise<SessionOutboundMessage> {
+    const socket = this.latestSocket().socket;
+    socket.receive(message);
+    return socket.messageFor(message.requestId);
   }
 
   sendHubRequestOnLatest(message: unknown): SessionOutboundMessage[] {

@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { registerWebConfirmation } from "@/utils/confirm-dialog";
 import { HostPluginsPage } from "./plugins-page";
 
 void testI18n;
@@ -58,6 +59,11 @@ vi.mock("@/components/adaptive-modal-sheet", async () => {
 
 vi.mock("react-native-reanimated", () => ({
   default: { View: "div" },
+  Keyframe: class {
+    duration() {
+      return this;
+    }
+  },
   Easing: { ease: "ease", inOut: (value: unknown) => value },
   interpolateColor: (value: number, _input: number[], output: string[]) =>
     value >= 1 ? output[1] : output[0],
@@ -131,7 +137,11 @@ function renderPage(client: PluginClient | null): void {
 }
 
 describe("HostPluginsPage", () => {
+  // Fusion routes web confirmations through a mounted provider, not globalThis.confirm.
+  let unregisterConfirmation: (() => void) | undefined;
+
   beforeEach(() => {
+    unregisterConfirmation = registerWebConfirmation(async () => true);
     vi.stubGlobal("React", React);
     runtime.connected = true;
     runtime.supported = true;
@@ -144,6 +154,7 @@ describe("HostPluginsPage", () => {
   });
 
   afterEach(() => {
+    unregisterConfirmation?.();
     cleanup();
     vi.unstubAllGlobals();
   });

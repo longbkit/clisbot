@@ -26,7 +26,7 @@ import { SelectField, type SelectFieldOption } from "@/components/ui/select-fiel
 import { Switch } from "@/components/ui/switch";
 import { useFetchQuery } from "@/data/query";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { SettingsSection } from "@/screens/settings/settings-section";
+import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { ConfirmationProvider, useConfirmation } from "@/components/confirmation-provider";
 import { useHubAccount } from "../account-provider";

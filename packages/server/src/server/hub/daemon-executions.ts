@@ -67,6 +67,7 @@ interface DaemonExecutionsOptions {
   assertProjectSourcePlacement?: (cwd: string, projectId: string) => Promise<void>;
   resolveWorkspaceProjectId?: (workspaceId: string) => Promise<string | undefined>;
   interruptAgent: (agentId: string) => Promise<unknown>;
+  archiveWorkspace: (workspaceId: string, requestId: string) => Promise<unknown>;
   logger: Logger;
   cleanupFailedCreate?: (input: {
     createdWorktree: CreatePaseoWorktreeWorkflowResult | null;
@@ -384,13 +385,9 @@ export class DaemonExecutions implements HubExecutionAgents {
       return;
     }
 
+    const workspaceId = requireExecutionWorkspaceId(record);
     this.requireAuthority(authorityGeneration, "execution control");
-    if (record.archivedAt) return;
-    if (this.agentManager.getAgent(record.id)) {
-      await this.agentManager.archiveAgent(record.id);
-    } else {
-      await this.agentManager.archiveSnapshot(record.id, new Date().toISOString());
-    }
+    await this.options.archiveWorkspace(workspaceId, input.requestId);
   }
 
   private resolveRecord(record: StoredAgentRecord): OwnedAgentSnapshot {

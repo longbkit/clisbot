@@ -41,6 +41,7 @@ import {
   addDaemonHostOption,
   addJsonAndDaemonHostOptions,
   addJsonOption,
+  withGlobalOptions,
 } from "./utils/command-options.js";
 import { resolveCliVersion } from "./version.js";
 
@@ -65,6 +66,7 @@ export function createCli(): Command {
     .option("-q, --quiet", "minimal output (IDs only)")
     .option("--no-headers", "omit table headers")
     .option("--no-color", "disable colored output");
+  addDaemonHostOption(program);
 
   // Primary agent commands (top-level)
   addJsonAndDaemonHostOptions(addLsOptions(program.command("ls"))).action(withOutput(runLsCommand));
@@ -91,9 +93,13 @@ export function createCli(): Command {
     )
     .action(withOutput(runCloneCommand));
 
-  addDaemonHostOption(addAttachOptions(program.command("attach"))).action(runAttachCommand);
+  addDaemonHostOption(addAttachOptions(program.command("attach"))).action(
+    withGlobalOptions(runAttachCommand),
+  );
 
-  addDaemonHostOption(addLogsOptions(program.command("logs"))).action(runLogsCommand);
+  addDaemonHostOption(addLogsOptions(program.command("logs"))).action(
+    withGlobalOptions(runLogsCommand),
+  );
 
   addJsonAndDaemonHostOptions(addStopOptions(program.command("stop"))).action(
     withOutput(runStopCommand),

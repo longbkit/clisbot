@@ -10,10 +10,12 @@ export const es: TranslationResources = {
       cancel: "Cancelar",
       close: "Cerrar",
       copy: "Copiar",
+      copyLine: "Copiar línea",
       dismiss: "Despedir",
       retry: "Rever",
       search: "Buscar",
       select: "Seleccionar",
+      selectAll: "Seleccionar todo",
     },
     placeholders: {
       search: "Buscar...",
@@ -33,6 +35,7 @@ export const es: TranslationResources = {
     errors: {
       error: "Error",
       unableToSave: "No se puede guardar",
+      unableToCopy: "No se pudo copiar",
       nameRequired: "El nombre es obligatorio",
       daemonUnavailable: "Daemonno disponible",
       daemonClientUnavailable: "ClienteDaemonno disponible",
@@ -293,6 +296,7 @@ export const es: TranslationResources = {
       zoomIn: "Acercar",
       zoomOut: "Alejar",
       resetZoom: "Restablecer vista",
+      fullscreen: "Pantalla completa",
       viewSource: "Ver fuente",
       viewDiagram: "Ver diagrama",
     },
@@ -364,7 +368,13 @@ export const es: TranslationResources = {
     },
   },
   importSession: {
+    chooseHostTitle: en.importSession.chooseHostTitle,
     title: "Importar sesión",
+    searchPlaceholder: "Buscar sesiones...",
+    scope: {
+      host: "Sesiones en {{host}}",
+      workspace: "Este espacio de trabajo",
+    },
     filters: {
       all: "Todo",
     },
@@ -373,12 +383,13 @@ export const es: TranslationResources = {
       updateHost: "Actualice el host para importar sesiones.",
       noProviders: "No hay proveedores importables habilitados.",
       loading: "Cargando sesiones recientes...",
-      failedAll: "No se pudieron cargar las sesiones recientes.",
-      failedProviders: "No se pudieron cargar sesiones para{{providers}}.",
+      failedProvider: "No se pudieron cargar las sesiones de {{provider}}",
       failedImport: "No se pudo importar la sesión seleccionada.",
     },
     actions: {
       refresh: "Actualizar sesiones",
+      showAll: "Mostrar todo",
+      loadMore: "Cargar más",
     },
     preview: {
       untitledSession: "Sesión sin título",
@@ -386,6 +397,7 @@ export const es: TranslationResources = {
     },
     empty: {
       noRecent: "No hay sesiones recientes para importar.",
+      noMatches: "Ninguna sesión coincide con tu búsqueda.",
       alreadyImported: "Todas las sesiones recientes ya están importadas.",
       noProviderSessions: "No se encontraron sesiones{{provider}}.",
     },
@@ -499,14 +511,23 @@ export const es: TranslationResources = {
         completed: "Configuración completada",
         failed: "Error de configuración",
         workspace: "Configuración deWorkspace",
+        blocked: "Configuración bloqueada",
       },
       status: {
         running: "Correr",
         completed: "Terminado",
         failed: "Fallido",
         waiting: "Esperando el resultado de la configuración",
+        blocked: "Bloqueado",
       },
       waiting: "Configurando el espacio de trabajo...",
+      blocked: {
+        title: "No se ejecutó la configuración",
+        description:
+          "Este PR proviene de {{repository}}, un repositorio diferente. Su configuración y scripts podrían ejecutar código que no has revisado.",
+        run: "Ejecutar configuración",
+        runFailed: "No se pudo ejecutar la configuración",
+      },
       empty: {
         noCommands: "No se ejecutó ningún comando de configuración para este espacio de trabajo.",
       },
@@ -915,11 +936,8 @@ export const es: TranslationResources = {
         refresh: "Refrescar",
         refreshState: "Actualizar el estado de git y {{brand}}",
         failedRefresh: "No se pudo actualizar el estado de git.",
-        emptyHiddenWhitespace: "No hay cambios visibles después de ocultar espacios en blanco",
-        emptyUncommitted: "Sin cambios no confirmados",
         seeUncommittedChanges: "Ver cambios no confirmados",
         seeCommittedChanges: "Ver cambios confirmados",
-        emptyAgainstBase: "Sin cambios frente a{{baseRef}}",
         checkingRepository: "Comprobando repositorio...",
         notRepository: "No es un repositorio de git",
         diffMode: "modo diferencial",
@@ -1062,6 +1080,16 @@ export const es: TranslationResources = {
       updateHost: "Actualiza este host para gestionar etiquetas.",
     },
   },
+  changelog: {
+    title: "Novedades",
+    installed: "Instalada",
+    showMore: "Mostrar más",
+    openWebsite: "Registro de cambios completo",
+    error: {
+      title: "No se pudo cargar el registro de cambios",
+      description: "Comprueba tu conexión e inténtalo de nuevo.",
+    },
+  },
   sidebar: {
     display: {
       trigger: "Preferencias de visualización",
@@ -1120,7 +1148,6 @@ export const es: TranslationResources = {
       addProject: "Agregar proyecto",
       newWorkspace: "Nuevo espacio de trabajo",
       hosts: "Hosts",
-      home: "Hogar",
       settings: "Ajustes",
       closeSidebar: "Cerrar barra lateral",
     },
@@ -1137,6 +1164,7 @@ export const es: TranslationResources = {
     },
     sections: {
       sessions: "Historial",
+      search: "Buscar",
       schedules: "Horarios",
     },
     worktreeSetup: {
@@ -2103,6 +2131,7 @@ export const es: TranslationResources = {
     about: {
       title: "Acerca de",
       appVersion: "Versión de la aplicación",
+      whatsNewHint: "Notas de versión de cada release",
       thisDevice: "este dispositivo",
       connectedHosts: "Anfitriones conectados",
       offline: "Desconectado",
@@ -2149,6 +2178,13 @@ export const es: TranslationResources = {
       chatOutline: {
         title: "Esquema del chat",
         description: "Muestra un esquema para saltar entre instrucciones",
+      },
+      sidebar: {
+        title: "Barra lateral",
+        description:
+          "Elige qué elementos aparecen en la parte superior de la barra lateral y en qué orden",
+        moveUp: "Mover hacia arriba",
+        moveDown: "Mover hacia abajo",
       },
       fonts: {
         title: "Fuentes",

@@ -50,7 +50,11 @@ vi.mock("./api-key-settings", () => ({ ApiKeySettings: () => null }));
 vi.mock("./provider-application-settings", () => ({ ProviderApplicationSettings: () => null }));
 vi.mock("../host-onboarding-section", () => ({ HubHostOnboardingSection: () => null }));
 vi.mock("@/constants/layout", () => ({ useIsCompactFormFactor: () => false }));
-vi.mock("react-native-unistyles", () => ({ StyleSheet: { create: () => ({}) } }));
+vi.mock("react-native-unistyles", () => ({
+  StyleSheet: { create: () => ({}) },
+  // v0.8.0 moved SettingsSection under components/, which pulls in withUnistyles.
+  withUnistyles: (component: unknown) => component,
+}));
 vi.mock("@/styles/settings", () => ({ settingsStyles: {} }));
 vi.mock("@/utils/confirm-dialog", () => ({ confirmDialog: vi.fn() }));
 vi.mock("@/utils/copy-to-clipboard", () => ({ copyToClipboard: fixture.copy }));
@@ -90,7 +94,7 @@ vi.mock("@/components/ui/button", () => ({
     </button>
   ),
 }));
-vi.mock("@/screens/settings/settings-section", () => ({
+vi.mock("@/components/settings/headings/settings-section", () => ({
   SettingsSection: ({ title, children }: { title: string; children: ReactNode }) => (
     <section>
       <h2>{title}</h2>
