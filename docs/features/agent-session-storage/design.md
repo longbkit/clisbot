@@ -3,6 +3,14 @@
 The feature's long-term contract: schema, identity rules, storage layout, data lifecycle, and
 all of AC1–AC9 / W1–W7. Each iteration has its own doc under [iterations/](iterations/).
 
+Supersedes `docs/audits/2026-09-08-workspace-placement-and-session-authorship.md`, the CONSIDER
+audit this feature grew out of (removed once shipped; `git log -- <path>` still has it). Its three
+open questions are all answered here: the field names it left unsettled are the envelope schema
+below, and the two gaps it found in code — `AgentTimelineStore` unused at daemon startup, and
+timeline content not fully reloaded — are closed by `createSessionStorageWiring` in
+`packages/server/src/server/bootstrap.ts` and `durableTimelineReader` in
+`packages/server/src/server/agent/agent-manager.ts`.
+
 ## Intended outcome
 
 A creates the workspace/session, B continues the chat, C answers a question or approves: the
