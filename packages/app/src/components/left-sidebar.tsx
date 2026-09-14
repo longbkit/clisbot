@@ -23,7 +23,6 @@ import {
 } from "@/components/sidebar-resize-handle-layout";
 import { HostPicker } from "@/components/hosts/host-picker";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
-import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
 import { SidebarHelpMenu } from "@/components/sidebar/sidebar-help-menu";
 import { SidebarResizeHandle } from "@/components/sidebar-resize-handle";
 import { Shortcut } from "@/components/ui/shortcut";
@@ -53,7 +52,7 @@ import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
 import { SidebarCalloutSlot } from "./sidebar-callout-slot";
 import { SidebarMetadataNotice } from "./sidebar/empty-states";
 import { SidebarWorkspaceList } from "./sidebar-workspace-list";
-import { AutomationSidebarItem } from "@/clisbot/hub/automation-sidebar-item";
+import { SidebarNavGroup } from "@/clisbot/hub/sidebar-nav-group";
 import { HubSidebarAccountButton } from "@/clisbot/hub/sidebar-account";
 
 type SidebarTheme = ReturnType<typeof useUnistyles>["theme"];
@@ -559,10 +558,7 @@ function MobileSidebar({
     >
       <View style={styles.sidebarContent} pointerEvents="auto">
         <WindowChromeSafeArea placement="below" />
-        <View style={styles.sidebarHeaderGroup}>
-          <SidebarNavRows onBeforeNavigate={closeSidebar} />
-          <AutomationSidebarItem onBeforeNavigate={closeSidebar} />
-        </View>
+        <SidebarNavGroup style={styles.sidebarHeaderGroup} onBeforeNavigate={closeSidebar} />
         <WindowChromeSafeArea placement="inline" style={styles.mobileCloseButtonRow}>
           <Pressable
             style={styles.mobileCloseButton}
@@ -759,10 +755,7 @@ function DesktopSidebar({
           ) : (
             <TitlebarDragRegion />
           )}
-          <View style={sidebarHeaderGroupStyle}>
-            <SidebarNavRows />
-            <AutomationSidebarItem />
-          </View>
+          <SidebarNavGroup style={sidebarHeaderGroupStyle} />
         </View>
 
         <SidebarMetadataNotice />
