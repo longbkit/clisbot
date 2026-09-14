@@ -1,3 +1,5 @@
+import { SessionOperationTickets } from "./session-operation-tickets.js";
+import type { SessionActor } from "@getpaseo/protocol/session-authorship";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -18,6 +20,7 @@ export interface IssuedAccessTicket {
 }
 
 export interface AccessTicketAdmission extends ResolvedDaemonAccess {
+  actor?: SessionActor | undefined;
   leaseId: string;
   leaseExpiresAt: Date;
 }
@@ -39,6 +42,7 @@ export class AccessTicketError extends Error {
 
 /** Issues and atomically consumes short-lived opaque daemon access credentials. */
 export class AccessTicketService {
+  readonly sessionOperations = new SessionOperationTickets();
   private readonly leaseDurationMs: number;
 
   constructor(
@@ -139,7 +143,12 @@ export class AccessTicketService {
         .update(schema.daemonAccessTickets)
         .set({ consumedAt: now })
         .where(eq(schema.daemonAccessTickets.id, ticket.id));
-      return { ...authority, leaseId: lease.id, leaseExpiresAt };
+      return {
+        ...authority,
+        leaseId: lease.id,
+        leaseExpiresAt,
+        actor: await accountActor(database, ticket),
+      };
     });
   }
 
@@ -188,7 +197,12 @@ export class AccessTicketService {
         .update(schema.daemonAccessLeases)
         .set({ expiresAt: leaseExpiresAt })
         .where(eq(schema.daemonAccessLeases.id, lease.id));
-      return { ...authority, leaseId: lease.id, leaseExpiresAt };
+      return {
+        ...authority,
+        leaseId: lease.id,
+        leaseExpiresAt,
+        actor: await accountActor(database, lease),
+      };
     });
     if (admission === null) {
       throw new AccessTicketError("access_denied", "daemon access is no longer granted");
@@ -311,4 +325,24 @@ async function lockActiveDaemon(database: DrizzleHandle, daemonId: string): Prom
   if (daemon === undefined) {
     throw new AccessTicketError("access_denied", "daemon access is no longer granted");
   }
+}
+
+async function accountActor(
+  database: DrizzleHandle,
+  identity: { clientId: string; userId: string; organizationId: string; membershipId: string },
+): Promise<SessionActor | undefined> {
+  if (identity.clientId.startsWith("channel-account:")) return undefined;
+  const [user] = await database
+    .select({ name: schema.users.name, image: schema.users.image })
+    .from(schema.users)
+    .where(eq(schema.users.id, identity.userId))
+    .limit(1);
+  return {
+    kind: "user",
+    id: identity.userId,
+    organizationId: identity.organizationId,
+    memberId: identity.membershipId,
+    ...(user?.name ? { displayName: user.name } : {}),
+    ...(user?.image ? { avatarUrl: user.image } : {}),
+  };
 }

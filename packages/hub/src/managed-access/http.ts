@@ -35,6 +35,28 @@ export async function consumeDaemonAccessTicket(
     );
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
+  const operation = z
+    .object({
+      sessionOperationTicket: z.string().min(1),
+      clientId: z.string().min(1),
+      digest: z.string().min(1),
+    })
+    .strict()
+    .safeParse(value);
+  if (operation.success) {
+    try {
+      return Response.json(
+        tickets.sessionOperations.consume({
+          ticket: operation.data.sessionOperationTicket,
+          daemonId,
+          clientId: operation.data.clientId,
+          digest: operation.data.digest,
+        }),
+      );
+    } catch {
+      return Response.json({ error: "invalid_session_operation_ticket" }, { status: 401 });
+    }
+  }
   const body = consumptionBodySchema.safeParse(value);
   if (!body.success) return Response.json({ error: "invalid_request" }, { status: 400 });
   try {
@@ -79,6 +101,7 @@ function accessAdmissionResponse(
   return Response.json({
     leaseId: admission.leaseId,
     principalId: admission.principalId,
+    actor: admission.actor,
     permissions: admission.permissions,
     resourceMode: admission.resourceMode,
     projects: admission.projects,

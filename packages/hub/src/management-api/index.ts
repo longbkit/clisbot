@@ -104,7 +104,15 @@ import {
 import { providerApplicationSetupGuides } from "./provider-application-setup.js";
 import { connectionConsumersById, type ConnectionConsumer } from "./connection-consumers.js";
 
-const ticketRequestSchema = z.object({ clientId: z.string().min(1).max(256) }).strict();
+const ticketRequestSchema = z
+  .object({
+    clientId: z
+      .string()
+      .min(1)
+      .max(256)
+      .refine((id) => !id.startsWith("channel-account:"), "Reserved channel client identity"),
+  })
+  .strict();
 const identityRequestSchema = z
   .object({
     memberId: z.string().min(1),

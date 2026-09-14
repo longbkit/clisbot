@@ -1,9 +1,14 @@
+import {
+  SessionOperationIdentitySchema,
+  type VerifiedSessionOperationIdentity,
+} from "@getpaseo/protocol/session-operation";
 import { z } from "zod";
 import { type TriggerProvider, type TriggerProviderMatch } from "../index.js";
 import { matchesInputFilters, parseInvocation, parseStructuredInvocation } from "../invocation.js";
 import type { WorkflowConfigurationResolver } from "../configuration.js";
 
 export const ManualRunPayloadSchema = z.object({
+  sessionIdentity: SessionOperationIdentitySchema.optional(),
   expectedVersionId: z.string().uuid().optional(),
   trigger: z.string().min(1),
   actor: z.string().min(1),
@@ -34,6 +39,7 @@ export interface ManualMergeData {
   };
 }
 export interface ManualRunContext {
+  sessionIdentity?: VerifiedSessionOperationIdentity;
   provider: "manual";
   deliveryId: string;
   event: ManualMergeData;
@@ -94,11 +100,7 @@ export function createManualRunProvider(
             : { expected_version_id: payload.expectedVersionId }),
         },
       };
-      const triggerContext: ManualRunContext = {
-        provider: "manual",
-        deliveryId: payload.publicDeliveryKey ?? external.deliveryId,
-        event,
-      };
+      const triggerContext = manualRunContext(payload, external.deliveryId, event);
       const outputContext: ManualRunOutputContext = { provider: "manual", actor: payload.actor };
       const structuredInput = ManualInvocationInputSchema.safeParse(payload.input);
       const invocation = structuredInput.success
@@ -134,5 +136,18 @@ export function createManualRunProvider(
       };
       return [match];
     },
+  };
+}
+
+function manualRunContext(
+  payload: ManualRunPayload,
+  deliveryId: string,
+  event: ManualMergeData,
+): ManualRunContext {
+  return {
+    provider: "manual",
+    deliveryId: payload.publicDeliveryKey ?? deliveryId,
+    event,
+    ...(payload.sessionIdentity ? { sessionIdentity: payload.sessionIdentity } : {}),
   };
 }

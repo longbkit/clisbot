@@ -58,3 +58,40 @@ describe("channel command turn queue", () => {
     expect(sendAgentMessage).toHaveBeenCalledTimes(1);
   });
 });
+
+it("captures the queued sender and durable ingress ID before later inbound messages", async () => {
+  const sendAgentMessage = vi.fn<DaemonConnection["sendAgentMessage"]>(async () => undefined);
+  const queue = new ChannelCommandTurnQueue({ sendAgentMessage });
+  const source: import("./plane/types.js").InboundMessage = {
+    channel: "slack",
+    accountId: "account",
+    senderIdentity: "slack:A",
+    senderName: "Original",
+    ingressId: "durable-claim",
+    text: "queued",
+    mentionedBot: true,
+    conversation: { kind: "channel", id: "C", rootConversationId: "C", threadId: null },
+  };
+  await queue.enqueue(
+    "agent",
+    "queued",
+    true,
+    async () => true,
+    async () => true,
+    source,
+  );
+  source.senderIdentity = "slack:B";
+  source.senderName = "Later";
+  await queue.onStream("agent", { type: "turn_completed", turnId: "turn" });
+  expect(sendAgentMessage).toHaveBeenCalledWith(
+    "agent",
+    "queued",
+    expect.objectContaining({
+      source: expect.objectContaining({
+        senderIdentity: "slack:A",
+        senderName: "Original",
+        ingressId: "durable-claim",
+      }),
+    }),
+  );
+});

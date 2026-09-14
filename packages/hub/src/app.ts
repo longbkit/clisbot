@@ -1,3 +1,4 @@
+import { automationMemberIdentity } from "./managed-access/automation-session-identity.js";
 import { createExecutionCapabilityServer } from "./execution-capabilities/server.js";
 import { OutputExecutorRegistry } from "./execution-capabilities/outputs.js";
 import {
@@ -494,7 +495,19 @@ function createAppPublicOperations(
           files,
           daemonAgentValidator ?? undefined,
         ),
-      dispatchManualEvent: (input) => dispatchManualTrigger(manualSource, input),
+      dispatchManualEvent: async (input) =>
+        dispatchManualTrigger(
+          manualSource,
+          input,
+          input.initiatingMembershipId
+            ? await automationMemberIdentity(
+                options.databaseRuntime,
+                input.organizationId,
+                input.initiatingMembershipId,
+                options.publicBaseUrl,
+              )
+            : undefined,
+        ),
     },
     options.daemonClock,
   );

@@ -246,6 +246,9 @@ async function dispatchManualRun(
   deliveryId: string,
 ): Promise<DispatchManualRunResult> {
   const outcome = await capabilities.dispatchManualEvent({
+    ...(authorization.kind === "member"
+      ? { initiatingMembershipId: authorization.membershipId }
+      : {}),
     organizationId: authorization.organizationId,
     triggerId: workflow.id,
     triggerRevisionId: workflow.revisionId,

@@ -1,3 +1,4 @@
+import { SessionOperationIdentitySchema } from "@getpaseo/protocol/session-operation";
 import { z } from "zod";
 import { parseCompiledHubConfig } from "../../config/compiler.js";
 import type { Database } from "../../db/types.js";
@@ -7,6 +8,7 @@ import { parseInvocation } from "../invocation.js";
 import type { TriggerProvider, TriggerProviderMatch } from "../index.js";
 
 export const ChannelWorkflowRequestPayloadSchema = z.object({
+  sessionIdentity: SessionOperationIdentitySchema.optional(),
   workflow: z.string().min(1),
   text: z.string(),
   channel: z.object({
@@ -67,6 +69,7 @@ export function createChannelWorkflowProvider(
         hubConfig: configuration,
         triggerContext: {
           provider: "channel",
+          ...(payload.sessionIdentity ? { sessionIdentity: payload.sessionIdentity } : {}),
           deliveryId: external.deliveryId,
           event: payload,
         },

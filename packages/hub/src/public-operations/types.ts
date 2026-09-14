@@ -256,6 +256,7 @@ export interface PublicOperationCapabilities {
     files: readonly HubBundleFile[],
   ): Promise<{ valid: true } | { valid: false; validationErrors: unknown }>;
   dispatchManualEvent(input: {
+    initiatingMembershipId?: string;
     organizationId: string;
     triggerId: string;
     triggerRevisionId: string;

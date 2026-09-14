@@ -1,3 +1,4 @@
+import { SessionOperationIdentitySchema } from "@getpaseo/protocol/session-operation";
 import {
   buildExecutionCapabilityMcpServer,
   deriveAgentExecutionCompletionToken,
@@ -2121,7 +2122,25 @@ async function buildCreateAgentOptions(
     hubExecutionEnv.executionId,
     channelReplyCapabilities,
   );
+  const context = intent.triggerContext;
+  const verified =
+    typeof context === "object" &&
+    context !== null &&
+    ["manual", "channel"].includes(String(Reflect.get(context, "provider")))
+      ? SessionOperationIdentitySchema.safeParse(Reflect.get(context, "sessionIdentity"))
+      : undefined;
   const createOptions: DaemonCreateAgentOptions = {
+    sessionIdentity: verified?.success
+      ? verified.data
+      : {
+          actor: {
+            kind: "automation",
+            id: intent.workflowId,
+            displayName: intent.triggerName,
+            organizationId: intent.organizationId,
+            hubOrigin: new URL(hubExecutionEnv.publicBaseUrl).origin,
+          },
+        },
     executionId: hubExecutionEnv.executionId,
     ...(intent.reuseAgentId === undefined ? {} : { reuseAgentId: intent.reuseAgentId }),
     provider: intent.agent.provider,

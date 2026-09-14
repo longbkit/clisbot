@@ -59,6 +59,7 @@ interface AgentValidationIssue {
 }
 type PendingRequest = PendingCreateRequest | PendingControlRequest | PendingAgentValidationRequest;
 interface ActiveSocket {
+  sessionStorage?: boolean;
   generation: number;
   socket: WebSocket;
   daemon: DaemonRecord;
@@ -249,6 +250,9 @@ export class ActiveDaemonRegistry {
       type: "hub.execution.agent.create.request",
       requestId,
       executionId,
+      ...(active.sessionStorage && options.sessionIdentity
+        ? { sessionIdentity: options.sessionIdentity }
+        : {}),
       reuseAgentId: options.reuseAgentId,
       provider: options.provider,
       cwd: options.cwd,
@@ -321,6 +325,11 @@ export class ActiveDaemonRegistry {
     }
     const serverInfo = HubDaemonServerInfoEnvelopeSchema.safeParse(value);
     if (serverInfo.success) {
+      const features = serverInfo.data.message.payload["features"];
+      active.sessionStorage =
+        typeof features === "object" &&
+        features !== null &&
+        Reflect.get(features, "agentSessionStorage") === true;
       this.acceptServerInfo(active, serverInfo.data.message.payload.permissions);
       return;
     }

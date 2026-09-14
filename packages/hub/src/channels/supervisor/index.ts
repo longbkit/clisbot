@@ -82,6 +82,7 @@ import type {
   InboundMessage,
   MediaPostParams,
   MediaPostResult,
+  ChannelPlaneDeps,
   OutboundPostResult,
   PlaneInboundResult,
   PlaneLogger,
@@ -166,6 +167,9 @@ export function flatInboundNormalizer(params: InboundReplyParams): InboundMessag
     channel: params.channel,
     accountId,
     senderIdentity: `${params.channel}:${rawSenderId}`,
+    ...(confirmedString(ctx["ClisbotInboundOperationId"])
+      ? { ingressId: String(ctx["ClisbotInboundOperationId"]) }
+      : {}),
     ...(senderName !== null ? { senderName } : {}),
     text,
     mentionedBot: ctx["WasMentioned"] === true,
@@ -1243,6 +1247,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       logger: this.logger,
     });
     const plane = createChannelPlane({
+      ...this.sessionIdentityDep(snapshot, compiled),
       organizationId: snapshot.organizationId,
       channelRevisionId: snapshot.revision?.id ?? null,
       accountScope: {
@@ -1365,22 +1370,49 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
    * returns undefined (no ticket, trusted session as today) for an `off` daemon
    * or an account with no daemon route.
    */
+  /**
+   * The plane resolves a sender's verified identity per inbound message; the supervisor binds
+   * the account's organization and connection so the plane only passes the message.
+   */
+  private sessionIdentityDep(
+    snapshot: ChannelControlPlaneSnapshot,
+    compiled: CompiledChannelAccount,
+  ): Pick<ChannelPlaneDeps, "resolveSessionIdentity"> {
+    const resolve = this.options.resolveSessionIdentity;
+    if (!resolve) return {};
+    return {
+      resolveSessionIdentity: (source) =>
+        resolve(
+          { organizationId: snapshot.organizationId, connectionId: compiled.connectionId },
+          source,
+        ),
+    };
+  }
+
   private applyChannelAdmissionTicket(
     daemonOptions: ChannelDaemonClientOptions,
     handle: AccountHandle,
     compiled: CompiledChannelAccount,
     snapshot: ChannelControlPlaneSnapshot,
   ): void {
-    if (this.options.buildDaemonAccessTicketResolver === undefined) return;
     const daemonReference = accountDaemonReference(compiled, snapshot.resolveAgentAccessTarget);
     if (daemonReference === undefined) return;
-    const clientId = handleKey(handle.channel, handle.accountId);
+    const clientId = `channel-account:${handleKey(handle.channel, handle.accountId)}`;
     daemonOptions.clientId = clientId;
-    daemonOptions.resolveAccessTicket = this.options.buildDaemonAccessTicketResolver({
-      organizationId: snapshot.organizationId,
-      daemonReference,
-      clientId,
-    });
+    if (this.options.buildSessionOperationTicketResolver)
+      daemonOptions.resolveSessionOperationTicket =
+        this.options.buildSessionOperationTicketResolver({
+          organizationId: snapshot.organizationId,
+          daemonReference,
+          clientId,
+          connectionId: compiled.connectionId,
+        });
+    if (this.options.buildDaemonAccessTicketResolver)
+      daemonOptions.resolveAccessTicket = this.options.buildDaemonAccessTicketResolver({
+        organizationId: snapshot.organizationId,
+        daemonReference,
+        clientId,
+      });
   }
 
   /**
@@ -1869,7 +1901,7 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
       workerId: `${handle.channel}:${handle.accountId}:drain`,
       abortSignal: handle.abortController.signal,
       resolveNonRetryableFailure: resolveHubIngressNonRetryableFailure,
-      dispatch: (payload) => this.dispatchInbound(handle, hostRuntime, payload),
+      dispatch: (payload, claim) => this.dispatchInbound(handle, hostRuntime, payload, claim.id),
       log: this.inboundDrainLog(handle),
     });
     this.drains.set(handleKey(handle.channel, handle.accountId), drain);
@@ -1887,8 +1919,13 @@ class ChannelSupervisorImpl implements ChannelSupervisor {
     handle: AccountHandle,
     hostRuntime: HostRuntime,
     payload: unknown,
+    ingressId: string,
   ): Promise<ChannelIngressDeferral | undefined> {
-    const params = payload as InboundReplyParams;
+    const stored = payload as InboundReplyParams;
+    const params: InboundReplyParams = {
+      ...stored,
+      ctxPayload: { ...stored.ctxPayload, ClisbotInboundOperationId: ingressId },
+    };
     const result = await hostRuntime.onInboundReply(params);
     if (!result.dispatched) {
       const deferral = planeInboundDeferral(result);

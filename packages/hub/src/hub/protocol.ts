@@ -1,3 +1,4 @@
+import { SessionOperationIdentitySchema } from "@getpaseo/protocol/session-operation";
 import { z } from "zod";
 import { WorktreeTargetSchema } from "../config/index.js";
 
@@ -128,6 +129,7 @@ export const HubExecutionAgentStreamEventSchema = z.discriminatedUnion("type", [
 ]);
 
 export const HubExecutionAgentCreateRequestSchema = z.object({
+  sessionIdentity: SessionOperationIdentitySchema.optional(),
   type: z.literal("hub.execution.agent.create.request"),
   requestId: z.string(),
   executionId: z.string(),

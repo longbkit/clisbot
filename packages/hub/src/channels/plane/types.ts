@@ -45,6 +45,8 @@ export interface InboundConversationDetail {
  * shape from the raw `ctxPayload`; the plane never reads the raw payload.
  */
 export interface InboundMessage {
+  /** Hub durable ingress row identity, never a client actor assertion. */
+  ingressId?: string;
   channel: SupportedChannelName;
   accountId: string;
   /** The channel identity of the sender (`<channel>:<provider-id>`). */
@@ -401,6 +403,9 @@ export type ChannelIdentityChallengeConsumer = (input: {
 
 /** Everything the execution plane is built with (the facade's deps). */
 export interface ChannelPlaneDeps {
+  resolveSessionIdentity?: (
+    source: InboundMessage,
+  ) => Promise<import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity>;
   organizationId: string;
   /** Immutable Channel configuration revision backing this plane. */
   channelRevisionId?: string | null | undefined;

@@ -1,3 +1,7 @@
+import {
+  createChannelOperationTicketResolver,
+  resolveChannelOperationIdentity,
+} from "./channels/daemon/session-operation.js";
 import { readChannelWorkflowRuns } from "./workflows/channel-status.js";
 import { stopChannelWorkflowRuns } from "./workflows/channel-stop.js";
 import { createHubApplication } from "./app.js";
@@ -614,6 +618,26 @@ async function createChannelSupervisorAtComposition(
         : undefined;
     const resolveDaemonTarget = createChannelDaemonTargetFactory(database, process.env);
     return factory.createChannelSupervisor({
+      ...(access && accessTickets && options.publicBaseUrl
+        ? {
+            resolveSessionIdentity: (target, source) =>
+              resolveChannelOperationIdentity(
+                { access, hubOrigin: options.publicBaseUrl! },
+                target,
+                source,
+              ),
+            buildSessionOperationTicketResolver: (target) =>
+              createChannelOperationTicketResolver(
+                {
+                  database,
+                  access,
+                  tickets: accessTickets,
+                  hubOrigin: options.publicBaseUrl!,
+                },
+                target,
+              ),
+          }
+        : {}),
       database,
       databaseRuntime,
       dataDir: hubDataDir,

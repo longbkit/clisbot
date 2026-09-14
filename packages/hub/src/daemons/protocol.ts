@@ -1,3 +1,4 @@
+import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
 import type { WorktreeTarget } from "../config/index.js";
 import type { JsonValue } from "../config/compiler.js";
 import type {
@@ -12,6 +13,7 @@ export interface DaemonAgentSnapshot {
 }
 
 export interface DaemonCreateAgentOptions {
+  sessionIdentity?: VerifiedSessionOperationIdentity;
   executionId: string;
   reuseAgentId?: string;
   provider: string;

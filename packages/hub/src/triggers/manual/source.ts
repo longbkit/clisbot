@@ -1,3 +1,4 @@
+import type { VerifiedSessionOperationIdentity } from "@getpaseo/protocol/session-operation";
 import { isDatabaseUnavailableError } from "../../db/errors.js";
 import type { Database } from "../../db/types.js";
 import { reportFailure } from "../../failures/index.js";
@@ -45,11 +46,25 @@ export async function handleManualTriggerRequest(
 export async function dispatchManualTrigger(
   source: TriggerSource,
   trigger: ManualTriggerInput,
+  sessionIdentity?: VerifiedSessionOperationIdentity,
 ): Promise<TriggerDispatchOutcome | void> {
   const state = manualTriggerStates.get(source);
   if (state === undefined) throw new Error("manual_runtime_unavailable");
+  const payload =
+    typeof trigger.payload === "object" &&
+    trigger.payload !== null &&
+    !Array.isArray(trigger.payload)
+      ? ({ ...trigger.payload } as Record<string, unknown>)
+      : trigger.payload;
+  if (typeof payload === "object" && payload !== null) {
+    // HTTP/manual payloads cannot self-assert this reserved metadata. Only the authorized caller supplies it.
+    delete (payload as Record<string, unknown>)["sessionIdentity"];
+    if (sessionIdentity)
+      (payload as Record<string, unknown>)["sessionIdentity"] = structuredClone(sessionIdentity);
+  }
   const persisted = await state.database.persistManualEvent({
     ...trigger,
+    payload,
     connectionId: trigger.connectionId ?? null,
     resourceId: trigger.resourceId ?? null,
   });

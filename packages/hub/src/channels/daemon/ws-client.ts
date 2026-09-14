@@ -360,7 +360,11 @@ export class TrustedDaemonClient extends EventEmitter {
         clientId: this.clientId,
         clientType: "cli",
         protocolVersion: WS_PROTOCOL_VERSION,
-        capabilities: { selective_agent_timeline: true, provider_subagents: true },
+        capabilities: {
+          selective_agent_timeline: true,
+          provider_subagents: true,
+          agent_session_storage: true,
+        },
         ...(accessTicket === undefined ? {} : { accessTicket }),
       }),
     );

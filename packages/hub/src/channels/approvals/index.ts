@@ -277,7 +277,22 @@ export class ApprovalEngine {
     // Latch BEFORE dispatch: a concurrent path that reads the entry between
     // here and the daemon call sees resolved and stays inert.
     prompt.resolved = true;
-    await this.respond(agentId, command.requestId, response);
+    await this.context.daemon.respondToAgentPermission(agentId, command.requestId, response, {
+      source: {
+        channel: context.channel,
+        accountId: context.accountId,
+        senderIdentity: responderIdentity,
+        ...(responderName ? { senderName: responderName } : {}),
+        text: "",
+        mentionedBot: true,
+        conversation: {
+          kind: context.rootKind,
+          id: context.externalThreadId ?? context.externalConversationId,
+          rootConversationId: context.externalConversationId,
+          threadId: context.externalThreadId,
+        },
+      },
+    });
     this.openPrompts.delete(this.promptKey(agentId, command.requestId));
     this.context.logger.info?.("approval answered in the channel thread", {
       agentId,
@@ -515,7 +530,11 @@ export class ApprovalEngine {
   }
 
   private async respond(agentId: string, requestId: string, response: AgentPermissionResponse) {
-    await this.context.daemon.respondToAgentPermission(agentId, requestId, response);
+    const stream = this.streams.get(agentId);
+    if (!stream) throw new Error("Channel approval context is unavailable");
+    await this.context.daemon.respondToAgentPermission(agentId, requestId, response, {
+      systemOperation: { kind: "system", channelId: stream.externalConversationId },
+    });
   }
 
   private promptKey(agentId: string, requestId: string): string {

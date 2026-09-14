@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "vitest";
 import type { DurableProviderEvent } from "../../db/types.js";
 import { createMemoryDatabase } from "../../db/memory.js";
-import { createManualTriggerSource, handleManualTriggerRequest } from "./source.js";
+import {
+  createManualTriggerSource,
+  handleManualTriggerRequest,
+  dispatchManualTrigger,
+} from "./source.js";
 
 describe("manual trigger source", () => {
   it("passes arbitrary provider-namespaced payloads to the handler", async () => {
@@ -41,6 +45,36 @@ describe("manual trigger source", () => {
       },
     ]);
     assert.deepEqual(manual.evidence(), [{ connectionId: null, resourceId: null }]);
+  });
+
+  it("strips arbitrary manual payload identity and preserves only an authorized caller snapshot", async () => {
+    const manual = await ManualTriggers.recording();
+    const input = {
+      organizationId: "org_1",
+      triggerId: manual.workflowId,
+      triggerRevisionId: manual.revisionId,
+      source: "manual.run",
+      deliveryId: "forged-identity",
+      payload: { actor: "forged", sessionIdentity: { actor: { kind: "user", id: "forged" } } },
+    };
+    await manual.deliver(input);
+    assert.deepEqual(manual.received()[0]?.payload, { actor: "forged" });
+    const identity = {
+      actor: {
+        kind: "user" as const,
+        id: "verified",
+        memberId: "member",
+        organizationId: "org_1",
+        hubOrigin: "https://hub.example",
+        displayName: "Original",
+      },
+    };
+    await manual.dispatchTrusted({ ...input, deliveryId: "verified-identity" }, identity);
+    identity.actor.displayName = "Changed after admission";
+    assert.deepEqual(manual.received()[1]?.payload, {
+      actor: "forged",
+      sessionIdentity: { ...identity, actor: { ...identity.actor, displayName: "Original" } },
+    });
   });
 
   it("rejects non-namespaced manual payload sources", async () => {
@@ -82,6 +116,13 @@ class ManualTriggers {
     readonly workflowId: string,
     readonly revisionId: string,
   ) {}
+
+  async dispatchTrusted(
+    input: ManualDelivery,
+    identity: import("@getpaseo/protocol/session-operation").VerifiedSessionOperationIdentity,
+  ): Promise<void> {
+    await dispatchManualTrigger(this.source, { ...input, receivedAt: new Date() }, identity);
+  }
 
   static async recording(): Promise<ManualTriggers> {
     const database = createMemoryDatabase();

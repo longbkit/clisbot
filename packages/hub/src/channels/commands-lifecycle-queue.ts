@@ -1,6 +1,8 @@
+import type { InboundMessage } from "./plane/types.js";
 import type { DaemonConnection } from "./daemon/client.js";
 
 interface QueuedMessage {
+  source?: InboundMessage;
   text: string;
   post(text: string): Promise<boolean>;
   authorize(): Promise<boolean>;
@@ -24,9 +26,10 @@ export class ChannelCommandTurnQueue {
     running: boolean,
     post: QueuedMessage["post"],
     authorize: QueuedMessage["authorize"] = async () => true,
+    source?: InboundMessage,
   ): Promise<void> {
     const queue = this.entries.get(agentId) ?? [];
-    queue.push({ text, post, authorize });
+    queue.push({ text, post, authorize, ...(source ? { source: structuredClone(source) } : {}) });
     this.entries.set(agentId, queue);
     if (!running && !this.awaitingStart.has(agentId)) await this.release(agentId);
   }
@@ -71,7 +74,10 @@ export class ChannelCommandTurnQueue {
       if (this.entries.get(agentId) !== queue) return;
       // The wire offers only interrupt/steer; steer avoids canceling a separately started turn.
       // The idle check above narrows that unavoidable cross-client race.
-      await this.daemon.sendAgentMessage(agentId, entry.text, { steer: true });
+      await this.daemon.sendAgentMessage(agentId, entry.text, {
+        steer: true,
+        ...(entry.source ? { source: entry.source } : {}),
+      });
     } catch (error) {
       this.awaitingStart.delete(agentId);
       const detail = error instanceof Error ? error.message : String(error);
