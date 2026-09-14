@@ -74,10 +74,33 @@ git commit -m "Sync upstream vX.Y.Z"
 git tag clisbot/sync-verified-$(date +%Y-%m-%d)-vX.Y.Z
 ```
 
-Paseo and Hub share this repository's local tag namespace. In the 2026-09-06
-checkout, local `v0.7.0` and `v0.8.0` point to Hub releases. Fetch Paseo tags
-into `refs/upstream-releases/` and verify the peeled commit before merging;
-neither a bare tag name nor the root package version proves the merged baseline.
+### Tags: `refs/tags/` mirrors `origin`, nothing else
+
+Both upstreams publish `v*` tags into the same flat namespace as our fork, and
+whichever fetch ran last wins. On 2026-09-14 local `v0.8.0` pointed at the **Hub**
+release, so `git checkout v0.8.0` produced the wrong repository's code, and
+`git fetch upstream --tags` refused to repair it (`would clobber existing tag`).
+Five of origin's own tags — `v0.1.39`, `v0.1.41`, `v0.1.43`, `v0.1.50`, `v0.1.53`
+— also name a different Paseo commit.
+
+Run `scripts/setup-git-remotes.sh` once per clone. It sets both upstreams to
+branches-only, so `refs/tags/` holds our fork's releases and matches `origin`
+exactly. Git config is per clone, so a fresh checkout needs it again.
+
+Fetch an upstream release on demand, into its own namespace, and verify the
+peeled commit before merging — neither a bare tag name nor the root package
+version proves the merged baseline:
+
+```bash
+git fetch --no-tags upstream     refs/tags/vX.Y.Z:refs/upstream-releases/vX.Y.Z
+git fetch --no-tags hub-upstream refs/tags/vX.Y.Z:refs/hub-releases/vX.Y.Z
+git rev-parse refs/upstream-releases/vX.Y.Z^{}
+```
+
+A verified sync point is a tag we own, so push it: `clisbot/sync-verified-*`
+belongs on `origin` like any other fork tag. Scratch markers (`clisbot/fork-tip-*`,
+`backup/*`) stay local and get deleted once the sync lands.
+
 Keep a dirty product checkout intact while preparing the merge in the detached
 worktree. The final branch update must preserve its tracked and untracked work.
 
