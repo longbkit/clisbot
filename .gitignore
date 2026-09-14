@@ -96,3 +96,6 @@ app.json
 
 # ad-hoc provider probe scripts
 **/.oc-probe.mjs
+
+# Agent working notes: lessons land in docs/, the tooling in scripts/.
+.writer-progress/
