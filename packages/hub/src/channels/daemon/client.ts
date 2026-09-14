@@ -1,3 +1,11 @@
+import { randomUUID } from "node:crypto";
+import type { InboundMessage } from "../plane/types.js";
+import {
+  channelMessageId,
+  type ChannelOperationTicketResolver,
+  type ChannelOperationSource,
+  type ChannelSystemOperation,
+} from "./session-operation.js";
 import { TrustedDaemonClient } from "./ws-client.js";
 import { discoverLocalDaemon, type DaemonDiscoveryResult } from "./discovery.js";
 import type {
@@ -5,6 +13,7 @@ import type {
   AgentSnapshot,
   CreateAgentConfig,
   CreateAgentOptions,
+  CreateWorkspaceInput,
   DaemonServerInfo,
   ProviderModel,
   ProviderMode,
@@ -34,6 +43,7 @@ export interface ChannelDaemonClientOptions {
    * The supervisor defaults this from the `PASEO_PASSWORD` env var. */
   password?: string;
   clientId?: string;
+  resolveSessionOperationTicket?: ChannelOperationTicketResolver;
   /** Mint the managed-access `accessTicket` for this account's `hello`, called
    * per (re)connect. Returns `undefined` when the daemon is not in `external`
    * mode (trusted session, as today). Built by
@@ -72,10 +82,21 @@ export interface DaemonConnection {
   /** Resolves when the trusted session is established (daemon `server_info` seen). */
   waitForConnected(timeoutMs?: number): Promise<void>;
   createAgent(config: CreateAgentConfig, options?: CreateAgentOptions): Promise<CreateAgentResult>;
+  /** Create the workspace a channel session will land in, so the daemon names
+   * it from the first request (`workspace-organization.ts`). */
+  createWorkspace(
+    input: CreateWorkspaceInput,
+    options?: { source?: InboundMessage },
+  ): Promise<{ workspaceId: string }>;
   sendAgentMessage(
     agentId: string,
     text: string,
-    options?: { steer?: boolean; attachments?: TextAttachment[] },
+    options?: {
+      steer?: boolean;
+      attachments?: TextAttachment[];
+      source?: InboundMessage;
+      messageId?: string;
+    },
   ): Promise<void>;
   /** Interrupt the active turn without creating a replacement turn. */
   cancelAgent(agentId: string): Promise<void>;
@@ -83,6 +104,11 @@ export interface DaemonConnection {
     agentId: string,
     requestId: string,
     response: AgentPermissionResponse,
+    options?: {
+      source?: InboundMessage;
+      systemOperation?: ChannelSystemOperation;
+      responseId?: string;
+    },
   ): Promise<void>;
   listAgents(): Promise<AgentSnapshot[]>;
   isAgentInProject(agent: AgentSnapshot, projectId: string): Promise<boolean>;
@@ -153,35 +179,76 @@ export function connectChannelDaemon(options: ChannelDaemonClientOptions = {}): 
     ...(options.onStateChange !== undefined ? { onStateChange: options.onStateChange } : {}),
   });
   socket.connect();
-  return createFacade(socket, discovery);
+  return createFacade(socket, discovery, options.resolveSessionOperationTicket);
 }
 
 function createFacade(
   socket: TrustedDaemonClient,
   discovery: DaemonDiscoveryResult,
+  resolveIdentity?: ChannelOperationTicketResolver,
 ): DaemonConnection {
+  const identify = async (
+    type: string,
+    payload: Record<string, unknown>,
+    source?: ChannelOperationSource,
+  ) => {
+    if (
+      !source ||
+      !resolveIdentity ||
+      asRecord(socket.serverInfo?.["features"])?.["agentSessionStorage"] !== true
+    )
+      return payload;
+    return {
+      ...payload,
+      sessionOperationTicket: await resolveIdentity({ type, ...payload }, source),
+    };
+  };
   return {
     discovery,
     waitForConnected: (timeoutMs) => socket.waitForConnected(timeoutMs),
-    createAgent: (config, options) =>
-      socket
-        .call("create_agent_request", createAgentPayload(config, options))
-        .then(mapCreatedAgent),
-    sendAgentMessage: (agentId, text, options) =>
-      socket
-        .call("send_agent_message_request", {
-          agentId,
-          text,
-          ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
-          activeTurnBehavior: options?.steer === false ? "interrupt" : "steer",
-        })
-        .then((payload) => {
-          const p = asRecord(payload);
-          if (p !== undefined && p["accepted"] === false) {
-            throw new Error((p["error"] as string | undefined) ?? "agent message rejected");
-          }
-          return undefined;
-        }),
+    createAgent: async (config, options) =>
+      mapCreatedAgent(
+        await socket.call(
+          "create_agent_request",
+          await identify(
+            "create_agent_request",
+            createAgentPayload(config, options),
+            options?.source,
+          ),
+        ),
+      ),
+    createWorkspace: async (input, options) =>
+      workspaceIdFromResponse(
+        await socket.call(
+          "workspace.create.request",
+          await identify(
+            "workspace.create.request",
+            createWorkspacePayload(input),
+            options?.source,
+          ),
+        ),
+      ),
+    sendAgentMessage: async (agentId, text, options) => {
+      const payload = await socket.call(
+        "send_agent_message_request",
+        await identify(
+          "send_agent_message_request",
+          {
+            agentId,
+            text,
+            ...(options?.source
+              ? { messageId: options.messageId ?? channelMessageId(options.source) }
+              : {}),
+            ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
+            activeTurnBehavior: options?.steer === false ? "interrupt" : "steer",
+          },
+          options?.source,
+        ),
+      );
+      const result = asRecord(payload);
+      if (result?.["accepted"] === false)
+        throw new Error((result["error"] as string | undefined) ?? "agent message rejected");
+    },
     cancelAgent: (agentId) =>
       socket.call("cancel_agent_request", { agentId }).then((payload) => {
         const p = asRecord(payload);
@@ -190,15 +257,19 @@ function createFacade(
         }
         return undefined;
       }),
-    respondToAgentPermission: (agentId, requestId, response) =>
-      // Fire-and-forget on the daemon (no correlated reply; the resolution
-      // arrives on the agent's stream as permission_resolved). Resolves once
-      // the frame is written to the socket.
+    respondToAgentPermission: async (agentId, requestId, response, options) =>
       socket.send({
         type: "agent_permission_response",
-        agentId,
-        requestId,
-        response,
+        ...(await identify(
+          "agent_permission_response",
+          {
+            agentId,
+            requestId,
+            response,
+            responseId: options?.responseId ?? randomUUID(),
+          },
+          options?.systemOperation ?? options?.source,
+        )),
       }),
     listAgents: () =>
       socket.call("fetch_agents_request", {}).then((payload) => {
@@ -276,10 +347,44 @@ function withTitle(config: CreateAgentConfig, title?: string): CreateAgentConfig
   return { ...config, title };
 }
 
+function createWorkspacePayload(input: CreateWorkspaceInput) {
+  return {
+    source: {
+      kind: "directory",
+      path: input.cwd,
+      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+    },
+    ...(input.firstAgentContext === undefined
+      ? {}
+      : {
+          firstAgentContext: {
+            ...(input.firstAgentContext.prompt === undefined
+              ? {}
+              : { prompt: input.firstAgentContext.prompt }),
+            ...(input.firstAgentContext.attachments === undefined
+              ? {}
+              : { attachments: input.firstAgentContext.attachments }),
+          },
+        }),
+  };
+}
+
+function workspaceIdFromResponse(payload: unknown): { workspaceId: string } {
+  const result = asRecord(payload);
+  const error = result?.["error"];
+  if (typeof error === "string" && error !== "") throw new Error(error);
+  const workspaceId = asRecord(result?.["workspace"])?.["id"];
+  if (typeof workspaceId !== "string")
+    throw new Error("daemon did not report the created workspace");
+  return { workspaceId };
+}
+
 function createAgentPayload(config: CreateAgentConfig, options?: CreateAgentOptions) {
   const { projectId, worktree, ...sessionConfig } = config;
   return {
     config: withTitle(sessionConfig, options?.title),
+    ...(options?.workspaceId === undefined ? {} : { workspaceId: options.workspaceId }),
+    ...(options?.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
     ...(options?.initialPrompt === undefined ? {} : { initialPrompt: options.initialPrompt }),
     ...(options?.attachments === undefined ? {} : { attachments: options.attachments }),
     ...(options?.autoArchive === undefined ? {} : { autoArchive: options.autoArchive }),

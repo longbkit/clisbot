@@ -46,6 +46,8 @@ export class FakeDaemon {
   readonly messages: RecordedDaemonMessage[] = [];
   /** Every agent id this daemon minted, oldest first. */
   readonly createdAgentIds: string[] = [];
+  /** Every workspace id this daemon minted, oldest first. */
+  readonly createdWorkspaceIds: string[] = [];
   private readonly server: Server;
   private readonly wss: WebSocketServer;
   private readonly clients = new Set<WebSocket>();
@@ -148,7 +150,12 @@ export class FakeDaemon {
     if (frame.type === "hello") {
       this.send(client, {
         type: "status",
-        payload: { status: "server_info", serverId: this.options.serverId },
+        payload: {
+          status: "server_info",
+          serverId: this.options.serverId,
+          // Workspace organization asks for this before it creates a workspace.
+          features: { workspaceMultiplicity: true },
+        },
       });
       return;
     }
@@ -179,6 +186,20 @@ export class FakeDaemon {
             requestId,
             agentId,
             agent: { id: agentId, provider, status: "initializing" },
+          },
+        });
+        return;
+      }
+      case "workspace.create.request": {
+        const workspaceId = `workspace-sim-${this.createdWorkspaceIds.length + 1}`;
+        this.createdWorkspaceIds.push(workspaceId);
+        this.send(client, {
+          type: "workspace.create.response",
+          payload: {
+            requestId,
+            workspace: { id: workspaceId },
+            setupTerminalId: null,
+            error: null,
           },
         });
         return;

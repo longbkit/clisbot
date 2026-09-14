@@ -111,6 +111,36 @@ menu. Switching ends the running session, because an agent's model is fixed when
 it starts; the next message opens a session on the new choice, and the choice
 outlives `/new`.
 
+## Where a conversation's work lands
+
+Each conversation gets its own workspace on the daemon, named from the first
+message it sends — `Fix the flaky login test`, not `repo`, `repo`, `repo`.
+Commands that continue that work (`/fork`, `/side`) open their session in the
+same workspace; commands that start something else (`/new`, `/quick`) open a new
+one. Renaming a workspace yourself is safe: automatic naming never overwrites a
+name you set.
+
+Turn it off per organization, account, or route and the daemon places and names
+sessions as it did before:
+
+```yaml
+defaults:
+  workspace: { organize: false }
+```
+
+## Editing a route while conversations are running
+
+A deployed change applies to live conversations, it does not strand them.
+Changing how a route talks — synchronization, templates, mention rules, approval
+rules, who may talk to it — keeps every bound conversation on its session, and
+the new rules apply from the next message. Two edits do end a session, because
+they change where the conversation goes:
+
+- pointing the route at another `agent:` or at a workflow retires the session
+  and starts one at the new target;
+- narrowing or removing the route so it no longer matches the conversation
+  leaves it unserved, and the bot stops answering there.
+
 ## Who may do what
 
 Four roles, worked out per conversation from the identities and roles you

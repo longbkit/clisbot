@@ -722,6 +722,52 @@ routes:
     assert.equal(routes[1]!.defaults.sync.threadLink, "full");
   });
 
+  it("folds workspace.organize like every other default leaf (A6)", () => {
+    const plane = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/main.yml"]: `
+channel: slack
+accountId: main
+connectionId: connection-id
+transport: { mode: socket }
+defaults:
+  workspace: { organize: false }
+routes:
+  - match: { kind: channel, ids: [C0APP] }
+    agent: worker-app
+    environment: repo-app
+  - match: { kind: channel, ids: [C0ORGANIZED] }
+    agent: worker-app
+    environment: repo-app
+    workspace: { organize: true }
+`,
+      }),
+    );
+    const routes = plane.accounts[0]!.routes;
+    // This account turns organization off and the first route inherits that;
+    // the second turns it back on.
+    assert.equal(routes[0]!.defaults.workspace?.organize, false);
+    assert.equal(routes[1]!.defaults.workspace?.organize, true);
+    // Unauthored anywhere, the key is absent: a revision written before the
+    // knob existed keeps the exact compiled block (and route fingerprint) it
+    // had, and absence reads as organization ON.
+    const untouched = compileChannelControlPlane(
+      input({
+        [".paseo/channels/slack/main.yml"]: `
+channel: slack
+accountId: main
+connectionId: connection-id
+transport: { mode: socket }
+routes:
+  - match: { kind: channel, ids: [C0APP] }
+    agent: worker-app
+    environment: repo-app
+`,
+      }),
+    );
+    assert.equal("workspace" in untouched.accounts[0]!.routes[0]!.defaults, false);
+  });
+
   it("carries a route-level outbound.template onto the tool path", () => {
     const plane = compileChannelControlPlane(
       input({

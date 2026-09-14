@@ -28,18 +28,6 @@ import {
   StreamingModeSchema,
   ThreadLinkSchema,
 } from "./enums.js";
-import type {
-  BindingKey,
-  DmPolicy,
-  EditNotifications,
-  GroupPolicy,
-  FollowUpMode,
-  OutboundPath,
-  ReactionNotifications,
-  ReplyAnchor,
-  ThreadLink,
-} from "./enums.js";
-
 // --- Shared value shapes ------------------------------------------------------
 
 /** `<channel>:<provider-id>` identity; email is `email:<address>` (§4.3.7). */
@@ -88,6 +76,25 @@ export type BindingDefaults = z.infer<typeof BindingDefaultsSchema>;
 
 export const ReplyDefaultsSchema = z.object({ anchor: ReplyAnchorSchema.optional() }).strict();
 export type ReplyDefaults = z.infer<typeof ReplyDefaultsSchema>;
+
+/**
+ * `workspace.organize` — the on/off switch for workspace organization
+ * (docs/features/workspace-organization/README.md, A6). On, the Hub picks the
+ * workspace a channel session lands in: `/side` and `/fork` stay in the source
+ * session's workspace, and a session that needs a new workspace creates it
+ * with the first request as naming context so the daemon's own auto-naming
+ * runs. Off, the Hub sends no workspace at all and the daemon places and names
+ * the session exactly as it did before the feature existed.
+ *
+ * Unauthored, the group is ABSENT from the compiled defaults and organization
+ * is ON. Absence rather than a floor value is deliberate: a route's compiled
+ * block is hashed into `routeFingerprint`, and that hash decides whether a
+ * stored `/agent` + `/model` selection or a running Workflow still belongs to
+ * this route. A floor value would rewrite every fingerprint on upgrade and
+ * orphan both.
+ */
+export const WorkspaceDefaultsSchema = z.object({ organize: z.boolean().optional() }).strict();
+export type WorkspaceDefaults = z.infer<typeof WorkspaceDefaultsSchema>;
 
 /**
  * `sync.progress` — the "the bot is working" surface, as three independent
@@ -281,67 +288,18 @@ export const ApprovalRuleSchema = z
 export type ApprovalRule = z.infer<typeof ApprovalRuleSchema>;
 
 /**
- * One inheritance layer of the defaults fold (org < account < route). Every
- * key and leaf is optional: an unset leaf inherits from the layer below, and
- * the org-layer effective values come from `ORG_DEFAULTS`, applied exactly
- * once by the compiler (§4.3.2/§4.3.6). Property types carry explicit
- * `| undefined` so zod-parsed layers assign cleanly under
- * exactOptionalPropertyTypes.
- */
-export interface DefaultsLayer {
-  interaction?:
-    | {
-        requireMention?: boolean | undefined;
-        followUp?: { mode?: FollowUpMode | undefined; ttlMinutes?: number | undefined } | undefined;
-      }
-    | undefined;
-  binding?: { key?: BindingKey | undefined } | undefined;
-  reply?: { anchor?: ReplyAnchor | undefined } | undefined;
-  outbound?: { path?: OutboundPath | undefined; template?: string | undefined } | undefined;
-  inbound?:
-    | {
-        reactionNotifications?: ReactionNotifications | undefined;
-        editNotifications?: EditNotifications | undefined;
-      }
-    | undefined;
-  access?:
-    | {
-        dmPolicy?: DmPolicy | undefined;
-        groupPolicy?: GroupPolicy | undefined;
-        allowFrom?: readonly (string | number)[] | undefined;
-        groupAllowFrom?: readonly (string | number)[] | undefined;
-        groupAllowFromFallbackToAllowFrom?: boolean | undefined;
-        deniedReply?: string | undefined;
-      }
-    | undefined;
-  sync?:
-    | {
-        finalAnswers?: boolean | undefined;
-        progress?: SyncProgress | undefined;
-        toolCalls?: boolean | undefined;
-        threadLink?: ThreadLink | undefined;
-        subagents?:
-          | {
-              finalAnswers?: boolean | undefined;
-              progress?: boolean | undefined;
-              toolCalls?: boolean | undefined;
-            }
-          | undefined;
-      }
-    | undefined;
-  approval?: readonly ApprovalRule[] | undefined;
-}
-
-/**
  * The inherited defaults block shared by `policy.yml`, account files, and
- * routes. The authored examples restate every knob so each file is
- * self-reviewable; omitted leaves inherit per `DefaultsLayer`.
+ * routes. Every key and leaf is optional at every layer: an omitted leaf
+ * inherits from the layer below (org < account < route) and falls to
+ * `ORG_DEFAULTS`, which the compiler applies exactly once (§4.3.2/§4.3.6).
+ * The authored examples restate every knob so each file is self-reviewable.
  */
 export const ChannelDefaultsSchema = z
   .object({
     interaction: InteractionDefaultsSchema.optional(),
     binding: BindingDefaultsSchema.optional(),
     reply: ReplyDefaultsSchema.optional(),
+    workspace: WorkspaceDefaultsSchema.optional(),
     outbound: OutboundDefaultsSchema.optional(),
     inbound: InboundDefaultsSchema.optional(),
     access: AccessDefaultsSchema.optional(),
@@ -392,85 +350,53 @@ export type OrgPolicy = z.infer<typeof OrgPolicySchema>;
 
 // --- Account files (§4.3.3) ----------------------------------------------------
 
-export const SlackTransportSchema = z
-  .object({
-    mode: SlackTransportModeSchema,
-    // P0.5: per-account ingress route, auto-registered by the control plane.
-    webhookPath: z.string().min(1).optional(),
-    errorPolicy: ErrorPolicySchema.optional(),
-    // Where the native approval card (buttons) may appear — the approval
-    // engine's prompt-posting decision reads it (default off). `allowlist`
-    // is fail-closed at P0; no effect until the companion allowlist key lands.
-    inlineButtons: InlineButtonsSchema.optional(),
-    // The app-manifest-registered NATIVE slash command name (e.g. `/paseo`)
-    // whose Socket Mode `slash_commands` events the vertical rewrites to the
-    // shared plain-text commands (`/paseo approve` → `approve`). Absent =
-    // native slash ingestion off; the in-message `/approve` + `\approve`
-    // text spellings always work with zero app setup (commands.ts).
-    slashCommand: z
-      .string()
-      .regex(/^\/[a-z][a-z0-9_]{2,31}$/u, "a Slack command name: /lowercase, 3-32 chars")
-      .optional(),
-  })
-  .strict();
+/**
+ * Every channel's `transport:` block is the same shape — the channel's own
+ * `mode` enum plus the shared `errorPolicy` — so it is built, not restated.
+ * `inlineButtons` says where the channel's NATIVE approval card (Slack blocks,
+ * Telegram inline keyboard, Discord components) may appear; the approval
+ * engine's prompt-posting decision reads it and `allowlist` is fail-closed at
+ * P0. A channel without a native card has no such leaf.
+ */
+function transportSchema<Mode extends z.ZodTypeAny>(mode: Mode) {
+  return z.strictObject({ mode, errorPolicy: ErrorPolicySchema.optional() });
+}
+
+function buttonedTransportSchema<Mode extends z.ZodTypeAny>(mode: Mode) {
+  return transportSchema(mode).extend({ inlineButtons: InlineButtonsSchema.optional() });
+}
+
+export const SlackTransportSchema = buttonedTransportSchema(SlackTransportModeSchema).extend({
+  // P0.5: per-account ingress route, auto-registered by the control plane.
+  webhookPath: z.string().min(1).optional(),
+  // The app-manifest-registered NATIVE slash command name (e.g. `/paseo`)
+  // whose Socket Mode `slash_commands` events the vertical rewrites to the
+  // shared plain-text commands (`/paseo approve` → `approve`). Absent =
+  // native slash ingestion off; the in-message `/approve` + `\approve`
+  // text spellings always work with zero app setup (commands.ts).
+  slashCommand: z
+    .string()
+    .regex(/^\/[a-z][a-z0-9_]{2,31}$/u, "a Slack command name: /lowercase, 3-32 chars")
+    .optional(),
+});
 export type SlackTransport = z.infer<typeof SlackTransportSchema>;
 
-export const TelegramTransportSchema = z
-  .object({
-    mode: TelegramTransportModeSchema,
-    errorPolicy: ErrorPolicySchema.optional(),
-    // Where the native approval card (inline keyboard) may appear — the
-    // approval engine's prompt-posting decision reads it (default off).
-    // `allowlist` is fail-closed at P0; no effect until the companion
-    // allowlist key lands.
-    inlineButtons: InlineButtonsSchema.optional(),
-  })
-  .strict();
+export const TelegramTransportSchema = buttonedTransportSchema(TelegramTransportModeSchema);
 export type TelegramTransport = z.infer<typeof TelegramTransportSchema>;
 
-export const DiscordTransportSchema = z
-  .object({
-    mode: DiscordTransportModeSchema,
-    errorPolicy: ErrorPolicySchema.optional(),
-    // Where the native approval card (message components) may appear — the
-    // approval engine's prompt-posting decision reads it (default off).
-    // `allowlist` is fail-closed at P0; no effect until the companion allowlist
-    // key lands.
-    inlineButtons: InlineButtonsSchema.optional(),
-  })
-  .strict();
+export const DiscordTransportSchema = buttonedTransportSchema(DiscordTransportModeSchema);
 export type DiscordTransport = z.infer<typeof DiscordTransportSchema>;
 
-export const GoogleChatTransportSchema = z
-  .object({
-    mode: GoogleChatTransportModeSchema,
-    errorPolicy: ErrorPolicySchema.optional(),
-  })
-  .strict();
+export const GoogleChatTransportSchema = transportSchema(GoogleChatTransportModeSchema);
 export type GoogleChatTransport = z.infer<typeof GoogleChatTransportSchema>;
 
-export const FeishuTransportSchema = z
-  .object({
-    mode: FeishuTransportModeSchema,
-    errorPolicy: ErrorPolicySchema.optional(),
-  })
-  .strict();
+export const FeishuTransportSchema = transportSchema(FeishuTransportModeSchema);
 export type FeishuTransport = z.infer<typeof FeishuTransportSchema>;
 
-export const ZalouserTransportSchema = z
-  .object({
-    mode: ZalouserTransportModeSchema,
-    errorPolicy: ErrorPolicySchema.optional(),
-  })
-  .strict();
+export const ZalouserTransportSchema = transportSchema(ZalouserTransportModeSchema);
 export type ZalouserTransport = z.infer<typeof ZalouserTransportSchema>;
 
-export const ZaloTransportSchema = z
-  .object({
-    mode: ZaloTransportModeSchema,
-    errorPolicy: ErrorPolicySchema.optional(),
-  })
-  .strict();
+export const ZaloTransportSchema = transportSchema(ZaloTransportModeSchema);
 export type ZaloTransport = z.infer<typeof ZaloTransportSchema>;
 
 // --- Vertical-owned account config (`account.config`) ---------------------------
@@ -688,6 +614,7 @@ export const RouteSchema = z
     interaction: InteractionDefaultsSchema.optional(),
     binding: BindingDefaultsSchema.optional(),
     reply: ReplyDefaultsSchema.optional(),
+    workspace: WorkspaceDefaultsSchema.optional(),
     outbound: OutboundDefaultsSchema.optional(),
     access: AccessDefaultsSchema.optional(),
     sync: SyncDefaultsSchema.optional(),

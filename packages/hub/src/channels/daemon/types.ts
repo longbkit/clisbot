@@ -123,6 +123,7 @@ export interface CreateAgentConfig {
 }
 
 export interface TextAttachment {
+  sourceSession?: { agentId: string; epoch: string; seq: number };
   type: "text";
   mimeType: "text/plain";
   contextKind?: string;
@@ -170,8 +171,29 @@ export interface AgentConfigApply {
   featureValues?: Record<string, unknown>;
 }
 export interface CreateAgentOptions {
+  source?: import("../plane/types.js").InboundMessage;
+  clientMessageId?: string;
   title?: string;
   initialPrompt?: string;
   attachments?: TextAttachment[];
   autoArchive?: boolean;
+  /** Where the session lands. Omitted, the daemon creates a workspace for the
+   * config's cwd, which is what every channel session did before workspace
+   * organization (`workspace-organization.ts`). */
+  workspaceId?: string;
+}
+
+/** The naming context the daemon's workspace auto-naming reads — the first
+ * request that will run in the workspace. Same shape as the app's
+ * `firstAgentContext` on `workspace.create.request`. */
+export interface FirstAgentContext {
+  prompt?: string;
+  attachments?: TextAttachment[];
+}
+
+export interface CreateWorkspaceInput {
+  /** Existing directory backing the workspace (the route environment's cwd). */
+  cwd: string;
+  projectId?: string;
+  firstAgentContext?: FirstAgentContext;
 }

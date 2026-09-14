@@ -110,6 +110,10 @@ class FakeDaemon {
       list_commands_request: {
         commands: [{ name: "review", description: "Review", argumentHint: "", kind: "skill" }],
       },
+      "workspace.create.request":
+        (message["source"] as { path?: string } | undefined)?.path === "/missing"
+          ? { workspace: null, setupTerminalId: null, error: "Directory not found: /missing" }
+          : { workspace: { id: "workspace-created" }, setupTerminalId: null, error: null },
       "agent.fork_context.request": {
         attachment: {
           type: "text",
@@ -522,6 +526,39 @@ describe("channel trusted-client daemon connection", () => {
     stopped.stop();
     await assert.rejects(stopped.setTimelineSubscription([]), /not connected/u);
     await assert.rejects(stopped.listAgents(), /not connected/u);
+  });
+
+  it("creates the session's workspace with the first request as naming context", async () => {
+    const created = await client.createWorkspace({
+      cwd: "/tmp/work",
+      projectId: "project-channel",
+      firstAgentContext: { prompt: "ship the login fix" },
+    });
+    assert.equal(created.workspaceId, "workspace-created");
+    const frame = daemon.messages.find((message) => message["type"] === "workspace.create.request");
+    assert.ok(frame !== undefined, "workspace.create.request was not sent");
+    assert.deepEqual(frame["source"], {
+      kind: "directory",
+      path: "/tmp/work",
+      projectId: "project-channel",
+    });
+    assert.deepEqual(frame["firstAgentContext"], { prompt: "ship the login fix" });
+    // The Hub never titles the workspace: the daemon's auto-naming owns the
+    // name and leaves a user-set title alone (A3/A4).
+    assert.equal(frame["title"], undefined);
+  });
+
+  it("surfaces a refused workspace creation as an error", async () => {
+    await assert.rejects(client.createWorkspace({ cwd: "/missing" }), /Directory not found/u);
+  });
+
+  it("places a created session in the resolved workspace", async () => {
+    await client.createAgent(
+      { provider: "codex", cwd: "/tmp/work" },
+      { workspaceId: "workspace-created" },
+    );
+    const frame = daemon.messages.findLast((message) => message["type"] === "create_agent_request");
+    assert.equal(frame?.["workspaceId"], "workspace-created");
   });
 
   it("normalizes actual wire mode, features, effective thinking and context on create and list", async () => {

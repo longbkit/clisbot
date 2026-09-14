@@ -102,6 +102,11 @@ Quick way to remember it: **continue here** = `/new`, `/resume`, `/fork`;
 **one-off answer** = `/side`, `/quick`. `/side` and `/fork` carry your context;
 `/quick` and `/new` start clean.
 
+They also decide where the work lands: `/side` and `/fork` continue what you
+were doing, so their session opens in the **same workspace** as the session
+here. `/quick` and `/new` start something else, so each opens its own workspace,
+named from the message you send.
+
 ## Extend the agent
 
 - `/skill`, `/skill search <keyword>`, `/skill <name>` — list, find, or run a

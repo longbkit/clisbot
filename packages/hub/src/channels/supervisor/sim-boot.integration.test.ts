@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ChannelStore } from "../../db/channels.js";
 import {
   SIM_ACCOUNT_ID,
+  SIM_ENV_CWD,
   SIM_SLACK_CHANNEL,
   SIM_SLACK_SENDER,
   SIM_TELEGRAM_CHAT,
@@ -37,6 +38,10 @@ const ENABLED = process.env["RUN_CHANNEL_SIM_BOOT"] === "1";
 // topic of the chat the earlier scenarios bound would inherit their `tool`
 // route, not the streaming one.
 const STREAM_TELEGRAM_CHAT = -1_001_777_555;
+/** Workspace organization drives its own chat: the assertion is about the
+ * FIRST session of a conversation, which a chat bound by another scenario no
+ * longer has. */
+const WORKSPACE_TELEGRAM_CHAT = -1_001_777_600;
 const STREAM_SLACK_CHANNEL = "C_SIM_STREAM";
 
 let boot: ChannelSimBoot;
@@ -169,6 +174,37 @@ describe.runIf(ENABLED)("channel plane against simulated platforms", () => {
     await expect.poll(() => daemonSawMarker(marker), { timeout: 30_000 }).toBe(true);
     // Admitted before the offset moved: a restart must not replay it.
     expect(boot.telegram.confirmedOffset).toBeGreaterThan(0);
+  }, 60_000);
+
+  // Workspace organization (docs/features/workspace-organization/README.md, A3):
+  // the thread's first session opens its own workspace, named from the mention
+  // that minted it, and the session is created inside that workspace.
+  it("opens the first session's workspace from the mention that minted it", async () => {
+    const marker = "S27-SIM-WS-1 rename the login screen";
+
+    boot.telegram.deliverMessage({
+      chatId: WORKSPACE_TELEGRAM_CHAT,
+      text: `@${boot.telegram.botUsername} ${marker}`,
+      fromId: SIM_TELEGRAM_SENDER,
+      chatType: "supergroup",
+    });
+
+    await expect.poll(() => daemonSawMarker(marker), { timeout: 30_000 }).toBe(true);
+    const requests = boot.daemon.received("workspace.create.request");
+    const index = requests.findIndex((request) => JSON.stringify(request).includes(marker));
+    expect(
+      index,
+      `no workspace was created for the mention\n${recentLogs(40).join("\n")}`,
+    ).toBeGreaterThanOrEqual(0);
+    const request = requests[index]!;
+    expect(request["source"]).toMatchObject({ kind: "directory", path: SIM_ENV_CWD });
+    expect(String((request["firstAgentContext"] as { prompt?: string })?.prompt)).toContain(marker);
+    // The daemon mints ids in create order, so this request's id is the one the
+    // session must carry.
+    const workspaceId = boot.daemon.createdWorkspaceIds[index];
+    expect(
+      boot.daemon.received("create_agent_request").map((create) => create["workspaceId"]),
+    ).toContain(workspaceId);
   }, 60_000);
 
   it("carries a Slack channel mention through the real Socket Mode receiver", async () => {

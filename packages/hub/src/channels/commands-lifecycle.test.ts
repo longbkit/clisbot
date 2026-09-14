@@ -69,9 +69,10 @@ const account: CompiledChannelAccount = {
   fallback: { deny: true },
 };
 let fixtureId = 0;
-function snapshot(id: string): AgentSnapshot {
+function snapshot(id: string, workspaceId?: string): AgentSnapshot {
   return {
     id,
+    ...(workspaceId === undefined ? {} : { workspaceId }),
     provider: "codex",
     cwd: "/repo",
     title: null,
@@ -83,7 +84,7 @@ function snapshot(id: string): AgentSnapshot {
 }
 function fixture(overrides: Partial<LifecycleCommandDependencies> = {}) {
   const id = ++fixtureId;
-  const old = snapshot(`old-${id}`),
+  const old = snapshot(`old-${id}`, "workspace-old"),
     target = snapshot(`target-${id}`),
     created = snapshot(`new-${id}`);
   const order: string[] = [];
@@ -92,18 +93,23 @@ function fixture(overrides: Partial<LifecycleCommandDependencies> = {}) {
     mimeType: "text/plain" as const,
     text: "prior conversation",
     contextKind: "chat_history" as const,
+    sourceSession: { agentId: "source-session", epoch: "source-epoch", seq: 12 },
   };
   const sendAgentMessage = vi.fn<DaemonConnection["sendAgentMessage"]>(async () => {
     order.push("send");
   });
   const cancelAgent = vi.fn(async () => undefined);
   const createAgent = vi.fn(async () => ({ agentId: created.id, agent: created }));
+  const createWorkspace = vi.fn(async () => ({ workspaceId: "workspace-quick" }));
   const daemon = {
     listAgents: async () => [old, target],
     sendAgentMessage,
     cancelAgent,
     createAgent,
-    getServerInfo: () => ({ features: { agentForkContext: true } }),
+    createWorkspace,
+    getServerInfo: () => ({
+      features: { agentForkContext: true, workspaceMultiplicity: true },
+    }),
     buildAgentForkContext: vi.fn(async () => ({ attachment, itemCount: 2 })),
   } as unknown as DaemonConnection;
   const context: LifecycleCommandContext = {
@@ -170,6 +176,7 @@ function fixture(overrides: Partial<LifecycleCommandDependencies> = {}) {
     sendAgentMessage,
     cancelAgent,
     createAgent,
+    createWorkspace,
     attach,
     detach,
     authorizeResume,
@@ -357,9 +364,12 @@ describe("channel lifecycle commands", () => {
     expect((await f.bound())?.agentId).toBe(f.created.id);
     expect(f.createAgent).toHaveBeenCalledWith(expect.objectContaining({ model: "staged-model" }), {
       title: "Channel /fork",
+      source: f.context.message,
+      workspaceId: "workspace-old",
     });
     expect(f.sendAgentMessage).toHaveBeenCalledWith(f.created.id, "continue", {
       steer: true,
+      source: f.context.message,
       attachments: [f.attachment],
     });
     expect(f.order).toEqual(["attach", "send"]);
@@ -373,7 +383,11 @@ describe("channel lifecycle commands", () => {
       expect((await f.bound())?.agentId).toBe(f.old.id);
       expect(f.createAgent).toHaveBeenCalledWith(expect.anything(), {
         title: `Channel /${name}`,
+        source: f.context.message,
         autoArchive: true,
+        // `/side` continues the bound session, so it inherits its workspace;
+        // `/quick` continues nothing and opens its own (A1).
+        workspaceId: name === "side" ? "workspace-old" : "workspace-quick",
       });
       expect(f.attach.mock.calls[0]?.[0]).toMatchObject({
         agentId: f.created.id,
@@ -386,6 +400,41 @@ describe("channel lifecycle commands", () => {
       expect(f.order).toEqual(["attach", "send"]);
     },
   );
+  it("side keeps the source workspace and its other sessions untouched (A1/A2)", async () => {
+    const f = fixture();
+    await f.seed();
+    await f.lifecycle.handle({ name: "side", value: "question" }, f.context);
+    // Nothing renames or re-places the source workspace: no naming context is
+    // sent, and the source session keeps its binding (A2/A5).
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+    expect((await f.bound())?.agentId).toBe(f.old.id);
+  });
+  it("quick names its own workspace from the request it carries (A3)", async () => {
+    const f = fixture();
+    await f.seed();
+    await f.lifecycle.handle({ name: "quick", value: "what changed today?" }, f.context);
+    expect(f.createWorkspace).toHaveBeenCalledWith(
+      { cwd: "/repo", firstAgentContext: { prompt: "what changed today?" } },
+      { source: f.context.message },
+    );
+  });
+  it("leaves placement to the daemon when workspace organization is off (A6)", async () => {
+    const f = fixture();
+    await f.seed();
+    const context = {
+      ...f.context,
+      route: {
+        ...f.context.route,
+        defaults: { ...f.context.route.defaults, workspace: { organize: false } },
+      },
+    };
+    await f.lifecycle.handle({ name: "fork", value: "continue" }, context);
+    expect(f.createWorkspace).not.toHaveBeenCalled();
+    expect(f.createAgent).toHaveBeenCalledWith(expect.anything(), {
+      title: "Channel /fork",
+      source: context.message,
+    });
+  });
   it("refuses unsupported fork hosts before creating a session", async () => {
     const f = fixture();
     f.daemon.getServerInfo = () => undefined;
@@ -450,6 +499,9 @@ describe("channel lifecycle commands", () => {
   it("steers the running turn", async () => {
     const f = fixture();
     await f.lifecycle.handle({ name: "steer", value: "change direction" }, f.context);
-    expect(f.sendAgentMessage).toHaveBeenCalledWith(f.old.id, "change direction", { steer: true });
+    expect(f.sendAgentMessage).toHaveBeenCalledWith(f.old.id, "change direction", {
+      steer: true,
+      source: f.context.message,
+    });
   });
 });

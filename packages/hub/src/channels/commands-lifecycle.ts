@@ -7,6 +7,7 @@ import type { DaemonConnection } from "./daemon/client.js";
 import type { AgentSnapshot, CreateAgentConfig } from "./daemon/types.js";
 import type { ChannelReplyAgentCapability, InboundMessage } from "./plane/types.js";
 import { ChannelCommandTurnQueue } from "./commands-lifecycle-queue.js";
+import { resolveSessionWorkspaceId } from "./workspace-organization.js";
 
 export interface LifecycleCommandContext {
   message: InboundMessage;
@@ -21,6 +22,7 @@ export interface LifecycleCommandDependencies {
   organizationId: string;
   channelRevisionId?: string | null;
   daemon: DaemonConnection;
+  logger?: import("./plane/types.js").PlaneLogger;
   store: Pick<ChannelStore, "findThreadBinding" | "rebindThreadBinding" | "releaseThreadBinding">;
   resolveConfig(
     context: LifecycleCommandContext,
@@ -149,7 +151,10 @@ export class ChannelLifecycleCommands {
     if (agent === undefined) throw new Error("The bound session is unavailable.");
     if (name === "steer") {
       if (agent.status !== "running") throw new Error("There is no running turn to steer.");
-      await this.deps.daemon.sendAgentMessage(agent.id, prompt, { steer: true });
+      await this.deps.daemon.sendAgentMessage(agent.id, prompt, {
+        steer: true,
+        source: context.message,
+      });
       return "Message admitted into the running turn.";
     }
     await this.queue.enqueue(
@@ -158,6 +163,7 @@ export class ChannelLifecycleCommands {
       agent.status === "running",
       context.post,
       () => this.deps.authorizeQueued?.(context) ?? Promise.resolve(false),
+      context.message,
     );
     return agent.status === "running"
       ? "Message queued until the current turn ends."
@@ -188,7 +194,13 @@ export class ChannelLifecycleCommands {
     // One-offs have their own relay association and never inherit a bound Agent's tool capability.
     const outputContext = oneOff ? this.relayContext(context) : context;
     const capability = this.capabilityFor(outputContext);
-    const created = await this.createConfiguredAgent(name, outputContext, capability, oneOff);
+    const created = await this.createConfiguredAgent(
+      name,
+      outputContext,
+      capability,
+      oneOff,
+      prompt,
+    );
     let change: BindingChange | undefined;
     try {
       if (
@@ -208,6 +220,7 @@ export class ChannelLifecycleCommands {
         prompt ?? "Continue from the conversation context.",
         {
           steer: true,
+          source: context.message,
           ...(attachments === undefined ? {} : { attachments }),
         },
       );
@@ -237,17 +250,44 @@ export class ChannelLifecycleCommands {
     context: LifecycleCommandContext,
     capability: ChannelReplyAgentCapability | undefined,
     oneOff: boolean,
+    prompt: string | undefined,
   ) {
     try {
       const config = await this.deps.resolveConfig(context, capability);
+      const workspaceId = await this.resolveSessionWorkspace(name, context, config, prompt);
       return await this.deps.daemon.createAgent(config, {
         title: `Channel /${name}`,
+        source: context.message,
         ...(oneOff ? { autoArchive: true } : {}),
+        ...(workspaceId === undefined ? {} : { workspaceId }),
       });
     } catch (error) {
       if (capability) this.deps.revokeCapability?.(capability.token);
       throw error;
     }
+  }
+
+  /**
+   * `/side` and `/fork` continue the bound session's work, so they land in its
+   * workspace (A1). `/quick` continues nothing: it opens its own workspace,
+   * named from the request it carries.
+   */
+  private async resolveSessionWorkspace(
+    name: string,
+    context: LifecycleCommandContext,
+    config: CreateAgentConfig,
+    prompt: string | undefined,
+  ): Promise<string | undefined> {
+    const continues = name !== "quick" && context.agentId !== undefined;
+    return await resolveSessionWorkspaceId(this.deps.daemon, {
+      organize: context.route.defaults.workspace?.organize,
+      ...(continues ? { sourceAgentId: context.agentId } : {}),
+      cwd: config.cwd,
+      ...(config.projectId === undefined ? {} : { projectId: config.projectId }),
+      ...(continues || prompt === undefined ? {} : { firstAgentContext: { prompt } }),
+      source: context.message,
+      ...(this.deps.logger === undefined ? {} : { logger: this.deps.logger }),
+    });
   }
 
   private relayContext(context: LifecycleCommandContext): LifecycleCommandContext {

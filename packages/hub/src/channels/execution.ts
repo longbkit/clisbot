@@ -17,7 +17,7 @@ import type { ChannelStore } from "../db/channels.js";
 import type { CompiledChannelAccount, CompiledRoute } from "./config/compile.js";
 import type { DaemonConnection } from "./daemon/client.js";
 import type { InboundReplyParams } from "./loader/host.js";
-import { isEnabled, mayTrigger, matchRoute, routeConversationMatches } from "./policy.js";
+import { isEnabled, mayTrigger, matchRoute, type InboundConversation } from "./policy.js";
 import {
   ApprovalEngine,
   assertChannelPosture,
@@ -50,7 +50,6 @@ import {
   admitFollowUp,
   BindingEngine,
   deriveBindingKey,
-  parseStoredRouteSelection,
   parseStoredRouteSummary,
   routeFingerprint,
   routePosition,
@@ -206,7 +205,7 @@ function identityLinkReplyText(
 
 function workflowDeliveryId(message: InboundMessage, route: CompiledRoute): string | undefined {
   if (route.target.kind !== "workflow") return undefined;
-  return `${message.channel}:${message.accountId}:${message.externalMessageId ?? randomUUID()}`;
+  return `${message.channel}:${message.accountId}:${message.externalMessageId ?? message.ingressId ?? randomUUID()}`;
 }
 
 /**
@@ -492,6 +491,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         organizationId: deps.organizationId,
         channelRevisionId: deps.channelRevisionId ?? null,
         daemon: daemonConnection,
+        logger,
         store: channelStore,
         resolveConfig: (context, capability) =>
           commandDispatcher!.resolveConfig(context, capability),
@@ -574,6 +574,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         clock,
         store: channelStore,
         daemon: daemonConnection,
+        detachAgent: detachChannelAgent,
         ...(deps.authorizeChannelUse === undefined
           ? {}
           : { authorizeChannelUse: deps.authorizeChannelUse }),
@@ -944,6 +945,15 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         limitDecision: "not_evaluated",
       });
     }
+    // The conversation is routed to a Workflow now, and a Workflow mints no
+    // binding: any session still bound here answers for a target the
+    // configuration no longer names, so it is retired rather than left to post
+    // beside the run. Admission has passed, so this is a decision the sender is
+    // allowed to cause.
+    if (route.target.kind === "workflow") {
+      const stale = await bindingForInbound(message, account);
+      if (stale !== undefined) await bindingsEngine().retireBoundSession(stale);
+    }
     const deliveryId = workflowDeliveryId(message, route);
     const routeLimit = routeExecutionLimiter?.admit({
       account,
@@ -1001,6 +1011,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         deliveryId,
         receivedAt: new Date(clock.now()),
         payload: {
+          ...(deps.resolveSessionIdentity
+            ? { sessionIdentity: await deps.resolveSessionIdentity(message) }
+            : {}),
           workflow,
           text: message.text,
           channel: {
@@ -1269,7 +1282,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     }
     const resolved = await resolveInboundRoute(message, account);
     if (resolved.kind !== "selected") {
-      return replyWithoutRoute(message, account, textCommand, resolved.kind);
+      return replyWithoutRoute(message, account, textCommand);
     }
     const route = resolved.route;
     // The upstream sender-admission gate (`access:`), in front of everything
@@ -1296,7 +1309,6 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     message: InboundMessage,
     account: CompiledChannelAccount,
     textCommand: ChannelTextCommand | null,
-    routeState: string,
   ): Promise<PlaneInboundResult> {
     if (textCommand?.name === "help" || textCommand?.name === "me") {
       const text =
@@ -1310,13 +1322,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
         detail: textCommand.name,
       });
     }
-    return result(false, {
-      kind: "ignored",
-      reason:
-        routeState === "invalid-binding"
-          ? "the bound session is not valid under the active Channel configuration"
-          : "no route matches this conversation",
-    });
+    return result(false, { kind: "ignored", reason: "no route matches this conversation" });
   }
 
   async function dispatchUnknownCommandOrPrompt(
@@ -1756,10 +1762,7 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
 
   // --- Routing ---------------------------------------------------------------
 
-  type InboundRouteResolution =
-    | { kind: "selected"; route: CompiledRoute }
-    | { kind: "invalid-binding" }
-    | { kind: "unmatched" };
+  type InboundRouteResolution = { kind: "selected"; route: CompiledRoute } | { kind: "unmatched" };
 
   /**
    * A durable direct-Agent binding owns the inbound before text routing. This
@@ -1773,9 +1776,11 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     const binding = await bindingForInbound(message, account);
     if (binding !== undefined) {
       const route = routeForBinding(binding);
-      return route?.target.kind === "agent"
-        ? { kind: "selected", route }
-        : { kind: "invalid-binding" };
+      // No route owns this conversation any more: the account stopped serving
+      // it, which is the same silence it had before it was ever bound. Whether
+      // the bound session is still the right one to answer with is the binding
+      // engine's call, after admission.
+      return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
     }
     const route = resolveNewRoute(message, account);
     return route === undefined ? { kind: "unmatched" } : { kind: "selected", route };
@@ -1916,7 +1921,17 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     );
   }
 
-  /** Resolve a stored direct binding without re-running its original text match. */
+  /**
+   * Which route owns this conversation now.
+   *
+   * Matched on the conversation the binding recorded (kind + id), never on the
+   * message text: `matchRoute` without text cannot select a `contains` route,
+   * so a later keyword in an ongoing conversation can never move it to another
+   * route. Config edits are therefore free — a route keeps owning its
+   * conversations while it keeps matching them, and the authority gates behind
+   * this (access, `bot.interact`, command privileges, approval) re-evaluate
+   * against the route as it is now, on every message.
+   */
   function routeForBinding(binding: ThreadBindingRecord): CompiledRoute | undefined {
     const account = findAccountForBinding(binding);
     if (account === undefined) return undefined;
@@ -1924,49 +1939,9 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
       kind: "channel" as const,
       id: binding.externalConversationId,
     };
-    const selection = parseStoredRouteSelection(binding.route);
-    if (selection === undefined) {
-      // Compatibility for bindings written before captured route selection.
-      // A content-specific route cannot match without its original text.
-      const legacy = matchRoute(descriptor, account);
-      if (legacy.route !== null) return legacy.route;
-      return legacy.fallback.deny ? undefined : catchAllRoute(legacy.fallback);
-    }
-    const fallback = account.fallback.deny ? undefined : catchAllRoute(account.fallback);
-    const atCapturedPosition =
-      selection.position === "fallback" ? fallback : account.routes[selection.position];
-    if (
-      selection.revisionId === (deps.channelRevisionId ?? null) &&
-      continuationMatches(atCapturedPosition, descriptor, selection.fingerprint)
-    ) {
-      return atCapturedPosition;
-    }
-    // A revision may reorder an otherwise identical route. Continue only when
-    // target and every effective policy leaf are byte-equivalent after compile.
-    return [...account.routes, ...(fallback === undefined ? [] : [fallback])].find((candidate) =>
-      continuationMatches(candidate, descriptor, selection.fingerprint),
-    );
-  }
-
-  function continuationMatches(
-    route: CompiledRoute | undefined,
-    descriptor: {
-      kind: "dm" | "channel" | "thread" | "group" | "topic";
-      id: string;
-    },
-    fingerprint: string,
-  ): route is CompiledRoute {
-    if (route === undefined || routeFingerprint(route) !== fingerprint) return false;
-    // The synthesized fallback has no authored scope; its fingerprint is the
-    // authority. Authored routes must still own the stored Conversation.
-    if (route.match.kind === "channel" && route.match.ids.length === 0 && !accountHasRoute(route)) {
-      return true;
-    }
-    return routeConversationMatches(route.match, descriptor);
-  }
-
-  function accountHasRoute(route: CompiledRoute): boolean {
-    return deps.controlPlane.accounts.some((account) => account.routes.includes(route));
+    const matched = matchRoute(descriptor, account);
+    if (matched.route !== null) return matched.route;
+    return matched.fallback.deny ? undefined : catchAllRoute(matched.fallback);
   }
 
   /** The one shared stream consumer; callers own their execution lease shape. */
@@ -1986,9 +1961,13 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
   }
 
   /**
-   * A Workflow stream may outlive the Channel revision that started it. New
-   * events attach only when the captured Route still exists with the same
-   * fingerprint; old Member-only rows retain their pre-fingerprint behavior.
+   * A Workflow stream may outlive the Channel revision that started it, so its
+   * later events attach through the same two questions the inbound path asks:
+   * does a route still own this conversation, and does it still target this
+   * Workflow. Editing an unrelated leaf of that route keeps the run's output
+   * flowing; repointing or removing it stops the output, which is the answer
+   * the configuration now gives. Old Member-only rows (no captured route) keep
+   * their pre-capture behavior.
    */
   function workflowRouteForCurrentConfiguration(
     account: CompiledChannelAccount,
@@ -1996,23 +1975,27 @@ export function createChannelPlane(deps: ChannelPlaneDeps): ChannelPlane {
     workflow: string,
   ): CompiledRoute | undefined {
     if (channel.route_fingerprint !== undefined) {
-      const fallback =
-        account.fallback.deny || account.fallback.target === undefined
-          ? undefined
-          : catchAllRoute(account.fallback);
-      let atCapturedPosition: CompiledRoute | undefined;
-      if (channel.route_position === "fallback") {
-        atCapturedPosition = fallback;
-      } else if (typeof channel.route_position === "number") {
-        atCapturedPosition = account.routes[channel.route_position];
+      // The run records the ROOT conversation, so a route declared at the
+      // thread/topic level is asked at that level first, with the thread the
+      // run started in; a root-level route answers the second question.
+      const descriptors: InboundConversation[] = [];
+      if (channel.external_thread_id !== null && channel.root_kind !== "dm") {
+        descriptors.push({
+          kind: channel.root_kind === "group" ? "topic" : "thread",
+          id: channel.external_thread_id,
+        });
       }
-      const candidates = [atCapturedPosition, ...account.routes, fallback];
-      return candidates.find(
-        (candidate) =>
-          candidate?.target.kind === "workflow" &&
-          candidate.target.workflow === workflow &&
-          routeFingerprint(candidate) === channel.route_fingerprint,
-      );
+      descriptors.push({ kind: channel.root_kind, id: channel.external_conversation_id });
+      for (const conversation of descriptors) {
+        const matched = matchRoute(conversation, account);
+        const route =
+          matched.route ??
+          (matched.fallback.deny || matched.fallback.target === undefined
+            ? undefined
+            : catchAllRoute(matched.fallback));
+        if (route?.target.kind === "workflow" && route.target.workflow === workflow) return route;
+      }
+      return undefined;
     }
     if (channel.route.audience?.kind === "conversationParticipants") {
       return undefined;

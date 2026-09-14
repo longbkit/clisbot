@@ -15,6 +15,7 @@ export function configurationDaemonStub(): Pick<
   | "applyAgentConfig"
   | "buildAgentForkContext"
   | "isAgentInProject"
+  | "createWorkspace"
 > {
   return {
     getServerInfo: () => ({
@@ -30,6 +31,10 @@ export function configurationDaemonStub(): Pick<
     ],
     listProviderModes: async () => [{ id: "default", label: "Default", isUnattended: false }],
     isAgentInProject: async () => false,
+    // Workspace organization stays off in the stub: `workspaceMultiplicity` is
+    // absent from the features above, so no test creates a workspace unless it
+    // opts in by reporting the feature.
+    createWorkspace: async () => ({ workspaceId: "workspace-stub" }),
     listAgentProfiles: async () => [],
     listCommands: async () => [],
     setAgentModel: async () => undefined,

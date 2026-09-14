@@ -25,20 +25,18 @@ import {
 import {
   AccountFileSchema,
   OPEN_AUDIENCE_ROUTE_LIMITS,
-  ORG_DEFAULTS,
   OrgPolicySchema,
   type ApprovalRule,
   type ChannelDefaults,
   type Fallback,
-  type SyncProgress,
-  type SyncProgressGroup,
-  type SyncStreaming,
   type RoleAssignment,
   type Route,
   type RouteLimits,
 } from "./schema.js";
-import type { DmPolicy, GroupPolicy } from "./enums.js";
+
 import type { CompiledRole } from "./privileges.js";
+import { foldDefaults, mergeApproval, requireStarFallback } from "./inheritance.js";
+import type { EffectiveDefaults } from "./inheritance.js";
 import { privilegeCovers } from "./privileges.js";
 import {
   compileRoles,
@@ -64,74 +62,17 @@ type OrgPolicy = z.infer<typeof OrgPolicySchema>;
 
 // --- Compiled snapshot ---------------------------------------------------------
 
+// The effective `defaults:` block is the fold's output, so it is declared with
+// the fold and re-exported here: `config/compile.js` stays the one import for
+// the compiled snapshot.
+export type { EffectiveAccess, EffectiveDefaults } from "./inheritance.js";
+
 /**
  * One route's folded `access:` block. Leaves stay optional: the ported
  * decision applies upstream's own per-leaf defaults (`dmPolicy: pairing`,
  * `groupPolicy: allowlist`) once the block exists at all, so authoring only
  * `allowFrom` behaves exactly as it does in OpenClaw.
  */
-export interface EffectiveAccess {
-  dmPolicy?: DmPolicy | undefined;
-  groupPolicy?: GroupPolicy | undefined;
-  allowFrom?: readonly (string | number)[] | undefined;
-  groupAllowFrom?: readonly (string | number)[] | undefined;
-  groupAllowFromFallbackToAllowFrom?: boolean | undefined;
-  deniedReply?: string | undefined;
-}
-
-export interface EffectiveDefaults {
-  requireMention: boolean;
-  followUp: { mode: "auto" | "mention-only"; ttlMinutes: number };
-  bindingKey: "thread" | "channel" | "dm";
-  replyAnchor: "default" | "thread";
-  /** The reply-path toggle (E4/E6), folded like every other default leaf;
-   * `template` stays null at the org floor (= the default injection block). */
-  outbound: { path: "relay" | "tool"; template: string | null };
-  /** What the plane does with the non-message inbound families
-   * (`plane/inbound-kinds.ts` owns the routing table; these are its knobs). */
-  inbound: {
-    reactionNotifications: "off" | "own" | "all";
-    editNotifications: "off" | "all";
-  };
-  /**
-   * The upstream sender-admission gate (`access:`). ABSENT is the floor and
-   * means "not authored": the plane runs the RBAC gate alone, exactly as it
-   * did before the knob existed. Present = the ported
-   * `resolveDmGroupAccessWithLists` decision runs in front of the RBAC gate.
-   */
-  access?: EffectiveAccess | undefined;
-  sync: {
-    finalAnswers: boolean;
-    /** The "the bot is working" group: the relayed progress line, the
-     * provider's native typing status, and a temporary reaction on the
-     * inbound marker. Folded per leaf; an authored bare boolean normalizes to
-     * `progressMessage` only. */
-    progress: {
-      progressMessage: boolean;
-      typingIndicator: boolean;
-      /** Resolved: the reserved `"off"`, or the emoji name to react with. */
-      messageReaction: string;
-    };
-    toolCalls: boolean;
-    threadLink: "full" | "final-only" | "none";
-    /** The live-draft surface for a running turn (`sync.streaming`). ABSENT is
-     * the org floor and means off: nothing streams and the turn's answer is
-     * one final post. The compiler omits the key unless a layer authored a
-     * leaf, so every revision written before the knob existed compiles to the
-     * defaults it always had. The leaves stay optional inside it too — the
-     * vertical's own resolver (Slack `resolveSlackStreamingMode` /
-     * `resolveSlackNativeStreaming`) owns the per-leaf default, which is how
-     * an account authored for OpenClaw keeps upstream's semantics. */
-    streaming?: SyncStreaming | undefined;
-    /** The subagent (Task tool) relay knobs; off at the org floor. */
-    subagents: {
-      finalAnswers: boolean;
-      progress: boolean;
-      toolCalls: boolean;
-    };
-  };
-}
-
 export type RouteTarget =
   | {
       kind: "agent";
@@ -517,30 +458,30 @@ function openAudienceAutoAllows(rules: readonly ApprovalRule[]): boolean {
   });
 }
 
+/**
+ * The conversation kinds each channel actually emits. A Discord thread IS a
+ * channel, so a thread route matches on `thread` and a guild text channel on
+ * `channel`; Discord, Google Chat and Feishu have no Telegram-style forum
+ * `topic` and no Slack-style multi-person `group`. Feishu spells a 1:1 chat
+ * `p2p` (a `dm` here) and a reply chain (`root_id`) a `thread`. Zalo and Zalo
+ * Personal have exactly two kinds and no thread surface at all.
+ */
+const ROUTE_KINDS: Readonly<Record<string, readonly string[]>> = {
+  slack: ["dm", "channel", "thread", "group"],
+  telegram: ["dm", "group", "topic"],
+  discord: ["dm", "channel", "thread"],
+  googlechat: ["dm", "channel", "thread"],
+  feishu: ["dm", "channel", "thread"],
+  zalo: ["dm", "group"],
+  zalouser: ["dm", "group"],
+};
+
 function validateRouteKind(
   channel: string,
   kind: Route["match"]["kind"],
   path: readonly (string | number)[],
 ): void {
-  let supported: readonly string[] = [];
-  if (channel === "slack") supported = ["dm", "channel", "thread", "group"];
-  if (channel === "telegram") supported = ["dm", "group", "topic"];
-  // A Discord thread IS a channel, so a thread route matches on `thread`; a
-  // guild text channel is `channel` and a DM is `dm`. Discord never emits a
-  // Telegram-style forum `topic`.
-  if (channel === "discord") supported = ["dm", "channel", "thread"];
-  // A Google Chat space is a `channel`; a message thread inside it is `thread`;
-  // a 1:1 DM space is `dm`. There is no Slack-style multi-person `group` and no
-  // forum `topic`.
-  if (channel === "googlechat") supported = ["dm", "channel", "thread"];
-  // A Feishu chat is a `channel`, a `p2p` chat a `dm`, and a reply chain a
-  // `thread` (`root_id`). No `group` and no `topic`.
-  if (channel === "feishu") supported = ["dm", "channel", "thread"];
-  // Zalo has exactly two conversation kinds and no thread surface at all.
-  if (channel === "zalo") supported = ["dm", "group"];
-  // Zalo Personal likewise: a friend DM or a group, and no threads.
-  if (channel === "zalouser") supported = ["dm", "group"];
-  if (!supported.includes(kind)) {
+  if (!(ROUTE_KINDS[channel] ?? []).includes(kind)) {
     issue(path, `${channel} never emits a ${kind} conversation`);
   }
 }
@@ -639,225 +580,4 @@ function compileFallback(
       input: context.input,
     }),
   };
-}
-
-// --- Inheritance fold + approval merge ------------------------------------------
-
-/**
- * Fold the inheritance layers (`org < account < route`, most-specific last):
- * the most specific layer that sets a leaf wins — an account or route override
- * beats the layer below it — and `ORG_DEFAULTS` is the floor when no layer
- * sets the leaf (§4.3.7: "org defaults < account defaults < route
- * overrides").
- */
-function foldDefaults(layers: readonly (ChannelDefaults | undefined)[]): EffectiveDefaults {
-  const pick = <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined): T | undefined => {
-    for (let index = layers.length - 1; index >= 0; index -= 1) {
-      const value = leaf(layers[index]);
-      if (value !== undefined) return value;
-    }
-    return undefined;
-  };
-  const floor = ORG_DEFAULTS;
-  const outbound = {
-    path: pick((layer) => layer?.outbound?.path) ?? floor.outbound.path,
-    template: pick((layer) => layer?.outbound?.template) ?? floor.outbound.template,
-  };
-  return {
-    requireMention:
-      pick((layer) => layer?.interaction?.requireMention) ?? floor.interaction.requireMention,
-    followUp: {
-      mode: pick((layer) => layer?.interaction?.followUp?.mode) ?? floor.interaction.followUp.mode,
-      ttlMinutes:
-        pick((layer) => layer?.interaction?.followUp?.ttlMinutes) ??
-        floor.interaction.followUp.ttlMinutes,
-    },
-    bindingKey: pick((layer) => layer?.binding?.key) ?? floor.binding.key,
-    replyAnchor: pick((layer) => layer?.reply?.anchor) ?? floor.reply.anchor,
-    outbound,
-    inbound: {
-      reactionNotifications:
-        pick((layer) => layer?.inbound?.reactionNotifications) ??
-        floor.inbound.reactionNotifications,
-      editNotifications:
-        pick((layer) => layer?.inbound?.editNotifications) ?? floor.inbound.editNotifications,
-    },
-    ...foldAccessDefaults(pick),
-    sync: toolPathSyncFold(outbound.path, foldSyncDefaults(pick, floor.sync)),
-  };
-}
-
-/**
- * Fold the `access:` leaves. Like `sync.streaming`, the floor is ABSENCE: the
- * key is omitted unless some layer authored a leaf, so a revision written
- * before the knob existed keeps the admission behaviour it always had. Once
- * ANY leaf is authored the block exists and the ported upstream decision runs,
- * with upstream's own per-leaf defaults for the leaves nobody set.
- */
-function foldAccessDefaults(
-  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
-): { access?: EffectiveAccess } {
-  const access: EffectiveAccess = {
-    ...optional(
-      "dmPolicy",
-      pick((layer) => layer?.access?.dmPolicy),
-    ),
-    ...optional(
-      "groupPolicy",
-      pick((layer) => layer?.access?.groupPolicy),
-    ),
-    ...optional(
-      "allowFrom",
-      pick((layer) => layer?.access?.allowFrom),
-    ),
-    ...optional(
-      "groupAllowFrom",
-      pick((layer) => layer?.access?.groupAllowFrom),
-    ),
-    ...optional(
-      "groupAllowFromFallbackToAllowFrom",
-      pick((layer) => layer?.access?.groupAllowFromFallbackToAllowFrom),
-    ),
-    ...optional(
-      "deniedReply",
-      pick((layer) => layer?.access?.deniedReply),
-    ),
-  };
-  return Object.keys(access).length === 0 ? {} : { access };
-}
-
-/** `{ [key]: value }` when the value is set, `{}` otherwise — the one spelling
- * the folds use under `exactOptionalPropertyTypes`. */
-function optional<K extends string, T>(key: K, value: T | undefined): { [P in K]?: T } {
-  return (value === undefined ? {} : { [key]: value }) as { [P in K]?: T };
-}
-
-/**
- * Normalize one authored `sync.progress` layer to leaves. A bare boolean is
- * the pre-group spelling and speaks about `progressMessage` ONLY — it never
- * mentioned the other two surfaces, so they stay unset and keep inheriting
- * from the layer below (an already-authored `progress: true` revision gains a
- * typing indicator from the floor, not from this leaf).
- */
-function progressLeaf(layer: SyncProgress | undefined): SyncProgressGroup {
-  if (layer === undefined) return {};
-  if (typeof layer === "boolean") return { progressMessage: layer };
-  return layer;
-}
-
-/** Fold the `sync` leaves (root + `subagents`) through the layer chain. */
-function foldSyncDefaults(
-  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
-  floor: (typeof ORG_DEFAULTS)["sync"],
-) {
-  return {
-    finalAnswers: pick((layer) => layer?.sync?.finalAnswers) ?? floor.finalAnswers,
-    progress: {
-      progressMessage:
-        pick((layer) => progressLeaf(layer?.sync?.progress).progressMessage) ??
-        floor.progress.progressMessage,
-      typingIndicator:
-        pick((layer) => progressLeaf(layer?.sync?.progress).typingIndicator) ??
-        floor.progress.typingIndicator,
-      messageReaction:
-        pick((layer) => progressLeaf(layer?.sync?.progress).messageReaction) ??
-        floor.progress.messageReaction,
-    },
-    toolCalls: pick((layer) => layer?.sync?.toolCalls) ?? floor.toolCalls,
-    threadLink: pick((layer) => layer?.sync?.threadLink) ?? floor.threadLink,
-    ...foldStreamingDefaults(pick),
-    subagents: {
-      finalAnswers:
-        pick((layer) => layer?.sync?.subagents?.finalAnswers) ?? floor.subagents.finalAnswers,
-      progress: pick((layer) => layer?.sync?.subagents?.progress) ?? floor.subagents.progress,
-      toolCalls: pick((layer) => layer?.sync?.subagents?.toolCalls) ?? floor.subagents.toolCalls,
-    },
-  };
-}
-
-/**
- * Fold the `sync.streaming` leaves. The floor is ABSENCE, not a value: the key
- * is omitted unless some layer authored a leaf, so an unauthored revision
- * compiles to the exact effective defaults it did before the knob existed.
- */
-function foldStreamingDefaults(
-  pick: <T>(leaf: (layer: ChannelDefaults | undefined) => T | undefined) => T | undefined,
-): { streaming?: SyncStreaming } {
-  const mode = pick((layer) => layer?.sync?.streaming?.mode);
-  const nativeTransport = pick((layer) => layer?.sync?.streaming?.nativeTransport);
-  if (mode === undefined && nativeTransport === undefined) return {};
-  return {
-    streaming: {
-      ...(mode === undefined ? {} : { mode }),
-      ...(nativeTransport === undefined ? {} : { nativeTransport }),
-    },
-  };
-}
-
-/**
- * The tool-path sync fold (E4/E6): when the effective `outbound.path` is
- * `tool`, the agent's user-visible answer leaves through the hub-attached
- * `message` MCP tool, so the route's relay knobs fold to all-off — the relay
- * must stay silent for tool-path turns (exactly-one outcome: the tool post is
- * the only user-visible answer). That includes `sync.subagents`: subagent
- * (Task tool) output relayed into the thread would be a second user-visible
- * answer on a tool turn. `threadLink` keeps its folded value — it has no
- * effect while the relay is silent and still applies if the path flips back
- * to `relay` on the next revision.
- */
-function toolPathSyncFold(
-  path: "relay" | "tool",
-  sync: EffectiveDefaults["sync"],
-): EffectiveDefaults["sync"] {
-  if (path !== "tool") return sync;
-  // The draft streams the relay's answer text; on the tool path there is no
-  // relayed answer to draft, so the key is dropped rather than set to `off`
-  // (absence IS off, and an emitted key would claim the route authored one).
-  const withoutStreaming: EffectiveDefaults["sync"] = { ...sync };
-  delete withoutStreaming.streaming;
-  return {
-    ...withoutStreaming,
-    finalAnswers: false,
-    // Only the relayed TEXT leaf goes quiet. The typing indicator and the
-    // reaction are not posts — they are the liveness signal, and a tool-path
-    // turn has less visible text than a relay turn, so folding them off would
-    // remove the only sign of work. The group shape is what makes this
-    // distinction expressible; the old single boolean could not.
-    progress: { ...sync.progress, progressMessage: false },
-    toolCalls: false,
-    subagents: { finalAnswers: false, progress: false, toolCalls: false },
-  };
-}
-
-/** Approval rules merge by prepending: the most specific layer matches first.
- * An exact-duplicate rule (same match + mode + initiatorOnly) in a specific
- * layer shadows the identical rule below it and is not added again — the doc
- * examples restate org rules in the account file "so the file reads as a
- * full, reviewable config" without changing the decision (§4.3.3). */
-function mergeApproval(
-  ...layers: readonly (readonly ApprovalRule[] | undefined)[]
-): readonly ApprovalRule[] {
-  const merged: ApprovalRule[] = [];
-  for (let index = layers.length - 1; index >= 0; index -= 1) {
-    for (const rule of layers[index] ?? []) {
-      const duplicate = merged.some(
-        (candidate) =>
-          candidate.match === rule.match &&
-          candidate.mode === rule.mode &&
-          candidate.initiatorOnly === rule.initiatorOnly,
-      );
-      if (!duplicate) merged.push(rule);
-    }
-  }
-  return merged;
-}
-
-/** §4.3.6: when approval rules exist, a `match: "*"` fallback rule is required. */
-function requireStarFallback(
-  path: readonly (string | number)[],
-  rules: readonly ApprovalRule[],
-): void {
-  if (rules.length > 0 && !rules.some((rule) => rule.match === "*")) {
-    issue(path, 'approval rules require a match: "*" fallback rule');
-  }
 }

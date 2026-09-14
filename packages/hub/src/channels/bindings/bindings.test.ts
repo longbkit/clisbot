@@ -46,21 +46,40 @@ function snapshotOf(id: string, title: string | null): AgentSnapshot {
 }
 
 function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
-  const created: { config: CreateAgentConfig; title: string | null }[] = [];
+  const created: {
+    config: CreateAgentConfig;
+    title: string | null;
+    workspaceId: string | null;
+  }[] = [];
+  const workspaces: { cwd: string; prompt: string | undefined }[] = [];
   const messages: { agentId: string; text: string; steer: boolean | null }[] = [];
   const responses: { agentId: string; requestId: string; response: AgentPermissionResponse }[] = [];
   const subscriptions: string[][] = [];
+  const sources: (InboundMessage | undefined)[] = [];
   let seq = 0;
   const daemon: DaemonConnection = {
     ...configurationDaemonStub(),
+    // Workspace organization is on at the org floor, so the engine creates the
+    // thread's first workspace through the daemon (A3).
+    getServerInfo: () => ({ serverId: "test-daemon", features: { workspaceMultiplicity: true } }),
+    createWorkspace: async (input) => {
+      workspaces.push({ cwd: input.cwd, prompt: input.firstAgentContext?.prompt });
+      return { workspaceId: `workspace-${workspaces.length - 1}` };
+    },
     discovery: { url: "ws://127.0.0.1:6767/ws", source: "default-port" },
     waitForConnected: async () => undefined,
     createAgent: async (config, options) => {
-      created.push({ config, title: options?.title ?? null });
+      sources.push(options?.source);
+      created.push({
+        config,
+        title: options?.title ?? null,
+        workspaceId: options?.workspaceId ?? null,
+      });
       const id = `agent-${seq++}`;
       return { agentId: id, agent: snapshotOf(id, options?.title ?? null) };
     },
     sendAgentMessage: async (agentId, text, options) => {
+      sources.push(options?.source);
       messages.push({ agentId, text, steer: options?.steer ?? null });
     },
     cancelAgent: async () => undefined,
@@ -73,7 +92,7 @@ function makeFakeDaemon(listAgents: AgentSnapshot[] = []) {
     },
     stop: () => undefined,
   };
-  return { daemon, created, messages, responses, subscriptions };
+  return { daemon, created, workspaces, messages, responses, subscriptions, sources };
 }
 
 const DEFAULTS = {
@@ -358,7 +377,7 @@ describe("bind (root marker, reply.anchor = thread)", () => {
 
 describe("bind (first mention)", () => {
   it("creates an agent, delivers the first prompt, and resolves the marker", async () => {
-    const { daemon, created, messages } = makeFakeDaemon();
+    const { daemon, created, messages, sources } = makeFakeDaemon();
     const engine = makeEngine(store, daemon);
 
     const outcome = await engine.bindOrSteer(message(), makeAccount(makeRoute()), makeRoute());
@@ -368,11 +387,107 @@ describe("bind (first mention)", () => {
     assert.equal(created.length, 1, "exactly one agent created");
     assert.equal(messages.length, 1, "the first message is the session's first prompt");
     assert.equal(messages[0]?.text, "start the build");
+    assert.deepEqual(
+      sources.map((source) => source?.senderIdentity),
+      [INITIATOR, INITIATOR],
+    );
     assert.equal(messages[0]?.steer, false, "the first prompt does not steer");
 
     const binding = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, null);
     assert.equal(binding?.status, "bound");
     assert.equal(binding?.agentId, outcome.kind === "bound" ? outcome.agentId : "");
+  });
+
+  it("opens the thread's workspace named from the first mention (A3)", async () => {
+    const { daemon, created, workspaces } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+
+    const route = makeRoute("C0NAMED");
+    await engine.bindOrSteer(
+      message({
+        text: "start the build",
+        conversation: {
+          kind: "channel",
+          id: "C0NAMED",
+          rootConversationId: "C0NAMED",
+          threadId: null,
+        },
+      }),
+      makeAccount(route),
+      route,
+    );
+
+    assert.deepEqual(workspaces, [{ cwd: "/tmp/repo", prompt: "start the build" }]);
+    assert.equal(created[0]?.workspaceId, "workspace-0", "the session lands in that workspace");
+  });
+
+  it("leaves placement to the daemon when workspace organization is off (A6)", async () => {
+    const { daemon, created, workspaces } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const route = makeRoute("C0UNORGANIZED", { defaults: { workspace: { organize: false } } });
+
+    await engine.bindOrSteer(
+      message({
+        text: "start the build",
+        conversation: {
+          kind: "channel",
+          id: "C0UNORGANIZED",
+          rootConversationId: "C0UNORGANIZED",
+          threadId: null,
+        },
+      }),
+      makeAccount(route),
+      route,
+    );
+
+    assert.deepEqual(workspaces, [], "no workspace is created");
+    assert.equal(created[0]?.workspaceId, null, "create_agent carries no workspace");
+  });
+
+  // Retargeting retires a running session, so it is gated like starting one:
+  // an inbound the route would not admit must leave the session alone.
+  it("does not retire a retargeted session for an inbound it would not admit", async () => {
+    const { daemon, created } = makeFakeDaemon();
+    const engine = makeEngine(store, daemon);
+    const conversation = {
+      kind: "channel" as const,
+      id: "C0RETARGETGATE",
+      rootConversationId: "C0RETARGETGATE",
+      threadId: null,
+    };
+    const route = makeRoute("C0RETARGETGATE");
+    const bound = await engine.bindOrSteer(
+      message({ conversation, text: "start the build" }),
+      makeAccount(route),
+      route,
+    );
+    assert.equal(bound.kind, "bound");
+
+    // The route now points at another agent, but this inbound does not mention
+    // the bot: it may not start a session, so it may not end one either.
+    const repointed: CompiledRoute = {
+      ...route,
+      target: { kind: "agent", agent: "reviewer", environment: "repo", template: null },
+    };
+    const outcome = await engine.bindOrSteer(
+      message({ conversation, text: "just chatting", mentionedBot: false }),
+      makeAccount(repointed),
+      repointed,
+    );
+
+    assert.equal(outcome.kind, "ignored");
+    assert.equal(created.length, 1, "no session is minted");
+    const binding = await store.findThreadBinding(
+      ORGANIZATION_ID,
+      ACCOUNT_ID,
+      "C0RETARGETGATE",
+      null,
+    );
+    assert.equal(
+      binding?.agentId,
+      bound.kind === "bound" ? bound.agentId : "",
+      "the bound session is untouched",
+    );
   });
 
   it("records the created agent's home (create-time cwd) through noteAgentCwd", async () => {
@@ -474,7 +589,7 @@ describe("bind (first mention)", () => {
   });
 
   it("ignores a sender that mayTrigger denies", async () => {
-    const { daemon, created } = makeFakeDaemon();
+    const { daemon, created, sources } = makeFakeDaemon();
     const account = makeAccount(makeRoute());
     // A route with no default roles and no assignments: nobody holds
     // `bot.interact`, so the gate denies every sender.
@@ -495,6 +610,7 @@ describe("bind (first mention)", () => {
       "sender may not trigger this route",
     );
     assert.equal(created.length, 0, "mayTrigger denial creates nothing and records no marker");
+    assert.equal(sources.length, 0, "denied senders never reach the ticket-minting daemon facade");
   });
 });
 
@@ -1005,6 +1121,9 @@ it("refuses a disallowed sticky configuration without leaving a pending binding"
   );
   assert.deepEqual(result, { kind: "ignored", reason: "outside grant" });
   assert.equal(fake.created.length, 0);
+  // Workspace organization runs after the configuration gate: a refused
+  // sender leaves no empty workspace behind.
+  assert.deepEqual(fake.workspaces, []);
   assert.equal(
     await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, CONVERSATION, marker),
     undefined,

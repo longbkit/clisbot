@@ -109,19 +109,17 @@ see [implementation-plan.md](implementation-plan.md#resolved-decisions).
 
 ## Starting sessions
 
-Đang cân nhắc: [`/side` và `/fork` tạo session trong cùng workspace](../workspace-organization/README.md#làm-trước--chưa-cần-đổi-yaml).
+Five commands mint or rebind a session. Three questions decide which: does it
+carry this conversation's context, does it take over the binding, and which
+workspace does it land in ([workspace organization](../workspace-organization/README.md)).
 
-Five commands mint or rebind a session. Two
-questions decide which: does it carry this conversation's context, and does it
-take over the binding?
-
-| Command            | Context                     | Takes over the conversation |
-| ------------------ | --------------------------- | --------------------------- |
-| `/new [message]`   | fresh, none                 | yes — continue here         |
-| `/resume <id>`     | an existing session         | yes — continue here         |
-| `/fork [message]`  | forked from current session | yes — continue here         |
-| `/side <message>`  | forked from current session | no — one-off answer         |
-| `/quick <message>` | fresh, none                 | no — one-off answer         |
+| Command            | Context                     | Takes over the conversation | Workspace                   |
+| ------------------ | --------------------------- | --------------------------- | --------------------------- |
+| `/new [message]`   | fresh, none                 | yes — continue here         | new, named from the message |
+| `/resume <id>`     | an existing session         | yes — continue here         | the resumed session's       |
+| `/fork [message]`  | forked from current session | yes — continue here         | the source session's        |
+| `/side <message>`  | forked from current session | no — one-off answer         | the source session's        |
+| `/quick <message>` | fresh, none                 | no — one-off answer         | new, named from the message |
 
 - **Fork** (`/fork`, `/side`) copies this conversation's transcript into the new
   session (`buildAgentForkContext` → a `chat_history` attachment on the create

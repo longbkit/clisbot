@@ -403,6 +403,9 @@ function workflowExecution(input: {
   id: string;
   conversationId: string;
   route: CompiledRoute;
+  /** Set to exercise the captured-route branch (a run started by this Hub). */
+  captured?: { position: number | "fallback" };
+  threadId?: string;
 }): AgentExecutionRecord {
   const bindingKey = JSON.stringify(["slack", ACCOUNT_ID, input.conversationId, null]);
   return {
@@ -425,10 +428,16 @@ function workflowExecution(input: {
         account_id: ACCOUNT_ID,
         binding_key: bindingKey,
         external_conversation_id: input.conversationId,
-        external_thread_id: null,
+        external_thread_id: input.threadId ?? null,
         sender_identity: INITIATOR,
         root_kind: "channel",
-        trigger_thread_id: null,
+        trigger_thread_id: input.threadId ?? null,
+        ...(input.captured === undefined
+          ? {}
+          : {
+              route_position: input.captured.position,
+              route_fingerprint: routeFingerprint(input.route),
+            }),
         route: {
           defaultRoles: input.route.defaultRoles,
           assignments: input.route.assignments,
@@ -605,6 +614,171 @@ describe("workflow route", () => {
     assert.equal(continued.outcome?.kind, "steered");
     assert.equal(continued.outcome?.kind === "steered" ? continued.outcome.agentId : "", agentId);
     assert.equal(harness.workflowDispatches.length, 1, "the active Agent binding wins");
+  });
+
+  // Routing asks two questions and nothing else: which route owns this
+  // conversation now, and does its target still match the bound session. A
+  // config edit that answers neither must not disturb a live conversation.
+  it("keeps steering a bound conversation after an unrelated config edit", async () => {
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0COSMETIC",
+      rootConversationId: "C0COSMETIC",
+      threadId: null,
+    };
+    const before = makeHarness({ channelRevisionId: "11111111-1111-4111-8111-111111111111" });
+    await before.plane.start(before.fake.daemon, store);
+    before.next.message = message({ text: "start", conversation });
+    const bound = await before.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(bound.outcome?.kind, "bound");
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+
+    // The operator edits a presentation leaf and deploys a new revision. Same
+    // route, same target — the conversation keeps its session.
+    const edited: CompiledRoute = {
+      ...makeRoute(),
+      defaults: { ...DEFAULTS, sync: { ...DEFAULTS.sync, threadLink: "full" } },
+    };
+    const after = makeHarness({
+      account: makeAccount(edited),
+      channelRevisionId: "22222222-2222-4222-8222-222222222222",
+    });
+    await after.plane.start(after.fake.daemon, store);
+    after.next.message = message({ text: "keep going", conversation });
+    const steered = await after.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(steered.outcome?.kind, "steered");
+    assert.equal(steered.outcome?.kind === "steered" ? steered.outcome.agentId : "", agentId);
+    assert.equal(after.fake.created.length, 0, "no session is minted for an unrelated edit");
+  });
+
+  it("mints a session at the new target when the route is repointed", async () => {
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0RETARGET",
+      rootConversationId: "C0RETARGET",
+      threadId: null,
+    };
+    const before = makeHarness();
+    await before.plane.start(before.fake.daemon, store);
+    before.next.message = message({ text: "start", conversation });
+    const bound = await before.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(bound.outcome?.kind, "bound");
+    const first = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+
+    // The operator repoints the route at another agent. Reusing the bound
+    // session would answer from an agent the configuration no longer names.
+    const repointed: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "agent", agent: "reviewer", environment: "repo", template: null },
+    };
+    const after = makeHarness({ account: makeAccount(repointed) });
+    await after.plane.start(after.fake.daemon, store);
+    after.next.message = message({ text: "now what", conversation });
+    const rebound = await after.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(rebound.outcome?.kind, "bound");
+    const second = rebound.outcome?.kind === "bound" ? rebound.outcome.agentId : "";
+    assert.equal(after.fake.created.length, 1, "a session is minted at the new target");
+    assert.equal(
+      after.fake.created[0]?.config.provider,
+      "codex",
+      "the new session is created, not steered",
+    );
+    assert.deepEqual(after.fake.cancelled, [first], "the session at the old target is retired");
+    const stored = await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0RETARGET", null);
+    assert.equal(stored?.agentId, second);
+  });
+
+  it("retires the bound session when the conversation is routed to a Workflow", async () => {
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0TOWORKFLOW",
+      rootConversationId: "C0TOWORKFLOW",
+      threadId: null,
+    };
+    const before = makeHarness();
+    await before.plane.start(before.fake.daemon, store);
+    before.next.message = message({ text: "start", conversation });
+    const bound = await before.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+    assert.equal(bound.outcome?.kind, "bound");
+    const agentId = bound.outcome?.kind === "bound" ? bound.outcome.agentId : "";
+
+    const workflowRoute: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+    };
+    const after = makeHarness({ account: makeAccount(workflowRoute) });
+    await after.plane.start(after.fake.daemon, store);
+    after.next.message = message({ text: "now what", conversation });
+    const dispatched = await after.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(dispatched.outcome?.kind, "workflow");
+    assert.deepEqual(after.fake.cancelled, [agentId], "the replaced session is retired");
+    assert.equal(
+      await store.findThreadBinding(ORGANIZATION_ID, ACCOUNT_ID, "C0TOWORKFLOW", null),
+      undefined,
+      "and its binding is released",
+    );
+  });
+
+  it("goes silent when no route owns the conversation any more", async () => {
+    const conversation: InboundMessage["conversation"] = {
+      kind: "channel",
+      id: "C0DROPPED",
+      rootConversationId: "C0DROPPED",
+      threadId: null,
+    };
+    const before = makeHarness();
+    await before.plane.start(before.fake.daemon, store);
+    before.next.message = message({ text: "start", conversation });
+    assert.equal(
+      (await before.plane.onInbound({ channel: "slack", accountId: ACCOUNT_ID, ctxPayload: {} }))
+        .outcome?.kind,
+      "bound",
+    );
+
+    // The route is narrowed to another Conversation and the fallback denies:
+    // this conversation is no longer served at all.
+    const narrowed: CompiledRoute = {
+      ...makeRoute(),
+      match: { kind: "channel", ids: ["C0OTHER"] },
+    };
+    const after = makeHarness({ account: makeAccount(narrowed) });
+    await after.plane.start(after.fake.daemon, store);
+    after.next.message = message({ text: "anyone there", conversation });
+    const ignored = await after.plane.onInbound({
+      channel: "slack",
+      accountId: ACCOUNT_ID,
+      ctxPayload: {},
+    });
+
+    assert.equal(ignored.outcome?.kind, "ignored");
+    assert.equal(after.fake.created.length, 0);
   });
 
   it("dispatches a durable workflow event without creating a direct agent binding", async () => {
@@ -1801,6 +1975,72 @@ describe("channel session commands", () => {
     assert.equal(requests[0]!.authorization.privilege, "agent.interact");
     assert.equal(requests[0]!.authorization.senderIdentity, INITIATOR);
     assert.equal(harness.fake.created.length, 0);
+    await harness.plane.stop();
+  });
+
+  // The captured-route branch: a run this Hub started records its route, and
+  // later events attach while a route still wires that Workflow to the
+  // conversation. The Workflow output records the ROOT conversation, so a route
+  // declared at the thread level must still be recognised.
+  it("keeps attaching a workflow stream to a thread-level route", async () => {
+    const route: CompiledRoute = {
+      ...makeRoute(),
+      match: { kind: "thread", ids: [] },
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+    };
+    const harness = makeHarness({ account: makeAccount(route) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const execution = workflowExecution({
+      id: "0f0a3d1e-2f2b-4a39-9c5a-9c1d6ad4c111",
+      conversationId: "C0WFTHREAD",
+      threadId: "1712000000.000500",
+      route,
+      captured: { position: 0 },
+    });
+
+    await harness.plane.onWorkflowStreamEvent({
+      execution,
+      agentId: "workflow-thread-agent",
+      event: {
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "ok" },
+      },
+    });
+
+    // A run whose Route no longer wires it here is rejected by cancelling its
+    // agent; an attached run is left alone.
+    assert.deepEqual(harness.fake.cancelled, [], "the run stays attached");
+    await harness.plane.stop();
+  });
+
+  it("stops attaching a workflow stream once the route no longer targets it", async () => {
+    const captured: CompiledRoute = {
+      ...makeRoute(),
+      target: { kind: "workflow", workflow: "engineering-assistant" },
+    };
+    // The operator repointed the conversation at a direct agent route.
+    const harness = makeHarness({ account: makeAccount(makeRoute()) });
+    await harness.plane.start(harness.fake.daemon, store);
+    const execution = workflowExecution({
+      id: "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      conversationId: "C0WFGONE",
+      route: captured,
+      captured: { position: 0 },
+    });
+
+    await harness.plane.onWorkflowStreamEvent({
+      execution,
+      agentId: "workflow-gone-agent",
+      event: {
+        type: "timeline",
+        provider: "codex",
+        item: { type: "assistant_message", text: "ok" },
+      },
+    });
+
+    assert.deepEqual(harness.fake.cancelled, ["workflow-gone-agent"], "the run is rejected");
+    assert.equal(harness.posted.length, 0, "nothing is relayed for a Workflow the route dropped");
     await harness.plane.stop();
   });
 
