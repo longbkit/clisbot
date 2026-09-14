@@ -138,14 +138,14 @@ describe("ProviderCatalogSession", () => {
     const { subsystem, emitted, pushSnapshotChange } = makeSubsystem({
       visibleProviders: new Set(["codex", "claude"]),
       supportsCustomModeIcons: true,
-      snapshot: { getSnapshot: () => entries },
+      snapshot: { getSnapshot: () => createProviderSnapshot(entries) },
       host: {
         filterProviderEntries: safeCodexEntries,
       },
     });
 
     subsystem.start();
-    pushSnapshotChange(entries);
+    pushSnapshotChange(createProviderSnapshot(entries));
     await subsystem.handleGetProvidersSnapshotRequest({
       type: "get_providers_snapshot_request",
       requestId: "projected-pull",

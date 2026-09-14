@@ -4,6 +4,7 @@ import { getErrorMessage } from "@getpaseo/protocol/error-utils";
 import { compactProviderSnapshot } from "@getpaseo/protocol/provider-snapshot-codec";
 import type { SessionInboundMessage, SessionOutboundMessage } from "../../messages.js";
 import {
+  identifyEntry,
   isGlobalProviderSnapshotKey,
   resolveSnapshotCwd,
   sameSnapshotRecords,
@@ -44,8 +45,11 @@ export interface ProviderCatalogSessionHost {
   // COMPAT(providersSnapshot): visibility gating for older clients lives on the shell
   // (agent-lifecycle shares it). Reads appVersion live.
   isProviderVisibleToClient(provider: string): boolean;
-  /** Apply session resource grants after client-version visibility filtering. */
-  filterProviderEntries(
+  /**
+   * Apply session resource grants after client-version visibility filtering. Optional so an
+   * unrestricted shell (and upstream's own host literals) need not implement it.
+   */
+  filterProviderEntries?(
     entries: ProviderSnapshotEntry[],
     cwd: string | undefined,
   ): ProviderSnapshotEntry[];
@@ -131,16 +135,28 @@ export class ProviderCatalogSession {
     // Managed Access narrows further: session resource grants decide which providers this
     // client may see at this cwd. Upstream centralised visibility here, so the grant check
     // rides along instead of repeating at every read site.
+    const applyGrants = this.host.filterProviderEntries;
+    if (!applyGrants) return { ...snapshot, records: visible };
     const cwd = isGlobalProviderSnapshotKey(snapshot.cwd) ? undefined : snapshot.cwd;
-    const granted = new Set(
-      this.host
-        .filterProviderEntries(
+    // A grant can also project an entry — narrowing its modes, say — so a changed entry is
+    // re-identified instead of carrying the unprojected content hash into the client's.
+    const projected = new Map(
+      applyGrants
+        .call(
+          this.host,
           visible.map(({ entry }) => entry),
           cwd,
         )
-        .map((entry) => entry.provider),
+        .map((entry) => [entry.provider, entry]),
     );
-    return { ...snapshot, records: visible.filter(({ entry }) => granted.has(entry.provider)) };
+    return {
+      ...snapshot,
+      records: visible.flatMap((record) => {
+        const entry = projected.get(record.entry.provider);
+        if (!entry) return [];
+        return entry === record.entry ? [record] : [identifyEntry(entry)];
+      }),
+    };
   }
 
   private snapshotPayload(snapshot: ProviderSnapshot, request?: { ifNoneMatch?: string }) {
@@ -333,8 +349,12 @@ export class ProviderCatalogSession {
     provider: AgentProvider,
   ): Promise<ProviderSnapshotEntry | undefined> {
     const manager = this.providerSnapshotManager;
+    // Single-provider reads answer the same client as the snapshot reads, so they go through
+    // the same visibility + session-grant filter instead of the raw snapshot.
     const findEntry = () =>
-      manager.getSnapshot(cwd).records.find(({ entry }) => entry.provider === provider)?.entry;
+      this.visibleSnapshot(manager.getSnapshot(cwd)).records.find(
+        ({ entry }) => entry.provider === provider,
+      )?.entry;
 
     let entry = findEntry();
     if (entry && !entry.enabled) {
@@ -406,21 +426,27 @@ export class ProviderCatalogSession {
   ): Promise<void> {
     const fetchedAt = new Date().toISOString();
     try {
-      const allowed = new Set(
-        this.host
-          .filterProviderEntries(
-            (await this.host.listProviderAvailability()).map(({ provider }) => ({
-              provider,
-              status: "unavailable" as const,
-              enabled: true,
-            })),
-            undefined,
+      const available = await this.host.listProviderAvailability();
+      const grants = this.host.filterProviderEntries;
+      const allowed = grants
+        ? new Set(
+            grants
+              .call(
+                this.host,
+                available.map(({ provider }) => ({
+                  provider,
+                  status: "unavailable" as const,
+                  enabled: true,
+                })),
+                undefined,
+              )
+              .map(({ provider }) => provider),
           )
-          .map(({ provider }) => provider),
-      );
-      const providers = (await this.host.listProviderAvailability()).filter(
+        : null;
+      const providers = available.filter(
         (provider) =>
-          this.host.isProviderVisibleToClient(provider.provider) && allowed.has(provider.provider),
+          this.host.isProviderVisibleToClient(provider.provider) &&
+          (allowed === null || allowed.has(provider.provider)),
       );
       this.host.emit({
         type: "list_available_providers_response",

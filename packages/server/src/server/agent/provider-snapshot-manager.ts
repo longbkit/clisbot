@@ -1191,7 +1191,7 @@ export function isGlobalProviderSnapshotKey(cwd: string): boolean {
   return cwd === GLOBAL_PROVIDER_SNAPSHOT_KEY;
 }
 
-function identifyEntry(entry: ProviderSnapshotEntry): ProviderSnapshotRecord {
+export function identifyEntry(entry: ProviderSnapshotEntry): ProviderSnapshotRecord {
   const { fetchedAt: _fetchedAt, ...content } = entry;
   const contentHash = createHash("sha256")
     .update(JSON.stringify(["paseo.provider-result/1", content]))
