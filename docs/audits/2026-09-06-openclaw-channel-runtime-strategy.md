@@ -4,7 +4,7 @@ Date: 2026-09-06. Mode: architect / implementation baseline. Progress ledger: [2
 
 ## Implementation checkpoint (2026-09-06)
 
-> Superseded 2026-09-07. This section records what was built on 2026-09-06 and is not maintained. For the platform as it stands read [channels-platform.md](../channels-platform.md); for running it, [channels-operations.md](../channels-operations.md); for per-slice state and live evidence, the goal ledger and `docs/tests/channels/p0-live-scenarios.md`.
+> Superseded 2026-09-07. This section records what was built on 2026-09-06 and is not maintained. For the platform as it stands read [../features/channels/README.md](../features/channels/README.md); for running it, [../guides/developer-guide/channels-operations.md](../guides/developer-guide/channels-operations.md); for per-slice state and live evidence, the goal ledger and `docs/tests/channels/p0-live-scenarios.md`.
 
 The first reliability slice is live in the Fusion path: `channel_ingress_queue` durably stores normalized inbound payloads before provider acknowledgement/offset advancement; claims use organization scoping, fencing tokens, lease refresh, stale recovery, per-lane advisory locking, retry and dead-letter states. Slack message/app-mention ACK now follows durable admission, and Telegram leaves the update watermark unchanged when admission fails. The Hub `message` tool accepts OpenClaw's canonical `message` field plus an idempotency key and returns structured delivery metadata.
 
@@ -20,7 +20,7 @@ This checkpoint was partial, and much of what it listed as missing has since lan
 
 Three constraints from this section still hold and are carried forward rather than restated elsewhere:
 
-- Slack slash and interactive callbacks remain ACK-first because of the provider response window. This is the only sanctioned exception to admit-before-acknowledge; the invariant per transport family is in [channels-platform.md](../channels-platform.md#durable-admission).
+- Slack slash and interactive callbacks remain ACK-first because of the provider response window. This is the only sanctioned exception to admit-before-acknowledge; the invariant per transport family is in [../features/channels/README.md](../features/channels/README.md#durable-admission).
 - Pre-adoption supersede and the claim→adoption deferral lifecycle are still not implemented.
 - **No catalog entry is presented as full support until its capability matrix and live evidence pass.** The user-facing matrix and the per-channel "Verified live" lines in [public-docs/hub/channels](../../public-docs/hub/channels/index.md) exist to enforce exactly this.
 

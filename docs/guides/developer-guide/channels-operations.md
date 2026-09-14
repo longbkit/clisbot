@@ -1,6 +1,6 @@
 # Channel operations
 
-Running, debugging, and live-testing the channel plane. The platform itself is [channels-platform.md](channels-platform.md); user-facing setup is [public-docs/hub/channels](../public-docs/hub/channels/index.md).
+Running, debugging, and live-testing the channel plane. The platform itself is [../../features/channels/README.md](../../features/channels/README.md); user-facing setup is [public-docs/hub/channels](../../../public-docs/hub/channels/index.md).
 
 ## The dev-home live loop
 
@@ -47,7 +47,7 @@ entries. Existing unmigrated homes remain readable through the legacy-layout det
 
 The channel plane admits against a daemon in managed-access `external` mode by minting an
 `accessTicket` per account (owner membership → unrestricted lease); see
-[2026-09-10 channel-vs-app-admission](audits/2026-09-10-channel-vs-app-admission.md). To exercise it:
+[2026-09-10 channel-vs-app-admission](../../audits/2026-09-10-channel-vs-app-admission.md). To exercise it:
 
 - **Flip the daemon** with a `set_daemon_config` over a trusted `/ws` session:
   `{ config: { managedAccess: { mode: "external" } } }`. It hot-applies and persists to
@@ -234,7 +234,7 @@ A silent `hub.log` around an inbound message that never got an answer means the 
 
 `npm run channels:sync:check` verifies every package against its manifest; `npm run channels:sync:report` lists what moved upstream since the pinned baseline. The upstream checkout comes from `$OPENCLAW_UPSTREAM_DIR`, defaulting to `~/projects/openclaw-private`, and is read through `git` at explicit commits, so the checkout may sit on any branch.
 
-The full procedure — when to bump a baseline, how to walk the deviation ledger, and the gate a sync has to pass — is [upstream-sync-and-contribution.md](guides/developer-guide/upstream-sync-and-contribution.md#openclaw-channel-source-manifests).
+The full procedure — when to bump a baseline, how to walk the deviation ledger, and the gate a sync has to pass — is [upstream-sync-and-contribution.md](upstream-sync-and-contribution.md#openclaw-channel-source-manifests).
 
 ## Full gate
 

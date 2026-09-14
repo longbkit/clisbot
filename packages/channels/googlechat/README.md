@@ -10,7 +10,7 @@ depending on `googleapis`; that client (`api.ts`) is carried verbatim.
 
 Hub wiring landed in a follow-up slice. [HUB-WIRING.md](HUB-WIRING.md) is the
 handoff document it was built from and stays the record of what the Hub side owns;
-`docs/channels-platform.md` describes the platform as built. Live E2E remains
+`../../../docs/features/channels/README.md` describes the platform as built. Live E2E remains
 blocked on the public HTTPS endpoint, not on the wiring.
 
 ## What a live test needs

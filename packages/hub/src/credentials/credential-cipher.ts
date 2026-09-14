@@ -149,7 +149,7 @@ function open({ key }: CredentialKey, owner: string, parsed: CredentialEnvelope)
  * `..._MASTER_KEY_PREVIOUS_FILE` is the rotation seam. Point it at the retired
  * key, name that key in `..._KEY_ID_PREVIOUS`, and every read falls back to it
  * while writes seal with the new one; the procedure is in
- * docs/channels-operations.md.
+ * ../../../../docs/guides/developer-guide/channels-operations.md.
  */
 export async function readCredentialCipherEnvironment(
   environment: Record<string, string | undefined>,

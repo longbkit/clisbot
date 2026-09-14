@@ -184,8 +184,8 @@ authorization, ownership, persistence, and lifecycle contract is documented in [
 One package per chat platform, ported from OpenClaw source and driven by the Hub, never by the
 daemon. A vertical owns protocol facts only — addressing, formatting, chunking, mentions, uploads
 — behind a shared plugin contract; credentials, routing, durable admission, and the agent seam
-belong to the Hub. See [channels-platform.md](channels-platform.md) for the contract and the
-layout rule, and [channels-operations.md](channels-operations.md) for running it.
+belong to the Hub. See [features/channels/README.md](features/channels/README.md) for the contract and the
+layout rule, and [guides/developer-guide/channels-operations.md](guides/developer-guide/channels-operations.md) for running it.
 
 ### `packages/desktop` — Desktop app (Electron)
 

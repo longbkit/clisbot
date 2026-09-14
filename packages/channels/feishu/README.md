@@ -72,5 +72,5 @@ needs "Event subscription → Use long connection" enabled in the app console.
 Landed in a follow-up slice. `HUB-WIRING.md` is the handoff document it was built
 from and stays the record of what the Hub side owns — including the one thing it
 got wrong: the tools reach the agent through the loaded `plugin.agentTools`, not
-through a Hub-side `registerFeishuTools` import. `docs/channels-platform.md`
+through a Hub-side `registerFeishuTools` import. `../../../docs/features/channels/README.md`
 describes the platform as built.

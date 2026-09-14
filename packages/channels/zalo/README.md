@@ -15,7 +15,7 @@ extension and a different slice (17).
 
 Hub wiring landed in a follow-up slice. [HUB-WIRING.md](HUB-WIRING.md) is the
 handoff document it was built from and stays the record of what the Hub side owns;
-`docs/channels-platform.md` describes the platform as built.
+`../../../docs/features/channels/README.md` describes the platform as built.
 
 ## What a live test needs
 

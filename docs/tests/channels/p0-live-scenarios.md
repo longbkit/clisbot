@@ -1276,7 +1276,7 @@ the result is built (`packages/hub/src/channels/channel-reply-send.ts:307`
 - The Hub's daemon link needs no `PASEO_PASSWORD` — the pairing in
   `hub-relationship.json` is active, and this wave's Hub booted from
   `start-hub.sh` (which exports none) with `channel daemon connected` twice.
-  `docs/channels-operations.md` now says what `PASEO_PASSWORD` is still for and
+  `../../guides/developer-guide/channels-operations.md` now says what `PASEO_PASSWORD` is still for and
   why `hub-local.json` leaves `paseo channels status` unusable after a
   `start-hub.sh` boot.
 

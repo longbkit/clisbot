@@ -6,7 +6,7 @@ This doc answers one question and records one decision:
 
 - **Decision (user, 2026-08-26):** pull Telegram **and Slack** into the repo as first-party verticals (level **S2** — own the slice, both channels in one work item, fully replacing the pinned-OpenClaw mechanism for both), keep the pinned OpenClaw dists as sync references, and generalize the package shape so zalouser can be pulled the same way later. Priority order: (1) customer experience — deviations from upstream are allowed when needed; (2) maximizing the ability to re-sync OpenClaw updates; (3) owning the parts we must fix.
 
-> **Status 2026-09-07.** The decision held and was extended: all seven catalog channels now ship as in-repo verticals against an OpenClaw source baseline, ported from upstream **source** rather than from the pinned dists this audit measured. §1–§3 remain the dist-verified record of _why_ the pull was taken and what the pinned supply looked like; the parts of §4 that describe the mechanics have been overtaken and are annotated in place. For the platform as built — layout rule, shared contract, admission invariant, Hub pipeline, `fusion/*` pattern, add-a-channel checklist — read [channels-platform.md](../channels-platform.md). Do not treat this audit as a build guide.
+> **Status 2026-09-07.** The decision held and was extended: all seven catalog channels now ship as in-repo verticals against an OpenClaw source baseline, ported from upstream **source** rather than from the pinned dists this audit measured. §1–§3 remain the dist-verified record of _why_ the pull was taken and what the pinned supply looked like; the parts of §4 that describe the mechanics have been overtaken and are annotated in place. For the platform as built — layout rule, shared contract, admission invariant, Hub pipeline, `fusion/*` pattern, add-a-channel checklist — read [../features/channels/README.md](../features/channels/README.md). Do not treat this audit as a build guide.
 
 ## 1. What "the same contract as openclaw/slack" actually is
 
@@ -190,7 +190,7 @@ zalouser's re-sync loop (§4.4) diffs against `zca-js` releases instead of OpenC
 
 ### 4.3 Deviation ledger (per package)
 
-**Where the ledger lives now (2026-09-07).** The per-package `DEVIATIONS.md` was folded into the manifest: `upstream-sync.json` carries a `deviations[]` array of `{ id, file?, reason, tests?[] }`, and `channels:sync:check` enforces unique ids, non-empty reasons, and a citation from every `adapted`/`reimplemented` file entry — none of which a prose file could enforce. Only the two oldest packages still carry a `DEVIATIONS.md`, as history. The operating rule below is unchanged and is the important part; the format is described in [channels-platform.md](../channels-platform.md#the-deviation-ledger).
+**Where the ledger lives now (2026-09-07).** The per-package `DEVIATIONS.md` was folded into the manifest: `upstream-sync.json` carries a `deviations[]` array of `{ id, file?, reason, tests?[] }`, and `channels:sync:check` enforces unique ids, non-empty reasons, and a citation from every `adapted`/`reimplemented` file entry — none of which a prose file could enforce. Only the two oldest packages still carry a `DEVIATIONS.md`, as history. The operating rule below is unchanged and is the important part; the format is described in [../features/channels/README.md](../features/channels/README.md#the-deviation-ledger).
 
 `DEVIATIONS.md` carries the reasoning, one entry per behavioral deviation; the ids it defines are what the manifest's `files[].deviation` references:
 

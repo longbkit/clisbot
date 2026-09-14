@@ -2,7 +2,7 @@
 
 How a chat platform becomes a channel in this repo: where the code lives, what contract it implements, what the Hub does with it, and what you have to touch to add the next one.
 
-User-facing setup lives in [public-docs/hub/channels](../public-docs/hub/channels/index.md). Day-to-day operation lives in [channels-operations.md](channels-operations.md). This doc is for the person writing or porting a vertical.
+User-facing setup lives in [public-docs/hub/channels](../../../public-docs/hub/channels/index.md). Day-to-day operation lives in [../../guides/developer-guide/channels-operations.md](../../guides/developer-guide/channels-operations.md). This doc is for the person writing or porting a vertical.
 
 ## Three owners, and why
 
@@ -86,23 +86,25 @@ A transport that cannot express the invariant does not ship. If you find yoursel
 
 One inbound message walks this path. Each row is the file to open.
 
-| Stage               | File                                                               | What it decides                                                                                                          |
-| ------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Catalog             | `packages/hub/src/channels/catalog.ts:85`                          | Metadata only: label, auth kind, transports, credentials, claimed capabilities, extra tools.                             |
-| Supported names     | `catalog.ts:512`                                                   | `SUPPORTED_CHANNEL_NAMES` — every channel union, zod enum, `Record` key and DB check constraint derives from this tuple. |
-| Pins                | `packages/hub/channel-pins.json`, `channels/install/pins.ts:141`   | Which supply serves the channel: `published`, `bundled`, or `in-repo`.                                                   |
-| Loader              | `channels/loader/load-channel.ts:213`                              | Imports the entry, calls `setChannelRuntime`, produces the plugin.                                                       |
-| Config enums/schema | `channels/config/enums.ts:14`, `config/schema.ts`                  | What an operator may author on an account and a Route.                                                                   |
-| Compile             | `channels/config/compile.ts:199`, `compile-support.ts:195`         | Authored YAML → `ChannelControlPlane`. `DRIVABLE_TRANSPORT_MODES` is where a mode the Hub cannot receive on is refused.  |
-| Account carriers    | `channels/supervisor/account-carriers.ts:162`                      | The per-account credential projection handed to `startAccount`. See below.                                               |
-| Connections         | `db/channel-connections.ts:29`, `credentials/credential-cipher.ts` | One table per channel; AES-256-GCM envelope bound by AAD to its scope.                                                   |
-| Supervisor          | `channels/supervisor/index.ts:607`                                 | Starts, stops, reconciles accounts; owns transport state.                                                                |
-| Ingress queue       | `db/channels.ts:571`, `channels/ingress/drain.ts:347`              | Durable rows, claim lease, fencing, per-lane exclusion, retry, dead-letter.                                              |
-| Plane routing       | `channels/execution.ts:201`, `plane/inbound-kinds.ts:95`           | Route match, access, mention policy, and the per-`kind` disposition.                                                     |
-| Message tool        | `channels/channel-reply.ts:92`, `channel-message-tool.ts:128`      | The MCP `message` tool and the per-channel action catalog.                                                               |
-| Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                               |
-| Channel agent tools | `channels/channel-agent-tools.ts:70`                               | Mounts `plugin.agentTools` on the reply MCP server, authorized per call.                                                 |
-| Streaming producer  | `channels/streaming/producer.ts:88`                                | Turns the turn's accumulating text into an edit-in-place draft.                                                          |
+| Stage               | File                                                               | What it decides                                                                                                                       |
+| ------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Catalog             | `packages/hub/src/channels/catalog.ts:85`                          | Metadata only: label, auth kind, transports, credentials, claimed capabilities, extra tools.                                          |
+| Supported names     | `catalog.ts:512`                                                   | `SUPPORTED_CHANNEL_NAMES` — every channel union, zod enum, `Record` key and DB check constraint derives from this tuple.              |
+| Pins                | `packages/hub/channel-pins.json`, `channels/install/pins.ts:141`   | Which supply serves the channel: `published`, `bundled`, or `in-repo`.                                                                |
+| Loader              | `channels/loader/load-channel.ts:213`                              | Imports the entry, calls `setChannelRuntime`, produces the plugin.                                                                    |
+| Config enums/schema | `channels/config/enums.ts:14`, `config/schema.ts`                  | What an operator may author on an account and a Route.                                                                                |
+| Compile             | `channels/config/compile.ts:173`, `compile-support.ts:195`         | Authored YAML → `ChannelControlPlane`. `DRIVABLE_TRANSPORT_MODES` is where a mode the Hub cannot receive on is refused.               |
+| Defaults fold       | `channels/config/inheritance.ts`                                   | `defaults:` layers (org < account < route) → the one effective block a route carries, plus the approval-rule merge.                   |
+| Account carriers    | `channels/supervisor/account-carriers.ts:162`                      | The per-account credential projection handed to `startAccount`. See below.                                                            |
+| Connections         | `db/channel-connections.ts:29`, `credentials/credential-cipher.ts` | One table per channel; AES-256-GCM envelope bound by AAD to its scope.                                                                |
+| Supervisor          | `channels/supervisor/index.ts:607`                                 | Starts, stops, reconciles accounts; owns transport state.                                                                             |
+| Ingress queue       | `db/channels.ts:571`, `channels/ingress/drain.ts:347`              | Durable rows, claim lease, fencing, per-lane exclusion, retry, dead-letter.                                                           |
+| Plane routing       | `channels/execution.ts:201`, `plane/inbound-kinds.ts:95`           | Route match, access, mention policy, and the per-`kind` disposition.                                                                  |
+| Session workspace   | `channels/workspace-organization.ts:71`                            | Which workspace a created session lands in (`workspace.organize`). See [workspace organization](../workspace-organization/README.md). |
+| Message tool        | `channels/channel-reply.ts:92`, `channel-message-tool.ts:128`      | The MCP `message` tool and the per-channel action catalog.                                                                            |
+| Outbound media      | `channels/media/outbound-stager.ts:183`                            | A send's `media`/`attachments`/`buffer` → one staged local file per attachment. See below.                                            |
+| Channel agent tools | `channels/channel-agent-tools.ts:70`                               | Mounts `plugin.agentTools` on the reply MCP server, authorized per call.                                                              |
+| Streaming producer  | `channels/streaming/producer.ts:88`                                | Turns the turn's accumulating text into an edit-in-place draft.                                                                       |
 
 ### What a carrier is
 
@@ -181,7 +183,7 @@ Every package carries `upstream-sync.json`: `{ upstreamRepo, baselineCommit, roo
 
 Prose descriptions of deviations do not count. The ledger is the record, `DEVIATIONS.md` in the two oldest packages is history, and the reason field is where the "why" goes.
 
-At every sync, walk the ledger: an entry upstream has since fixed gets deleted and the local deviation reverted; an entry upstream will not fix keeps its row with an updated status. That walk is the mechanism that keeps "we deviate when we must" from turning into permanent unexplained drift. The procedure lives in [upstream-sync-and-contribution.md](guides/developer-guide/upstream-sync-and-contribution.md#openclaw-channel-source-manifests).
+At every sync, walk the ledger: an entry upstream has since fixed gets deleted and the local deviation reverted; an entry upstream will not fix keeps its row with an updated status. That walk is the mechanism that keeps "we deviate when we must" from turning into permanent unexplained drift. The procedure lives in [upstream-sync-and-contribution.md](../../guides/developer-guide/upstream-sync-and-contribution.md#openclaw-channel-source-manifests).
 
 ## Adding a channel
 
@@ -219,7 +221,7 @@ Ordered, and each step names the file. Derived from how Zalo and Feishu were wir
 
 Two gates decide whether an inbound message may start a turn, and both have to
 allow. Operator-facing behaviour is documented once, in
-[`public-docs/hub/channels/index.md`](../public-docs/hub/channels/index.md); this
+[`public-docs/hub/channels/index.md`](../../../public-docs/hub/channels/index.md); this
 is why it is shaped the way it is.
 
 The **sender gate** is upstream's. `resolveDmGroupAccessWithLists` is ported
@@ -250,11 +252,35 @@ Three shapes are worth knowing:
   with no Hub identity. Without that, pairing would be theatre: an
   operator-approved stranger has no linked identity and no role, so approval
   has to be the grant.
+- **A bound conversation answers two routing questions, and only two.** Which
+  route owns this conversation now, and does its target still match the bound
+  session. The first is answered by matching the conversation the binding
+  recorded (kind + id) — `matchRoute` is called without text, so a `contains`
+  route can never capture a conversation that is already bound. The second
+  compares the stored `target` with the route's: same target keeps the session,
+  a different one releases the binding and mints a session at the new target,
+  no route at all leaves the conversation unserved and silent. A conversation
+  routed to a Workflow retires its bound session too — a Workflow mints no
+  binding, so a session left behind would post beside the run. Retiring is
+  gated exactly like starting: an inbound the route would not admit changes
+  nothing. Authority is not
+  part of this: `access:`, `bot.interact`, command privileges and approval all
+  re-evaluate against the route as it is now, on every message, so tightening a
+  policy takes effect on live conversations instead of stranding them.
+
+  This replaces a rule that compared the route's content hash
+  (`routeFingerprint`) and refused everything on a mismatch. Any edit to a
+  route — `sync.threadLink`, a template typo, an org-level default that folds
+  into every route — rewrote the hash and made every conversation bound under
+  it unanswerable, with `/new` refused too and only `/help` still working. The
+  hash survives as provenance on the binding row and as the route stamp on a
+  reply capability; no routing decision reads it.
+
 - **The `/agent` and `/model` choice is conversation-scoped, not
   binding-scoped.** It cannot live on `thread_bindings`: a choice is made before
   the first turn as often as after one, and `/new` deletes that row.
   `channel_conversation_selections` outlives every session in the conversation
-  and is read in `bindings/index.ts` at the one place a session is minted.
+  and is read in `bindings/session-create.ts` at the one place a session is minted.
   Switching ends the running session because a Paseo agent's model is fixed at
   create time — there is no set-model RPC, and pretending otherwise would report
   a model the agent is not running.
